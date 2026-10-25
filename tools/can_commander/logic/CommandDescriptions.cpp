@@ -34,6 +34,26 @@ namespace tool
                 return "Position Loop Bandwidth";
             case can::focQueryContractVersionId:
                 return "Firmware Compatibility Check";
+            case can::focAlignId:
+                return "Align Rotor";
+            case can::focIdentifyElectricalId:
+                return "Identify Electrical";
+            case can::focIdentifyMechanicalId:
+                return "Identify Mechanical";
+            case can::focRequestTelemetryId:
+                return "Status Request";
+            case can::focSetEncoderResolutionId:
+                return "Encoder Resolution";
+            case can::focConfigureTelemetryRateId:
+                return "Telemetry Rate";
+            case can::focSelectAlgorithmId:
+                return "Controller Selection";
+            case can::focQueryAlgorithmsId:
+                return "Controller Query";
+            case can::focSetParameterId:
+                return "Setting";
+            case can::focQueryParameterId:
+                return "Setting Query";
             default:
                 return {};
         }
@@ -80,6 +100,8 @@ namespace tool
                 return "rejected: aborted by a motor fault";
             case can::FocMotorCategoryError::applicationError:
                 return "rejected by the motor controller";
+            case can::FocMotorCategoryError::invalidParameters:
+                return "rejected: the controller cannot be designed from the motor parameters and settings it has";
             default:
                 return "rejected for an unknown reason";
         }

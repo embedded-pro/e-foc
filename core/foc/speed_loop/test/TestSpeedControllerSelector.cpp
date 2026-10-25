@@ -105,3 +105,27 @@ TEST_F(TestSpeedControllerSelector, tunings_are_applied_to_the_active_controller
 
     EXPECT_GT(selector.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 1.0f } }).Value(), reference.Value());
 }
+
+TEST_F(TestSpeedControllerSelector, settings_the_active_lqi_cannot_be_designed_with_are_refused_and_the_law_kept)
+{
+    selector.Configure(ValidParameters());
+    ASSERT_EQ(selector.Select(foc::SpeedAlgorithm::lqi), foc::SelectResult::ok);
+
+    auto unreachable = foc::SpeedLoopTunings{};
+    unreachable.bandwidth = 1.0f;
+
+    EXPECT_EQ(selector.TrySetTunings(unreachable), foc::SelectResult::invalidParameters);
+    EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::lqi);
+    EXPECT_GT(selector.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 10.0f } }).Value(), tolerance);
+}
+
+TEST_F(TestSpeedControllerSelector, lqi_is_not_selectable_with_settings_it_cannot_be_designed_with)
+{
+    auto unreachable = foc::SpeedLoopTunings{};
+    unreachable.bandwidth = 1.0f;
+    selector.Configure(ValidParameters());
+    selector.SetTunings(unreachable);
+
+    EXPECT_EQ(selector.Select(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
+    EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::pid);
+}

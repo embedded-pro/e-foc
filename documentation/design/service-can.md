@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: can-service
-date: 2026-10-24
+date: 2026-10-25
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-24
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.0                    |
+| Version   | 0.4.0                    |
 | Component | can-service              |
-| Date      | 2026-10-24               |
+| Date      | 2026-10-25               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -38,6 +38,9 @@ date: 2026-10-24
 - Delegating identification commands to `ElectricalParametersIdentification` and `MechanicalParametersIdentification` services and broadcasting results via response frames.
 - Persisting encoder resolution and telemetry rate changes to `NonVolatileMemory`.
 - Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
+- Selecting the control algorithm of each loop and reporting the algorithms in force.
+- Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
+  parameters of the calibration record and the settings that take effect at the next start.
 
 **Is NOT responsible for:**
 - The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
@@ -80,6 +83,94 @@ bus: an incompatible node silences commands to itself only, and a node that answ
 update) is judged afresh. The client remembers the eight most recent nodes, the number of servers `can-lite`
 tracks per bus.
 
+**Contract 2.1 — algorithms and parameters.** Version 2.1 adds four commands and two responses; nothing in
+2.0 changes, so a 2.0 client keeps working against a 2.1 server and a 2.1 client can tell from the minor
+version whether a server understands them.
+
+| ID     | Message              | Direction | Fields (after the sequence byte for commands)     | Answer                                     |
+|--------|----------------------|-----------|---------------------------------------------------|--------------------------------------------|
+| `0x13` | `SelectAlgorithm`    | command   | loop `uint8`, algorithm `uint8`                   | `AlgorithmsResponse`, then the acknowledge |
+| `0x14` | `QueryAlgorithms`    | command   | —                                                 | `AlgorithmsResponse`, then the acknowledge |
+| `0x15` | `SetParameter`       | command   | parameter `uint8`, value `float32`                | `ParameterResponse`, then the acknowledge  |
+| `0x16` | `QueryParameter`     | command   | parameter `uint8`                                 | `ParameterResponse`, then the acknowledge  |
+| `0x93` | `AlgorithmsResponse` | response  | mode, current, speed, position algorithm `uint8`  | —                                          |
+| `0x96` | `ParameterResponse`  | response  | parameter `uint8`, flags `uint8`, value `float32` | —                                          |
+
+The loop is `current = 0`, `speed = 1`, `position = 2`. The algorithm enumerations are the contract's own,
+with the values the firmware's selection uses: current `pid = 0`, `decoupledPid = 1`, `deadbeat = 2`,
+`slidingMode = 3`; speed `pid = 0`, `lqi = 1`, `adrc = 2`, `twoDof = 3`; position `pid = 0`, `cascadeP = 1`,
+`lqr = 2`, `lqi = 3`, `twoDof = 4`. `AlgorithmsResponse` leads with the active control mode (`FocMotorMode`)
+and always carries all three loops: a loop the active mode does not run reports the algorithm stored for it.
+The mode is what tells a client which loops it may tune, and it is the only message that reports the mode
+without changing it.
+
+A `float32` field is the IEEE 754 single-precision bit pattern sent most significant byte first, the order of
+every other multi-byte field. The parameters span from 10⁻⁹ kg·m² to 10⁶ bit/s, which no single fixed-point
+scale carries, and a float keeps seven significant digits across all of them. An integer parameter is sent
+as the float of that integer and is refused unless the value is whole; every integer the table allows is
+exactly representable. Flag bit 0 of `ParameterResponse` is *automatic*: the value is one the firmware chose
+because none was set, and setting a parameter that allows it to `0` returns it to automatic.
+
+| ID     | Parameter                       | Unit       | Range                              | Automatic | Takes effect             |
+|--------|---------------------------------|------------|------------------------------------|-----------|--------------------------|
+| `0x00` | `currentBandwidth`              | rad/s      | 1 – 20000                          | yes       | immediately              |
+| `0x01` | `currentSwitchingGain`          | A          | 0 – 5, below the boundary layer    | no        | immediately              |
+| `0x02` | `currentBoundaryLayer`          | A          | 0.01 – 5, above the switching gain | no        | immediately              |
+| `0x03` | `currentTwoStepDeadbeat`        | -          | 0 or 1                             | no        | immediately              |
+| `0x10` | `speedBandwidth`                | rad/s      | 1 – 2000                           | yes       | immediately              |
+| `0x11` | `speedErrorWeight`              | -          | 0.001 – 1000                       | no        | immediately              |
+| `0x12` | `speedIntegralWeight`           | -          | 0.001 – 1000                       | no        | immediately              |
+| `0x13` | `speedObserverBandwidthRatio`   | -          | 1 – 20                             | no        | immediately              |
+| `0x14` | `speedReferenceTimeConstant`    | s          | 0.0001 – 10                        | no        | immediately              |
+| `0x20` | `positionBandwidth`             | rad/s      | 1 – 500                            | yes       | immediately              |
+| `0x21` | `positionErrorWeight`           | -          | 0.001 – 1000                       | no        | immediately              |
+| `0x22` | `positionSpeedErrorWeight`      | -          | 0.001 – 1000                       | no        | immediately              |
+| `0x23` | `positionIntegralWeight`        | -          | 0.001 – 1000                       | no        | immediately              |
+| `0x24` | `positionReferenceTimeConstant` | s          | 0.0001 – 10                        | no        | immediately              |
+| `0x40` | `resistance`                    | ohm        | 0.0001 – 100                       | no        | immediately              |
+| `0x41` | `inductance`                    | mH         | 0.0001 – 1000                      | no        | immediately              |
+| `0x42` | `polePairs`                     | -          | 1 – 64                             | no        | after the next alignment |
+| `0x43` | `fluxLinkage`                   | Wb         | 0.00001 – 10                       | yes       | immediately              |
+| `0x44` | `inertia`                       | kg.m2      | 0.000000001 – 10                   | no        | immediately              |
+| `0x45` | `viscousFriction`               | Nm.s/rad   | 0 – 10                             | no        | immediately              |
+| `0x60` | `encoderResolution`             | counts/rev | 1 – 16777216                       | no        | at the next start        |
+| `0x61` | `canNodeId`                     | -          | 1 – 4095                           | no        | at the next start        |
+| `0x62` | `canBitrate`                    | bit/s      | 125000, 250000, 500000 or 1000000  | no        | at the next start        |
+
+The ranges are the firmware's command limits, so the table, the server's validation and the commander's
+input fields share one definition. The tuning settings (`0x00`–`0x24`) are the ones described in
+`controller-selection.md` Part H and are kept in the configuration record; the motor parameters
+(`0x40`–`0x45`) are fields of the calibration record; `0x60`–`0x62` are configuration fields read once at
+start-up. A loop's settings can only be written while the active control mode runs that loop, and a
+tuning setting or motor parameter is refused unless the drive is stopped (`Idle` or `Ready`), so no
+setting changes under a running law. Start-up settings are read only at start-up and can be written at any
+time; a `canNodeId` base whose sum with the board ID exceeds 4095 is replaced by 1 at the next start
+(Part I). Every accepted write is stored, so a client that sweeps a setting rewrites the non-volatile
+record on each step; tune interactively rather than in tight automated loops.
+
+**Answers.** A write is acknowledged only once it is in force and stored: the `ParameterResponse` that
+precedes the acknowledgement carries the value now held, which for a bandwidth set to `0` is the one the
+firmware chose. Rejections reuse the 2.0 vocabulary:
+
+| Situation                                                                         | Answer                                        |
+|-----------------------------------------------------------------------------------|-----------------------------------------------|
+| Unknown loop, algorithm or parameter; value not finite, out of range or not whole | acknowledge `invalidPayload`                  |
+| Tuning setting or motor parameter while the drive is not stopped                  | acknowledge `invalidState`                    |
+| Another command or a non-volatile write still outstanding                         | category error `busy`                         |
+| Motor-parameter write interrupted by an emergency stop or a fault                 | category error `abortedByFault`               |
+| The loop is not part of the active control mode                                   | category error `modeMismatch`                 |
+| The controller cannot be designed from the stored motor model and settings        | category error `invalidParameters` (new, `6`) |
+| The value is in force but could not be stored                                     | category error `persistenceFailed`            |
+
+An interrupted motor-parameter write cannot be taken back once the record is on its way to the
+non-volatile memory, so the value may still be in force after `abortedByFault`; a client reads it back.
+
+`invalidParameters` is added to the category error enumeration; the meaning of the existing codes is
+unchanged, which keeps the addition a minor version. It answers a model-based algorithm (decoupled PID,
+deadbeat, speed LQI and ADRC, position LQR and LQI) selected before the motor parameters it needs are known,
+a position LQR or LQI design that does not converge for the requested settings, and a switching gain that
+would reach the boundary layer. In every case the law that was running keeps running unchanged.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
 1e-5 and 1e-6 in SI units, which any useful `int16` scale rounds to zero, so they travel as unsigned
@@ -108,12 +199,14 @@ disagrees with this contract. e-foc's definitions are authoritative for this pro
 documentation. Because every decode is length-exact, a frame built from the example is rejected with
 `invalidPayload` rather than misread — visibly, not silently.
 
-| Message / item   | e-foc                               | can-lite example       | Why                                                                                          |
-|------------------|-------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
-| `0x03/0x04/0x05` | one `int16` closed-loop bandwidth   | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
-| `0x0A`           | `Align`                             | reserved, unused       | alignment is a first-class command here                                                      |
-| `FocMotorState`  | adds `partialCalibration = 4`       | stops at `calibrating` | speed and position modes can hold a partial record                                           |
-| `0x12` / `0x92`  | contract version query and response | absent                 | the example has no versioning                                                                |
+| Message / item                | e-foc                                       | can-lite example       | Why                                                                                          |
+|-------------------------------|---------------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
+| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
+| `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                      |
+| `FocMotorState`               | adds `partialCalibration = 4`               | stops at `calibrating` | speed and position modes can hold a partial record                                           |
+| `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
+| `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
+| category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
 
 ### Part B — FocMotorCategoryServer
 
@@ -123,11 +216,16 @@ The observer interface provides callbacks for:
 - `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop` — lifecycle commands with a `CanAckStatus` result callback.
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
-- `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
+- `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
 - `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step, then `CmdReserveExternalCalibration()` for the duration of the run; `invalidState` if not in `Ready`; releases the reservation when the estimation reports and on success broadcasts `focMechanicalParamsResponseId`.
 - `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
+- `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
+  contract's enumerations; the result callback sends `AlgorithmsResponse` and then the acknowledgement.
+- `OnSetParameter`, `OnQueryParameter` — receive a parameter number and, for a write, a value the server has
+  already checked against the parameter table (finite, in range, whole where the parameter is an integer); the
+  result callback sends `ParameterResponse` and then the acknowledgement.
 
 ### Part C — FocMotorCategoryClient
 
@@ -147,14 +245,41 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnEmergencyStop` → aborts the bridge's mechanical identification if one runs, then `CmdEmergencyStop()`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
-- PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine. The state machine applies the
-  same `foc::CommandLimits` ranges and the same enabled-state policy the CLI gets: a value outside the range
-  for that loop, or one that does not apply to the active mode, is acknowledged `invalidPayload`; a redesign
-  refused because the drive is running is acknowledged `invalidState`.
+- PID bandwidth commands → the loop's stored settings with this bandwidth, through `Set*Tunings` on the state
+  machine, as a `SetParameter` of that bandwidth: the same `foc::CommandLimits` ranges and stopped-state policy,
+  acknowledged once stored; a value out of range is acknowledged `invalidPayload`, a loop the active mode does
+  not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
 - `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); `CmdReserveExternalCalibration()`; run estimation; `CmdReleaseExternalCalibration()` when it reports; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure. The reservation keeps `Start`, mode selection and setpoints refused while the motor spins.
 - `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
+  The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
+  record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection that
+  an older copy of the record still held.
+- `OnSelectAlgorithm` → the control mode's selection for that loop, then the configuration record is stored;
+  the response and acknowledgement follow the write. `AlgorithmsResponse` reports what the selectors run, so
+  a refused selection is visible as the unchanged algorithm.
+- `OnSetParameter` → by parameter group:
+  - a tuning setting: the bridge takes the loop's stored settings, replaces the one field and hands the whole
+    record to the control mode, which validates it (ranges, switching gain below boundary layer, position
+    design feasibility), applies it to the running controller when stopped and stores it;
+  - a motor parameter: the control mode dispatches `SetMotorParameter` to the lifecycle, which stores the
+    edited calibration record and re-applies the model (`state-machine.md`); the operator's tuning settings
+    are re-applied on top, because applying a model re-derives the loop tunings;
+  - a start-up setting: changed in the configuration record and stored; it takes effect at the next start.
+    A start-up setting that cannot be stored is taken back, and the record's next write leaves it out.
+  A second write while one is outstanding, or while a mode selection or a configuration write is in
+  flight, answers `busy`.
+- `OnQueryParameter` → the value in force: a loop setting's effective value (an automatic bandwidth reports
+  the bandwidth the firmware derived, flagged automatic, or `0` flagged automatic when the active mode does
+  not run that loop), a motor parameter from the calibration record in RAM (`0` while unknown; an unset flux
+  linkage reports the platform's default, flagged automatic), a start-up setting from the stored
+  configuration.
+
+The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
+`OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter` and `OnQueryParameter` — are forwarded to
+`FocMotorSettingsBridge`, which the bridge owns. It holds the one outstanding setting at a time, so a settings
+write that arrives while another is being stored is answered `busy`, whichever message carried it.
 
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in `invalidPayload`. A mode mismatch results in `categoryError/modeMismatch`.
 
@@ -257,13 +382,17 @@ carries (`can-lite` tracks eight servers).
 
 ## Data Model
 
-| Entity                | Field    | Type / Unit | Range                         | Notes                       |
-|-----------------------|----------|-------------|-------------------------------|-----------------------------|
-| FocMotorMode          | mode     | enum uint8  | torque=0, speed=1, position=2 | Transmitted as single byte  |
-| Torque setpoint       | iq       | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 10 [A]    |
-| Speed setpoint        | speed    | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 1 [rad/s] |
-| Position setpoint     | position | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 100 [rad] |
-| FocMotorCategoryError | code     | enum uint8  | 0–5                           | See FocMotorMessages.hpp    |
+| Entity                | Field     | Type / Unit    | Range                          | Notes                                                            |
+|-----------------------|-----------|----------------|--------------------------------|------------------------------------------------------------------|
+| FocMotorMode          | mode      | enum uint8     | torque=0, speed=1, position=2  | Transmitted as single byte                                       |
+| Torque setpoint       | iq        | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 10 [A]                                         |
+| Speed setpoint        | speed     | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 1 [rad/s]                                      |
+| Position setpoint     | position  | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 100 [rad]                                      |
+| FocMotorCategoryError | code      | enum uint8     | 0–6                            | See FocMotorMessages.hpp                                         |
+| FocControlLoop        | loop      | enum uint8     | current=0, speed=1, position=2 | Selects the loop of `SelectAlgorithm`                            |
+| FocParameter          | parameter | enum uint8     | see the parameter table        | Numbers of `SetParameter`, `QueryParameter`, `ParameterResponse` |
+| Parameter value       | value     | float32 wire   | the parameter's range          | IEEE 754, most significant byte first                            |
+| ParameterResponse     | flags     | bitfield uint8 | bit 0: automatic               | Other bits are zero                                              |
 
 ---
 
@@ -307,7 +436,7 @@ sequenceDiagram
     BRG->>ACK: responseCallback(CanAckStatus::success)
 ```
 
-### Bandwidth Rejection Path
+### 2.0 Bandwidth Commands
 
 ```mermaid
 sequenceDiagram
@@ -315,17 +444,51 @@ sequenceDiagram
     participant SRV as FocMotorCategoryServer
     participant BRG as FocMotorCanBridge
     participant CMS as ControlModeStateMachine
+    participant NVM as ConfigWriter
 
     CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
     SRV->>BRG: OnSetPidCurrent(bandwidth, successCallback)
-    BRG->>CMS: TrySetCurrentBandwidth(bandwidth)
-    CMS->>BRG: outOfRange | wrongMode | notWhileEnabled
-    BRG->>SRV: SendCommandAck(focSetPidCurrentId, invalidPayload | invalidState)
-    SRV->>CAN: commandAck frame
+    alt bandwidth below 1 rad/s
+        BRG->>SRV: SendCommandAck(invalidPayload)
+    else
+        BRG->>CMS: SetCurrentTunings(stored tunings with this bandwidth)
+        CMS->>NVM: Persist
+        NVM-->>CMS: stored
+        CMS-->>BRG: ok | invalidState | wrongMode | invalidParameters | nvmFailed
+        BRG->>SRV: success ack, or the SetParameter answer for the refusal
+    end
+    SRV->>CAN: commandAck frame (and category error when refused)
 ```
 
-`outOfRange` and `wrongMode` map to `invalidPayload`; `notWhileEnabled` maps to `invalidState`, so a client
-can tell a badly formed request from one that was well formed but arrived while the drive was running.
+From contract 2.1 the 2.0 bandwidth commands no longer change the running loop alone: they set the stored
+setting, so a bandwidth survives a restart and reads back through `QueryParameter`. A command for a loop the
+active mode does not run is answered `modeMismatch` rather than `invalidPayload`.
+
+### SetParameter (tuning setting)
+
+```mermaid
+sequenceDiagram
+    participant CAN as CAN Bus
+    participant SRV as FocMotorCategoryServer
+    participant BRG as FocMotorCanBridge
+    participant CMS as ControlModeStateMachine
+    participant NVM as NonVolatileMemory
+
+    CAN->>SRV: SetParameter(speedObserverBandwidthRatio, 8.0)
+    SRV->>SRV: value finite, in range
+    SRV->>BRG: OnSetParameter(parameter, value, onDone)
+    BRG->>CMS: stored speed settings with the ratio replaced
+    CMS->>CMS: stopped, loop in the active mode, design feasible
+    CMS->>CMS: apply to the speed controller
+    CMS->>NVM: SaveConfig(record with the new settings)
+    NVM-->>CMS: Ok
+    CMS-->>BRG: ok
+    BRG->>SRV: ParameterResponse(parameter, flags, value in force)
+    SRV->>CAN: response, then commandAck(success)
+```
+
+A motor parameter takes the same path to the bridge, which then dispatches `SetMotorParameter` to the
+lifecycle instead; the response carries the value the calibration record now holds.
 
 ---
 
@@ -340,6 +503,8 @@ graph LR
         CPS --> MCS["FocMotorCategoryServer"]
         MCS --> BRG["FocMotorCanBridge"]
         BRG --> SM["ControlModeStateMachine"]
+        BRG --> SET["FocMotorSettingsBridge"]
+        SET --> SM
     end
 
     subgraph "Client Path (host tools)"
@@ -356,24 +521,26 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint              | Value / Description                                                                                      |
-|-------------------------|----------------------------------------------------------------------------------------------------------|
-| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                   |
-| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time               |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                  |
-| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields               |
-| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`            |
-| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`            |
-| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`   |
-| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder |
-| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                        |
+| Constraint              | Value / Description                                                                                       |
+|-------------------------|-----------------------------------------------------------------------------------------------------------|
+| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                    |
+| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                   |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                |
+| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`             |
+| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`             |
+| Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                             |
+| Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop |
+| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`    |
+| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder  |
+| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                         |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                         | Resolution                                                                                                                   | Status   |
-|---|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                                                  | resolved |
-| 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, forwarded to `TrySet*Bandwidth` on `ControlModeStateMachine` | resolved |
-| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                 | resolved |
+| # | Question                                                         | Resolution                                                                                                                       | Status   |
+|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|----------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                                                      | resolved |
+| 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, stored as that loop's bandwidth setting (2.0 Bandwidth Commands) | resolved |
+| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                     | resolved |

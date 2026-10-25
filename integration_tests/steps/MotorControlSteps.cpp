@@ -43,7 +43,7 @@ WHEN(R"(a torque setpoint of {float} A is applied)", (float iq))
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetTorqueSetpointId,
         EncodeFixed16BE(iq, can::focCurrentScale)))
         << "Torque setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetTorqueSetpointId, iq };
+    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetTorqueSetpointId, iq, fixture.ServerNodeId() };
 }
 
 WHEN(R"(a speed setpoint of {float} rad\/s is applied)", (float radiansPerSecond))
@@ -52,7 +52,7 @@ WHEN(R"(a speed setpoint of {float} rad\/s is applied)", (float radiansPerSecond
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId,
         EncodeFixed16BE(radiansPerSecond, can::focSpeedScale)))
         << "Speed setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, radiansPerSecond };
+    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, radiansPerSecond, fixture.ServerNodeId() };
 }
 
 WHEN(R"(a position setpoint of {float} rad is applied)", (float rad))
@@ -61,7 +61,7 @@ WHEN(R"(a position setpoint of {float} rad is applied)", (float rad))
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetPositionSetpointId,
         EncodeFixed16BE(rad, can::focPositionScale)))
         << "Position setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad };
+    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad, fixture.ServerNodeId() };
 }
 
 THEN(R"(the state machine shall be in the running state)")

@@ -717,10 +717,10 @@ namespace tool
             motor->OnBusyChanged(busy);
     }
 
-    void MainWindow::OnCommandTimeout(uint16_t nodeId)
+    void MainWindow::OnCommandTimeout(uint16_t nodeId, uint8_t commandType)
     {
         if (auto* motor = Motor(nodeId))
-            motor->OnCommandTimeout();
+            motor->OnCommandTimeout(commandType);
         else
             Report(IssueSeverity::warning, QString("Node %1: no response to the last command").arg(nodeId));
     }
@@ -787,6 +787,18 @@ namespace tool
     {
         if (auto* motor = Motor(nodeId))
             motor->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
+    }
+
+    void MainWindow::OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnAlgorithms(algorithms);
+    }
+
+    void MainWindow::OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnParameter(parameter, value);
     }
 
     void MainWindow::OnAdapterError(infra::BoundedConstString message)

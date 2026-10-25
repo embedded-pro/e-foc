@@ -15,7 +15,6 @@ namespace integration
 {
     struct Fixture
     {
-        static constexpr uint16_t kServerNodeId = 1;
         // The target drops a client silent for 3 s of its own time, and a command such as an identification
         // acknowledges only when it ends: a waiting client heartbeats, as CanProtocolClient does. The simulated
         // target can run faster than the wall clock, so the interval leaves margin on the 3 s.
@@ -31,6 +30,7 @@ namespace integration
 
         bool WaitForCanHeartbeat(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        uint16_t ServerNodeId() const;
         bool SendCanCommand(uint8_t category, uint8_t messageType,
             const hal::Can::Message& payload = {},
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
@@ -84,8 +84,10 @@ namespace integration
         void SyncLines();
         void SendClientHeartbeat();
         std::size_t LineIndexOf(std::size_t mark) const;
+        std::optional<uint16_t> FindHeartbeatNode(CaptureMark from) const;
 
         TargetInteractor& interactor;
         std::chrono::steady_clock::time_point canReference{};
+        uint16_t serverNodeId{ 1 };
     };
 }

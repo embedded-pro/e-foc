@@ -25,6 +25,8 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
 target_sources(e_foc.state_machine_test PRIVATE
     TestFocStateMachineHelper.hpp
     TestAlgorithmPersistence.cpp
+    TestConfigWriter.cpp
+    TestOperatorTunings.cpp
     TestCalibrationContext.cpp
     TestCalibrationOrchestrator.cpp
     TestControlMode.cpp

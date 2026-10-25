@@ -175,7 +175,7 @@ namespace foc
         bool ConfigureImpl(const MotorModelParameters& parameters);
         bool ConfigureMechanicsImpl(MechanicalModelParameters& parameters);
         void SetCurrentTuningsImpl(const CurrentLoopTunings& tunings);
-        void SetSpeedTuningsImpl(const SpeedLoopTunings& tunings);
+        SelectResult SetSpeedTuningsImpl(const SpeedLoopTunings& tunings);
         SelectResult SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm);
         SelectResult SelectSpeedAlgorithmImpl(SpeedAlgorithm algorithm);
         CurrentAlgorithm ActiveCurrentAlgorithmImpl() const;

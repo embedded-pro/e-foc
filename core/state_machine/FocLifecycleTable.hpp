@@ -37,7 +37,7 @@ namespace application
         template<class Stopped>
         static constexpr std::array<Transition, 5> MaintenanceRowsFor();
         template<class S>
-        static constexpr Transition FluxLinkageSavedRow();
+        static constexpr Transition MotorParameterSavedRow();
         template<class S>
         static void RegisterEnteredHook(LifecycleMachine& machine);
     };

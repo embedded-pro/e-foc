@@ -6,6 +6,9 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <chrono>
+#include <cmath>
+#include <utility>
 
 namespace tool
 {
@@ -35,6 +38,8 @@ namespace tool
 
         ConnectCommands();
         ConnectSetpoints();
+        ConnectCommissioning();
+        ConnectSettings();
         Refresh();
     }
 
@@ -100,7 +105,9 @@ namespace tool
 
     bool MotorPanel::SendEmergencyStop()
     {
+        StopApplying("emergency stop");
         pendingCommand = "Emergency Stop";
+        pendingCommandType = can::focEmergencyStopId;
         return client.SendEmergencyStop(nodeId);
     }
 
@@ -108,16 +115,23 @@ namespace tool
     {
         connect(commandPanel, &CommandPanel::StartMotorRequested, this, [this]()
             {
-                Send("Start Motor", [this]()
+                Send("Start Motor", can::focStartId, [this]()
                     {
                         return client.SendStartMotor(nodeId);
                     });
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, this, [this]()
             {
-                Send("Stop Motor", [this]()
+                Send("Stop Motor", can::focStopId, [this]()
                     {
                         return client.SendStopMotor(nodeId);
+                    });
+            });
+        connect(commandPanel, &CommandPanel::ClearFaultRequested, this, [this]()
+            {
+                Send("Clear Fault", can::focClearFaultId, [this]()
+                    {
+                        return client.SendClearFault(nodeId);
                     });
             });
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
@@ -127,7 +141,7 @@ namespace tool
         connect(commandPanel, &CommandPanel::SetControlModeRequested, this, [this](can::FocMotorMode mode)
             {
                 commandPanel->ShowRequestedControlMode(mode);
-                Send("Control Mode " + CommandPanel::ControlModeName(mode), [this, mode]()
+                Send("Control Mode " + CommandPanel::ControlModeName(mode), can::focSelectControlModeId, [this, mode]()
                     {
                         return client.SendSetControlMode(nodeId, mode);
                     });
@@ -136,33 +150,185 @@ namespace tool
 
     void MotorPanel::ConnectSetpoints()
     {
-        const auto bind = [this](void (CommandPanel::*signal)(float), const char* label, const char* unit, bool (CanCommandClient::*send)(uint16_t, float))
+        const auto bind = [this](void (CommandPanel::*signal)(float), const char* label, const char* unit, uint8_t commandType, bool (CanCommandClient::*send)(uint16_t, float))
         {
-            connect(commandPanel, signal, this, [this, label, unit, send](float value)
+            connect(commandPanel, signal, this, [this, label, unit, commandType, send](float value)
                 {
-                    Send(QString("%1 %2 %3").arg(label).arg(value).arg(unit), [this, send, value]()
+                    Send(QString("%1 %2 %3").arg(label).arg(value).arg(unit), commandType, [this, send, value]()
                         {
                             return (client.*send)(nodeId, value);
                         });
                 });
         };
 
-        bind(&CommandPanel::SetTorqueSetpointRequested, "Torque Setpoint", "A", &CanCommandClient::SendSetTorqueSetpoint);
-        bind(&CommandPanel::SetSpeedSetpointRequested, "Speed Setpoint", "rad/s", &CanCommandClient::SendSetSpeedSetpoint);
-        bind(&CommandPanel::SetPositionSetpointRequested, "Position Setpoint", "rad", &CanCommandClient::SendSetPositionSetpoint);
-        bind(&CommandPanel::SetCurrentBandwidthRequested, "Current Loop Bandwidth", "rad/s", &CanCommandClient::SendSetCurrentBandwidth);
-        bind(&CommandPanel::SetSpeedBandwidthRequested, "Speed Loop Bandwidth", "rad/s", &CanCommandClient::SendSetSpeedBandwidth);
-        bind(&CommandPanel::SetPositionBandwidthRequested, "Position Loop Bandwidth", "rad/s", &CanCommandClient::SendSetPositionBandwidth);
+        bind(&CommandPanel::SetTorqueSetpointRequested, "Torque Setpoint", "A", can::focSetTorqueSetpointId, &CanCommandClient::SendSetTorqueSetpoint);
+        bind(&CommandPanel::SetSpeedSetpointRequested, "Speed Setpoint", "rad/s", can::focSetSpeedSetpointId, &CanCommandClient::SendSetSpeedSetpoint);
+        bind(&CommandPanel::SetPositionSetpointRequested, "Position Setpoint", "rad", can::focSetPositionSetpointId, &CanCommandClient::SendSetPositionSetpoint);
     }
 
-    void MotorPanel::Send(const QString& command, const std::function<bool()>& send)
+    void MotorPanel::ConnectCommissioning()
+    {
+        auto& tab = commandPanel->MotorParameters();
+        connect(&tab, &MotorParametersTab::AlignRequested, this, [this]()
+            {
+                Send("Align Rotor", can::focAlignId, [this]()
+                    {
+                        return client.SendAlign(nodeId);
+                    });
+            });
+        connect(&tab, &MotorParametersTab::IdentifyElectricalRequested, this, [this]()
+            {
+                Send("Identify Electrical", can::focIdentifyElectricalId, [this]()
+                    {
+                        return client.SendIdentifyElectrical(nodeId);
+                    });
+            });
+        connect(&tab, &MotorParametersTab::IdentifyMechanicalRequested, this, [this]()
+            {
+                Send("Identify Mechanical", can::focIdentifyMechanicalId, [this]()
+                    {
+                        return client.SendIdentifyMechanical(nodeId);
+                    });
+            });
+    }
+
+    void MotorPanel::ConnectSettings()
+    {
+        for (auto* page : commandPanel->SettingsPages())
+        {
+            connect(page, &SettingsPage::ApplyRequested, this, [this, page]()
+                {
+                    Apply(*page);
+                });
+            connect(page, &SettingsPage::RevertRequested, this, [this]()
+                {
+                    client.RequestSettings(nodeId);
+                });
+        }
+    }
+
+    bool MotorPanel::Send(const QString& command, uint8_t commandType, const std::function<bool()>& send)
     {
         pendingCommand = command;
+        pendingCommandType = commandType;
         if (send())
-            return;
+            return true;
 
         const auto reason = client.Compatibility(nodeId) == can::ContractCompatibility::incompatible ? "its firmware contract is incompatible" : "the CAN adapter refused the frame";
         Report(IssueSeverity::error, QString("%1 was not sent: %2").arg(command, reason));
+        return false;
+    }
+
+    void MotorPanel::Apply(SettingsPage& page)
+    {
+        if (const auto problem = page.Problem(); !problem.isEmpty())
+        {
+            Report(IssueSeverity::warning, QString("settings not applied: %1").arg(problem));
+            return;
+        }
+
+        auto plan = page.Plan();
+        if (plan.changes.empty())
+            return;
+
+        applyingPage = &page;
+        page.SetApplying(true);
+        changes.Start(std::move(plan.changes));
+        SendCurrentChange();
+    }
+
+    void MotorPanel::SendCurrentChange()
+    {
+        const auto change = changes.Current();
+        if (!Send(Describe(change), CommandTypeOf(change, IsLegacy()), [this, change]()
+                {
+                    return SendChange(change);
+                }))
+            StopApplying("a change could not be sent", false);
+    }
+
+    bool MotorPanel::SendChange(const SettingChange& change)
+    {
+        if (change.kind == SettingChange::Kind::algorithm)
+            return client.SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
+
+        if (!IsLegacy())
+            return client.SendSetParameter(nodeId, change.parameter, change.value);
+
+        switch (change.parameter)
+        {
+            case can::FocParameter::currentBandwidth:
+                return client.SendSetCurrentBandwidth(nodeId, change.value);
+            case can::FocParameter::speedBandwidth:
+                return client.SendSetSpeedBandwidth(nodeId, change.value);
+            case can::FocParameter::positionBandwidth:
+                return client.SendSetPositionBandwidth(nodeId, change.value);
+            case can::FocParameter::encoderResolution:
+                return client.SendSetEncoderResolution(nodeId, static_cast<uint32_t>(std::lround(change.value)));
+            default:
+                return false;
+        }
+    }
+
+    QString MotorPanel::Describe(const SettingChange& change) const
+    {
+        if (change.kind == SettingChange::Kind::algorithm)
+            return QString("%1 controller %2").arg(ToQt(LoopName(change.loop)), ToQt(AlgorithmName(change.loop, change.algorithm)));
+
+        if (const auto* editor = applyingPage != nullptr ? applyingPage->EditorFor(change.parameter) : nullptr)
+            return editor->Describe(change.value);
+        return ToQt(PresentationOf(change.parameter).name);
+    }
+
+    bool MotorPanel::IsChangeAnswer(uint8_t commandType) const
+    {
+        return changes.Active() && commandType == CommandTypeOf(changes.Current(), IsLegacy());
+    }
+
+    void MotorPanel::OnChangeAccepted()
+    {
+        const auto& change = changes.Current();
+        if (IsLegacy() && change.kind == SettingChange::Kind::parameter)
+            applyingPage->ShowValue(change.parameter, can::FocParameterValue{ change.value, false });
+
+        if (changes.Advance())
+        {
+            SendCurrentChange();
+            return;
+        }
+
+        if (applyingPage == &commandPanel->MotorParameters())
+            client.RequestSettings(nodeId);
+
+        applyingPage->SetApplying(false);
+        applyingPage = nullptr;
+        Report(IssueSeverity::info, "settings applied");
+    }
+
+    void MotorPanel::StopApplying(const QString& reason, bool currentSent)
+    {
+        if (!changes.Active())
+            return;
+
+        const auto notSent = changes.Remaining() - (currentSent ? 1 : 0);
+        changes.Stop();
+        applyingPage->SetApplying(false);
+        applyingPage = nullptr;
+
+        if (notSent > 0)
+            Report(IssueSeverity::warning, QString("applying settings stopped (%1): %2 not sent and still marked")
+                                               .arg(reason, notSent == 1 ? QString("1 change") : QString("%1 changes").arg(notSent)));
+    }
+
+    void MotorPanel::ForgetControlMode()
+    {
+        commandPanel->ClearActiveControlMode();
+        client.RequestSettings(nodeId);
+    }
+
+    bool MotorPanel::IsLegacy() const
+    {
+        return !client.SupportsSettings(nodeId);
     }
 
     void MotorPanel::Report(IssueSeverity severity, const QString& message) const
@@ -172,10 +338,13 @@ namespace tool
 
     void MotorPanel::ForgetNodeState()
     {
+        StopApplying("the controller left the bus");
         lastState.reset();
         lastFault.reset();
         telemetryPanel->Clear();
         commandPanel->ClearActiveControlMode();
+        for (auto* page : commandPanel->SettingsPages())
+            page->ForgetValues();
     }
 
     QString MotorPanel::CommandsUnavailableReason() const
@@ -202,9 +371,21 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::SettingsUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (lastState == FocMotorState::running)
+            return "Stop the motor to change its controllers or motor parameters.";
+        if (lastState == FocMotorState::calibrating)
+            return "Wait for the calibration to finish.";
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         commandPanel->SetCommandsAvailable(CommandsUnavailableReason(), !client.IsBusy(nodeId));
+        commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         RefreshHeader();
         emit StatusChanged();
     }
@@ -261,32 +442,61 @@ namespace tool
         Refresh();
     }
 
-    void MotorPanel::OnCommandTimeout()
+    void MotorPanel::OnCommandTimeout(uint8_t commandType)
     {
+        const auto timeout = std::chrono::duration_cast<std::chrono::seconds>(CanCommandClient::TimeoutFor(commandType));
         Report(IssueSeverity::warning, QString("no response to %1 within %2 s: check that the controller is powered")
                                            .arg(pendingCommand.isEmpty() ? QString("the last command") : pendingCommand)
-                                           .arg(std::chrono::duration_cast<std::chrono::seconds>(CanCommandClient::commandTimeout).count()));
+                                           .arg(timeout.count()));
+
+        if (IsChangeAnswer(commandType))
+            StopApplying("no answer");
     }
 
     void MotorPanel::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
-        auto name = ToQt(CommandDisplayName(categoryId, commandType));
+        const bool ownCategory = categoryId == can::focMotorCategoryId;
+        auto name = ownCategory && commandType == pendingCommandType && !pendingCommand.isEmpty() ? pendingCommand : ToQt(CommandDisplayName(categoryId, commandType));
         if (name.isEmpty())
             name = QString("Command 0x%1/0x%2").arg(categoryId, 2, 16, QChar('0')).arg(commandType, 2, 16, QChar('0'));
 
-        const auto severity = status == services::CanAckStatus::success ? IssueSeverity::info : IssueSeverity::warning;
-        Report(severity, QString("%1 %2").arg(name, ToQt(AckStatusDescription(status))));
+        const bool accepted = status == services::CanAckStatus::success;
+        if (!ownCategory || status != services::CanAckStatus::categoryError)
+            Report(accepted ? IssueSeverity::info : IssueSeverity::warning, QString("%1 %2").arg(name, ToQt(AckStatusDescription(status))));
+        if (!ownCategory)
+            return;
+
+        if (commandType == can::focIdentifyMechanicalId && status == services::CanAckStatus::notImplemented)
+            commandPanel->MotorParameters().SetMechanicalIdentificationUnavailable(
+                "This controller's firmware does not identify the mechanical parameters over CAN: enter inertia and friction above instead.");
+
+        if (commandType == can::focSelectControlModeId && !accepted)
+            ForgetControlMode();
+
+        if (IsChangeAnswer(commandType))
+        {
+            if (accepted)
+                OnChangeAccepted();
+            else
+                StopApplying(QString("%1 was refused").arg(name));
+        }
     }
 
     void MotorPanel::OnCommandRejected(uint8_t commandType, can::FocMotorCategoryError error)
     {
-        auto name = ToQt(CommandDisplayName(can::focMotorCategoryId, commandType));
+        auto name = commandType == pendingCommandType && !pendingCommand.isEmpty() ? pendingCommand : ToQt(CommandDisplayName(can::focMotorCategoryId, commandType));
         if (name.isEmpty())
             name = QString("Command 0x%1").arg(commandType, 2, 16, QChar('0'));
 
         Report(IssueSeverity::warning, QString("%1 %2").arg(name, ToQt(RejectionDescription(error))));
         if (commandType == can::focSelectControlModeId)
-            commandPanel->ClearActiveControlMode();
+            ForgetControlMode();
+
+        if (IsChangeAnswer(commandType))
+            StopApplying(QString("%1 was refused").arg(name));
+
+        if (commandType == can::focSetParameterId || commandType == can::focSelectAlgorithmId)
+            client.RequestSettings(nodeId);
     }
 
     void MotorPanel::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
@@ -294,7 +504,11 @@ namespace tool
         contractVersion = QString("%1.%2").arg(major).arg(minor);
 
         if (compatible)
+        {
             Report(IssueSeverity::info, QString("firmware contract %1 is compatible").arg(contractVersion));
+            for (auto* page : commandPanel->SettingsPages())
+                page->SetLegacy(IsLegacy());
+        }
         else
             Report(IssueSeverity::error, CommandsUnavailableReason());
 
@@ -354,5 +568,17 @@ namespace tool
     {
         telemetryPanel->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
         Report(IssueSeverity::info, QString("mechanical parameters B = %1 N·m·s/rad, J = %2 kg·m²").arg(frictionNmSPerRad).arg(inertiaKgM2));
+    }
+
+    void MotorPanel::OnAlgorithms(const can::FocAlgorithms& algorithms)
+    {
+        commandPanel->Controllers().SetAlgorithms(algorithms);
+        commandPanel->SetActiveControlMode(algorithms.mode);
+    }
+
+    void MotorPanel::OnParameter(can::FocParameter parameter, can::FocParameterValue value)
+    {
+        for (auto* page : commandPanel->SettingsPages())
+            page->ShowValue(parameter, value);
     }
 }

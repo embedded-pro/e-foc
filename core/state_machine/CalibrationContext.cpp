@@ -69,21 +69,6 @@ namespace application
         rotorReferenceValid_ = valid;
     }
 
-    float CalibrationContext::PendingFluxLinkage() const
-    {
-        return pendingFluxLinkage;
-    }
-
-    void CalibrationContext::SetPendingFluxLinkage(float value)
-    {
-        pendingFluxLinkage = value;
-    }
-
-    void CalibrationContext::CommitPendingFluxLinkage()
-    {
-        calibrationData.fluxLinkage = pendingFluxLinkage;
-    }
-
     bool CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
     {
         ApplyCurrentOffsets();

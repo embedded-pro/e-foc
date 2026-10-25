@@ -1145,7 +1145,15 @@ TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMo
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData& stored, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(stored.currentLoop.bandwidth, 8377.6f, 1e-2f);
+                onDone(services::NvmStatus::Ok);
+            }));
+
     EXPECT_EQ(subject->TrySetCurrentBandwidth(8377.6f), state_machine::TuningResult::ok);
+    EXPECT_NEAR(subject->StoredCurrentTunings().bandwidth, 8377.6f, 1e-2f);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode)
@@ -1159,7 +1167,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
 {
     GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigSucceeds();
+    GivenNvmSaveConfigAlwaysSucceeds();
     ConstructSubject();
 
     subject->Select(state_machine::ControlMode::speed, [](auto) {});
@@ -1170,7 +1178,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
 TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPositionMode)
 {
     GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigSucceeds();
+    GivenNvmSaveConfigAlwaysSucceeds();
     ConstructSubject();
 
     EXPECT_EQ(subject->TrySetPositionBandwidth(18.8f), state_machine::TuningResult::wrongMode);
@@ -1224,18 +1232,19 @@ TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_IsRejectedWhileEna
     EXPECT_CALL(inverterMock, Start()).Times(1);
     subject->ActiveStateMachine().CmdEnable();
 
-    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notWhileEnabled);
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notStopped);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_IsAcceptedAgainOnceDisabled)
 {
     GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
     ConstructSubject();
     AlignAfterBoot();
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     subject->ActiveStateMachine().CmdEnable();
-    ASSERT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notWhileEnabled);
+    ASSERT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notStopped);
 
     EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
     subject->ActiveStateMachine().CmdDisable();
@@ -1443,6 +1452,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMod
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreRejectedInTorqueMode)
 {
     GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
     ConstructSubject();
 
     EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::ok);
@@ -1493,6 +1503,166 @@ TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmOutsideEnumRangeIsCorre
     subject->Select(state_machine::ControlMode::torque, [](auto) {});
 
     EXPECT_EQ(persisted, static_cast<uint8_t>(foc::CurrentAlgorithm::pid));
+}
+
+TEST_F(ControlModeStateMachineExtTest, StoredTunings_AreRestoredFromTheConfigurationRecord)
+{
+    GivenNvmAlwaysInvalid();
+
+    services::ConfigData config{};
+    config.currentLoop.bandwidth = 5000.0f;
+    config.currentLoop.switchingGain = 0.3f;
+    config.currentLoop.boundaryLayer = 0.9f;
+    config.speedLoop.observerBandwidthRatio = 8.0f;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_NEAR(subject->StoredCurrentTunings().bandwidth, 5000.0f, 1e-2f);
+    EXPECT_NEAR(subject->StoredCurrentTunings().switchingGain, 0.3f, 1e-6f);
+    EXPECT_NEAR(subject->StoredCurrentTunings().boundaryLayer, 0.9f, 1e-6f);
+    EXPECT_NEAR(subject->StoredSpeedTunings().observerBandwidthRatio, 8.0f, 1e-5f);
+    EXPECT_NEAR(subject->EffectiveCurrentTunings().bandwidth, 5000.0f, 1e-2f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, StoredTunings_ThatCannotBeUsed_FallBackToTheDefaults)
+{
+    GivenNvmAlwaysInvalid();
+
+    services::ConfigData config{};
+    config.currentLoop.switchingGain = 0.9f;
+    config.speedLoop.observerBandwidthRatio = 90.0f;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_NEAR(subject->StoredCurrentTunings().switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
+    EXPECT_NEAR(subject->StoredSpeedTunings().observerBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio, 1e-6f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, EffectiveTunings_OfLoopsTheModeDoesNotRun_AreUnavailable)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_FALSE(subject->EffectiveSpeedTunings().has_value());
+    EXPECT_FALSE(subject->EffectivePositionTunings().has_value());
+}
+
+TEST_F(ControlModeStateMachineExtTest, SetCurrentTunings_IsRefusedWhileEnabledAndNothingIsStored)
+{
+    GivenNvmValid();
+    ConstructSubject();
+    AlignAfterBoot();
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    auto tunings = subject->StoredCurrentTunings();
+    tunings.boundaryLayer = 0.9f;
+    std::optional<state_machine::SettingResult> result;
+    subject->SetCurrentTunings(tunings, [&result](state_machine::SettingResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_EQ(state_machine::SettingResult::invalidState, result);
+    EXPECT_NEAR(subject->StoredCurrentTunings().boundaryLayer, foc::CurrentLoopTunings{}.boundaryLayer, 1e-6f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SetCurrentTunings_AnswersOnlyOnceTheRecordIsStored)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    infra::Function<void(services::NvmStatus)> pendingSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&pendingSave](const services::ConfigData& saved, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(saved.currentLoop.boundaryLayer, 0.9f, 1e-6f);
+                pendingSave = onDone;
+            }));
+
+    auto tunings = subject->StoredCurrentTunings();
+    tunings.boundaryLayer = 0.9f;
+    std::optional<state_machine::SettingResult> result;
+    subject->SetCurrentTunings(tunings, [&result](state_machine::SettingResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_FALSE(result.has_value());
+    pendingSave(services::NvmStatus::Ok);
+    EXPECT_EQ(state_machine::SettingResult::ok, result);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SetMotorParameter_OutsideItsRange_IsRefusedWithoutAWrite)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    std::optional<state_machine::SettingResult> result;
+    const auto record = [&result](state_machine::SettingResult value)
+    {
+        result = value;
+    };
+
+    subject->SetMotorParameter(services::MotorParameter::polePairs, 0.0f, record);
+    EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
+
+    subject->SetMotorParameter(services::MotorParameter::resistance, -1.0f, record);
+    EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
+
+    subject->SetMotorParameter(services::MotorParameter::inertia, 100.0f, record);
+    EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SetMotorParameter_InterruptedByAnEmergencyStop_IsAnsweredAsAborted)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    infra::Function<void(services::NvmStatus)> pendingSave;
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&pendingSave](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                pendingSave = onDone;
+            }));
+
+    std::optional<state_machine::SettingResult> result;
+    subject->SetMotorParameter(services::MotorParameter::inertia, 2.0e-5f, [&result](state_machine::SettingResult value)
+        {
+            result = value;
+        });
+    ASSERT_FALSE(result.has_value());
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+    subject->ActiveStateMachine().CmdEmergencyStop();
+
+    EXPECT_EQ(state_machine::SettingResult::aborted, result);
+    pendingSave(services::NvmStatus::Ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_WithACallback_AnswersOnceTheSelectionIsStored)
+{
+    GivenNvmValid();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    infra::Function<void(services::NvmStatus)> pendingSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&pendingSave](const services::ConfigData& saved, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(saved.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode));
+                pendingSave = onDone;
+            }));
+
+    std::optional<state_machine::SettingResult> result;
+    subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::slidingMode, [&result](state_machine::SettingResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::slidingMode);
+    EXPECT_FALSE(result.has_value());
+
+    pendingSave(services::NvmStatus::Ok);
+    EXPECT_EQ(state_machine::SettingResult::ok, result);
 }
 
 TEST_F(ControlModeStateMachineLifecycleTest, PersistedCurrentAlgorithmIsAppliedOnceReadyIsReached)
@@ -1700,6 +1870,11 @@ TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Rejects_A_Negative_Band
 TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Is_Accepted_In_Torque_Mode)
 {
     GivenTorqueModeReady();
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
 
     const auto output = OutputOf("scbw 6283.2");
 

@@ -20,8 +20,12 @@ target_link_libraries(e_foc.tool.can_commander.gui PUBLIC
 target_sources(e_foc.tool.can_commander.gui PRIVATE
     CommandPanel.hpp
     CommandPanel.cpp
+    ConfigurationTab.hpp
+    ConfigurationTab.cpp
     ConnectionPanel.hpp
     ConnectionPanel.cpp
+    ControllersTab.hpp
+    ControllersTab.cpp
     DisplayFormat.hpp
     EventLogView.hpp
     EventLogView.cpp
@@ -31,6 +35,12 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     MotorOverview.cpp
     MotorPanel.hpp
     MotorPanel.cpp
+    MotorParametersTab.hpp
+    MotorParametersTab.cpp
+    SettingEditor.hpp
+    SettingEditor.cpp
+    SettingsPage.hpp
+    SettingsPage.cpp
     TelemetryPanel.hpp
     TelemetryPanel.cpp
     UpdateBanner.hpp

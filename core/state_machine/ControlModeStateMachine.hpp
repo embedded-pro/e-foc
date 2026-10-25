@@ -5,6 +5,7 @@
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/AlgorithmPersistence.hpp"
+#include "core/state_machine/ConfigWriter.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/NvmActivity.hpp"
@@ -24,7 +25,19 @@ namespace state_machine
         ok,
         outOfRange,
         wrongMode,
-        notWhileEnabled
+        notStopped
+    };
+
+    enum class SettingResult : uint8_t
+    {
+        ok,
+        busy,
+        invalidState,
+        wrongMode,
+        outOfRange,
+        invalidParameters,
+        nvmFailed,
+        aborted
     };
 
     class ControlModeStateMachine
@@ -51,11 +64,38 @@ namespace state_machine
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
 
+        void ApplyOnlineEstimates();
+
         TuningResult TrySetCurrentBandwidth(float bandwidth);
         TuningResult TrySetSpeedBandwidth(float bandwidth);
         TuningResult TrySetPositionBandwidth(float bandwidth);
 
-        void SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone);
+        using OnSetting = infra::Function<void(SettingResult)>;
+
+        foc::CurrentLoopTunings StoredCurrentTunings() const;
+        foc::SpeedLoopTunings StoredSpeedTunings() const;
+        foc::PositionLoopTunings StoredPositionTunings() const;
+        foc::CurrentLoopTunings EffectiveCurrentTunings() const;
+        std::optional<foc::SpeedLoopTunings> EffectiveSpeedTunings() const;
+        std::optional<foc::PositionLoopTunings> EffectivePositionTunings() const;
+        void SetCurrentTunings(const foc::CurrentLoopTunings& tunings, const OnSetting& onDone);
+        void SetSpeedTunings(const foc::SpeedLoopTunings& tunings, const OnSetting& onDone);
+        void SetPositionTunings(const foc::PositionLoopTunings& tunings, const OnSetting& onDone);
+
+        void SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, const OnSetting& onDone);
+        void SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, const OnSetting& onDone);
+        void SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, const OnSetting& onDone);
+
+        void SetMotorParameter(services::MotorParameter parameter, float value, const OnSetting& onDone);
+        const services::CalibrationData& CalibrationRecord() const;
+        foc::Weber DefaultFluxLinkage() const;
+
+        services::ConfigData& Config();
+        const services::ConfigData& Config() const;
+        void PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone);
+        bool HasPendingConfigWrite() const;
+        bool HasPendingConfigPersist() const;
+
         foc::Weber ActiveFluxLinkage() const;
         CommandResult CmdReserveExternalCalibration();
         CommandResult CmdReleaseExternalCalibration();
@@ -71,12 +111,6 @@ namespace state_machine
         foc::SpeedAlgorithm ActiveSpeedAlgorithm() const;
         foc::PositionAlgorithm ActivePositionAlgorithm() const;
 
-        // Lets writers outside the lifecycle (e.g. CAN configuration persistence) share the same
-        // single-flight NVM accounting the FSM guards read from, so they collide with a Busy rather
-        // than an unguarded fault.
-        void BeginNvmActivity();
-        void EndNvmActivity();
-
         application::FocStateMachineCommon& ActiveCommon();
         const application::FocStateMachineCommon& ActiveCommon() const;
         application::OuterLoopStateMachine* ActiveOuterLoop();
@@ -84,6 +118,10 @@ namespace state_machine
     private:
         void Activate(ControlMode mode);
         void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
+        foc::CurrentLoopTunable* CurrentTunable();
+        foc::SpeedLoopTunable* SpeedTunable();
+        foc::PositionLoopTunable* PositionTunable();
+        const application::OuterLoopStateMachine* ActiveOuterLoop() const;
         foc::CurrentLoopSelectable* CurrentSelectable();
         foc::SpeedLoopSelectable* SpeedSelectable();
         foc::PositionLoopSelectable* PositionSelectable();
@@ -95,6 +133,12 @@ namespace state_machine
         void OnSaveConfigDone(services::NvmStatus status);
         void OnRollbackSaveConfigDone(services::NvmStatus status);
         bool CanActivatePendingSelect() const;
+        SettingResult SettingGate() const;
+        void ApplyOperatorTunings();
+        void StoreAndPersist(const OnSetting& onDone);
+        void CompleteSetting(SettingResult result);
+        static SettingResult ToSettingResult(foc::SelectResult result);
+        static SettingResult ToSettingResult(CommandResult result);
 
         const application::TerminalAndTracer terminalAndTracer;
         const application::MotorHardware hardware;
@@ -105,7 +149,9 @@ namespace state_machine
 
         services::ConfigData configData;
         application::NvmActivity nvmActivity;
+        ConfigWriter configWriter;
         AlgorithmPersistence algorithmPersistence;
+        OnSetting pendingSettingCallback;
         ControlMode pendingSelectMode{ ControlMode::torque };
         infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;
         uint8_t previousDefaultControlMode{ 0 };

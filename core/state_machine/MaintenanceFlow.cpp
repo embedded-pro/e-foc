@@ -1,4 +1,7 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
+#include "core/state_machine/MotorParameterLimits.hpp"
+#include <cmath>
 
 namespace application
 {
@@ -36,43 +39,60 @@ namespace application
         env.pending.Complete(state_machine::CommandResult::rejected);
     }
 
-    bool MaintenanceFlow::IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command) const
+    bool MaintenanceFlow::IsAcceptableMotorParameter(const state_machine::SetMotorParameter& command) const
     {
-        if (command.fluxLinkage.Value() > 0.0f && calibration.HasValidCalibration())
-            return true;
+        const auto acceptable = state_machine::IsAcceptableMotorParameter(command.parameter, command.value);
+        if (!acceptable)
+            env.tracer.Trace() << "[SM] Motor parameter rejected: outside its range";
 
-        env.tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor";
-        return false;
+        return acceptable;
     }
 
-    void MaintenanceFlow::BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command)
+    void MaintenanceFlow::BeginSetMotorParameter(const state_machine::SetMotorParameter& command)
     {
-        env.context.SetPendingFluxLinkage(command.fluxLinkage.Value());
+        pendingParameter = command.parameter;
+        pendingValue = command.value;
         env.pending.Accept(command.onDone);
 
-        auto updated = env.context.Data();
-        updated.fluxLinkage = env.context.PendingFluxLinkage();
-
         env.nvmActivity.Begin();
-        env.nvm.SaveCalibration(updated, [this](services::NvmStatus status)
+        env.nvm.SaveCalibration(Edited(env.context.Data()), [this](services::NvmStatus status)
             {
-                OnFluxLinkageStored(status);
+                OnMotorParameterStored(status);
             });
     }
 
-    void MaintenanceFlow::OnFluxLinkageSaved(services::NvmStatus status)
+    void MaintenanceFlow::AdoptMotorParameter(services::NvmStatus status)
     {
         if (status != services::NvmStatus::Ok)
         {
-            env.tracer.Trace() << "[SM] Flux linkage not persisted";
-            env.pending.Complete(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
+            env.tracer.Trace() << "[SM] Motor parameter not persisted";
             return;
         }
 
-        env.context.CommitPendingFluxLinkage();
-        env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
-        env.tracer.Trace() << "[SM] Flux linkage stored";
-        env.pending.Complete(state_machine::CommandResult::ok);
+        const auto previous = env.context.Data();
+        env.context.SetData(Edited(previous));
+
+        if (env.context.Data().polePairs != previous.polePairs)
+        {
+            env.context.SetRotorReferenceValid(false);
+            env.tracer.Trace() << "[SM] Pole pairs changed; cogging map dropped; align the rotor before enabling";
+        }
+
+        if (calibration.HasValidCalibration())
+        {
+            env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
+            env.mode.ApplyModeSpecificCalibration(env.context.Data());
+        }
+
+        env.tracer.Trace() << "[SM] Motor parameter stored";
+    }
+
+    void MaintenanceFlow::CompleteMotorParameter(services::NvmStatus status)
+    {
+        if (status == services::NvmStatus::Ok)
+            env.pending.Complete(state_machine::CommandResult::ok);
+        else
+            env.pending.Complete(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
     }
 
     void MaintenanceFlow::OnInvalidated(services::NvmStatus status)
@@ -81,9 +101,32 @@ namespace application
         env.machine.Dispatch(state_machine::CalibrationInvalidated{ status });
     }
 
-    void MaintenanceFlow::OnFluxLinkageStored(services::NvmStatus status)
+    void MaintenanceFlow::OnMotorParameterStored(services::NvmStatus status)
     {
         env.nvmActivity.End();
-        env.machine.Dispatch(state_machine::FluxLinkageSaved{ status });
+        env.machine.Dispatch(state_machine::MotorParameterSaved{ status });
+    }
+
+    services::CalibrationData MaintenanceFlow::Edited(const services::CalibrationData& data) const
+    {
+        auto edited = data;
+        services::WriteMotorParameter(edited, pendingParameter, pendingValue);
+
+        if (edited.polePairs != data.polePairs)
+        {
+            edited.coggingTorqueScale = 0.0f;
+            edited.coggingTorque.fill(0);
+        }
+
+        if (data.stage == services::CalibrationStage::complete || CompletesRecord(edited))
+            edited.stage = services::CalibrationStage::complete;
+
+        return edited;
+    }
+
+    bool MaintenanceFlow::CompletesRecord(const services::CalibrationData& data) const
+    {
+        return data.polePairs != 0 && foc::IsFinitePositive(data.lD) && CalibrationContext::HasFiniteElectricalParameters(data) &&
+               env.mode.HasValidModeSpecificCalibration(data);
     }
 }

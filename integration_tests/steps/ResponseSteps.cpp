@@ -20,9 +20,9 @@ namespace
     constexpr float kMilliPerSecond = 1000.0f;
     constexpr float kMilliPerAmpere = 1000.0f;
 
-    uint32_t CommandRawId(uint8_t messageType)
+    uint32_t CommandRawId(const Setpoint& setpoint)
     {
-        return services::MakeCanId(services::CanPriority::command, can::focMotorCategoryId, messageType, Fixture::kServerNodeId);
+        return services::MakeCanId(services::CanPriority::command, can::focMotorCategoryId, setpoint.messageType, setpoint.nodeId);
     }
 
     uint32_t TicksFromMilliseconds(const ScenarioSetup& setup, float milliseconds)
@@ -66,7 +66,7 @@ namespace
         if (!setup.lastSetpoint || !setup.trace.StartTick())
             return std::nullopt;
 
-        const auto stamp = setup.trace.CommandTick(CommandRawId(setup.lastSetpoint->messageType));
+        const auto stamp = setup.trace.CommandTick(CommandRawId(*setup.lastSetpoint));
         if (stamp && *stamp >= *setup.trace.StartTick())
             return stamp;
         return std::nullopt;

@@ -1,0 +1,23 @@
+- id: REQ-INT-015
+  title: Integration scenarios command the motor controller only over CAN
+  shall: >
+    Every software-in-the-loop scenario, and every hardware-in-the-loop scenario of the
+    motor controller application, shall send each command to the target as a CAN frame
+    of the FOC motor contract, and shall not write to the target's serial terminal.
+
+- id: REQ-INT-016
+  title: Integration verdicts rest only on CAN and the simulated plant
+  shall: >
+    The pass or fail outcome of every software-in-the-loop scenario, and of every
+    hardware-in-the-loop scenario of the motor controller application, shall be decided
+    only from the CAN frames the target sends and, on a simulated target, from the record
+    the simulated plant writes. The target's serial output shall be recorded for diagnosis
+    and attached to a failed scenario, and shall not be parsed for a verdict.
+
+- id: REQ-INT-017
+  title: Every CAN message a scenario uses is a product message
+  shall: >
+    Each CAN command and response an integration scenario relies on shall be part of the
+    published FOC motor contract and shall be available to every CAN client; no command
+    or response shall exist only for testing. A fault that a scenario injects on a
+    simulated target shall be described in the simulated world, not commanded.

@@ -2,6 +2,7 @@
 
 #include "core/foc/speed_loop/SpeedController.hpp"
 #include "numerical/controllers/implementations/IntegralStateFeedbackLqi.hpp"
+#include <optional>
 
 namespace foc
 {
@@ -9,6 +10,8 @@ namespace foc
     {
     public:
         static constexpr SpeedAlgorithm algorithm{ SpeedAlgorithm::lqi };
+
+        static bool IsDesignFeasible(const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings);
 
         bool Configure(const MechanicalModelParameters& motorParameters);
         bool SetTunings(const SpeedLoopTunings& tunings);
@@ -20,12 +23,11 @@ namespace foc
         using SpeedLqi = controllers::IntegralStateFeedbackLqi<float, 1, 1, 1>;
 
         static SpeedLqi Inert();
+        static std::optional<SpeedLqi> Solve(const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings);
         bool Construct();
 
         MechanicalModelParameters parameters{};
-        float bandwidth{ SpeedLoopTunings{}.bandwidth };
-        float speedErrorWeight{ SpeedLoopTunings{}.speedErrorWeight };
-        float integralWeight{ SpeedLoopTunings{}.integralWeight };
+        SpeedLoopTunings tunings{};
         SpeedLqi lqi{ Inert() };
     };
 

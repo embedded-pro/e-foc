@@ -1,6 +1,7 @@
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include <cstddef>
 
 namespace can
 {
@@ -10,7 +11,7 @@ namespace can
         , origin(origin)
     {
         AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse,
-            electricalParamsResponse, mechanicalParamsResponse);
+            electricalParamsResponse, mechanicalParamsResponse, algorithmsResponse, parameterResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -124,6 +125,88 @@ namespace can
     {
         services::CanPayloadWriter payload;
         return SendCommand(targetNodeId, focQueryContractVersionId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendAlign(uint16_t targetNodeId)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focAlignId);
+    }
+
+    bool FocMotorCategoryClient::SendIdentifyElectrical(uint16_t targetNodeId)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focIdentifyElectricalId);
+    }
+
+    bool FocMotorCategoryClient::SendIdentifyMechanical(uint16_t targetNodeId)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focIdentifyMechanicalId);
+    }
+
+    bool FocMotorCategoryClient::SendRequestTelemetry(uint16_t targetNodeId)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focRequestTelemetryId);
+    }
+
+    bool FocMotorCategoryClient::SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        services::CanPayloadWriter payload;
+        payload.WriteUInt32(countsPerRevolution);
+        return SendCommand(targetNodeId, focSetEncoderResolutionId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendSelectAlgorithm(uint16_t targetNodeId, FocControlLoop loop, uint8_t algorithm)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(loop));
+        payload.WriteUInt8(algorithm);
+        return SendCommand(targetNodeId, focSelectAlgorithmId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendQueryAlgorithms(uint16_t targetNodeId)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focQueryAlgorithmsId);
+    }
+
+    bool FocMotorCategoryClient::SendSetParameter(uint16_t targetNodeId, FocParameter parameter, float value)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(parameter));
+        WriteFloat32(payload, value);
+        return SendCommand(targetNodeId, focSetParameterId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendQueryParameter(uint16_t targetNodeId, FocParameter parameter)
+    {
+        if (SendsRefused(targetNodeId))
+            return false;
+
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(parameter));
+        return SendCommand(targetNodeId, focQueryParameterId, payload);
     }
 
     ContractCompatibility FocMotorCategoryClient::Compatibility(uint16_t nodeId) const
@@ -251,6 +334,55 @@ namespace can
         NotifyObservers([source = origin.SourceNodeId(), resistance, inductance, polePairs](auto& observer)
             {
                 observer.OnElectricalParamsResponse(source, resistance, inductance, polePairs);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleAlgorithmsResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focAlgorithmsResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto mode = reader.ReadUInt8();
+        const auto current = reader.ReadUInt8();
+        const auto speed = reader.ReadUInt8();
+        const auto position = reader.ReadUInt8();
+
+        if (mode > static_cast<uint8_t>(FocMotorMode::position) || current >= AlgorithmCount(FocControlLoop::current) ||
+            speed >= AlgorithmCount(FocControlLoop::speed) || position >= AlgorithmCount(FocControlLoop::position))
+            return false;
+
+        const FocAlgorithms algorithms{ static_cast<FocMotorMode>(mode), static_cast<FocCurrentAlgorithm>(current),
+            static_cast<FocSpeedAlgorithm>(speed), static_cast<FocPositionAlgorithm>(position) };
+
+        NotifyObservers([source = origin.SourceNodeId(), &algorithms](auto& observer)
+            {
+                observer.OnAlgorithmsResponse(source, algorithms);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleParameterResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focParameterResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto descriptor = FindParameter(reader.ReadUInt8());
+        const auto flags = std::byte{ reader.ReadUInt8() };
+        const auto value = ReadFloat32(reader);
+
+        if (!descriptor.has_value())
+            return false;
+
+        const FocParameterValue held{ value, (flags & std::byte{ focParameterAutomaticFlag }) != std::byte{} };
+
+        NotifyObservers([source = origin.SourceNodeId(), parameter = descriptor->id, held](auto& observer)
+            {
+                observer.OnParameterResponse(source, parameter, held);
             });
 
         return true;

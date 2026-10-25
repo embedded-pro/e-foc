@@ -3,11 +3,12 @@
 
 namespace foc
 {
-    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm algorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings&)
+    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm algorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings)
     {
         switch (algorithm)
         {
             case SpeedAlgorithm::lqi:
+                return LqiSpeedController::IsDesignFeasible(parameters, tunings);
             case SpeedAlgorithm::adrc:
                 return AreMechanicalParametersValid(parameters);
             default:

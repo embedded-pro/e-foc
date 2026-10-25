@@ -153,16 +153,17 @@ namespace state_machine
         services::NvmStatus status;
     };
 
-    struct SetFluxLinkage
+    struct SetMotorParameter
     {
-        static constexpr const char* name{ "SetFluxLinkage" };
-        foc::Weber fluxLinkage;
+        static constexpr const char* name{ "SetMotorParameter" };
+        services::MotorParameter parameter;
+        float value;
         CommandCallback onDone;
     };
 
-    struct FluxLinkageSaved
+    struct MotorParameterSaved
     {
-        static constexpr const char* name{ "FluxLinkageSaved" };
+        static constexpr const char* name{ "MotorParameterSaved" };
         services::NvmStatus status;
     };
 
@@ -199,8 +200,8 @@ namespace state_machine
         FaultDetected,
         ClearCalibration,
         CalibrationInvalidated,
-        SetFluxLinkage,
-        FluxLinkageSaved,
+        SetMotorParameter,
+        MotorParameterSaved,
         BootValidityChecked,
         BootCalibrationLoaded>;
 }

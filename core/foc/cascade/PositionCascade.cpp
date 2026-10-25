@@ -36,9 +36,9 @@ namespace foc
         SetCurrentTuningsImpl(tunings);
     }
 
-    void PositionCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
+    SelectResult PositionCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
     {
-        SetSpeedTuningsImpl(tunings);
+        return SetSpeedTuningsImpl(tunings);
     }
 
     SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)

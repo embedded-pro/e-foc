@@ -2,9 +2,9 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.1.0
+version: 1.2.0
 component: integration-testing
-date: 2026-09-21
+date: 2026-10-25
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.1.0                      |
+| Version   | 1.2.0                      |
 | Component | integration-testing        |
-| Date      | 2026-09-21                 |
+| Date      | 2026-10-25                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are
 > structured*. It expands on the architecture by specifying component responsibilities, data flows,
@@ -129,6 +129,9 @@ trace polls telemetry rather than waiting passively. Trace lines are retained ac
 command path reads, and cleared per scenario and per restart, so an assertion cannot match a line
 from an earlier boot.
 
+> A planned change takes the terminal and the traces off this list: see
+> [Planned — Commands and Verdicts over CAN Only](#planned--commands-and-verdicts-over-can-only).
+
 ### Isolation
 
 Scenarios ran into each other through three shared resources, all now per session: the working
@@ -153,6 +156,11 @@ The command transport heartbeats while it awaits an acknowledgement, as a CAN cl
 identification acknowledges only when it ends, and the target emergency-stops an identification or an
 enabled drive whose client falls silent (see the CAN service design).
 
+The transport addresses the node whose heartbeat it waits for at the start of a scenario. A board
+answers as its configured base plus the board ID read from its jumpers, so the suite takes the node
+ID from the first server heartbeat it sees rather than assuming node 1; the emulated target, with
+no jumpers, is node 1.
+
 ### Required from the system under test
 
 - A CAN command set covering mode selection, calibration, alignment, enable, disable, setpoints,
@@ -170,3 +178,99 @@ No test-only command is added to the product to make the suite work.
 Each scenario carries the requirement identifiers it verifies as tags alongside its runner tag.
 The traceability matrix is generated from those tags during release, reading the feature directory
 directly, so the mapping lives with the scenarios rather than in this document where it would rot.
+
+---
+
+## Planned — Commands and Verdicts over CAN Only
+
+> **Status: planned.** The scenarios do not follow this yet; until they do, the sections above
+> describe the suite as it runs. It lands as one follow-up change.
+
+### The rule
+
+Every scenario of the motor controller application, on the emulator and on hardware alike, sends
+every command as a CAN frame and decides pass or fail only from the CAN frames the target sends and,
+on the emulator, from what the simulated plant records about itself. The serial port is a debug
+channel: the suite records everything the target prints and attaches it to a failed scenario, but
+never writes to it and never parses it for a verdict (REQ-INT-015, REQ-INT-016).
+
+- **CAN is the product's control surface.** A deployed controller is commanded over the bus, by the
+  CAN Commander or a host. A scenario that goes through the terminal proves a path no deployed system
+  uses, and stays green while the CAN path is broken.
+- **Traces are not a contract.** Their wording changes with any logging edit, nothing versions them,
+  and a parser can match a stale line. The CAN contract is versioned and has its own wire tests.
+- **One step, two targets.** When both targets speak only CAN, a step reads the same on the emulator
+  and on hardware; today some steps take the terminal on one target and CAN on the other.
+- **Debug output is free to change.** Trace wording, verbosity and rate stop mattering to the suite,
+  and a slow or chatty serial port can no longer delay or break a verdict.
+
+### Channels after the change
+
+| Channel                            | Direction     | Carries                                                       | Asserted on                       |
+|------------------------------------|---------------|---------------------------------------------------------------|-----------------------------------|
+| CAN                                | both          | commands, acknowledgements, responses, telemetry              | yes                               |
+| Plant record (emulator only)       | target → host | the trajectory, and the tick each command frame was delivered | yes                               |
+| Serial port and semihosting output | target → host | traces, terminal output, fault dumps                          | no: recorded, attached on failure |
+
+```mermaid
+graph LR
+    STEPS["Step definitions"] -->|"commands"| CAN["CAN"]
+    CAN -->|"acknowledgements, responses, telemetry"| STEPS
+    PLANT["Simulated plant"] -->|"record file"| STEPS
+    TARGET["Target"] -->|"traces"| LOG["Scenario debug log"]
+    LOG -.->|"attached on failure"| REPORT["Test report"]
+```
+
+On the emulator, CAN frames share the terminal's socket today (`CAN_RX` lines in) and the trace
+output (`CAN_TX` lines out). They move to a second emulated serial port that carries only CAN
+frames, in the same encoding, in both directions. The plant's samples and the command-delivery ticks
+move off the trace output into a file the plant writes in the scenario directory through
+semihosting, which the host reads back. On hardware, CAN already goes through the bridge's own bus.
+
+### What has to move
+
+Each row is a dependence on the terminal or on a trace today, and what replaces it.
+
+| Today, over the serial port                                   | Used by                                                       | Over CAN                                                                                                                                                   | Contract  |
+|---------------------------------------------------------------|---------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| `clear_cal`                                                   | starting with no valid calibration, on both targets           | Emulator: describe stored memory without a calibration, as other scenarios do. Hardware: a `ClearCalibration` command, refused unless stopped              | new       |
+| `calibrate`                                                   | the full calibration "run from the terminal", on both targets | a `Calibrate` command that acknowledges when the sequence ends, as the identifications do                                                                  | new       |
+| `[SM] Calibration record:` trace                              | identification scenarios and the hardware motor scenarios     | `QueryParameter` for resistance, inductance, pole pairs, inertia and friction; new read-only parameters for the three current offsets and the cogging peak | 2.1 + new |
+| `estimate_status` and the `[EST]` traces                      | online estimator scenarios                                    | a `QueryEstimates` command, answered with the tracked resistance, inductance, inertia and friction                                                         | new       |
+| `loop_stats`, `clear_stats` and the `[LOOP]` traces           | control-loop timing                                           | `QueryLoopStatistics` and `ClearLoopStatistics`                                                                                                            | new       |
+| `[SM] … loop algorithm:` traces                               | controller matrix                                             | `QueryAlgorithms`                                                                                                                                          | 2.1       |
+| `watchdog_stall`, the `[WDT]` trace and the reset-cause trace | emulator watchdog                                             | the stall is scheduled in the world description, like a disturbance; the reset cause is read with a `QueryResetCause` command once the heartbeat returns   | new       |
+| `CAN_RX` and `CAN_TX` lines                                   | every emulator scenario                                       | the CAN-only emulated serial port                                                                                                                          | transport |
+| `PLANT` and `CAN_RX_AT` lines                                 | step-response, disturbance and estimator scenarios            | the plant record file                                                                                                                                      | transport |
+
+Algorithm selection on the hardware motor scenarios already goes over CAN (`SelectAlgorithm`, contract
+2.1): reading the terminal's reply raced the trace output, so a heartbeat trace line could be taken for it.
+
+The runner's own `[METRIC]` lines are its report on standard error, not target output, and stay.
+
+Every new command is a product diagnostic that the CAN Commander shows as well: a commissioning
+engineer needs the estimates, the loop statistics and the reset cause as much as a test does, so no
+command exists only for testing (REQ-INT-017). Stalling the event loop is the one injected fault, and
+it is not a command: it is part of the simulated world and exists only on the emulator.
+
+### Out of scope: the bring-up image
+
+The hardware-test image (scenarios tagged `@hil`: ADC, PWM, encoder, EEPROM, CAN peripheral, UART,
+hard fault, reset cause, watchdog) brings up a board; it is not the motor controller. Its terminal is
+its interface, the UART scenario tests that terminal itself, and the CAN scenario checks the
+peripheral before any CAN command server runs. It keeps using the terminal.
+
+### Migration
+
+One follow-up change, in this order, each step leaving the suite green:
+
+1. **Contract 2.2.** Design, then add, the new commands and read-only parameters: wire contract,
+   wire tests, firmware handlers, and the CAN Commander views.
+2. **Emulator transport.** CAN moves to its own emulated serial port, the plant record to its file,
+   and the serial output becomes the per-scenario debug log.
+3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its
+   stall in the world description.
+4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use;
+   they remain only in the bring-up fixture, so a new step cannot bring them back.
+5. **Documents.** Rewrite Observation and Interfaces here, and Parts B, D, G, I and J and the
+   Interfaces of the software-in-the-loop design, for the new channels.

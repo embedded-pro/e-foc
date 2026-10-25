@@ -70,16 +70,16 @@ classDiagram
 
 #### Lifecycle Commands
 
-| Command             | Alias | Arguments | Action                                         |
-|---------------------|-------|-----------|------------------------------------------------|
-| `calibrate`         | `cal` | —         | Runs the calibration sequence                  |
-| `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`    |
-| `disable`           | `dis` | —         | Disables the motor                             |
-| `clear_fault`       | `cf`  | —         | Clears a latched fault                         |
-| `clear_cal`         | `cc`  | —         | Invalidates stored calibration                 |
-| `active_mode`       | `am`  | —         | Prints the active control mode                 |
-| `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains |
-| `estimate_status`   | `es`  | —         | Prints the current online estimates            |
+| Command           | Alias | Arguments | Action                                         |
+|-------------------|-------|-----------|------------------------------------------------|
+| `calibrate`       | `cal` | —         | Runs the calibration sequence                  |
+| `enable`          | `en`  | —         | Enables the motor; rejected outside `Ready`    |
+| `disable`         | `dis` | —         | Disables the motor                             |
+| `clear_fault`     | `cf`  | —         | Clears a latched fault                         |
+| `clear_cal`       | `cc`  | —         | Invalidates stored calibration                 |
+| `active_mode`     | `am`  | —         | Prints the active control mode                 |
+| `apply_estimates` | `ae`  | —         | Applies the online estimates to the loop gains |
+| `estimate_status` | `es`  | —         | Prints the current online estimates            |
 
 #### Algorithm Selection
 
@@ -119,13 +119,14 @@ overwrites.
 | `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | 1 … 2000       | Speed and position modes |
 | `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | 1 … 500        | Position mode            |
 
-Retuning is refused while the motor is enabled, and refused when the active law cannot be redesigned
-for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or negative bandwidth
+Retuning is refused unless the motor is stopped (`Idle` or `Ready`), and refused when the active law
+cannot be redesigned for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or negative bandwidth
 produces zero or sign-inverted gains, which inverts the sense of the loop's feedback on a motor that
 may be spinning.
 
-Both bounds and the enabled-state policy are enforced inside `ControlModeStateMachine::TrySet*Bandwidth`
-rather than in the command handlers, so the CLI and the CAN bridge cannot drift apart. The ranges come
+Both bounds and the stopped-state policy are enforced inside `ControlModeStateMachine::TrySet*Bandwidth`
+rather than in the command handlers. The CAN bridge sets the same bandwidths through the settings path,
+which applies the same ranges and policy and answers once the value is stored. The ranges come
 from `foc::CommandLimits`; the predicates that apply them live in `core/foc/math/ParameterValidation.hpp`.
 A rejected value is reported before any controller is touched, so a refused retune leaves the previously
 accepted bandwidth live.

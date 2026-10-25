@@ -55,3 +55,22 @@
     shall take effect only after a reset. A board without ID jumpers shall use board ID 0. A
     configured base of 0, the broadcast address, or one whose sum with the board ID exceeds the
     12-bit node field shall be replaced by the default base of 1.
+
+- id: REQ-CAN-007
+  title: Every setting the firmware holds is reachable by number
+  shall: >
+    Contract version 2.1 shall add, without changing any 2.0 message, a numbered parameter
+    space covering every loop tuning setting, the six motor parameters of the calibration
+    record and the start-up settings (encoder resolution, CAN node ID base and bitrate),
+    each with a unit and a range defined once in core/can, and the commands to select and
+    query each loop's algorithm. A write shall be acknowledged only once the value is in force
+    and stored, preceded by a response carrying the value now held; a query shall answer the
+    value in force, flagged when the firmware chose it automatically. A value that is not
+    finite, outside its range or not whole for an integer parameter shall be answered with
+    invalidPayload and change nothing.
+
+- id: REQ-CAN-008
+  title: Floating-point fields have one byte order
+  shall: >
+    A float32 field of the category shall be the IEEE 754 single-precision bit pattern sent
+    most significant byte first, as every other multi-byte field of the category is.

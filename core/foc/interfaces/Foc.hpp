@@ -71,7 +71,7 @@ namespace foc
 
     public:
         virtual bool ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
-        virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
+        virtual SelectResult SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
 
     class PositionLoopTunable

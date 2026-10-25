@@ -25,7 +25,7 @@ namespace foc
     {
     public:
         MOCK_METHOD(bool, ConfigureMechanics, (const MechanicalModelParameters& parameters), (override));
-        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
     };
 
     class FocSpeedMock
@@ -38,7 +38,7 @@ namespace foc
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (RadiansPerSecond), (override));
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
-        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
         MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
         MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
         MOCK_METHOD(SelectResult, SelectSpeedAlgorithm, (SpeedAlgorithm algorithm), (override));
@@ -70,7 +70,7 @@ namespace foc
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (Radians), (override));
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
-        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
         MOCK_METHOD(SelectResult, SetPositionTunings, (const PositionLoopTunings& tunings), (override));
         MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
         MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));

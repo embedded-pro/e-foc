@@ -2,12 +2,10 @@
 
 namespace state_machine
 {
-    AlgorithmPersistence::AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer,
-        application::NvmActivity& nvmActivity)
-        : nvm(nvm)
+    AlgorithmPersistence::AlgorithmPersistence(ConfigWriter& writer, services::ConfigData& configData, services::Tracer& tracer)
+        : writer(writer)
         , configData(configData)
         , tracer(tracer)
-        , nvmActivity(nvmActivity)
     {}
 
     void AlgorithmPersistence::ApplyPersistedAlgorithms(foc::CurrentLoopSelectable* current, foc::SpeedLoopSelectable* speed, foc::PositionLoopSelectable* position)
@@ -49,7 +47,7 @@ namespace state_machine
         }
     }
 
-    foc::SelectResult AlgorithmPersistence::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, foc::CurrentLoopSelectable* selectable)
+    foc::SelectResult AlgorithmPersistence::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, foc::CurrentLoopSelectable* selectable, const OnPersisted& onPersisted)
     {
         if (selectable == nullptr)
             return foc::SelectResult::invalidAlgorithm;
@@ -59,12 +57,11 @@ namespace state_machine
             return result;
 
         configData.currentAlgorithm = static_cast<uint8_t>(algorithm);
-        nvmActivity.Begin();
-        PersistConfig();
+        writer.Persist(onPersisted);
         return result;
     }
 
-    foc::SelectResult AlgorithmPersistence::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, foc::SpeedLoopSelectable* selectable)
+    foc::SelectResult AlgorithmPersistence::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, foc::SpeedLoopSelectable* selectable, const OnPersisted& onPersisted)
     {
         if (selectable == nullptr)
             return foc::SelectResult::invalidAlgorithm;
@@ -74,12 +71,11 @@ namespace state_machine
             return result;
 
         configData.speedAlgorithm = static_cast<uint8_t>(algorithm);
-        nvmActivity.Begin();
-        PersistConfig();
+        writer.Persist(onPersisted);
         return result;
     }
 
-    foc::SelectResult AlgorithmPersistence::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, foc::PositionLoopSelectable* selectable)
+    foc::SelectResult AlgorithmPersistence::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, foc::PositionLoopSelectable* selectable, const OnPersisted& onPersisted)
     {
         if (selectable == nullptr)
             return foc::SelectResult::invalidAlgorithm;
@@ -89,8 +85,7 @@ namespace state_machine
             return result;
 
         configData.positionAlgorithm = static_cast<uint8_t>(algorithm);
-        nvmActivity.Begin();
-        PersistConfig();
+        writer.Persist(onPersisted);
         return result;
     }
 
@@ -169,35 +164,6 @@ namespace state_machine
             default:
                 return "unknown";
         }
-    }
-
-    void AlgorithmPersistence::PersistConfig()
-    {
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                if (status == services::NvmStatus::Busy)
-                {
-                    RetryPersist();
-                    return;
-                }
-
-                nvmActivity.End();
-                if (status != services::NvmStatus::Ok)
-                    tracer.Trace() << "config persist failed";
-            });
-    }
-
-    void AlgorithmPersistence::RetryPersist()
-    {
-        persistRetryTimer.Start(persistRetryDelay, [this]()
-            {
-                PersistConfig();
-            });
-    }
-
-    bool AlgorithmPersistence::HasPendingPersist() const
-    {
-        return persistRetryTimer.Armed();
     }
 
     std::optional<foc::CurrentAlgorithm> AlgorithmPersistence::CurrentAlgorithmFromRaw(uint8_t raw)

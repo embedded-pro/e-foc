@@ -44,6 +44,11 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache dpkg-dev desktop-file-utils
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: ${{ github.job }}-ubuntu-latest
+          max-size: 2G
+          save: ${{ github.ref == 'refs/heads/main' }}
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"

@@ -2,6 +2,7 @@
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include <algorithm>
 #include <utility>
 
 namespace tool
@@ -10,6 +11,10 @@ namespace tool
 
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter, uint16_t{ 0 } }
+        , statusRefresh{ statusRefreshInterval, [this]()
+            {
+                RefreshStatus();
+            } }
     {
         CanProtocolClientObserver::Attach(focClient.ProtocolClient());
         can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
@@ -44,16 +49,35 @@ namespace tool
         return focClient.CategoryClient().Compatibility(nodeId);
     }
 
+    bool CanCommandClient::SupportsSettings(uint16_t nodeId) const
+    {
+        const auto minor = contractMinors.find(nodeId);
+        return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= settingsContractMinor;
+    }
+
+    infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
+    {
+        switch (commandType)
+        {
+            case can::focAlignId:
+            case can::focIdentifyElectricalId:
+            case can::focIdentifyMechanicalId:
+                return motionCommandTimeout;
+            default:
+                return commandTimeout;
+        }
+    }
+
     void CanCommandClient::MarkBusy(uint16_t nodeId, uint8_t commandType)
     {
         auto& node = commands[nodeId];
         node.pendingCommand = commandType;
-        node.timeout.Start(commandTimeout, [this, nodeId]()
+        node.timeout.Start(TimeoutFor(commandType), [this, nodeId, commandType]()
             {
                 ClearBusy(nodeId);
-                NotifyObservers([nodeId](auto& observer)
+                NotifyObservers([nodeId, commandType](auto& observer)
                     {
-                        observer.OnCommandTimeout(nodeId);
+                        observer.OnCommandTimeout(nodeId, commandType);
                     });
             });
 
@@ -175,9 +199,181 @@ namespace tool
             });
     }
 
+    bool CanCommandClient::SendClearFault(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focClearFaultId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendClearFault(nodeId);
+            });
+    }
+
+    bool CanCommandClient::SendAlign(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focAlignId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendAlign(nodeId);
+            });
+    }
+
+    bool CanCommandClient::SendIdentifyElectrical(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focIdentifyElectricalId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendIdentifyElectrical(nodeId);
+            });
+    }
+
+    bool CanCommandClient::SendIdentifyMechanical(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focIdentifyMechanicalId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendIdentifyMechanical(nodeId);
+            });
+    }
+
+    bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
+    {
+        return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
+            {
+                return focClient.CategoryClient().SendSetEncoderResolution(nodeId, countsPerRevolution);
+            });
+    }
+
+    bool CanCommandClient::SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm)
+    {
+        return Tracked(nodeId, can::focSelectAlgorithmId, [this, nodeId, loop, algorithm]()
+            {
+                return focClient.CategoryClient().SendSelectAlgorithm(nodeId, loop, algorithm);
+            });
+    }
+
+    bool CanCommandClient::SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value)
+    {
+        return Tracked(nodeId, can::focSetParameterId, [this, nodeId, parameter, value]()
+            {
+                return focClient.CategoryClient().SendSetParameter(nodeId, parameter, value);
+            });
+    }
+
     bool CanCommandClient::RequestData(uint16_t nodeId)
     {
         return focClient.CategoryClient().SendQueryContractVersion(nodeId);
+    }
+
+    void CanCommandClient::RequestSettings(uint16_t nodeId)
+    {
+        if (!SupportsSettings(nodeId))
+            return;
+
+        QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
+        for (const auto& descriptor : can::focParameters)
+            QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+    }
+
+    void CanCommandClient::RequestStatus(uint16_t nodeId)
+    {
+        if (Compatibility(nodeId) == can::ContractCompatibility::compatible)
+            QueueRead(nodeId, Read{ can::focRequestTelemetryId });
+    }
+
+    void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
+    {
+        auto& node = reads[nodeId];
+        const auto queued = std::ranges::any_of(node.queued, [&read](const Read& other)
+            {
+                return other.commandType == read.commandType && other.parameter == read.parameter;
+            });
+
+        if (!queued)
+            node.queued.push_back(read);
+
+        if (!node.inFlight.has_value())
+            SendNextRead(nodeId);
+    }
+
+    void CanCommandClient::SendNextRead(uint16_t nodeId)
+    {
+        auto& node = reads[nodeId];
+        while (!node.queued.empty())
+        {
+            const auto read = node.queued.front();
+            node.queued.pop_front();
+
+            if (SendRead(nodeId, read))
+            {
+                node.inFlight = read.commandType;
+                node.timeout.Start(readTimeout, [this, nodeId, commandType = read.commandType]()
+                    {
+                        CompleteRead(nodeId, commandType);
+                    });
+                return;
+            }
+        }
+    }
+
+    bool CanCommandClient::SendRead(uint16_t nodeId, const Read& read)
+    {
+        auto& category = focClient.CategoryClient();
+        switch (read.commandType)
+        {
+            case can::focQueryAlgorithmsId:
+                return category.SendQueryAlgorithms(nodeId);
+            case can::focQueryParameterId:
+                return category.SendQueryParameter(nodeId, read.parameter);
+            default:
+                return category.SendRequestTelemetry(nodeId);
+        }
+    }
+
+    void CanCommandClient::CompleteRead(uint16_t nodeId, uint8_t commandType)
+    {
+        const auto node = reads.find(nodeId);
+        if (node == reads.end() || node->second.inFlight != commandType)
+            return;
+
+        node->second.inFlight.reset();
+        node->second.timeout.Cancel();
+        SendNextRead(nodeId);
+    }
+
+    void CanCommandClient::ForgetReads(uint16_t nodeId)
+    {
+        const auto node = reads.find(nodeId);
+        if (node == reads.end())
+            return;
+
+        node->second.queued.clear();
+        node->second.inFlight.reset();
+        node->second.timeout.Cancel();
+    }
+
+    bool CanCommandClient::IsRead(uint8_t commandType)
+    {
+        return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId;
+    }
+
+    void CanCommandClient::OnAccepted(uint16_t nodeId, uint8_t commandType)
+    {
+        switch (commandType)
+        {
+            case can::focSelectControlModeId:
+            case can::focSelectAlgorithmId:
+            case can::focAlignId:
+            case can::focIdentifyElectricalId:
+            case can::focIdentifyMechanicalId:
+                RequestSettings(nodeId);
+                break;
+            default:
+                break;
+        }
+
+        RequestStatus(nodeId);
+    }
+
+    void CanCommandClient::RefreshStatus()
+    {
+        for (const auto nodeId : onlineNodes)
+            RequestStatus(nodeId);
     }
 
     void CanCommandClient::MarkOnline(uint16_t nodeId)
@@ -198,6 +394,7 @@ namespace tool
             return;
 
         ClearBusy(nodeId);
+        ForgetReads(nodeId);
         NotifyObservers([nodeId](auto& observer)
             {
                 observer.OnNodeOnlineChanged(nodeId, false);
@@ -228,6 +425,12 @@ namespace tool
 
     void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode)
     {
+        if (IsRead(originCommandId))
+        {
+            CompleteRead(nodeId, originCommandId);
+            return;
+        }
+
         CompleteCommand(nodeId, originCommandId);
         NotifyObservers([nodeId, originCommandId, errorCode](auto& observer)
             {
@@ -248,11 +451,15 @@ namespace tool
     void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
     {
         const bool compatible = major == can::focContractVersionMajor;
+        contractMinors[nodeId] = minor;
 
         NotifyObservers([nodeId, major, minor, compatible](auto& observer)
             {
                 observer.OnContractVersion(nodeId, major, minor, compatible);
             });
+
+        RequestSettings(nodeId);
+        RequestStatus(nodeId);
     }
 
     void CanCommandClient::OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
@@ -268,6 +475,22 @@ namespace tool
         NotifyObservers([nodeId, friction, inertia](auto& observer)
             {
                 observer.OnMechanicalParametersReceived(nodeId, friction.Value(), inertia.Value());
+            });
+    }
+
+    void CanCommandClient::OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms)
+    {
+        NotifyObservers([nodeId, &algorithms](auto& observer)
+            {
+                observer.OnAlgorithmsReceived(nodeId, algorithms);
+            });
+    }
+
+    void CanCommandClient::OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value)
+    {
+        NotifyObservers([nodeId, parameter, value](auto& observer)
+            {
+                observer.OnParameterReceived(nodeId, parameter, value);
             });
     }
 
@@ -330,6 +553,12 @@ namespace tool
         const uint8_t ackMsgType = data[1];
         const auto ackStatus = static_cast<CanAckStatus>(data[2]);
 
+        if (ackCategory == can::focMotorCategoryId && IsRead(ackMsgType))
+        {
+            CompleteRead(nodeId, ackMsgType);
+            return true;
+        }
+
         if (ackCategory == can::focMotorCategoryId)
             CompleteCommand(nodeId, ackMsgType);
 
@@ -337,6 +566,9 @@ namespace tool
             {
                 observer.OnCommandAck(nodeId, ackCategory, ackMsgType, ackStatus);
             });
+
+        if (ackCategory == can::focMotorCategoryId && ackStatus == CanAckStatus::success)
+            OnAccepted(nodeId, ackMsgType);
         return true;
     }
 

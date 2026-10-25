@@ -1,12 +1,11 @@
 #pragma once
 
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
-#include "core/services/non_volatile_memory/ConfigData.hpp"
-#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
@@ -27,8 +26,6 @@ namespace can
             drivers::Encoder& encoder,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
-            services::NonVolatileMemory& nvm,
-            services::ConfigData configData,
             services::Tracer& tracer);
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
@@ -54,6 +51,10 @@ namespace can
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
         void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) override;
         void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) override;
+        void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) override;
+        void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) override;
+        void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) override;
+        void OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone) override;
 
     private:
         static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
@@ -61,8 +62,6 @@ namespace can
 
         void ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
             const infra::Function<void(services::CanAckStatus)>& onDone);
-        void ReportTuningOutcome(uint8_t messageId, state_machine::TuningResult result,
-            const infra::Function<void()>& onDone);
         void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         bool SetpointAllowedInCurrentState() const;
@@ -77,14 +76,12 @@ namespace can
         drivers::Encoder& encoder;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
-        services::NonVolatileMemory& nvm;
-        services::ConfigData configData;
+        FocMotorSettingsBridge settings;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
         infra::Function<void(services::CanAckStatus)> pendingAlignDoneCallback;
         infra::Function<void()> pendingElectricalIdentDoneCallback;
         infra::Function<void()> pendingMechIdentDoneCallback;
-        infra::Function<void()> pendingNvmDoneCallback;
         std::optional<foc::Ohm> pendingElectricalR;
         std::optional<foc::MilliHenry> pendingElectricalL;
     };

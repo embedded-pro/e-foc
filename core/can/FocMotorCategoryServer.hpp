@@ -41,6 +41,11 @@ namespace can
         virtual void OnRequestTelemetry(const infra::Function<void()>& onDone) = 0;
         virtual void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) = 0;
         virtual void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) = 0;
+
+        virtual void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) = 0;
+        virtual void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) = 0;
+        virtual void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) = 0;
+        virtual void OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone) = 0;
     };
 
     class FocMotorCategoryServer
@@ -61,6 +66,8 @@ namespace can
             foc::RadiansPerSecond speed, foc::Radians position);
         void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
         void BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
+        void SendAlgorithmsResponse(const FocAlgorithms& algorithms);
+        void SendParameterResponse(FocParameter parameter, FocParameterValue value);
 
     private:
         bool HandleStart(const hal::Can::Message& data);
@@ -83,6 +90,10 @@ namespace can
         bool HandleQueryMotorType(const hal::Can::Message& data);
         bool HandleConfigureTelemetryRate(const hal::Can::Message& data);
         bool HandleQueryContractVersion(const hal::Can::Message& data);
+        bool HandleSelectAlgorithm(const hal::Can::Message& data);
+        bool HandleQueryAlgorithms(const hal::Can::Message& data);
+        bool HandleSetParameter(const hal::Can::Message& data);
+        bool HandleQueryParameter(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };
@@ -103,5 +114,17 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> queryMotorType{ focQueryMotorTypeId, *this, &FocMotorCategoryServer::HandleQueryMotorType };
         services::CanMessageHandler<FocMotorCategoryServer> configureTelemetryRate{ focConfigureTelemetryRateId, *this, &FocMotorCategoryServer::HandleConfigureTelemetryRate };
         services::CanMessageHandler<FocMotorCategoryServer> queryContractVersion{ focQueryContractVersionId, *this, &FocMotorCategoryServer::HandleQueryContractVersion };
+
+        struct SettingsMessages
+        {
+            explicit SettingsMessages(FocMotorCategoryServer& server);
+
+            services::CanMessageHandler<FocMotorCategoryServer> selectAlgorithm;
+            services::CanMessageHandler<FocMotorCategoryServer> queryAlgorithms;
+            services::CanMessageHandler<FocMotorCategoryServer> setParameter;
+            services::CanMessageHandler<FocMotorCategoryServer> queryParameter;
+        };
+
+        SettingsMessages settingsMessages{ *this };
     };
 }

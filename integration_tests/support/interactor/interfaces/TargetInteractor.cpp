@@ -46,6 +46,11 @@ namespace integration
         return std::nullopt;
     }
 
+    std::optional<hal::Can::Id> TargetInteractor::FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>&, std::size_t) const
+    {
+        return std::nullopt;
+    }
+
     void TargetInteractor::RestartTarget()
     {}
 }

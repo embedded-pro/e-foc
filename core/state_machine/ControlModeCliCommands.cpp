@@ -15,7 +15,7 @@ namespace
 
     constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
     constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
-    constexpr auto whileEnabledMessage = "rejected: bandwidth cannot be redesigned while enabled.";
+    constexpr auto notStoppedMessage = "rejected: settings change only while the motor is stopped.";
     constexpr auto outOfRangeMessage = "invalid value: out of range.";
 
     CliResult ToCliResult(state_machine::TuningResult result)
@@ -26,8 +26,8 @@ namespace
                 return CliResult{};
             case state_machine::TuningResult::outOfRange:
                 return CliResult{ CliStatus::error, outOfRangeMessage };
-            case state_machine::TuningResult::notWhileEnabled:
-                return CliResult{ CliStatus::error, whileEnabledMessage };
+            case state_machine::TuningResult::notStopped:
+                return CliResult{ CliStatus::error, notStoppedMessage };
             case state_machine::TuningResult::wrongMode:
                 break;
         }
@@ -181,12 +181,12 @@ namespace
             [&sm, &terminal](const infra::BoundedConstString& params)
             {
                 float value{ 0.0f };
-                if (auto error = ParseSingleFloat(params, value, 0.0f, foc::CommandLimits::maxFluxLinkage); error.has_value())
+                if (auto error = ParseSingleFloat(params, value, foc::CommandLimits::minFluxLinkage, foc::CommandLimits::maxFluxLinkage); error.has_value())
                 {
                     terminal.ProcessResult(*error);
                     return;
                 }
-                sm.SetFluxLinkage(foc::Weber{ value }, [](state_machine::CommandResult) {});
+                sm.SetMotorParameter(services::MotorParameter::fluxLinkage, value, [](state_machine::SettingResult) {});
                 terminal.ProcessResult(CliResult{});
             } });
 
@@ -308,7 +308,7 @@ namespace state_machine
         terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
             [&sm](const infra::BoundedConstString&)
             {
-                sm.ActiveStateMachine().ApplyOnlineEstimates();
+                sm.ApplyOnlineEstimates();
             } });
 
         terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },

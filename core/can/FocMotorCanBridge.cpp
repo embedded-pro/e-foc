@@ -14,8 +14,6 @@ namespace can
         drivers::Encoder& encoder,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
-        services::NonVolatileMemory& nvm,
-        services::ConfigData configData,
         services::Tracer& tracer)
         : FocMotorCategoryServerObserver(server)
         , server(server)
@@ -24,8 +22,7 @@ namespace can
         , encoder(encoder)
         , electricalIdent(electricalIdent)
         , mechIdent{ mechIdent }
-        , nvm(nvm)
-        , configData(configData)
+        , settings(server, controlMode)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -156,31 +153,17 @@ namespace can
 
     void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidCurrentId, controlMode.TrySetCurrentBandwidth(bandwidth), onDone);
+        settings.SetLegacyBandwidth(can::focSetPidCurrentId, FocParameter::currentBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidSpeedId, controlMode.TrySetSpeedBandwidth(bandwidth), onDone);
+        settings.SetLegacyBandwidth(can::focSetPidSpeedId, FocParameter::speedBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidPositionId, controlMode.TrySetPositionBandwidth(bandwidth), onDone);
-    }
-
-    void FocMotorCanBridge::ReportTuningOutcome(uint8_t messageId, state_machine::TuningResult result, const infra::Function<void()>& onDone)
-    {
-        if (result == state_machine::TuningResult::ok)
-        {
-            onDone();
-            return;
-        }
-
-        // A redesign refused because the drive is running is a state problem, not a malformed frame
-        server.SendCommandAck(messageId, result == state_machine::TuningResult::notWhileEnabled
-                                             ? services::CanAckStatus::invalidState
-                                             : services::CanAckStatus::invalidPayload);
+        settings.SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -374,62 +357,32 @@ namespace can
 
     void FocMotorCanBridge::OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
     {
-        if (pendingNvmDoneCallback != nullptr)
-        {
-            server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (resolution == 0)
-        {
-            server.SendCommandAck(can::focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        configData.encoderResolution = resolution;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.BeginNvmActivity();
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                controlMode.EndNvmActivity();
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::persistenceFailed);
-            });
+        settings.SetEncoderResolution(resolution, onDone);
     }
 
     void FocMotorCanBridge::OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
     {
-        if (pendingNvmDoneCallback != nullptr)
-        {
-            server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::busy);
-            return;
-        }
+        settings.ConfigureTelemetryRate(rateHz, onDone);
+    }
 
-        if (rateHz == 0 || rateHz > 10000)
-        {
-            server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
-            return;
-        }
+    void FocMotorCanBridge::OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)
+    {
+        settings.SelectAlgorithm(loop, algorithm, onDone);
+    }
 
-        configData.telemetryRateHz = rateHz;
-        pendingNvmDoneCallback = onDone;
+    void FocMotorCanBridge::OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone)
+    {
+        onDone(settings.ActiveAlgorithms());
+    }
 
-        controlMode.BeginNvmActivity();
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                controlMode.EndNvmActivity();
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::persistenceFailed);
-            });
+    void FocMotorCanBridge::OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone)
+    {
+        settings.SetParameter(parameter, value, onDone);
+    }
+
+    void FocMotorCanBridge::OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
+    {
+        onDone(settings.HeldValue(parameter));
     }
 
     void FocMotorCanBridge::ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,

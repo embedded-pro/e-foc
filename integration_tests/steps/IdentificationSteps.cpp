@@ -28,9 +28,9 @@ namespace
     constexpr std::size_t kElectricalResponseBytes = 5;
     constexpr useconds_t kStatePollIntervalUs = 100000;
 
-    hal::Can::Id ResponseId(uint8_t messageType)
+    hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
     {
-        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, Fixture::kServerNodeId));
+        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
     }
 
     float Fixed16(const hal::Can::Message& payload, std::size_t offset, int32_t scale)
@@ -202,7 +202,7 @@ WHEN(R"(electrical identification is run)")
     std::optional<hal::Can::Message> payload;
     ASSERT_TRUE(DrainUntil(fixture, [&]
         {
-            payload = fixture.FindCapturedCanFrame(ResponseId(can::focElectricalParamsResponseId), mark);
+            payload = fixture.FindCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark);
             return payload.has_value();
         },
         kTraceTimeout))
@@ -275,7 +275,7 @@ namespace
             const float target = atHigh ? high : low;
             ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFixed16BE(target, can::focSpeedScale)))
                 << "Speed setpoint command rejected";
-            setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target };
+            setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target, fixture.ServerNodeId() };
 
             ASSERT_TRUE(WaitForGuestTicks(fixture, setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
         }

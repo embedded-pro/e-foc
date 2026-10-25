@@ -3,6 +3,7 @@
 #include "tools/can_commander/gui/CommandPanel.hpp"
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
+#include "tools/can_commander/logic/MotorSettings.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QLabel>
@@ -33,7 +34,7 @@ namespace tool
         void SetBusConnected(bool connected);
         void OnNodeOnlineChanged(bool online);
         void OnBusyChanged(bool busy);
-        void OnCommandTimeout();
+        void OnCommandTimeout(uint8_t commandType);
         void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status);
         void OnCommandRejected(uint8_t commandType, can::FocMotorCategoryError error);
         void OnContractVersion(uint8_t major, uint8_t minor, bool compatible);
@@ -44,6 +45,8 @@ namespace tool
         void OnBusVoltage(float voltage);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2);
+        void OnAlgorithms(const can::FocAlgorithms& algorithms);
+        void OnParameter(can::FocParameter parameter, can::FocParameterValue value);
 
     signals:
         void StatusChanged();
@@ -52,12 +55,25 @@ namespace tool
         QWidget* CreateHeader();
         void ConnectCommands();
         void ConnectSetpoints();
-        void Send(const QString& command, const std::function<bool()>& send);
+        void ConnectCommissioning();
+        void ConnectSettings();
+        bool Send(const QString& command, uint8_t commandType, const std::function<bool()>& send);
         void Report(IssueSeverity severity, const QString& message) const;
         void ForgetNodeState();
         QString CommandsUnavailableReason() const;
+        QString SettingsUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
+
+        void Apply(SettingsPage& page);
+        void SendCurrentChange();
+        bool SendChange(const SettingChange& change);
+        QString Describe(const SettingChange& change) const;
+        bool IsChangeAnswer(uint8_t commandType) const;
+        void OnChangeAccepted();
+        void StopApplying(const QString& reason, bool currentSent = true);
+        void ForgetControlMode();
+        bool IsLegacy() const;
 
         CanCommandClient& client;
         const uint16_t nodeId;
@@ -73,7 +89,11 @@ namespace tool
         std::optional<bool> nodeOnline;
         QString contractVersion;
         QString pendingCommand;
+        uint8_t pendingCommandType{ 0 };
         std::optional<FocMotorState> lastState;
         std::optional<FocFaultCode> lastFault;
+
+        ChangeSequence changes;
+        SettingsPage* applyingPage{ nullptr };
     };
 }

@@ -3,9 +3,8 @@
 #include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
-#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
-#include "core/state_machine/NvmActivity.hpp"
-#include "infra/timer/Timer.hpp"
+#include "core/state_machine/ConfigWriter.hpp"
+#include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <optional>
 
@@ -14,17 +13,18 @@ namespace state_machine
     class AlgorithmPersistence
     {
     public:
-        AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer,
-            application::NvmActivity& nvmActivity);
+        using OnPersisted = infra::Function<void(services::NvmStatus)>;
+
+        AlgorithmPersistence(ConfigWriter& writer, services::ConfigData& configData, services::Tracer& tracer);
 
         void ApplyPersistedAlgorithms(
             foc::CurrentLoopSelectable* current,
             foc::SpeedLoopSelectable* speed,
             foc::PositionLoopSelectable* position);
 
-        foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, foc::CurrentLoopSelectable* selectable);
-        foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, foc::SpeedLoopSelectable* selectable);
-        foc::SelectResult SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, foc::PositionLoopSelectable* selectable);
+        foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, foc::CurrentLoopSelectable* selectable, const OnPersisted& onPersisted = nullptr);
+        foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, foc::SpeedLoopSelectable* selectable, const OnPersisted& onPersisted = nullptr);
+        foc::SelectResult SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, foc::PositionLoopSelectable* selectable, const OnPersisted& onPersisted = nullptr);
 
         foc::CurrentAlgorithm ActiveCurrentAlgorithm(const foc::CurrentLoopSelectable* selectable) const;
         foc::SpeedAlgorithm ActiveSpeedAlgorithm(const foc::SpeedLoopSelectable* selectable) const;
@@ -34,23 +34,13 @@ namespace state_machine
         static const char* SpeedAlgorithmName(foc::SpeedAlgorithm algorithm);
         static const char* PositionAlgorithmName(foc::PositionAlgorithm algorithm);
 
-        // Busy is transient, so a busy write is retried until it lands; a mode switch waits for it
-        bool HasPendingPersist() const;
-
     private:
-        void PersistConfig();
-        void RetryPersist();
-
         static std::optional<foc::CurrentAlgorithm> CurrentAlgorithmFromRaw(uint8_t raw);
         static std::optional<foc::SpeedAlgorithm> SpeedAlgorithmFromRaw(uint8_t raw);
         static std::optional<foc::PositionAlgorithm> PositionAlgorithmFromRaw(uint8_t raw);
 
-        static constexpr std::chrono::milliseconds persistRetryDelay{ 10 };
-
-        services::NonVolatileMemory& nvm;
+        ConfigWriter& writer;
         services::ConfigData& configData;
         services::Tracer& tracer;
-        application::NvmActivity& nvmActivity;
-        infra::TimerSingleShot persistRetryTimer;
     };
 }

@@ -273,3 +273,21 @@
     algorithm selection shall be refused as busy while any such write is outstanding. A calibration
     save answered busy shall be retried, not reported as a failure, and shall not be retried once
     the run has been aborted.
+
+- id: REQ-SM-031
+  title: Motor parameters can be entered while the drive is stopped
+  shall: >
+    The state machine shall accept a new phase resistance, inductance, pole-pair count, flux
+    linkage, inertia or viscous friction in Idle and Ready while no asynchronous work is
+    outstanding, whether or not a calibration record exists, and refuse it in every other
+    state. It shall store the edited record before adopting it, so that a failed write leaves
+    both the stored and the running record unchanged. A record that was complete shall stay
+    complete; an incomplete record shall become complete once it holds a pole-pair count, a
+    positive resistance and inductance and the mode-specific values the active mode requires,
+    and a complete record shall be applied to the controllers as at boot. A change of the
+    pole-pair count shall invalidate the rotor reference, so that the drive cannot be enabled
+    until the rotor has been aligned again, and shall drop the cogging map, which is binned per
+    electrical period. An edit interrupted by an emergency stop or a fault shall be answered as
+    aborted, not busy, because its record may still be stored. An electrical identification
+    shall keep the mechanical parameters and loop bandwidths of the record, which it does not
+    measure.

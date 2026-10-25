@@ -15,6 +15,8 @@ target_sources(e_foc.tool.can_commander.logic PRIVATE
     CanCommandClient.cpp
     CommandDescriptions.hpp
     CommandDescriptions.cpp
+    MotorSettings.hpp
+    MotorSettings.cpp
 )
 
 if(MSVC)

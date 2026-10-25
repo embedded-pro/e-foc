@@ -15,16 +15,21 @@ namespace application
         void ReconcileClear();
         void RejectClear();
 
-        bool IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command) const;
-        void BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command);
-        void OnFluxLinkageSaved(services::NvmStatus status);
+        bool IsAcceptableMotorParameter(const state_machine::SetMotorParameter& command) const;
+        void BeginSetMotorParameter(const state_machine::SetMotorParameter& command);
+        void AdoptMotorParameter(services::NvmStatus status);
+        void CompleteMotorParameter(services::NvmStatus status);
 
     private:
         void OnInvalidated(services::NvmStatus status);
-        void OnFluxLinkageStored(services::NvmStatus status);
+        void OnMotorParameterStored(services::NvmStatus status);
+        services::CalibrationData Edited(const services::CalibrationData& data) const;
+        bool CompletesRecord(const services::CalibrationData& data) const;
 
     private:
         const LifecycleEnvironment& env;
         const CalibrationFlow& calibration;
+        services::MotorParameter pendingParameter{ services::MotorParameter::resistance };
+        float pendingValue{ 0.0f };
     };
 }

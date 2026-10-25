@@ -51,6 +51,12 @@ namespace application
         return configured;
     }
 
+    float OuterLoopStateMachine::AutomaticSpeedLoopBandwidth() const
+    {
+        const auto bandwidth = GetCalibration().speedLoopBandwidth;
+        return foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
+    }
+
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
         ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth, TorqueConstantFor(data));
@@ -95,10 +101,11 @@ namespace application
         GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
-    void OuterLoopStateMachine::ApplyOnlineEstimates()
+    state_machine::AppliedEstimates OuterLoopStateMachine::ApplyOnlineEstimates()
     {
+        state_machine::AppliedEstimates applied;
         if (!std::holds_alternative<state_machine::Enabled>(CurrentState()))
-            return;
+            return applied;
 
         const auto inertia = GetOnlineMechEstimator().CurrentInertia();
         const auto friction = GetOnlineMechEstimator().CurrentFriction();
@@ -110,6 +117,7 @@ namespace application
         {
             GetTracer().Trace() << "[SM] Applying mechanical estimates: J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value());
             ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec, TorqueConstantFor(GetCalibration()));
+            applied.mechanics = true;
         }
 
         const auto resistance = GetOnlineElecEstimator().CurrentResistance();
@@ -121,7 +129,10 @@ namespace application
         {
             GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L_mH=" << inductance.Value();
             ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()));
+            applied.electrical = true;
         }
+
+        return applied;
     }
 
     void OuterLoopStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)

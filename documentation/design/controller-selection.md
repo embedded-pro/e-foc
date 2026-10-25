@@ -2,9 +2,9 @@
 title: "Runtime Controller Selection"
 type: design
 status: accepted
-version: 0.3.0
+version: 0.4.0
 component: "controller-selection"
-date: 2026-08-17
+date: 2026-10-25
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-08-17
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
 | Status    | accepted                     |
-| Version   | 0.3.0                        |
+| Version   | 0.4.0                        |
 | Component | controller-selection         |
-| Date      | 2026-08-17                   |
+| Date      | 2026-10-25                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -41,14 +41,16 @@ date: 2026-08-17
 - Persisting the active algorithm identifier for each loop to non-volatile memory upon each selection
 - Restoring the persisted algorithm identifiers at boot and re-configuring the controllers from NVM
   before the first Enable command
-- Exposing algorithm selection to the CLI terminal
+- Exposing algorithm selection to the CLI terminal and to the CAN interface
+- Holding the operator's tuning settings for every loop, validating them, applying them to the running
+  controllers and persisting them
 
 **Is NOT responsible for:**
 - Implementing the control algorithms themselves — each concrete controller is self-contained
 - Executing FOC transforms (Clarke, Park, SVM) — these remain inline in the FOC loop
 - Estimating motor model parameters — that is the responsibility of the RLS identification services
 - Safety monitoring or fault detection — the FOC state machine owns these
-- Tuning algorithm-specific parameters beyond what is derivable from motor model parameters
+- Choosing the tuning settings — the operator supplies them; the defaults stand in until they do
 
 ---
 
@@ -223,8 +225,14 @@ rule rather than an afterthought:
 - When disabled, `SetPositionTunings` revalidates the new tunings against the active algorithm
   and rejects them if the design fails, keeping the last accepted gains live.
 
-This is why `SetPositionTunings` returns `SelectResult` where the current and speed loops return
-`void`: those loops derive their gains algebraically and cannot fail.
+This is why `SetPositionTunings` returns `SelectResult` where the current loop returns `void`: the
+current loop derives its gains algebraically and cannot fail. The speed loop returns `SelectResult` as
+well. Its LQI law solves the same kind of Riccati equation, and with the operator's weights (Part H) it
+does not converge everywhere in their range — at the lowest bandwidths, for instance, the effort weight
+makes the iteration too slow to settle — so `LqiSpeedController` is designed with `TryCreate`, its
+feasibility is part of `IsSelectable`, and a setting it cannot be designed with is refused and leaves the
+running law as it was. Before the settings existed the speed law aborted on a design that did not
+converge; it never stops the drive that way now.
 
 `IntegralStateFeedbackLqi` is not used for the LQI position law even though it now offers a
 `TryCreate` factory. It augments the plant with `C · (−Ts)`, which reintroduces the sample period
@@ -289,9 +297,21 @@ verbatim, so an operator always learns why a selection was refused.
 
 ### Part G — CAN Interface
 
-Algorithm selection is **not** exposed over CAN. The `can-lite` `foc_motor` category defines no
-frame for it, and the CAN bridge does not reinterpret an existing frame to carry an algorithm
-identifier. Selection and query are CLI-only; see REQ-CTRL-001 and REQ-CTRL-013.
+From contract 2.1 the FOC motor category carries algorithm selection and the tuning settings
+(`service-can.md`, Part A). `SelectAlgorithm` names a loop and an algorithm of that loop and is
+held to the same rules as the CLI command: refused with `invalidState` unless the active mode is
+stopped (`Idle` or `Ready`), with `busy` while work is outstanding (Part D), with `modeMismatch` when
+the active mode does not run that loop, and with `invalidParameters` when the algorithm cannot be
+designed from the motor model it would run on (Part H). `QueryAlgorithms` reports the algorithm in force for every
+loop; a loop the active mode does not run reports the identifier stored for it.
+
+Over CAN a selection is acknowledged once its identifier has been stored, so a client never reads
+"accepted" for a choice the next power cycle would lose. The CLI keeps its immediate answer and
+stores in the background.
+
+Each tuning setting is a numbered parameter that `SetParameter` writes and `QueryParameter` reads.
+The settings follow the same gate as a selection and are kept per loop, not per algorithm: the
+record of a loop is shared by all of its algorithms, each of which reads the fields it uses.
 
 ---
 
@@ -361,47 +381,64 @@ RLS and are available as soon as electrical calibration completes.
 Each loop exposes one tuning record shared by all of its algorithms: a single closed-loop bandwidth
 plus a small set of law-specific weights. The record is not estimated — it encodes the operator's
 performance intent, and each algorithm reads only the fields that apply to it. Gains are always
-derived from the bandwidth and the motor model, never supplied per axis.
+derived from the bandwidth and the motor model, never supplied per axis. The tables list which
+algorithm reads each field, as the code designs them.
 
 **Current loop:**
 
-| Knob             | Default       | Consumed by        |
-|------------------|---------------|--------------------|
-| Bandwidth        | 2π·1000 rad/s | PID, Decoupled PID |
-| Switching gain   | 0.2           | Sliding-mode       |
-| Boundary layer   | 0.5           | Sliding-mode       |
-| Two-step variant | off           | Deadbeat           |
+| Knob             | Default   | Consumed by                      |
+|------------------|-----------|----------------------------------|
+| Bandwidth        | automatic | PID, Decoupled PID, Sliding-mode |
+| Switching gain   | 0.2 A     | Sliding-mode                     |
+| Boundary layer   | 0.5 A     | Sliding-mode                     |
+| Two-step variant | off       | Deadbeat                         |
 
 The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
 below the boundary layer, so the ratio of the two is bounded by design. This is why the back-EMF is
-handled by feedforward rather than by a larger switching gain.
+handled by feedforward rather than by a larger switching gain, and why a setting that would bring
+the switching gain to the boundary layer is refused rather than stored.
 
 **Speed loop:**
 
-| Knob                     | Default     | Consumed by |
-|--------------------------|-------------|-------------|
-| Bandwidth                | 2π·30 rad/s | PID, ADRC   |
-| Speed error weight       | 1.0         | LQI         |
-| Integral weight          | 0.1         | LQI         |
-| Observer bandwidth ratio | 5.0         | ADRC        |
-| Reference time constant  | 5.3 ms      | Two-DOF     |
+| Knob                     | Default   | Consumed by             |
+|--------------------------|-----------|-------------------------|
+| Bandwidth                | automatic | PID, LQI, ADRC, Two-DOF |
+| Speed error weight       | 1.0       | LQI                     |
+| Integral weight          | 0.1       | LQI                     |
+| Observer bandwidth ratio | 5.0       | ADRC                    |
+| Reference time constant  | 5.3 ms    | Two-DOF                 |
 
 **Position loop:**
 
-| Knob                    | Default    | Consumed by              |
-|-------------------------|------------|--------------------------|
-| Bandwidth               | 2π·3 rad/s | PID, Cascade P, LQR, LQI |
-| Position error weight   | 1.0        | PID, LQR, LQI            |
-| Speed error weight      | 0.1        | LQR, LQI                 |
-| Integral weight         | 0.05       | PID, LQI                 |
-| Reference time constant | 53 ms      | Two-DOF                  |
+| Knob                    | Default   | Consumed by                       |
+|-------------------------|-----------|-----------------------------------|
+| Bandwidth               | automatic | PID, Cascade P, LQR, LQI, Two-DOF |
+| Position error weight   | 1.0       | LQR, LQI                          |
+| Speed error weight      | 0.1       | LQR, LQI                          |
+| Integral weight         | 0.05      | LQI                               |
+| Reference time constant | 53 ms     | Two-DOF                           |
 
 Two-DOF on both outer loops derives its feedback part from the same bandwidth as the corresponding
-PID law and adds only the reference pre-filter time constant on top.
+PID law and adds only the reference pre-filter time constant on top. The position PID law has one
+knob, its bandwidth; its integral zero and reference weight are design constants
+(`documentation/theory/position-loop-pid.md`), so the weights do not reach it.
 
-Of these knobs only the current loop bandwidth and the speed loop bandwidth are persisted, as part
-of the calibration record. The remaining weights and the position loop bandwidth are not stored and
-return to their defaults on boot.
+**Automatic bandwidth.** A bandwidth the operator has not set is *automatic*: the firmware keeps
+deriving it as it always has — the current loop from the calibration record or, without one, from
+the PWM rate (a fifteenth of the switching frequency); the speed loop from the calibration record
+or 50 rad/s; the position loop at 2π·3 rad/s. Setting a bandwidth replaces the derivation until it
+is set back to automatic. A drive whose settings were never touched therefore runs exactly the
+loops it ran before the settings existed.
+
+**Persistence and application.** The settings of all three loops are one operator record, kept in
+the configuration record (`service-nvm.md`) and restored at boot. They are written into the
+running controllers whenever the active mode reaches `Ready` — after the selection restore of
+Part I — and whenever a setting or a motor parameter changes while it is stopped, because applying
+a motor model re-derives the tunings from it. Calibration in progress keeps the bandwidths its own
+identification steps need; the operator's record returns with the `Ready` that ends it. A setting
+is validated against the active algorithm before it is stored: a position LQR or LQI design that
+does not converge, or a switching gain at or above the boundary layer, is refused and leaves the
+running law and the stored record as they were.
 
 #### Readiness Gate per Algorithm
 
@@ -460,6 +497,9 @@ selection's write that comes back busy is retried after a short delay until it l
 any other write to that memory is outstanding, selections, mode changes and calibration are refused
 with *busy* (`documentation/design/state-machine.md` C2a).
 
+The operator's tuning record is stored in the same configuration record, beside the identifiers,
+and is restored with them; Part H describes when it is applied.
+
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
 `Ready` with the previously selected algorithms active, ready to enable.
@@ -482,6 +522,8 @@ repeat the selection after every power cycle. The motor state machine will trans
 | ComputeSpeedControl              | Dispatches to the active speed controller for one sample                                | Called at 1 kHz from low-priority handler.                                        |
 | ComputePositionControl           | Dispatches to the active position controller for one sample                             | Called at 1 kHz from low-priority handler.                                        |
 | ReconfigureFromCurrentParameters | Re-applies the latest RLS snapshot to the active controllers without changing algorithm | Motor must be disabled.                                                           |
+| SetLoopTunings                   | Replaces the operator's tuning record of one loop                                       | Stopped, loop in the active mode, design feasible; applied and stored when `ok`.  |
+| EffectiveLoopTunings             | Returns a loop's record with an automatic bandwidth resolved to the derived value       | Never blocks.                                                                     |
 
 ### Required
 
@@ -518,6 +560,7 @@ repeat the selection after every power cycle. The motor state machine will trans
 | NvmRecord            | positionAlgorithm    | uint8             | 0–255                                         | As above                                                         |
 | CalibrationRecord    | currentLoopBandwidth | rad/s (float)     | ≥ 0                                           | Persisted current loop bandwidth                                 |
 | CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Persisted speed loop bandwidth                                   |
+| ConfigRecord         | loop tunings         | per knob          | `service-can.md` parameter table              | Operator's settings; a bandwidth of 0 is automatic               |
 
 ---
 
@@ -624,8 +667,8 @@ graph TD
 
 ## Open Questions
 
-| # | Question                                                                                                                                                                                             | Options                                                                                    | Status |
-|---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|--------|
-| 1 | Should the CAN `SetControllerAlgorithm` frame be acknowledged synchronously (blocking until NVM write completes) or asynchronously (NVM write deferred)?                                             | Synchronous (simpler, adds latency) vs. asynchronous (lower bus latency, NVM write queued) | open   |
-| 2 | Should `ReconfigureFromCurrentParameters` be exposed on the CLI, or only as a CAN command?                                                                                                           | CLI only / CAN only / both                                                                 | open   |
-| 3 | When the motor transitions from Speed mode to Position mode, should the position-loop LQR gains be recomputed from the speed-mode ADRC's parameter snapshot, or should they be stored independently? | Independent storage (current design) vs. shared parameter snapshot                         | open   |
+| # | Question                                                                                                                                                                                             | Options                                                              | Status |
+|---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|--------|
+| 1 | Should the CAN `SetControllerAlgorithm` frame be acknowledged synchronously (blocking until NVM write completes) or asynchronously (NVM write deferred)?                                             | Acknowledged once stored (Part G), as every persisted CAN setting is | closed |
+| 2 | Should `ReconfigureFromCurrentParameters` be exposed on the CLI, or only as a CAN command?                                                                                                           | CLI only / CAN only / both                                           | open   |
+| 3 | When the motor transitions from Speed mode to Position mode, should the position-loop LQR gains be recomputed from the speed-mode ADRC's parameter snapshot, or should they be stored independently? | Independent storage (current design) vs. shared parameter snapshot   | open   |

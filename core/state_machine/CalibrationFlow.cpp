@@ -64,16 +64,24 @@ namespace application
         return false;
     }
 
-    // An external identification measures neither the current sensors nor the cogging, so the record keeps both in force.
+    // An external identification measures neither the current sensors, the cogging, the mechanics nor the loop
+    // bandwidths, so the record keeps all of them in force.
     void CalibrationFlow::BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
+        const auto& held = env.context.Data();
+
         env.pending.Accept(command.onDone);
         calibrating.pendingData = command.data;
-        calibrating.pendingData.currentOffsetA = env.context.Data().currentOffsetA;
-        calibrating.pendingData.currentOffsetB = env.context.Data().currentOffsetB;
-        calibrating.pendingData.currentOffsetC = env.context.Data().currentOffsetC;
-        calibrating.pendingData.coggingTorque = env.context.Data().coggingTorque;
-        calibrating.pendingData.coggingTorqueScale = env.context.Data().coggingTorqueScale;
+        calibrating.pendingData.currentOffsetA = held.currentOffsetA;
+        calibrating.pendingData.currentOffsetB = held.currentOffsetB;
+        calibrating.pendingData.currentOffsetC = held.currentOffsetC;
+        calibrating.pendingData.coggingTorque = held.coggingTorque;
+        calibrating.pendingData.coggingTorqueScale = held.coggingTorqueScale;
+        calibrating.pendingData.inertia = held.inertia;
+        calibrating.pendingData.frictionViscous = held.frictionViscous;
+        calibrating.pendingData.frictionCoulomb = held.frictionCoulomb;
+        calibrating.pendingData.currentLoopBandwidth = held.currentLoopBandwidth;
+        calibrating.pendingData.speedLoopBandwidth = held.speedLoopBandwidth;
         RunAlignmentOnly(calibrating);
     }
 

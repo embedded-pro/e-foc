@@ -9,7 +9,9 @@
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Observer.hpp"
 #include <cstdint>
+#include <deque>
 #include <map>
+#include <optional>
 #include <set>
 
 namespace tool
@@ -31,7 +33,7 @@ namespace tool
 
         virtual void OnNodeOnlineChanged(uint16_t nodeId, bool online) = 0;
         virtual void OnBusyChanged(uint16_t nodeId, bool busy) = 0;
-        virtual void OnCommandTimeout(uint16_t nodeId) = 0;
+        virtual void OnCommandTimeout(uint16_t nodeId, uint8_t commandType) = 0;
         virtual void OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) = 0;
         virtual void OnCommandRejected(uint16_t nodeId, uint8_t commandType, can::FocMotorCategoryError error) = 0;
         virtual void OnContractVersion(uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible) = 0;
@@ -44,6 +46,8 @@ namespace tool
         virtual void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) = 0;
         virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
         virtual void OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2) = 0;
+        virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
+        virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
     };
 
     class CanCommandClient
@@ -54,6 +58,10 @@ namespace tool
     {
     public:
         static constexpr infra::Duration commandTimeout{ std::chrono::seconds(2) };
+        static constexpr infra::Duration motionCommandTimeout{ std::chrono::minutes(2) };
+        static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
+        static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
+        static constexpr uint8_t settingsContractMinor{ 1 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -62,6 +70,8 @@ namespace tool
         bool IsOnline(uint16_t nodeId) const;
         std::set<uint16_t> OnlineNodes() const;
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
+        bool SupportsSettings(uint16_t nodeId) const;
+        static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
         bool SendStopMotor(uint16_t nodeId);
@@ -75,7 +85,17 @@ namespace tool
         bool SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth);
         bool SendSetPositionBandwidth(uint16_t nodeId, float bandwidth);
 
+        bool SendClearFault(uint16_t nodeId);
+        bool SendAlign(uint16_t nodeId);
+        bool SendIdentifyElectrical(uint16_t nodeId);
+        bool SendIdentifyMechanical(uint16_t nodeId);
+        bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
+        bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
+        bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);
+
         bool RequestData(uint16_t nodeId);
+        void RequestSettings(uint16_t nodeId);
+        void RequestStatus(uint16_t nodeId);
 
     private:
         struct NodeCommand
@@ -85,11 +105,32 @@ namespace tool
             infra::TimerSingleShot timeout;
         };
 
+        struct Read
+        {
+            uint8_t commandType{ 0 };
+            can::FocParameter parameter{ can::FocParameter::currentBandwidth };
+        };
+
+        struct NodeReads
+        {
+            std::deque<Read> queued;
+            std::optional<uint8_t> inFlight;
+            infra::TimerSingleShot timeout;
+        };
+
         void MarkBusy(uint16_t nodeId, uint8_t commandType);
         void ClearBusy(uint16_t nodeId);
         void CompleteCommand(uint16_t nodeId, uint8_t commandType);
         void MarkOnline(uint16_t nodeId);
         void MarkOffline(uint16_t nodeId);
+        void QueueRead(uint16_t nodeId, Read read);
+        void SendNextRead(uint16_t nodeId);
+        void CompleteRead(uint16_t nodeId, uint8_t commandType);
+        bool SendRead(uint16_t nodeId, const Read& read);
+        void ForgetReads(uint16_t nodeId);
+        void OnAccepted(uint16_t nodeId, uint8_t commandType);
+        void RefreshStatus();
+        static bool IsRead(uint8_t commandType);
 
         template<class Send>
         bool Tracked(uint16_t nodeId, uint8_t commandType, Send send);
@@ -107,6 +148,8 @@ namespace tool
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnMechanicalParamsResponse(uint16_t nodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) override;
+        void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
+        void OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
 
         // services::CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) override;
@@ -119,6 +162,9 @@ namespace tool
 
         can::FocMotorCanClient focClient;
         std::map<uint16_t, NodeCommand> commands;
+        std::map<uint16_t, NodeReads> reads;
+        std::map<uint16_t, uint8_t> contractMinors;
         std::set<uint16_t> onlineNodes;
+        infra::TimerRepeating statusRefresh;
     };
 }

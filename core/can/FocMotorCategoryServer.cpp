@@ -28,8 +28,16 @@ namespace can
             setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
             setPidCurrent, setPidSpeed, setPidPosition,
             align, identifyElectrical, identifyMechanical, requestTelemetry,
-            setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion);
+            setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion,
+            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter);
     }
+
+    FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
+        : selectAlgorithm{ focSelectAlgorithmId, server, &FocMotorCategoryServer::HandleSelectAlgorithm }
+        , queryAlgorithms{ focQueryAlgorithmsId, server, &FocMotorCategoryServer::HandleQueryAlgorithms }
+        , setParameter{ focSetParameterId, server, &FocMotorCategoryServer::HandleSetParameter }
+        , queryParameter{ focQueryParameterId, server, &FocMotorCategoryServer::HandleQueryParameter }
+    {}
 
     uint8_t FocMotorCategoryServer::Id() const
     {
@@ -421,6 +429,120 @@ namespace can
         SendCommandAck(focQueryContractVersionId, services::CanAckStatus::success);
 
         return true;
+    }
+
+    bool FocMotorCategoryServer::HandleSelectAlgorithm(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focSelectAlgorithmId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto rawLoop = reader.ReadUInt8();
+        const auto algorithm = reader.ReadUInt8();
+
+        if (!reader.Valid() || rawLoop > static_cast<uint8_t>(FocControlLoop::position))
+            return false;
+
+        const auto loop = static_cast<FocControlLoop>(rawLoop);
+        if (algorithm >= AlgorithmCount(loop))
+            return false;
+
+        NotifyObservers([this, loop, algorithm](auto& observer)
+            {
+                observer.OnSelectAlgorithm(loop, algorithm, [this](const FocAlgorithms& algorithms)
+                    {
+                        SendAlgorithmsResponse(algorithms);
+                        SendCommandAck(focSelectAlgorithmId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleQueryAlgorithms(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focQueryAlgorithmsId))
+            return false;
+
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnQueryAlgorithms([this](const FocAlgorithms& algorithms)
+                    {
+                        SendAlgorithmsResponse(algorithms);
+                        SendCommandAck(focQueryAlgorithmsId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleSetParameter(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focSetParameterId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto descriptor = FindParameter(reader.ReadUInt8());
+        const auto value = ReadFloat32(reader);
+
+        if (!reader.Valid() || !descriptor.has_value() || !IsAcceptableParameterValue(*descriptor, value))
+            return false;
+
+        NotifyObservers([this, parameter = descriptor->id, value](auto& observer)
+            {
+                observer.OnSetParameter(parameter, value, [this, parameter](FocParameterValue held)
+                    {
+                        SendParameterResponse(parameter, held);
+                        SendCommandAck(focSetParameterId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleQueryParameter(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focQueryParameterId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto descriptor = FindParameter(reader.ReadUInt8());
+
+        if (!reader.Valid() || !descriptor.has_value())
+            return false;
+
+        NotifyObservers([this, parameter = descriptor->id](auto& observer)
+            {
+                observer.OnQueryParameter(parameter, [this, parameter](FocParameterValue held)
+                    {
+                        SendParameterResponse(parameter, held);
+                        SendCommandAck(focQueryParameterId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    void FocMotorCategoryServer::SendAlgorithmsResponse(const FocAlgorithms& algorithms)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(algorithms.mode));
+        payload.WriteUInt8(static_cast<uint8_t>(algorithms.current));
+        payload.WriteUInt8(static_cast<uint8_t>(algorithms.speed));
+        payload.WriteUInt8(static_cast<uint8_t>(algorithms.position));
+        SendResponse(focAlgorithmsResponseId, payload);
+    }
+
+    void FocMotorCategoryServer::SendParameterResponse(FocParameter parameter, FocParameterValue value)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(parameter));
+        payload.WriteUInt8(value.automatic ? focParameterAutomaticFlag : 0);
+        WriteFloat32(payload, value.value);
+        SendResponse(focParameterResponseId, payload);
     }
 
     void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
