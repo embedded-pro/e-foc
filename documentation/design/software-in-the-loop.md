@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.6.0
+version: 1.7.0
 component: "software-in-the-loop"
-date: 2026-10-23
+date: 2026-10-25
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.6.0                       |
+| Version   | 1.7.0                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-10-23                  |
+| Date      | 2026-10-25                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1005,3 +1005,9 @@ tracer, so a step that needs the outcome drains the trace for the line it expect
 for a prompt.
 
 **Not required:** any test-only command. The target's CAN and terminal surfaces are the product's.
+
+> **Planned.** Scenarios will command the target and decide their verdicts over CAN only, and the
+> serial output becomes a debug log no scenario parses. On this target, CAN moves to its own emulated
+> serial port, the plant's samples and command-delivery ticks move to a file the plant writes in the
+> scenario directory, and the terminal commands and traces above stop being part of the interface.
+> See *Planned — Commands and Verdicts over CAN Only* in `documentation/design/integration-testing.md`.
