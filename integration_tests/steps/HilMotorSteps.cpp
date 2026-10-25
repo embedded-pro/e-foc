@@ -1,5 +1,6 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/support/ControllerSelection.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include <chrono>
@@ -25,22 +26,17 @@ namespace
             d += twoPi;
         return d;
     }
-
-    std::string CommandFor(const std::string& loop)
-    {
-        if (loop == "current")
-            return "select_current_algorithm";
-        if (loop == "speed")
-            return "select_speed_algorithm";
-        return "select_position_algorithm";
-    }
 }
 
-WHEN(R"(the {word} loop algorithm is set to {word})", (std::string loop, std::string algorithm))
+WHEN(R"(the {word} loop algorithm is set to {word})", (std::string loopName, std::string algorithmName))
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand(CommandFor(loop) + " " + algorithm)) << "Could not send the algorithm selection";
-    ASSERT_NE(fixture.lastResponse.find("selected"), std::string::npos) << "The " << loop << " algorithm " << algorithm << " was not accepted: " << fixture.lastResponse;
+    const auto loop = LoopNamed(loopName);
+    ASSERT_TRUE(loop.has_value()) << "Unknown control loop: " << loopName;
+    const auto algorithm = AlgorithmNamed(*loop, algorithmName);
+    ASSERT_TRUE(algorithm.has_value()) << "Unknown " << loopName << " loop algorithm: " << algorithmName;
+    ASSERT_TRUE(SelectAlgorithmOverCan(fixture, *loop, *algorithm))
+        << "The target refused the " << algorithmName << " " << loopName << " loop algorithm";
 }
 
 THEN(R"(the identified pole pairs shall be {int})", (int expected))

@@ -239,10 +239,12 @@ Each row is a dependence on the terminal or on a trace today, and what replaces 
 | `estimate_status` and the `[EST]` traces                      | online estimator scenarios                                    | a `QueryEstimates` command, answered with the tracked resistance, inductance, inertia and friction                                                         | new       |
 | `loop_stats`, `clear_stats` and the `[LOOP]` traces           | control-loop timing                                           | `QueryLoopStatistics` and `ClearLoopStatistics`                                                                                                            | new       |
 | `[SM] … loop algorithm:` traces                               | controller matrix                                             | `QueryAlgorithms`                                                                                                                                          | 2.1       |
-| `select_*_algorithm`                                          | hardware motor scenarios                                      | `SelectAlgorithm`                                                                                                                                          | 2.1       |
 | `watchdog_stall`, the `[WDT]` trace and the reset-cause trace | emulator watchdog                                             | the stall is scheduled in the world description, like a disturbance; the reset cause is read with a `QueryResetCause` command once the heartbeat returns   | new       |
 | `CAN_RX` and `CAN_TX` lines                                   | every emulator scenario                                       | the CAN-only emulated serial port                                                                                                                          | transport |
 | `PLANT` and `CAN_RX_AT` lines                                 | step-response, disturbance and estimator scenarios            | the plant record file                                                                                                                                      | transport |
+
+Algorithm selection on the hardware motor scenarios already goes over CAN (`SelectAlgorithm`, contract
+2.1): reading the terminal's reply raced the trace output, so a heartbeat trace line could be taken for it.
 
 The runner's own `[METRIC]` lines are its report on standard error, not target output, and stay.
 

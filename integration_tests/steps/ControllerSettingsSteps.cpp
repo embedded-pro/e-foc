@@ -2,9 +2,9 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/support/ControllerSelection.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
-#include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -23,38 +23,6 @@ namespace
     hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
     {
         return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
-    }
-
-    std::optional<can::FocControlLoop> LoopNamed(const std::string& name)
-    {
-        if (name == "current")
-            return can::FocControlLoop::current;
-        if (name == "speed")
-            return can::FocControlLoop::speed;
-        if (name == "position")
-            return can::FocControlLoop::position;
-        return std::nullopt;
-    }
-
-    std::optional<uint8_t> AlgorithmNamed(can::FocControlLoop loop, const std::string& name)
-    {
-        static constexpr std::array<const char*, 4> current{ "pid", "decoupled", "deadbeat", "sliding" };
-        static constexpr std::array<const char*, 4> speed{ "pid", "lqi", "adrc", "twodof" };
-        static constexpr std::array<const char*, 5> position{ "pid", "cascadep", "lqr", "lqi", "twodof" };
-
-        const auto find = [&name](const auto& names) -> std::optional<uint8_t>
-        {
-            for (uint8_t index = 0; index != names.size(); ++index)
-                if (name == names[index])
-                    return index;
-            return std::nullopt;
-        };
-
-        if (loop == can::FocControlLoop::current)
-            return find(current);
-        if (loop == can::FocControlLoop::speed)
-            return find(speed);
-        return find(position);
     }
 
     std::optional<can::FocParameter> ParameterNamed(const std::string& name)
@@ -115,10 +83,7 @@ WHEN(R"(the {word} loop controller is set to {word} over CAN)", (std::string loo
     const auto algorithm = AlgorithmNamed(*loop, algorithmName);
     ASSERT_TRUE(algorithm.has_value()) << "Unknown " << loopName << " loop algorithm: " << algorithmName;
 
-    hal::Can::Message payload;
-    payload.push_back(static_cast<uint8_t>(*loop));
-    payload.push_back(*algorithm);
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSelectAlgorithmId, payload, kSettingTimeout))
+    ASSERT_TRUE(SelectAlgorithmOverCan(fixture, *loop, *algorithm))
         << "The target refused the " << algorithmName << " " << loopName << " loop controller";
 }
 
