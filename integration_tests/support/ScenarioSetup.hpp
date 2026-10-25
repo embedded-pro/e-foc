@@ -13,6 +13,7 @@ namespace integration
     {
         uint8_t messageType{ 0 };
         float value{ 0.0f };
+        uint16_t nodeId{ 1 };
     };
 
     struct IdentifiedParameters

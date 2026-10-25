@@ -20,9 +20,9 @@ namespace
     constexpr auto kSettingTimeout = std::chrono::seconds{ 10 };
     constexpr auto kResponseTimeout = std::chrono::seconds{ 5 };
 
-    hal::Can::Id ResponseId(uint8_t messageType)
+    hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
     {
-        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, Fixture::kServerNodeId));
+        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
     }
 
     std::optional<can::FocControlLoop> LoopNamed(const std::string& name)
@@ -70,7 +70,7 @@ namespace
         const auto deadline = std::chrono::steady_clock::now() + kResponseTimeout;
         while (true)
         {
-            if (auto response = fixture.FindCapturedCanFrame(ResponseId(messageType), mark))
+            if (auto response = fixture.FindCapturedCanFrame(ResponseId(fixture, messageType), mark))
                 return response;
             if (std::chrono::steady_clock::now() >= deadline)
                 return std::nullopt;

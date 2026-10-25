@@ -156,6 +156,11 @@ The command transport heartbeats while it awaits an acknowledgement, as a CAN cl
 identification acknowledges only when it ends, and the target emergency-stops an identification or an
 enabled drive whose client falls silent (see the CAN service design).
 
+The transport addresses the node whose heartbeat it waits for at the start of a scenario. A board
+answers as its configured base plus the board ID read from its jumpers, so the suite takes the node
+ID from the first server heartbeat it sees rather than assuming node 1; the emulated target, with
+no jumpers, is node 1.
+
 ### Required from the system under test
 
 - A CAN command set covering mode selection, calibration, alignment, enable, disable, setpoints,
