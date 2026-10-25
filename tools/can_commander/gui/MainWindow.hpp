@@ -48,7 +48,7 @@ namespace tool
         void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& frame) override;
         void OnNodeOnlineChanged(uint16_t nodeId, bool online) override;
         void OnBusyChanged(uint16_t nodeId, bool busy) override;
-        void OnCommandTimeout(uint16_t nodeId) override;
+        void OnCommandTimeout(uint16_t nodeId, uint8_t commandType) override;
         void OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
         void OnCommandRejected(uint16_t nodeId, uint8_t commandType, can::FocMotorCategoryError error) override;
         void OnContractVersion(uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible) override;
@@ -60,6 +60,8 @@ namespace tool
         void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) override;
         void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
         void OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2) override;
+        void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
+        void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
 
         void BuildMenus();
         void BuildFileMenu();

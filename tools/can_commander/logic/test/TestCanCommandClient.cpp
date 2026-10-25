@@ -7,8 +7,10 @@
 #include "tools/can_commander/logic/test/CanCommandClientObserverMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <bit>
 #include <limits>
 #include <set>
+#include <vector>
 
 namespace
 {
@@ -97,9 +99,65 @@ namespace
             LogReceived(rawId, Message({ can::focMotorCategoryId, commandType, static_cast<uint8_t>(status), 0 }));
         }
 
-        void DeliverContract(uint8_t major, uint16_t node)
+        void DeliverContract(uint8_t major, uint16_t node, uint8_t minor = 0)
         {
-            Receive(FocId(services::CanPriority::response, can::focContractVersionResponseId, node), Message({ major, 0 }));
+            Receive(FocId(services::CanPriority::response, can::focContractVersionResponseId, node), Message({ major, minor }));
+        }
+
+        struct SentFrame
+        {
+            uint16_t node;
+            uint8_t messageType;
+            hal::Can::Message payload;
+        };
+
+        void RecordSends()
+        {
+            EXPECT_CALL(adapter, SendData(_, _, _))
+                .Times(testing::AnyNumber())
+                .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                    {
+                        if (services::ExtractCanCategory(id.Get29BitId()) == can::focMotorCategoryId)
+                            sent.push_back({ static_cast<uint16_t>(services::ExtractCanNodeId(id.Get29BitId())), services::ExtractCanMessageType(id.Get29BitId()), msg });
+                        cb(true);
+                    }));
+        }
+
+        std::vector<uint8_t> SentTypes() const
+        {
+            std::vector<uint8_t> types;
+            for (const auto& frame : sent)
+                types.push_back(frame.messageType);
+            return types;
+        }
+
+        std::size_t Count(uint8_t messageType) const
+        {
+            return static_cast<std::size_t>(std::count_if(sent.begin(), sent.end(), [messageType](const SentFrame& frame)
+                {
+                    return frame.messageType == messageType;
+                }));
+        }
+
+        void AnswerLastRead(uint16_t node = 1)
+        {
+            DeliverAck(sent.back().messageType, node);
+        }
+
+        void AnswerAllReads(uint16_t node = 1)
+        {
+            for (auto before = std::size_t{ 0 }; before != sent.size();)
+            {
+                before = sent.size();
+                AnswerLastRead(node);
+            }
+        }
+
+        void BringCompatible(uint16_t node, uint8_t minor)
+        {
+            BringOnline(node);
+            EXPECT_CALL(observer, OnContractVersion(node, can::focContractVersionMajor, minor, true));
+            DeliverContract(can::focContractVersionMajor, node, minor);
         }
 
         void SetBusConnected(bool connected)
@@ -139,6 +197,7 @@ namespace
         CanCommandClient client{ adapter };
         StrictMock<CanCommandClientObserverMock> observer{ client };
         hal::Can::Message capturedPayload;
+        std::vector<SentFrame> sent;
     };
 
     class TestCanCommandClientAdapterFails
@@ -297,8 +356,15 @@ TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
     EXPECT_TRUE(client.SendSetCurrentBandwidth(8, 500.0f));
     EXPECT_TRUE(client.SendSetSpeedBandwidth(9, 188.5f));
     EXPECT_TRUE(client.SendSetPositionBandwidth(10, 18.8f));
+    EXPECT_TRUE(client.SendClearFault(11));
+    EXPECT_TRUE(client.SendAlign(12));
+    EXPECT_TRUE(client.SendIdentifyElectrical(13));
+    EXPECT_TRUE(client.SendIdentifyMechanical(14));
+    EXPECT_TRUE(client.SendSetEncoderResolution(15, 4096));
+    EXPECT_TRUE(client.SendSelectAlgorithm(16, can::FocControlLoop::speed, 1));
+    EXPECT_TRUE(client.SendSetParameter(17, can::FocParameter::inertia, 1.0e-5f));
 
-    for (uint16_t node = 1; node <= 10; ++node)
+    for (uint16_t node = 1; node <= 17; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 
@@ -379,7 +445,7 @@ TEST_F(TestCanCommandClient, a_pending_command_times_out_after_the_command_timeo
     ForwardTime(CanCommandClient::commandTimeout - std::chrono::milliseconds(1));
     EXPECT_TRUE(client.IsBusy(1));
 
-    EXPECT_CALL(observer, OnCommandTimeout(1));
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStartId));
     ForwardTime(std::chrono::milliseconds(1));
     EXPECT_FALSE(client.IsBusy(1));
 }
@@ -393,7 +459,7 @@ TEST_F(TestCanCommandClient, a_newer_command_restarts_the_timeout)
     ForwardTime(std::chrono::milliseconds(1500));
     EXPECT_TRUE(client.IsBusy(1));
 
-    EXPECT_CALL(observer, OnCommandTimeout(1));
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focEmergencyStopId));
     ForwardTime(std::chrono::milliseconds(500));
 }
 
@@ -597,8 +663,243 @@ TEST_F(TestCanCommandClientAdapterFails, timeout_after_failed_send_ends_the_pend
 {
     client.SendStartMotor(1);
 
-    EXPECT_CALL(observer, OnCommandTimeout(1));
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStartId));
     ForwardTime(CanCommandClient::commandTimeout);
 
     EXPECT_FALSE(client.IsBusy(1));
+}
+
+TEST_F(TestCanCommandClient, a_node_supports_settings_from_contract_2_1)
+{
+    EXPECT_FALSE(client.SupportsSettings(1));
+
+    RecordSends();
+    BringCompatible(1, 0);
+    EXPECT_FALSE(client.SupportsSettings(1));
+
+    BringCompatible(2, 1);
+    EXPECT_TRUE(client.SupportsSettings(2));
+}
+
+TEST_F(TestCanCommandClient, a_2_1_node_is_read_one_request_at_a_time_once_found_compatible)
+{
+    BringOnline(1);
+    RecordSends();
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 1, true));
+    DeliverContract(can::focContractVersionMajor, 1, 1);
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId }), SentTypes());
+    EXPECT_FALSE(client.IsBusy(1));
+
+    AnswerLastRead();
+
+    ASSERT_EQ(2u, sent.size());
+    EXPECT_EQ(can::focQueryParameterId, sent.back().messageType);
+    EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::currentBandwidth), sent.back().payload[1]);
+}
+
+TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+
+    AnswerAllReads();
+
+    EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
+}
+
+TEST_F(TestCanCommandClient, a_2_0_node_is_only_asked_for_its_status)
+{
+    BringOnline(1);
+    RecordSends();
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 0, true));
+    DeliverContract(can::focContractVersionMajor, 1, 0);
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, an_incompatible_node_is_not_read)
+{
+    BringOnline(1);
+    RecordSends();
+    EXPECT_CALL(observer, OnContractVersion(1, _, _, false));
+    DeliverContract(static_cast<uint8_t>(can::focContractVersionMajor + 1), 1, 1);
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+
+    EXPECT_TRUE(sent.empty());
+}
+
+TEST_F(TestCanCommandClient, an_unanswered_read_gives_way_to_the_next_after_the_read_timeout)
+{
+    BringOnline(1);
+    RecordSends();
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 1, true));
+    DeliverContract(can::focContractVersionMajor, 1, 1);
+
+    ForwardTime(CanCommandClient::readTimeout - std::chrono::milliseconds(1));
+    EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId }), SentTypes());
+
+    ForwardTime(std::chrono::milliseconds(1));
+    EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId, can::focQueryParameterId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, a_refused_read_is_not_reported_and_gives_way_to_the_next)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+
+    Receive(FocId(services::CanPriority::response, services::canCategoryErrorResponseMessageTypeId, 1),
+        Message({ can::focQueryAlgorithmsId, static_cast<uint8_t>(can::FocMotorCategoryError::busy) }));
+
+    EXPECT_EQ(can::focQueryParameterId, sent.back().messageType);
+}
+
+TEST_F(TestCanCommandClient, an_algorithms_response_is_relayed)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    EXPECT_CALL(observer, OnAlgorithmsReceived(1, can::FocAlgorithms{ can::FocMotorMode::speed, can::FocCurrentAlgorithm::pid, can::FocSpeedAlgorithm::adrc, can::FocPositionAlgorithm::pid }));
+
+    Receive(FocId(services::CanPriority::response, can::focAlgorithmsResponseId, 1), Message({ 1, 0, 2, 0 }));
+}
+
+TEST_F(TestCanCommandClient, a_parameter_response_is_relayed_with_its_value_and_flags)
+{
+    const auto bits = std::bit_cast<uint32_t>(188.5f);
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    EXPECT_CALL(observer, OnParameterReceived(1, can::FocParameter::speedBandwidth, can::FocParameterValue{ 188.5f, true }));
+
+    Receive(FocId(services::CanPriority::response, can::focParameterResponseId, 1),
+        Message({ static_cast<uint8_t>(can::FocParameter::speedBandwidth), can::focParameterAutomaticFlag,
+            static_cast<uint8_t>(bits >> 24), static_cast<uint8_t>(bits >> 16), static_cast<uint8_t>(bits >> 8), static_cast<uint8_t>(bits) }));
+}
+
+TEST_F(TestCanCommandClient, set_parameter_carries_the_value_as_a_big_endian_float)
+{
+    CaptureNextPayload();
+    client.SendSetParameter(1, can::FocParameter::speedBandwidth, 188.5f);
+
+    EXPECT_EQ((std::vector<uint8_t>{ static_cast<uint8_t>(can::FocParameter::speedBandwidth), 0x43, 0x3C, 0x80, 0x00 }),
+        std::vector<uint8_t>(capturedPayload.begin() + 1, capturedPayload.end()));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_mode_change_reads_the_settings_again)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+    AnswerAllReads();
+    client.SendSetControlMode(1, can::FocMotorMode::speed);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focSelectControlModeId, services::CanAckStatus::success));
+    DeliverAck(can::focSelectControlModeId);
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+    AnswerAllReads();
+    client.SendAlign(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focAlignId, services::CanAckStatus::success));
+    DeliverAck(can::focAlignId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
+{
+    RecordSends();
+    BringCompatible(1, 0);
+    AnswerAllReads();
+    client.SendStartMotor(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focStartId, services::CanAckStatus::success));
+    DeliverAck(can::focStartId);
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, a_refused_command_reads_nothing)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+    AnswerAllReads();
+    client.SendSetControlMode(1, can::FocMotorMode::speed);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focSelectControlModeId, services::CanAckStatus::invalidState));
+    DeliverAck(can::focSelectControlModeId, 1, services::CanAckStatus::invalidState);
+
+    EXPECT_TRUE(sent.empty());
+}
+
+TEST_F(TestCanCommandClient, the_status_of_a_compatible_node_is_read_every_second)
+{
+    RecordSends();
+    BringCompatible(1, 0);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focRequestTelemetryId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, a_status_read_is_not_queued_twice)
+{
+    RecordSends();
+    BringCompatible(1, 0);
+
+    client.RequestStatus(1);
+    client.RequestStatus(1);
+    AnswerAllReads();
+
+    EXPECT_EQ(2u, Count(can::focRequestTelemetryId));
+}
+
+TEST_F(TestCanCommandClient, going_offline_forgets_the_reads)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, false));
+    EXPECT_CALL(observer, OnConnectionChanged(false));
+    SetBusConnected(false);
+    sent.clear();
+
+    ForwardTime(std::chrono::seconds(5));
+
+    EXPECT_TRUE(sent.empty());
+}
+
+TEST_F(TestCanCommandClient, alignment_and_identification_wait_two_minutes_for_their_answer)
+{
+    client.SendAlign(1);
+    client.SendIdentifyElectrical(2);
+    client.SendIdentifyMechanical(3);
+
+    ForwardTime(std::chrono::seconds(10));
+    EXPECT_TRUE(client.IsBusy(1));
+
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focAlignId));
+    EXPECT_CALL(observer, OnCommandTimeout(2, can::focIdentifyElectricalId));
+    EXPECT_CALL(observer, OnCommandTimeout(3, can::focIdentifyMechanicalId));
+    ForwardTime(CanCommandClient::motionCommandTimeout - std::chrono::seconds(10));
+}
+
+TEST_F(TestCanCommandClient, the_timeout_follows_the_command)
+{
+    EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focSetParameterId));
+    EXPECT_EQ(CanCommandClient::motionCommandTimeout, CanCommandClient::TimeoutFor(can::focAlignId));
 }

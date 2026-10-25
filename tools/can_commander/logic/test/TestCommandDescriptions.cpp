@@ -37,3 +37,19 @@ TEST_F(TestCommandDescriptions, describes_rejections_in_plain_language)
     EXPECT_EQ("rejected: not valid in the active control mode", RejectionDescription(can::FocMotorCategoryError::modeMismatch));
     EXPECT_EQ("rejected for an unknown reason", RejectionDescription(static_cast<can::FocMotorCategoryError>(0xff)));
 }
+
+TEST_F(TestCommandDescriptions, names_commissioning_and_settings_commands)
+{
+    EXPECT_EQ("Align Rotor", CommandDisplayName(can::focMotorCategoryId, can::focAlignId));
+    EXPECT_EQ("Identify Electrical", CommandDisplayName(can::focMotorCategoryId, can::focIdentifyElectricalId));
+    EXPECT_EQ("Identify Mechanical", CommandDisplayName(can::focMotorCategoryId, can::focIdentifyMechanicalId));
+    EXPECT_EQ("Encoder Resolution", CommandDisplayName(can::focMotorCategoryId, can::focSetEncoderResolutionId));
+    EXPECT_EQ("Controller Selection", CommandDisplayName(can::focMotorCategoryId, can::focSelectAlgorithmId));
+    EXPECT_EQ("Setting", CommandDisplayName(can::focMotorCategoryId, can::focSetParameterId));
+}
+
+TEST_F(TestCommandDescriptions, explains_a_design_that_cannot_be_made)
+{
+    EXPECT_EQ("rejected: the controller cannot be designed from the motor parameters and settings it has",
+        RejectionDescription(can::FocMotorCategoryError::invalidParameters));
+}

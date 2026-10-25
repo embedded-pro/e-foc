@@ -34,10 +34,36 @@ namespace tool
         ui::backend::qt::StyleStatusLabel(*hintLabel, ui::theme::StatusLevel::Warning);
         layout->addWidget(hintLabel);
 
+        controllers = new ControllersTab();
+        motorParameters = new MotorParametersTab();
+        configuration = new ConfigurationTab();
+
         tabs = new QTabWidget();
         tabs->addTab(CreateMotorControlTab(), "&Motor Control");
-        tabs->addTab(CreatePidTuningTab(), "&PID Tuning");
+        tabs->addTab(controllers, "C&ontrollers");
+        tabs->addTab(motorParameters, "Motor &Parameters");
+        tabs->addTab(configuration, "Confi&guration");
         layout->addWidget(tabs, 1);
+    }
+
+    ControllersTab& CommandPanel::Controllers() const
+    {
+        return *controllers;
+    }
+
+    MotorParametersTab& CommandPanel::MotorParameters() const
+    {
+        return *motorParameters;
+    }
+
+    ConfigurationTab& CommandPanel::Configuration() const
+    {
+        return *configuration;
+    }
+
+    std::array<SettingsPage*, 3> CommandPanel::SettingsPages() const
+    {
+        return { controllers, motorParameters, configuration };
     }
 
     QWidget* CommandPanel::CreateMotorControlTab()
@@ -65,13 +91,17 @@ namespace tool
 
         auto* startButton = new QPushButton("&Start Motor");
         auto* stopButton = new QPushButton("S&top Motor");
+        auto* clearFaultButton = new QPushButton("Clear F&ault");
         layout->addWidget(startButton);
         layout->addWidget(stopButton);
+        layout->addWidget(clearFaultButton);
 
         commandWidgets.push_back(startButton);
         commandWidgets.push_back(stopButton);
+        commandWidgets.push_back(clearFaultButton);
         connect(startButton, &QPushButton::clicked, this, &CommandPanel::StartMotorRequested);
         connect(stopButton, &QPushButton::clicked, this, &CommandPanel::StopMotorRequested);
+        connect(clearFaultButton, &QPushButton::clicked, this, &CommandPanel::ClearFaultRequested);
         return group;
     }
 
@@ -137,54 +167,6 @@ namespace tool
         return group;
     }
 
-    QWidget* CommandPanel::CreatePidTuningTab()
-    {
-        using foc::CommandLimits;
-
-        auto* page = new QWidget();
-        auto* layout = new QVBoxLayout(page);
-        pidStack = new QStackedWidget();
-
-        for (int loops = 1; loops <= 3; ++loops)
-        {
-            auto* loopPage = new QWidget();
-            auto* loopLayout = new QVBoxLayout(loopPage);
-            AddBandwidthGroup(*loopLayout, "Current Loop Bandwidth", CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
-            if (loops >= 2)
-                AddBandwidthGroup(*loopLayout, "Speed Loop Bandwidth", CommandLimits::maxSpeedBandwidth, &CommandPanel::SetSpeedBandwidthRequested);
-            if (loops >= 3)
-                AddBandwidthGroup(*loopLayout, "Position Loop Bandwidth", CommandLimits::maxPositionBandwidth, &CommandPanel::SetPositionBandwidthRequested);
-            loopLayout->addStretch();
-            pidStack->addWidget(loopPage);
-        }
-
-        layout->addWidget(pidStack);
-        return page;
-    }
-
-    void CommandPanel::AddBandwidthGroup(QVBoxLayout& layout, const char* title, float maxBandwidth, void (CommandPanel::*signal)(float))
-    {
-        auto* group = new QGroupBox(title);
-        auto* formLayout = new QFormLayout(group);
-
-        auto* spin = new QDoubleSpinBox();
-        spin->setRange(foc::CommandLimits::minBandwidth, static_cast<double>(maxBandwidth));
-        spin->setDecimals(DecimalsFor(can::focPidScale));
-        spin->setSuffix(" rad/s");
-        spin->setKeyboardTracking(false);
-        formLayout->addRow("Bandwidth:", spin);
-
-        auto* applyButton = new QPushButton("Apply");
-        formLayout->addRow(applyButton);
-        layout.addWidget(group);
-
-        commandWidgets.push_back(applyButton);
-        connect(applyButton, &QPushButton::clicked, this, [this, spin, signal]()
-            {
-                emit(this->*signal)(static_cast<float>(spin->value()));
-            });
-    }
-
     void CommandPanel::SetCommandsAvailable(const QString& unavailableReason, bool explained)
     {
         const bool available = unavailableReason.isEmpty();
@@ -196,6 +178,16 @@ namespace tool
 
         hintLabel->setText(unavailableReason);
         hintLabel->setVisible(!available && explained);
+
+        motorParameters->SetActionsAvailable(unavailableReason);
+        configuration->SetUnavailable(unavailableReason);
+    }
+
+    // Controllers and motor parameters change only while the motor is stopped; start-up settings at any time
+    void CommandPanel::SetSettingsAvailable(const QString& unavailableReason)
+    {
+        controllers->SetUnavailable(unavailableReason);
+        motorParameters->SetUnavailable(unavailableReason);
     }
 
     void CommandPanel::ShowRequestedControlMode(can::FocMotorMode mode)
@@ -211,14 +203,15 @@ namespace tool
             return;
 
         setpointStack->setCurrentIndex(index);
-        pidStack->setCurrentIndex(index);
         modeLabel->setText(QString("Active: %1").arg(ControlModeName(mode)));
         ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Ok);
+        controllers->SetMode(mode);
     }
 
     void CommandPanel::ClearActiveControlMode()
     {
         modeLabel->setText("Active: unknown");
         ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Neutral);
+        controllers->SetMode(std::nullopt);
     }
 }
