@@ -28,17 +28,22 @@ date: 2026-10-25
 ## Overview
 
 The suite is a **black-box driver**. It starts a target running the real firmware, speaks to it
-over the product's own CAN command set, and asserts on the telemetry and traces that come back. It
+over the product's own CAN command set, and asserts on the frames that come back and, on an
+emulated target, on the plant's own record. It
 does not reach into the firmware, does not mock its components, and knows nothing of its internal
 types.
 
 Scenarios are authored in Gherkin and live in a single directory. A tag decides which target
 implements a scenario, and the runner is invoked with that tag.
 
-| Tag    | Target                                           | Detailed in                                    |
-|--------|--------------------------------------------------|------------------------------------------------|
-| `@sil` | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
-| `@hil` | Real firmware on hardware, over the bridge       | This document                                  |
+| Tag          | Target                                                               | Detailed in                                    |
+|--------------|----------------------------------------------------------------------|------------------------------------------------|
+| `@sil`       | Real firmware under an emulator, simulated motor                     | `documentation/design/software-in-the-loop.md` |
+| `@hil_motor` | The motor-controller firmware on hardware, over the bridge, CAN only | This document                                  |
+| `@hil`       | The bring-up image on hardware, over the bridge, with its terminal   | This document                                  |
+
+`@hil` is the only tag whose scenarios get the terminal (see *Out of scope: the bring-up image*); a
+motor-controller scenario on hardware is tagged `@hil_motor`.
 
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the
 > state machine directly. No such fixture exists, and none is planned: mocking the platform and
@@ -108,7 +113,7 @@ sequenceDiagram
     R->>I: boot
     I->>T: restart with those in place
     R->>T: commands
-    T-->>R: telemetry and traces
+    T-->>R: acknowledgements, responses, telemetry
     R->>I: after scenario
     I->>T: stop and discard
 ```
@@ -285,4 +290,4 @@ One follow-up change, in this order, each step leaving the suite green:
 4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use;
    they remain only in the bring-up fixture, so a new step cannot bring them back. Done.
 5. **Documents.** Rewrite Observation and Interfaces here, and Parts B, D, G, I and J and the
-   Interfaces of the software-in-the-loop design, for the new channels.
+   Interfaces of the software-in-the-loop design, for the new channels. Done.
