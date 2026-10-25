@@ -15,6 +15,8 @@ add_library(e_foc.integration_tests.support OBJECT
     plant/PlantConfigWriter.hpp
     plant/PlantConfigWriter.cpp
     plant/PlantPresets.hpp
+    TerminalFixture.hpp
+    TerminalFixture.cpp
 )
 
 target_include_directories(e_foc.integration_tests.support PUBLIC

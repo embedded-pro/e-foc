@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <gtest/gtest.h>
 
@@ -7,12 +7,12 @@ using namespace integration;
 
 WHEN(R"(the force_hardfault command is sent to the hardware target)")
 {
-    context.Get<Fixture>().SendCommand("force_hardfault", hil::timeouts::cleanup);
+    context.Get<TerminalFixture>().SendCommand("force_hardfault", hil::timeouts::cleanup);
 }
 
 THEN(R"(the fault_status command reports captured fault data)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
     ASSERT_TRUE(fixture.SendCommand("fault_status", hil::timeouts::prompt))
         << "fault_status command did not respond";
     bool foundFaultData = false;

@@ -194,6 +194,8 @@ Every metric assertion prints a `[METRIC]` line; limits are pinned from those li
 
 **SIL channels**: CAN frames travel as `CAN_RX`/`CAN_TX` text lines on the emulator's second serial port; the first is the product's terminal, which no scenario writes to. Everything the firmware prints is the scenario's debug log (`debug.log` in the scenario directory), and a failed scenario's report carries its last lines.
 
+**Terminal guard**: motor-controller steps use `integration::Fixture`, which speaks CAN only. The terminal is `TerminalInteractor` (implemented by the hardware interactor alone) behind `TerminalFixture`, which the `@hil` bring-up hook emplaces; never add terminal or trace access to `Fixture` or `TargetInteractor`.
+
 ## Agent routing
 
 - **orchestrator** — first stop for any non-trivial task; triages to specialists

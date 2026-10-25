@@ -29,7 +29,6 @@ namespace
     constexpr const char* kDebugLogName = "debug.log";
     constexpr std::string_view kTransmittedPrefix{ "CAN_TX " };
     constexpr auto kPumpSlice = std::chrono::milliseconds{ 10 };
-    constexpr auto kQuietSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kGdbAttachTimeout = std::chrono::milliseconds{ 300000 };
 
     bool SilVerbose()
@@ -194,7 +193,7 @@ namespace sil
         if (!debugLog.is_open())
             debugLog.open(scenarioDirectory + "/" + kDebugLogName, std::ios::out | std::ios::app);
 
-        const std::string terminalPath = SocketPath("terminal");
+        terminalPath = SocketPath("terminal");
         const std::string canPath = SocketPath("can");
         unlink(terminalPath.c_str());
         unlink(canPath.c_str());
@@ -266,8 +265,7 @@ namespace sil
         close(pipefd[1]);
         outPipeFd = pipefd[0];
 
-        const bool connected = ConnectSocket(terminalSockFd, terminalPath) && ConnectSocket(canSockFd, canPath);
-        unlink(terminalPath.c_str());
+        const bool connected = ConnectSocket(canSockFd, canPath);
         unlink(canPath.c_str());
 
         if (!connected)
@@ -275,6 +273,9 @@ namespace sil
             Stop();
             return false;
         }
+
+        if (SilVerbose())
+            std::fprintf(stderr, "[QEMU] terminal socket %s\n", terminalPath.c_str());
 
         if (std::getenv("SIL_GDB") != nullptr)
             PumpUntil(std::chrono::steady_clock::now() + kGdbAttachTimeout, [this]()
@@ -316,12 +317,14 @@ namespace sil
         if (pid < 0)
             return;
 
-        for (int* fd : { &outPipeFd, &terminalSockFd, &canSockFd })
+        for (int* fd : { &outPipeFd, &canSockFd })
             if (*fd >= 0)
             {
                 close(*fd);
                 *fd = -1;
             }
+
+        unlink(terminalPath.c_str());
 
         int status = 0;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ 2000 };
@@ -347,48 +350,10 @@ namespace sil
 
     void QemuSilSession::ResetCapture()
     {
-        capturedLines.clear();
         debugTail.clear();
         debugLinesSeen = 0;
         receivedFrames.clear();
         nextFrame = 0;
-    }
-
-    bool QemuSilSession::SendTerminalLine(const std::string& line)
-    {
-        if (terminalSockFd < 0)
-            return false;
-
-        if (SilVerbose())
-            std::fprintf(stderr, "[host->QEMU terminal] %s\n", line.c_str());
-
-        const std::string data = line + "\n";
-        return write(terminalSockFd, data.data(), data.size()) == static_cast<ssize_t>(data.size());
-    }
-
-    void QemuSilSession::DrainDebugOutput(std::chrono::milliseconds timeout)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            const auto seen = debugLinesSeen;
-            const auto slice = std::min(deadline, std::chrono::steady_clock::now() + kQuietSlice);
-            if (!PumpUntil(slice, [this, seen]()
-                    {
-                        return debugLinesSeen != seen;
-                    }))
-                return;
-        }
-    }
-
-    const std::vector<std::string>& QemuSilSession::CapturedLines() const
-    {
-        return capturedLines;
-    }
-
-    void QemuSilSession::ClearCapturedLines()
-    {
-        capturedLines.clear();
     }
 
     std::string QemuSilSession::DebugLogTail() const
@@ -514,13 +479,11 @@ namespace sil
         if (debugLog.is_open())
             debugLog << line << '\n';
 
-        debugTail.push_back(line);
+        debugTail.push_back(std::move(line));
         if (debugTail.size() > debugTailLines)
             debugTail.pop_front();
 
         ++debugLinesSeen;
-        if (capturedLines.size() < maxCapturedLines)
-            capturedLines.push_back(std::move(line));
     }
 
     void QemuSilSession::OnCanLine(const std::string& line)

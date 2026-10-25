@@ -24,15 +24,6 @@ namespace sil
         void ConfigureNonVolatileMemory(const std::vector<uint8_t>& image) override;
         void RestartTarget() override;
 
-        bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) override;
-        bool DrainSerial(std::chrono::milliseconds timeout) override;
-        bool WaitForPrompt(std::chrono::milliseconds timeout) override;
-        void ClearSerialLines() override;
-        const std::vector<std::string>& SerialLines() const override;
-        std::size_t DiscardedSerialLineCount() const override;
-        const std::string& LastSerialLine() const override;
-        std::chrono::milliseconds LastSerialDuration() const override;
-
         void ClearCanFrames() override;
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
             std::chrono::milliseconds timeout) override;
@@ -50,7 +41,5 @@ namespace sil
     private:
         std::string elfPath;
         QemuSilSession session;
-        std::string lastLine;
-        std::size_t discardedSerialLines{ 0 };
     };
 }

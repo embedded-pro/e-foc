@@ -1,6 +1,7 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <algorithm>
@@ -22,20 +23,21 @@ namespace
 WHEN(R"(a CAN command is transmitted to the hardware target)")
 {
     auto& fixture = context.Get<Fixture>();
+    auto& terminal = context.Get<TerminalFixture>();
 
     fixture.StartCanCapture();
 
-    ASSERT_TRUE(fixture.SendCommand("can_start " + std::to_string(hil::GetBridgeConfig().canBitrate), hil::timeouts::command))
+    ASSERT_TRUE(terminal.SendCommand("can_start " + std::to_string(hil::GetBridgeConfig().canBitrate), hil::timeouts::command))
         << "can_start command did not receive a response";
 
-    ASSERT_TRUE(fixture.SendCommand("can_send 256 1 2 3", hil::timeouts::command))
+    ASSERT_TRUE(terminal.SendCommand("can_send 256 1 2 3", hil::timeouts::command))
         << "can_send command did not receive a response within timeout";
 
     fixture.MarkCanReference();
 
-    fixture.FlushPartialLines(hil::timeouts::command);
+    terminal.FlushPartialLines(hil::timeouts::command);
 
-    const bool acknowledged = std::any_of(fixture.allLines.begin(), fixture.allLines.end(),
+    const bool acknowledged = std::any_of(terminal.allLines.begin(), terminal.allLines.end(),
         [](const std::string& l)
         {
             return l.find("CAN frame sent") != std::string::npos;

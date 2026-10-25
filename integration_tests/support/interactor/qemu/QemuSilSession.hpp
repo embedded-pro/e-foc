@@ -35,10 +35,6 @@ namespace sil
         bool IsRunning() const;
         void ResetCapture();
 
-        bool SendTerminalLine(const std::string& line);
-        void DrainDebugOutput(std::chrono::milliseconds timeout);
-        const std::vector<std::string>& CapturedLines() const;
-        void ClearCapturedLines();
         std::string DebugLogTail() const;
 
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data);
@@ -57,18 +53,16 @@ namespace sil
         bool TakeFrame(hal::Can::Id expectedId, hal::Can::Message& out);
         void ReadPlantRecord(std::vector<std::string>& lines);
 
-        static constexpr std::size_t maxCapturedLines = 16384;
         static constexpr std::size_t debugTailLines = 200;
 
         std::string scenarioDirectory;
+        std::string terminalPath;
         pid_t pid{ -1 };
         bool exited{ false };
         int outPipeFd{ -1 };
-        int terminalSockFd{ -1 };
         int canSockFd{ -1 };
 
         std::string debugPartial;
-        std::vector<std::string> capturedLines;
         std::size_t debugLinesSeen{ 0 };
         std::deque<std::string> debugTail;
         std::ofstream debugLog;

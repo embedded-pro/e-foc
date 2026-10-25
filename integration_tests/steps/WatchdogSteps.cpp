@@ -3,6 +3,7 @@
 #include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <chrono>
@@ -17,9 +18,9 @@ namespace
 {
     constexpr auto kRebootTimeout = std::chrono::seconds{ 60 };
 
-    bool ContainsLine(const Fixture& fixture, const std::string& text)
+    bool ContainsLine(const TerminalFixture& terminal, const std::string& text)
     {
-        for (const auto& line : fixture.allLines)
+        for (const auto& line : terminal.allLines)
             if (line.find(text) != std::string::npos)
                 return true;
 
@@ -54,9 +55,9 @@ THEN(R"(the emulated target reboots and reports the reset cause Watchdog)")
 
 WHEN(R"(the watchdog_stall command is sent to the hardware target)")
 {
-    auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("watchdog_stall", hil::timeouts::command))
+    auto& terminal = context.Get<TerminalFixture>();
+    ASSERT_TRUE(terminal.SendCommand("watchdog_stall", hil::timeouts::command))
         << "watchdog_stall command did not respond";
-    ASSERT_TRUE(ContainsLine(fixture, "[WDT] stalling event loop"))
+    ASSERT_TRUE(ContainsLine(terminal, "[WDT] stalling event loop"))
         << "watchdog_stall did not report that the event loop is about to stall";
 }

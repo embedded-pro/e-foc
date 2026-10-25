@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <chrono>
 #include <gtest/gtest.h>
@@ -9,7 +9,7 @@ using namespace integration;
 
 namespace
 {
-    void ExpectReportedResetCause(Fixture& fixture, const std::string& cause)
+    void ExpectReportedResetCause(TerminalFixture& fixture, const std::string& cause)
     {
         ASSERT_TRUE(fixture.SendCommand("reset_cause", hil::timeouts::command))
             << "reset_cause command did not respond";
@@ -29,12 +29,12 @@ namespace
 
 WHEN(R"(the reset command is sent to the hardware target)")
 {
-    context.Get<Fixture>().SendCommand("reset", hil::timeouts::cleanup);
+    context.Get<TerminalFixture>().SendCommand("reset", hil::timeouts::cleanup);
 }
 
 WHEN(R"(the hardware target reconnects after reset)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
 
     const auto deadline = std::chrono::steady_clock::now() + hil::timeouts::bootBanner;
     bool reconnected = false;
@@ -55,10 +55,10 @@ WHEN(R"(the hardware target reconnects after reset)")
 
 THEN(R"(the reset_cause command reports Software)")
 {
-    ExpectReportedResetCause(context.Get<Fixture>(), "Software");
+    ExpectReportedResetCause(context.Get<TerminalFixture>(), "Software");
 }
 
 THEN(R"(the reset_cause command reports Watchdog)")
 {
-    ExpectReportedResetCause(context.Get<Fixture>(), "Watchdog");
+    ExpectReportedResetCause(context.Get<TerminalFixture>(), "Watchdog");
 }

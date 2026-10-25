@@ -19,7 +19,8 @@ using namespace integration;
 namespace
 {
     constexpr auto kIdentificationTimeout = std::chrono::seconds{ 180 };
-    constexpr auto kTraceTimeout = std::chrono::seconds{ 15 };
+    constexpr auto kResponseTimeout = std::chrono::seconds{ 15 };
+    constexpr auto kRecordPollSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kExcitationWallClockTimeout = std::chrono::seconds{ 300 };
     constexpr float kMilliPerUnit = 1000.0f;
     constexpr float kReferenceCelsius = 25.0f;
@@ -41,19 +42,6 @@ namespace
         services::CanPayloadWriter payload;
         payload.WriteFixed16(value, scale);
         return payload.Message();
-    }
-
-    template<typename Predicate>
-    bool DrainUntil(Fixture& fixture, Predicate done, std::chrono::milliseconds timeout)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (done())
-                return true;
-            fixture.DrainLines(std::chrono::milliseconds{ 50 });
-        }
-        return done();
     }
 
     void ReadCalibrationRecord(Fixture& fixture, IdentifiedParameters& out)
@@ -144,28 +132,29 @@ namespace
         EXPECT_GE(excessPercent, minimumPercent) << source << " " << quantity << " is " << *value << " against a plant of " << *truth;
     }
 
-    void FeedTrace(ScenarioSetup& setup)
+    void FeedTrace(ScenarioSetup& setup, std::chrono::milliseconds timeout = std::chrono::milliseconds{ 0 })
     {
-        for (const auto& line : TargetInteractor::Instance().TakePlantRecord(std::chrono::milliseconds{ 0 }))
+        for (const auto& line : TargetInteractor::Instance().TakePlantRecord(timeout))
             setup.trace.Consume(line);
     }
 
     // Guest time, not wall-clock: the plant's own samples say how far its clock has advanced, which is
     // what makes the excitation the same length on every host.
-    bool WaitForGuestTicks(Fixture& fixture, ScenarioSetup& setup, uint32_t ticks)
+    bool WaitForGuestTicks(ScenarioSetup& setup, uint32_t ticks)
     {
         FeedTrace(setup);
         const auto from = setup.trace.LastSampleTick();
         if (!from)
             return false;
 
-        return DrainUntil(fixture, [&]
-            {
-                FeedTrace(setup);
-                const auto last = setup.trace.LastSampleTick();
-                return last && *last >= *from + ticks;
-            },
-            kExcitationWallClockTimeout);
+        const auto deadline = std::chrono::steady_clock::now() + kExcitationWallClockTimeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            if (const auto last = setup.trace.LastSampleTick(); last && *last >= *from + ticks)
+                return true;
+            FeedTrace(setup, kRecordPollSlice);
+        }
+        return false;
     }
 }
 
@@ -178,14 +167,8 @@ WHEN(R"(electrical identification is run)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    std::optional<hal::Can::Message> payload;
-    ASSERT_TRUE(DrainUntil(fixture, [&]
-        {
-            payload = fixture.FindCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark);
-            return payload.has_value();
-        },
-        kTraceTimeout))
-        << "The target sent no electrical parameters response";
+    const auto payload = fixture.WaitForCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark, kResponseTimeout);
+    ASSERT_TRUE(payload.has_value()) << "The target sent no electrical parameters response";
     ASSERT_GE(payload->size(), kElectricalResponseBytes) << "Electrical parameters response is too short";
 
     setup.identified.resistanceOhm = Fixed16(*payload, 0, can::focResistanceScale);
@@ -233,7 +216,7 @@ namespace
                 << "Speed setpoint command rejected";
             setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target, fixture.ServerNodeId() };
 
-            ASSERT_TRUE(WaitForGuestTicks(fixture, setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
+            ASSERT_TRUE(WaitForGuestTicks(setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
         }
     }
 }

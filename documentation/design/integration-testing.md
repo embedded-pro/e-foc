@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.3.0
+version: 1.4.0
 component: integration-testing
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.3.0                      |
+| Version   | 1.4.0                      |
 | Component | integration-testing        |
 | Date      | 2026-10-25                 |
 
@@ -71,13 +71,21 @@ telemetry transport, and — for a simulated target only — the world the firmw
 ```mermaid
 graph TD
     STEPS["Step definitions"] --> FIXTURE["Scenario fixture"]
+    STEPS --> TFIXTURE["Bring-up terminal fixture"]
     FIXTURE --> SEAM["Target interactor"]
+    TFIXTURE --> TSEAM["Terminal interactor"]
     SEAM --> SIL["Emulator interactor"]
     SEAM --> HIL["Hardware interactor"]
+    TSEAM --> HIL
     SIL --> QEMU["Emulated target"]
     HIL --> BRIDGE["Hardware bridge"]
     BRIDGE --> BOARD["Motor board"]
 ```
+
+The terminal is not part of that seam. It has an interactor of its own, which only the hardware
+interactor implements, and a fixture of its own, which exists only in a scenario tagged `@hil` (see
+*Out of scope: the bring-up image*). A motor-controller step has no terminal to write to and no trace
+to read, and on the emulator there is no terminal interactor at all.
 
 The simulation seam — describe the plant, describe stored memory, restart — defaults to doing
 nothing and to reporting that simulation is unsupported. A hardware target inherits that default,
@@ -126,15 +134,14 @@ electrical-parameters response against the plant the scenario configured. Every 
 float, so no unit is scaled to suit a printout.
 
 Everything a target prints is its debug log. The emulated target's is kept per scenario, and the
-report of a failed scenario carries its last lines. Only the bring-up scenarios (see *Out of scope:
-the bring-up image* below) still send terminal commands and read traces. Trace output only drains
-while the target's event loop has work, and trace lines are cleared per scenario and per restart,
-so an assertion cannot match a line from an earlier boot.
+report of a failed scenario carries its last lines. Only the bring-up scenarios send terminal
+commands and read traces, through the bring-up terminal fixture. Its lines are cleared per scenario
+and per restart, so an assertion cannot match a line from an earlier boot.
 
 ### Isolation
 
 Scenarios ran into each other through three shared resources, all now per session: the working
-directory holding the target's files, the sockets carrying frames and terminal lines, and the
+directory holding the target's files, the sockets behind the target's serial ports, and the
 captured output.
 
 ---
@@ -149,7 +156,7 @@ captured output.
 | Command transport | Send a category command and await its acknowledgement                       |
 | Telemetry         | Await a state, a fault code, or read the measured position                  |
 | Readings          | Read a numbered parameter or the running algorithms over CAN                |
-| Serial capture    | Drain and search the bring-up image's trace output                          |
+| Bring-up terminal | Send a terminal command and search the trace output, in `@hil` scenarios    |
 | Simulation        | Describe the plant and the stored calibration and configuration             |
 | Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
@@ -185,9 +192,10 @@ directly, so the mapping lives with the scenarios rather than in this document w
 
 ## Planned — Commands and Verdicts over CAN Only
 
-> **Status: in progress.** Every row of *What has to move* is done: the motor-controller scenarios
-> command the target and decide their verdicts over CAN and the plant record only, as the sections
-> above describe. The guard of migration step 4 and the CAN Commander views of step 1 remain.
+> **Status: in progress.** Every row of *What has to move* is done, and the guard of migration step
+> 4 is in place: the motor-controller scenarios command the target and decide their verdicts over
+> CAN and the plant record only, as the sections above describe. The CAN Commander views of step 1
+> remain.
 
 ### The rule
 
@@ -260,7 +268,8 @@ it is not a command: it is part of the simulated world and exists only on the em
 The hardware-test image (scenarios tagged `@hil`: ADC, PWM, encoder, EEPROM, CAN peripheral, UART,
 hard fault, reset cause, watchdog) brings up a board; it is not the motor controller. Its terminal is
 its interface, the UART scenario tests that terminal itself, and the CAN scenario checks the
-peripheral before any CAN command server runs. It keeps using the terminal.
+peripheral before any CAN command server runs. It keeps using the terminal, through a fixture that
+a hook creates only for a scenario tagged `@hil`.
 
 ### Migration
 
@@ -274,6 +283,6 @@ One follow-up change, in this order, each step leaving the suite green:
 3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its
    stall in the world description. Done.
 4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use;
-   they remain only in the bring-up fixture, so a new step cannot bring them back.
+   they remain only in the bring-up fixture, so a new step cannot bring them back. Done.
 5. **Documents.** Rewrite Observation and Interfaces here, and Parts B, D, G, I and J and the
    Interfaces of the software-in-the-loop design, for the new channels.

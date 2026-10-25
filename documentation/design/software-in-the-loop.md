@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.8.0
+version: 1.9.0
 component: "software-in-the-loop"
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.8.0                       |
+| Version   | 1.9.0                       |
 | Component | software-in-the-loop        |
 | Date      | 2026-10-25                  |
 
@@ -30,8 +30,7 @@ Software-in-the-loop runs the **real firmware** for the emulated Cortex-M4 targe
 emulator, against a simulated three-phase motor that the firmware itself owns. The test host
 commands it over the wire the product speaks, CAN frames carried as text lines on an emulated
 serial port of their own, and reads what the motor did from a record the plant writes. Everything
-the firmware prints is kept as the scenario's debug log; until the remaining terminal steps move to
-CAN, some scenarios still read its traces.
+the firmware prints is kept as the scenario's debug log, which no scenario reads for a verdict.
 
 Nothing is mocked on the target. The state machine, the control cascades, the calibration
 services, the non-volatile memory stack and the CAN server are the shipping ones. Only the motor,
@@ -52,7 +51,7 @@ graph LR
     SESSION -->|"NVM image"| APP
     SESSION <-->|"CAN frames"| APP
     PLANT -->|"plant record"| SESSION
-    APP -->|"traces"| SESSION
+    APP -->|"debug log"| SESSION
 ```
 
 ---
@@ -62,7 +61,8 @@ graph LR
 **Is responsible for:**
 - Describing the motor plant per scenario and delivering that description to the firmware at boot
 - Pre-seeding non-volatile memory so a scenario starts from a chosen calibration and configuration
-- Driving the target only through its CAN command set and observing only its telemetry and traces
+- Driving the target only through its CAN command set and observing only its CAN frames and the
+  plant record
 - Simulating the board protection the hardware provides, and the wiring faults hardware can suffer
 - Isolating scenarios from one another so neither files nor sockets nor captured output leak across
 
@@ -125,7 +125,9 @@ description and its memory image by plain relative name and knows nothing about 
 The directory, and the sockets behind the target's serial ports, are unique per session; scenarios
 ran into each other when either was shared.
 
-The target has two serial ports. The first is the product's terminal. The second carries only CAN
+The target has two serial ports. The first is the product's terminal, which the host does not
+connect to; with `SIL_VERBOSE` set it prints the terminal socket's path, so a person can attach to
+a running scenario. The second carries only CAN
 frames, one text line per frame in each direction, so a frame can never be split by a terminal line
 or taken for one. Whatever the firmware prints, traces and terminal output alike, goes to the
 emulator's console and is the scenario's debug log: it is written to the scenario directory, and a
@@ -199,7 +201,7 @@ REQ-PERF-004 requires.
 The mode scenarios boot calibrated and clear the counters before the rotor is aligned on command,
 so the window covers alignment as well as closed-loop running, and run every current law in torque
 mode and the decoupled law in speed and position mode. The calibration scenario clears them before
-a full calibration is run from the terminal, so the window covers every identification procedure
+a full calibration is run over CAN, so the window covers every identification procedure
 and the alignment between them. Each requires at least one execution, a non-zero shortest one (a
 dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest execution under a
 pinned limit. With the current-offset and dead-time corrections in the path, the slowest execution
@@ -410,7 +412,7 @@ plant therefore also carries a signed shaft torque, which keeps its sign whateve
 like gravity on an arm.
 
 A scenario schedules that torque in the plant description: a magnitude and a delay after
-enabling. The control tick applies it on the exact tick, notes the tick on the trace, and the
+enabling. The control tick applies it on the exact tick, notes the tick in the plant record, and the
 loop under test has to hold its setpoint against it. Re-enabling re-arms the schedule and
 disabling clears the torque, so every enable starts from the same plant.
 
@@ -562,8 +564,7 @@ Three product channels carry what the firmware believes, all of them CAN message
 - The **online estimates** (`0x90`–`0x93`), seeded from the record and updated at the outer-loop
   rate while the motor runs.
 
-Every value travels as a float, so the micro-units the traces need for inertia and friction play no
-part.
+Every value travels as a float, so no unit is scaled to suit a printout.
 
 The scenarios cover the offline procedures from a blank calibration and from one deliberately
 wrong by given factors, the online estimators from a wrong seed under a speed reference that

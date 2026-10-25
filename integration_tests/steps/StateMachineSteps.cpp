@@ -10,6 +10,7 @@ GIVEN(R"(the {word} motor system is initialised with no valid calibration data)"
 {
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "CAN stack not ready";
+    (void)fixture.SendCanCommand(can::focMotorCategoryId, can::focStopId);
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focClearCalibrationId, {}, std::chrono::seconds{ 10 }))
         << "The target did not clear its stored calibration";
 }

@@ -5,13 +5,16 @@
 #include "integration_tests/support/interactor/hardware/SerialLogger.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
+#include "integration_tests/support/interactor/interfaces/TerminalInteractor.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
 
 namespace hil
 {
-    class HardwareInteractor : public integration::TargetInteractor
+    class HardwareInteractor
+        : public integration::TargetInteractor
+        , public integration::TerminalInteractor
     {
     public:
         explicit HardwareInteractor(const BridgeConfig& config);

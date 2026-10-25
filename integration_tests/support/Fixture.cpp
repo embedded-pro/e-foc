@@ -14,6 +14,7 @@ namespace
     }
 
     constexpr auto kHeartbeatSlice = std::chrono::milliseconds{ 250 };
+    constexpr auto kCapturePollSlice = std::chrono::milliseconds{ 50 };
 
     bool IsServerHeartbeat(uint32_t rawId)
     {
@@ -29,43 +30,6 @@ namespace integration
     Fixture::Fixture()
         : interactor{ TargetInteractor::Instance() }
     {}
-
-    void Fixture::SyncLines()
-    {
-        allLines = interactor.SerialLines();
-        lastResponse = interactor.LastSerialLine();
-        lastCommandDuration = interactor.LastSerialDuration();
-    }
-
-    bool Fixture::SendCommand(const std::string& command, std::chrono::milliseconds timeout)
-    {
-        const bool ok = interactor.SendCommand(command, timeout);
-        SyncLines();
-        return ok;
-    }
-
-    bool Fixture::DrainLines(std::chrono::milliseconds timeout)
-    {
-        const bool ok = interactor.DrainSerial(timeout);
-        SyncLines();
-        return ok;
-    }
-
-    bool Fixture::FlushPartialLines(std::chrono::milliseconds timeout)
-    {
-        const auto linesBeforeFlush = allLines;
-        const bool ok = interactor.DrainSerial(timeout);
-        SyncLines();
-        allLines.insert(allLines.begin(), linesBeforeFlush.begin(), linesBeforeFlush.end());
-        return ok;
-    }
-
-    bool Fixture::WaitForPrompt(std::chrono::milliseconds timeout)
-    {
-        const bool ok = interactor.WaitForPrompt(timeout);
-        SyncLines();
-        return ok;
-    }
 
     bool Fixture::WaitForCanHeartbeat(std::chrono::milliseconds timeout)
     {
@@ -364,31 +328,26 @@ namespace integration
         return interactor.FindReceivedCanFrame(id, from.frame);
     }
 
+    std::optional<hal::Can::Message> Fixture::WaitForCapturedCanFrame(hal::Can::Id id, CaptureMark from, std::chrono::milliseconds timeout)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (true)
+        {
+            if (auto found = FindCapturedCanFrame(id, from))
+                return found;
+
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+            if (remaining <= std::chrono::milliseconds{ 0 })
+                return std::nullopt;
+
+            hal::Can::Message payload;
+            std::chrono::milliseconds elapsed{ 0 };
+            (void)WaitForCanFrame(id, payload, std::min(remaining, kCapturePollSlice), elapsed);
+        }
+    }
+
     Fixture::CaptureMark Fixture::MarkCapture() const
     {
-        return { CapturedLineCount(), interactor.ReceivedCanFrameCount() };
-    }
-
-    std::size_t Fixture::CapturedLineCount() const
-    {
-        return interactor.DiscardedSerialLineCount() + interactor.SerialLines().size();
-    }
-
-    std::optional<std::string> Fixture::LastCapturedLineWith(std::size_t fromMark, const std::string& needle) const
-    {
-        const auto& lines = interactor.SerialLines();
-        std::optional<std::string> found;
-
-        for (std::size_t i = LineIndexOf(fromMark); i < lines.size(); ++i)
-            if (lines[i].find(needle) != std::string::npos)
-                found = lines[i];
-
-        return found;
-    }
-
-    std::size_t Fixture::LineIndexOf(std::size_t mark) const
-    {
-        const auto discarded = interactor.DiscardedSerialLineCount();
-        return mark > discarded ? mark - discarded : 0;
+        return { interactor.ReceivedCanFrameCount() };
     }
 }

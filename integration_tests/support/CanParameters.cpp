@@ -21,15 +21,7 @@ namespace integration
 
     std::optional<hal::Can::Message> CapturedResponse(Fixture& fixture, uint8_t messageType, Fixture::CaptureMark mark)
     {
-        const auto deadline = std::chrono::steady_clock::now() + kResponseTimeout;
-        while (true)
-        {
-            if (auto response = fixture.FindCapturedCanFrame(ResponseId(fixture, messageType), mark))
-                return response;
-            if (std::chrono::steady_clock::now() >= deadline)
-                return std::nullopt;
-            fixture.DrainLines(std::chrono::milliseconds{ 50 });
-        }
+        return fixture.WaitForCapturedCanFrame(ResponseId(fixture, messageType), mark, kResponseTimeout);
     }
 
     std::optional<can::FocParameter> ParameterNamed(const std::string& name)

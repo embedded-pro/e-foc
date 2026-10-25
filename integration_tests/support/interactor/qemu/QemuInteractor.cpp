@@ -17,7 +17,6 @@ namespace sil
 
     void QemuInteractor::BeforeScenario()
     {
-        lastLine.clear();
         session.ResetCapture();
         if (!session.CreateScenarioDirectory())
             GTEST_FAIL() << "[QEMU] could not create the scenario working directory";
@@ -53,60 +52,7 @@ namespace sil
 
     void QemuInteractor::RestartTarget()
     {
-        ClearSerialLines();
         ASSERT_TRUE(session.Restart(elfPath)) << "[QEMU] QEMU session failed to restart";
-    }
-
-    // The terminal answers through the tracer, so a step that needs the outcome drains the serial lines for
-    // the trace it expects rather than waiting here.
-    bool QemuInteractor::SendCommand(const std::string& command, std::chrono::milliseconds)
-    {
-        if (!session.IsRunning())
-            return false;
-        return session.SendTerminalLine(command);
-    }
-
-    bool QemuInteractor::DrainSerial(std::chrono::milliseconds timeout)
-    {
-        if (!session.IsRunning())
-            return true;
-
-        session.DrainDebugOutput(timeout);
-        const auto& lines = session.CapturedLines();
-        lastLine = lines.empty() ? std::string{} : lines.back();
-        return true;
-    }
-
-    bool QemuInteractor::WaitForPrompt(std::chrono::milliseconds)
-    {
-        return true;
-    }
-
-    void QemuInteractor::ClearSerialLines()
-    {
-        discardedSerialLines += session.CapturedLines().size();
-        lastLine.clear();
-        session.ClearCapturedLines();
-    }
-
-    const std::vector<std::string>& QemuInteractor::SerialLines() const
-    {
-        return session.CapturedLines();
-    }
-
-    std::size_t QemuInteractor::DiscardedSerialLineCount() const
-    {
-        return discardedSerialLines;
-    }
-
-    const std::string& QemuInteractor::LastSerialLine() const
-    {
-        return lastLine;
-    }
-
-    std::chrono::milliseconds QemuInteractor::LastSerialDuration() const
-    {
-        return std::chrono::milliseconds{ 0 };
     }
 
     void QemuInteractor::ClearCanFrames()

@@ -32,11 +32,6 @@ namespace integration
     void TargetInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>&)
     {}
 
-    std::size_t TargetInteractor::DiscardedSerialLineCount() const
-    {
-        return 0;
-    }
-
     std::size_t TargetInteractor::ReceivedCanFrameCount() const
     {
         return 0;

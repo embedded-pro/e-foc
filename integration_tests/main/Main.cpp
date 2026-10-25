@@ -3,10 +3,12 @@
 #include "integration_tests/support/interactor/hardware/HardwareInteractor.hpp"
 #include "integration_tests/support/interactor/hardware/SerialLogger.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
+#include "integration_tests/support/interactor/interfaces/TerminalInteractor.hpp"
 #include <cstdlib>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #ifdef __unix__
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
@@ -65,7 +67,9 @@ int main(int argc, char** argv)
             else if (g_mode == "hil")
             {
                 hil::SerialLogger::Instance().Configure(g_logDir, g_logDisabled);
-                g_interactor = std::make_unique<hil::HardwareInteractor>(g_bridgeConfig);
+                auto hardware = std::make_unique<hil::HardwareInteractor>(g_bridgeConfig);
+                integration::TerminalInteractor::SetInstance(*hardware);
+                g_interactor = std::move(hardware);
             }
             else
             {

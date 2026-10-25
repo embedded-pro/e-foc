@@ -28,18 +28,9 @@ namespace hil
     void HardwareInteractor::BeforeScenario()
     {
         SerialLogger::Instance().BeginScenario();
-        auto& session = BridgeSession::Instance();
 
         if (GetBridgeConfig().restartPerScenario)
-        {
             RestartTarget();
-            return;
-        }
-
-        (void)session.WaitForPrompt(timeouts::promptShort);
-        (void)session.SendSerial("stop", timeouts::cleanup);
-        (void)session.SendSerial("can_stop", timeouts::cleanup);
-        (void)session.WaitForPrompt(timeouts::cleanup);
     }
 
     void HardwareInteractor::RestartTarget()

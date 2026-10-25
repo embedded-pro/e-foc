@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <algorithm>
 #include <cmath>
@@ -11,7 +11,7 @@ using namespace integration;
 
 WHEN(R"(the ADC phase current measurement is requested)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
     ASSERT_TRUE(fixture.SendCommand("duty 50 50 50", hil::timeouts::command))
         << "failed to start PWM as ADC trigger";
     ASSERT_TRUE(fixture.SendCommand("adc shortest", hil::timeouts::asyncCommand))
@@ -21,7 +21,7 @@ WHEN(R"(the ADC phase current measurement is requested)")
 
 THEN(R"(the measured phase currents shall be within the idle current range)")
 {
-    const auto& lines = context.Get<Fixture>().allLines;
+    const auto& lines = context.Get<TerminalFixture>().allLines;
     ASSERT_FALSE(lines.empty()) << "No ADC measurement response received";
 
     const auto sampleIt = std::find_if(lines.begin(), lines.end(),
