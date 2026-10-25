@@ -183,8 +183,8 @@ directly, so the mapping lives with the scenarios rather than in this document w
 
 ## Planned — Commands and Verdicts over CAN Only
 
-> **Status: planned.** The scenarios do not follow this yet; until they do, the sections above
-> describe the suite as it runs. It lands as one follow-up change.
+> **Status: in progress.** Contract 2.2 (`service-can.md` Part A) provides the CAN side; the steps move
+> to it as listed below. Until every row is done, the sections above describe the suite as it runs.
 
 ### The rule
 
@@ -231,26 +231,26 @@ semihosting, which the host reads back. On hardware, CAN already goes through th
 
 Each row is a dependence on the terminal or on a trace today, and what replaces it.
 
-| Today, over the serial port                                   | Used by                                                       | Over CAN                                                                                                                                                   | Contract  |
-|---------------------------------------------------------------|---------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
-| `clear_cal`                                                   | starting with no valid calibration, on both targets           | Emulator: describe stored memory without a calibration, as other scenarios do. Hardware: a `ClearCalibration` command, refused unless stopped              | new       |
-| `calibrate`                                                   | the full calibration "run from the terminal", on both targets | a `Calibrate` command that acknowledges when the sequence ends, as the identifications do                                                                  | new       |
-| `[SM] Calibration record:` trace                              | identification scenarios and the hardware motor scenarios     | `QueryParameter` for resistance, inductance, pole pairs, inertia and friction; new read-only parameters for the three current offsets and the cogging peak | 2.1 + new |
-| `estimate_status` and the `[EST]` traces                      | online estimator scenarios                                    | a `QueryEstimates` command, answered with the tracked resistance, inductance, inertia and friction                                                         | new       |
-| `loop_stats`, `clear_stats` and the `[LOOP]` traces           | control-loop timing                                           | `QueryLoopStatistics` and `ClearLoopStatistics`                                                                                                            | new       |
-| `[SM] … loop algorithm:` traces                               | controller matrix                                             | `QueryAlgorithms`                                                                                                                                          | 2.1       |
-| `watchdog_stall`, the `[WDT]` trace and the reset-cause trace | emulator watchdog                                             | the stall is scheduled in the world description, like a disturbance; the reset cause is read with a `QueryResetCause` command once the heartbeat returns   | new       |
-| `CAN_RX` and `CAN_TX` lines                                   | every emulator scenario                                       | the CAN-only emulated serial port                                                                                                                          | transport |
-| `PLANT` and `CAN_RX_AT` lines                                 | step-response, disturbance and estimator scenarios            | the plant record file                                                                                                                                      | transport |
+| Today, over the serial port                                   | Used by                                                       | Over CAN                                                                                                                                                | Contract  |
+|---------------------------------------------------------------|---------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| `clear_cal`                                                   | starting with no valid calibration, on both targets           | `ClearCalibration`, refused unless stopped                                                                                                              | 2.2       |
+| `calibrate`                                                   | the full calibration "run from the terminal", on both targets | `Calibrate`, acknowledged when the sequence ends, as the identifications are                                                                            | 2.2       |
+| `[SM] Calibration record:` trace                              | identification scenarios and the hardware motor scenarios     | `QueryParameter` for resistance, inductance, pole pairs, inertia and friction (`0x40`–`0x45`), the current offsets and the cogging peak (`0x80`–`0x83`) | 2.1 + 2.2 |
+| `estimate_status` and the `[EST]` traces                      | online estimator scenarios                                    | `QueryParameter` for the online estimates (`0x90`–`0x93`)                                                                                               | 2.2       |
+| `loop_stats`, `clear_stats` and the `[LOOP]` traces           | control-loop timing                                           | `QueryParameter` for the loop statistics (`0xA0`–`0xA7`) and `ClearDiagnostics`                                                                         | 2.2       |
+| `[SM] … loop algorithm:` traces                               | controller matrix                                             | `QueryAlgorithms`                                                                                                                                       | 2.1       |
+| `watchdog_stall`, the `[WDT]` trace and the reset-cause trace | emulator watchdog                                             | the stall is scheduled in the world description, like a disturbance; the reset cause is read as `resetCause` (`0xB0`) once the heartbeat returns        | 2.2       |
+| `CAN_RX` and `CAN_TX` lines                                   | every emulator scenario                                       | the CAN-only emulated serial port                                                                                                                       | transport |
+| `PLANT` and `CAN_RX_AT` lines                                 | step-response, disturbance and estimator scenarios            | the plant record file                                                                                                                                   | transport |
 
 Algorithm selection on the hardware motor scenarios already goes over CAN (`SelectAlgorithm`, contract
 2.1): reading the terminal's reply raced the trace output, so a heartbeat trace line could be taken for it.
 
 The runner's own `[METRIC]` lines are its report on standard error, not target output, and stay.
 
-Every new command is a product diagnostic that the CAN Commander shows as well: a commissioning
+Every new message is a product diagnostic that the CAN Commander shows as well: a commissioning
 engineer needs the estimates, the loop statistics and the reset cause as much as a test does, so no
-command exists only for testing (REQ-INT-017). Stalling the event loop is the one injected fault, and
+message exists only for testing (REQ-INT-017). Stalling the event loop is the one injected fault, and
 it is not a command: it is part of the simulated world and exists only on the emulator.
 
 ### Out of scope: the bring-up image
@@ -264,8 +264,9 @@ peripheral before any CAN command server runs. It keeps using the terminal.
 
 One follow-up change, in this order, each step leaving the suite green:
 
-1. **Contract 2.2.** Design, then add, the new commands and read-only parameters: wire contract,
-   wire tests, firmware handlers, and the CAN Commander views.
+1. **Contract 2.2.** Add `Calibrate`, `ClearCalibration`, `ClearDiagnostics` and the read-only
+   parameters of `service-can.md` Part A: wire contract, wire tests, firmware handlers, and the CAN
+   Commander views.
 2. **Emulator transport.** CAN moves to its own emulated serial port, the plant record to its file,
    and the serial output becomes the per-scenario debug log.
 3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its

@@ -171,6 +171,55 @@ deadbeat, speed LQI and ADRC, position LQR and LQI) selected before the motor pa
 a position LQR or LQI design that does not converge for the requested settings, and a switching gain that
 would reach the boundary layer. In every case the law that was running keeps running unchanged.
 
+**Contract 2.2 — commissioning and diagnostics.** Version 2.2 adds three commands and seventeen read-only
+parameters; nothing in 2.1 changes. Together they reach everything the terminal offered for commissioning
+and diagnosis, so a client — the CAN Commander, a host on the bus or the integration suite — needs no serial
+connection (`integration-testing.md`, "Commands and Verdicts over CAN Only").
+
+| ID     | Message            | Direction | Fields | Answer                                                         |
+|--------|--------------------|-----------|--------|----------------------------------------------------------------|
+| `0x17` | `Calibrate`        | command   | —      | acknowledge when the calibration sequence ends                 |
+| `0x18` | `ClearCalibration` | command   | —      | acknowledge once the stored calibration record is invalidated  |
+| `0x19` | `ClearDiagnostics` | command   | —      | acknowledge once the control-loop and CAN statistics are reset |
+
+`Calibrate` runs the sequence of `state-machine.md` — current offsets, pole pairs, resistance and inductance,
+alignment and, in speed and position modes, the mechanical identification and the cogging map — and stores
+the record, as the terminal's `calibrate` does. Like the identifications it is answered when it ends, so a
+client allows it two minutes. `ClearCalibration` invalidates the stored record, as `clear_cal` does, and the
+drive returns to `Idle`. Both are refused unless the drive is stopped:
+
+| Situation                                                 | Answer                             |
+|-----------------------------------------------------------|------------------------------------|
+| The drive is not stopped (`Idle` or `Ready`)              | acknowledge `invalidState`         |
+| Another command or a non-volatile write still outstanding | category error `busy`              |
+| A step of the calibration sequence fails                  | category error `calibrationFailed` |
+| Interrupted by an emergency stop or a fault               | category error `abortedByFault`    |
+| The record could not be stored or invalidated             | category error `persistenceFailed` |
+
+The read-only parameters answer `QueryParameter` like any other and are refused by `SetParameter` with
+`invalidPayload`. Counts travel as the float of the count, exact up to 2²⁴ (about fourteen minutes of
+control periods at 20 kHz) and rounded beyond.
+
+| ID     | Parameter                  | Unit     | Value                                                                                        |
+|--------|----------------------------|----------|----------------------------------------------------------------------------------------------|
+| `0x80` | `currentOffsetA`           | A        | Phase A current-sensor offset in the calibration record                                      |
+| `0x81` | `currentOffsetB`           | A        | Phase B current-sensor offset in the calibration record                                      |
+| `0x82` | `currentOffsetC`           | A        | Phase C current-sensor offset in the calibration record                                      |
+| `0x83` | `coggingPeak`              | Nm       | Peak of the stored cogging map; `0` when the record holds none                               |
+| `0x90` | `estimatedResistance`      | ohm      | Online estimate; `0` while the active mode runs no estimator or it has none                  |
+| `0x91` | `estimatedInductance`      | mH       | Online estimate, as above                                                                    |
+| `0x92` | `estimatedInertia`         | kg.m2    | Online estimate, as above                                                                    |
+| `0x93` | `estimatedViscousFriction` | Nm.s/rad | Online estimate, as above                                                                    |
+| `0xA0` | `loopSamples`              | -        | Control periods measured since the statistics were last reset                                |
+| `0xA1` | `loopBudgetCycles`         | cycles   | Cycles one control period allows                                                             |
+| `0xA2` | `loopMinimumCycles`        | cycles   | Shortest control-interrupt execution                                                         |
+| `0xA3` | `loopAverageCycles`        | cycles   | Mean control-interrupt execution                                                             |
+| `0xA4` | `loopMaximumCycles`        | cycles   | Longest control-interrupt execution                                                          |
+| `0xA5` | `loopOverruns`             | -        | Executions longer than the budget                                                            |
+| `0xA6` | `loopDeadlineMisses`       | -        | Periods whose interrupt started late                                                         |
+| `0xA7` | `loopReentries`            | -        | Interrupts that arrived while the previous one ran                                           |
+| `0xB0` | `resetCause`               | -        | Cause of the last reset: `powerUp 0`, `brownOut 1`, `software 2`, `hardware 3`, `watchdog 4` |
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
 1e-5 and 1e-6 in SI units, which any useful `int16` scale rounds to zero, so they travel as unsigned

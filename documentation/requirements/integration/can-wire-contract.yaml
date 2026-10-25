@@ -69,6 +69,24 @@
     finite, outside its range or not whole for an integer parameter shall be answered with
     invalidPayload and change nothing.
 
+- id: REQ-CAN-009
+  title: Commissioning needs no terminal
+  shall: >
+    Contract version 2.2 shall add, without changing any 2.1 message, a Calibrate command that
+    runs the full calibration sequence and is acknowledged when it ends, a ClearCalibration
+    command that invalidates the stored calibration record, and a ClearDiagnostics command
+    that resets the control-loop and CAN statistics. Calibrate and ClearCalibration shall be
+    refused with invalidState unless the drive is stopped.
+
+- id: REQ-CAN-010
+  title: Diagnostics are readable by number
+  shall: >
+    Contract version 2.2 shall make the calibration record's current-sensor offsets and
+    cogging peak, the online estimates of resistance, inductance, inertia and viscous
+    friction, the control-loop execution statistics and the cause of the last reset readable
+    through QueryParameter as read-only parameters. SetParameter on a read-only parameter
+    shall be answered with invalidPayload and change nothing.
+
 - id: REQ-CAN-008
   title: Floating-point fields have one byte order
   shall: >
