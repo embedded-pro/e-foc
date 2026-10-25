@@ -2,7 +2,7 @@
 title: "Watchdog Design"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: "watchdog"
 date: 2026-09-26
 ---
@@ -12,7 +12,7 @@ date: 2026-09-26
 | Title     | Watchdog Design |
 | Type      | design          |
 | Status    | draft           |
-| Version   | 0.3.0           |
+| Version   | 0.4.0           |
 | Component | watchdog        |
 | Date      | 2026-09-26      |
 
@@ -135,11 +135,13 @@ The bring-up application keeps one command:
 - **watchdog_stall** — schedules an action that never returns. The expiry handler cuts the power stage,
   the hardware resets the target, and the target comes back reporting the reset cause as *watchdog*.
 
-The emulated target registers the same **watchdog_stall** command from its platform rather than from the
-application, so the production firmware carries no stall command. A SIL scenario uses it to stall the
-event loop and then waits for the reboot banner to report the reset cause as *watchdog*. That runs the
-whole expiry path in continuous integration: the stalled action, the NMI early warning, the semihosting
-marker, the machine reset and the reset-cause report.
+The emulated target has no stall command. A SIL scenario describes the stall in the plant description,
+as it describes any other fault of the simulated world: the platform schedules the never-returning action
+the given time after boot, unless that boot followed a watchdog reset. The scenario then reads the reset
+cause over CAN (`resetCause`, contract 2.2) once the target answers again and expects *watchdog*. That
+runs the whole expiry path in continuous integration: the stalled action, the NMI early warning, the
+semihosting marker, the machine reset and the reset-cause report. The production firmware carries no
+stall command either way.
 
 There is no command to enable or query the watchdog, because it has no state the application can change.
 

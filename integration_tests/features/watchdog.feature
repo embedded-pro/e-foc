@@ -12,6 +12,7 @@ Feature: Hardware Watchdog Supervision
 
   @REQ-EH-008 @REQ-EH-012 @sil
   Scenario: A stalled event loop resets the emulated target and reports the watchdog as the reset cause
-    Given the emulated target is running
-    When the event loop of the emulated target is stalled
+    Given a nominal motor plant
+    And the event loop of the emulated target stalls 2000 ms after it boots
+    When the target boots
     Then the emulated target reboots and reports the reset cause Watchdog

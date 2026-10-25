@@ -4,6 +4,8 @@ add_subdirectory(interactor/hardware)
 add_subdirectory(response)
 
 add_library(e_foc.integration_tests.support OBJECT
+    CanParameters.hpp
+    CanParameters.cpp
     ControllerSelection.hpp
     ControllerSelection.cpp
     Fixture.hpp

@@ -190,9 +190,9 @@ Every metric assertion prints a `[METRIC]` line; limits are pinned from those li
 
 **Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The SIL presets `teknic` and `anaheim` select them; `nominal` is the Teknic.
 
-**Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (CAN electrical response, `[SM] Calibration record:` and `[EST]` trace lines, all mechanical values in micro-units) against the plant the scenario configured.
+**Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (the CAN electrical response, and the calibration record and online estimates read as contract 2.2 parameters) against the plant the scenario configured.
 
-**SIL channels**: CAN frames travel as `CAN_RX`/`CAN_TX` text lines on the emulator's second serial port; the first is the product's terminal, whose answers arrive as trace lines, never as a prompt to wait for. Everything the firmware prints is the scenario's debug log (`debug.log` in the scenario directory), and a failed scenario's report carries its last lines.
+**SIL channels**: CAN frames travel as `CAN_RX`/`CAN_TX` text lines on the emulator's second serial port; the first is the product's terminal, which no scenario writes to. Everything the firmware prints is the scenario's debug log (`debug.log` in the scenario directory), and a failed scenario's report carries its last lines.
 
 ## Agent routing
 

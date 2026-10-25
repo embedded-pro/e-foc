@@ -2,24 +2,14 @@
 
 namespace application
 {
-    SilWatchdogStall::SilWatchdogStall(services::TerminalWithCommands& terminal, services::Tracer& tracer)
-        : services::TerminalCommands(terminal)
-        , tracer{ tracer }
-        , commands{ { Command{ { "watchdog_stall", "wds", "Stall the event loop so the watchdog resets the target. Ex: watchdog_stall" }, [this](const infra::BoundedConstString&)
-              {
-                  Stall();
-              } } } }
+    SilWatchdogStall::SilWatchdogStall(services::Tracer& tracer)
+        : tracer{ tracer }
     {}
 
-    infra::MemoryRange<const SilWatchdogStall::Command> SilWatchdogStall::Commands()
+    void SilWatchdogStall::Schedule(infra::Duration delay)
     {
-        return infra::MakeRange(commands);
-    }
-
-    void SilWatchdogStall::Stall()
-    {
-        tracer.Trace() << "[WDT] stalling event loop";
-        stallTimer.Start(stallDelay, []()
+        tracer.Trace() << "[WDT] event loop stalls in " << std::chrono::duration_cast<std::chrono::milliseconds>(delay).count() << " ms";
+        stallTimer.Start(delay, []()
             {
                 volatile bool stalled{ true };
                 while (stalled)

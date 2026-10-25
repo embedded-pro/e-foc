@@ -60,6 +60,6 @@ Feature: Control Loop Timing
     And the motor boots in speed mode
     When the target boots
     And the control loop statistics are cleared
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the control loop shall have stayed within its budget
     And no control loop execution shall have taken more than 570 cycles

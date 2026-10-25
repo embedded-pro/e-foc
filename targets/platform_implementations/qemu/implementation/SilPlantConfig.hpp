@@ -81,6 +81,8 @@ namespace sil
         float deadTimeCompensationNanoseconds;
         float deadTimeCompensationKneeAmpere;
 
+        uint32_t eventLoopStallDelayMs;
+
         uint8_t polePairs;
         uint8_t faultFlags;
         // Carried in centiseconds so it fits the byte this record already reserved; zero means the
@@ -91,10 +93,10 @@ namespace sil
         uint8_t dutyDelayPeriods;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 220, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 224, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 8;
+    static constexpr uint8_t plantConfigLayoutVersion = 9;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

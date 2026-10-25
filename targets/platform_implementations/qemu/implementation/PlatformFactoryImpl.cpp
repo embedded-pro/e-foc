@@ -175,6 +175,9 @@ namespace application
         // The delay is carried in centiseconds because it reuses a byte the record already had.
         encoderFreeze.Configure(static_cast<uint32_t>(
             static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u));
+
+        if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
+            watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,

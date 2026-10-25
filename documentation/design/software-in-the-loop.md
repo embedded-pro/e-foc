@@ -84,20 +84,20 @@ a truncated or stale description is rejected rather than half-read.
 
 The description covers everything the plant needs:
 
-| Group             | Contents                                                                                    |
-|-------------------|---------------------------------------------------------------------------------------------|
-| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping               |
-| Drive             | Supply voltage, control frequency, peak current, load torque                                |
-| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                |
-| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                   |
-| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                        |
-| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling                |
-| Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit |
-| Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse         |
-| Current sensing   | Converter clock and timing, averaging, trigger delay, amplifier lag, full scale, resolution |
-| Reproducibility   | The seed both noise generators start from                                                   |
-| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                     |
-| Recording         | The rate at which the plant reports its trajectory, and how many samples                    |
+| Group             | Contents                                                                                                             |
+|-------------------|----------------------------------------------------------------------------------------------------------------------|
+| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping                                        |
+| Drive             | Supply voltage, control frequency, peak current, load torque                                                         |
+| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                                         |
+| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                                            |
+| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                                                 |
+| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling, an event-loop stall and when it begins |
+| Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit                          |
+| Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse                                  |
+| Current sensing   | Converter clock and timing, averaging, trigger delay, amplifier lag, full scale, resolution                          |
+| Reproducibility   | The seed both noise generators start from                                                                            |
+| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                                              |
+| Recording         | The rate at which the plant reports its trajectory, and how many samples                                             |
 
 The thermal group's resistance and inductance coefficients act from the temperature the
 nameplate values were measured at (25 °C), not from the ambient, so a plant described with a hot
@@ -181,8 +181,8 @@ flakiness rather than merely reducing it.
 ### Part B3 — Timing the control interrupt
 
 The platform measures every execution of the control callback and counts the ones that overrun
-the budget, miss the period or re-enter (REQ-PERF-004 to REQ-PERF-006); `loop_stats` reports
-them. On hardware the duration comes from the DWT cycle counter. The emulator does not implement
+the budget, miss the period or re-enter (REQ-PERF-004 to REQ-PERF-006); the control-loop
+statistics parameters of contract 2.2 report them, and `ClearDiagnostics` restarts them. On hardware the duration comes from the DWT cycle counter. The emulator does not implement
 the DWT and its registers read zero, so every execution measured zero and the counters could not
 report an overrun however long the callback ran. The emulated platform reads a free-running timer
 of the emulated machine instead, clocked from the same 25 MHz system clock as the control timer,
@@ -224,9 +224,10 @@ does with it.
 
 ### Part D — Selecting controller algorithms
 
-Algorithm selection is deliberately not exposed over CAN. The harness therefore does not ask for
-an algorithm; it writes the stored configuration that the firmware restores on entry to Ready, and
-then asks the firmware which algorithm is actually running.
+The controller matrix does not select an algorithm over CAN, although contract 2.1 can: it writes
+the stored configuration that the firmware restores on entry to Ready, so the restore path is what
+it tests, and then asks the firmware over CAN (`QueryAlgorithms`) which algorithm is actually
+running. The settings scenarios select over CAN.
 
 That last step is not ceremony. A state feedback design that does not converge for a given motor
 leaves the previously active algorithm in place. A scenario that only asserted what it requested
@@ -550,19 +551,19 @@ scenario wrote the resistance, inductance, flux linkage, inertia and friction th
 with, so whatever the firmware identifies can be compared with them, and the comparison is
 made on both reference motors so that a tolerance is not tuned to one winding.
 
-Three product channels carry what the firmware believes, and all three are the product's own:
+Three product channels carry what the firmware believes, all of them CAN messages of the product:
 
 - The **electrical parameters response** the CAN identification command broadcasts before it
   acknowledges: resistance, inductance and pole pairs at the wire's resolution of 1 mΩ and 1 µH.
-- The **calibration record** the state machine traces whenever it stores one, `[SM] Calibration
-  record:`. This is the only way the mechanical identification's result is visible on this target:
-  the CAN mechanical command is not wired, and the full sequence that includes it runs from the
-  terminal's `calibrate`, which in the emulator reaches the firmware on its terminal port.
-- The **online estimates** the terminal prints on `estimate_status`, `[EST] Mech:` and
-  `[EST] Elec:`, seeded from the record and updated at the outer-loop rate while the motor runs.
+- The **calibration record**, read with `QueryParameter` once `Calibrate` has acknowledged: the motor
+  parameters (`0x40`–`0x45`), the current-sensor offsets and the cogging-map peak (`0x80`–`0x83`).
+  This is the only way the mechanical identification's result is visible on this target: the CAN
+  mechanical command is not wired, and the full sequence that includes it is `Calibrate`.
+- The **online estimates** (`0x90`–`0x93`), seeded from the record and updated at the outer-loop
+  rate while the motor runs.
 
-Inertia and friction are traced in micro-units on both trace lines; the tracer prints three
-decimals, and the rotors here weigh a few micro-newton-metre-seconds-squared.
+Every value travels as a float, so the micro-units the traces need for inertia and friction play no
+part.
 
 The scenarios cover the offline procedures from a blank calibration and from one deliberately
 wrong by given factors, the online estimators from a wrong seed under a speed reference that
@@ -999,26 +1000,19 @@ CAN driver, is outside what a scenario can reach and belongs to a test of that d
 
 **Provided to scenarios:** a named plant (one of the reference motors, or a variation on the
 nominal one) or one described field by field, a stored calibration and configuration to boot
-from, a calibration deliberately off by given factors, a scheduled shaft torque, a recording rate
-and budget, a boot step, the CAN command set, the product's terminal commands, a capture step that
+from, a calibration deliberately off by given factors, a scheduled shaft torque, a scheduled
+event-loop stall, a recording rate and budget, a boot step, the CAN command set, a capture step that
 waits on the plant's own clock, and assertions over telemetry, reported algorithms, fault codes,
 rotor movement, step-response metrics, disturbance recovery and identified or tracked parameters.
 
-**Required from the target:** that it read its plant description at boot, expose its state, fault
-code, measured speed and position over telemetry, trace the algorithm each loop is running, trace
-every calibration record it stores and its online estimates on request, report its control-loop
-execution statistics on request, and, when asked to, report the plant's trajectory and the tick
-each command frame was delivered on.
+**Required from the target:** that it read its plant description at boot; expose its state, fault
+code, measured speed and position over telemetry; answer over CAN with the algorithm each loop is
+running, its calibration record, its online estimates, its control-loop statistics and its reset
+cause; and, when asked to, write the plant's trajectory and the tick each command frame was
+delivered on to its record file.
 
-**How a terminal command reaches the emulated target:** on the first serial port, which the firmware
-reads line by line and hands to the terminal exactly as a serial port would. CAN frames have the
-second port to themselves. The terminal answers through the tracer, so a step that needs the outcome
-drains the trace for the line it expects instead of waiting for a prompt.
+**The terminal** stays on the first serial port for a person debugging a run, and what the target
+prints is the scenario's debug log. No scenario writes to the terminal or reads a verdict from the
+log.
 
 **Not required:** any test-only command. The target's CAN and terminal surfaces are the product's.
-
-> **Planned.** Scenarios will command the target and decide their verdicts over CAN only, and the
-> serial output becomes a debug log no scenario parses. On this target CAN already has its own
-> emulated serial port and the plant's samples and command-delivery ticks are in the record file; the
-> terminal commands and traces above stop being part of the interface as the remaining steps move.
-> See *Planned — Commands and Verdicts over CAN Only* in `documentation/design/integration-testing.md`.

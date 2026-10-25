@@ -2,6 +2,7 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/ControllerSelection.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
@@ -14,66 +15,6 @@
 #include <string>
 
 using namespace integration;
-
-namespace
-{
-    constexpr auto kSettingTimeout = std::chrono::seconds{ 10 };
-    constexpr auto kResponseTimeout = std::chrono::seconds{ 5 };
-
-    hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
-    {
-        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
-    }
-
-    std::optional<can::FocParameter> ParameterNamed(const std::string& name)
-    {
-        for (const auto& descriptor : can::focParameters)
-            if (name == descriptor.name)
-                return descriptor.id;
-        return std::nullopt;
-    }
-
-    std::optional<hal::Can::Message> CapturedResponse(Fixture& fixture, uint8_t messageType, Fixture::CaptureMark mark)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + kResponseTimeout;
-        while (true)
-        {
-            if (auto response = fixture.FindCapturedCanFrame(ResponseId(fixture, messageType), mark))
-                return response;
-            if (std::chrono::steady_clock::now() >= deadline)
-                return std::nullopt;
-            fixture.DrainLines(std::chrono::milliseconds{ 50 });
-        }
-    }
-
-    bool WriteParameter(Fixture& fixture, can::FocParameter parameter, float value)
-    {
-        const auto bits = std::bit_cast<uint32_t>(value);
-        hal::Can::Message payload;
-        payload.push_back(static_cast<uint8_t>(parameter));
-        for (int shift = 24; shift >= 0; shift -= 8)
-            payload.push_back(static_cast<uint8_t>(bits >> shift));
-        return fixture.SendCanCommand(can::focMotorCategoryId, can::focSetParameterId, payload, kSettingTimeout);
-    }
-
-    std::optional<can::FocParameterValue> ReadParameter(Fixture& fixture, can::FocParameter parameter)
-    {
-        const auto mark = fixture.MarkCapture();
-        hal::Can::Message payload;
-        payload.push_back(static_cast<uint8_t>(parameter));
-        if (!fixture.SendCanCommand(can::focMotorCategoryId, can::focQueryParameterId, payload, kResponseTimeout))
-            return std::nullopt;
-
-        const auto response = CapturedResponse(fixture, can::focParameterResponseId, mark);
-        if (!response.has_value() || response->size() != 6 || (*response)[0] != static_cast<uint8_t>(parameter))
-            return std::nullopt;
-
-        uint32_t bits{ 0 };
-        for (std::size_t index = 2; index != 6; ++index)
-            bits = (bits << 8) | (*response)[index];
-        return can::FocParameterValue{ std::bit_cast<float>(bits), ((*response)[1] & can::focParameterAutomaticFlag) != 0 };
-    }
-}
 
 WHEN(R"(the {word} loop controller is set to {word} over CAN)", (std::string loopName, std::string algorithmName))
 {
@@ -95,11 +36,8 @@ THEN(R"(the {word} loop controller read over CAN shall be {word})", (std::string
     const auto algorithm = AlgorithmNamed(*loop, algorithmName);
     ASSERT_TRUE(algorithm.has_value()) << "Unknown " << loopName << " loop algorithm: " << algorithmName;
 
-    const auto mark = fixture.MarkCapture();
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focQueryAlgorithmsId, {}, kResponseTimeout))
-        << "The target did not answer the controller query";
-    const auto response = CapturedResponse(fixture, can::focAlgorithmsResponseId, mark);
-    ASSERT_TRUE(response.has_value() && response->size() == 4) << "The target sent no controllers response";
+    const auto response = ReadAlgorithms(fixture);
+    ASSERT_TRUE(response.has_value()) << "The target sent no controllers response";
 
     EXPECT_EQ((*response)[1 + static_cast<std::size_t>(*loop)], *algorithm)
         << "The " << loopName << " loop reports controller " << static_cast<int>((*response)[1 + static_cast<std::size_t>(*loop)]);

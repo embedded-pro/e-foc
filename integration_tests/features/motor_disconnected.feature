@@ -65,7 +65,7 @@ Feature: Disconnected And Faulty Motor Wiring
     And the motor boots in position mode
     And the position loop runs the <position> algorithm
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     And a position setpoint of 0.0 rad is applied
     And the motor is enabled
     And the response is captured for 2500 ms after enable

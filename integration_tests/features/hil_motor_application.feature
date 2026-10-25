@@ -17,7 +17,7 @@ Feature: Motor controller application on the connected motor
   Scenario: Speed calibration identifies the rotor inertia
     Given the speed motor system is initialised with no valid calibration data
     When the speed control mode is selected
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the state machine shall be in the Ready state
     And the identified pole pairs shall be 4
     And the identified resistance shall be between 0.8 and 1.4 ohm
@@ -44,7 +44,7 @@ Feature: Motor controller application on the connected motor
   Scenario Outline: Speed loop tracks its setpoint with the <current> current loop and the <speed> speed loop
     Given the speed motor system is initialised with no valid calibration data
     When the speed control mode is selected
-    And the full calibration is run from the terminal
+    And the full calibration is run
     And the current loop algorithm is set to <current>
     And the speed loop algorithm is set to <speed>
     And the motor is enabled
@@ -81,7 +81,7 @@ Feature: Motor controller application on the connected motor
   Scenario Outline: Position loop holds its setpoint with the <position> position loop
     Given the position motor system is initialised with no valid calibration data
     When the position control mode is selected
-    And the full calibration is run from the terminal
+    And the full calibration is run
     And the position loop algorithm is set to <position>
     And the motor is enabled
     And a position setpoint of 1.0 rad is applied

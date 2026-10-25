@@ -207,7 +207,7 @@ namespace application
         SemihostingSerial serial;
         sil::CmsdkUartLines terminalPort{ kTerminalUartBase };
         TerminalAndTracerBlock terminalAndTracer{ serial };
-        SilWatchdogStall watchdogStall{ terminalAndTracer.terminal, terminalAndTracer.tracer };
+        SilWatchdogStall watchdogStall{ terminalAndTracer.tracer };
         SemihostingEeprom eeprom{ "eeprom.bin" };
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
