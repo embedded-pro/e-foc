@@ -151,7 +151,6 @@ namespace state_machine
         return true;
     }
 
-    // An applied estimate re-derives its loop's tunings, so the operator's settings go back on top of that loop alone
     void ControlModeStateMachine::ApplyOnlineEstimates()
     {
         const auto applied = ActiveStateMachine().ApplyOnlineEstimates();
@@ -563,7 +562,6 @@ namespace state_machine
         onDone(result);
     }
 
-    // An emergency stop answers a write whose record may still land, so it is not reported as busy
     SettingResult ControlModeStateMachine::ToSettingResult(CommandResult result)
     {
         switch (result)
@@ -763,7 +761,6 @@ namespace state_machine
         configWriter.Persist(onDone);
     }
 
-    // A mode selection writes the record itself and switches only once nothing else is being stored
     bool ControlModeStateMachine::HasPendingConfigWrite() const
     {
         return pendingSelectCallback != nullptr || configWriter.HasPendingPersist();

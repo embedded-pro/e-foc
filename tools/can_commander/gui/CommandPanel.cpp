@@ -183,7 +183,6 @@ namespace tool
         configuration->SetUnavailable(unavailableReason);
     }
 
-    // Controllers and motor parameters change only while the motor is stopped; start-up settings at any time
     void CommandPanel::SetSettingsAvailable(const QString& unavailableReason)
     {
         controllers->SetUnavailable(unavailableReason);

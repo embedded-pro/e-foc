@@ -132,7 +132,6 @@ namespace tool
             MarkEdited();
     }
 
-    // The 2.0 bandwidth commands carry whole rad/s and know no automatic bandwidth
     void SettingEditor::SetLegacy(bool legacyContract)
     {
         legacy = legacyContract;

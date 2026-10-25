@@ -219,7 +219,6 @@ namespace tool
         return false;
     }
 
-    // Each change waits for the previous one to be accepted, so a refusal leaves the rest unsent and still marked
     void MotorPanel::Apply(SettingsPage& page)
     {
         if (const auto problem = page.Problem(); !problem.isEmpty())
@@ -286,7 +285,6 @@ namespace tool
         return changes.Active() && commandType == CommandTypeOf(changes.Current(), IsLegacy());
     }
 
-    // Contract 2.0 does not read a setting back, so what it accepted is what it holds
     void MotorPanel::OnChangeAccepted()
     {
         const auto& change = changes.Current();
@@ -299,7 +297,6 @@ namespace tool
             return;
         }
 
-        // A motor model changes what the automatic settings derive, so everything is read again
         if (applyingPage == &commandPanel->MotorParameters())
             client.RequestSettings(nodeId);
 
@@ -323,7 +320,6 @@ namespace tool
                                                .arg(reason, notSent == 1 ? QString("1 change") : QString("%1 changes").arg(notSent)));
     }
 
-    // A refused mode change leaves the mode in force unknown until the controller reports it again
     void MotorPanel::ForgetControlMode()
     {
         commandPanel->ClearActiveControlMode();
@@ -464,7 +460,6 @@ namespace tool
         if (name.isEmpty())
             name = QString("Command 0x%1/0x%2").arg(categoryId, 2, 16, QChar('0')).arg(commandType, 2, 16, QChar('0'));
 
-        // A category error arrives first and names the reason; its acknowledgement adds nothing to the log
         const bool accepted = status == services::CanAckStatus::success;
         if (!ownCategory || status != services::CanAckStatus::categoryError)
             Report(accepted ? IssueSeverity::info : IssueSeverity::warning, QString("%1 %2").arg(name, ToQt(AckStatusDescription(status))));
@@ -500,7 +495,6 @@ namespace tool
         if (IsChangeAnswer(commandType))
             StopApplying(QString("%1 was refused").arg(name));
 
-        // An interrupted write may still have landed, so the tabs show what the controller holds rather than what was sent
         if (commandType == can::focSetParameterId || commandType == can::focSelectAlgorithmId)
             client.RequestSettings(nodeId);
     }

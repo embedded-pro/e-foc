@@ -1068,7 +1068,6 @@ TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
     EXPECT_TRUE(applied.electrical);
-    // The record's zero friction is not a physical estimate, so the mechanics are skipped
     EXPECT_FALSE(applied.mechanics);
 }
 

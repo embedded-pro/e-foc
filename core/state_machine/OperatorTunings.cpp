@@ -92,7 +92,6 @@ namespace state_machine
                IsAcceptableReferenceTimeConstant(tunings.referenceTimeConstant);
     }
 
-    // Inside the boundary layer the sliding-mode error map only contracts while the switching gain stays below it
     bool IsDesignable(const foc::CurrentLoopTunings& tunings)
     {
         return tunings.switchingGain < tunings.boundaryLayer;

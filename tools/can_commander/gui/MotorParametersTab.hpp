@@ -7,7 +7,6 @@
 
 namespace tool
 {
-    // The motor model the controllers are designed from, and the commissioning actions that measure it
     class MotorParametersTab
         : public SettingsPage
     {

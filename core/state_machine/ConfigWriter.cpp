@@ -45,7 +45,6 @@ namespace state_machine
             });
     }
 
-    // Busy is contention with another writer of the shared NVM, not a failure of this record
     void ConfigWriter::OnWritten(services::NvmStatus status)
     {
         if (status == services::NvmStatus::Busy)
@@ -60,7 +59,6 @@ namespace state_machine
         if (status != services::NvmStatus::Ok)
             tracer.Trace() << "config persist failed";
 
-        // The finished write's owner answers first: it may take its change back, and the rewrite must not store it
         auto done = onWritten;
         onWritten = nullptr;
         if (done != nullptr)

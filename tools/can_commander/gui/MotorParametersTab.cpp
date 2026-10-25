@@ -55,7 +55,6 @@ namespace tool
         return group;
     }
 
-    // Contract 2.0 has no message for the motor parameters; its commissioning actions still work
     void MotorParametersTab::SetLegacy(bool legacyContract)
     {
         for (auto* editor : Editors())

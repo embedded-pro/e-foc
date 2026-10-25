@@ -14,8 +14,6 @@
 
 namespace tool
 {
-    // A tab of settings the controller holds: each field shows the value in force until it is
-    // edited, and Apply hands the edits to the motor panel, which sends them one at a time.
     class SettingsPage
         : public QWidget
     {

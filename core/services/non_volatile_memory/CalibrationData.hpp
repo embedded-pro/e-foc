@@ -71,7 +71,6 @@ namespace services
         }
     }
 
-    // The record models a non-salient machine, so one inductance stands for both axes.
     inline void WriteMotorParameter(CalibrationData& data, MotorParameter parameter, float value)
     {
         switch (parameter)

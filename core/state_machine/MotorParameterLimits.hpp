@@ -7,7 +7,6 @@
 
 namespace state_machine
 {
-    // A flux linkage of zero stands for the platform default
     inline bool IsAcceptableMotorParameter(services::MotorParameter parameter, float value)
     {
         using foc::CommandLimits;

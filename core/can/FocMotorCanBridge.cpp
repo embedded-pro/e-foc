@@ -168,8 +168,6 @@ namespace can
         SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
     }
 
-    // A 2.0 bandwidth command sets the setting SetParameter sets and is answered the same way, once stored;
-    // contract 2.0 knows no automatic bandwidth, so a zero stays out of range
     void FocMotorCanBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
     {
         if (SettingOutstanding())
@@ -508,7 +506,6 @@ namespace can
             controlMode.SetPositionTunings(WithSetting(controlMode.StoredPositionTunings(), parameter, value), completed);
     }
 
-    // A start-up setting takes effect at the next start, so a write that fails is taken back rather than left to a later write
     void FocMotorCanBridge::SetStartupSetting(FocParameter parameter, uint32_t value)
     {
         previousStartupSetting = StartupSettingOf(controlMode.Config(), parameter);

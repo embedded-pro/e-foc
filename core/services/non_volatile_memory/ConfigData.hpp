@@ -7,7 +7,6 @@
 namespace services
 {
     // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
-    // A loop bandwidth of 0 asks the firmware to derive it.
     struct ConfigData
     {
         uint32_t canNodeId = 1;

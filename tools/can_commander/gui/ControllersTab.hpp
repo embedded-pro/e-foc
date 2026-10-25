@@ -11,8 +11,6 @@
 
 namespace tool
 {
-    // The loops of the active control mode, each with its controller and the settings that
-    // controller uses; the loop's other settings stay stored on the controller, hidden here.
     class ControllersTab
         : public SettingsPage
     {

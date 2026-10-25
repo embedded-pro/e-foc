@@ -65,7 +65,6 @@ namespace
         return std::nullopt;
     }
 
-    // A response precedes the acknowledgement that ends SendCanCommand, so it is already captured
     std::optional<hal::Can::Message> CapturedResponse(Fixture& fixture, uint8_t messageType, Fixture::CaptureMark mark)
     {
         const auto deadline = std::chrono::steady_clock::now() + kResponseTimeout;
@@ -157,7 +156,6 @@ WHEN(R"(the {word} is set to automatic over CAN)", (std::string name))
     ASSERT_TRUE(WriteParameter(fixture, *parameter, 0.0f)) << "The target refused an automatic " << name;
 }
 
-// The simulated EEPROM is a file the target writes through, so what it stored survives the restart
 WHEN(R"(the target restarts)")
 {
     ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Only a simulated target can be restarted by a step";

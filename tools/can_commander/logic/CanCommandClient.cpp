@@ -276,7 +276,6 @@ namespace tool
             QueueRead(nodeId, Read{ can::focRequestTelemetryId });
     }
 
-    // One read in flight per node: the controller answers each with two frames and its send queue holds six
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
     {
         auto& node = reads[nodeId];
@@ -371,7 +370,6 @@ namespace tool
         RequestStatus(nodeId);
     }
 
-    // The controller sends its status only when asked
     void CanCommandClient::RefreshStatus()
     {
         for (const auto nodeId : onlineNodes)

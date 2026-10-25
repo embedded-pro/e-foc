@@ -61,7 +61,6 @@ namespace application
             });
     }
 
-    // The record is adopted only once the NVM holds it, so RAM never runs a value a reset would lose
     void MaintenanceFlow::AdoptMotorParameter(services::NvmStatus status)
     {
         if (status != services::NvmStatus::Ok)
@@ -113,7 +112,6 @@ namespace application
         auto edited = data;
         services::WriteMotorParameter(edited, pendingParameter, pendingValue);
 
-        // The cogging map is binned per electrical period, so after a pole-pair change it describes other positions
         if (edited.polePairs != data.polePairs)
         {
             edited.coggingTorqueScale = 0.0f;

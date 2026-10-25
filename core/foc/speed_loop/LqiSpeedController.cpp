@@ -56,7 +56,6 @@ namespace foc
         return { SpeedLqi::GainStateMatrix{ 0.0f }, SpeedLqi::GainIntegralMatrix{ 0.0f }, 1.0f };
     }
 
-    // The weights are the operator's, so the Riccati solve may not converge; a design that does not stays inert
     std::optional<LqiSpeedController::SpeedLqi> LqiSpeedController::Solve(const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings)
     {
         if (!AreMechanicalParametersValid(parameters))

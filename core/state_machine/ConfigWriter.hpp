@@ -10,8 +10,6 @@
 
 namespace state_machine
 {
-    // The one writer of the configuration record. A request made while a write is outstanding is folded
-    // into one more write of the record as it is then, so no change is lost to a write that started before it.
     class ConfigWriter
     {
     public:

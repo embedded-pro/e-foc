@@ -156,7 +156,6 @@ namespace tool
         return !IsLegacy() && IsLoopShown(loop) && loop.algorithm->currentIndex() >= 0 && ChosenAlgorithm(loop) != loop.held;
     }
 
-    // A 2.0 controller takes the bandwidths alone; otherwise a setting is shown when the chosen law uses it
     bool ControllersTab::Shows(const Loop& loop, const SettingEditor& editor) const
     {
         if (IsLegacy())

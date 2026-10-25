@@ -15,9 +15,6 @@
 
 namespace tool
 {
-    // One setting as the controller holds it and as the operator edits it. The text shown for the
-    // value in force is what an edit is compared with, so a value read back with more digits than
-    // the field shows never reads as changed.
     class SettingEditor
         : public QWidget
     {

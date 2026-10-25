@@ -86,7 +86,6 @@ namespace state_machine
         return std::holds_alternative<Idle>(state) || std::holds_alternative<Ready>(state);
     }
 
-    // Which loops an application of online estimates re-derived, whether or not the new design took
     struct AppliedEstimates
     {
         bool mechanics{ false };

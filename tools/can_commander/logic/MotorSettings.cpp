@@ -26,7 +26,6 @@ namespace tool
         using Speed = can::FocSpeedAlgorithm;
         using Position = can::FocPositionAlgorithm;
 
-        // Units are spelled as UTF-8 escapes so the bytes survive any compiler source code page
         constexpr std::string_view radPerSecond{ " rad/s" };
         constexpr std::string_view ohm{ " \xCE\xA9" };
         constexpr std::string_view kilogramSquareMetre{ " kg\xC2\xB7m\xC2\xB2" };
@@ -101,7 +100,6 @@ namespace tool
                 });
         }
 
-        // The firmware refuses a switching gain at or above the boundary layer, after every single write
         void OrderSlidingModePair(std::vector<SettingChange>& settings, std::optional<float> heldSwitchingGain)
         {
             const auto gain = Find(settings, FocParameter::currentSwitchingGain);
@@ -207,7 +205,6 @@ namespace tool
         }
     }
 
-    // The laws whose design the firmware solves from the settings, and which can therefore refuse a setting
     bool RefusesSettings(can::FocControlLoop loop, uint8_t algorithm)
     {
         if (loop == FocControlLoop::speed)
@@ -265,8 +262,6 @@ namespace tool
         return descriptor.has_value() && descriptor->integer;
     }
 
-    // Automatic is chosen explicitly, so a typed zero is refused rather than read as automatic; the
-    // 2.0 bandwidth commands carry whole rad/s
     bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy)
     {
         const auto descriptor = can::FindParameter(parameter);
@@ -304,10 +299,6 @@ namespace tool
         return legacy ? LegacyCommandOf(change.parameter).value_or(can::focSetParameterId) : can::focSetParameterId;
     }
 
-    // A setting is checked against the law in force when it is written, and a law against the settings
-    // stored when it is chosen. Settings go first, so the chosen law is designed with them; a law that
-    // never refuses a setting goes first instead, so the law it replaces does not judge settings it
-    // will no longer run.
     ChangePlan PlanLoop(const LoopEdits& edits)
     {
         auto settings = edits.settings;

@@ -72,11 +72,9 @@ namespace state_machine
 
         using OnSetting = infra::Function<void(SettingResult)>;
 
-        // The operator's record; a bandwidth of 0 is automatic.
         foc::CurrentLoopTunings StoredCurrentTunings() const;
         foc::SpeedLoopTunings StoredSpeedTunings() const;
         foc::PositionLoopTunings StoredPositionTunings() const;
-        // The record with an automatic bandwidth resolved, or nullopt when the active mode does not run the loop.
         foc::CurrentLoopTunings EffectiveCurrentTunings() const;
         std::optional<foc::SpeedLoopTunings> EffectiveSpeedTunings() const;
         std::optional<foc::PositionLoopTunings> EffectivePositionTunings() const;
@@ -92,7 +90,6 @@ namespace state_machine
         const services::CalibrationData& CalibrationRecord() const;
         foc::Weber DefaultFluxLinkage() const;
 
-        // Start-up settings are changed in place and stored with PersistConfig.
         services::ConfigData& Config();
         const services::ConfigData& Config() const;
         void PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone);

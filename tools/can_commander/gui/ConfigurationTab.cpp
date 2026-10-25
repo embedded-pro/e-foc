@@ -21,7 +21,6 @@ namespace tool
         Refresh();
     }
 
-    // Contract 2.0 sets the encoder resolution with its own message and has none for the others
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         for (auto* editor : Editors())
