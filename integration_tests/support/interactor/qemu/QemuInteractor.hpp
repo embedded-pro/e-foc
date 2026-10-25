@@ -40,11 +40,16 @@ namespace sil
             std::chrono::milliseconds timeout,
             std::chrono::steady_clock::time_point referenceTime,
             std::chrono::milliseconds& elapsed) override;
+        std::size_t ReceivedCanFrameCount() const override;
+        std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const override;
+        std::optional<hal::Can::Id> FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>& matches, std::size_t fromFrame) const override;
+
+        std::vector<std::string> TakePlantRecord(std::chrono::milliseconds timeout) override;
+        std::string DebugLog() const override;
 
     private:
         std::string elfPath;
         QemuSilSession session;
-        std::vector<std::string> lines;
         std::string lastLine;
         std::size_t discardedSerialLines{ 0 };
     };

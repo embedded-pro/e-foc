@@ -65,9 +65,8 @@ namespace integration
             std::size_t frame;
         };
 
-        // A frame the target sent while another wait was reading stays captured: the simulated target prints it
-        // as a serial line, the bridge to real hardware keeps it. This finds the last one with the given id
-        // after the mark.
+        // A frame the target sent while another wait was reading stays captured: both interactors keep every
+        // frame they receive. This finds the last one with the given id after the mark.
         std::optional<hal::Can::Message> FindCapturedCanFrame(hal::Can::Id id, CaptureMark from) const;
         CaptureMark MarkCapture() const;
         // Counts every line the target printed, including those an interactor dropped since, so a mark taken

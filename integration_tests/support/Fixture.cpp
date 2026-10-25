@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <optional>
-#include <string_view>
 #include <unistd.h>
 
 namespace
@@ -14,61 +13,7 @@ namespace
         return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
     }
 
-    int HexValue(char c)
-    {
-        if (c >= '0' && c <= '9')
-            return c - '0';
-        if (c >= 'a' && c <= 'f')
-            return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F')
-            return c - 'A' + 10;
-        return -1;
-    }
-
-    // "CAN_TX <id-hex> <payload-hex>", the form the simulated target prints every frame it sends in.
-    constexpr std::string_view transmittedPrefix{ "CAN_TX " };
     constexpr auto kHeartbeatSlice = std::chrono::milliseconds{ 250 };
-
-    std::optional<uint32_t> ParseTransmittedId(const std::string& line)
-    {
-        if (!line.starts_with(transmittedPrefix))
-            return std::nullopt;
-
-        const auto idEnd = line.find(' ', transmittedPrefix.size());
-        if (idEnd == std::string::npos)
-            return std::nullopt;
-
-        uint32_t rawId = 0;
-        for (std::size_t i = transmittedPrefix.size(); i < idEnd; ++i)
-        {
-            const int digit = HexValue(line[i]);
-            if (digit < 0)
-                return std::nullopt;
-            rawId = (rawId << 4) | static_cast<uint32_t>(digit);
-        }
-
-        return rawId;
-    }
-
-    bool ParseTransmittedFrame(const std::string& line, hal::Can::Id expectedId, hal::Can::Message& out)
-    {
-        const auto rawId = ParseTransmittedId(line);
-        if (!rawId.has_value() || hal::Can::Id::Create29BitId(*rawId) != expectedId)
-            return false;
-
-        const auto idEnd = line.find(' ', transmittedPrefix.size());
-        out.clear();
-        for (std::size_t i = idEnd + 1; i + 1 < line.size() && !out.full(); i += 2)
-        {
-            const int hi = HexValue(line[i]);
-            const int lo = HexValue(line[i + 1]);
-            if (hi < 0 || lo < 0)
-                break;
-            out.push_back(static_cast<uint8_t>((hi << 4) | lo));
-        }
-
-        return true;
-    }
 
     bool IsServerHeartbeat(uint32_t rawId)
     {
@@ -155,11 +100,6 @@ namespace integration
 
     std::optional<uint16_t> Fixture::FindHeartbeatNode(CaptureMark from) const
     {
-        const auto& lines = interactor.SerialLines();
-        for (std::size_t i = LineIndexOf(from.line); i < lines.size(); ++i)
-            if (const auto rawId = ParseTransmittedId(lines[i]); rawId.has_value() && IsServerHeartbeat(*rawId))
-                return services::ExtractCanNodeId(*rawId);
-
         const auto id = interactor.FindReceivedCanFrameId([](hal::Can::Id candidate)
             {
                 return candidate.Is29BitId() && IsServerHeartbeat(candidate.Get29BitId());
@@ -421,19 +361,6 @@ namespace integration
 
     std::optional<hal::Can::Message> Fixture::FindCapturedCanFrame(hal::Can::Id id, CaptureMark from) const
     {
-        const auto& lines = interactor.SerialLines();
-        std::optional<hal::Can::Message> found;
-
-        for (std::size_t i = LineIndexOf(from.line); i < lines.size(); ++i)
-        {
-            hal::Can::Message payload;
-            if (ParseTransmittedFrame(lines[i], id, payload))
-                found = payload;
-        }
-
-        if (found)
-            return found;
-
         return interactor.FindReceivedCanFrame(id, from.frame);
     }
 

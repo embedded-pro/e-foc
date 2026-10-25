@@ -1,5 +1,6 @@
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <stdexcept>
+#include <thread>
 
 namespace integration
 {
@@ -53,4 +54,15 @@ namespace integration
 
     void TargetInteractor::RestartTarget()
     {}
+
+    std::vector<std::string> TargetInteractor::TakePlantRecord(std::chrono::milliseconds timeout)
+    {
+        std::this_thread::sleep_for(timeout);
+        return {};
+    }
+
+    std::string TargetInteractor::DebugLog() const
+    {
+        return {};
+    }
 }

@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.7.0
+version: 1.8.0
 component: "software-in-the-loop"
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.7.0                       |
+| Version   | 1.8.0                       |
 | Component | software-in-the-loop        |
 | Date      | 2026-10-25                  |
 
@@ -28,8 +28,10 @@ date: 2026-10-25
 
 Software-in-the-loop runs the **real firmware** for the emulated Cortex-M4 target under an
 emulator, against a simulated three-phase motor that the firmware itself owns. The test host
-speaks to it only over the wire the product speaks: CAN frames carried as text lines on the
-emulated UART, plus the firmware's own trace output.
+commands it over the wire the product speaks, CAN frames carried as text lines on an emulated
+serial port of their own, and reads what the motor did from a record the plant writes. Everything
+the firmware prints is kept as the scenario's debug log; until the remaining terminal steps move to
+CAN, some scenarios still read its traces.
 
 Nothing is mocked on the target. The state machine, the control cascades, the calibration
 services, the non-volatile memory stack and the CAN server are the shipping ones. Only the motor,
@@ -48,7 +50,9 @@ graph LR
     end
     SESSION -->|"plant description"| PLANT
     SESSION -->|"NVM image"| APP
-    SESSION <-->|"CAN frames, traces"| APP
+    SESSION <-->|"CAN frames"| APP
+    PLANT -->|"plant record"| SESSION
+    APP -->|"traces"| SESSION
 ```
 
 ---
@@ -118,8 +122,16 @@ explicit seed the noise generators are not merely unpredictable, they are unreli
 
 The emulator runs from a directory created for the scenario, so the firmware opens its plant
 description and its memory image by plain relative name and knows nothing about the host's paths.
-The directory, and the socket carrying CAN frames, are unique per session; scenarios ran into each
-other when either was shared.
+The directory, and the sockets behind the target's serial ports, are unique per session; scenarios
+ran into each other when either was shared.
+
+The target has two serial ports. The first is the product's terminal. The second carries only CAN
+frames, one text line per frame in each direction, so a frame can never be split by a terminal line
+or taken for one. Whatever the firmware prints, traces and terminal output alike, goes to the
+emulator's console and is the scenario's debug log: it is written to the scenario directory, and a
+failed scenario's report carries its last lines. The plant's record (Part G) is a file the firmware
+writes into the same directory. The host takes the first heartbeat on the CAN port as the sign that
+the target is up; it never waits for a line of console output.
 
 ```mermaid
 sequenceDiagram
@@ -132,9 +144,9 @@ sequenceDiagram
     H->>H: write both images into the scenario directory
     H->>T: start the emulator there
     T->>T: read the plant, restore the configuration
-    T-->>H: ready
+    T-->>H: CAN heartbeat
     S->>T: CAN commands
-    T-->>S: telemetry and traces
+    T-->>S: acknowledgements and telemetry
 ```
 
 ### Part B2 — Emulated time, and why it has to be instruction-counted
@@ -332,13 +344,13 @@ sequenceDiagram
     participant H as Host
     I->>R: sample every Nth tick, stamped
     E->>R: drain a few records per millisecond
-    E-->>H: one text line per record on the trace channel
+    E-->>H: one text line per record in the record file
     H->>H: parse into a series, check the spacing
 ```
 
 Two rules keep this honest. Nothing is printed from the interrupt: samples go into a ring the
-interrupt alone writes, and the event loop alone drains, so the trace channel is written from one
-context as it always was. And the ring never blocks: when it is full the sample is dropped and
+interrupt alone writes, and the event loop alone drains, so the record file is written from one
+context. And the ring never blocks: when it is full the sample is dropped and
 counted, the count is reported when recording stops, and the host also checks that consecutive
 samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric.
 
@@ -355,9 +367,9 @@ event loop can keep up with instead — which lengthens the span its fixed-size 
 so the capture that waits for that window.
 
 Recording begins on enable, which resets the rotor to rest, and stops when the sample budget in
-the plant description is spent or the motor is disabled. The budget bounds the output so a
-scenario that never reads it cannot fill the pipe and stall the guest; a scenario that measures
-drains continuously while it waits. Marker lines bracket the run: one when recording begins with
+the plant description is spent or the motor is disabled. The budget bounds the record so a
+scenario that never reads it does not grow it without limit; a scenario that measures reads it
+continuously while it waits. Marker lines bracket the run: one when recording begins with
 the tick it began on, one when a scheduled torque step fires, one when recording stops. Every
 command frame the target takes from the wire is stamped with the tick it was delivered on, so a
 setpoint changed while running has an onset the host can look up rather than guess.
@@ -545,7 +557,7 @@ Three product channels carry what the firmware believes, and all three are the p
 - The **calibration record** the state machine traces whenever it stores one, `[SM] Calibration
   record:`. This is the only way the mechanical identification's result is visible on this target:
   the CAN mechanical command is not wired, and the full sequence that includes it runs from the
-  terminal's `calibrate`, which in the emulator travels on the socket the CAN frames use.
+  terminal's `calibrate`, which in the emulator reaches the firmware on its terminal port.
 - The **online estimates** the terminal prints on `estimate_status`, `[EST] Mech:` and
   `[EST] Elec:`, seeded from the record and updated at the outer-loop rate while the motor runs.
 
@@ -998,16 +1010,15 @@ every calibration record it stores and its online estimates on request, report i
 execution statistics on request, and, when asked to, report the plant's trajectory and the tick
 each command frame was delivered on.
 
-**How a terminal command reaches the emulated target:** on the same socket as the CAN frames. The
-firmware reads that socket line by line; a line with the `CAN_RX` prefix is a frame, any other line
-is handed to the terminal exactly as a serial port would hand it. The terminal answers through the
-tracer, so a step that needs the outcome drains the trace for the line it expects instead of waiting
-for a prompt.
+**How a terminal command reaches the emulated target:** on the first serial port, which the firmware
+reads line by line and hands to the terminal exactly as a serial port would. CAN frames have the
+second port to themselves. The terminal answers through the tracer, so a step that needs the outcome
+drains the trace for the line it expects instead of waiting for a prompt.
 
 **Not required:** any test-only command. The target's CAN and terminal surfaces are the product's.
 
 > **Planned.** Scenarios will command the target and decide their verdicts over CAN only, and the
-> serial output becomes a debug log no scenario parses. On this target, CAN moves to its own emulated
-> serial port, the plant's samples and command-delivery ticks move to a file the plant writes in the
-> scenario directory, and the terminal commands and traces above stop being part of the interface.
+> serial output becomes a debug log no scenario parses. On this target CAN already has its own
+> emulated serial port and the plant's samples and command-delivery ticks are in the record file; the
+> terminal commands and traces above stop being part of the interface as the remaining steps move.
 > See *Planned — Commands and Verdicts over CAN Only* in `documentation/design/integration-testing.md`.

@@ -49,6 +49,9 @@ namespace integration
         virtual std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const;
         virtual std::optional<hal::Can::Id> FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>& matches, std::size_t fromFrame) const;
 
+        virtual std::vector<std::string> TakePlantRecord(std::chrono::milliseconds timeout);
+        virtual std::string DebugLog() const;
+
         static TargetInteractor& Instance();
         static void SetInstance(TargetInteractor& instance);
     };

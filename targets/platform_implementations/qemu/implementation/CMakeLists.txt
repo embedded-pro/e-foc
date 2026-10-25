@@ -4,12 +4,20 @@ emil_build_for(e_foc.platform_abstraction_qemu ALL All BOOL EMIL_BUILD_QEMU)
 target_sources(e_foc.platform_abstraction_qemu PRIVATE
     BoardProtectionSimulator.cpp
     BoardProtectionSimulator.hpp
+    CmsdkUartLines.cpp
+    CmsdkUartLines.hpp
+    EmulatedCan.cpp
+    EmulatedCan.hpp
+    EmulatedCanBusAdapter.cpp
+    EmulatedCanBusAdapter.hpp
     SemihostingEeprom.cpp
     SemihostingEeprom.hpp
     SemihostingFile.cpp
     SemihostingFile.hpp
     SemihostingPlantConfig.cpp
     SemihostingPlantConfig.hpp
+    SemihostingRecordFile.cpp
+    SemihostingRecordFile.hpp
     SilPlantConfig.hpp
     QemuTimer.cpp
     QemuTimer.hpp
@@ -17,10 +25,6 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     PlatformFactoryImpl.hpp
     QemuConstants.hpp
     QemuCycleCounter.hpp
-    SemihostingCan.cpp
-    SemihostingCan.hpp
-    SemihostingCanBusAdapter.cpp
-    SemihostingCanBusAdapter.hpp
     SemihostingSerial.cpp
     SemihostingSerial.hpp
     SilWatchdogStall.cpp

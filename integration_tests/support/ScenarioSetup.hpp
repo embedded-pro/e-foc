@@ -37,7 +37,6 @@ namespace integration
         bool booted{ false };
         std::optional<Setpoint> lastSetpoint;
         response::PlantTrace trace;
-        std::size_t consumedLines{ 0 };
         IdentifiedParameters identified;
         IdentifiedParameters online;
     };

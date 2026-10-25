@@ -166,9 +166,8 @@ namespace
 
     void FeedTrace(ScenarioSetup& setup)
     {
-        const auto& lines = TargetInteractor::Instance().SerialLines();
-        for (; setup.consumedLines < lines.size(); ++setup.consumedLines)
-            setup.trace.Consume(lines[setup.consumedLines]);
+        for (const auto& line : TargetInteractor::Instance().TakePlantRecord(std::chrono::milliseconds{ 0 }))
+            setup.trace.Consume(line);
     }
 
     // Guest time, not wall-clock: the plant's own samples say how far its clock has advanced, which is

@@ -2,26 +2,27 @@
 
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "infra/util/Function.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
+#include "targets/platform_implementations/qemu/implementation/EmulatedCan.hpp"
 #include <optional>
 
 namespace application
 {
-    class SemihostingCanBusAdapter
+    class EmulatedCanBusAdapter
         : public CanBusAdapter
     {
     public:
+        explicit EmulatedCanBusAdapter(uintptr_t uartBase);
+
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
 
         void NotifyError(CanError error);
 
-        std::optional<sil::SemihostingCan::Frame> PollIncoming();
-        void OnTerminalLine(const infra::Function<void(const char*)>& handler);
+        std::optional<sil::EmulatedCan::Frame> PollIncoming();
 
     private:
-        sil::SemihostingCan can;
+        sil::EmulatedCan can;
         infra::Function<void(CanError)> onError;
     };
 }

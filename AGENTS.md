@@ -184,7 +184,7 @@ Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that 
 
 **Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`. `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
 
-**SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines on the trace channel (control-tick time base, never printed from the ISR), a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`).
+**SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines in the `plant.rec` record file it writes into the scenario directory (control-tick time base, never written from the ISR), a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`).
 
 Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
 
@@ -192,7 +192,7 @@ Every metric assertion prints a `[METRIC]` line; limits are pinned from those li
 
 **Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (CAN electrical response, `[SM] Calibration record:` and `[EST]` trace lines, all mechanical values in micro-units) against the plant the scenario configured.
 
-**SIL terminal**: a terminal command is a line without the `CAN_RX` prefix on the same socket as the CAN frames; the answer arrives as trace lines, never as a prompt to wait for.
+**SIL channels**: CAN frames travel as `CAN_RX`/`CAN_TX` text lines on the emulator's second serial port; the first is the product's terminal, whose answers arrive as trace lines, never as a prompt to wait for. Everything the firmware prints is the scenario's debug log (`debug.log` in the scenario directory), and a failed scenario's report carries its last lines.
 
 ## Agent routing
 

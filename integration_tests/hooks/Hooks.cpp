@@ -2,6 +2,7 @@
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
+#include <utility>
 
 HOOK_BEFORE_ALL(.name = "Setup target")
 {
@@ -22,5 +23,10 @@ HOOK_BEFORE_SCENARIO()
 
 HOOK_AFTER_SCENARIO()
 {
-    integration::TargetInteractor::Instance().AfterScenario();
+    auto& interactor = integration::TargetInteractor::Instance();
+    if (hasError)
+        if (auto log = interactor.DebugLog(); !log.empty())
+            Attach(std::move(log), cucumber_cpp::library::engine::AttachOptions{ "text/plain", "target-debug-output.log" });
+
+    interactor.AfterScenario();
 }
