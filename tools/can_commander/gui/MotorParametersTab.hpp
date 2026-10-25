@@ -18,11 +18,14 @@ namespace tool
         void SetLegacy(bool legacyContract) override;
         void SetActionsAvailable(const QString& reason);
         void SetMechanicalIdentificationUnavailable(const QString& reason);
+        void SetMaintenanceUnavailable(const QString& reason);
 
     signals:
         void AlignRequested();
         void IdentifyElectricalRequested();
         void IdentifyMechanicalRequested();
+        void CalibrateRequested();
+        void ClearCalibrationRequested();
 
     protected:
         void Refresh() override;
@@ -34,7 +37,10 @@ namespace tool
         QPushButton* alignButton{ nullptr };
         QPushButton* identifyElectricalButton{ nullptr };
         QPushButton* identifyMechanicalButton{ nullptr };
+        QPushButton* calibrateButton{ nullptr };
+        QPushButton* clearCalibrationButton{ nullptr };
         QString actionsUnavailable;
         QString mechanicalUnavailable;
+        QString maintenanceUnavailable;
     };
 }

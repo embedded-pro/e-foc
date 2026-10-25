@@ -265,6 +265,16 @@ namespace tool
         return Slice(23, 17);
     }
 
+    std::string_view ResetCauseName(float cause)
+    {
+        static constexpr std::array<std::string_view, 5> names{ "Power-up", "Brown-out", "Software", "Hardware", "Watchdog" };
+
+        const auto index = std::lround(cause);
+        if (index < 0 || static_cast<std::size_t>(index) >= names.size() || static_cast<float>(index) != cause)
+            return "Unknown";
+        return names[static_cast<std::size_t>(index)];
+    }
+
     const SettingPresentation& PresentationOf(can::FocParameter parameter)
     {
         const auto presentation = std::ranges::find_if(presentations, [parameter](const SettingPresentation& entry)

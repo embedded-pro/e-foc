@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.5.1
+version: 0.6.0
 component: "tool-can-commander"
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.5.1                |
+| Version   | 0.6.0                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-25           |
 
@@ -82,8 +82,9 @@ graph TD
     M1 --> Telemetry["Telemetry and identified parameters"]
     Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint"]
     Commands --> Controllers["Controllers: algorithm and settings per loop"]
-    Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align and identify"]
+    Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align, identify, calibrate"]
     Commands --> Configuration["Configuration: start-up settings"]
+    Commands --> Diagnostics["Diagnostics: readings the controller reports"]
 ```
 
 - A tab appears automatically for every node whose frames are seen on the bus. The user can also add a tab
@@ -132,9 +133,9 @@ Each command outcome is logged in words and prefixed with its motor: accepted, t
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally
 and never sent, or a command that received no answer in time.
 
-Align, Identify Electrical and Identify Mechanical move the rotor and answer only when they finish, so the
-tool waits up to two minutes for them instead of two seconds; the panel says the rotor will move before the
-button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
+Align, Identify Electrical, Identify Mechanical and Calibrate move the rotor and answer only when they
+finish, so the tool waits up to two minutes for them instead of two seconds; the panel says the rotor will
+move before the button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
 in progress (Part J). A controller that answers Identify Mechanical with "not implemented" gets that button
 disabled, with the reason, until its tab is closed.
 
@@ -165,8 +166,11 @@ flowchart LR
   algorithm uses; the other settings of the loop are hidden, not deleted. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
 - **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (or the platform default),
-  inertia and viscous friction, and the commissioning actions Align, Identify Electrical and Identify
-  Mechanical. Changing the pole pairs says that the rotor has to be aligned again before it can start.
+  inertia and viscous friction, and the commissioning actions Align, Identify Electrical, Identify
+  Mechanical and Calibrate, the whole sequence of the firmware's calibration. Changing the pole pairs says
+  that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
+  after the user confirms it in a dialog, since the motor cannot start again until it is calibrated; a
+  successful Calibrate or Clear Calibration reads the motor parameters and the diagnostics again.
 - **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.
   They are stored at once and take effect when the controller restarts; a new node ID or bitrate means the
   motor appears under another tab, or only after reconnecting at the new bitrate, and the tab says so.
@@ -185,7 +189,19 @@ reason, while the last status says the motor runs or calibrates. Start-up settin
 
 A node on contract 2.0 has none of the 2.1 messages. Its Controllers tab offers the loop bandwidths alone,
 sent with the 2.0 bandwidth commands and not read back; the motor parameter fields are disabled with the
-reason; the commissioning actions and the encoder resolution work as on 2.1.
+reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
+Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
+reason.
+
+### Part K — diagnostics
+
+The **Diagnostics** tab shows what the controller measured or derived and cannot be edited: the calibration
+record's current-sensor offsets and cogging peak, the online estimates (zero in torque mode, which runs no
+estimator), the control-loop statistics and the cause of the last reset, named. They are the read-only
+parameters of contract 2.2, read one at a time like the settings when the node is found compatible, after a
+calibration and on Refresh; each shows "—" until it is read, and the values are dropped when the node leaves
+the bus. Clear Statistics sends `ClearDiagnostics`, which restarts the control-loop and CAN error statistics,
+and reads them again once the controller accepts it.
 
 ### Part E — issue log
 

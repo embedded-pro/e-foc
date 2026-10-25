@@ -190,12 +190,12 @@ directly, so the mapping lives with the scenarios rather than in this document w
 
 ---
 
-## Planned — Commands and Verdicts over CAN Only
+## Commands and Verdicts over CAN Only
 
-> **Status: in progress.** Every row of *What has to move* is done, and the guard of migration step
-> 4 is in place: the motor-controller scenarios command the target and decide their verdicts over
-> CAN and the plant record only, as the sections above describe. The CAN Commander views of step 1
-> remain.
+> **Status: done.** Every row of *What has to move* is done, the guard of migration step 4 is in
+> place, and the CAN Commander shows every new message: the motor-controller scenarios command the
+> target and decide their verdicts over CAN and the plant record only, as the sections above
+> describe.
 
 ### The rule
 
@@ -277,7 +277,7 @@ One follow-up change, in this order, each step leaving the suite green:
 
 1. **Contract 2.2.** Add `Calibrate`, `ClearCalibration`, `ClearDiagnostics` and the read-only
    parameters of `service-can.md` Part A: wire contract, wire tests, firmware handlers, and the CAN
-   Commander views. Done, except the CAN Commander views.
+   Commander views. Done.
 2. **Emulator transport.** CAN moves to its own emulated serial port, the plant record to its file,
    and the serial output becomes the per-scenario debug log. Done.
 3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its

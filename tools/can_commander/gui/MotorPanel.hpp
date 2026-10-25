@@ -56,12 +56,15 @@ namespace tool
         void ConnectCommands();
         void ConnectSetpoints();
         void ConnectCommissioning();
+        void ConnectDiagnostics();
+        void ConfirmClearCalibration();
         void ConnectSettings();
         bool Send(const QString& command, uint8_t commandType, const std::function<bool()>& send);
         void Report(IssueSeverity severity, const QString& message) const;
         void ForgetNodeState();
         QString CommandsUnavailableReason() const;
         QString SettingsUnavailableReason() const;
+        QString DiagnosticsUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 

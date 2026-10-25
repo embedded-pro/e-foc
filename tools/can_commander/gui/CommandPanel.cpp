@@ -37,12 +37,14 @@ namespace tool
         controllers = new ControllersTab();
         motorParameters = new MotorParametersTab();
         configuration = new ConfigurationTab();
+        diagnostics = new DiagnosticsTab();
 
         tabs = new QTabWidget();
         tabs->addTab(CreateMotorControlTab(), "&Motor Control");
         tabs->addTab(controllers, "C&ontrollers");
         tabs->addTab(motorParameters, "Motor &Parameters");
         tabs->addTab(configuration, "Confi&guration");
+        tabs->addTab(diagnostics, "Diagnosti&cs");
         layout->addWidget(tabs, 1);
     }
 
@@ -59,6 +61,11 @@ namespace tool
     ConfigurationTab& CommandPanel::Configuration() const
     {
         return *configuration;
+    }
+
+    DiagnosticsTab& CommandPanel::Diagnostics() const
+    {
+        return *diagnostics;
     }
 
     std::array<SettingsPage*, 3> CommandPanel::SettingsPages() const

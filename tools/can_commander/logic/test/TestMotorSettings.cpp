@@ -327,3 +327,15 @@ TEST_F(TestMotorSettings, an_empty_sequence_is_never_active)
 
     EXPECT_FALSE(sequence.Active());
 }
+
+TEST_F(TestMotorSettings, names_the_reset_cause_the_controller_reports)
+{
+    EXPECT_EQ("Power-up", ResetCauseName(0.0f));
+    EXPECT_EQ("Brown-out", ResetCauseName(1.0f));
+    EXPECT_EQ("Software", ResetCauseName(2.0f));
+    EXPECT_EQ("Hardware", ResetCauseName(3.0f));
+    EXPECT_EQ("Watchdog", ResetCauseName(4.0f));
+    EXPECT_EQ("Unknown", ResetCauseName(5.0f));
+    EXPECT_EQ("Unknown", ResetCauseName(-1.0f));
+    EXPECT_EQ("Unknown", ResetCauseName(2.5f));
+}

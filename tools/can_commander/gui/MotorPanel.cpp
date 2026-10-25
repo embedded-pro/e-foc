@@ -4,6 +4,8 @@
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include <QHBoxLayout>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <chrono>
@@ -39,6 +41,7 @@ namespace tool
         ConnectCommands();
         ConnectSetpoints();
         ConnectCommissioning();
+        ConnectDiagnostics();
         ConnectSettings();
         Refresh();
     }
@@ -188,6 +191,47 @@ namespace tool
                 Send("Identify Mechanical", can::focIdentifyMechanicalId, [this]()
                     {
                         return client.SendIdentifyMechanical(nodeId);
+                    });
+            });
+        connect(&tab, &MotorParametersTab::CalibrateRequested, this, [this]()
+            {
+                Send("Calibrate", can::focCalibrateId, [this]()
+                    {
+                        return client.SendCalibrate(nodeId);
+                    });
+            });
+        connect(&tab, &MotorParametersTab::ClearCalibrationRequested, this, &MotorPanel::ConfirmClearCalibration);
+    }
+
+    void MotorPanel::ConfirmClearCalibration()
+    {
+        QMessageBox box(QMessageBox::Warning, "Clear Calibration",
+            QString("Clear the calibration stored in %1? The motor cannot start until it is calibrated again.").arg(Title()),
+            QMessageBox::Cancel, this);
+        const auto* clear = box.addButton("Clear Calibration", QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != clear)
+            return;
+
+        Send("Clear Calibration", can::focClearCalibrationId, [this]()
+            {
+                return client.SendClearCalibration(nodeId);
+            });
+    }
+
+    void MotorPanel::ConnectDiagnostics()
+    {
+        auto& tab = commandPanel->Diagnostics();
+        connect(&tab, &DiagnosticsTab::RefreshRequested, this, [this]()
+            {
+                client.RequestReadings(nodeId);
+            });
+        connect(&tab, &DiagnosticsTab::ClearStatisticsRequested, this, [this]()
+            {
+                Send("Clear Diagnostics", can::focClearDiagnosticsId, [this]()
+                    {
+                        return client.SendClearDiagnostics(nodeId);
                     });
             });
     }
@@ -345,6 +389,7 @@ namespace tool
         commandPanel->ClearActiveControlMode();
         for (auto* page : commandPanel->SettingsPages())
             page->ForgetValues();
+        commandPanel->Diagnostics().ForgetValues();
     }
 
     QString MotorPanel::CommandsUnavailableReason() const
@@ -382,10 +427,21 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::DiagnosticsUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsDiagnostics(nodeId))
+            return QString("Needs firmware contract 2.2 or newer: this controller has %1.").arg(contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
-        commandPanel->SetCommandsAvailable(CommandsUnavailableReason(), !client.IsBusy(nodeId));
+        const auto commandsReason = CommandsUnavailableReason();
+        const auto diagnosticsReason = DiagnosticsUnavailableReason();
+        commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
+        commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
+        commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
         RefreshHeader();
         emit StatusChanged();
     }
@@ -580,5 +636,6 @@ namespace tool
     {
         for (auto* page : commandPanel->SettingsPages())
             page->ShowValue(parameter, value);
+        commandPanel->Diagnostics().ShowValue(parameter, value);
     }
 }

@@ -62,6 +62,7 @@ namespace tool
         static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
         static constexpr uint8_t settingsContractMinor{ 1 };
+        static constexpr uint8_t diagnosticsContractMinor{ 2 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -71,6 +72,7 @@ namespace tool
         std::set<uint16_t> OnlineNodes() const;
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
         bool SupportsSettings(uint16_t nodeId) const;
+        bool SupportsDiagnostics(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
@@ -89,12 +91,16 @@ namespace tool
         bool SendAlign(uint16_t nodeId);
         bool SendIdentifyElectrical(uint16_t nodeId);
         bool SendIdentifyMechanical(uint16_t nodeId);
+        bool SendCalibrate(uint16_t nodeId);
+        bool SendClearCalibration(uint16_t nodeId);
+        bool SendClearDiagnostics(uint16_t nodeId);
         bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
         bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);
 
         bool RequestData(uint16_t nodeId);
         void RequestSettings(uint16_t nodeId);
+        void RequestReadings(uint16_t nodeId);
         void RequestStatus(uint16_t nodeId);
 
     private:
@@ -129,6 +135,7 @@ namespace tool
         bool SendRead(uint16_t nodeId, const Read& read);
         void ForgetReads(uint16_t nodeId);
         void OnAccepted(uint16_t nodeId, uint8_t commandType);
+        bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
         void RefreshStatus();
         static bool IsRead(uint8_t commandType);
 

@@ -51,8 +51,18 @@ namespace tool
 
     bool CanCommandClient::SupportsSettings(uint16_t nodeId) const
     {
+        return SupportsMinor(nodeId, settingsContractMinor);
+    }
+
+    bool CanCommandClient::SupportsDiagnostics(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, diagnosticsContractMinor);
+    }
+
+    bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
+    {
         const auto minor = contractMinors.find(nodeId);
-        return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= settingsContractMinor;
+        return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= minimumMinor;
     }
 
     infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
@@ -62,6 +72,7 @@ namespace tool
             case can::focAlignId:
             case can::focIdentifyElectricalId:
             case can::focIdentifyMechanicalId:
+            case can::focCalibrateId:
                 return motionCommandTimeout;
             default:
                 return commandTimeout;
@@ -231,6 +242,30 @@ namespace tool
             });
     }
 
+    bool CanCommandClient::SendCalibrate(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focCalibrateId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::calibrate);
+            });
+    }
+
+    bool CanCommandClient::SendClearCalibration(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focClearCalibrationId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::clearCalibration);
+            });
+    }
+
+    bool CanCommandClient::SendClearDiagnostics(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focClearDiagnosticsId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::clearDiagnostics);
+            });
+    }
+
     bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
     {
         return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
@@ -268,6 +303,16 @@ namespace tool
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
         for (const auto& descriptor : can::focParameters)
             if (!descriptor.readOnly)
+                QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+    }
+
+    void CanCommandClient::RequestReadings(uint16_t nodeId)
+    {
+        if (!SupportsDiagnostics(nodeId))
+            return;
+
+        for (const auto& descriptor : can::focParameters)
+            if (descriptor.readOnly)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
@@ -363,6 +408,14 @@ namespace tool
             case can::focIdentifyElectricalId:
             case can::focIdentifyMechanicalId:
                 RequestSettings(nodeId);
+                break;
+            case can::focCalibrateId:
+            case can::focClearCalibrationId:
+                RequestSettings(nodeId);
+                RequestReadings(nodeId);
+                break;
+            case can::focClearDiagnosticsId:
+                RequestReadings(nodeId);
                 break;
             default:
                 break;
@@ -460,6 +513,7 @@ namespace tool
             });
 
         RequestSettings(nodeId);
+        RequestReadings(nodeId);
         RequestStatus(nodeId);
     }
 
