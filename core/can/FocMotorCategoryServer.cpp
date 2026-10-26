@@ -29,8 +29,7 @@ namespace can
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
-            commissioningMessages.align, commissioningMessages.identifyElectrical, commissioningMessages.identifyMechanical,
-            commissioningMessages.calibrate, commissioningMessages.clearCalibration, clearDiagnostics);
+            clearDiagnostics);
     }
 
     FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
@@ -40,7 +39,9 @@ namespace can
         , identifyMechanical{ focIdentifyMechanicalId, *this, &CommissioningMessages::HandleIdentifyMechanical }
         , calibrate{ focCalibrateId, *this, &CommissioningMessages::HandleCalibrate }
         , clearCalibration{ focClearCalibrationId, *this, &CommissioningMessages::HandleClearCalibration }
-    {}
+    {
+        server.AddMessageTypes(align, identifyElectrical, identifyMechanical, calibrate, clearCalibration);
+    }
 
     FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
         : selectAlgorithm{ focSelectAlgorithmId, server, &FocMotorCategoryServer::HandleSelectAlgorithm }

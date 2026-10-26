@@ -1,4 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
+#include <optional>
 
 namespace can
 {
@@ -16,8 +17,44 @@ namespace can
     static_assert(static_cast<uint8_t>(foc::PositionAlgorithm::lqi) == static_cast<uint8_t>(FocPositionAlgorithm::lqi));
     static_assert(static_cast<uint8_t>(foc::PositionAlgorithm::twoDof) == static_cast<uint8_t>(FocPositionAlgorithm::twoDof));
 
+    namespace
+    {
+        std::optional<ParameterGroup> ReadingGroupOf(FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::currentOffsetA:
+                case FocParameter::currentOffsetB:
+                case FocParameter::currentOffsetC:
+                case FocParameter::coggingPeak:
+                    return ParameterGroup::calibrationRecord;
+                case FocParameter::estimatedResistance:
+                case FocParameter::estimatedInductance:
+                case FocParameter::estimatedInertia:
+                case FocParameter::estimatedViscousFriction:
+                    return ParameterGroup::onlineEstimate;
+                case FocParameter::loopSamples:
+                case FocParameter::loopBudgetCycles:
+                case FocParameter::loopMinimumCycles:
+                case FocParameter::loopAverageCycles:
+                case FocParameter::loopMaximumCycles:
+                case FocParameter::loopOverruns:
+                case FocParameter::loopDeadlineMisses:
+                case FocParameter::loopReentries:
+                    return ParameterGroup::loopStatistics;
+                case FocParameter::resetCause:
+                    return ParameterGroup::platform;
+                default:
+                    return std::nullopt;
+            }
+        }
+    }
+
     ParameterGroup GroupOf(FocParameter parameter)
     {
+        if (const auto reading = ReadingGroupOf(parameter))
+            return *reading;
+
         switch (parameter)
         {
             case FocParameter::currentBandwidth:
@@ -41,27 +78,6 @@ namespace can
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
                 return ParameterGroup::startup;
-            case FocParameter::currentOffsetA:
-            case FocParameter::currentOffsetB:
-            case FocParameter::currentOffsetC:
-            case FocParameter::coggingPeak:
-                return ParameterGroup::calibrationRecord;
-            case FocParameter::estimatedResistance:
-            case FocParameter::estimatedInductance:
-            case FocParameter::estimatedInertia:
-            case FocParameter::estimatedViscousFriction:
-                return ParameterGroup::onlineEstimate;
-            case FocParameter::loopSamples:
-            case FocParameter::loopBudgetCycles:
-            case FocParameter::loopMinimumCycles:
-            case FocParameter::loopAverageCycles:
-            case FocParameter::loopMaximumCycles:
-            case FocParameter::loopOverruns:
-            case FocParameter::loopDeadlineMisses:
-            case FocParameter::loopReentries:
-                return ParameterGroup::loopStatistics;
-            case FocParameter::resetCause:
-                return ParameterGroup::platform;
             default:
                 return ParameterGroup::motor;
         }

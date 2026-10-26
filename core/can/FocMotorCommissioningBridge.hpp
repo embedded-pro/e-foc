@@ -5,6 +5,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/Function.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -28,6 +29,8 @@ namespace can
         bool ReserveCalibration(uint8_t commandId);
         bool ElectricalIdentificationInProgress() const;
         bool MechanicalIdentificationInProgress() const;
+        void OnResistanceAndInductance(const services::ElectricalParametersIdentification::ResistanceInductanceResult& result);
+        void OnPolePairs(std::optional<std::size_t> polePairs);
         void FailElectricalIdentification(FocMotorCategoryError error);
 
         FocMotorCategoryServer& server;

@@ -139,8 +139,6 @@ namespace can
             bool HandleClearCalibration(const hal::Can::Message& data);
 
             FocMotorCategoryServer& server;
-
-        public:
             services::CanMessageHandler<CommissioningMessages> align;
             services::CanMessageHandler<CommissioningMessages> identifyElectrical;
             services::CanMessageHandler<CommissioningMessages> identifyMechanical;

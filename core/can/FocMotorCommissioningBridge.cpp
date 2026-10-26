@@ -52,56 +52,66 @@ namespace can
         electricalIdent.EstimateResistanceAndInductance({},
             [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
-                if (!result.resistance.has_value() || !result.inductance.has_value() || result.fitQuality < 0.5f)
+                OnResistanceAndInductance(result);
+            });
+    }
+
+    void FocMotorCommissioningBridge::OnResistanceAndInductance(const services::ElectricalParametersIdentification::ResistanceInductanceResult& result)
+    {
+        if (!result.resistance.has_value() || !result.inductance.has_value() || result.fitQuality < 0.5f)
+        {
+            FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
+            return;
+        }
+
+        pendingElectricalR = result.resistance;
+        pendingElectricalL = result.inductance;
+
+        electricalIdent.EstimateNumberOfPolePairs({},
+            [this](std::optional<std::size_t> polePairs)
+            {
+                OnPolePairs(polePairs);
+            });
+    }
+
+    void FocMotorCommissioningBridge::OnPolePairs(std::optional<std::size_t> polePairs)
+    {
+        if (!polePairs.has_value() || *polePairs > std::numeric_limits<uint8_t>::max())
+        {
+            FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
+            return;
+        }
+
+        services::CalibrationData data{};
+        data.rPhase = pendingElectricalR->Value();
+        data.lD = pendingElectricalL->Value();
+        data.lQ = pendingElectricalL->Value();
+        data.polePairs = static_cast<uint8_t>(*polePairs);
+        data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
+        pendingElectricalR.reset();
+        pendingElectricalL.reset();
+
+        server.BroadcastElectricalParams(
+            foc::Ohm{ data.rPhase },
+            foc::MilliHenry{ data.lD },
+            static_cast<std::size_t>(data.polePairs));
+
+        controlMode.CmdCompleteExternalCalibration(data,
+            [this](state_machine::CommandResult result)
+            {
+                auto callback = pendingElectricalIdentDoneCallback;
+                pendingElectricalIdentDoneCallback = nullptr;
+
+                if (result == state_machine::CommandResult::ok)
+                    callback();
+                else
                 {
-                    FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
-                    return;
+                    if (result == state_machine::CommandResult::rejected)
+                        controlMode.CmdReleaseExternalCalibration();
+
+                    server.SendCategoryError(can::focIdentifyElectricalId,
+                        state_machine::ToCategoryError(result));
                 }
-
-                pendingElectricalR = result.resistance;
-                pendingElectricalL = result.inductance;
-
-                electricalIdent.EstimateNumberOfPolePairs({},
-                    [this](std::optional<std::size_t> polePairs)
-                    {
-                        if (!polePairs.has_value() || *polePairs > std::numeric_limits<uint8_t>::max())
-                        {
-                            FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
-                            return;
-                        }
-
-                        services::CalibrationData data{};
-                        data.rPhase = pendingElectricalR->Value();
-                        data.lD = pendingElectricalL->Value();
-                        data.lQ = pendingElectricalL->Value();
-                        data.polePairs = static_cast<uint8_t>(*polePairs);
-                        data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
-                        pendingElectricalR.reset();
-                        pendingElectricalL.reset();
-
-                        server.BroadcastElectricalParams(
-                            foc::Ohm{ data.rPhase },
-                            foc::MilliHenry{ data.lD },
-                            static_cast<std::size_t>(data.polePairs));
-
-                        controlMode.CmdCompleteExternalCalibration(data,
-                            [this](state_machine::CommandResult result)
-                            {
-                                auto callback = pendingElectricalIdentDoneCallback;
-                                pendingElectricalIdentDoneCallback = nullptr;
-
-                                if (result == state_machine::CommandResult::ok)
-                                    callback();
-                                else
-                                {
-                                    if (result == state_machine::CommandResult::rejected)
-                                        controlMode.CmdReleaseExternalCalibration();
-
-                                    server.SendCategoryError(can::focIdentifyElectricalId,
-                                        state_machine::ToCategoryError(result));
-                                }
-                            });
-                    });
             });
     }
 
