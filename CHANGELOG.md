@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/embedded-pro/e-foc/compare/v1.2.1...v1.3.0) (2026-10-26)
+
+
+### Features
+
+* **can:** Choose controllers per mode and set every setting and motor parameter over CAN (contract 2.1) ([#429](https://github.com/embedded-pro/e-foc/issues/429)) ([5f2fca4](https://github.com/embedded-pro/e-foc/commit/5f2fca42859dc650c24cdd35977a781d11c316e1))
+* **can:** Contract 2.2 and CAN-only SIL/HIL ([#430](https://github.com/embedded-pro/e-foc/issues/430)) ([0884e8c](https://github.com/embedded-pro/e-foc/commit/0884e8c0b21b1c1924b43ffcda475e322ac20fe9))
+
 ## [1.2.1](https://github.com/embedded-pro/e-foc/compare/v1.2.0...v1.2.1) (2026-10-24)
 
 
