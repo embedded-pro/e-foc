@@ -2,6 +2,7 @@
 #include "integration_tests/support/interactor/hardware/SerialLogger.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include "tools/hardware_bridge/client/common/ResolveIPv4.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <sstream>
@@ -38,14 +39,52 @@ namespace hil
     void BridgeSession::Connect()
     {
         const auto ipv4 = tool::ResolveIPv4(config.host);
+        ConnectSerial(ipv4);
+        ConnectCan(ipv4);
+        AwaitConnections();
+    }
 
+    bool BridgeSession::Connected() const
+    {
+        return serialTracker && serialTracker->Alive() && canTracker && canTracker->Alive();
+    }
+
+    void BridgeSession::Reconnect()
+    {
+        SerialLogger::Instance().Note("bridge", std::string{ "reconnecting (serial " } + (serialTracker && serialTracker->Alive() ? "up" : "down") +
+                                                    ", can " + (canTracker && canTracker->Alive() ? "up" : "down") + ")");
+
+        const auto ipv4 = tool::ResolveIPv4(config.host);
+        if (!serialTracker || !serialTracker->Alive())
+        {
+            typingTransmitter.reset();
+            serialTracker.reset();
+            serial.reset();
+            serialBuffer.clear();
+            ConnectSerial(ipv4);
+        }
+
+        if (!canTracker || !canTracker->Alive())
+        {
+            canTracker.reset();
+            can.reset();
+            ConnectCan(ipv4);
+        }
+
+        AwaitConnections();
+    }
+
+    void BridgeSession::EnsureConnected()
+    {
+        if (!Connected())
+            Reconnect();
+    }
+
+    void BridgeSession::ConnectSerial(services::IPv4Address address)
+    {
         serial = std::make_unique<tool::TcpClientSerial>(
-            network.ConnectionFactory(), ipv4, config.serialPort);
-        can = std::make_unique<tool::TcpClientCanbus>(
-            network.ConnectionFactory(), ipv4, config.canPort);
-
+            network.ConnectionFactory(), address, config.serialPort);
         serialTracker = std::make_unique<Tracker>(*serial);
-        canTracker = std::make_unique<Tracker>(*can);
 
         typingTransmitter = std::make_unique<TypingTransmitter>(
             *serial,
@@ -63,6 +102,13 @@ namespace hil
             {
                 OnSerialBytes(data);
             });
+    }
+
+    void BridgeSession::ConnectCan(services::IPv4Address address)
+    {
+        can = std::make_unique<tool::TcpClientCanbus>(
+            network.ConnectionFactory(), address, config.canPort);
+        canTracker = std::make_unique<Tracker>(*can);
 
         can->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
@@ -73,13 +119,16 @@ namespace hil
                 receivedFrames.push_back(frame);
                 canQueue.push_back(std::move(frame));
             });
+    }
 
+    void BridgeSession::AwaitConnections()
+    {
         const auto deadline = std::chrono::steady_clock::now() + config.connectTimeout;
         try
         {
             network.ExecuteUntil([&]
                 {
-                    if (serialTracker->Alive() && canTracker->Alive())
+                    if (serialTracker->Settled() && canTracker->Settled())
                         return true;
                     if (std::chrono::steady_clock::now() >= deadline)
                         return true;
@@ -129,8 +178,7 @@ namespace hil
     bool BridgeSession::SendSerial(const std::string& command,
         std::chrono::milliseconds timeout)
     {
-        if (!serialTracker || !serialTracker->Alive())
-            throw std::runtime_error{ "BridgeSession: serial bridge disconnected" };
+        EnsureConnected();
 
         {
             std::ostringstream os;
@@ -187,8 +235,7 @@ namespace hil
 
     bool BridgeSession::WaitForPrompt(std::chrono::milliseconds timeout)
     {
-        if (!serialTracker || !serialTracker->Alive())
-            return false;
+        EnsureConnected();
 
         {
             std::ostringstream os;
@@ -217,10 +264,66 @@ namespace hil
         return ok;
     }
 
+    bool BridgeSession::WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout)
+    {
+        {
+            std::ostringstream os;
+            os << "WaitForRestart(\"" << bannerLine << "\", timeout=" << timeout.count() << "ms)";
+            SerialLogger::Instance().ApiCall(os.str());
+        }
+
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        bool reconnected = false;
+        while (!reconnected && !SerialLinesContain(bannerLine) && std::chrono::steady_clock::now() < deadline)
+        {
+            const auto slice = std::min(timeouts::reconnectPoll, ToMilliseconds(deadline - std::chrono::steady_clock::now()));
+            if (Connected())
+            {
+                RunUntil([this, &bannerLine]
+                    {
+                        return SerialLinesContain(bannerLine) || !Connected();
+                    },
+                    slice);
+                continue;
+            }
+
+            try
+            {
+                Reconnect();
+                reconnected = true;
+            }
+            catch (const std::runtime_error& error)
+            {
+                SerialLogger::Instance().Note("bridge", error.what());
+                RunUntil([]
+                    {
+                        return false;
+                    },
+                    slice);
+            }
+        }
+
+        const bool banner = SerialLinesContain(bannerLine);
+        {
+            std::ostringstream os;
+            os << "WaitForRestart -> " << (banner || reconnected ? "true" : "false")
+               << " (banner=" << (banner ? "true" : "false") << ", reconnected=" << (reconnected ? "true" : "false") << ")";
+            SerialLogger::Instance().ApiResult(os.str());
+        }
+        return banner || reconnected;
+    }
+
+    bool BridgeSession::SerialLinesContain(const std::string& needle) const
+    {
+        return std::any_of(serialLines.begin(), serialLines.end(), [&needle](const std::string& line)
+            {
+                return line.find(needle) != std::string::npos;
+            });
+    }
+
     bool BridgeSession::FlushAndAccumulate(std::chrono::milliseconds timeout)
     {
-        if (!serialTracker || !serialTracker->Alive())
-            return false;
+        EnsureConnected();
 
         {
             std::ostringstream os;
@@ -330,8 +433,7 @@ namespace hil
 
     bool BridgeSession::DrainSerial(std::chrono::milliseconds timeout)
     {
-        if (!serialTracker || !serialTracker->Alive())
-            throw std::runtime_error{ "BridgeSession: serial bridge disconnected" };
+        EnsureConnected();
 
         {
             std::ostringstream os;

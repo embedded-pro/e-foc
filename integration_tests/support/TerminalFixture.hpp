@@ -18,6 +18,7 @@ namespace integration
         bool DrainLines(std::chrono::milliseconds timeout);
         bool FlushPartialLines(std::chrono::milliseconds timeout);
         bool WaitForPrompt(std::chrono::milliseconds timeout = std::chrono::milliseconds{ 1000 });
+        bool WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout);
 
         // Counts every line the target printed, including those an interactor dropped since, so a mark taken
         // before a command still names the first line of its answer.

@@ -3,12 +3,15 @@
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <chrono>
 #include <gtest/gtest.h>
+#include <string>
 #include <thread>
 
 using namespace integration;
 
 namespace
 {
+    const std::string kBootBannerLine{ "Reset Cause:" };
+
     void ExpectReportedResetCause(TerminalFixture& fixture, const std::string& cause)
     {
         ASSERT_TRUE(fixture.SendCommand("reset_cause", hil::timeouts::command))
@@ -35,6 +38,9 @@ WHEN(R"(the reset command is sent to the hardware target)")
 WHEN(R"(the hardware target reconnects after reset)")
 {
     auto& fixture = context.Get<TerminalFixture>();
+
+    ASSERT_TRUE(fixture.WaitForRestart(kBootBannerLine, hil::timeouts::bootBanner))
+        << "hardware target did not restart: no boot banner and no bridge reconnection";
 
     const auto deadline = std::chrono::steady_clock::now() + hil::timeouts::bootBanner;
     bool reconnected = false;

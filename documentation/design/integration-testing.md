@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.4.0
+version: 1.5.0
 component: integration-testing
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.4.0                      |
+| Version   | 1.5.0                      |
 | Component | integration-testing        |
 | Date      | 2026-10-25                 |
 
@@ -275,6 +275,12 @@ hard fault, reset cause, watchdog) brings up a board; it is not the motor contro
 its interface, the UART scenario tests that terminal itself, and the CAN scenario checks the
 peripheral before any CAN command server runs. It keeps using the terminal, through a fixture that
 a hook creates only for a scenario tagged `@hil`.
+
+The scenarios that reset the board (the reset command, the watchdog stall and the hard fault) wait for
+the restart before they talk to the terminal again. The boot banner's reset-cause line marks it, and so
+does the bridge dropping the serial link, which a reset can do. A probe sent earlier would reach the
+image that is about to reset. The session reconnects to the bridge whenever a link has dropped, so one
+dropped link fails no later scenario.
 
 ### Migration
 

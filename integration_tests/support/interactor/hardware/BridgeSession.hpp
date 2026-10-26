@@ -36,10 +36,15 @@ namespace hil
             return config;
         }
 
+        bool Connected() const;
+        void Reconnect();
+        void EnsureConnected();
+
         void ClearSerialLines();
         bool SendSerial(const std::string& command, std::chrono::milliseconds timeout);
         bool DrainSerial(std::chrono::milliseconds timeout);
         bool WaitForPrompt(std::chrono::milliseconds timeout);
+        bool WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout);
 
         bool FlushAndAccumulate(std::chrono::milliseconds timeout);
 
@@ -83,6 +88,10 @@ namespace hil
         BridgeSession();
 
         void Connect();
+        void ConnectSerial(services::IPv4Address address);
+        void ConnectCan(services::IPv4Address address);
+        void AwaitConnections();
+        bool SerialLinesContain(const std::string& needle) const;
         void RunUntil(const std::function<bool()>& predicate, std::chrono::milliseconds timeout);
         void OnSerialBytes(infra::ConstByteRange data);
         void AppendSerialByte(char ch);
@@ -107,11 +116,17 @@ namespace hil
             void Disconnected() override
             {
                 alive = false;
+                dropped = true;
             }
 
             bool Alive() const
             {
                 return alive;
+            }
+
+            bool Settled() const
+            {
+                return alive || dropped;
             }
 
             bool ConnectedOnce() const
@@ -122,6 +137,7 @@ namespace hil
         private:
             bool connectedOnce{ false };
             bool alive{ false };
+            bool dropped{ false };
         };
 
         BridgeConfig config;

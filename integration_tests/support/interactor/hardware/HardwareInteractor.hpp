@@ -28,6 +28,7 @@ namespace hil
         bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) override;
         bool DrainSerial(std::chrono::milliseconds timeout) override;
         bool WaitForPrompt(std::chrono::milliseconds timeout) override;
+        bool WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout) override;
         void ClearSerialLines() override;
         const std::vector<std::string>& SerialLines() const override;
         std::size_t DiscardedSerialLineCount() const override;
