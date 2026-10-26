@@ -19,7 +19,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
     And the identified inertia shall be within 20 % of the plant
@@ -44,7 +44,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified friction shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
 
@@ -151,7 +151,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
     And the motor boots in speed mode
     When the target boots
     And the control loop statistics are cleared
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the motor shall not report a fault
     And the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
@@ -180,7 +180,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the motor shall not report a fault
     And the identified inertia shall be within 20 % of the plant
 
@@ -195,7 +195,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified inertia shall be within <limit> % of the plant
 
     Examples:
@@ -217,7 +217,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified inertia shall be within 20 % of the plant
 
     Examples:
@@ -236,7 +236,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | friction | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified inertia shall be within 10 % of the plant
 
     Examples:

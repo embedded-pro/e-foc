@@ -1,17 +1,19 @@
+#include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <gtest/gtest.h>
 #include <optional>
-#include <string>
 
 using namespace integration;
 
 namespace
 {
-    constexpr auto kTraceTimeout = std::chrono::seconds{ 15 };
+    constexpr auto kClearTimeout = std::chrono::seconds{ 5 };
 
     struct LoopStatistics
     {
@@ -25,70 +27,42 @@ namespace
         unsigned long reentries{ 0 };
     };
 
-    std::optional<unsigned long> ValueAfter(const std::string& line, const std::string& key)
-    {
-        const auto at = line.find(key);
-        if (at == std::string::npos)
-            return std::nullopt;
-        return std::strtoul(line.c_str() + at + key.size(), nullptr, 10);
-    }
-
-    template<typename Predicate>
-    bool DrainUntil(Fixture& fixture, Predicate done, std::chrono::milliseconds timeout)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (done())
-                return true;
-            fixture.DrainLines(std::chrono::milliseconds{ 50 });
-        }
-        return done();
-    }
-
     std::optional<LoopStatistics> ReadLoopStatistics(Fixture& fixture)
     {
-        const auto mark = fixture.CapturedLineCount();
-        if (!fixture.SendCommand("loop_stats"))
-            return std::nullopt;
-
-        std::optional<std::string> totals;
-        std::optional<std::string> durations;
-        std::optional<std::string> counters;
-        const bool printed = DrainUntil(fixture, [&]
-            {
-                totals = fixture.LastCapturedLineWith(mark, "[LOOP] samples=");
-                durations = fixture.LastCapturedLineWith(mark, "[LOOP] cycles last=");
-                counters = fixture.LastCapturedLineWith(mark, "[LOOP] overruns=");
-                return totals.has_value() && durations.has_value() && counters.has_value();
-            },
-            kTraceTimeout);
-
-        if (!printed)
-            return std::nullopt;
-
         LoopStatistics statistics;
-        statistics.samples = ValueAfter(*totals, "samples=").value_or(0);
-        statistics.budget = ValueAfter(*totals, "budget=").value_or(0);
-        statistics.minimum = ValueAfter(*durations, "min=").value_or(0);
-        statistics.average = ValueAfter(*durations, "avg=").value_or(0);
-        statistics.maximum = ValueAfter(*durations, "max=").value_or(0);
-        statistics.overruns = ValueAfter(*counters, "overruns=").value_or(0);
-        statistics.deadlineMisses = ValueAfter(*counters, "deadlineMisses=").value_or(0);
-        statistics.reentries = ValueAfter(*counters, "reentries=").value_or(0);
+        const std::array<std::pair<can::FocParameter, unsigned long*>, 8> fields{ {
+            { can::FocParameter::loopSamples, &statistics.samples },
+            { can::FocParameter::loopBudgetCycles, &statistics.budget },
+            { can::FocParameter::loopMinimumCycles, &statistics.minimum },
+            { can::FocParameter::loopAverageCycles, &statistics.average },
+            { can::FocParameter::loopMaximumCycles, &statistics.maximum },
+            { can::FocParameter::loopOverruns, &statistics.overruns },
+            { can::FocParameter::loopDeadlineMisses, &statistics.deadlineMisses },
+            { can::FocParameter::loopReentries, &statistics.reentries },
+        } };
+
+        for (const auto& [parameter, field] : fields)
+        {
+            const auto value = ReadParameterValue(fixture, parameter);
+            if (!value.has_value())
+                return std::nullopt;
+            *field = static_cast<unsigned long>(std::lround(*value));
+        }
+
         return statistics;
     }
 }
 
 WHEN(R"(the control loop statistics are cleared)")
 {
-    ASSERT_TRUE(context.Get<Fixture>().SendCommand("clear_stats")) << "The clear_stats command was not acknowledged";
+    ASSERT_TRUE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focClearDiagnosticsId, {}, kClearTimeout))
+        << "The target did not acknowledge ClearDiagnostics";
 }
 
 THEN(R"(the control loop shall have stayed within its budget)")
 {
     const auto statistics = ReadLoopStatistics(context.Get<Fixture>());
-    ASSERT_TRUE(statistics.has_value()) << "The target did not print its control loop statistics";
+    ASSERT_TRUE(statistics.has_value()) << "The target did not report its control loop statistics over CAN";
 
     std::fprintf(stderr, "[METRIC] loop samples=%lu budget=%lu min=%lu avg=%lu max=%lu overruns=%lu deadlineMisses=%lu reentries=%lu\n",
         statistics->samples, statistics->budget, statistics->minimum, statistics->average, statistics->maximum,
@@ -105,7 +79,7 @@ THEN(R"(the control loop shall have stayed within its budget)")
 THEN(R"(no control loop execution shall have taken more than {int} cycles)", (int cycles))
 {
     const auto statistics = ReadLoopStatistics(context.Get<Fixture>());
-    ASSERT_TRUE(statistics.has_value()) << "The target did not print its control loop statistics";
+    ASSERT_TRUE(statistics.has_value()) << "The target did not report its control loop statistics over CAN";
 
     EXPECT_LE(statistics->maximum, static_cast<unsigned long>(cycles))
         << "The slowest execution took " << statistics->maximum << " cycles";

@@ -21,12 +21,14 @@
 #include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
+#include "targets/platform_implementations/qemu/implementation/CmsdkUartLines.hpp"
+#include "targets/platform_implementations/qemu/implementation/EmulatedCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuCycleCounter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingRecordFile.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilWatchdogStall.hpp"
 #include <atomic>
@@ -177,9 +179,10 @@ namespace application
 
         void FocTimerIsr();
         foc::PlantResponseSample PlantSampleAt(uint32_t tick) const;
+        void PollPorts();
         void DrainResponseRecords();
-        void PrintResponseRecord(const foc::PlantResponseRecord& record);
-        void StampReceivedFrame(uint32_t tick, const sil::SemihostingCan::Frame& frame);
+        void RecordResponse(const foc::PlantResponseRecord& record);
+        void StampReceivedFrame(uint32_t tick, const sil::EmulatedCan::Frame& frame);
 
     private:
         static foc::ThreePhaseMotorModel::Parameters MotorParametersFrom(
@@ -202,8 +205,9 @@ namespace application
         Cortex cortex;
         QemuTimer focTimer;
         SemihostingSerial serial;
+        sil::CmsdkUartLines terminalPort{ kTerminalUartBase };
         TerminalAndTracerBlock terminalAndTracer{ serial };
-        SilWatchdogStall watchdogStall{ terminalAndTracer.terminal, terminalAndTracer.tracer };
+        SilWatchdogStall watchdogStall{ terminalAndTracer.tracer };
         SemihostingEeprom eeprom{ "eeprom.bin" };
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
@@ -212,12 +216,13 @@ namespace application
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;
+        SemihostingRecordFile plantRecord{ "plant.rec" };
         foc::TorqueStepScheduler torqueStep;
         foc::EncoderFreezeScheduler encoderFreeze;
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
-        std::optional<SemihostingCanBusAdapter> canBusAdapter;
-        infra::TimerRepeating canPollTimer;
+        std::optional<EmulatedCanBusAdapter> canBusAdapter;
+        infra::TimerRepeating portPollTimer;
         infra::TimerRepeating protectionPollTimer;
         infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;

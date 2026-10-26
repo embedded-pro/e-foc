@@ -54,6 +54,12 @@ namespace tool
                 return "Setting";
             case can::focQueryParameterId:
                 return "Setting Query";
+            case can::focCalibrateId:
+                return "Calibrate";
+            case can::focClearCalibrationId:
+                return "Clear Calibration";
+            case can::focClearDiagnosticsId:
+                return "Clear Diagnostics";
             default:
                 return {};
         }

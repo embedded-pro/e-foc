@@ -6,6 +6,12 @@
 
 namespace tool
 {
+    namespace
+    {
+        constexpr const char* calibrateHint = "Run the whole calibration: current offsets, pole pairs, resistance and inductance, alignment and, in speed and position mode, the mechanical identification and the cogging map";
+        constexpr const char* clearCalibrationHint = "Forget the stored calibration record; the motor has to be calibrated again before it can start";
+    }
+
     MotorParametersTab::MotorParametersTab(QWidget* parent)
         : SettingsPage(parent)
     {
@@ -29,7 +35,7 @@ namespace tool
         auto* group = new QGroupBox("Commissioning");
         auto* layout = new QVBoxLayout(group);
 
-        auto* warning = new QLabel("These actions move the rotor: keep the shaft free and clear of people. "
+        auto* warning = new QLabel("Aligning, identifying and calibrating move the rotor: keep the shaft free and clear of people. "
                                    "Each one answers when it finishes, which can take up to two minutes.");
         warning->setWordWrap(true);
         ui::backend::qt::StyleStatusLabel(*warning, ui::theme::StatusLevel::Warning);
@@ -41,17 +47,25 @@ namespace tool
         identifyElectricalButton->setToolTip("Measure resistance, inductance and pole pairs, then align the rotor");
         identifyMechanicalButton = new QPushButton("Identify Mecha&nical");
         identifyMechanicalButton->setToolTip("Measure inertia and viscous friction by spinning the rotor");
+        calibrateButton = new QPushButton("Calibra&te");
+        calibrateButton->setToolTip(calibrateHint);
+        clearCalibrationButton = new QPushButton("Clear Calibration…");
+        clearCalibrationButton->setToolTip(clearCalibrationHint);
 
         auto* buttons = new QHBoxLayout();
         buttons->addWidget(alignButton);
         buttons->addWidget(identifyElectricalButton);
         buttons->addWidget(identifyMechanicalButton);
+        buttons->addWidget(calibrateButton);
         buttons->addStretch();
+        buttons->addWidget(clearCalibrationButton);
         layout->addLayout(buttons);
 
         connect(alignButton, &QPushButton::clicked, this, &MotorParametersTab::AlignRequested);
         connect(identifyElectricalButton, &QPushButton::clicked, this, &MotorParametersTab::IdentifyElectricalRequested);
         connect(identifyMechanicalButton, &QPushButton::clicked, this, &MotorParametersTab::IdentifyMechanicalRequested);
+        connect(calibrateButton, &QPushButton::clicked, this, &MotorParametersTab::CalibrateRequested);
+        connect(clearCalibrationButton, &QPushButton::clicked, this, &MotorParametersTab::ClearCalibrationRequested);
         return group;
     }
 
@@ -75,6 +89,12 @@ namespace tool
         Refresh();
     }
 
+    void MotorParametersTab::SetMaintenanceUnavailable(const QString& reason)
+    {
+        maintenanceUnavailable = reason;
+        Refresh();
+    }
+
     void MotorParametersTab::Refresh()
     {
         polePairsHint->setVisible(EditorFor(can::FocParameter::polePairs)->IsEdited());
@@ -88,6 +108,12 @@ namespace tool
         const auto& mechanicalReason = available ? mechanicalUnavailable : actionsUnavailable;
         identifyMechanicalButton->setEnabled(mechanicalReason.isEmpty());
         identifyMechanicalButton->setToolTip(mechanicalReason.isEmpty() ? QString("Measure inertia and viscous friction by spinning the rotor") : mechanicalReason);
+
+        const auto& maintenanceReason = available ? maintenanceUnavailable : actionsUnavailable;
+        calibrateButton->setEnabled(maintenanceReason.isEmpty());
+        calibrateButton->setToolTip(maintenanceReason.isEmpty() ? QString(calibrateHint) : maintenanceReason);
+        clearCalibrationButton->setEnabled(maintenanceReason.isEmpty());
+        clearCalibrationButton->setToolTip(maintenanceReason.isEmpty() ? QString(clearCalibrationHint) : maintenanceReason);
 
         SettingsPage::Refresh();
     }

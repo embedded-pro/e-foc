@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <gtest/gtest.h>
 
@@ -7,7 +7,7 @@ using namespace integration;
 
 GIVEN(R"(the hardware target is connected and responding)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
 
     (void)fixture.WaitForPrompt();
     bool responded = fixture.SendCommand("enc");

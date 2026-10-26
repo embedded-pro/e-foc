@@ -1,5 +1,6 @@
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <stdexcept>
+#include <thread>
 
 namespace integration
 {
@@ -31,11 +32,6 @@ namespace integration
     void TargetInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>&)
     {}
 
-    std::size_t TargetInteractor::DiscardedSerialLineCount() const
-    {
-        return 0;
-    }
-
     std::size_t TargetInteractor::ReceivedCanFrameCount() const
     {
         return 0;
@@ -53,4 +49,15 @@ namespace integration
 
     void TargetInteractor::RestartTarget()
     {}
+
+    std::vector<std::string> TargetInteractor::TakePlantRecord(std::chrono::milliseconds timeout)
+    {
+        std::this_thread::sleep_for(timeout);
+        return {};
+    }
+
+    std::string TargetInteractor::DebugLog() const
+    {
+        return {};
+    }
 }

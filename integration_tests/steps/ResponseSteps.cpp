@@ -36,28 +36,26 @@ namespace
         return static_cast<float>(spacing.value_or(1)) / static_cast<float>(setup.plant.baseFrequencyHz);
     }
 
-    void FeedNewLines(ScenarioSetup& setup)
+    void FeedRecord(ScenarioSetup& setup, std::chrono::milliseconds timeout)
     {
-        const auto& lines = TargetInteractor::Instance().SerialLines();
-        for (; setup.consumedLines < lines.size(); ++setup.consumedLines)
-            setup.trace.Consume(lines[setup.consumedLines]);
+        for (const auto& line : TargetInteractor::Instance().TakePlantRecord(timeout))
+            setup.trace.Consume(line);
     }
 
     template<typename Predicate>
     bool CaptureUntil(ScenarioSetup& setup, Predicate done)
     {
-        auto& interactor = TargetInteractor::Instance();
         const auto deadline = std::chrono::steady_clock::now() + kCaptureWallClockTimeout;
 
         while (std::chrono::steady_clock::now() < deadline)
         {
-            FeedNewLines(setup);
+            FeedRecord(setup, std::chrono::milliseconds{ 0 });
             if (done())
                 return true;
-            interactor.DrainSerial(std::chrono::milliseconds{ 50 });
+            FeedRecord(setup, std::chrono::milliseconds{ 50 });
         }
 
-        FeedNewLines(setup);
+        FeedRecord(setup, std::chrono::milliseconds{ 0 });
         return done();
     }
 
@@ -342,7 +340,7 @@ THEN(R"(the {word} shall recover to within {float} {word} of the setpoint within
 THEN(R"(the d-axis current shall be above {int} mA RMS from {int} to {int} ms after enable)", (int limitMa, int fromMs, int toMs))
 {
     auto& setup = context.Get<ScenarioSetup>();
-    FeedNewLines(setup);
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
 
     const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
     ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
@@ -352,7 +350,7 @@ THEN(R"(the d-axis current shall be above {int} mA RMS from {int} to {int} ms af
 THEN(R"(the d-axis current shall be below {int} mA RMS from {int} to {int} ms after enable)", (int limitMa, int fromMs, int toMs))
 {
     auto& setup = context.Get<ScenarioSetup>();
-    FeedNewLines(setup);
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
 
     const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
     ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
@@ -362,7 +360,7 @@ THEN(R"(the d-axis current shall be below {int} mA RMS from {int} to {int} ms af
 THEN(R"(the response shall have no dropped samples)")
 {
     auto& setup = context.Get<ScenarioSetup>();
-    FeedNewLines(setup);
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
 
     EXPECT_EQ(setup.trace.Dropped(), 0u) << "The recorder dropped samples";
     EXPECT_EQ(setup.trace.Gaps(), 0u) << "The captured samples are not uniformly spaced";
@@ -371,7 +369,7 @@ THEN(R"(the response shall have no dropped samples)")
 THEN(R"(the encoder shall have frozen during the response)")
 {
     auto& setup = context.Get<ScenarioSetup>();
-    FeedNewLines(setup);
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
 
     const auto onset = setup.trace.EventTick("encoder_freeze");
     ASSERT_TRUE(onset.has_value()) << "The encoder freeze was scheduled but never fired";

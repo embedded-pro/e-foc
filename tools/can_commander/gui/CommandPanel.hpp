@@ -3,6 +3,7 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "tools/can_commander/gui/ConfigurationTab.hpp"
 #include "tools/can_commander/gui/ControllersTab.hpp"
+#include "tools/can_commander/gui/DiagnosticsTab.hpp"
 #include "tools/can_commander/gui/MotorParametersTab.hpp"
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -31,6 +32,7 @@ namespace tool
         ControllersTab& Controllers() const;
         MotorParametersTab& MotorParameters() const;
         ConfigurationTab& Configuration() const;
+        DiagnosticsTab& Diagnostics() const;
         std::array<SettingsPage*, 3> SettingsPages() const;
 
     signals:
@@ -65,6 +67,7 @@ namespace tool
         ControllersTab* controllers;
         MotorParametersTab* motorParameters;
         ConfigurationTab* configuration;
+        DiagnosticsTab* diagnostics;
         std::vector<QWidget*> commandWidgets;
     };
 }

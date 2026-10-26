@@ -4,6 +4,26 @@
 
 namespace application
 {
+    namespace
+    {
+        can::FocResetCause ToCanResetCause(ResetCause cause)
+        {
+            switch (cause)
+            {
+                case ResetCause::brownOut:
+                    return can::FocResetCause::brownOut;
+                case ResetCause::software:
+                    return can::FocResetCause::software;
+                case ResetCause::hardware:
+                    return can::FocResetCause::hardware;
+                case ResetCause::watchdog:
+                    return can::FocResetCause::watchdog;
+                default:
+                    return can::FocResetCause::powerUp;
+            }
+        }
+    }
+
     Logic::Logic(application::PlatformFactory& hardware)
         : hardware{ hardware }
         , boardId{ hardware.BoardId() }
@@ -55,7 +75,9 @@ namespace application
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt(),
                         .dutyUpdateDelayPeriods = this->hardware.DutyUpdateDelayPeriods() });
-                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, *electricalIdent, nullptr, this->hardware.Tracer());
+                canBridge.emplace(*motorCanServer, *controlMode,
+                    can::FocMotorCanBridge::Platform{ this->hardware, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
+                    *electricalIdent, nullptr, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {

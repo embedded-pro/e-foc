@@ -60,7 +60,7 @@ Feature: Parameter Identification Against a Known Plant
       | adc_bias_ampere_c      | 0.054  |
     And the motor boots in torque mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
@@ -77,7 +77,7 @@ Feature: Parameter Identification Against a Known Plant
     And the plant reads its currents through the bench's current-sense chain
     And the motor boots in torque mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
 
@@ -97,7 +97,7 @@ Feature: Parameter Identification Against a Known Plant
     And a speed setpoint of 52 rad/s is applied
     Then the measured speed shall exceed 45 rad/s within 4000 ms
     When the motor is disabled
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
@@ -113,7 +113,7 @@ Feature: Parameter Identification Against a Known Plant
       | friction   | 0.5 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified resistance shall be within 5 % of the plant
     And the identified inductance shall be within 20 % of the plant
     And the identified pole pairs shall match the plant
@@ -282,7 +282,7 @@ Feature: Parameter Identification Against a Known Plant
     And the plant's shaft has the bench's dry friction and cogging
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified cogging shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
 
@@ -295,7 +295,7 @@ Feature: Parameter Identification Against a Known Plant
       | cogging_cycles_per_revolution | 24     |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the identified cogging shall be within 30 % of the plant
 
   @sil @REQ-CAL-018
@@ -305,7 +305,7 @@ Feature: Parameter Identification Against a Known Plant
       | coulomb_friction_nm | 0.0037 |
     And the motor boots in speed mode
     When the target boots
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the calibration shall store no cogging map
     And the identified inertia shall be within 5 % of the plant
 

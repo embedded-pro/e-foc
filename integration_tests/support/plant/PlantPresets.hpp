@@ -132,6 +132,8 @@ namespace sil
             .deadTimeCompensationNanoseconds = 0.0f,
             .deadTimeCompensationKneeAmpere = 0.0f,
 
+            .eventLoopStallDelayMs = 0u,
+
             .polePairs = 0u,
             .faultFlags = 0u,
             .encoderFreezeDelayCentiseconds = 0u,

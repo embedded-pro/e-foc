@@ -1,5 +1,4 @@
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
-#include <algorithm>
 #include <chrono>
 #include <gtest/gtest.h>
 #include <utility>
@@ -18,9 +17,7 @@ namespace sil
 
     void QemuInteractor::BeforeScenario()
     {
-        lines.clear();
-        lastLine.clear();
-        session.ClearCapturedLines();
+        session.ResetCapture();
         if (!session.CreateScenarioDirectory())
             GTEST_FAIL() << "[QEMU] could not create the scenario working directory";
         if (!session.Start(elfPath))
@@ -55,73 +52,7 @@ namespace sil
 
     void QemuInteractor::RestartTarget()
     {
-        lines.clear();
-        lastLine.clear();
-        session.ClearCapturedLines();
         ASSERT_TRUE(session.Restart(elfPath)) << "[QEMU] QEMU session failed to restart";
-    }
-
-    // A terminal line rides the same socket as CAN frames; the firmware routes every line without the
-    // CAN prefix to its terminal. The terminal answers through the tracer, so a step that needs the
-    // outcome drains the serial lines for the trace it expects rather than waiting here.
-    bool QemuInteractor::SendCommand(const std::string& command, std::chrono::milliseconds)
-    {
-        if (!session.IsRunning())
-            return false;
-        return session.SendLine(command);
-    }
-
-    bool QemuInteractor::DrainSerial(std::chrono::milliseconds timeout)
-    {
-        if (!session.IsRunning())
-            return true;
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        std::string line;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-                deadline - std::chrono::steady_clock::now());
-            if (remaining <= std::chrono::milliseconds{ 0 })
-                break;
-            if (!session.ReadLine(line, std::min(remaining, std::chrono::milliseconds{ 50 })))
-                break;
-            lines.push_back(line);
-            lastLine = line;
-        }
-        return true;
-    }
-
-    bool QemuInteractor::WaitForPrompt(std::chrono::milliseconds)
-    {
-        return true;
-    }
-
-    void QemuInteractor::ClearSerialLines()
-    {
-        discardedSerialLines += session.CapturedLines().size();
-        lines.clear();
-        lastLine.clear();
-        session.ClearCapturedLines();
-    }
-
-    const std::vector<std::string>& QemuInteractor::SerialLines() const
-    {
-        return session.CapturedLines();
-    }
-
-    std::size_t QemuInteractor::DiscardedSerialLineCount() const
-    {
-        return discardedSerialLines;
-    }
-
-    const std::string& QemuInteractor::LastSerialLine() const
-    {
-        return lastLine;
-    }
-
-    std::chrono::milliseconds QemuInteractor::LastSerialDuration() const
-    {
-        return std::chrono::milliseconds{ 0 };
     }
 
     void QemuInteractor::ClearCanFrames()
@@ -147,5 +78,45 @@ namespace sil
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);
         return found;
+    }
+
+    std::size_t QemuInteractor::ReceivedCanFrameCount() const
+    {
+        return session.ReceivedFrames().size();
+    }
+
+    std::optional<hal::Can::Message> QemuInteractor::FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const
+    {
+        const auto& frames = session.ReceivedFrames();
+        std::optional<hal::Can::Message> found;
+
+        for (std::size_t i = fromFrame; i < frames.size(); ++i)
+            if (frames[i].id == id)
+                found = frames[i].message;
+
+        return found;
+    }
+
+    std::optional<hal::Can::Id> QemuInteractor::FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>& matches, std::size_t fromFrame) const
+    {
+        const auto& frames = session.ReceivedFrames();
+
+        for (std::size_t i = fromFrame; i < frames.size(); ++i)
+            if (matches(frames[i].id))
+                return frames[i].id;
+
+        return std::nullopt;
+    }
+
+    std::vector<std::string> QemuInteractor::TakePlantRecord(std::chrono::milliseconds timeout)
+    {
+        if (!session.IsRunning())
+            return {};
+        return session.TakePlantRecord(timeout);
+    }
+
+    std::string QemuInteractor::DebugLog() const
+    {
+        return session.DebugLogTail();
     }
 }

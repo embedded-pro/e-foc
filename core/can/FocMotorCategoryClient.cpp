@@ -21,7 +21,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendStart(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focStartId);
@@ -29,7 +29,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendStop(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focStopId);
@@ -37,7 +37,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendClearFault(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focClearFaultId);
@@ -45,7 +45,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendEmergencyStop(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focEmergencyStopId, services::CanPriority::emergency);
@@ -53,7 +53,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSelectControlMode(uint16_t targetNodeId, FocMotorMode mode)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -63,7 +63,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetTorqueSetpoint(uint16_t targetNodeId, foc::Ampere value)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -73,7 +73,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetSpeedSetpoint(uint16_t targetNodeId, foc::RadiansPerSecond value)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -83,7 +83,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetPositionSetpoint(uint16_t targetNodeId, foc::Radians value)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -93,7 +93,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -103,7 +103,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -113,7 +113,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -127,9 +127,17 @@ namespace can
         return SendCommand(targetNodeId, focQueryContractVersionId, payload);
     }
 
+    bool FocMotorCategoryClient::SendMaintenanceCommand(uint16_t targetNodeId, FocMaintenanceCommand command)
+    {
+        if (contracts.Incompatible(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, static_cast<uint8_t>(command));
+    }
+
     bool FocMotorCategoryClient::SendAlign(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focAlignId);
@@ -137,7 +145,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendIdentifyElectrical(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focIdentifyElectricalId);
@@ -145,7 +153,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendIdentifyMechanical(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focIdentifyMechanicalId);
@@ -153,7 +161,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendRequestTelemetry(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focRequestTelemetryId);
@@ -161,7 +169,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -171,7 +179,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSelectAlgorithm(uint16_t targetNodeId, FocControlLoop loop, uint8_t algorithm)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -182,7 +190,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendQueryAlgorithms(uint16_t targetNodeId)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focQueryAlgorithmsId);
@@ -190,7 +198,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetParameter(uint16_t targetNodeId, FocParameter parameter, float value)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -201,7 +209,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendQueryParameter(uint16_t targetNodeId, FocParameter parameter)
     {
-        if (SendsRefused(targetNodeId))
+        if (contracts.Incompatible(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -209,7 +217,7 @@ namespace can
         return SendCommand(targetNodeId, focQueryParameterId, payload);
     }
 
-    ContractCompatibility FocMotorCategoryClient::Compatibility(uint16_t nodeId) const
+    ContractCompatibility NodeContracts::Of(uint16_t nodeId) const
     {
         for (const auto& contract : contracts)
             if (contract.nodeId == nodeId && nodeId != 0)
@@ -218,12 +226,12 @@ namespace can
         return ContractCompatibility::unknown;
     }
 
-    bool FocMotorCategoryClient::SendsRefused(uint16_t targetNodeId) const
+    bool NodeContracts::Incompatible(uint16_t nodeId) const
     {
-        return Compatibility(targetNodeId) == ContractCompatibility::incompatible;
+        return Of(nodeId) == ContractCompatibility::incompatible;
     }
 
-    void FocMotorCategoryClient::RecordCompatibility(uint16_t nodeId, ContractCompatibility compatibility)
+    void NodeContracts::Record(uint16_t nodeId, ContractCompatibility compatibility)
     {
         for (auto& contract : contracts)
             if (contract.nodeId == nodeId)
@@ -243,6 +251,11 @@ namespace can
         nextEvicted = (nextEvicted + 1) % contracts.size();
     }
 
+    ContractCompatibility FocMotorCategoryClient::Compatibility(uint16_t nodeId) const
+    {
+        return contracts.Of(nodeId);
+    }
+
     bool FocMotorCategoryClient::HandleContractVersionResponse(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focContractVersionResponseId))
@@ -254,7 +267,7 @@ namespace can
 
         const auto source = origin.SourceNodeId();
         if (source != 0)
-            RecordCompatibility(source, major == focContractVersionMajor ? ContractCompatibility::compatible : ContractCompatibility::incompatible);
+            contracts.Record(source, major == focContractVersionMajor ? ContractCompatibility::compatible : ContractCompatibility::incompatible);
 
         NotifyObservers([source, major, minor](auto& observer)
             {

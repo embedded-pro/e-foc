@@ -3,16 +3,15 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <gtest/gtest.h>
 #include <optional>
 #include <string>
-#include <unistd.h>
 #include <vector>
 
 using namespace integration;
@@ -20,13 +19,12 @@ using namespace integration;
 namespace
 {
     constexpr auto kIdentificationTimeout = std::chrono::seconds{ 180 };
-    constexpr auto kTraceTimeout = std::chrono::seconds{ 15 };
+    constexpr auto kResponseTimeout = std::chrono::seconds{ 15 };
+    constexpr auto kRecordPollSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kExcitationWallClockTimeout = std::chrono::seconds{ 300 };
     constexpr float kMilliPerUnit = 1000.0f;
-    constexpr float kMicroPerUnit = 1000000.0f;
     constexpr float kReferenceCelsius = 25.0f;
     constexpr std::size_t kElectricalResponseBytes = 5;
-    constexpr useconds_t kStatePollIntervalUs = 100000;
 
     hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
     {
@@ -46,48 +44,18 @@ namespace
         return payload.Message();
     }
 
-    std::optional<float> ValueAfter(const std::string& line, const std::string& key)
+    void ReadCalibrationRecord(Fixture& fixture, IdentifiedParameters& out)
     {
-        const auto at = line.find(key);
-        if (at == std::string::npos)
-            return std::nullopt;
-        return std::strtof(line.c_str() + at + key.size(), nullptr);
-    }
-
-    template<typename Predicate>
-    bool DrainUntil(Fixture& fixture, Predicate done, std::chrono::milliseconds timeout)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (done())
-                return true;
-            fixture.DrainLines(std::chrono::milliseconds{ 50 });
-        }
-        return done();
-    }
-
-    // Both the calibration record and the [EST] lines carry key=value pairs; a line only sets the keys it has.
-    void ParseTraceValues(const std::string& line, IdentifiedParameters& out)
-    {
-        if (const auto r = ValueAfter(line, " R="))
-            out.resistanceOhm = r;
-        if (const auto l = ValueAfter(line, " L_mH="))
-            out.inductanceMilliHenry = l;
-        if (const auto p = ValueAfter(line, " p="))
-            out.polePairs = static_cast<unsigned>(std::lround(*p));
-        if (const auto j = ValueAfter(line, " J_uNms2="))
-            out.inertiaKgM2 = *j / kMicroPerUnit;
-        if (const auto b = ValueAfter(line, " B_uNms="))
-            out.frictionNmSPerRad = *b / kMicroPerUnit;
-        if (const auto a = ValueAfter(line, " Ia_mA="))
-            out.currentOffsetAmpereA = *a / kMilliPerUnit;
-        if (const auto b = ValueAfter(line, " Ib_mA="))
-            out.currentOffsetAmpereB = *b / kMilliPerUnit;
-        if (const auto c = ValueAfter(line, " Ic_mA="))
-            out.currentOffsetAmpereC = *c / kMilliPerUnit;
-        if (const auto cogging = ValueAfter(line, " cog_mNm="))
-            out.coggingPeakNm = *cogging / kMilliPerUnit;
+        out.resistanceOhm = ReadParameterValue(fixture, can::FocParameter::resistance);
+        out.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::inductance);
+        if (const auto polePairs = ReadParameterValue(fixture, can::FocParameter::polePairs))
+            out.polePairs = static_cast<unsigned>(std::lround(*polePairs));
+        out.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::inertia);
+        out.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::viscousFriction);
+        out.currentOffsetAmpereA = ReadParameterValue(fixture, can::FocParameter::currentOffsetA);
+        out.currentOffsetAmpereB = ReadParameterValue(fixture, can::FocParameter::currentOffsetB);
+        out.currentOffsetAmpereC = ReadParameterValue(fixture, can::FocParameter::currentOffsetC);
+        out.coggingPeakNm = ReadParameterValue(fixture, can::FocParameter::coggingPeak);
     }
 
     void CompareOffsetWithPlant(const ScenarioSetup& setup, const char* phase, std::optional<float> identified, float bias, float limitMilliAmpere)
@@ -164,29 +132,29 @@ namespace
         EXPECT_GE(excessPercent, minimumPercent) << source << " " << quantity << " is " << *value << " against a plant of " << *truth;
     }
 
-    void FeedTrace(ScenarioSetup& setup)
+    void FeedTrace(ScenarioSetup& setup, std::chrono::milliseconds timeout = std::chrono::milliseconds{ 0 })
     {
-        const auto& lines = TargetInteractor::Instance().SerialLines();
-        for (; setup.consumedLines < lines.size(); ++setup.consumedLines)
-            setup.trace.Consume(lines[setup.consumedLines]);
+        for (const auto& line : TargetInteractor::Instance().TakePlantRecord(timeout))
+            setup.trace.Consume(line);
     }
 
     // Guest time, not wall-clock: the plant's own samples say how far its clock has advanced, which is
     // what makes the excitation the same length on every host.
-    bool WaitForGuestTicks(Fixture& fixture, ScenarioSetup& setup, uint32_t ticks)
+    bool WaitForGuestTicks(ScenarioSetup& setup, uint32_t ticks)
     {
         FeedTrace(setup);
         const auto from = setup.trace.LastSampleTick();
         if (!from)
             return false;
 
-        return DrainUntil(fixture, [&]
-            {
-                FeedTrace(setup);
-                const auto last = setup.trace.LastSampleTick();
-                return last && *last >= *from + ticks;
-            },
-            kExcitationWallClockTimeout);
+        const auto deadline = std::chrono::steady_clock::now() + kExcitationWallClockTimeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            if (const auto last = setup.trace.LastSampleTick(); last && *last >= *from + ticks)
+                return true;
+            FeedTrace(setup, kRecordPollSlice);
+        }
+        return false;
     }
 }
 
@@ -199,14 +167,8 @@ WHEN(R"(electrical identification is run)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    std::optional<hal::Can::Message> payload;
-    ASSERT_TRUE(DrainUntil(fixture, [&]
-        {
-            payload = fixture.FindCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark);
-            return payload.has_value();
-        },
-        kTraceTimeout))
-        << "The target sent no electrical parameters response";
+    const auto payload = fixture.WaitForCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark, kResponseTimeout);
+    ASSERT_TRUE(payload.has_value()) << "The target sent no electrical parameters response";
     ASSERT_GE(payload->size(), kElectricalResponseBytes) << "Electrical parameters response is too short";
 
     setup.identified.resistanceOhm = Fixed16(*payload, 0, can::focResistanceScale);
@@ -214,39 +176,16 @@ WHEN(R"(electrical identification is run)")
     setup.identified.polePairs = (*payload)[4];
 }
 
-WHEN(R"(the full calibration is run from the terminal)")
+WHEN(R"(the full calibration is run)")
 {
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.CapturedLineCount();
-    ASSERT_TRUE(fixture.SendCommand("calibrate")) << "Could not send the calibrate command";
-    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::calibrating, std::chrono::seconds{ 15 }))
-        << "Calibration never started";
+    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focCalibrateId, {}, kIdentificationTimeout))
+        << "The calibration did not complete";
 
-    std::optional<can::FocMotorState> state;
-    const auto deadline = std::chrono::steady_clock::now() + kIdentificationTimeout;
-    while (std::chrono::steady_clock::now() < deadline)
-    {
-        state = fixture.ReadMotorState();
-        if (state && *state != can::FocMotorState::calibrating)
-            break;
-        usleep(kStatePollIntervalUs);
-    }
-
-    ASSERT_TRUE(state.has_value()) << "No telemetry while waiting for the calibration to end";
-    ASSERT_EQ(*state, can::FocMotorState::idle) << "Calibration ended in state " << static_cast<int>(*state) << " instead of Ready";
-
-    std::optional<std::string> record;
-    ASSERT_TRUE(DrainUntil(fixture, [&]
-        {
-            record = fixture.LastCapturedLineWith(mark, "[SM] Calibration record:");
-            return record.has_value();
-        },
-        kTraceTimeout))
-        << "The target never traced the calibration record it stored";
-
-    ParseTraceValues(*record, setup.identified);
+    ReadCalibrationRecord(fixture, setup.identified);
+    ASSERT_TRUE(setup.identified.resistanceOhm.has_value()) << "The target did not report its calibration record over CAN";
 }
 
 namespace
@@ -277,7 +216,7 @@ namespace
                 << "Speed setpoint command rejected";
             setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target, fixture.ServerNodeId() };
 
-            ASSERT_TRUE(WaitForGuestTicks(fixture, setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
+            ASSERT_TRUE(WaitForGuestTicks(setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
         }
     }
 }
@@ -297,22 +236,14 @@ WHEN(R"(the online estimates are read)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.CapturedLineCount();
-    ASSERT_TRUE(fixture.SendCommand("estimate_status")) << "Could not send the estimate_status command";
+    setup.online.resistanceOhm = ReadParameterValue(fixture, can::FocParameter::estimatedResistance);
+    setup.online.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::estimatedInductance);
+    setup.online.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::estimatedInertia);
+    setup.online.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::estimatedViscousFriction);
 
-    std::optional<std::string> mechanical;
-    std::optional<std::string> electrical;
-    ASSERT_TRUE(DrainUntil(fixture, [&]
-        {
-            mechanical = fixture.LastCapturedLineWith(mark, "[EST] Mech:");
-            electrical = fixture.LastCapturedLineWith(mark, "[EST] Elec:");
-            return mechanical.has_value() && electrical.has_value();
-        },
-        kTraceTimeout))
-        << "The target did not print its online estimates";
-
-    ParseTraceValues(*mechanical, setup.online);
-    ParseTraceValues(*electrical, setup.online);
+    ASSERT_TRUE(setup.online.resistanceOhm.has_value() && setup.online.inductanceMilliHenry.has_value() &&
+                setup.online.inertiaKgM2.has_value() && setup.online.frictionNmSPerRad.has_value())
+        << "The target did not report its online estimates over CAN";
 }
 
 THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::string quantity, float limitPercent))

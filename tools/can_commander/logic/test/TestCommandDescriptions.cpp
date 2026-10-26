@@ -46,6 +46,9 @@ TEST_F(TestCommandDescriptions, names_commissioning_and_settings_commands)
     EXPECT_EQ("Encoder Resolution", CommandDisplayName(can::focMotorCategoryId, can::focSetEncoderResolutionId));
     EXPECT_EQ("Controller Selection", CommandDisplayName(can::focMotorCategoryId, can::focSelectAlgorithmId));
     EXPECT_EQ("Setting", CommandDisplayName(can::focMotorCategoryId, can::focSetParameterId));
+    EXPECT_EQ("Calibrate", CommandDisplayName(can::focMotorCategoryId, can::focCalibrateId));
+    EXPECT_EQ("Clear Calibration", CommandDisplayName(can::focMotorCategoryId, can::focClearCalibrationId));
+    EXPECT_EQ("Clear Diagnostics", CommandDisplayName(can::focMotorCategoryId, can::focClearDiagnosticsId));
 }
 
 TEST_F(TestCommandDescriptions, explains_a_design_that_cannot_be_made)

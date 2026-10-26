@@ -26,6 +26,8 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     ConnectionPanel.cpp
     ControllersTab.hpp
     ControllersTab.cpp
+    DiagnosticsTab.hpp
+    DiagnosticsTab.cpp
     DisplayFormat.hpp
     EventLogView.hpp
     EventLogView.cpp

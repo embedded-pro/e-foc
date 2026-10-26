@@ -26,10 +26,21 @@ namespace can
     {
         AddMessageTypes(start, stop, clearFault, emergencyStop, selectControlMode,
             setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
-            setPidCurrent, setPidSpeed, setPidPosition,
-            align, identifyElectrical, identifyMechanical, requestTelemetry,
+            setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion,
-            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter);
+            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
+            clearDiagnostics);
+    }
+
+    FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
+        : server(server)
+        , align{ focAlignId, *this, &CommissioningMessages::HandleAlign }
+        , identifyElectrical{ focIdentifyElectricalId, *this, &CommissioningMessages::HandleIdentifyElectrical }
+        , identifyMechanical{ focIdentifyMechanicalId, *this, &CommissioningMessages::HandleIdentifyMechanical }
+        , calibrate{ focCalibrateId, *this, &CommissioningMessages::HandleCalibrate }
+        , clearCalibration{ focClearCalibrationId, *this, &CommissioningMessages::HandleClearCalibration }
+    {
+        server.AddMessageTypes(align, identifyElectrical, identifyMechanical, calibrate, clearCalibration);
     }
 
     FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
@@ -297,48 +308,96 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryServer::HandleAlign(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::CommissioningMessages::HandleAlign(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focAlignId))
             return false;
 
-        NotifyObservers([this](auto& observer)
+        server.NotifyObservers([this](auto& observer)
             {
                 observer.OnAlign([this](services::CanAckStatus status)
                     {
-                        SendCommandAck(focAlignId, status);
+                        server.SendCommandAck(focAlignId, status);
                     });
             });
 
         return true;
     }
 
-    bool FocMotorCategoryServer::HandleIdentifyElectrical(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::CommissioningMessages::HandleIdentifyElectrical(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focIdentifyElectricalId))
             return false;
 
-        NotifyObservers([this](auto& observer)
+        server.NotifyObservers([this](auto& observer)
             {
                 observer.OnIdentifyElectrical([this]()
                     {
-                        SendCommandAck(focIdentifyElectricalId, services::CanAckStatus::success);
+                        server.SendCommandAck(focIdentifyElectricalId, services::CanAckStatus::success);
                     });
             });
 
         return true;
     }
 
-    bool FocMotorCategoryServer::HandleIdentifyMechanical(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::CommissioningMessages::HandleIdentifyMechanical(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focIdentifyMechanicalId))
             return false;
 
-        NotifyObservers([this](auto& observer)
+        server.NotifyObservers([this](auto& observer)
             {
                 observer.OnIdentifyMechanical([this]()
                     {
-                        SendCommandAck(focIdentifyMechanicalId, services::CanAckStatus::success);
+                        server.SendCommandAck(focIdentifyMechanicalId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::CommissioningMessages::HandleCalibrate(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focCalibrateId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnCalibrate([this](services::CanAckStatus status)
+                    {
+                        server.SendCommandAck(focCalibrateId, status);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::CommissioningMessages::HandleClearCalibration(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focClearCalibrationId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnClearCalibration([this](services::CanAckStatus status)
+                    {
+                        server.SendCommandAck(focClearCalibrationId, status);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleClearDiagnostics(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focClearDiagnosticsId))
+            return false;
+
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnClearDiagnostics([this]()
+                    {
+                        SendCommandAck(focClearDiagnosticsId, services::CanAckStatus::success);
                     });
             });
 

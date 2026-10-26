@@ -1,14 +1,19 @@
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
+#include <optional>
 #include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -20,10 +25,81 @@
 namespace
 {
     constexpr const char* kIcountShift = "shift=3";
+    constexpr const char* kPlantRecordName = "plant.rec";
+    constexpr const char* kDebugLogName = "debug.log";
+    constexpr std::string_view kTransmittedPrefix{ "CAN_TX " };
+    constexpr auto kPumpSlice = std::chrono::milliseconds{ 10 };
+    constexpr auto kGdbAttachTimeout = std::chrono::milliseconds{ 300000 };
 
     bool SilVerbose()
     {
         return std::getenv("SIL_VERBOSE") != nullptr;
+    }
+
+    int HexValue(char c)
+    {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1;
+    }
+
+    std::string SocketPath(const char* channel)
+    {
+        static uint32_t sequence = 0;
+        return "/tmp/qemu_sil_" + std::string{ channel } + "_" + std::to_string(getpid()) + "_" + std::to_string(sequence++) + ".sock";
+    }
+
+    std::string EncodeCanFrame(hal::Can::Id id, const hal::Can::Message& data)
+    {
+        const uint32_t rawId = id.Is11BitId() ? id.Get11BitId() : id.Get29BitId();
+
+        std::array<char, 17> payload{};
+        std::size_t pos = 0;
+        for (const uint8_t byte : data)
+        {
+            payload[pos++] = "0123456789abcdef"[(byte >> 4) & 0xF];
+            payload[pos++] = "0123456789abcdef"[byte & 0xF];
+        }
+
+        std::array<char, 16> idText{};
+        std::snprintf(idText.data(), idText.size(), "%08lx", static_cast<unsigned long>(rawId));
+
+        return "CAN_RX " + std::string{ idText.data() } + " " + std::string{ payload.data(), pos };
+    }
+
+    std::optional<sil::QemuSilSession::CanFrame> ParseCanFrame(const std::string& line)
+    {
+        if (!line.starts_with(kTransmittedPrefix))
+            return std::nullopt;
+
+        const auto idEnd = line.find(' ', kTransmittedPrefix.size());
+        if (idEnd == std::string::npos || idEnd == kTransmittedPrefix.size())
+            return std::nullopt;
+
+        uint32_t rawId = 0;
+        for (std::size_t i = kTransmittedPrefix.size(); i < idEnd; ++i)
+        {
+            const int digit = HexValue(line[i]);
+            if (digit < 0)
+                return std::nullopt;
+            rawId = (rawId << 4) | static_cast<uint32_t>(digit);
+        }
+
+        sil::QemuSilSession::CanFrame frame{ hal::Can::Id::Create29BitId(rawId), {} };
+        for (std::size_t i = idEnd + 1; i + 1 < line.size() && !frame.message.full(); i += 2)
+        {
+            const int hi = HexValue(line[i]);
+            const int lo = HexValue(line[i + 1]);
+            if (hi < 0 || lo < 0)
+                break;
+            frame.message.push_back(static_cast<uint8_t>((hi << 4) | lo));
+        }
+
+        return frame;
     }
 }
 
@@ -49,17 +125,17 @@ namespace sil
         if (scenarioDirectory.empty())
             return;
 
+        if (debugLog.is_open())
+            debugLog.close();
+
         if (SilVerbose())
-        {
             std::fprintf(stderr, "[QEMU] keeping scenario directory %s\n", scenarioDirectory.c_str());
-            scenarioDirectory.clear();
-            return;
+        else
+        {
+            std::error_code error;
+            std::filesystem::remove_all(scenarioDirectory, error);
         }
 
-        for (const char* name : { "plant.bin", "eeprom.bin" })
-            std::remove((scenarioDirectory + "/" + name).c_str());
-
-        ::rmdir(scenarioDirectory.c_str());
         scenarioDirectory.clear();
     }
 
@@ -105,17 +181,26 @@ namespace sil
         }
         const std::string absoluteElf{ resolvedElf };
 
-        static uint32_t sessionSequence = 0;
-        const std::string inPath = "/tmp/qemu_sil_in_" + std::to_string(getpid()) + "_" +
-                                   std::to_string(sessionSequence++) + ".sock";
-        unlink(inPath.c_str());
+        std::error_code error;
+        std::filesystem::remove(scenarioDirectory + "/" + kPlantRecordName, error);
+        plantRecordOffset = 0;
+        plantRecordPartial.clear();
+        debugPartial.clear();
+        canPartial.clear();
+        nextFrame = receivedFrames.size();
+        exited = false;
 
-        // in: UNIX socket for serial0 (CMSDK UART) — CAN_RX frames from test.
-        // wait=off so QEMU starts immediately; the test connects after READY.
-        const std::string inChardevArg = "socket,id=in,path=" + inPath + ",server=on,wait=off";
+        if (!debugLog.is_open())
+            debugLog.open(scenarioDirectory + "/" + kDebugLogName, std::ios::out | std::ios::app);
 
-        // Pipe for QEMU stdout: firmware printf (semihosting target=native) goes
-        // here, giving us CAN_TX lines and the READY sentinel.
+        terminalPath = SocketPath("terminal");
+        const std::string canPath = SocketPath("can");
+        unlink(terminalPath.c_str());
+        unlink(canPath.c_str());
+
+        const std::string terminalChardev = "socket,id=terminal,path=" + terminalPath + ",server=on,wait=off";
+        const std::string canChardev = "socket,id=can,path=" + canPath + ",server=on,wait=off";
+
         int pipefd[2];
         if (pipe(pipefd) != 0)
             return false;
@@ -130,7 +215,6 @@ namespace sil
 
         if (pid == 0)
         {
-            // Child: wire QEMU's stdout/stderr → pipe write end, stdin → /dev/null.
             close(pipefd[0]);
             const int devNull = open("/dev/null", O_RDWR);
             if (devNull >= 0)
@@ -152,11 +236,15 @@ namespace sil
                 "mps2-an386",
                 "-nographic",
                 "-chardev",
-                inChardevArg.c_str(),
+                terminalChardev.c_str(),
+                "-chardev",
+                canChardev.c_str(),
                 "-semihosting-config",
                 "enable=on",
                 "-serial",
-                "chardev:in",
+                "chardev:terminal",
+                "-serial",
+                "chardev:can",
                 "-kernel",
                 absoluteElf.c_str(),
             };
@@ -174,53 +262,54 @@ namespace sil
             _exit(1);
         }
 
-        // Parent: close the write end of the pipe and save the read end.
         close(pipefd[1]);
         outPipeFd = pipefd[0];
-        readBufPos = 0;
-        readBufLen = 0;
 
-        std::string ready;
-        const auto readyTimeout = (std::getenv("SIL_GDB") != nullptr)
-                                      ? std::chrono::milliseconds{ 300000 }
-                                      : std::chrono::milliseconds{ 10000 };
-        if (!WaitFor("READY", ready, readyTimeout))
+        const bool connected = ConnectSocket(canSockFd, canPath);
+        unlink(canPath.c_str());
+
+        if (!connected)
         {
             Stop();
             return false;
         }
 
-        // Connect to the UART input socket (created by QEMU with wait=off).
+        if (SilVerbose())
+            std::fprintf(stderr, "[QEMU] terminal socket %s\n", terminalPath.c_str());
+
+        if (std::getenv("SIL_GDB") != nullptr)
+            PumpUntil(std::chrono::steady_clock::now() + kGdbAttachTimeout, [this]()
+                {
+                    return debugLinesSeen != 0 || nextFrame != receivedFrames.size();
+                });
+
+        return true;
+    }
+
+    bool QemuSilSession::ConnectSocket(int& fd, const std::string& path) const
+    {
         for (int attempt = 0; attempt < 50; ++attempt)
         {
-            inSockFd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-            if (inSockFd < 0)
+            fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+            if (fd < 0)
             {
                 usleep(100000);
                 continue;
             }
 
-            struct sockaddr_un addr{};
+            sockaddr_un address{};
+            address.sun_family = AF_UNIX;
+            std::strncpy(address.sun_path, path.c_str(), sizeof(address.sun_path) - 1);
 
-            addr.sun_family = AF_UNIX;
-            std::strncpy(addr.sun_path, inPath.c_str(), sizeof(addr.sun_path) - 1);
+            if (connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0)
+                return true;
 
-            if (connect(inSockFd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0)
-                break;
-
-            close(inSockFd);
-            inSockFd = -1;
+            close(fd);
+            fd = -1;
             usleep(100000);
         }
-        unlink(inPath.c_str());
 
-        if (inSockFd < 0)
-        {
-            Stop();
-            return false;
-        }
-
-        return true;
+        return false;
     }
 
     void QemuSilSession::Stop()
@@ -228,24 +317,20 @@ namespace sil
         if (pid < 0)
             return;
 
-        if (outPipeFd >= 0)
-        {
-            close(outPipeFd);
-            outPipeFd = -1;
-        }
+        for (int* fd : { &outPipeFd, &canSockFd })
+            if (*fd >= 0)
+            {
+                close(*fd);
+                *fd = -1;
+            }
 
-        if (inSockFd >= 0)
-        {
-            close(inSockFd);
-            inSockFd = -1;
-        }
+        unlink(terminalPath.c_str());
 
         int status = 0;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ 2000 };
         while (std::chrono::steady_clock::now() < deadline)
         {
-            const pid_t result = waitpid(pid, &status, WNOHANG);
-            if (result == pid)
+            if (waitpid(pid, &status, WNOHANG) == pid)
             {
                 pid = -1;
                 return;
@@ -258,233 +343,203 @@ namespace sil
         pid = -1;
     }
 
-    bool QemuSilSession::SendLine(const std::string& line)
-    {
-        if (inSockFd < 0)
-            return false;
-
-        const std::string data = line + "\n";
-        if (SilVerbose())
-            std::fprintf(stderr, "[host->QEMU] %s\n", line.c_str());
-        const ssize_t written = write(inSockFd, data.data(), data.size());
-        return written == static_cast<ssize_t>(data.size());
-    }
-
-    bool QemuSilSession::FillReadBuffer(int timeoutMs)
-    {
-        pollfd pfd{ outPipeFd, POLLIN, 0 };
-        const int ready = poll(&pfd, 1, timeoutMs);
-        if (ready <= 0)
-            return false;
-        if ((pfd.revents & POLLHUP) != 0 && (pfd.revents & POLLIN) == 0)
-            return false;
-
-        const ssize_t n = read(outPipeFd, readBuf.data(), readBuf.size());
-        if (n <= 0)
-            return false;
-
-        readBufPos = 0;
-        readBufLen = static_cast<int>(n);
-        return true;
-    }
-
-    bool QemuSilSession::ReadLine(std::string& line, std::chrono::milliseconds timeout)
-    {
-        if (outPipeFd < 0)
-            return false;
-
-        // A line cut by a timeout is kept for the next call; dropping it would lose the
-        // frame or sample it belonged to and leave its tail to be parsed as a line of its own.
-        line = std::move(partialLine);
-        partialLine.clear();
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-
-        while (true)
-        {
-            // Drain buffered bytes first before calling poll/read.
-            while (readBufPos < readBufLen)
-            {
-                const char ch = readBuf[readBufPos++];
-                if (ch == '\n')
-                {
-                    if (SilVerbose())
-                        std::fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
-                    if (capturedLines.size() < maxCapturedLines)
-                        capturedLines.push_back(line);
-                    return true;
-                }
-                line += ch;
-            }
-
-            const auto remaining = deadline - std::chrono::steady_clock::now();
-            if (remaining <= std::chrono::milliseconds{ 0 })
-                break;
-
-            const int ms = static_cast<int>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
-            if (!FillReadBuffer(ms))
-                break;
-        }
-
-        partialLine = std::move(line);
-        line.clear();
-        return false;
-    }
-
-    bool QemuSilSession::WaitFor(const std::string& prefix, std::string& line, std::chrono::milliseconds timeout)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-
-        while (true)
-        {
-            const auto remaining = deadline - std::chrono::steady_clock::now();
-            if (remaining <= std::chrono::milliseconds{ 0 })
-                return false;
-
-            std::string candidate;
-            if (!ReadLine(candidate, std::chrono::duration_cast<std::chrono::milliseconds>(remaining)))
-                return false;
-
-            if (candidate.find("ABORT") == 0)
-            {
-                std::fprintf(stderr, "[QEMU] firmware crash: %s\n", candidate.c_str());
-                return false;
-            }
-
-            if (candidate.find(prefix) == 0)
-            {
-                line = candidate;
-                return true;
-            }
-        }
-    }
-
     bool QemuSilSession::IsRunning() const
     {
         return pid >= 0;
     }
 
-    const std::vector<std::string>& QemuSilSession::CapturedLines() const
+    void QemuSilSession::ResetCapture()
     {
-        return capturedLines;
+        debugTail.clear();
+        debugLinesSeen = 0;
+        receivedFrames.clear();
+        nextFrame = 0;
     }
 
-    void QemuSilSession::ClearCapturedLines()
+    std::string QemuSilSession::DebugLogTail() const
     {
-        capturedLines.clear();
-        partialLine.clear();
+        std::string tail;
+        for (const auto& line : debugTail)
+            tail += line + "\n";
+        return tail;
     }
 
     bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data)
     {
-        return SendLine(EncodeCanFrame(id, data, "CAN_RX"));
+        if (canSockFd < 0)
+            return false;
+
+        const auto line = EncodeCanFrame(id, data);
+        if (SilVerbose())
+            std::fprintf(stderr, "[host->QEMU can] %s\n", line.c_str());
+
+        const std::string text = line + "\n";
+        return write(canSockFd, text.data(), text.size()) == static_cast<ssize_t>(text.size());
     }
 
-    bool QemuSilSession::WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out,
-        std::chrono::milliseconds timeout)
+    bool QemuSilSession::WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out, std::chrono::milliseconds timeout)
     {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        return PumpUntil(std::chrono::steady_clock::now() + timeout, [this, expectedId, &out]()
+            {
+                return TakeFrame(expectedId, out);
+            });
+    }
 
+    const std::vector<QemuSilSession::CanFrame>& QemuSilSession::ReceivedFrames() const
+    {
+        return receivedFrames;
+    }
+
+    std::vector<std::string> QemuSilSession::TakePlantRecord(std::chrono::milliseconds timeout)
+    {
+        std::vector<std::string> lines;
+        PumpUntil(std::chrono::steady_clock::now() + timeout, [this, &lines]()
+            {
+                ReadPlantRecord(lines);
+                return !lines.empty();
+            });
+        return lines;
+    }
+
+    bool QemuSilSession::Pump(std::chrono::milliseconds timeout)
+    {
+        std::array<pollfd, 2> fds{ { { outPipeFd, POLLIN, 0 }, { canSockFd, POLLIN, 0 } } };
+        if (poll(fds.data(), fds.size(), static_cast<int>(timeout.count())) <= 0)
+            return false;
+
+        bool progressed = false;
+        if ((fds[0].revents & (POLLIN | POLLHUP)) != 0)
+            progressed |= ReadLines(outPipeFd, debugPartial, [this](std::string line)
+                {
+                    OnDebugLine(std::move(line));
+                });
+
+        if ((fds[1].revents & (POLLIN | POLLHUP)) != 0)
+            progressed |= ReadLines(canSockFd, canPartial, [this](std::string line)
+                {
+                    OnCanLine(line);
+                });
+
+        return progressed;
+    }
+
+    bool QemuSilSession::PumpUntil(std::chrono::steady_clock::time_point deadline, const std::function<bool()>& done)
+    {
         while (true)
         {
-            const auto remaining = deadline - std::chrono::steady_clock::now();
-            if (remaining <= std::chrono::milliseconds{ 0 })
-                return false;
-
-            std::string line;
-            if (!ReadLine(line, std::chrono::duration_cast<std::chrono::milliseconds>(remaining)))
-                return false;
-
-            if (line.find("ABORT") == 0)
-            {
-                std::fprintf(stderr, "[QEMU] firmware crash: %s\n", line.c_str());
-                return false;
-            }
-
-            if (ParseCanFrame(line, "CAN_TX", expectedId, out))
+            if (done())
                 return true;
+
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+            if (remaining <= std::chrono::milliseconds{ 0 } || exited || outPipeFd < 0)
+                return false;
+
+            Pump(std::min(remaining, kPumpSlice));
         }
     }
 
-    std::string QemuSilSession::EncodeCanFrame(hal::Can::Id id, const hal::Can::Message& data,
-        const std::string& prefix)
+    bool QemuSilSession::ReadLines(int fd, std::string& partial, const std::function<void(std::string)>& onLine)
     {
-        const uint32_t rawId = id.Is11BitId() ? id.Get11BitId() : id.Get29BitId();
-
-        char buf[32]{};
-        int pos = 0;
-        for (const uint8_t byte : data)
+        std::array<char, 4096> buffer{};
+        const ssize_t received = read(fd, buffer.data(), buffer.size());
+        if (received <= 0)
         {
-            buf[pos++] = "0123456789abcdef"[(byte >> 4) & 0xF];
-            buf[pos++] = "0123456789abcdef"[byte & 0xF];
-        }
-        buf[pos] = '\0';
-
-        char idBuf[16]{};
-        std::snprintf(idBuf, sizeof(idBuf), "%08lx", static_cast<unsigned long>(rawId));
-
-        return prefix + " " + idBuf + " " + buf;
-    }
-
-    bool QemuSilSession::ParseCanFrame(const std::string& line, const std::string& prefix,
-        hal::Can::Id expectedId, hal::Can::Message& out)
-    {
-        const std::string fullPrefix = prefix + " ";
-        if (line.rfind(fullPrefix, 0) != 0)
-            return false;
-
-        const std::string rest = line.substr(fullPrefix.size());
-        const auto spacePos = rest.find(' ');
-        if (spacePos == std::string::npos)
-            return false;
-
-        const std::string idStr = rest.substr(0, spacePos);
-        uint32_t rawId = 0;
-        try
-        {
-            rawId = static_cast<uint32_t>(std::stoul(idStr, nullptr, 16));
-        }
-        catch (...)
-        {
+            if (fd == outPipeFd)
+                exited = true;
+            else if (fd == canSockFd)
+            {
+                close(canSockFd);
+                canSockFd = -1;
+            }
             return false;
         }
 
-        const hal::Can::Id parsedId = hal::Can::Id::Create29BitId(rawId);
-        if (parsedId != expectedId)
+        for (ssize_t i = 0; i != received; ++i)
         {
-            if (SilVerbose())
-                std::fprintf(stderr, "[CAN drop] parsed=%08lx expected=%08lx line=%s\n",
-                    static_cast<unsigned long>(rawId),
-                    static_cast<unsigned long>(expectedId.Is11BitId() ? expectedId.Get11BitId() : expectedId.Get29BitId()),
-                    line.c_str());
-            return false;
-        }
-
-        const std::string dataStr = rest.substr(spacePos + 1);
-        out.clear();
-
-        auto hexVal = [](char c) -> int
-        {
-            if (c >= '0' && c <= '9')
-                return c - '0';
-            if (c >= 'a' && c <= 'f')
-                return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F')
-                return c - 'A' + 10;
-            return -1;
-        };
-
-        for (std::size_t i = 0; i + 1 < dataStr.size(); i += 2)
-        {
-            const int hi = hexVal(dataStr[i]);
-            const int lo = hexVal(dataStr[i + 1]);
-            if (hi < 0 || lo < 0)
-                break;
-            if (out.full())
-                break;
-            out.push_back(static_cast<uint8_t>((hi << 4) | lo));
+            const char c = buffer[static_cast<std::size_t>(i)];
+            if (c == '\n')
+            {
+                if (!partial.empty() && partial.back() == '\r')
+                    partial.pop_back();
+                onLine(std::move(partial));
+                partial.clear();
+            }
+            else
+                partial += c;
         }
 
         return true;
+    }
+
+    void QemuSilSession::OnDebugLine(std::string line)
+    {
+        if (SilVerbose())
+            std::fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
+
+        if (debugLog.is_open())
+            debugLog << line << '\n';
+
+        debugTail.push_back(std::move(line));
+        if (debugTail.size() > debugTailLines)
+            debugTail.pop_front();
+
+        ++debugLinesSeen;
+    }
+
+    void QemuSilSession::OnCanLine(const std::string& line)
+    {
+        if (SilVerbose())
+            std::fprintf(stderr, "[QEMU can->host] %s\n", line.c_str());
+
+        if (const auto frame = ParseCanFrame(line))
+            receivedFrames.push_back(*frame);
+    }
+
+    bool QemuSilSession::TakeFrame(hal::Can::Id expectedId, hal::Can::Message& out)
+    {
+        for (; nextFrame < receivedFrames.size(); ++nextFrame)
+            if (receivedFrames[nextFrame].id == expectedId)
+            {
+                out = receivedFrames[nextFrame++].message;
+                return true;
+            }
+
+        return false;
+    }
+
+    void QemuSilSession::ReadPlantRecord(std::vector<std::string>& lines)
+    {
+        const auto path = scenarioDirectory + "/" + kPlantRecordName;
+        std::error_code error;
+        const auto size = std::filesystem::file_size(path, error);
+        if (error)
+            return;
+
+        if (size < plantRecordOffset)
+        {
+            plantRecordOffset = 0;
+            plantRecordPartial.clear();
+        }
+
+        if (size == plantRecordOffset)
+            return;
+
+        std::ifstream file{ path, std::ios::binary };
+        file.seekg(static_cast<std::streamoff>(plantRecordOffset));
+        std::string appended(static_cast<std::size_t>(size - plantRecordOffset), '\0');
+        file.read(appended.data(), static_cast<std::streamsize>(appended.size()));
+        appended.resize(static_cast<std::size_t>(file.gcount()));
+        plantRecordOffset += appended.size();
+
+        for (const char c : appended)
+        {
+            if (c == '\n')
+            {
+                lines.push_back(std::move(plantRecordPartial));
+                plantRecordPartial.clear();
+            }
+            else
+                plantRecordPartial += c;
+        }
     }
 }

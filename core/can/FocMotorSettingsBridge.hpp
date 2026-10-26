@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>
@@ -10,7 +11,8 @@ namespace can
     class FocMotorSettingsBridge
     {
     public:
-        FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode);
+        FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
+            application::PlatformDiagnostics& diagnostics, FocResetCause resetCause);
 
         void SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone);
         void SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone);
@@ -19,6 +21,7 @@ namespace can
         void SetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone);
         FocAlgorithms ActiveAlgorithms() const;
         FocParameterValue HeldValue(FocParameter parameter) const;
+        void ClearDiagnostics();
 
     private:
         bool SettingOutstanding() const;
@@ -30,9 +33,14 @@ namespace can
         void ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result);
         FocParameterValue HeldLoopSetting(FocParameter parameter) const;
         FocParameterValue HeldMotorParameter(FocParameter parameter) const;
+        FocParameterValue HeldCalibrationReading(FocParameter parameter) const;
+        FocParameterValue HeldOnlineEstimate(FocParameter parameter) const;
+        FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
+        application::PlatformDiagnostics& diagnostics;
+        FocResetCause resetCause;
 
         infra::Function<void()> pendingNvmDoneCallback;
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;

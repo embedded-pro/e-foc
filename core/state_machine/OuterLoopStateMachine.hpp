@@ -30,6 +30,7 @@ namespace application
 
     public:
         state_machine::AppliedEstimates ApplyOnlineEstimates() override;
+        std::optional<state_machine::OnlineEstimates> CurrentOnlineEstimates() override;
         void TraceOnlineEstimates();
         float AutomaticSpeedLoopBandwidth() const;
 

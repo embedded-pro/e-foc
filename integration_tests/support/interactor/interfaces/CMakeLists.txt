@@ -1,6 +1,8 @@
 add_library(e_foc.integration_tests.interactor.interfaces OBJECT
     TargetInteractor.hpp
     TargetInteractor.cpp
+    TerminalInteractor.hpp
+    TerminalInteractor.cpp
 )
 
 target_include_directories(e_foc.integration_tests.interactor.interfaces PUBLIC

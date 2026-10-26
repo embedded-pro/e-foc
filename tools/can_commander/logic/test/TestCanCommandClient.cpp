@@ -7,6 +7,7 @@
 #include "tools/can_commander/logic/test/CanCommandClientObserverMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <bit>
 #include <limits>
 #include <set>
@@ -129,6 +130,26 @@ namespace
             for (const auto& frame : sent)
                 types.push_back(frame.messageType);
             return types;
+        }
+
+        static std::size_t WritableParameterCount()
+        {
+            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
+                {
+                    return !descriptor.readOnly;
+                }));
+        }
+
+        bool QueriedAReadOnlyParameter() const
+        {
+            return std::ranges::any_of(sent, [](const SentFrame& frame)
+                {
+                    if (frame.messageType != can::focQueryParameterId || frame.payload.size() < 2)
+                        return false;
+
+                    const auto descriptor = can::FindParameter(frame.payload[1]);
+                    return descriptor.has_value() && descriptor->readOnly;
+                });
         }
 
         std::size_t Count(uint8_t messageType) const
@@ -706,7 +727,8 @@ TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
     AnswerAllReads();
 
     EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_FALSE(QueriedAReadOnlyParameter());
     EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
 }
 
@@ -811,7 +833,7 @@ TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
     DeliverAck(can::focAlignId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
@@ -902,4 +924,92 @@ TEST_F(TestCanCommandClient, the_timeout_follows_the_command)
 {
     EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focSetParameterId));
     EXPECT_EQ(CanCommandClient::motionCommandTimeout, CanCommandClient::TimeoutFor(can::focAlignId));
+}
+
+TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
+{
+    RecordSends();
+    BringCompatible(1, 2);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsDiagnostics(1));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_TRUE(QueriedAReadOnlyParameter());
+}
+
+TEST_F(TestCanCommandClient, a_2_1_node_is_not_asked_for_diagnostics)
+{
+    RecordSends();
+    BringCompatible(1, 1);
+    AnswerAllReads();
+    sent.clear();
+
+    client.RequestReadings(1);
+
+    EXPECT_FALSE(client.SupportsDiagnostics(1));
+    EXPECT_TRUE(sent.empty());
+}
+
+TEST_F(TestCanCommandClient, calibration_and_diagnostics_go_out_as_their_own_commands)
+{
+    RecordSends();
+
+    EXPECT_TRUE(client.SendCalibrate(1));
+    EXPECT_TRUE(client.SendClearCalibration(2));
+    EXPECT_TRUE(client.SendClearDiagnostics(3));
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focCalibrateId, can::focClearCalibrationId, can::focClearDiagnosticsId }), SentTypes());
+}
+
+TEST_F(TestCanCommandClient, a_calibration_waits_two_minutes_for_its_answer)
+{
+    EXPECT_EQ(CanCommandClient::motionCommandTimeout, CanCommandClient::TimeoutFor(can::focCalibrateId));
+    EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focClearCalibrationId));
+    EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focClearDiagnosticsId));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diagnostics_again)
+{
+    RecordSends();
+    BringCompatible(1, 2);
+    AnswerAllReads();
+    client.SendCalibrate(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focCalibrateId, services::CanAckStatus::success));
+    DeliverAck(can::focCalibrateId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
+{
+    RecordSends();
+    BringCompatible(1, 2);
+    AnswerAllReads();
+    client.SendClearCalibration(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focClearCalibrationId, services::CanAckStatus::success));
+    DeliverAck(can::focClearCalibrationId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
+{
+    RecordSends();
+    BringCompatible(1, 2);
+    AnswerAllReads();
+    client.SendClearDiagnostics(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focClearDiagnosticsId, services::CanAckStatus::success));
+    DeliverAck(can::focClearDiagnosticsId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focParameters.size() - WritableParameterCount(), Count(can::focQueryParameterId));
 }

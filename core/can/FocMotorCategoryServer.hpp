@@ -46,6 +46,10 @@ namespace can
         virtual void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) = 0;
         virtual void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) = 0;
         virtual void OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone) = 0;
+
+        virtual void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
+        virtual void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
+        virtual void OnClearDiagnostics(const infra::Function<void()>& onDone) = 0;
     };
 
     class FocMotorCategoryServer
@@ -82,9 +86,6 @@ namespace can
         bool HandleSetPidCurrent(const hal::Can::Message& data);
         bool HandleSetPidSpeed(const hal::Can::Message& data);
         bool HandleSetPidPosition(const hal::Can::Message& data);
-        bool HandleAlign(const hal::Can::Message& data);
-        bool HandleIdentifyElectrical(const hal::Can::Message& data);
-        bool HandleIdentifyMechanical(const hal::Can::Message& data);
         bool HandleRequestTelemetry(const hal::Can::Message& data);
         bool HandleSetEncoderResolution(const hal::Can::Message& data);
         bool HandleQueryMotorType(const hal::Can::Message& data);
@@ -94,6 +95,7 @@ namespace can
         bool HandleQueryAlgorithms(const hal::Can::Message& data);
         bool HandleSetParameter(const hal::Can::Message& data);
         bool HandleQueryParameter(const hal::Can::Message& data);
+        bool HandleClearDiagnostics(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };
@@ -106,9 +108,6 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> setPidCurrent{ focSetPidCurrentId, *this, &FocMotorCategoryServer::HandleSetPidCurrent };
         services::CanMessageHandler<FocMotorCategoryServer> setPidSpeed{ focSetPidSpeedId, *this, &FocMotorCategoryServer::HandleSetPidSpeed };
         services::CanMessageHandler<FocMotorCategoryServer> setPidPosition{ focSetPidPositionId, *this, &FocMotorCategoryServer::HandleSetPidPosition };
-        services::CanMessageHandler<FocMotorCategoryServer> align{ focAlignId, *this, &FocMotorCategoryServer::HandleAlign };
-        services::CanMessageHandler<FocMotorCategoryServer> identifyElectrical{ focIdentifyElectricalId, *this, &FocMotorCategoryServer::HandleIdentifyElectrical };
-        services::CanMessageHandler<FocMotorCategoryServer> identifyMechanical{ focIdentifyMechanicalId, *this, &FocMotorCategoryServer::HandleIdentifyMechanical };
         services::CanMessageHandler<FocMotorCategoryServer> requestTelemetry{ focRequestTelemetryId, *this, &FocMotorCategoryServer::HandleRequestTelemetry };
         services::CanMessageHandler<FocMotorCategoryServer> setEncoderResolution{ focSetEncoderResolutionId, *this, &FocMotorCategoryServer::HandleSetEncoderResolution };
         services::CanMessageHandler<FocMotorCategoryServer> queryMotorType{ focQueryMotorTypeId, *this, &FocMotorCategoryServer::HandleQueryMotorType };
@@ -126,5 +125,28 @@ namespace can
         };
 
         SettingsMessages settingsMessages{ *this };
+
+        class CommissioningMessages
+        {
+        public:
+            explicit CommissioningMessages(FocMotorCategoryServer& server);
+
+        private:
+            bool HandleAlign(const hal::Can::Message& data);
+            bool HandleIdentifyElectrical(const hal::Can::Message& data);
+            bool HandleIdentifyMechanical(const hal::Can::Message& data);
+            bool HandleCalibrate(const hal::Can::Message& data);
+            bool HandleClearCalibration(const hal::Can::Message& data);
+
+            FocMotorCategoryServer& server;
+            services::CanMessageHandler<CommissioningMessages> align;
+            services::CanMessageHandler<CommissioningMessages> identifyElectrical;
+            services::CanMessageHandler<CommissioningMessages> identifyMechanical;
+            services::CanMessageHandler<CommissioningMessages> calibrate;
+            services::CanMessageHandler<CommissioningMessages> clearCalibration;
+        };
+
+        CommissioningMessages commissioningMessages{ *this };
+        services::CanMessageHandler<FocMotorCategoryServer> clearDiagnostics{ focClearDiagnosticsId, *this, &FocMotorCategoryServer::HandleClearDiagnostics };
     };
 }

@@ -4,7 +4,7 @@ Feature: Control Loop Timing
   re-enter. The mode scenarios boot calibrated and clear those counters before
   the rotor is aligned on command, so the window covers alignment as well as
   closed-loop running. The calibration scenario clears them before a full
-  calibration is run from the terminal, so the window covers every
+  calibration is run over CAN, so the window covers every
   identification procedure and the alignment between them. Each scenario then
   asks the target for the counters.
 
@@ -60,6 +60,6 @@ Feature: Control Loop Timing
     And the motor boots in speed mode
     When the target boots
     And the control loop statistics are cleared
-    And the full calibration is run from the terminal
+    And the full calibration is run
     Then the control loop shall have stayed within its budget
     And no control loop execution shall have taken more than 570 cycles

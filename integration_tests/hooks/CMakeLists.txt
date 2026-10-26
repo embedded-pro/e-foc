@@ -10,4 +10,5 @@ target_link_libraries(e_foc.integration_tests.hooks PUBLIC
     cucumber_cpp.runner
     e_foc.integration_tests.support
     e_foc.integration_tests.interactor.interfaces
+    e_foc.integration_tests.interactor.hardware
 )

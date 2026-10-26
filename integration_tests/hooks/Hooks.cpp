@@ -1,7 +1,13 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
+#include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
+#include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
+#include "integration_tests/support/interactor/interfaces/TerminalInteractor.hpp"
+#include <gtest/gtest.h>
+#include <utility>
 
 HOOK_BEFORE_ALL(.name = "Setup target")
 {
@@ -20,7 +26,27 @@ HOOK_BEFORE_SCENARIO()
     context.Emplace<integration::ScenarioSetup>();
 }
 
+HOOK_BEFORE_SCENARIO(.expression = "@hil", .name = "Bring-up terminal")
+{
+    auto* terminal = integration::TerminalInteractor::Instance();
+    ASSERT_NE(terminal, nullptr) << "The bring-up scenarios need a target with a terminal";
+
+    const auto fixture = context.Emplace<integration::TerminalFixture>(*terminal);
+    if (hil::GetBridgeConfig().restartPerScenario)
+        return;
+
+    (void)fixture->WaitForPrompt(hil::timeouts::promptShort);
+    (void)fixture->SendCommand("stop", hil::timeouts::cleanup);
+    (void)fixture->SendCommand("can_stop", hil::timeouts::cleanup);
+    (void)fixture->WaitForPrompt(hil::timeouts::cleanup);
+}
+
 HOOK_AFTER_SCENARIO()
 {
-    integration::TargetInteractor::Instance().AfterScenario();
+    auto& interactor = integration::TargetInteractor::Instance();
+    if (hasError)
+        if (auto log = interactor.DebugLog(); !log.empty())
+            Attach(std::move(log), cucumber_cpp::library::engine::AttachOptions{ "text/plain", "target-debug-output.log" });
+
+    interactor.AfterScenario();
 }

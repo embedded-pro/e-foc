@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <chrono>
 #include <cstdlib>
@@ -37,14 +37,14 @@ namespace
 
 WHEN(R"(a calibration data block is written to EEPROM)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
     ASSERT_TRUE(fixture.SendCommand("eeprom_write 0 170 55", hil::timeouts::slowCommand))
         << "eeprom_write command did not receive a response";
 }
 
 THEN(R"(the data read back from EEPROM shall be identical to the written data)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
     ASSERT_TRUE(fixture.SendCommand("eeprom_read 0 2", hil::timeouts::slowCommand))
         << "eeprom_read command did not receive a response";
     fixture.FlushPartialLines(hil::timeouts::command);

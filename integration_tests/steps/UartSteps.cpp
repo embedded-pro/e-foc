@@ -1,5 +1,5 @@
 #include "cucumber_cpp/Steps.hpp"
-#include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/TerminalFixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <gtest/gtest.h>
 #include <string>
@@ -8,7 +8,7 @@ using namespace integration;
 
 WHEN(R"(the hardware target is rebooted and emits its banner over UART)")
 {
-    auto& fixture = context.Get<Fixture>();
+    auto& fixture = context.Get<TerminalFixture>();
     fixture.FlushPartialLines(hil::timeouts::bootBanner);
     ASSERT_FALSE(fixture.allLines.empty())
         << "No UART output captured while waiting for the post-reset banner";
@@ -16,7 +16,7 @@ WHEN(R"(the hardware target is rebooted and emits its banner over UART)")
 
 THEN(R"(the CLI banner shall be well-formed)")
 {
-    const auto& lines = context.Get<Fixture>().allLines;
+    const auto& lines = context.Get<TerminalFixture>().allLines;
     ASSERT_FALSE(lines.empty()) << "No UART lines captured for banner inspection";
 
     const auto contains = [&](const std::string& needle)

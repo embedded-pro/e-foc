@@ -65,6 +65,9 @@ namespace
         MOCK_METHOD(void, OnQueryAlgorithms, ((const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
         MOCK_METHOD(void, OnSetParameter, (can::FocParameter, float, (const infra::Function<void(can::FocParameterValue)>&)), (override));
         MOCK_METHOD(void, OnQueryParameter, (can::FocParameter, (const infra::Function<void(can::FocParameterValue)>&)), (override));
+        MOCK_METHOD(void, OnCalibrate, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
+        MOCK_METHOD(void, OnClearCalibration, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
+        MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
     };
 
     class ContractClientObserver
@@ -375,6 +378,9 @@ TEST_F(FocMotorWireContractTest, every_documented_parameter_value_round_trips_bi
 {
     for (const auto& parameter : can::focParameters)
     {
+        if (parameter.readOnly)
+            continue;
+
         for (const auto value : { parameter.minimum, parameter.maximum })
         {
             EXPECT_CALL(serverObserver, OnSetParameter(parameter.id, value, _));
@@ -475,6 +481,9 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendQueryAlgorithms(1));
     EXPECT_FALSE(client.SendSetParameter(1, can::FocParameter::resistance, 0.36f));
     EXPECT_FALSE(client.SendQueryParameter(1, can::FocParameter::resistance));
+    EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::calibrate));
+    EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearCalibration));
+    EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearDiagnostics));
 }
 
 TEST_F(FocMotorWireContractTest, an_incompatible_node_does_not_refuse_commands_to_other_nodes)
@@ -566,6 +575,9 @@ namespace
             { can::focQueryAlgorithmsId, { 0x00 } },
             { can::focSetParameterId, { 0x00, 0x13, 0x41, 0x00, 0x00, 0x00 } },
             { can::focQueryParameterId, { 0x00, 0x40 } },
+            { can::focCalibrateId, { 0x00 } },
+            { can::focClearCalibrationId, { 0x00 } },
+            { can::focClearDiagnosticsId, { 0x00 } },
 
             { can::focMotorTypeResponseId, { 0x01 } },
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
@@ -642,6 +654,9 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnQueryAlgorithms(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetParameter(_, _, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnQueryParameter(_, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnCalibrate(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnClearCalibration(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnClearDiagnostics(_)).Times(AnyNumber());
 
     for (const auto& descriptor : can::focMotorMessages)
     {
@@ -702,8 +717,8 @@ TEST_F(FocMotorWireContractTest, parameter_numbers_are_unique_and_every_range_ad
     {
         EXPECT_TRUE(numbers.insert(static_cast<uint8_t>(parameter.id)).second) << parameter.name;
         EXPECT_LE(parameter.minimum, parameter.maximum) << parameter.name;
-        EXPECT_TRUE(can::IsAcceptableParameterValue(parameter, parameter.maximum)) << parameter.name;
-        EXPECT_TRUE(can::IsAcceptableParameterValue(parameter, parameter.minimum)) << parameter.name;
+        EXPECT_EQ(!parameter.readOnly, can::IsAcceptableParameterValue(parameter, parameter.maximum)) << parameter.name;
+        EXPECT_EQ(!parameter.readOnly, can::IsAcceptableParameterValue(parameter, parameter.minimum)) << parameter.name;
         EXPECT_EQ(parameter.automatic, can::IsAcceptableParameterValue(parameter, 0.0f) && parameter.minimum > 0.0f) << parameter.name;
     }
 }
@@ -730,4 +745,56 @@ TEST_F(FocMotorWireContractTest, values_outside_a_parameter_s_domain_are_refused
     EXPECT_TRUE(check(can::FocParameter::canBitrate, 500000.0f));
     EXPECT_TRUE(check(can::FocParameter::polePairs, 7.0f));
     EXPECT_TRUE(check(can::FocParameter::viscousFriction, 0.0f));
+}
+
+TEST_F(FocMotorWireContractTest, a_read_only_parameter_is_refused_by_a_write_and_answered_by_a_query)
+{
+    for (const auto& parameter : can::focParameters)
+    {
+        if (!parameter.readOnly)
+            continue;
+
+        client.SendSetParameter(1, parameter.id, 1.0f);
+        EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(sentMessageType, sentMessage)) << parameter.name;
+
+        EXPECT_CALL(serverObserver, OnQueryParameter(parameter.id, _));
+        client.SendQueryParameter(1, parameter.id);
+        DeliverToServer();
+    }
+}
+
+TEST_F(FocMotorWireContractTest, the_maintenance_commands_reach_their_handlers_and_answer_with_the_handler_s_status)
+{
+    EXPECT_CALL(serverObserver, OnCalibrate(_))
+        .WillOnce(Invoke([](const infra::Function<void(services::CanAckStatus)>& onDone)
+            {
+                onDone(services::CanAckStatus::invalidState);
+            }));
+    ackSpy.Reset();
+    EXPECT_TRUE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::calibrate));
+    DeliverToServer();
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(services::CanAckStatus::invalidState, ackSpy.last->status);
+
+    EXPECT_CALL(serverObserver, OnClearCalibration(_))
+        .WillOnce(Invoke([](const infra::Function<void(services::CanAckStatus)>& onDone)
+            {
+                onDone(services::CanAckStatus::success);
+            }));
+    ackSpy.Reset();
+    EXPECT_TRUE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearCalibration));
+    DeliverToServer();
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+
+    EXPECT_CALL(serverObserver, OnClearDiagnostics(_))
+        .WillOnce(Invoke([](const infra::Function<void()>& onDone)
+            {
+                onDone();
+            }));
+    ackSpy.Reset();
+    EXPECT_TRUE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearDiagnostics));
+    DeliverToServer();
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
 }

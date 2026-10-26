@@ -3,10 +3,12 @@
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <string_view>
 
 namespace
 {
@@ -52,6 +54,12 @@ namespace
     long Micro(float value)
     {
         return std::lround(value * 1000000.0f);
+    }
+
+    template<std::size_t Size>
+    std::string_view Formatted(const std::array<char, Size>& buffer, int length)
+    {
+        return std::string_view{ buffer.data(), length > 0 ? std::min(static_cast<std::size_t>(length), Size - 1) : std::size_t{ 0 } };
     }
 }
 
@@ -167,6 +175,9 @@ namespace application
         // The delay is carried in centiseconds because it reuses a byte the record already had.
         encoderFreeze.Configure(static_cast<uint32_t>(
             static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u));
+
+        if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
+            watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -191,6 +202,10 @@ namespace application
         responseDrainTimer.Start(std::chrono::milliseconds(1), [this]()
             {
                 DrainResponseRecords();
+            });
+        portPollTimer.Start(std::chrono::milliseconds(1), [this]()
+            {
+                PollPorts();
             });
         focTimer.Start();
     }
@@ -338,19 +353,8 @@ namespace application
     {
         if (!canBusAdapter)
         {
-            canBusAdapter.emplace();
+            canBusAdapter.emplace(kCanUartBase);
             diagnostics.AttachCanBus(*canBusAdapter);
-            canBusAdapter->OnTerminalLine([this](const char* line)
-                {
-                    serial.Deliver(line);
-                });
-            canPollTimer.Start(std::chrono::milliseconds(1), [this]()
-                {
-                    // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
-                    const uint32_t tick = controlTick.load(std::memory_order_relaxed);
-                    if (const auto frame = canBusAdapter->PollIncoming())
-                        StampReceivedFrame(tick, *frame);
-                });
         }
     }
 
@@ -452,53 +456,64 @@ namespace application
         return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
     }
 
+    void PlatformFactoryImpl::PollPorts()
+    {
+        if (const char* line = terminalPort.PollLine(); line != nullptr)
+            serial.Deliver(line);
+
+        if (!canBusAdapter)
+            return;
+
+        // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
+        const uint32_t tick = controlTick.load(std::memory_order_relaxed);
+        if (const auto frame = canBusAdapter->PollIncoming())
+            StampReceivedFrame(tick, *frame);
+    }
+
     void PlatformFactoryImpl::DrainResponseRecords()
     {
-        bool printed = false;
-
         for (int i = 0; i != kResponseLinesPerDrain; ++i)
         {
             const auto record = responseRecorder.Pop();
             if (!record)
                 break;
 
-            if (!printed)
-                std::putchar('\n');
-            printed = true;
-
-            PrintResponseRecord(*record);
+            RecordResponse(*record);
         }
 
-        if (printed)
-            std::fflush(stdout);
+        plantRecord.Flush();
     }
 
-    void PlatformFactoryImpl::PrintResponseRecord(const foc::PlantResponseRecord& record)
+    void PlatformFactoryImpl::RecordResponse(const foc::PlantResponseRecord& record)
     {
         const auto& sample = record.sample;
         const auto tick = static_cast<unsigned long>(sample.tick);
+        std::array<char, 96> line{};
+        int length = 0;
 
         switch (record.kind)
         {
             case foc::PlantResponseKind::sample:
-                std::printf("PLANT %lu %ld %ld %ld %ld %ld\n", tick, Milli(sample.omegaMech), Micro(sample.thetaMech), Micro(sample.iq), Micro(sample.id), Micro(sample.externalTorqueNm));
+                length = std::snprintf(line.data(), line.size(), "PLANT %lu %ld %ld %ld %ld %ld\n", tick, Milli(sample.omegaMech), Micro(sample.thetaMech), Micro(sample.iq), Micro(sample.id), Micro(sample.externalTorqueNm));
                 break;
             case foc::PlantResponseKind::began:
-                std::printf("PLANT_START %lu\n", tick);
+                length = std::snprintf(line.data(), line.size(), "PLANT_START %lu\n", tick);
                 break;
             case foc::PlantResponseKind::torqueStep:
-                std::printf("PLANT_EVENT %lu torque %ld\n", tick, Micro(sample.externalTorqueNm));
+                length = std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu torque %ld\n", tick, Micro(sample.externalTorqueNm));
                 break;
             case foc::PlantResponseKind::encoderFreeze:
-                std::printf("PLANT_EVENT %lu encoder_freeze %ld\n", tick, Micro(sample.thetaMech));
+                length = std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu encoder_freeze %ld\n", tick, Micro(sample.thetaMech));
                 break;
             case foc::PlantResponseKind::stopped:
-                std::printf("PLANT_STOP %lu %lu\n", tick, static_cast<unsigned long>(record.dropped));
+                length = std::snprintf(line.data(), line.size(), "PLANT_STOP %lu %lu\n", tick, static_cast<unsigned long>(record.dropped));
                 break;
         }
+
+        plantRecord.Append(Formatted(line, length));
     }
 
-    void PlatformFactoryImpl::StampReceivedFrame(uint32_t tick, const sil::SemihostingCan::Frame& frame)
+    void PlatformFactoryImpl::StampReceivedFrame(uint32_t tick, const sil::EmulatedCan::Frame& frame)
     {
         char hexData[17]{};
         int pos = 0;
@@ -510,8 +525,10 @@ namespace application
         hexData[pos] = '\0';
 
         const uint32_t rawId = frame.id.Is11BitId() ? frame.id.Get11BitId() : frame.id.Get29BitId();
-        std::printf("\nCAN_RX_AT %lu %lx %s\n", static_cast<unsigned long>(tick), static_cast<unsigned long>(rawId), hexData);
-        std::fflush(stdout);
+        std::array<char, 64> line{};
+        const int length = std::snprintf(line.data(), line.size(), "CAN_RX_AT %lu %lx %s\n", static_cast<unsigned long>(tick), static_cast<unsigned long>(rawId), hexData);
+        plantRecord.Append(Formatted(line, length));
+        plantRecord.Flush();
     }
 
     hal::Hertz PlatformFactoryImpl::BaseFrequency() const

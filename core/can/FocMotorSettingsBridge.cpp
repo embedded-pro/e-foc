@@ -2,12 +2,42 @@
 #include "core/can/FocMotorSettings.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "core/services/cogging_compensation/CoggingMap.hpp"
 
 namespace can
 {
-    FocMotorSettingsBridge::FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode)
+    namespace
+    {
+        uint32_t LoopStatistic(const application::ControlLoopMetrics::Snapshot& statistics, FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::loopSamples:
+                    return statistics.samples;
+                case FocParameter::loopBudgetCycles:
+                    return statistics.budgetCycles;
+                case FocParameter::loopMinimumCycles:
+                    return statistics.minimumCycles;
+                case FocParameter::loopAverageCycles:
+                    return statistics.averageCycles;
+                case FocParameter::loopMaximumCycles:
+                    return statistics.maximumCycles;
+                case FocParameter::loopOverruns:
+                    return statistics.overruns;
+                case FocParameter::loopDeadlineMisses:
+                    return statistics.deadlineMisses;
+                default:
+                    return statistics.reentries;
+            }
+        }
+    }
+
+    FocMotorSettingsBridge::FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
+        application::PlatformDiagnostics& diagnostics, FocResetCause resetCause)
         : server(server)
         , controlMode(controlMode)
+        , diagnostics(diagnostics)
+        , resetCause(resetCause)
     {}
 
     void FocMotorSettingsBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
@@ -152,9 +182,63 @@ namespace can
                 return HeldMotorParameter(parameter);
             case ParameterGroup::startup:
                 return FocParameterValue{ static_cast<float>(StartupSettingOf(controlMode.Config(), parameter)), false };
+            case ParameterGroup::calibrationRecord:
+                return HeldCalibrationReading(parameter);
+            case ParameterGroup::onlineEstimate:
+                return HeldOnlineEstimate(parameter);
+            case ParameterGroup::loopStatistics:
+                return HeldLoopStatistic(parameter);
+            case ParameterGroup::platform:
+                return FocParameterValue{ static_cast<float>(resetCause), false };
             default:
                 return HeldLoopSetting(parameter);
         }
+    }
+
+    void FocMotorSettingsBridge::ClearDiagnostics()
+    {
+        diagnostics.Reset();
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldCalibrationReading(FocParameter parameter) const
+    {
+        const auto& record = controlMode.CalibrationRecord();
+
+        switch (parameter)
+        {
+            case FocParameter::currentOffsetA:
+                return FocParameterValue{ record.currentOffsetA, false };
+            case FocParameter::currentOffsetB:
+                return FocParameterValue{ record.currentOffsetB, false };
+            case FocParameter::currentOffsetC:
+                return FocParameterValue{ record.currentOffsetC, false };
+            default:
+                return FocParameterValue{ services::CoggingPeak(record.coggingTorque, record.coggingTorqueScale).Value(), false };
+        }
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldOnlineEstimate(FocParameter parameter) const
+    {
+        const auto estimates = controlMode.ActiveStateMachine().CurrentOnlineEstimates();
+        if (!estimates.has_value())
+            return FocParameterValue{ 0.0f, false };
+
+        switch (parameter)
+        {
+            case FocParameter::estimatedResistance:
+                return FocParameterValue{ estimates->resistance.Value(), false };
+            case FocParameter::estimatedInductance:
+                return FocParameterValue{ estimates->inductance.Value(), false };
+            case FocParameter::estimatedInertia:
+                return FocParameterValue{ estimates->inertia.Value(), false };
+            default:
+                return FocParameterValue{ estimates->viscousFriction.Value(), false };
+        }
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldLoopStatistic(FocParameter parameter) const
+    {
+        return FocParameterValue{ static_cast<float>(LoopStatistic(diagnostics.ControlLoopStatistics(), parameter)), false };
     }
 
     bool FocMotorSettingsBridge::SettingOutstanding() const

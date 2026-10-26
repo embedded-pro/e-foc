@@ -1,4 +1,5 @@
 #include "core/can/FocMotorCanBridge.hpp"
+#include "core/can/FocMotorCommandOutcome.hpp"
 #include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
@@ -10,19 +11,17 @@ namespace can
     FocMotorCanBridge::FocMotorCanBridge(
         FocMotorCategoryServer& server,
         state_machine::ControlModeStateMachine& controlMode,
-        const drivers::ThreePhaseInverter& inverter,
-        drivers::Encoder& encoder,
+        const Platform& platform,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
         services::Tracer& tracer)
         : FocMotorCategoryServerObserver(server)
         , server(server)
         , controlMode(controlMode)
-        , inverter(inverter)
-        , encoder(encoder)
-        , electricalIdent(electricalIdent)
-        , mechIdent{ mechIdent }
-        , settings(server, controlMode)
+        , inverter(platform.inverter)
+        , encoder(platform.encoder)
+        , commissioning(server, controlMode, electricalIdent, mechIdent)
+        , settings(server, controlMode, platform.diagnostics, platform.resetCause)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -66,25 +65,24 @@ namespace can
 
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(can::focStartId, controlMode.ActiveStateMachine().CmdEnable(), onDone);
+        ReportCommandOutcome(server, can::focStartId, controlMode.ActiveStateMachine().CmdEnable(), onDone);
     }
 
     void FocMotorCanBridge::OnStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(can::focStopId, controlMode.ActiveStateMachine().CmdDisable(), onDone);
+        ReportCommandOutcome(server, can::focStopId, controlMode.ActiveStateMachine().CmdDisable(), onDone);
     }
 
     void FocMotorCanBridge::OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(can::focClearFaultId, controlMode.ActiveStateMachine().CmdClearFault(), onDone);
+        ReportCommandOutcome(server, can::focClearFaultId, controlMode.ActiveStateMachine().CmdClearFault(), onDone);
     }
 
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        if (mechIdent != nullptr)
-            mechIdent->Abort();
+        commissioning.AbortMechanicalIdentification();
 
-        ReportCommandOutcome(can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
+        ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
 
     void FocMotorCanBridge::OnSelectControlMode(FocMotorMode mode,
@@ -168,176 +166,33 @@ namespace can
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        if (pendingAlignDoneCallback != nullptr)
-        {
-            server.SendCategoryError(can::focAlignId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        pendingAlignDoneCallback = onDone;
-        controlMode.CmdReAlign([this](state_machine::CommandResult result)
-            {
-                auto callback = pendingAlignDoneCallback;
-                pendingAlignDoneCallback = nullptr;
-                if (result == state_machine::CommandResult::ok)
-                    callback(services::CanAckStatus::success);
-                else
-                    server.SendCategoryError(can::focAlignId, state_machine::ToCategoryError(result));
-            });
-    }
-
-    bool FocMotorCanBridge::ReserveCalibration(uint8_t commandId)
-    {
-        const auto reservation = controlMode.CmdReserveExternalCalibration();
-
-        if (reservation == state_machine::CommandResult::ok)
-            return true;
-
-        if (reservation == state_machine::CommandResult::queued)
-            server.SendCategoryError(commandId, FocMotorCategoryError::busy);
-        else
-            server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
-
-        return false;
-    }
-
-    // An emergency stop or a fault ends the reservation and aborts the estimation without answering it
-    bool FocMotorCanBridge::ElectricalIdentificationInProgress() const
-    {
-        return pendingElectricalIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.ActiveStateMachine().CurrentState());
-    }
-
-    bool FocMotorCanBridge::MechanicalIdentificationInProgress() const
-    {
-        return mechIdent->IsRunning() || (pendingMechIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.ActiveStateMachine().CurrentState()));
-    }
-
-    void FocMotorCanBridge::FailElectricalIdentification(FocMotorCategoryError error)
-    {
-        pendingElectricalR.reset();
-        pendingElectricalL.reset();
-        pendingElectricalIdentDoneCallback = nullptr;
-        controlMode.CmdReleaseExternalCalibration();
-        server.SendCategoryError(can::focIdentifyElectricalId, error);
+        commissioning.Align(onDone);
     }
 
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>& onDone)
     {
-        if (ElectricalIdentificationInProgress())
-        {
-            server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (!ReserveCalibration(can::focIdentifyElectricalId))
-            return;
-
-        pendingElectricalR.reset();
-        pendingElectricalL.reset();
-        pendingElectricalIdentDoneCallback = onDone;
-
-        electricalIdent.EstimateResistanceAndInductance({},
-            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
-            {
-                if (!result.resistance.has_value() || !result.inductance.has_value() || result.fitQuality < 0.5f)
-                {
-                    FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
-                    return;
-                }
-
-                pendingElectricalR = result.resistance;
-                pendingElectricalL = result.inductance;
-
-                electricalIdent.EstimateNumberOfPolePairs({},
-                    [this](std::optional<std::size_t> polePairs)
-                    {
-                        if (!polePairs.has_value() || *polePairs > std::numeric_limits<uint8_t>::max())
-                        {
-                            FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
-                            return;
-                        }
-
-                        services::CalibrationData data{};
-                        data.rPhase = pendingElectricalR->Value();
-                        data.lD = pendingElectricalL->Value();
-                        data.lQ = pendingElectricalL->Value();
-                        data.polePairs = static_cast<uint8_t>(*polePairs);
-                        data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
-                        pendingElectricalR.reset();
-                        pendingElectricalL.reset();
-
-                        server.BroadcastElectricalParams(
-                            foc::Ohm{ data.rPhase },
-                            foc::MilliHenry{ data.lD },
-                            static_cast<std::size_t>(data.polePairs));
-
-                        controlMode.CmdCompleteExternalCalibration(data,
-                            [this](state_machine::CommandResult result)
-                            {
-                                auto callback = pendingElectricalIdentDoneCallback;
-                                pendingElectricalIdentDoneCallback = nullptr;
-
-                                if (result == state_machine::CommandResult::ok)
-                                    callback();
-                                else
-                                {
-                                    if (result == state_machine::CommandResult::rejected)
-                                        controlMode.CmdReleaseExternalCalibration();
-
-                                    server.SendCategoryError(can::focIdentifyElectricalId,
-                                        state_machine::ToCategoryError(result));
-                                }
-                            });
-                    });
-            });
+        commissioning.IdentifyElectrical(onDone);
     }
 
     void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void()>& onDone)
     {
-        if (mechIdent == nullptr)
-        {
-            server.SendCommandAck(can::focIdentifyMechanicalId, services::CanAckStatus::notImplemented);
-            return;
-        }
+        commissioning.IdentifyMechanical(onDone);
+    }
 
-        if (MechanicalIdentificationInProgress())
-        {
-            server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::busy);
-            return;
-        }
+    void FocMotorCanBridge::OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone)
+    {
+        commissioning.Calibrate(onDone);
+    }
 
-        const auto cal = controlMode.ActiveCalibrationData();
-        if (!cal.has_value())
-        {
-            server.SendCommandAck(can::focIdentifyMechanicalId, services::CanAckStatus::invalidState);
-            return;
-        }
+    void FocMotorCanBridge::OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone)
+    {
+        commissioning.ClearCalibration(onDone);
+    }
 
-        if (!ReserveCalibration(can::focIdentifyMechanicalId))
-            return;
-
-        pendingMechIdentDoneCallback = onDone;
-
-        mechIdent->EstimateFrictionAndInertia(
-            foc::TorqueConstantFor(cal->polePairs, controlMode.ActiveFluxLinkage()),
-            static_cast<std::size_t>(cal->polePairs),
-            {},
-            [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
-                std::optional<foc::NewtonMeterSecondSquared> inertia)
-            {
-                auto callback = pendingMechIdentDoneCallback;
-                pendingMechIdentDoneCallback = nullptr;
-                controlMode.CmdReleaseExternalCalibration();
-
-                if (!friction.has_value() || !inertia.has_value())
-                {
-                    server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::calibrationFailed);
-                    return;
-                }
-
-                server.BroadcastMechanicalParams(*friction, *inertia);
-                callback();
-            });
+    void FocMotorCanBridge::OnClearDiagnostics(const infra::Function<void()>& onDone)
+    {
+        settings.ClearDiagnostics();
+        onDone();
     }
 
     void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>& onDone)
@@ -383,17 +238,6 @@ namespace can
     void FocMotorCanBridge::OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
     {
         onDone(settings.HeldValue(parameter));
-    }
-
-    void FocMotorCanBridge::ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
-        const infra::Function<void(services::CanAckStatus)>& onDone)
-    {
-        if (result == state_machine::CommandResult::ok)
-            onDone(services::CanAckStatus::success);
-        else if (result == state_machine::CommandResult::rejected)
-            onDone(services::CanAckStatus::invalidState);
-        else
-            server.SendCategoryError(commandId, state_machine::ToCategoryError(result));
     }
 
     void FocMotorCanBridge::ReportSelectFailure(state_machine::SelectResult result)
