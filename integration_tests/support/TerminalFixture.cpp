@@ -43,6 +43,13 @@ namespace integration
         return ok;
     }
 
+    bool TerminalFixture::WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout)
+    {
+        const bool ok = interactor.WaitForRestart(bannerLine, timeout);
+        SyncLines();
+        return ok;
+    }
+
     std::size_t TerminalFixture::CapturedLineCount() const
     {
         return interactor.DiscardedSerialLineCount() + interactor.SerialLines().size();

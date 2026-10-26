@@ -29,6 +29,8 @@ namespace hil
     {
         SerialLogger::Instance().BeginScenario();
 
+        BridgeSession::Instance().EnsureConnected();
+
         if (GetBridgeConfig().restartPerScenario)
             RestartTarget();
     }
@@ -48,8 +50,14 @@ namespace hil
         if (GetBridgeConfig().restartPerScenario)
             GdbFlasher{ GetBridgeConfig() }.Reset();
 
-        (void)session.DrainSerial(timeouts::cleanup);
-        (void)session.WaitForPrompt(timeouts::promptShort);
+        if (session.Connected())
+        {
+            (void)session.DrainSerial(timeouts::cleanup);
+            (void)session.WaitForPrompt(timeouts::promptShort);
+        }
+        else
+            SerialLogger::Instance().Note("bridge", "link down after the scenario; the next scenario reconnects");
+
         SerialLogger::Instance().EndScenario(true);
     }
 
@@ -66,6 +74,11 @@ namespace hil
     bool HardwareInteractor::WaitForPrompt(std::chrono::milliseconds timeout)
     {
         return BridgeSession::Instance().WaitForPrompt(timeout);
+    }
+
+    bool HardwareInteractor::WaitForRestart(const std::string& bannerLine, std::chrono::milliseconds timeout)
+    {
+        return BridgeSession::Instance().WaitForRestart(bannerLine, timeout);
     }
 
     void HardwareInteractor::ClearSerialLines()
