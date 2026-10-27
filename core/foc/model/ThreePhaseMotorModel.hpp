@@ -3,7 +3,13 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/CurrentSense.hpp"
+#include "core/foc/model/ElectricalPlant.hpp"
+#include "core/foc/model/EncoderModel.hpp"
+#include "core/foc/model/MechanicalPlant.hpp"
+#include "core/foc/model/PhaseCurrentSensor.hpp"
 #include "core/foc/model/PowerStage.hpp"
+#include "core/foc/model/SupplyModel.hpp"
+#include "core/foc/model/ThermalModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
@@ -11,7 +17,6 @@
 #include "infra/util/SharedPtr.hpp"
 #include <cstddef>
 #include <optional>
-#include <random>
 
 namespace foc
 {
@@ -53,35 +58,10 @@ namespace foc
             foc::Ampere maxSupportedCurrent{ 20.0f };
         };
 
-        struct NoiseConfig
-        {
-            float sigmaAmpere{ 0.0f };
-            float biasAmpereA{ 0.0f };
-            float biasAmpereB{ 0.0f };
-            float biasAmpereC{ 0.0f };
-        };
-
-        struct ThermalConfig
-        {
-            float ambientCelsius{ 25.0f };
-            float thermalResistance{ 2.0f };
-            float thermalCapacitance{ 25.0f };
-            float copperTempCoeff{ 0.00393f };
-            float ironInductanceCoeff{ 0.0f };
-            float referenceCelsius{ 25.0f };
-        };
-
-        struct EncoderNoiseConfig
-        {
-            float sigmaRadians{ 0.0f };
-            float biasRadians{ 0.0f };
-        };
-
-        struct SupplyConfig
-        {
-            float sourceResistanceOhm{ 0.0f };
-            float currentLimitAmpere{ 0.0f };
-        };
+        using NoiseConfig = CurrentNoiseConfig;
+        using ThermalConfig = foc::ThermalConfig;
+        using EncoderNoiseConfig = foc::EncoderNoiseConfig;
+        using SupplyConfig = foc::SupplyConfig;
 
         struct FaultInjectionConfig
         {
@@ -90,11 +70,6 @@ namespace foc
             bool openPhaseC{ false };
             bool encoderStuck{ false };
             float supplyVoltageScale{ 1.0f };
-
-            bool AnyPhaseOpen() const
-            {
-                return openPhaseA || openPhaseB || openPhaseC;
-            }
         };
 
         ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
@@ -145,74 +120,10 @@ namespace foc
         void Model(const foc::PhasePwmDutyCycles& dutyPhases);
         void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
         void ScheduleNextCycle();
-        float SampleNoise();
-        float SampleEncoderNoise();
-        void ApplyOpenPhases();
-        foc::ThreePhase PhaseVoltages(const foc::PhasePwmDutyCycles& dutyPhases, foc::Volts supply) const;
-        foc::PhaseCurrents MeasuredCurrents(const foc::PhasePwmDutyCycles& dutyPhases);
+        float Period() const;
+        WindingParameters Winding() const;
 
     private:
-        struct MotorState
-        {
-            foc::Ampere ia{ 0.0f };
-            foc::Ampere ib{ 0.0f };
-            foc::Ampere ic{ 0.0f };
-            foc::Radians theta{ 0.0f };
-            foc::Radians theta_mech{ 0.0f };
-            foc::RadiansPerSecond omega{ 0.0f };
-            foc::RadiansPerSecond omega_mech{ 0.0f };
-        };
-
-        struct CurrentNoiseState
-        {
-            NoiseConfig config{};
-            std::mt19937 engine{ std::random_device{}() };
-            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
-            foc::Ampere iaLast{ 0.0f };
-            foc::Ampere ibLast{ 0.0f };
-            foc::Ampere icLast{ 0.0f };
-        };
-
-        struct ThermalState
-        {
-            ThermalConfig config{};
-            float windingTempCelsius{ 25.0f };
-        };
-
-        struct EncoderNoiseState
-        {
-            EncoderNoiseConfig config{};
-            std::mt19937 engine{ std::random_device{}() };
-            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
-            float lastSample{ 0.0f };
-        };
-
-        struct FaultInjectionState
-        {
-            FaultInjectionConfig config{};
-            foc::Radians stuckAngle{ 0.0f };
-        };
-
-        struct SupplyState
-        {
-            SupplyConfig config{};
-            float busCurrentAmpere{ 0.0f };
-        };
-
-        struct PlantNonIdealities
-        {
-            float coulombFrictionNm{ 0.0f };
-            float coggingTorqueNm{ 0.0f };
-            uint32_t coggingCyclesPerRevolution{ 0 };
-            uint32_t encoderCountsPerRevolution{ 0 };
-        };
-
-        struct LoadState
-        {
-            std::optional<foc::NewtonMeter> load;
-            foc::NewtonMeter externalTorque{ 0.0f };
-        };
-
         struct SelfDriveState
         {
             bool driving{ false };
@@ -222,28 +133,21 @@ namespace foc
 
         Parameters parameters;
         hal::Hertz baseFrequency;
-        foc::Volts powerSupplyVoltage;
-        MotorState motorState;
 
         [[no_unique_address]] foc::Clarke clarke;
-        [[no_unique_address]] foc::Park park;
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
         const bool selfDriveEnabled;
-        LoadState loads;
-        foc::RotatingFrame lastDqCurrents{};
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
 
-        CurrentNoiseState currentNoise;
-        ThermalState thermal;
-        EncoderNoiseState encoderNoise;
-        FaultInjectionState faultInjection;
-        SupplyState supplyState;
-        PlantNonIdealities nonIdealities;
-        PowerStageConfig powerStage;
-        CurrentSenseConfig currentSense;
+        ElectricalPlant electrical;
+        MechanicalPlant mechanical;
+        ThermalModel thermal;
+        SupplyModel supply;
+        EncoderModel encoder;
+        PhaseCurrentSensor currentSensor;
         foc::ThreePhase lastPhaseVoltages{};
         SelfDriveState selfDrive;
     };

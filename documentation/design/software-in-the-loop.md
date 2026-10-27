@@ -1069,6 +1069,51 @@ where, balanced by the time each takes, is a file next to the features
 an emulated scenario exactly once before it runs its share, so a new feature cannot be left out. A
 last job gathers the three reports into the one check the suite always published.
 
+
+### Part O — How the plant is put together
+
+To the firmware the plant is one inverter and one encoder. Inside, it models six things, each in a
+part of its own, so a change to one cannot reach into another:
+
+| Part             | Models                                                                                         | Described by (part of this document)                   |
+|------------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------|
+| Electrical plant | The winding currents in the rotor frame, the power stage between duty and winding, open phases | Winding parameters, power stage (L), wiring faults (F) |
+| Mechanical plant | Rotor angle and speed under load, external torque, viscous and dry friction, cogging           | Rotor parameters, non-idealities (K), disturbances (H) |
+| Thermal model    | The winding temperature and the resistance and inductance it shifts                            | Thermal description (A)                                |
+| Supply           | The bus voltage: source resistance, current-limit fold-back, a weak supply                     | Supply description (K), wiring faults (F)              |
+| Encoder          | The reported angle: bias, noise, counts per revolution, a stuck encoder                        | Encoder description (K), wiring faults (F)             |
+| Current sensor   | The phase currents as the converter reports them: bias, noise, shunt amplifier, conversion     | Converter noise, current-sense chain (M)               |
+
+A wiring fault is not a part of its own. An open phase belongs to the winding, a stuck encoder to the
+encoder and a weak supply to the supply, so the fault description is handed to each of them.
+
+```mermaid
+graph TD
+    INV["Plant: the inverter and encoder the firmware drives"] --> EP["Electrical plant"]
+    INV --> MP["Mechanical plant"]
+    INV --> TH["Thermal model"]
+    INV --> SUP["Supply"]
+    INV --> ENC["Encoder"]
+    INV --> CS["Current sensor"]
+```
+
+Every control period runs the parts in one fixed order, and the order is part of the model:
+
+1. The supply gives the bus voltage, and the thermal model the resistance and inductances at the
+   present temperature.
+2. The electrical plant turns the duties into leg voltages and advances the winding currents by one
+   period, at the rotor's electrical angle and speed.
+3. The supply integrates the power the inverter drew, and the thermal model the copper loss of the
+   new currents.
+4. The mechanical plant advances the rotor with the torque of the currents at the start of the
+   period, which keeps the position's second difference on the current reported with it.
+5. The current sensor reads the new currents, then the encoder draws its noise for the period.
+
+The random draws come in that sequence, three for the current sensor and one for the encoder, so a
+seeded scenario replays exactly. Splitting the plant into these parts changed none of its outputs:
+a trace of 18,000 periods with every non-ideality, fault and noise source enabled matched the single
+class it replaced bit for bit.
+
 ---
 
 ## Interfaces

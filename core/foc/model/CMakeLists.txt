@@ -7,10 +7,22 @@ target_include_directories(e_foc.foc.model PUBLIC
 target_sources(e_foc.foc.model PRIVATE
     CurrentSense.cpp
     CurrentSense.hpp
+    ElectricalPlant.cpp
+    ElectricalPlant.hpp
+    EncoderModel.cpp
+    EncoderModel.hpp
+    MechanicalPlant.cpp
+    MechanicalPlant.hpp
     OneShotDelay.hpp
+    PhaseCurrentSensor.cpp
+    PhaseCurrentSensor.hpp
     PlantResponseRecorder.hpp
     PowerStage.cpp
     PowerStage.hpp
+    SupplyModel.cpp
+    SupplyModel.hpp
+    ThermalModel.cpp
+    ThermalModel.hpp
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp
 )

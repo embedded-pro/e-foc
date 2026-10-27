@@ -10,7 +10,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
 - `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
-- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
+- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `EncoderModel` and `PhaseCurrentSensor`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
