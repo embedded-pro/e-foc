@@ -22,6 +22,15 @@ namespace application
                     return can::FocResetCause::powerUp;
             }
         }
+
+        // A board without a dead-time loss would get every duty back unchanged, so the stage stays out of the loop
+        drivers::ThreePhaseInverter& CompensatedInverter(const drivers::DeadTimeLoss& loss, services::DeadTimeCompensation& compensation, drivers::ThreePhaseInverter& uncompensated)
+        {
+            if (loss.effectiveDeadTime.count() == 0 || loss.kneeCurrent.Value() <= 0.0f)
+                return uncompensated;
+
+            return compensation;
+        }
     }
 
     Logic::Logic(application::PlatformFactory& hardware)
@@ -35,9 +44,11 @@ namespace application
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }
         , currentOffsets{ hardware }
-        , deadTimeCompensation{ *currentOffsets, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
-        , electricalIdent{ deadTimeCompensation, hardware, vdc }
-        , motorAlignment{ deadTimeCompensation, hardware }
+        , deadTimeLoss{ hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
+        , deadTimeCompensation{ *currentOffsets, deadTimeLoss }
+        , compensatedInverter{ CompensatedInverter(deadTimeLoss, deadTimeCompensation, *currentOffsets) }
+        , electricalIdent{ compensatedInverter, hardware, vdc }
+        , motorAlignment{ compensatedInverter, hardware }
         , rotorStandstill{ hardware }
         , platformFaultNotifier{ hardware }
         , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
@@ -65,7 +76,7 @@ namespace application
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ deadTimeCompensation, this->hardware, vdc },
+                    MotorHardware{ compensatedInverter, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
                     *platformFaultNotifier,

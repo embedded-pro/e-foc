@@ -44,13 +44,53 @@ namespace
     };
 }
 
-TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
+TEST_F(TestRunner, ConstructionLeavesThePhaseCurrentsSlotAlone)
 {
-    EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _)).Times(2);
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _)).Times(1);
 
     foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
-    testing::InSequence seq;
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, EnableTakesThePhaseCurrentsSlotOnlyOnceTheInverterRuns)
+{
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
+
+    {
+        testing::InSequence seq;
+        EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _));
+        EXPECT_CALL(focMock, Enable());
+        EXPECT_CALL(inverterMock, Start());
+        EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+            .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+                {
+                    inverterMock.StorePhaseCurrentsCallback(onDone);
+                });
+    }
+
+    runner.Enable();
+
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlotBeforeTheInverterStops)
+{
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
+
+    {
+        testing::InSequence seq;
+        EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _));
+        EXPECT_CALL(inverterMock, Stop());
+        EXPECT_CALL(focMock, Disable());
+    }
+
+    runner.Disable();
+
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(testing::AnyNumber());
     EXPECT_CALL(inverterMock, Stop());
     EXPECT_CALL(focMock, Disable());
 }
@@ -129,11 +169,15 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
     runner.Disable();
 }
 
-TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
+TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenLeavesTheSlotReleased)
 {
     foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            {
+                inverterMock.StorePhaseCurrentsCallback(onDone);
+            })
         .WillOnce([this, &runner](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
             {
                 inverterMock.StorePhaseCurrentsCallback(onDone);
@@ -144,6 +188,8 @@ TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
                 inverterMock.StorePhaseCurrentsCallback(onDone);
             });
 
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
     EXPECT_CALL(inverterMock, Stop()).Times(3);
     EXPECT_CALL(focMock, Disable()).Times(3);
 

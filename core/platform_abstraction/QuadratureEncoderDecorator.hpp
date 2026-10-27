@@ -3,7 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
-#include <cmath>
+#include <cstdint>
 #include <numbers>
 
 namespace application
@@ -30,29 +30,28 @@ namespace application
 
     private:
         Impl encoder;
+        float radiansPerCount;
     };
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     template<typename... Args>
-    QuadratureEncoderDecoratorImpl<Impl>::QuadratureEncoderDecoratorImpl(uint32_t, Args&&... args)
+    QuadratureEncoderDecoratorImpl<Impl>::QuadratureEncoderDecoratorImpl(uint32_t resolution, Args&&... args)
         : encoder(std::forward<Args>(args)...)
+        , radiansPerCount{ resolution != 0 ? 2.0f * std::numbers::pi_v<float> / static_cast<float>(resolution) : 0.0f }
     {
     }
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
+    // The count stays below the resolution, so the angle needs at most one 2π to land in [−π, π)
     OPTIMIZE_FOR_SPEED foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
     {
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr float pi = std::numbers::pi_v<float>;
 
-        const auto count = static_cast<float>(encoder.Position());
-        const auto resolution = static_cast<float>(encoder.Resolution());
-        const auto angle = count * twoPi / resolution;
-        const auto angle_plus_pi = angle + pi;
-        const auto wrapped = angle - twoPi * std::floor(angle_plus_pi / twoPi);
+        const auto angle = static_cast<float>(encoder.Position()) * radiansPerCount;
 
-        return foc::Radians{ wrapped };
+        return foc::Radians{ angle < pi ? angle : angle - twoPi };
     }
 }
