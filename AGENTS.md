@@ -109,7 +109,8 @@ Documentation-first: update `documentation/` **before or alongside** behavioral 
 
 - `documentation/theory/` — FOC algorithm or motor model changes
 - `documentation/performance-optimization/README.md` — timing-critical changes
-- All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art. Markdown image syntax is allowed only for the pre-rendered preview of a TikZ figure (`documentation/tikz/images/*.svg`, regenerated with `python documentation/tools/render-tikz-svgs.py`) placed next to its `{=latex}` block; no other image references
+- All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art. Markdown image syntax is allowed only for the pre-rendered preview of a TikZ figure (`documentation/tikz/images/*.svg`) placed next to its `{=latex}` block; no other image references
+- TikZ previews: after editing `documentation/tikz/*.tex`, regenerate them with `python documentation/tools/render-tikz-svgs.py`
 - Templates: `documentation/templates/`
 
 ## Build
