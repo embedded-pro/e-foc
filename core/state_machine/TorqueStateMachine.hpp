@@ -15,7 +15,8 @@ namespace application
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy,
-            NvmActivity& nvmActivity);
+            NvmActivity& nvmActivity,
+            RotorReference rotorReference = RotorReference::lost);
         ~TorqueStateMachine();
 
         foc::FocTorque& GetController();

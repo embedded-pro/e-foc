@@ -13,8 +13,11 @@ namespace application
         void Begin();
         void Continue(bool valid);
         void Finish(services::NvmStatus status);
+        bool ResumesAligned(services::NvmStatus status) const;
+        state_machine::Ready FinishAligned();
 
     private:
+        void ApplyRecord();
         void OnValidityChecked(bool valid);
         void OnCalibrationLoaded(services::NvmStatus status);
 

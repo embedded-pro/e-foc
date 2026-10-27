@@ -334,9 +334,18 @@ namespace application
             FaultReconciliationRows());
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 2> FocLifecycleTable::BootRows()
+    constexpr std::array<FocLifecycleTable::Transition, 3> FocLifecycleTable::BootRows()
     {
         return {
+            Machine::Row<state_machine::Idle, state_machine::BootCalibrationLoaded, state_machine::Ready>(
+                [](const LifecycleContext& context, const state_machine::Idle&, const state_machine::BootCalibrationLoaded& event)
+                {
+                    return context.boot.ResumesAligned(event.status);
+                },
+                [](LifecycleContext& context, state_machine::Idle&, const state_machine::BootCalibrationLoaded&)
+                {
+                    return context.boot.FinishAligned();
+                }),
             Machine::InternalRow<state_machine::Idle, state_machine::BootValidityChecked>(
                 [](LifecycleContext& context, state_machine::Idle&, const state_machine::BootValidityChecked& event)
                 {
@@ -350,7 +359,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 48> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 49> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }
@@ -358,7 +367,7 @@ namespace application
     constexpr LifecycleMachine::Rules FocLifecycleTable::Rules()
     {
         return LifecycleMachine::Rules{}
-            .Allow<state_machine::Idle, state_machine::Calibrating, state_machine::Idle>()
+            .Allow<state_machine::Idle, state_machine::Calibrating, state_machine::Idle, state_machine::Ready>()
             .Allow<state_machine::Ready, state_machine::Calibrating, state_machine::Enabled, state_machine::Idle>()
             .Allow<state_machine::Calibrating, state_machine::Ready, state_machine::Idle>()
             .Allow<state_machine::Enabled, state_machine::Ready, state_machine::Idle>()

@@ -22,7 +22,8 @@ namespace application
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy,
             const OuterLoopArgs& outerLoopArgs,
-            NvmActivity& nvmActivity)
+            NvmActivity& nvmActivity,
+            RotorReference rotorReference = RotorReference::lost)
             : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, outerLoopArgs.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
@@ -34,7 +35,7 @@ namespace application
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
             RegisterFaultHandler(faultNotifier);
             RegisterCliIfNeeded(transitionPolicy);
-            Boot();
+            Boot(rotorReference);
         }
 
         ~OuterLoopStateMachineFor()

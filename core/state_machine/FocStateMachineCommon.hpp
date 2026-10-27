@@ -71,7 +71,7 @@ namespace application
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void ReleaseExternalResources();
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
-        void Boot();
+        void Boot(RotorReference rotorReference);
 
         void ProvisionalControlSuperseded() override;
         void RestoreControlAfterProvisionalIdentification() override;

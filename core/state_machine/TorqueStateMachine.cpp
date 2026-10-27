@@ -9,13 +9,14 @@ namespace application
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
         state_machine::TransitionPolicy transitionPolicy,
-        NvmActivity& nvmActivity)
+        NvmActivity& nvmActivity,
+        RotorReference rotorReference)
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
         , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
-        Boot();
+        Boot(rotorReference);
     }
 
     TorqueStateMachine::~TorqueStateMachine()

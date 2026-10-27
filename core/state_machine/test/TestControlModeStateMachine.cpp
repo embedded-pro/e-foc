@@ -496,6 +496,39 @@ namespace
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
         }
 
+        void GivenNvmAlwaysValidWithMechanics()
+        {
+            services::CalibrationData data{};
+            data.polePairs = 7;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.inertia = 1.0e-5f;
+            data.frictionViscous = 1.0e-4f;
+            data.stage = services::CalibrationStage::complete;
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([data](services::CalibrationData& out,
+                                           infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        bool IsReadyWithRotorReference() const
+        {
+            const auto* ready = std::get_if<state_machine::Ready>(&subject->ActiveStateMachine().CurrentState());
+            return ready != nullptr && ready->rotorReferenceValid;
+        }
+
         void GivenNvmValid()
         {
             services::CalibrationData data{};
@@ -743,6 +776,73 @@ TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled
         });
 
     EXPECT_EQ(result, state_machine::SelectResult::busy);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Select_From_Aligned_Ready_Keeps_The_Rotor_Reference)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    state_machine::SelectResult result{ state_machine::SelectResult::busy };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SelectResult::ok);
+    EXPECT_TRUE(IsReadyWithRotorReference());
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Select_From_Unaligned_Idle_Leaves_The_New_Mode_To_Be_Aligned)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+
+    subject->Select(state_machine::ControlMode::position, [](state_machine::SelectResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Select_Into_A_Mode_The_Record_Does_Not_Complete_Stays_Idle)
+{
+    GivenNvmAlwaysValid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineExtTest, A_Mode_Left_Idle_By_A_Switch_Has_No_Rotor_Reference_Once_Its_Record_Completes)
+{
+    GivenNvmAlwaysValid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+    subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .Times(2)
+        .WillRepeatedly(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    subject->SetMotorParameter(services::MotorParameter::inertia, 1.0e-5f, [](state_machine::SettingResult) {});
+    subject->SetMotorParameter(services::MotorParameter::viscousFriction, 1.0e-4f, [](state_machine::SettingResult) {});
+    ASSERT_EQ(subject->CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(subject->CmdReleaseExternalCalibration(), state_machine::CommandResult::ok);
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(subject->ActiveStateMachine().CurrentState()));
+    EXPECT_FALSE(IsReadyWithRotorReference());
 }
 
 TEST_F(ControlModeStateMachineExtTest, Cli_Enable_Is_NoOp_In_Idle)
