@@ -233,6 +233,22 @@ toolchain, four such calls in the RLS covariance update took the slowest control
 calibration in SIL from 237 to 377 cycles; without them it is 250. Hot code uses the `Matrix` operators rather than
 hand-written element loops, which under `-ffast-math` can also round a symmetric matrix's (i, j) and (j, i) differently.
 
+### 9. Settle at Configuration Time What Every Tick Would Recompute
+
+The 20 kHz path should do only the work that changes from one sample to the next:
+
+- **Gate by wiring, not by a flag.** The runner holds the phase-current slot only while the bridge runs, so no sample
+  tests an `enabled` flag (`documentation/design/state-machine.md`).
+- **Cache reciprocals.** The encoder keeps 2π/resolution from construction and wraps with one compare instead of two
+  divides and a `floor`.
+- **Clamp once.** The modulator clamps and quantises each phase in one step; a second clamp in a later conversion is
+  pure cost.
+- **Skip work that cannot change the result.** A voltage already inside the modulation circle is not rescaled; a
+  board without a dead-time loss does not wire the dead-time stage into the loop.
+- **Divide out one ratio.** Choosing the tighter of two bounds by cross-multiplying leaves one division instead of two.
+- **Run the law that is configured.** A general controller whose limits never clamp and whose derivative gain is zero
+  is replaced by the two-state law it reduces to.
+
 ---
 
 ## Debug Builds
