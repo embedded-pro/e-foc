@@ -50,9 +50,6 @@ namespace application
         float DefaultCurrentLoopBandwidth() const;
         foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
 
-        drivers::ThreePhaseInverter& GetInverter();
-        foc::Volts GetVdc() const;
-
     private:
         drivers::ThreePhaseInverter& inverter;
         foc::Volts vdc;

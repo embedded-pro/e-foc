@@ -192,14 +192,12 @@ namespace foc
 
         float CurrentMechanicalAngle() const;
         MotionObservation ObserveSpeedLoopMotion() const;
-        float PolePairs() const;
         LowPriorityInterrupt& GetLowPriorityInterrupt();
 
         void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
         void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
         void UpdateOnlineMechanicalEstimator();
         void UpdateOnlineElectricalEstimator();
-        void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
 
