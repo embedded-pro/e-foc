@@ -1,5 +1,5 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
-#include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include <gmock/gmock.h>
@@ -28,12 +28,12 @@ namespace
         return arg.a == expected.a && arg.b == expected.b && arg.c == expected.c;
     }
 
-    class TestPhaseCurrentOffsetCompensation
+    class TestPhaseCurrentOffsetMeasurement
         : public ::testing::Test
         , public infra::ClockFixture
     {
     public:
-        TestPhaseCurrentOffsetCompensation()
+        TestPhaseCurrentOffsetMeasurement()
         {
             EXPECT_CALL(inverterMock, BaseFrequency()).WillRepeatedly(Return(baseFrequency));
         }
@@ -47,7 +47,7 @@ namespace
             const auto neutral = hal::DutyCycle::FromPercent(50);
             EXPECT_CALL(inverterMock, ThreePhasePwmOutput(DutiesEq(foc::PhasePwmDutyCycles{ neutral, neutral, neutral })));
 
-            compensation->Measure([this](std::optional<foc::PhaseCurrents> offsets)
+            measurement->Measure([this](std::optional<foc::PhaseCurrents> offsets)
                 {
                     measured = offsets;
                     completed = true;
@@ -61,51 +61,36 @@ namespace
         }
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
-        infra::WithSharedAccess<services::PhaseCurrentOffsetCompensation> compensation{ inverterMock,
-            services::PhaseCurrentOffsetCompensation::Config{ .settleSamples = 2, .averagedSamples = 4, .maxOffset = foc::Ampere{ 0.5f } } };
+        services::InverterCompensation compensation{ inverterMock, drivers::DeadTimeLoss{} };
+        infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> measurement{ inverterMock, compensation,
+            services::PhaseCurrentOffsetMeasurement::Config{ .settleSamples = 2, .averagedSamples = 4, .maxOffset = foc::Ampere{ 0.5f } } };
         std::optional<foc::PhaseCurrents> measured;
         bool completed{ false };
     };
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, the_currents_it_forwards_have_the_applied_offsets_removed)
+TEST_F(TestPhaseCurrentOffsetMeasurement, applied_offsets_are_removed_by_the_compensation_stage)
 {
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(baseFrequency, _)).WillOnce([this](auto, const auto& onDone)
         {
             inverterMock.StorePhaseCurrentsCallback(onDone);
         });
     std::optional<foc::PhaseCurrents> forwarded;
-    compensation->PhaseCurrentsReady(baseFrequency, [&forwarded](foc::PhaseCurrents currents)
+    compensation.PhaseCurrentsReady(baseFrequency, [&forwarded](foc::PhaseCurrents currents)
         {
             forwarded = currents;
         });
 
-    compensation->Apply(Currents(0.027f, -0.018f, 0.054f));
+    measurement->Apply(Currents(0.027f, -0.018f, 0.054f));
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.027f, -0.518f, -0.446f));
 
     ASSERT_TRUE(forwarded.has_value());
     EXPECT_THAT(*forwarded, CurrentsNear(Currents(1.0f, -0.5f, -0.5f)));
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, the_bridge_commands_pass_through_unchanged)
+TEST_F(TestPhaseCurrentOffsetMeasurement, a_measurement_averages_the_raw_currents_at_neutral_duty_after_they_settle)
 {
-    const foc::PhasePwmDutyCycles duties{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(40), hal::DutyCycle::FromPercent(50) };
-
-    EXPECT_CALL(inverterMock, Start());
-    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(DutiesEq(duties)));
-    EXPECT_CALL(inverterMock, Stop());
-
-    compensation->Start();
-    compensation->ThreePhasePwmOutput(duties);
-    compensation->Stop();
-
-    EXPECT_EQ(compensation->BaseFrequency(), baseFrequency);
-    EXPECT_EQ(compensation->MaxCurrentSupported(), foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent });
-}
-
-TEST_F(TestPhaseCurrentOffsetCompensation, a_measurement_averages_the_raw_currents_at_neutral_duty_after_they_settle)
-{
-    compensation->Apply(Currents(0.1f, 0.1f, 0.1f));
+    measurement->Apply(Currents(0.1f, 0.1f, 0.1f));
     StartMeasurement();
 
     Feed(Currents(0.4f, 0.4f, 0.4f), 2);
@@ -117,10 +102,10 @@ TEST_F(TestPhaseCurrentOffsetCompensation, a_measurement_averages_the_raw_curren
     ASSERT_TRUE(completed);
     ASSERT_TRUE(measured.has_value());
     EXPECT_THAT(*measured, CurrentsNear(Currents(0.03f, -0.02f, 0.05f)));
-    EXPECT_FALSE(compensation->IsRunning());
+    EXPECT_FALSE(measurement->IsRunning());
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, an_offset_beyond_the_limit_fails_the_measurement)
+TEST_F(TestPhaseCurrentOffsetMeasurement, an_offset_beyond_the_limit_fails_the_measurement)
 {
     StartMeasurement();
 
@@ -133,7 +118,7 @@ TEST_F(TestPhaseCurrentOffsetCompensation, an_offset_beyond_the_limit_fails_the_
     EXPECT_FALSE(measured.has_value());
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, a_current_beyond_the_inverter_limit_stops_the_bridge_and_fails)
+TEST_F(TestPhaseCurrentOffsetMeasurement, a_current_beyond_the_inverter_limit_stops_the_bridge_and_fails)
 {
     StartMeasurement();
 
@@ -146,7 +131,7 @@ TEST_F(TestPhaseCurrentOffsetCompensation, a_current_beyond_the_inverter_limit_s
     EXPECT_FALSE(measured.has_value());
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, a_bridge_that_sends_no_samples_fails_the_measurement)
+TEST_F(TestPhaseCurrentOffsetMeasurement, a_bridge_that_sends_no_samples_fails_the_measurement)
 {
     StartMeasurement();
 
@@ -157,16 +142,16 @@ TEST_F(TestPhaseCurrentOffsetCompensation, a_bridge_that_sends_no_samples_fails_
     EXPECT_FALSE(measured.has_value());
 }
 
-TEST_F(TestPhaseCurrentOffsetCompensation, an_aborted_measurement_stops_the_bridge_and_reports_nothing)
+TEST_F(TestPhaseCurrentOffsetMeasurement, an_aborted_measurement_stops_the_bridge_and_reports_nothing)
 {
     StartMeasurement();
     Feed(Currents(0.0f, 0.0f, 0.0f), 3);
 
     EXPECT_CALL(inverterMock, Stop());
-    compensation->Abort();
+    measurement->Abort();
     Feed(Currents(0.0f, 0.0f, 0.0f), 3);
     ExecuteAllActions();
 
     EXPECT_FALSE(completed);
-    EXPECT_FALSE(compensation->IsRunning());
+    EXPECT_FALSE(measurement->IsRunning());
 }

@@ -9,11 +9,13 @@
 
 namespace services
 {
-    class DeadTimeCompensation
+    class InverterCompensation
         : public drivers::ThreePhaseInverter
     {
     public:
-        DeadTimeCompensation(drivers::ThreePhaseInverter& inverter, const drivers::DeadTimeLoss& loss);
+        InverterCompensation(drivers::ThreePhaseInverter& inverter, const drivers::DeadTimeLoss& loss);
+
+        void ApplyOffsets(const foc::PhaseCurrents& offsets);
 
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -23,10 +25,14 @@ namespace services
         foc::Ampere MaxCurrentSupported() const override;
 
     private:
-        OPTIMIZE_FOR_SPEED void Forward(const foc::PhaseCurrents& currents)
+        OPTIMIZE_FOR_SPEED void Forward(const foc::PhaseCurrents& raw)
         {
-            lastCurrents = currents;
-            onCurrents(currents);
+            lastCurrents = foc::PhaseCurrents{
+                foc::Ampere{ raw.a.Value() - offsets.a.Value() },
+                foc::Ampere{ raw.b.Value() - offsets.b.Value() },
+                foc::Ampere{ raw.c.Value() - offsets.c.Value() }
+            };
+            onCurrents(lastCurrents);
         }
 
         OPTIMIZE_FOR_SPEED hal::DutyCycle Compensated(hal::DutyCycle duty, foc::Ampere current) const
@@ -50,9 +56,11 @@ namespace services
 
         drivers::ThreePhaseInverter& inverter;
         drivers::DeadTimeLoss loss;
+        const bool compensatesDeadTime;
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onCurrents;
         float inverseKneeCurrent{ 0.0f };
         float lossCounts{ 0.0f };
+        foc::PhaseCurrents offsets{};
         foc::PhaseCurrents lastCurrents{};
     };
 }

@@ -1,7 +1,7 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/model/PowerStage.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
-#include "core/services/dead_time_compensation/DeadTimeCompensation.hpp"
+#include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include <chrono>
 #include <cmath>
 #include <gmock/gmock.h>
@@ -26,16 +26,23 @@ namespace
         return hal::DutyCycle{ static_cast<uint32_t>(static_cast<float>(duty.Value()) + counts + 0.5f) };
     }
 
+    MATCHER_P(CurrentsNear, expected, "")
+    {
+        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-6f &&
+               std::abs(arg.b.Value() - expected.b.Value()) < 1e-6f &&
+               std::abs(arg.c.Value() - expected.c.Value()) < 1e-6f;
+    }
+
     MATCHER_P(DutiesEq, expected, "")
     {
         return arg.a == expected.a && arg.b == expected.b && arg.c == expected.c;
     }
 
-    class TestDeadTimeCompensation
+    class TestInverterCompensation
         : public ::testing::Test
     {
     public:
-        explicit TestDeadTimeCompensation(const drivers::DeadTimeLoss& loss = benchLoss)
+        explicit TestInverterCompensation(const drivers::DeadTimeLoss& loss = benchLoss)
             : compensation{ inverterMock, loss }
         {}
 
@@ -60,33 +67,50 @@ namespace
         }
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
-        services::DeadTimeCompensation compensation;
+        services::InverterCompensation compensation;
         std::optional<foc::PhaseCurrents> forwarded;
         const hal::DutyCycle half{ hal::DutyCycle::FromPercent(50) };
     };
 
-    class TestDeadTimeCompensationWithoutLoss
-        : public TestDeadTimeCompensation
+    class TestInverterCompensationWithoutLoss
+        : public TestInverterCompensation
     {
     public:
-        TestDeadTimeCompensationWithoutLoss()
-            : TestDeadTimeCompensation(drivers::DeadTimeLoss{})
+        TestInverterCompensationWithoutLoss()
+            : TestInverterCompensation(drivers::DeadTimeLoss{})
         {}
     };
 }
 
-TEST_F(TestDeadTimeCompensation, the_currents_pass_through_unchanged)
+TEST_F(TestInverterCompensation, without_offsets_the_currents_pass_through_unchanged)
 {
     Register();
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -0.4f, -0.6f));
 
     ASSERT_TRUE(forwarded.has_value());
-    EXPECT_NEAR(forwarded->a.Value(), 1.0f, 1e-6f);
-    EXPECT_NEAR(forwarded->b.Value(), -0.4f, 1e-6f);
-    EXPECT_NEAR(forwarded->c.Value(), -0.6f, 1e-6f);
+    EXPECT_THAT(*forwarded, CurrentsNear(Currents(1.0f, -0.4f, -0.6f)));
 }
 
-TEST_F(TestDeadTimeCompensation, the_bridge_commands_pass_through_unchanged)
+TEST_F(TestInverterCompensation, the_currents_it_forwards_have_the_applied_offsets_removed)
+{
+    Register();
+    compensation.ApplyOffsets(Currents(0.027f, -0.018f, 0.054f));
+    inverterMock.TriggerPhaseCurrentsCallback(Currents(1.027f, -0.518f, -0.446f));
+
+    ASSERT_TRUE(forwarded.has_value());
+    EXPECT_THAT(*forwarded, CurrentsNear(Currents(1.0f, -0.5f, -0.5f)));
+}
+
+TEST_F(TestInverterCompensation, the_dead_time_correction_follows_the_currents_with_the_offsets_removed)
+{
+    Register();
+    compensation.ApplyOffsets(Currents(1.0f, 0.0f, 0.0f));
+    inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -0.5f, 0.0f));
+
+    EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ half, Shifted(half, -lossCounts), half }));
+}
+
+TEST_F(TestInverterCompensation, the_bridge_commands_pass_through_unchanged)
 {
     EXPECT_CALL(inverterMock, Start());
     EXPECT_CALL(inverterMock, Stop());
@@ -99,7 +123,7 @@ TEST_F(TestDeadTimeCompensation, the_bridge_commands_pass_through_unchanged)
     EXPECT_EQ(compensation.MaxCurrentSupported(), foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent });
 }
 
-TEST_F(TestDeadTimeCompensation, a_leg_gains_the_whole_loss_while_a_current_past_the_knee_flows_out_of_it_and_gives_it_up_while_one_flows_in)
+TEST_F(TestInverterCompensation, a_leg_gains_the_whole_loss_while_a_current_past_the_knee_flows_out_of_it_and_gives_it_up_while_one_flows_in)
 {
     Register();
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -0.5f, 0.0f));
@@ -107,7 +131,7 @@ TEST_F(TestDeadTimeCompensation, a_leg_gains_the_whole_loss_while_a_current_past
     EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ Shifted(half, lossCounts), Shifted(half, -lossCounts), half }));
 }
 
-TEST_F(TestDeadTimeCompensation, below_the_knee_the_correction_follows_the_current)
+TEST_F(TestInverterCompensation, below_the_knee_the_correction_follows_the_current)
 {
     Register();
     inverterMock.TriggerPhaseCurrentsCallback(Currents(0.1f, -0.05f, -0.05f));
@@ -115,7 +139,7 @@ TEST_F(TestDeadTimeCompensation, below_the_knee_the_correction_follows_the_curre
     EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ Shifted(half, 0.5f * lossCounts), Shifted(half, -0.25f * lossCounts), Shifted(half, -0.25f * lossCounts) }));
 }
 
-TEST_F(TestDeadTimeCompensation, the_correction_is_a_fixed_time_so_a_slower_pwm_needs_less_duty)
+TEST_F(TestInverterCompensation, the_correction_is_a_fixed_time_so_a_slower_pwm_needs_less_duty)
 {
     Register(hal::Hertz{ 10000 });
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -1.0f, 0.0f));
@@ -123,7 +147,7 @@ TEST_F(TestDeadTimeCompensation, the_correction_is_a_fixed_time_so_a_slower_pwm_
     EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ Shifted(half, 0.5f * lossCounts), Shifted(half, -0.5f * lossCounts), half }));
 }
 
-TEST_F(TestDeadTimeCompensation, the_corrected_duty_stays_within_the_period)
+TEST_F(TestInverterCompensation, the_corrected_duty_stays_within_the_period)
 {
     Register();
     inverterMock.TriggerPhaseCurrentsCallback(Currents(-1.0f, 1.0f, 0.0f));
@@ -132,7 +156,7 @@ TEST_F(TestDeadTimeCompensation, the_corrected_duty_stays_within_the_period)
     EXPECT_THAT(Output({ hal::DutyCycle{ 0 }, full, half }), DutiesEq(foc::PhasePwmDutyCycles{ hal::DutyCycle{ 0 }, full, half }));
 }
 
-TEST_F(TestDeadTimeCompensationWithoutLoss, an_unknown_loss_leaves_the_duties_alone)
+TEST_F(TestInverterCompensationWithoutLoss, an_unknown_loss_leaves_the_duties_alone)
 {
     Register();
     inverterMock.TriggerPhaseCurrentsCallback(Currents(2.0f, -1.0f, -1.0f));
@@ -141,7 +165,7 @@ TEST_F(TestDeadTimeCompensationWithoutLoss, an_unknown_loss_leaves_the_duties_al
     EXPECT_THAT(Output(duties), DutiesEq(duties));
 }
 
-TEST_F(TestDeadTimeCompensation, through_a_stage_that_loses_the_dead_time_the_corrected_leg_delivers_the_commanded_voltage)
+TEST_F(TestInverterCompensation, through_a_stage_that_loses_the_dead_time_the_corrected_leg_delivers_the_commanded_voltage)
 {
     constexpr float busVoltage{ 24.0f };
     constexpr float period{ 50e-6f };

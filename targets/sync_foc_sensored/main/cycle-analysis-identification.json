@@ -15,8 +15,7 @@
         "ImmediateInterruptHandler::Invoke",
         "AdcPhaseCurrentMeasurementImpl.*lambda",
         "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
-        "PhaseCurrentOffsetCompensation::PhaseCurrentsReady.*lambda",
-        "DeadTimeCompensation::PhaseCurrentsReady.*lambda",
+        "InverterCompensation::PhaseCurrentsReady.*lambda",
         "Runner.*::OnPhaseCurrents",
         "ControlLoopMetrics::Record",
         "ControlLoopMetrics::RecordReentry"

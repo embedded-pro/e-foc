@@ -190,10 +190,10 @@ namespace mil
         , vdc{ drive.PowerSupplyVoltage() }
         , tickPeriod{ std::chrono::nanoseconds{ 1000000000u / drive.BaseFrequency().Value() } }
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }
-        , currentOffsets{ drive }
-        , deadTimeCompensation{ *currentOffsets, drive.InverterDeadTimeLoss() }
-        , electricalIdent{ deadTimeCompensation, drive, vdc }
-        , motorAlignment{ deadTimeCompensation, drive }
+        , inverterCompensation{ drive, drive.InverterDeadTimeLoss() }
+        , currentOffsets{ drive, inverterCompensation }
+        , electricalIdent{ inverterCompensation, drive, vdc }
+        , motorAlignment{ inverterCompensation, drive }
         , rotorStandstill{ drive }
     {
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
@@ -203,7 +203,7 @@ namespace mil
 
                 controlMode.emplace(
                     application::TerminalAndTracer{ terminal, tracer },
-                    application::MotorHardware{ deadTimeCompensation, drive, vdc },
+                    application::MotorHardware{ inverterCompensation, drive, vdc },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
                     faultNotifier,

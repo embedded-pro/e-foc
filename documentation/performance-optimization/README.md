@@ -243,8 +243,10 @@ The 20 kHz path should do only the work that changes from one sample to the next
   divides and a `floor`.
 - **Clamp once.** The modulator clamps and quantises each phase in one step; a second clamp in a later conversion is
   pure cost.
-- **Skip work that cannot change the result.** A voltage already inside the modulation circle is not rescaled; a
-  board without a dead-time loss does not wire the dead-time stage into the loop.
+- **Skip work that cannot change the result.** A voltage already inside the modulation circle is not rescaled; on a
+  board without a dead-time loss the compensation stage hands its duties on untouched.
+- **Do not stack pass-through stages.** The sensor offsets and the dead-time correction are one stage between the
+  platform and the loop, so a sample and a duty each cross one call instead of two.
 - **Divide out one ratio.** Choosing the tighter of two bounds by cross-multiplying leaves one division instead of two.
 - **Run the law that is configured.** A general controller whose limits never clamp and whose derivative gain is zero
   is replaced by the two-state law it reduces to.

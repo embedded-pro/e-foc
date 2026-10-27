@@ -13,9 +13,9 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalDiagnostics.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
-#include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
-#include "core/services/dead_time_compensation/DeadTimeCompensation.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
@@ -55,10 +55,8 @@ namespace application
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
-        infra::WithSharedAccess<services::PhaseCurrentOffsetCompensation> currentOffsets;
-        drivers::DeadTimeLoss deadTimeLoss;
-        services::DeadTimeCompensation deadTimeCompensation;
-        drivers::ThreePhaseInverter& compensatedInverter;
+        services::InverterCompensation inverterCompensation;
+        infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         services::RotorStandstillImpl rotorStandstill;

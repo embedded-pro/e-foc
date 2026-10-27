@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
-#include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
-#include "core/services/dead_time_compensation/DeadTimeCompensation.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
@@ -162,8 +162,8 @@ namespace mil
         services::NvmEepromRegion calibrationRegion{ eeprom, sil::calibrationRegionOffset, calibrationRegionSize };
         services::NvmEepromRegion configRegion{ eeprom, sil::configRegionOffset, configRegionSize };
         services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
-        infra::WithSharedAccess<services::PhaseCurrentOffsetCompensation> currentOffsets;
-        services::DeadTimeCompensation deadTimeCompensation;
+        services::InverterCompensation inverterCompensation;
+        infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         services::RotorStandstillImpl rotorStandstill;
