@@ -437,11 +437,11 @@ carries (`can-lite` tracks eight servers).
 
 ### Provided
 
-| Interface                      | Purpose                                                                            | Contract                                                                       |
-|--------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| FocMotorCategoryServerObserver | Observer interface for the server category                                         | Callbacks must not block or allocate; called from the event dispatcher context |
-| FocMotorCategoryClientObserver | Observer interface for the client category                                         | Callbacks must not block or allocate                                           |
-| FocMotorCanClient              | Wires the protocol client and the category client onto one CAN bus                 | Callers send through `CategoryClient()`; each `Send*` returns `bool` queued    |
+| Interface                      | Purpose                                                            | Contract                                                                       |
+|--------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| FocMotorCategoryServerObserver | Observer interface for the server category                         | Callbacks must not block or allocate; called from the event dispatcher context |
+| FocMotorCategoryClientObserver | Observer interface for the client category                         | Callbacks must not block or allocate                                           |
+| FocMotorCanClient              | Wires the protocol client and the category client onto one CAN bus | Callers send through `CategoryClient()`; each `Send*` returns `bool` queued    |
 
 ### Required
 

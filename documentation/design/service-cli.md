@@ -245,15 +245,15 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface            | Purpose                                                                                       | Contract                                                                 |
-|----------------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection                 | Transparent to the underlying terminal after the banner has been printed |
-| `TerminalHelper`     | Parses a command token into a number within caller-supplied bounds                            | Yields no value for a malformed or out-of-range token                    |
+| Interface            | Purpose                                                                       | Contract                                                                 |
+|----------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection | Transparent to the underlying terminal after the banner has been printed |
+| `TerminalHelper`     | Parses a command token into a number within caller-supplied bounds            | Yields no value for a malformed or out-of-range token                    |
 
 ### Required
 
-| Interface             | Purpose                                                                                     | Contract                                                                            |
-|-----------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| Interface             | Purpose                                                                                     | Contract                                                                         |
+|-----------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
 | `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | Must be connected to the physical serial driver before any command is registered |
 
 ---
