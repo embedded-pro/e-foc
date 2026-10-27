@@ -13,7 +13,7 @@ namespace
         return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
     }
 
-    constexpr auto kHeartbeatSlice = std::chrono::milliseconds{ 250 };
+    constexpr auto kHeartbeatSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kCapturePollSlice = std::chrono::milliseconds{ 50 };
 
     bool IsServerHeartbeat(uint32_t rawId)
@@ -41,6 +41,8 @@ namespace integration
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
             if (remaining <= std::chrono::milliseconds{ 0 })
                 return false;
+
+            RequestStatus();
 
             const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
                 services::canSystemCategoryId, services::canHeartbeatMessageTypeId, serverNodeId);
@@ -126,6 +128,13 @@ namespace integration
             ++nextSequence;
             return ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
         }
+    }
+
+    void Fixture::RequestStatus()
+    {
+        const hal::Can::Id statusRequestId = MakeId(services::CanPriority::command,
+            services::canSystemCategoryId, services::canStatusRequestMessageTypeId, services::canBroadcastNodeId);
+        interactor.SendCanFrame(statusRequestId, {}, std::chrono::milliseconds{ 100 });
     }
 
     void Fixture::SendClientHeartbeat()
