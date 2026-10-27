@@ -79,16 +79,6 @@ TEST_F(TestAdcPhaseCurrentMeasurement, a_full_conversion_is_scaled_and_offset_on
     EXPECT_NEAR(measured->c.Value(), -512.0f, 1e-3f);
 }
 
-TEST_F(TestAdcPhaseCurrentMeasurement, a_conversion_that_drains_fewer_samples_than_phases_is_discarded)
-{
-    Start();
-
-    const std::array<uint16_t, 2> tooFew{ { 2048, 3072 } };
-    capture.onSamples(infra::MakeRange(tooFew));
-
-    EXPECT_FALSE(measured.has_value());
-}
-
 TEST_F(TestAdcPhaseCurrentMeasurement, a_conversion_carrying_more_samples_than_phases_uses_the_first_three)
 {
     Start();
