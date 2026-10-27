@@ -6,11 +6,7 @@
 
 namespace services
 {
-    // The mean torque against the mean speed of each run of observations whose speed stays within a band, as the
-    // moments a viscous-friction slope is fitted from. Within a run a speed loop answers every dip with torque, and
-    // a loop that ripples there swings the torque against the acceleration, so either would decide a slope fitted
-    // to the observations themselves; their means carry neither. Means and covariances decay together with the
-    // estimator's forgetting, so a long run at one speed narrows the spread rather than inflating a covariance.
+    // Per constant-speed run, the mean speed and torque a viscous-friction slope is fitted from.
     class SteadySpeedFrictionFit
     {
     public:

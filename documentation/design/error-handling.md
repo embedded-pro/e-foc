@@ -78,7 +78,12 @@ performed, and on a board with no protection comparators the fault being cleared
 Every platform reports `unknown` today:
 
 - **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
-  whose outputs drive the PWM fault inputs. Their counts come from the motor board's `BoardCharacteristics`; the
+  whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO; steps 3 to 5
+  are redirected to comparators 0, 1 and 2 through the SSOP register and never reach the FIFO, so the phase-current
+  adapter still receives exactly three samples. Comparator 0 watches the total current (PB4, AIN10), and 1 and 2 the
+  bus voltage (PB5, AIN11) against the overvoltage and the undervoltage threshold; their outputs feed bits 0, 1 and 2
+  of PWM fault source 1 (`FLTSRC1`), which tristates every motor PWM output the instant a threshold is crossed.
+  Their counts come from the motor board's `BoardCharacteristics`; the
   total-current sense is biased to mid-rail, so `OvercurrentThresholdCounts` is an offset above half scale (6.6 A,
   80 % of the +8.25 A a 5 A/V sense spans on a 3.3 V ADC). The bus voltage is sampled twice, once against the
   overvoltage trip and once against an undervoltage trip at 18 V, because a sequencer step feeds one comparator.

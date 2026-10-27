@@ -17,15 +17,10 @@ namespace services
         ~MechanicalParametersIdentification() = default;
 
     public:
-        // targetSpeed and dwellSpeed are the two levels of the excitation trajectory; the run alternates
-        // between them every dwellTime so that each transition excites the acceleration column of the
-        // regressor. maxCurrent and maxSpeed bound the motion the trajectory is allowed to produce, and
-        // timeout bounds its duration. The forgetting factor is near unity because the plant does not drift
-        // within one short run, and a shorter memory leaves the steady-state covariance above the
-        // convergence threshold this run must reach.
         struct Config
         {
             foc::RadiansPerSecond targetSpeed{ 52.36f };
+            // Near unity: a shorter memory keeps the covariance above the convergence bound.
             float forgettingFactor{ 0.9995f };
             infra::Duration timeout{ std::chrono::seconds{ 5 } };
             foc::RadiansPerSecond dwellSpeed{ 26.18f };

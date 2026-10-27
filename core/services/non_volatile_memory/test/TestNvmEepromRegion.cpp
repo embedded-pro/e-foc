@@ -30,18 +30,15 @@ namespace
 
 TEST_F(NvmEepromRegionTest, write_stores_data_at_correct_base_address)
 {
-    // Arrange
     const std::array<uint8_t, 3> data = { 0x11, 0x22, 0x33 };
     bool writeDone = false;
 
-    // Act
     region.Write(infra::MakeConstByteRange(data), [&]
         {
             writeDone = true;
         });
     RunUntilDone(writeDone);
 
-    // Assert — read back directly from EepromStub at expected offset
     std::array<uint8_t, 3> readback{};
     bool readDone = false;
     eeprom.ReadBuffer(infra::MakeByteRange(readback), 256, [&]
@@ -57,19 +54,16 @@ TEST_F(NvmEepromRegionTest, write_stores_data_at_correct_base_address)
 
 TEST_F(NvmEepromRegionTest, write_does_not_affect_adjacent_region)
 {
-    // Arrange
     services::NvmEepromRegion adjacent{ eeprom, 384, 128 };
     const std::array<uint8_t, 3> data = { 0x77, 0x88, 0x99 };
     bool writeDone = false;
 
-    // Act
     region.Write(infra::MakeConstByteRange(data), [&]
         {
             writeDone = true;
         });
     RunUntilDone(writeDone);
 
-    // Assert — adjacent region bytes remain at initial 0xFF
     std::array<uint8_t, 3> adjacentData{};
     bool readDone = false;
     adjacent.Read(infra::MakeByteRange(adjacentData), [&]
@@ -85,7 +79,6 @@ TEST_F(NvmEepromRegionTest, write_does_not_affect_adjacent_region)
 
 TEST_F(NvmEepromRegionTest, read_retrieves_data_at_base_address)
 {
-    // Arrange — seed eeprom directly at offset 256
     const std::array<uint8_t, 2> seed = { 0xAB, 0xCD };
     bool seedDone = false;
     eeprom.WriteBuffer(infra::MakeConstByteRange(seed), 256, [&]
@@ -94,7 +87,6 @@ TEST_F(NvmEepromRegionTest, read_retrieves_data_at_base_address)
         });
     RunUntilDone(seedDone);
 
-    // Act
     std::array<uint8_t, 2> readback{};
     bool readDone = false;
     region.Read(infra::MakeByteRange(readback), [&]
@@ -103,14 +95,12 @@ TEST_F(NvmEepromRegionTest, read_retrieves_data_at_base_address)
         });
     RunUntilDone(readDone);
 
-    // Assert
     EXPECT_EQ(readback[0], 0xAB);
     EXPECT_EQ(readback[1], 0xCD);
 }
 
 TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
 {
-    // Arrange — write non-0xFF bytes first
     const std::array<uint8_t, 5> data = { 0x00, 0x11, 0x22, 0x33, 0x44 };
     bool writeDone = false;
     region.Write(infra::MakeConstByteRange(data), [&]
@@ -119,7 +109,6 @@ TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
         });
     RunUntilDone(writeDone);
 
-    // Act
     bool eraseDone = false;
     region.Erase([&]
         {
@@ -127,7 +116,7 @@ TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
         });
     RunUntilDone(eraseDone);
 
-    // Assert — the whole region, not just the bytes the arrange step dirtied
+    // The whole region, not just the bytes written above
     std::array<uint8_t, 128> readback{};
     bool readDone = false;
     region.Read(infra::MakeByteRange(readback), [&]
@@ -142,7 +131,6 @@ TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
 
 TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_after_it)
 {
-    // Arrange — write data to the region starting right after this one, at offset 384
     services::NvmEepromRegion after{ eeprom, 384, 128 };
     const std::array<uint8_t, 3> data = { 0x88, 0x99, 0xAA };
     bool writeDone = false;
@@ -152,7 +140,6 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_after_it)
         });
     RunUntilDone(writeDone);
 
-    // Act — erase the region at offset 256
     bool eraseDone = false;
     region.Erase([&]
         {
@@ -160,7 +147,7 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_after_it)
         });
     RunUntilDone(eraseDone);
 
-    // Assert — region at 384 is unchanged; fails if Erase writes the whole erasePattern
+    // Fails if Erase writes the whole erasePattern
     std::array<uint8_t, 3> readback{};
     bool readDone = false;
     after.Read(infra::MakeByteRange(readback), [&]
@@ -176,7 +163,6 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_after_it)
 
 TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_before_it)
 {
-    // Arrange — write data to region starting at offset 128
     services::NvmEepromRegion before{ eeprom, 128, 128 };
     const std::array<uint8_t, 3> data = { 0x55, 0x66, 0x77 };
     bool writeDone = false;
@@ -186,7 +172,6 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_before_it)
         });
     RunUntilDone(writeDone);
 
-    // Act — erase the region at offset 256
     bool eraseDone = false;
     region.Erase([&]
         {
@@ -194,7 +179,6 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_before_it)
         });
     RunUntilDone(eraseDone);
 
-    // Assert — region at 128 is unchanged
     std::array<uint8_t, 3> readback{};
     bool readDone = false;
     before.Read(infra::MakeByteRange(readback), [&]

@@ -182,16 +182,13 @@ namespace application
         provisionalControlApplied = true;
     }
 
-    // A committed calibration has just been applied over the provisional plant, so there is nothing left to
-    // put back.
+    // A committed calibration replaces the provisional plant; nothing is left to restore.
     void FocStateMachineCommon::ProvisionalControlSuperseded()
     {
         provisionalControlApplied = false;
     }
 
-    // A provisional model exists only to make the rotor move during identification. Whatever ends the run
-    // short of a committed calibration must put back the model the drive had before it, so that the loops
-    // are never left tuned for a plant nobody measured.
+    // Anything short of a committed calibration must put back the model the drive had before the run.
     void FocStateMachineCommon::RestoreControlAfterProvisionalIdentification()
     {
         if (!provisionalControlApplied)

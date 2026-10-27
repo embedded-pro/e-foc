@@ -209,8 +209,7 @@ namespace services
             onDone(friction, inertia);
     }
 
-    // Scheduling from the control interrupt costs more than it has left on the sample that closes a window, so
-    // the interrupt only records the outcome and posts the window, and this tick fits and finishes from the event loop
+    // The interrupt only records the outcome and posts the window; the tick fits from the event loop.
     void MechanicalParametersIdentificationImpl::Tick()
     {
         StepSpeedCommand();

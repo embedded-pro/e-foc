@@ -14,9 +14,7 @@ namespace services
 
     inline constexpr std::size_t coggingMapBins = 48;
 
-    // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
-    // 'reserved1' keeps sizeof(CalibrationData) a multiple of 4 and
-    // ensures the full struct is a deterministic, padding-free storage schema.
+    // Padding-free schema: four-byte fields first, reserved1 completes the word; see service-nvm.md.
     struct CalibrationData
     {
         float rPhase = 0.0f;

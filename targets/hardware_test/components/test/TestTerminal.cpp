@@ -42,7 +42,6 @@ namespace
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
         MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
 
-        // ThreePhaseInverter
         MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
         MOCK_METHOD(void, Start, (), (override));
@@ -50,7 +49,6 @@ namespace
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
 
-        // Encoder
         MOCK_METHOD(foc::Radians, Read, (), (override));
         MOCK_METHOD(void, Set, (foc::Radians), (override));
         MOCK_METHOD(void, SetZero, (), (override));

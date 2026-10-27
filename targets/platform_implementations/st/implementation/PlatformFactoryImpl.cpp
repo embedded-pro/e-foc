@@ -50,8 +50,7 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
-        // The driver starts the window watchdog at the highest priority; an early warning that can preempt a hung
-        // handler would keep refreshing it, so it is lowered to the lowest level the NVIC implements
+        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it.
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
 
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);

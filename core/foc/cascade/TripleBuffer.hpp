@@ -20,8 +20,7 @@ namespace foc
         }
     }
 
-    // Lock-free single-writer/single-reader handoff across the ISR boundary: Publish() never
-    // writes into the slot the reader currently holds, so Acquire() always returns a whole value.
+    // Single-writer/single-reader ISR handoff: Publish() never writes into the slot the reader holds.
     template<typename T>
     class TripleBuffer
     {

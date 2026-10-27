@@ -35,10 +35,7 @@ namespace foc
         PlantResponseSample sample{};
     };
 
-    // Single producer (the control tick) and single consumer (the event loop). Begin/End only raise
-    // flags so the tick stays the only writer of the ring. Markers never enter the ring: each has
-    // its own slot the tick fills and the consumer empties, so a full ring can drop samples but
-    // never the record that reports the drops.
+    // The tick produces, the event loop consumes; Begin/End only raise flags, markers bypass the ring.
     template<std::size_t Capacity>
     class PlantResponseRecorder
     {

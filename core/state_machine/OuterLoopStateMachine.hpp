@@ -91,9 +91,7 @@ namespace application
 
         static constexpr float velocityBandwidthRadPerSec = 50.0f;
 
-        // Bounded placeholders that make the loops able to move the rotor during identification. They are
-        // deliberately small so the speed loop leans on its current envelope rather than on a plant nobody
-        // has measured yet, and they are never persisted as calibration.
+        // Small placeholders that let the loops move the rotor during identification; never persisted.
         static constexpr float provisionalInertia = 1.0e-4f;
         static constexpr float provisionalFriction = 0.0f;
         static constexpr float identificationBandwidthRadPerSec = 20.0f;

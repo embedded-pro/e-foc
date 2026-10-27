@@ -101,7 +101,7 @@ namespace services
         Complete(std::nullopt);
     }
 
-    // Interrupt context: the caller's completion is event-loop work, and the run tag drops an aborted run's outcome.
+    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void MotorAlignmentImpl::Finish(std::optional<foc::Radians> result)
     {
         driver.Stop();

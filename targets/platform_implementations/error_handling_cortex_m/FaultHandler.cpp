@@ -37,8 +37,7 @@ extern "C"
 
         application::CutPowerStage();
 
-        // Invalidate while writing to prevent partially-written data being
-        // read as valid on a watchdog timeout mid-write.
+        // Invalidated while writing so a watchdog reset mid-write is not read as valid
         persistentFaultData.magic = 0u;
 
         // ARM exception stack frame: R0, R1, R2, R3, R12, LR, PC, xPSR
@@ -51,12 +50,10 @@ extern "C"
         persistentFaultData.pc = stack[6];
         persistentFaultData.psr = stack[7];
 
-        // Cortex-M fault status registers
         persistentFaultData.cfsr = SCB->CFSR;
         persistentFaultData.mmfar = SCB->MMFAR;
         persistentFaultData.bfar = SCB->BFAR;
 
-        // Stack trace: scan above the exception frame for code addresses
         const uint32_t textStart = reinterpret_cast<uint32_t>(&_text);
         const uint32_t textEnd = reinterpret_cast<uint32_t>(&_etext);
         const uint32_t* sp = stack + 8u; // skip 8-word exception frame

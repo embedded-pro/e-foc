@@ -76,6 +76,12 @@ Each region stores a single record consisting of a fixed-size header followed by
 
 This layout ensures that a calibration record stored in EEPROM cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
 
+The record structs are packed so the CRC covers exactly the stored bytes. `CalibrationData` and `ConfigData` list
+their four-byte fields before the byte-sized ones and complete the last word with reserved bytes, so neither has
+implicit padding either; a `static_assert` on each size holds that. A layout version is bumped whenever a field is
+added, resized or reordered, so a record written by an earlier firmware reads as a version mismatch instead of
+being misinterpreted.
+
 ### Integrity Checks on Read
 
 When a region is read back, the following checks are applied in order:
@@ -205,13 +211,14 @@ stateDiagram-v2
 
 ### Calibration and Configuration Data Fields
 
-**CalibrationData** (52 bytes total):
+**CalibrationData** (108 bytes total, layout version 4):
 
 | Field                | Physical unit | Description                                         |
 |----------------------|---------------|-----------------------------------------------------|
 | rPhase               | Ω             | Measured phase resistance                           |
 | lD                   | H             | Measured d-axis inductance                          |
 | lQ                   | H             | Measured q-axis inductance                          |
+| fluxLinkage          | Wb            | Rotor flux linkage                                  |
 | currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor   |
 | inertia              | kg·m²         | Estimated rotor inertia                             |
 | frictionCoulomb      | N·m           | Coulomb (constant) friction                         |
@@ -219,8 +226,11 @@ stateDiagram-v2
 | encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service) |
 | currentLoopBandwidth | rad/s         | Current loop closed-loop bandwidth                  |
 | speedLoopBandwidth   | rad/s         | Speed loop closed-loop bandwidth                    |
+| coggingTorqueScale   | N·m per count | Scale of the cogging map entries                    |
 | encoderDirection     | —             | Polarity correction (+1 or −1)                      |
 | polePairs            | —             | Number of motor pole pairs                          |
+| stage                | —             | Whether the calibration completed                   |
+| coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins  |
 
 **ConfigData** (76 bytes total):
 

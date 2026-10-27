@@ -152,7 +152,7 @@ namespace services
             onMeasured(std::nullopt);
     }
 
-    // Interrupt context: only the bridge stops here; the timer and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void PhaseCurrentOffsetCompensation::Finish(bool measured)
     {
         inverter.Stop();

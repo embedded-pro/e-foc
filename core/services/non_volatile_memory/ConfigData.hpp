@@ -31,7 +31,7 @@ namespace services
         float referenceTimeConstant = foc::PositionLoopTunings{}.referenceTimeConstant;
     };
 
-    // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
+    // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
     {
         uint32_t canNodeId = 1;

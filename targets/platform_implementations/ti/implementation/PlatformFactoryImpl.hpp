@@ -56,7 +56,6 @@ namespace application
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
 
-        // Implementation of PlatformFactory — configuration
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         drivers::DeadTimeLoss InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const override;
         uint32_t DutyUpdateDelayPeriods() const override;
@@ -64,7 +63,6 @@ namespace application
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;
 
-        // Implementation of PlatformFactory — accessors
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
@@ -85,7 +83,6 @@ namespace application
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
 
-        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -93,7 +90,6 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
@@ -172,15 +168,11 @@ namespace application
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
-            // Steps 0–2 go to the ADC FIFO (phase currents A/B/C).
-            // Steps 3–5 are redirected to DCMP units 0, 1 and 2 via the SSOP register and
-            // do NOT appear in the FIFO, so AdcPhaseCurrentMeasurementImpl still receives
-            // exactly 3 samples.  DCMP0/1/2 outputs connect to PWM FLTSRC1 bits 0/1/2 and
-            // tristate all motor PWM outputs instantly when a threshold is crossed.
+            // Steps 0-2 fill the ADC FIFO; steps 3-5 feed digital comparators 0-2 and trip PWM FLTSRC1.
             static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
-                {}, // step 0: currentPhaseA  → FIFO (noComparator)
-                {}, // step 1: currentPhaseB  → FIFO (noComparator)
-                {}, // step 2: currentPhaseC  → FIFO (noComparator)
+                {},
+                {},
+                {},
                 { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
                 { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,

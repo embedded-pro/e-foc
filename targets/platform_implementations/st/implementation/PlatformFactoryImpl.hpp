@@ -31,13 +31,11 @@ namespace application
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
 
-        // Implementation of PlatformFactory — configuration
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;
 
-        // Implementation of PlatformFactory — accessors
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
@@ -66,18 +64,16 @@ namespace application
             return PlatformFactory::BoardProtectionState::unknown;
         }
 
-        // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
+        // Also satisfies ThreePhaseInverter::Start; no-op on ST
         void Start() override;
         uint32_t ElapsedCycles() override;
 
-        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;

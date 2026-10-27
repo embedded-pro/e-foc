@@ -123,7 +123,8 @@ needs in order to reach its absolute convergence threshold.
 
 **Anti-windup**: the integral state is frozen (conditional integration) on any sample where the
 unsaturated command falls outside $\pm I_{q,max}$, and resumes as soon as the command re-enters the
-envelope.
+envelope. The controller does this by running a second time on that sample with the negated error, which winds
+the integral state back.
 
 ---
 

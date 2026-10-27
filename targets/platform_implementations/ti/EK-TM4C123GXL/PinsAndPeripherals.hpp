@@ -65,7 +65,6 @@ namespace application
         constexpr static uint8_t PwmIndex = 0;
         constexpr static uint8_t CanIndex = 0;
 
-        // Fault comparator support is not available on EK-TM4C123GXL.
         constexpr static bool hasFaultComparators{ false };
         constexpr static bool hasBoardIdPins{ false };
         constexpr static bool hasPowerStatusPin{ false };
@@ -74,7 +73,6 @@ namespace application
         constexpr static uint8_t UndervoltageComparatorIndex{ 2 };
         constexpr static float adcReferenceVoltage{ 3.3f };
         constexpr static float adcResolution{ 4096.0f };
-        // Hardware comparators absent — trip counts not used; set to 0 explicitly.
         constexpr static uint16_t overvoltageThresholdCounts{ 0 };
         constexpr static uint16_t overcurrentThresholdCounts{ 0 };
         constexpr static uint16_t undervoltageThresholdCounts{ 0 };
@@ -86,7 +84,6 @@ namespace application
         extern std::array<hal_pwm::PinChannel, 3> pwmPhases;
     }
 
-    // Buffer capacities read by the shared platform implementation.
     namespace Resources
     {
         constexpr std::size_t tracerBufferSize{ 2048 };

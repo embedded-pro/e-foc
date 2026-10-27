@@ -66,8 +66,6 @@ namespace application
         constexpr static uint8_t PwmIndex = 0;
         constexpr static uint8_t CanIndex = 0;
 
-        // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
-        // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip; DCMP2 (PB5 / ADC11) → undervoltage trip.
         constexpr static bool hasFaultComparators = true;
         constexpr static bool hasBoardIdPins{ true };
         constexpr static bool hasPowerStatusPin{ true };
@@ -78,7 +76,6 @@ namespace application
         constexpr static float adcReferenceVoltage{ 3.3f };
         constexpr static float adcResolution{ 4096.0f };
 
-        // Fault trip thresholds derived from motor board shield characteristics.
         constexpr static uint16_t overvoltageThresholdCounts =
             application::BoardCharacteristics::OvervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
         constexpr static uint16_t overcurrentThresholdCounts =
@@ -93,7 +90,6 @@ namespace application
         extern std::array<hal_pwm::PinChannel, 3> pwmPhases;
     }
 
-    // Buffer capacities read by the shared platform implementation.
     namespace Resources
     {
         constexpr std::size_t tracerBufferSize{ 2048 };

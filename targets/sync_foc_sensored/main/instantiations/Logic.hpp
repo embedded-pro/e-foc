@@ -50,7 +50,6 @@ namespace application
         uint8_t boardId;
         services::DebugLed debugLed;
         foc::Volts vdc;
-        // help + 3 diagnostics + 20 control-mode commands; registering a 25th asserts at boot
         services::TerminalWithBanner::WithMaxSize<24> terminalWithStorage;
         services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;

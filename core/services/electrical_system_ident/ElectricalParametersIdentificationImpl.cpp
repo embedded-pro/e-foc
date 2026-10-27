@@ -124,7 +124,7 @@ namespace services
         }
     }
 
-    // Interrupt context: only the bridge stops here; the step timer and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void ElectricalParametersIdentificationImpl::FinishPolePairs()
     {
         driver.Stop();
@@ -183,8 +183,7 @@ namespace services
                 if (!polePairsRunning || polePairsFinishing)
                     return;
 
-                // A rotor resting on the null of the first vector only moves when a later one pulls it, so the
-                // reference waits one electrical turn, and is then read one step behind the field as the end is.
+                // A rotor on the first vector's null moves only once a later one pulls it; wait a turn.
                 const auto currentPosition = encoder.Read();
                 if (currentSampleIndex > leadInSteps)
                 {

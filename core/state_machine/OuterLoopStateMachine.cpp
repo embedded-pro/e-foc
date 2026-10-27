@@ -6,8 +6,7 @@
 
 namespace
 {
-    // The tracer prints three decimals, which is no resolution at all for inertias around 1e-6 and
-    // frictions around 1e-5; mechanical quantities are therefore traced in micro-units.
+    // Mechanical quantities are traced in micro-units: the tracer prints only three decimals.
     constexpr float microPerUnit = 1.0e6f;
 
     float Micro(float value)
@@ -225,9 +224,7 @@ namespace application
         return &**ownCoggingMapping;
     }
 
-    // Identification needs the loops it is about to excite to be live. Until the electrical model measured
-    // moments ago is applied the current loop holds inert gains, and until mechanics are configured the speed
-    // loop holds a zero current envelope, so the commanded trajectory never reaches the rotor.
+    // Inert current gains or a zero speed envelope never move the rotor, so both are applied first.
     bool OuterLoopStateMachine::ApplyIdentificationControl(const services::CalibrationData& pending)
     {
         const auto torqueConstant = TorqueConstantFor(pending);
@@ -235,9 +232,7 @@ namespace application
         if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
             return false;
 
-        // Marked before the first call, not after: applying an electrical model sets the current-loop
-        // tunings whether or not the plant itself was accepted, so from here on there is something to
-        // restore even when this returns false.
+        // Marked first: the electrical model sets the current tunings even when the plant is refused.
         MarkProvisionalControlApplied();
 
         if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending)))

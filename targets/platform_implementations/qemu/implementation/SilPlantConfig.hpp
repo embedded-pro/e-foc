@@ -85,10 +85,7 @@ namespace sil
 
         uint8_t polePairs;
         uint8_t faultFlags;
-        // Carried in centiseconds so it fits the byte this record already reserved; zero means the
-        // encoder is never frozen while running, which is what every scenario that does not ask
-        // for it writes. The boot-time encoderStuck flag is the separate case of an encoder that
-        // was already dead before the drive aligned.
+        // Centiseconds in a spare byte; zero means the encoder never freezes while running.
         uint8_t encoderFreezeDelayCentiseconds;
         uint8_t dutyDelayPeriods;
     };
