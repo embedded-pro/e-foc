@@ -22,6 +22,7 @@ date: 2026-04-13
 
 **Is responsible for:**
 - Capturing Cortex-M CPU register state and a stack-address backtrace when a HardFault exception occurs, before the system resets.
+- Cutting the power stage and resetting when an assertion fails.
 - Persisting that diagnostic snapshot in a memory region that is not cleared on reset, so it survives the subsequent boot.
 - Reporting the cause of the most recent reset (power-up, brown-out, software, hardware, or watchdog) to the application layer via `PlatformFactory`.
 - Exposing the formatted fault snapshot and reset cause to the CLI at boot time.
@@ -119,7 +120,18 @@ validity sentinel is written last; this is the atomic
 commit point. If the MCU loses power or watchdog-resets mid-write, an incomplete capture is detected and
 discarded on the next boot.
 
-After capture, the handler calls `abort()`, which the platform startup maps to `NVIC_SystemReset()`.
+After capture, the handler resets the MCU with `NVIC_SystemReset()`.
+
+### Assertion failures — `abort()`
+
+A failed `really_assert` ends in `abort()`. EMIL's default is weak: it stops at a breakpoint when a debugger is
+attached and otherwise spins forever, with the gate drivers still switching at the last duties. The watchdog does
+not cut them when the failure happens in an interrupt. The hung interrupt starves the early warning, so nothing cuts
+the stage before the hardware reset 25 to 50 ms later ([Watchdog Design](watchdog.md), Part C).
+
+The fault handler's file therefore defines `abort()` on TI and ST, replacing the weak default. It calls
+`CutPowerStage()` first, stops at a breakpoint when a debugger is attached, and otherwise resets with
+`NVIC_SystemReset()`. It writes no fault record, so the next boot reports a software reset.
 
 ### Persistent fault region
 
@@ -263,5 +275,5 @@ sequenceDiagram
     C->>PFD: write cfsr, mmfar, bfar from SCB
     C->>PFD: scan stack for .text addresses → stackTrace
     C->>PFD: magic = 0xDEADBEEF  (commit)
-    C->>CPU: abort() → NVIC_SystemReset()
+    C->>CPU: NVIC_SystemReset()
 ```

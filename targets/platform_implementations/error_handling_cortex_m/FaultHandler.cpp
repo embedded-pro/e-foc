@@ -81,4 +81,19 @@ extern "C"
         NVIC_SystemReset();
         __builtin_unreachable();
     }
+
+    // Replaces EMIL's weak abort(), which spins with the bridge switching; a hung interrupt starves the watchdog's cutoff
+    [[noreturn]] void abort()
+    {
+        constexpr uintptr_t dhcsrAddress = 0xE000EDF0u;
+        constexpr uint32_t debuggerAttached = 1u << 0;
+
+        application::CutPowerStage();
+
+        if ((*reinterpret_cast<volatile uint32_t*>(dhcsrAddress) & debuggerAttached) != 0u)
+            __asm volatile("bkpt 0");
+
+        NVIC_SystemReset();
+        __builtin_unreachable();
+    }
 }
