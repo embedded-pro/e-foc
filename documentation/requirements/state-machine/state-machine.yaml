@@ -291,3 +291,13 @@
     aborted, not busy, because its record may still be stored. An electrical identification
     shall keep the mechanical parameters and loop bandwidths of the record, which it does not
     measure.
+
+- id: REQ-SM-032
+  title: A control-mode switch keeps an established rotor reference
+  shall: >
+    When a control-mode selection is activated while the active mode is Ready with an
+    established rotor reference, the newly activated mode shall reach Ready with the rotor
+    reference established, without a new alignment, once its stored calibration record has
+    loaded and is complete for that mode. When the active mode is Idle, or the record is not
+    complete for the new mode, the new mode shall start in Idle and require an alignment or a
+    calibration before it can be enabled, as after power-on.

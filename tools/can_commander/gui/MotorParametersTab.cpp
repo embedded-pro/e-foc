@@ -42,7 +42,7 @@ namespace tool
         layout->addWidget(warning);
 
         alignButton = new QPushButton("A&lign Rotor");
-        alignButton->setToolTip("Find the rotor's electrical zero. Needed after a pole-pair change.");
+        alignButton->setToolTip("Find the rotor's electrical zero. Needed after the controller starts and after a pole-pair change.");
         identifyElectricalButton = new QPushButton("Identify &Electrical");
         identifyElectricalButton->setToolTip("Measure resistance, inductance and pole pairs, then align the rotor");
         identifyMechanicalButton = new QPushButton("Identify Mecha&nical");

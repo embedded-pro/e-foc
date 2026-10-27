@@ -50,8 +50,9 @@ namespace application
         RegisterModeSpecificCli(terminal);
     }
 
-    void FocStateMachineCommon::Boot()
+    void FocStateMachineCommon::Boot(RotorReference rotorReference)
     {
+        calibrationContext.SetRotorReferenceValid(rotorReference == RotorReference::kept);
         stateMachine.Start<state_machine::Idle>();
         boot.Begin();
     }

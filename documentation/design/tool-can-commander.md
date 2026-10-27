@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: "tool-can-commander"
-date: 2026-10-25
+date: 2026-10-27
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.6.0                |
+| Version   | 0.7.0                |
 | Component | tool-can-commander   |
-| Date      | 2026-10-25           |
+| Date      | 2026-10-27           |
 
 ---
 
@@ -80,7 +80,7 @@ graph TD
     M1 --> Header["Header: node, firmware, pending command"]
     M1 --> Commands["Commands"]
     M1 --> Telemetry["Telemetry and identified parameters"]
-    Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint"]
+    Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint knob"]
     Commands --> Controllers["Controllers: algorithm and settings per loop"]
     Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align, identify, calibrate"]
     Commands --> Configuration["Configuration: start-up settings"]
@@ -104,6 +104,7 @@ graph TD
 | Tab                                               | status dot and tooltip of that motor                                                  | each node                               |
 | Motor header                                      | node state, firmware contract, the command waiting for an answer                      | that node                               |
 | Control mode                                      | *requested…* until acknowledged, then *active*                                        | that node's mode or algorithms response |
+| Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value | that node's setpoint acknowledgement    |
 | Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted        | that node's parameter responses         |
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's status (read every second)  |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                               |
@@ -129,6 +130,17 @@ Input ranges and decimal places follow the wire contract: the limit is the small
 command limit and what the 16-bit wire field can carry, and the decimals match the wire resolution, so the
 tool never offers precision that the frame drops.
 
+The setpoint of the active control mode is chosen with a knob and the number box beside it, which follow
+each other: torque in amperes, speed in revolutions per minute, position in degrees. The wire still carries
+amperes, radians per second and radians; the tool converts at its edge, and one knob step is one count of
+the wire field (0.1 A, 1 rad/s ≈ 9.55 rpm, 0.01 rad ≈ 0.57°), so a typed value snaps to the nearest value
+the frame can carry. Turning the knob or typing never sends anything: Apply, or Enter in the box or on the
+focused knob, sends the value shown. Beside the knob the panel shows the value the controller last
+accepted, also marked on the knob's scale; while the knob shows another value it says what Apply would
+send. An acknowledged mode change or the node leaving the bus forgets the accepted value, because the new
+mode starts from its own setpoint. The measured speed and position read in rpm and degrees as well; loop
+bandwidths stay in rad/s, since they are frequencies, not speeds.
+
 Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally
 and never sent, or a command that received no answer in time.
@@ -138,6 +150,37 @@ finish, so the tool waits up to two minutes for them instead of two seconds; the
 move before the button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
 in progress (Part J). A controller that answers Identify Mechanical with "not implemented" gets that button
 disabled, with the reason, until its tab is closed.
+
+### Part L — refused commands
+
+When a controller refuses an operating command — start, stop, clear fault, a setpoint or Align — because of
+its state ("not allowed in the motor's current state") or because the command does not fit (an alignment
+without a calibration for the active mode, a setpoint for another mode), the panel opens a non-modal dialog
+that names the motor and the refused command and says what makes the motor operational again, judged from
+the last status the controller reported:
+
+| Last reported state    | Refused                                            | Advice                                                                                     | Button                |
+|------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------|
+| Idle, or no status yet | Start Motor, a setpoint                            | Align the rotor, then start; the reference is lost at start-up and on a pole-pair change   | Align Rotor           |
+| Idle                   | Align Rotor (no complete calibration for the mode) | Calibrate, or enter the motor parameters (inertia and friction in speed and position mode) | Open Motor Parameters |
+| Partially calibrated   | any operating command                              | Identify or enter inertia and friction, then align and start                               | Open Motor Parameters |
+| Fault                  | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
+| Fault                  | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
+| Calibrating            | any operating command                              | Wait until it finishes                                                                     | —                     |
+| Running                | Align Rotor                                        | Stop the motor first                                                                       | Stop Motor            |
+| any                    | a setpoint for another control mode                | Select that mode while the motor is stopped                                                | —                     |
+
+Stop Motor refused while stopped, Clear Fault refused without a fault and Start Motor refused while running
+get no dialog; the log line says enough. The button sends the same command as its counterpart in the panel,
+only while that motor accepts commands, and brings its tab to the front. A motor has at most one dialog: the
+same advice raises the open one, other advice replaces it, and a change of the reported state closes it,
+since what it says no longer applies. The refusal is logged as before.
+
+The controller reports Ready and Idle both as idle, so the advice for an idle motor covers both: aligning is
+what makes an idle motor Ready, and the text names the other reason Start Motor is refused in Ready (the
+board protection). A control-mode switch out of an aligned Ready keeps the rotor reference (state-machine
+design, C4), so switching modes no longer needs Align Rotor; a switch into speed or position mode without
+inertia and friction does, after they are set.
 
 ### Part J — controllers, motor parameters and configuration
 

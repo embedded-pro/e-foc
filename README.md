@@ -238,9 +238,10 @@ CAN Commander executable and installer are also Authenticode-signed, so Windows 
 
 **e-foc CAN Commander** commands and monitors the e-foc motor controllers on one CAN bus — up to eight,
 each addressed by its node ID. Every controller whose heartbeat is seen gets its own tab (you can also add
-one by node ID) with start/stop, control mode, setpoints, loop bandwidths, telemetry and identified
-parameters; an overview row keeps every motor's state and faults in view, and one always-visible
-**EMERGENCY STOP ALL** (`Esc`) reaches every motor.
+one by node ID) with start/stop, control mode, a setpoint knob (torque in A, speed in rpm, position in
+degrees), loop bandwidths, telemetry and identified parameters; an overview row keeps every motor's state
+and faults in view, and one always-visible **EMERGENCY STOP ALL** (`Esc`) reaches every motor. When a motor
+refuses a command because of its state, a dialog says what makes it operational again and offers that step.
 
 Each controller needs its own node ID. On the EK-TM4C1294XL, fit the board-ID jumpers on PK0–PK2 (to
 ground; PK0 is bit 0): with the default configuration a board answers as node 1 + its board ID, so

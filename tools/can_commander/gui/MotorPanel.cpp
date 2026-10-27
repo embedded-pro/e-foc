@@ -1,6 +1,8 @@
 #include "tools/can_commander/gui/MotorPanel.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include "tools/can_commander/gui/SetpointKnob.hpp"
 #include "tools/can_commander/logic/CommandDescriptions.hpp"
+#include "tools/can_commander/logic/SetpointAxis.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include <QHBoxLayout>
@@ -18,6 +20,19 @@ namespace tool
     {
         using ui::backend::qt::ToQt;
         using ui::theme::StatusLevel;
+
+        uint8_t SetpointCommandOf(can::FocMotorMode mode)
+        {
+            switch (mode)
+            {
+                case can::FocMotorMode::speed:
+                    return can::focSetSpeedSetpointId;
+                case can::FocMotorMode::position:
+                    return can::focSetPositionSetpointId;
+                default:
+                    return can::focSetTorqueSetpointId;
+            }
+        }
     }
 
     MotorPanel::MotorPanel(CanCommandClient& client, uint16_t nodeId, Reporter reporter, QWidget* parent)
@@ -123,20 +138,8 @@ namespace tool
                         return client.SendStartMotor(nodeId);
                     });
             });
-        connect(commandPanel, &CommandPanel::StopMotorRequested, this, [this]()
-            {
-                Send("Stop Motor", can::focStopId, [this]()
-                    {
-                        return client.SendStopMotor(nodeId);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::ClearFaultRequested, this, [this]()
-            {
-                Send("Clear Fault", can::focClearFaultId, [this]()
-                    {
-                        return client.SendClearFault(nodeId);
-                    });
-            });
+        connect(commandPanel, &CommandPanel::StopMotorRequested, this, &MotorPanel::SendStopMotor);
+        connect(commandPanel, &CommandPanel::ClearFaultRequested, this, &MotorPanel::SendClearFault);
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
             {
                 client.RequestData(nodeId);
@@ -151,34 +154,63 @@ namespace tool
             });
     }
 
+    void MotorPanel::SendStopMotor()
+    {
+        Send("Stop Motor", can::focStopId, [this]()
+            {
+                return client.SendStopMotor(nodeId);
+            });
+    }
+
+    void MotorPanel::SendClearFault()
+    {
+        Send("Clear Fault", can::focClearFaultId, [this]()
+            {
+                return client.SendClearFault(nodeId);
+            });
+    }
+
+    void MotorPanel::SendAlign()
+    {
+        Send("Align Rotor", can::focAlignId, [this]()
+            {
+                return client.SendAlign(nodeId);
+            });
+    }
+
     void MotorPanel::ConnectSetpoints()
     {
-        const auto bind = [this](void (CommandPanel::*signal)(float), const char* label, const char* unit, uint8_t commandType, bool (CanCommandClient::*send)(uint16_t, float))
-        {
-            connect(commandPanel, signal, this, [this, label, unit, commandType, send](float value)
-                {
-                    Send(QString("%1 %2 %3").arg(label).arg(value).arg(unit), commandType, [this, send, value]()
-                        {
-                            return (client.*send)(nodeId, value);
-                        });
-                });
-        };
+        connect(commandPanel, &CommandPanel::SetpointRequested, this, &MotorPanel::SendSetpoint);
+    }
 
-        bind(&CommandPanel::SetTorqueSetpointRequested, "Torque Setpoint", "A", can::focSetTorqueSetpointId, &CanCommandClient::SendSetTorqueSetpoint);
-        bind(&CommandPanel::SetSpeedSetpointRequested, "Speed Setpoint", "rad/s", can::focSetSpeedSetpointId, &CanCommandClient::SendSetSpeedSetpoint);
-        bind(&CommandPanel::SetPositionSetpointRequested, "Position Setpoint", "rad", can::focSetPositionSetpointId, &CanCommandClient::SendSetPositionSetpoint);
+    void MotorPanel::SendSetpoint(can::FocMotorMode mode, int32_t counts)
+    {
+        const auto value = AxisFor(mode).SiOf(counts);
+        pendingSetpoint = PendingSetpoint{ mode, counts };
+        if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(AxisFor(mode), counts)), SetpointCommandOf(mode), [this, mode, value]()
+                {
+                    return SendSetpointValue(mode, value);
+                }))
+            pendingSetpoint.reset();
+    }
+
+    bool MotorPanel::SendSetpointValue(can::FocMotorMode mode, float value)
+    {
+        switch (mode)
+        {
+            case can::FocMotorMode::speed:
+                return client.SendSetSpeedSetpoint(nodeId, value);
+            case can::FocMotorMode::position:
+                return client.SendSetPositionSetpoint(nodeId, value);
+            default:
+                return client.SendSetTorqueSetpoint(nodeId, value);
+        }
     }
 
     void MotorPanel::ConnectCommissioning()
     {
         auto& tab = commandPanel->MotorParameters();
-        connect(&tab, &MotorParametersTab::AlignRequested, this, [this]()
-            {
-                Send("Align Rotor", can::focAlignId, [this]()
-                    {
-                        return client.SendAlign(nodeId);
-                    });
-            });
+        connect(&tab, &MotorParametersTab::AlignRequested, this, &MotorPanel::SendAlign);
         connect(&tab, &MotorParametersTab::IdentifyElectricalRequested, this, [this]()
             {
                 Send("Identify Electrical", can::focIdentifyElectricalId, [this]()
@@ -383,10 +415,13 @@ namespace tool
     void MotorPanel::ForgetNodeState()
     {
         StopApplying("the controller left the bus");
+        CloseRecovery();
         lastState.reset();
         lastFault.reset();
+        pendingSetpoint.reset();
         telemetryPanel->Clear();
         commandPanel->ClearActiveControlMode();
+        commandPanel->ForgetAcceptedSetpoints();
         for (auto* page : commandPanel->SettingsPages())
             page->ForgetValues();
         commandPanel->Diagnostics().ForgetValues();
@@ -505,6 +540,9 @@ namespace tool
                                            .arg(pendingCommand.isEmpty() ? QString("the last command") : pendingCommand)
                                            .arg(timeout.count()));
 
+        if (pendingSetpoint.has_value() && commandType == SetpointCommandOf(pendingSetpoint->mode))
+            pendingSetpoint.reset();
+
         if (IsChangeAnswer(commandType))
             StopApplying("no answer");
     }
@@ -529,6 +567,16 @@ namespace tool
         if (commandType == can::focSelectControlModeId && !accepted)
             ForgetControlMode();
 
+        if (pendingSetpoint.has_value() && commandType == SetpointCommandOf(pendingSetpoint->mode))
+        {
+            if (accepted)
+                commandPanel->ShowAcceptedSetpoint(pendingSetpoint->mode, pendingSetpoint->counts);
+            pendingSetpoint.reset();
+        }
+
+        if (status == services::CanAckStatus::invalidState)
+            OfferRecovery(commandType, Refusal::invalidState);
+
         if (IsChangeAnswer(commandType))
         {
             if (accepted)
@@ -547,6 +595,12 @@ namespace tool
         Report(IssueSeverity::warning, QString("%1 %2").arg(name, ToQt(RejectionDescription(error))));
         if (commandType == can::focSelectControlModeId)
             ForgetControlMode();
+
+        if (pendingSetpoint.has_value() && commandType == SetpointCommandOf(pendingSetpoint->mode))
+            pendingSetpoint.reset();
+
+        if (error == can::FocMotorCategoryError::modeMismatch)
+            OfferRecovery(commandType, Refusal::modeMismatch);
 
         if (IsChangeAnswer(commandType))
             StopApplying(QString("%1 was refused").arg(name));
@@ -574,6 +628,7 @@ namespace tool
     void MotorPanel::OnControlModeAcknowledged(can::FocMotorMode activeMode)
     {
         commandPanel->SetActiveControlMode(activeMode);
+        commandPanel->ForgetAcceptedSetpoints();
         Report(IssueSeverity::info, QString("control mode is now %1").arg(CommandPanel::ControlModeName(activeMode)));
     }
 
@@ -583,7 +638,10 @@ namespace tool
 
         const bool changed = lastState != state || lastFault != fault;
         if (lastState != state)
+        {
             Report(IssueSeverity::info, QString("state %1").arg(TelemetryPanel::MotorStateName(state)));
+            CloseRecovery();
+        }
 
         if (lastFault != fault)
         {
@@ -637,5 +695,79 @@ namespace tool
         for (auto* page : commandPanel->SettingsPages())
             page->ShowValue(parameter, value);
         commandPanel->Diagnostics().ShowValue(parameter, value);
+    }
+
+    void MotorPanel::OfferRecovery(uint8_t commandType, Refusal refusal)
+    {
+        const auto faultName = lastFault.has_value() && *lastFault != FocFaultCode::none ? TelemetryPanel::FaultCodeName(*lastFault).toStdString() : std::string{};
+        if (const auto advice = AdviseRecovery(RefusedCommand{ commandType, refusal, lastState, commandPanel->ActiveControlMode(), faultName }))
+            ShowRecovery(commandType, *advice);
+    }
+
+    void MotorPanel::ShowRecovery(uint8_t commandType, const RecoveryAdvice& advice)
+    {
+        if (recoveryBox != nullptr && advice == recoveryAdvice)
+        {
+            recoveryBox->raise();
+            return;
+        }
+
+        CloseRecovery();
+        recoveryAdvice = advice;
+
+        const auto command = ToQt(CommandDisplayName(can::focMotorCategoryId, commandType));
+        recoveryBox = new QMessageBox(QMessageBox::Warning, QString("%1: %2 Refused").arg(Title(), command), QString("%1 refused %2.").arg(Title(), command), QMessageBox::Close, this);
+        recoveryBox->setInformativeText(ToQt(advice.text));
+        recoveryBox->setAttribute(Qt::WA_DeleteOnClose);
+        recoveryBox->setWindowModality(Qt::NonModal);
+
+        if (advice.action != RecoveryAction::none)
+        {
+            auto* actionButton = recoveryBox->addButton(ToQt(RecoveryActionName(advice.action)), QMessageBox::AcceptRole);
+            recoveryBox->setDefaultButton(actionButton);
+            connect(actionButton, &QAbstractButton::clicked, this, [this, action = advice.action]()
+                {
+                    RunRecovery(action);
+                });
+        }
+
+        recoveryBox->show();
+    }
+
+    void MotorPanel::RunRecovery(RecoveryAction action)
+    {
+        emit ShowRequested();
+        if (action == RecoveryAction::showMotorParameters)
+        {
+            commandPanel->ShowMotorParameters();
+            return;
+        }
+
+        if (const auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+        {
+            Report(IssueSeverity::warning, QString("%1 not sent: %2").arg(ToQt(RecoveryActionName(action)), reason));
+            return;
+        }
+
+        switch (action)
+        {
+            case RecoveryAction::alignRotor:
+                SendAlign();
+                break;
+            case RecoveryAction::clearFault:
+                SendClearFault();
+                break;
+            case RecoveryAction::stopMotor:
+                SendStopMotor();
+                break;
+            default:
+                break;
+        }
+    }
+
+    void MotorPanel::CloseRecovery()
+    {
+        if (recoveryBox != nullptr)
+            recoveryBox->close();
     }
 }

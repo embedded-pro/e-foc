@@ -234,8 +234,18 @@ namespace state_machine
         return TuningResult::ok;
     }
 
+    application::RotorReference ControlModeStateMachine::RotorReferenceToKeep() const
+    {
+        if (std::holds_alternative<std::monostate>(activeSm))
+            return application::RotorReference::lost;
+
+        const auto* ready = std::get_if<Ready>(&ActiveStateMachine().CurrentState());
+        return ready != nullptr && ready->rotorReferenceValid ? application::RotorReference::kept : application::RotorReference::lost;
+    }
+
     void ControlModeStateMachine::Activate(ControlMode mode)
     {
+        const auto rotorReference = RotorReferenceToKeep();
         if (!std::holds_alternative<std::monostate>(activeSm))
             ActiveStateMachine().CmdEmergencyStop();
 
@@ -248,7 +258,8 @@ namespace state_machine
                 faultNotifier,
                 TransitionPolicy::Auto,
                 outerLoopArgs,
-                nvmActivity));
+                nvmActivity,
+                rotorReference));
         else if (mode == ControlMode::position)
             AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
                 terminalAndTracer,
@@ -258,7 +269,8 @@ namespace state_machine
                 faultNotifier,
                 TransitionPolicy::Auto,
                 outerLoopArgs,
-                nvmActivity));
+                nvmActivity,
+                rotorReference));
         else
             AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
                 terminalAndTracer,
@@ -267,7 +279,8 @@ namespace state_machine
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto,
-                nvmActivity));
+                nvmActivity,
+                rotorReference));
     }
 
     void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)

@@ -1,10 +1,12 @@
 #include "tools/can_commander/gui/CommandPanel.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "tools/can_commander/gui/DisplayFormat.hpp"
+#include "tools/can_commander/logic/SetpointAxis.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QKeyEvent>
+#include <QSignalBlocker>
 
 namespace tool
 {
@@ -138,40 +140,136 @@ namespace tool
 
     QStackedWidget* CommandPanel::CreateSetpointStack()
     {
-        using foc::CommandLimits;
+        setpoints[0].mode = can::FocMotorMode::torque;
+        setpoints[1].mode = can::FocMotorMode::speed;
+        setpoints[2].mode = can::FocMotorMode::position;
 
         setpointStack = new QStackedWidget();
-        setpointStack->addWidget(CreateSetpointGroup("Torque Setpoint", "Iq:", SetpointLimit(CommandLimits::maxTorqueSetpoint, can::focCurrentScale),
-            DecimalsFor(can::focCurrentScale), " A", &CommandPanel::SetTorqueSetpointRequested));
-        setpointStack->addWidget(CreateSetpointGroup("Speed Setpoint", "Speed:", SetpointLimit(CommandLimits::maxSpeedSetpoint, can::focSpeedScale),
-            DecimalsFor(can::focSpeedScale), " rad/s", &CommandPanel::SetSpeedSetpointRequested));
-        setpointStack->addWidget(CreateSetpointGroup("Position Setpoint", "Position:", SetpointLimit(CommandLimits::maxPositionSetpoint, can::focPositionScale),
-            DecimalsFor(can::focPositionScale), " rad", &CommandPanel::SetPositionSetpointRequested));
+        setpointStack->addWidget(CreateSetpointGroup(setpoints[0], "Torque Setpoint", "Iq:"));
+        setpointStack->addWidget(CreateSetpointGroup(setpoints[1], "Speed Setpoint", "Speed:"));
+        setpointStack->addWidget(CreateSetpointGroup(setpoints[2], "Position Setpoint", "Position:"));
         return setpointStack;
     }
 
-    QGroupBox* CommandPanel::CreateSetpointGroup(const char* title, const char* label, double limit, int decimals, const char* suffix, void (CommandPanel::*signal)(float))
+    QGroupBox* CommandPanel::CreateSetpointGroup(SetpointControls& controls, const char* title, const char* label)
     {
+        const auto& axis = AxisFor(controls.mode);
         auto* group = new QGroupBox(title);
-        auto* layout = new QFormLayout(group);
+        auto* layout = new QHBoxLayout(group);
 
-        auto* spin = new QDoubleSpinBox();
-        spin->setRange(-limit, limit);
-        spin->setDecimals(decimals);
-        spin->setSuffix(suffix);
-        spin->setKeyboardTracking(false);
-        spin->setToolTip(QString("Accepted by the firmware: ±%1%2").arg(limit, 0, 'f', decimals).arg(suffix));
-        layout->addRow(label, spin);
+        controls.knob = new SetpointKnob(axis);
+        const auto range = QString("Accepted by the firmware: ±%1").arg(controls.knob->Format(axis.MaxCounts()));
+        controls.knob->setAccessibleName(QString("%1 knob").arg(title));
+        controls.knob->setToolTip(QString("Turn to choose the setpoint, then Apply. Arrow keys step, Page Up and Page Down jump.\n%1").arg(range));
+        layout->addWidget(controls.knob);
+        layout->addLayout(CreateSetpointEntry(controls, title, label, range), 1);
 
-        auto* applyButton = new QPushButton("Apply");
-        layout->addRow(applyButton);
-
-        commandWidgets.push_back(applyButton);
-        connect(applyButton, &QPushButton::clicked, this, [this, spin, signal]()
-            {
-                emit(this->*signal)(static_cast<float>(spin->value()));
-            });
+        commandWidgets.push_back(controls.apply);
+        ConnectSetpoint(controls);
+        RefreshSetpointStatus(controls);
         return group;
+    }
+
+    QLayout* CommandPanel::CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label, const QString& range)
+    {
+        const auto& axis = AxisFor(controls.mode);
+        controls.spin = new QDoubleSpinBox();
+        controls.spin->setDecimals(axis.Decimals());
+        controls.spin->setRange(axis.DisplayOf(-axis.MaxCounts()), axis.DisplayOf(axis.MaxCounts()));
+        controls.spin->setSingleStep(axis.DisplayStep());
+        controls.spin->setSuffix(ui::backend::qt::ToQt(axis.Suffix()));
+        controls.spin->setKeyboardTracking(false);
+        controls.spin->setMinimumWidth(140);
+        controls.spin->setAccessibleName(title);
+        controls.spin->setToolTip(QString("%1\nEnter applies the value.").arg(range));
+        auto* form = new QFormLayout();
+        form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+        form->addRow(label, controls.spin);
+
+        controls.apply = new QPushButton("Apply");
+        auto* buttons = new QHBoxLayout();
+        buttons->addWidget(controls.apply);
+        buttons->addStretch();
+
+        controls.status = new QLabel();
+        controls.status->setWordWrap(true);
+
+        auto* column = new QVBoxLayout();
+        column->addStretch();
+        column->addLayout(form);
+        column->addLayout(buttons);
+        column->addWidget(controls.status);
+        column->addStretch();
+        return column;
+    }
+
+    void CommandPanel::ConnectSetpoint(SetpointControls& controls)
+    {
+        controls.knob->installEventFilter(this);
+        controls.spin->installEventFilter(this);
+
+        connect(controls.knob, &QDial::valueChanged, this, [this, &controls](int counts)
+            {
+                SyncSetpoint(controls, counts);
+            });
+        connect(controls.spin, &QDoubleSpinBox::valueChanged, this, [this, &controls](double value)
+            {
+                SyncSetpoint(controls, AxisFor(controls.mode).CountsOf(value));
+            });
+        connect(controls.apply, &QPushButton::clicked, this, [this, &controls]()
+            {
+                emit SetpointRequested(controls.mode, controls.knob->value());
+            });
+    }
+
+    void CommandPanel::SyncSetpoint(SetpointControls& controls, int32_t counts)
+    {
+        {
+            const QSignalBlocker knobBlocker{ controls.knob };
+            const QSignalBlocker spinBlocker{ controls.spin };
+            controls.knob->setValue(counts);
+            controls.spin->setValue(AxisFor(controls.mode).DisplayOf(counts));
+        }
+        RefreshSetpointStatus(controls);
+    }
+
+    void CommandPanel::RefreshSetpointStatus(SetpointControls& controls)
+    {
+        controls.knob->SetAccepted(controls.accepted);
+
+        const auto chosen = controls.knob->value();
+        auto text = QString("Last accepted: %1").arg(controls.accepted.has_value() ? controls.knob->Format(*controls.accepted) : QString("—"));
+        auto level = ui::theme::StatusLevel::Neutral;
+        if (controls.accepted != chosen)
+        {
+            text += QString(". Apply sends %1.").arg(controls.knob->Format(chosen));
+            if (controls.accepted.has_value())
+                level = ui::theme::StatusLevel::Warning;
+        }
+
+        controls.status->setText(text);
+        ui::backend::qt::StyleStatusLabel(*controls.status, level);
+    }
+
+    bool CommandPanel::eventFilter(QObject* watched, QEvent* event)
+    {
+        if (event->type() != QEvent::KeyPress)
+            return QWidget::eventFilter(watched, event);
+
+        const auto key = static_cast<QKeyEvent*>(event)->key();
+        if (key != Qt::Key_Return && key != Qt::Key_Enter)
+            return QWidget::eventFilter(watched, event);
+
+        for (auto& controls : setpoints)
+            if (watched == controls.knob || watched == controls.spin)
+            {
+                controls.spin->interpretText();
+                if (controls.apply->isEnabled())
+                    controls.apply->click();
+                return true;
+            }
+
+        return QWidget::eventFilter(watched, event);
     }
 
     void CommandPanel::SetCommandsAvailable(const QString& unavailableReason, bool explained)
@@ -208,6 +306,7 @@ namespace tool
         if (index < 0 || index >= setpointStack->count())
             return;
 
+        activeMode = mode;
         setpointStack->setCurrentIndex(index);
         modeLabel->setText(QString("Active: %1").arg(ControlModeName(mode)));
         ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Ok);
@@ -216,8 +315,38 @@ namespace tool
 
     void CommandPanel::ClearActiveControlMode()
     {
+        activeMode.reset();
         modeLabel->setText("Active: unknown");
         ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Neutral);
         controllers->SetMode(std::nullopt);
+    }
+
+    std::optional<can::FocMotorMode> CommandPanel::ActiveControlMode() const
+    {
+        return activeMode;
+    }
+
+    void CommandPanel::ShowAcceptedSetpoint(can::FocMotorMode mode, int32_t counts)
+    {
+        for (auto& controls : setpoints)
+            if (controls.mode == mode)
+            {
+                controls.accepted = counts;
+                RefreshSetpointStatus(controls);
+            }
+    }
+
+    void CommandPanel::ForgetAcceptedSetpoints()
+    {
+        for (auto& controls : setpoints)
+        {
+            controls.accepted.reset();
+            RefreshSetpointStatus(controls);
+        }
+    }
+
+    void CommandPanel::ShowMotorParameters()
+    {
+        tabs->setCurrentWidget(motorParameters);
     }
 }

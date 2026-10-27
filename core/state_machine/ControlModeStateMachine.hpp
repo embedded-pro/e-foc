@@ -116,6 +116,7 @@ namespace state_machine
         application::OuterLoopStateMachine* ActiveOuterLoop();
 
     private:
+        application::RotorReference RotorReferenceToKeep() const;
         void Activate(ControlMode mode);
         void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
         foc::CurrentLoopTunable* CurrentTunable();

@@ -17,6 +17,10 @@ target_sources(e_foc.tool.can_commander.logic PRIVATE
     CommandDescriptions.cpp
     MotorSettings.hpp
     MotorSettings.cpp
+    RecoveryAdvice.hpp
+    RecoveryAdvice.cpp
+    SetpointAxis.hpp
+    SetpointAxis.cpp
 )
 
 if(MSVC)

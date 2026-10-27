@@ -28,6 +28,14 @@ namespace application
         foc::Volts vdc;
     };
 
+    // Kept by a control-mode switch out of an aligned Ready: the encoder zero the alignment set is
+    // shared hardware and survives the machine that set it.
+    enum class RotorReference : uint8_t
+    {
+        lost,
+        kept
+    };
+
     struct CalibrationServices
     {
         services::ElectricalParametersIdentification& electricalIdent;

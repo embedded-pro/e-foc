@@ -20,6 +20,7 @@ namespace application
     {
         if (!valid)
         {
+            env.context.SetRotorReferenceValid(false);
             env.tracer.Trace() << "[SM] NVM invalid, starting in Idle";
             return;
         }
@@ -33,6 +34,9 @@ namespace application
 
     void BootSequence::Finish(services::NvmStatus status)
     {
+        // A reference kept by a control-mode switch survives only into Ready (FinishAligned).
+        env.context.SetRotorReferenceValid(false);
+
         if (status != services::NvmStatus::Ok)
             env.tracer.Trace() << "[SM] NVM load failed, starting in Idle";
         else if (!calibration.HasValidCalibration())
@@ -43,9 +47,26 @@ namespace application
         else
         {
             env.tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";
-            env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
-            env.mode.ApplyModeSpecificCalibration(env.context.Data());
+            ApplyRecord();
         }
+    }
+
+    bool BootSequence::ResumesAligned(services::NvmStatus status) const
+    {
+        return status == services::NvmStatus::Ok && env.context.IsRotorReferenceValid() && calibration.HasValidCalibration();
+    }
+
+    state_machine::Ready BootSequence::FinishAligned()
+    {
+        env.tracer.Trace() << "[SM] Electrical parameters restored; rotor reference kept across the control-mode switch";
+        ApplyRecord();
+        return calibration.ReadyState();
+    }
+
+    void BootSequence::ApplyRecord()
+    {
+        env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
+        env.mode.ApplyModeSpecificCalibration(env.context.Data());
     }
 
     void BootSequence::OnValidityChecked(bool valid)

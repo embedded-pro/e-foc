@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.3.2
+version: 0.4.0
 component: state-machine
-date: 2026-10-23
+date: 2026-10-27
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.3.2                      |
+| Version   | 0.4.0                      |
 | Component | state-machine              |
-| Date      | 2026-10-23                 |
+| Date      | 2026-10-27                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -33,6 +33,7 @@ date: 2026-10-23
 - Enforcing all transition guards so that the FOC controller can only be enabled after a successful calibration, and calibration can only be started from `Idle` or `Ready`
 - Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
 - On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds
+- Keeping an established rotor reference across a control-mode switch: a machine built by a switch out of an aligned `Ready` boots straight to `Ready` when the stored record is complete for its mode (see C4)
 - Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `align`, `enable`, `disable`, `clear_fault`, `clear_cal`)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
@@ -52,7 +53,7 @@ The state machine has five named states:
 
 | State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                  |
 |---------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                                                                                      |
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and a rotor reference kept by a control-mode switch), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                          |
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
 | `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                                                                                  |
 | `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                |
@@ -65,6 +66,7 @@ stateDiagram-v2
     [*] --> Idle
 
     Idle --> Calibrating : CmdCalibrate,\nCmdReAlign (if R/L loaded)\nor CmdReserveExternalCalibration
+    Idle --> Ready : boot load complete\n(rotor reference kept\nby a mode switch)
     Idle --> Idle : CmdClearCalibration
     Idle --> Fault : hardware fault
 
@@ -130,7 +132,7 @@ The table is the single source of truth for what the machine accepts:
   handles, states that no row leaves, and rows from any state that can never fire all stop the
   build, naming the offending row. A malformed lifecycle therefore never produces a binary.
 - `FocLifecycleTable::Rules()` declares which state changes the lifecycle may make, separately
-  from the rows: `Idle` → `Calibrating` or `Idle`; `Ready` → `Calibrating`, `Enabled` or
+  from the rows: `Idle` → `Calibrating`, `Ready` or `Idle`; `Ready` → `Calibrating`, `Enabled` or
   `Idle`; `Calibrating`, `Enabled` and `Fault` → `Ready` or `Idle`; and any state → `Fault`.
   `Enabled` is forbidden from every state except `Ready`, and `Fault` never leads straight
   back to `Calibrating`. A row that makes any other transition, or an allowed transition that
@@ -177,10 +179,10 @@ collaborators that carry out the work, each with one responsibility.
 
 | Collaborator         | Responsibility                                                                                                                                                                       |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocLifecycleTable`  | The 48 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                                                                         |
+| `FocLifecycleTable`  | The 49 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                                                                         |
 | `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command                                                      |
 | `MaintenanceFlow`    | Clearing the stored calibration and editing the motor parameters it holds                                                                                                            |
-| `BootSequence`       | The boot-time validity check and load of the stored record                                                                                                                           |
+| `BootSequence`       | The boot-time validity check and load of the stored record, and the move to `Ready` when a control-mode switch kept the rotor reference                                              |
 | `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                                                                               |
 | `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                                                                             |
 | `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling                                                   |
@@ -726,6 +728,12 @@ configuration requirement.
 
 On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, the electrical parameters (R, L, pole pairs, current-loop bandwidth) are applied to the FOC controller, but the machine **remains in `Idle`** — the rotor-reference (encoder zero offset) is RAM-only and is lost on every reset, so it must be re-established by a live alignment before the motor can be enabled. If the check fails or the data is absent, the machine starts in `Idle` with no parameters applied.
 
+The one exception is a machine built by a control-mode switch out of an aligned `Ready` (C4). It is told
+at construction that the rotor reference is kept; when the load succeeds and the record is complete for
+its mode, the load's completion moves it from `Idle` to `Ready` with the rotor reference valid, after
+applying the record exactly as above. A record that is incomplete for the new mode, or a load that fails,
+leaves it in `Idle` as at power-on.
+
 ### Alignment-Only Recovery
 
 `CmdReAlign()` re-establishes the rotor reference without re-running the full identification chain. It requires the machine to be in `Idle` or `Ready` with valid electrical calibration already loaded (non-zero pole pairs and positive phase resistance). The procedure:
@@ -910,6 +918,42 @@ sequenceDiagram
     NVM-->>CSM: Ok
     CSM-->>Caller: cb(busy)
     note over CSM: activeSm is still the Torque machine,\nstill in Fault, fault code unchanged
+```
+
+#### C4 — A Mode Switch Keeps the Rotor Reference
+
+The alignment zeroes the encoder, which is hardware every mode's machine shares; destroying the machine
+that ran it does not move the rotor or the encoder. `Activate()` therefore reads, before it stops and
+destroys the active machine, whether that machine is in `Ready` with `rotorReferenceValid`. If it is, the
+new machine is built with the rotor reference kept and boots to `Ready` once its stored record loads and is
+complete for the new mode (Boot-Time NVM Check), so the operator can enable it without aligning again.
+In every other case — the active machine was in `Idle`, or the record lacks the inertia and friction a
+speed or position machine needs — the new machine boots to `Idle` with no rotor reference, as at power-on,
+and needs `CmdReAlign()` or `CmdCalibrate()`.
+
+Only `Ready` hands the reference over: it is the state in which the old machine itself would have accepted
+`CmdEnable`, so a switch never makes a motor startable that was not startable before it. `Select()` is
+refused outside `Idle` and `Ready` (C2), so a fault is never carried past.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant CSM as ControlModeStateMachine
+    participant Old as Torque machine (Ready, aligned)
+    participant New as Speed machine
+    participant NVM
+
+    Caller->>CSM: Select(Speed, cb)
+    CSM->>NVM: SaveConfig(defaultMode=Speed)
+    NVM-->>CSM: Ok
+    CSM->>Old: rotor reference valid in Ready?
+    Old-->>CSM: yes
+    CSM->>Old: EmergencyStop, destroy
+    CSM->>New: construct (rotor reference kept)
+    New->>NVM: IsCalibrationValid, LoadCalibration
+    NVM-->>New: record complete for speed mode
+    note over New: Idle to Ready, rotor reference valid
+    CSM-->>Caller: cb(ok)
 ```
 
 ---

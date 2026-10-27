@@ -4,9 +4,12 @@
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
+#include "tools/can_commander/logic/RecoveryAdvice.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QLabel>
+#include <QMessageBox>
+#include <QPointer>
 #include <QWidget>
 #include <functional>
 #include <optional>
@@ -50,11 +53,21 @@ namespace tool
 
     signals:
         void StatusChanged();
+        void ShowRequested();
 
     private:
         QWidget* CreateHeader();
         void ConnectCommands();
         void ConnectSetpoints();
+        void SendStopMotor();
+        void SendClearFault();
+        void SendAlign();
+        void SendSetpoint(can::FocMotorMode mode, int32_t counts);
+        bool SendSetpointValue(can::FocMotorMode mode, float value);
+        void OfferRecovery(uint8_t commandType, Refusal refusal);
+        void ShowRecovery(uint8_t commandType, const RecoveryAdvice& advice);
+        void RunRecovery(RecoveryAction action);
+        void CloseRecovery();
         void ConnectCommissioning();
         void ConnectDiagnostics();
         void ConfirmClearCalibration();
@@ -95,6 +108,16 @@ namespace tool
         uint8_t pendingCommandType{ 0 };
         std::optional<FocMotorState> lastState;
         std::optional<FocFaultCode> lastFault;
+
+        struct PendingSetpoint
+        {
+            can::FocMotorMode mode;
+            int32_t counts;
+        };
+
+        std::optional<PendingSetpoint> pendingSetpoint;
+        QPointer<QMessageBox> recoveryBox;
+        RecoveryAdvice recoveryAdvice;
 
         ChangeSequence changes;
         SettingsPage* applyingPage{ nullptr };
