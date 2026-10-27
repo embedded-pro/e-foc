@@ -77,6 +77,24 @@ TEST_F(TestLowSideShuntWindow, a_highest_duty_above_the_maximum_scales_the_vecto
     EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
 }
 
+TEST_F(TestLowSideShuntWindow, with_both_bounds_exceeded_the_middle_one_scales_when_it_is_the_tighter)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(1.0f), Duty(0.9f), Duty(0.0f) }, limit, Duty(0.95f));
+
+    EXPECT_NEAR(Fraction(kept.a), 0.7f / 0.9f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.7f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, with_both_bounds_exceeded_the_maximum_scales_when_it_is_the_tighter)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(1.0f), Duty(0.75f), Duty(0.0f) }, limit, Duty(0.8f));
+
+    EXPECT_NEAR(Fraction(kept.a), 0.8f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.6f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
 TEST_F(TestLowSideShuntWindow, equal_duties_above_the_limit_move_to_the_limit)
 {
     const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.9f), Duty(0.9f), Duty(0.9f) }, limit, maxDuty);
