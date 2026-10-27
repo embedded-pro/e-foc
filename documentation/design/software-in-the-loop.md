@@ -739,19 +739,19 @@ timing scenarios fail on each when it is put back:
 
 ## Scenario Taxonomy
 
-| Area                     | What it establishes                                                                                                 |
-|--------------------------|---------------------------------------------------------------------------------------------------------------------|
-| Control modes            | Each mode calibrates or refuses to without mechanical parameters; a mode switch keeps the alignment                 |
-| Controller algorithms    | Every algorithm of every loop is selected through the stored configuration and reported running, in combinations    |
-| Plant characteristics    | Alignment refuses a noisy encoder; heavy current noise does not stop torque control                                 |
-| Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault            |
-| Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                          |
-| Board protection         | Trips reach the state machine and are reported                                                                      |
-| Control performance      | Each loop's default law stays inside its envelope, from rest and while running                                      |
-| Control robustness       | The noisy plant keeps the speed and position envelopes; every position law holds against the bench's cogging       |
-| Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from, linearly and through saturation    |
-| Parameter identification | Each identification requirement holds once on the bench motor, through its power stage and current-sense chain      |
-| Control loop timing      | The control interrupt holds its budget and a pinned worst case in calibration, alignment and closed-loop running    |
+| Area                     | What it establishes                                                                                              |
+|--------------------------|------------------------------------------------------------------------------------------------------------------|
+| Control modes            | Each mode calibrates or refuses to without mechanical parameters; a mode switch keeps the alignment              |
+| Controller algorithms    | Every algorithm of every loop is selected through the stored configuration and reported running, in combinations |
+| Plant characteristics    | Alignment refuses a noisy encoder; heavy current noise does not stop torque control                              |
+| Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault         |
+| Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                       |
+| Board protection         | Trips reach the state machine and are reported                                                                   |
+| Control performance      | Each loop's default law stays inside its envelope, from rest and while running                                   |
+| Control robustness       | The noisy plant keeps the speed and position envelopes; every position law holds against the bench's cogging     |
+| Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from, linearly and through saturation |
+| Parameter identification | Each identification requirement holds once on the bench motor, through its power stage and current-sense chain   |
+| Control loop timing      | The control interrupt holds its budget and a pinned worst case in calibration, alignment and closed-loop running |
 
 Every requirement a scenario verifies keeps at least one scenario here. The sweeps across laws,
 plants, signs and seeds run on the host instead (Part N).
