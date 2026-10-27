@@ -4,8 +4,6 @@
 
 namespace application
 {
-    // NXP FRDM-MC-LVPMSM low-voltage 3-phase PMSM motor control shield.
-    // Voltage divider ratio: 18.433 (bus measurement); current sensor gain: 5 A/V, mid-rail biased.
     struct BoardCharacteristics
     {
         static constexpr float voltageToVolts{ 18.433f };

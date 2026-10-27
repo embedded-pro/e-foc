@@ -32,8 +32,6 @@ namespace application
         Impl encoder;
     };
 
-    // Implementation
-
     template<typename Impl>
     requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     template<typename... Args>

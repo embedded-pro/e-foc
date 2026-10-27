@@ -216,6 +216,19 @@ window, and a window mean carries little of the quantisation of any one reading.
 in milli-newton-metres against micro-unit $J$ and $B$, so its three columns are of order one on these
 rotors.
 
+#### 4.2 Viscous friction from constant-speed runs
+
+The viscous term of the full regression also takes the torque of every transient and every ripple, which on the rig
+outweighed the small difference friction makes between two constant speeds. The online estimator therefore takes $B$
+from a second fit: each run of observations whose speed stays within a band of the run's mean contributes one point,
+its mean speed against its mean torque less $J$ times the run's mean acceleration, and $B$ is the slope of the line
+through those points, weighted by run length. Within a run the speed loop answers every dip with torque, and a loop
+that ripples there swings the torque against the acceleration, so either would decide a slope fitted to the
+observations themselves; the means carry neither. The moments decay with the regression's forgetting factor, so a
+long run at one speed narrows the spread rather than inflating a covariance. $B$ is the same in both directions of
+rotation while the intercepts are not, so the slope is pooled over the runs of both, each about its own means; see
+`documentation/design/service-mechanical-ident.md`, *Online Inertia and Friction Estimation*.
+
 ### 5. Convergence Criteria
 
 The offline identification has converged to reliable estimates when:

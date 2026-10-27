@@ -62,7 +62,7 @@ namespace services
 
     void ResistanceEstimator::StartSettlePhase()
     {
-        // At the PWM's own rate on every platform: a slower rate re-clocks the target's PWM but only decimates the emulator's, and the dead-time correction takes its scale from it
+        // The PWM's own rate: a slower one re-clocks the target's PWM but only decimates the emulator's.
         driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currents)
             {
                 if (!this->onDone || finishing)
@@ -166,7 +166,7 @@ namespace services
             onDone(Result{});
     }
 
-    // Interrupt context: only the injection stops here; the timers and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void ResistanceEstimator::Finish(bool measured)
     {
         driver.Stop();

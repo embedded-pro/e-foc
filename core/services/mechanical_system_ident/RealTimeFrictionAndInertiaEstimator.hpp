@@ -23,12 +23,10 @@ namespace services
 
         RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency);
 
-        // FrictionAndInertiaEstimator (4-param, for one-shot calibration procedure)
         Result Update(foc::PhaseCurrents currentPhases, foc::RadiansPerSecond speed, foc::Radians electricalAngle, foc::NewtonMeter targetTorque) override;
 
         void Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction);
 
-        // OnlineMechanicalEstimator (3-param, driven by state machine each outer-loop cycle)
         void SetTorqueConstant(foc::NewtonMeter kt) override;
         void SetInitialEstimate(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction) override;
 

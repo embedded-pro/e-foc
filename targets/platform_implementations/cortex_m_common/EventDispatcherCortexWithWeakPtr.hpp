@@ -4,10 +4,7 @@
 
 namespace application
 {
-    // The weak-pointer dispatcher is a second singleton next to the plain one. A platform that registers
-    // only the plain cortex dispatcher leaves it unset, and every completion scheduled against a WeakPtr
-    // (mechanical identification, deferred fault notifications) dereferences nothing. This worker
-    // registers both and idles the core the way the plain cortex worker does.
+    // Also registers the WeakPtr dispatcher singleton, which the plain cortex worker leaves unset.
     class EventDispatcherCortexWithWeakPtrWorker
         : public infra::EventDispatcherWithWeakPtrWorker
     {

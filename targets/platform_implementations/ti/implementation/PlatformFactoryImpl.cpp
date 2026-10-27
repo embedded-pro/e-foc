@@ -10,11 +10,11 @@
 
 namespace
 {
-    static constexpr uint32_t sysctlRescExt = 0x00000001u;  // Bit 0: External reset pin
-    static constexpr uint32_t sysctlRescBor = 0x00000004u;  // Bit 2: Brown-Out reset
-    static constexpr uint32_t sysctlRescWdt0 = 0x00000008u; // Bit 3: Watchdog Timer 0
-    static constexpr uint32_t sysctlRescSw = 0x00000010u;   // Bit 4: Software reset (NVIC_SystemReset)
-    static constexpr uint32_t sysctlRescWdt1 = 0x00000020u; // Bit 5: Watchdog Timer 1
+    static constexpr uint32_t sysctlRescExt = 0x00000001u;
+    static constexpr uint32_t sysctlRescBor = 0x00000004u;
+    static constexpr uint32_t sysctlRescWdt0 = 0x00000008u;
+    static constexpr uint32_t sysctlRescSw = 0x00000010u;
+    static constexpr uint32_t sysctlRescWdt1 = 0x00000020u;
 
     application::ResetCause ReadAndClearResetCause()
     {

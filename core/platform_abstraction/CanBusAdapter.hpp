@@ -138,8 +138,6 @@ namespace application
         infra::Function<void(CanError)> onError;
     };
 
-    // Implementation
-
     template<std::derived_from<hal::Can> Impl>
     void CanBusAdapterImpl<Impl>::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {

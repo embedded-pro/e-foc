@@ -16,7 +16,7 @@ namespace services
     public:
         static constexpr std::size_t bins{ coggingMapBins };
         static constexpr uint32_t minimumSamplesPerBin{ 16 };
-        // A map of noise alone agrees with itself to about 1; the bench motor's 0.5 mN·m of cogging already reads 6.6
+        // Noise alone agrees to about 1; see documentation/design/service-cogging-compensation.md.
         static constexpr float minimumAgreement{ 3.0f };
 
         enum class Direction : uint8_t

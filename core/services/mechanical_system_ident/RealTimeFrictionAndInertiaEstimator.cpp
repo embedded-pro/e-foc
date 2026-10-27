@@ -63,7 +63,6 @@ namespace services
         if (!rls.has_value())
             return;
 
-        // RLS model: torque = theta[0]*1(coulomb) + theta[1]*acceleration(inertia) + theta[2]*speed(friction)
         MotorRLS::CoefficientsMatrix initial{};
         initial.at(0, 0) = 0.0f;
         initial.at(1, 0) = inertia.Value();
@@ -162,8 +161,7 @@ namespace services
         if (!HasOnlineEstimateSettled(fit))
             return;
 
-        // The full fit's viscous term also takes the torque of every transient and every ripple, which on the rig
-        // outweighed the small difference between constant speeds; the runs at constant speed give the friction
+        // Friction comes from the constant-speed runs; the full fit's viscous term takes transients too.
         const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
         const auto steadyFriction = SteadyFriction();
         const auto friction = steadyFriction.has_value() ? SettledFriction(*steadyFriction / parameterScale) : currentFriction.Value();
@@ -175,9 +173,7 @@ namespace services
         currentFriction = foc::NewtonMeterSecondPerRadian{ friction };
     }
 
-    // The viscous friction is the same both ways while the intercepts are not, so the slope is pooled over both
-    // directions' runs, each about its own means: a direction that has only held speeds where the friction is still
-    // flat, as the rig's is from 10 to 30 rad/s, cannot set it alone, and the last direction run does not choose it
+    // Viscous friction is the same both ways, so the slope is pooled over both directions' runs.
     std::optional<float> RealTimeFrictionAndInertiaEstimator::SteadyFriction() const
     {
         auto variance = 0.0f;

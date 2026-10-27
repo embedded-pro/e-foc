@@ -42,8 +42,6 @@ namespace foc
 
         if (math::Abs(control) > 1.0f)
         {
-            // Back-calculation anti-windup: feeding the negated error winds the
-            // LQI integrator back toward zero when the output saturates.
             const SpeedLqi::OutputVector antiWindup{ 2.0f * context.measured.Value() - context.reference.Value() };
             lqi.ComputeControl(state, antiWindup, measured);
         }

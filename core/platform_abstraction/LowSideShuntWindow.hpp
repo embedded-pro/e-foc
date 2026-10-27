@@ -7,13 +7,7 @@
 
 namespace foc
 {
-    // A low-side shunt reads its phase only while that leg's low-side switch conducts around the PWM centre, so a
-    // duty above the board's limit hides the phase from the current loop. Lowering all three duties together keeps
-    // the line-to-line voltages, and with them the vector the current loop asked for. A vector wider than the limit
-    // takes the lowest duty to zero and keeps the middle one within the limit, so two phases stay readable, and the
-    // highest may go up to the board's maximum duty: LowSideShuntReadout gives its current from the other two. Only
-    // a vector whose middle duty is still above the limit, or whose highest is above the maximum, is scaled down,
-    // keeping its direction.
+    // Keeps the line-to-line voltages while lowering the duties so two low-side shunts stay readable.
     ALWAYS_INLINE_HOT PhasePwmDutyCycles KeepLowSideShuntsReadable(const PhasePwmDutyCycles& duties, hal::DutyCycle maxReadable, hal::DutyCycle maxDuty)
     {
         const auto limit = maxReadable.Value();
@@ -39,9 +33,7 @@ namespace foc
         return PhasePwmDutyCycles{ keep(duties.a), keep(duties.b), keep(duties.c) };
     }
 
-    // The samples of a PWM centre fall in the low-side pulse that the period ending there and the one starting there
-    // share, so a phase is unreadable if either period gave it a duty above the limit. KeepLowSideShuntsReadable
-    // leaves at most the highest phase there, and the winding's currents sum to zero.
+    // A phase is unreadable if either period around the PWM centre gave it a duty above the limit.
     class LowSideShuntReadout
     {
     public:

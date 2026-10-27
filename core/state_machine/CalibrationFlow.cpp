@@ -64,8 +64,7 @@ namespace application
         return false;
     }
 
-    // An external identification measures neither the current sensors, the cogging, the mechanics nor the loop
-    // bandwidths, so the record keeps all of them in force.
+    // An external identification leaves offsets, cogging, mechanics and bandwidths as recorded.
     void CalibrationFlow::BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
         const auto& held = env.context.Data();
@@ -227,8 +226,7 @@ namespace application
             });
     }
 
-    // Inertia and friction are traced in micro-units: the tracer prints three decimals, which cannot show
-    // values around 1e-6 and 1e-5.
+    // Inertia and friction are traced in micro-units: the tracer prints only three decimals.
     void CalibrationFlow::TraceRecord(const services::CalibrationData& data) const
     {
         env.tracer.Trace() << "[SM] Calibration record: R=" << data.rPhase

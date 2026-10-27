@@ -39,8 +39,7 @@ namespace
 
     constexpr std::size_t leadInSteps = 12;
 
-    // A four-pole-pair rotor that rests at restingElectricalAngle under the first vectorsIgnored vectors of the
-    // sweep, then lines up with every vector after them.
+    // Rests at restingElectricalAngle for the first vectorsIgnored vectors, then follows each vector.
     float FollowingRotor(std::size_t appliedVectors, float restingElectricalAngle, std::size_t vectorsIgnored)
     {
         constexpr float polePairs = 4.0f;
@@ -386,7 +385,6 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejecte
 
     identification->EstimateResistanceAndInductance(config, [](services::ElectricalParametersIdentification::ResistanceInductanceResult) {});
 
-    // Second call while first is in-flight must return immediately with nullopt
     identification->EstimateResistanceAndInductance(config, [&second](services::ElectricalParametersIdentification::ResistanceInductanceResult r)
         {
             second.called = true;
@@ -415,7 +413,6 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is
 
     identification->EstimateNumberOfPolePairs(config, [](auto) {});
 
-    // Second call while first is in-flight must return immediately with nullopt
     identification->EstimateNumberOfPolePairs(config, [&second](auto result)
         {
             second.called = true;
@@ -580,8 +577,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_succeeds_t
     bool doneCalled = false;
     services::ElectricalParametersIdentification::ResistanceInductanceResult capturedResult{};
 
-    // Resistance phase: first PhaseCurrentsReady (no-op), then after settle: second (measurement)
-    // Inductance phase: third PhaseCurrentsReady (for sinusoidal injection)
+    // PhaseCurrentsReady calls: resistance start (no-op), settled measurement, then inductance injection
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
         .WillOnce(::testing::Return())
         .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& cb)
@@ -603,13 +599,11 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_succeeds_t
 
     ForwardTime(std::chrono::milliseconds{ 100 });
 
-    // Feed positive current to get a valid resistance measurement
     for (std::size_t i = 0; i < numberOfSamples; ++i)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     ExecuteAllActions();
 
-    // Inductance phase: feed enough samples to complete (warmup + measurement periods * samplesPerPeriod)
     const float fInj = static_cast<float>(config.injectionFrequency.Value());
     const std::size_t samplesPerPeriod = static_cast<std::size_t>(std::round(10000.0f / fInj));
     const std::size_t totalInductanceSamples = (config.warmupPeriods + config.measurementPeriods) * samplesPerPeriod;
@@ -641,7 +635,6 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_af
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_)).Times(::testing::AnyNumber());
     EXPECT_CALL(driverMock, Stop()).Times(::testing::AnyNumber());
 
-    // First estimation
     identification->EstimateResistanceAndInductance(config, [&](auto)
         {
             ++callCount;
@@ -654,7 +647,6 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_af
 
     ASSERT_EQ(callCount, 1u);
 
-    // Second call after first completed (rlRunning is now false)
     bool secondCalled = false;
     identification->EstimateResistanceAndInductance(config, [&](auto)
         {

@@ -20,9 +20,7 @@ namespace application
         virtual void RunPostAlignmentStep(state_machine::Calibrating& calibrating) = 0;
         virtual bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) = 0;
 
-        // Mechanical identification runs the drive under a provisional plant. Whatever ends the run has to
-        // say what becomes of it: a committed calibration supersedes it, anything else must put back the
-        // model the drive held before the run.
+        // A committed calibration supersedes the provisional plant; otherwise the old model is restored.
         virtual void ProvisionalControlSuperseded() = 0;
         virtual void RestoreControlAfterProvisionalIdentification() = 0;
 

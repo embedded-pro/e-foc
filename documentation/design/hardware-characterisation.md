@@ -157,6 +157,18 @@ light rotor then identifies within 2.2 %. The scenario is the teknic plant with
    reports the gap per quantity. That gap is the figure of merit for the plant: it falls as
    Parts B and C land, and a regression in it says the model has drifted from the rig.
 
+### Part F — Duty limits of the E-FOC-HARDWARE board
+
+The board's `BoardCharacteristics` carries two duty limits: one measured on the rig and one set by the gate driver.
+
+| Limit            | Value | Provenance                                                                                                                                      |
+|------------------|-------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| Maximum readable | 70 %  | Above it a phase's low-side window at the PWM centre is too short for its shunt: a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %     |
+| Maximum duty     | 95 %  | The FAN7888 charges each high-side bootstrap capacitor only while the low side conducts; 95 % leaves 2.5 µs of every period, less the dead band |
+
+The current loop lost a phase above the readable limit, which is why `foc::KeepLowSideShuntsReadable` lowers the duties
+(`documentation/architecture/system.md`).
+
 ---
 
 ## Interfaces

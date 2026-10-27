@@ -8,8 +8,7 @@
 
 namespace services
 {
-    // On-media record layout constants. Bumping a version constant invalidates all stored
-    // data of that type, protecting against silent corruption after a firmware update.
+    // Bumping a layout version invalidates all stored data of that type; see service-nvm.md.
     static constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     static constexpr uint32_t ConfigMagic = 0xDEADBEEF;
     static constexpr uint8_t CalibrationLayoutVersion = 4;
@@ -19,7 +18,6 @@ namespace services
         : public NonVolatileMemory
     {
     public:
-        // Record layout: [magic:4][version:1][crc32:4][data:N]
         static constexpr std::size_t calibrationRecordSize =
             sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(CalibrationData);
         static constexpr std::size_t configRecordSize =

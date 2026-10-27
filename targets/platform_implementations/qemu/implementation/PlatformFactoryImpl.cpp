@@ -14,8 +14,7 @@ namespace
 {
     constexpr int kResponseLinesPerDrain = 16;
 
-    // The emulated machine has no reset-cause register and its reset reloads RAM, so the watchdog leaves its
-    // record in a host file instead
+    // No reset-cause register and reset reloads RAM, so the watchdog leaves its record in a host file.
     constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
     constexpr uint8_t watchdogResetMarker = 0x01;
 
@@ -314,8 +313,7 @@ namespace application
         return diagnostics;
     }
 
-    // The converter takes its sample-and-hold from the firmware, as the TI platform maps it, unless a scenario pins
-    // it in the plant.
+    // Sample-and-hold follows the firmware's request, as on TI, unless a scenario pins it in the plant.
     void PlatformFactoryImpl::ApplyCurrentSense(SampleAndHold requested)
     {
         if (!plantConfig.has_value())
@@ -364,10 +362,7 @@ namespace application
         return *canBusAdapter;
     }
 
-    // The plant is always stepped at the control rate; the requested rate only decides how often the
-    // samples are delivered, as an ADC trigger divider would. The identification procedures ask for
-    // 10 kHz and demodulate on that assumption, so handing them every 20 kHz sample doubles the
-    // inductance they measure.
+    // The plant always steps at the control rate; the requested rate only sets the delivery interval.
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         const uint32_t requested = frequency.Value();

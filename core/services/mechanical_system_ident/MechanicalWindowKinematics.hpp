@@ -13,9 +13,7 @@ namespace services
         float iq;
     };
 
-    // Merges outer-loop windows into observation windows sized for the encoder, and turns each run of three
-    // observation windows into one observation at the middle of the middle one; see the window kinematics in
-    // documentation/design/service-mechanical-ident.md.
+    // Merges outer-loop windows into observations; see Window Kinematics in service-mechanical-ident.md.
     class MechanicalWindowKinematics
     {
     public:

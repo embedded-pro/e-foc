@@ -355,7 +355,10 @@ Two rules keep this honest. Nothing is printed from the interrupt: samples go in
 interrupt alone writes, and the event loop alone drains, so the record file is written from one
 context. And the ring never blocks: when it is full the sample is dropped and
 counted, the count is reported when recording stops, and the host also checks that consecutive
-samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric.
+samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric. Begin and End
+only raise flags the tick acts on, so the tick stays the ring's only writer, and each marker has a slot of its own
+that the tick fills and the event loop empties: a full ring can drop samples but never the record that reports the
+drops.
 
 Between them those two rules set a ceiling on how long a recording can run, and it is worth
 stating because it is not the budget and it bites only the fast ones. The interrupt produces at
@@ -1010,7 +1013,9 @@ rotor movement, step-response metrics, disturbance recovery and identified or tr
 code, measured speed and position over telemetry; answer over CAN with the algorithm each loop is
 running, its calibration record, its online estimates, its control-loop statistics and its reset
 cause; and, when asked to, write the plant's trajectory and the tick each command frame was
-delivered on to its record file.
+delivered on to its record file. The emulated machine has no reset-cause register and its reset reloads RAM, so a
+watchdog reset leaves a marker in a host file (`watchdog_reset.bin`) that the next boot takes and clears, and the
+reset cause reads `watchdog` once and `powerUp` otherwise.
 
 **The terminal** stays on the first serial port for a person debugging a run, and what the target
 prints is the scenario's debug log. No scenario writes to the terminal or reads a verdict from the

@@ -7,8 +7,7 @@ namespace services
 {
     namespace
     {
-        // Layout: [magic:4][version:1][crc32:4][data:N]
-        // pragma pack prevents inter-field padding so the CRC covers exactly the stored bytes.
+        // Packed so the CRC covers exactly the stored bytes; record layout in service-nvm.md.
 #pragma pack(push, 1)
 
         struct CalibrationStorageRecord

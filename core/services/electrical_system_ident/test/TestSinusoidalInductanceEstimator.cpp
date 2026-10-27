@@ -16,10 +16,7 @@ namespace
     constexpr float vdc = 24.0f;
     constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
 
-    // Drives a ZOH alpha-axis RL plant with the same sinusoidal voltage the estimator injects,
-    // feeding back phase-A current (= alpha current for this excitation).
-    // Returns the result AND the ZOH-theoretic expected L in mH so the caller can assert
-    // algorithm correctness without relying on continuous-time approximation accuracy.
+    // Also returns the ZOH-theoretic expected L in mH, so no continuous-time approximation is needed.
     struct PlantSimResult
     {
         services::SinusoidalInductanceEstimator::Result result;
@@ -41,20 +38,18 @@ namespace
         plantParams.samplingFrequency = hal::Hertz{ static_cast<std::size_t>(fs) };
         const auto plant = foc::CurrentPlantModel::FromParameters(plantParams);
 
-        // The impl rounds f_inj to the nearest integer samples/period and uses that exact frequency.
-        // Mirror this here so the test voltage matches what the impl injects.
+        // The impl rounds f_inj to whole samples/period; mirror it so the test voltage matches.
         const float fInj = static_cast<float>(config.injectionFrequency.Value());
         const auto samplesPerPeriod = static_cast<std::size_t>(std::round(fs / fInj));
         const float omegaExact = twoPi * fs / static_cast<float>(samplesPerPeriod);
-        const float phaseInc = omegaExact / fs; // = 2π / samplesPerPeriod
+        const float phaseInc = omegaExact / fs;
 
         const float vNorm = foc::DutyFraction(config.injectionVoltage);
         const float vTermAmp = vNorm * 0.75f * vdc;
         const auto totalSamples = (config.warmupPeriods + config.measurementPeriods) * samplesPerPeriod;
 
-        // ZOH-theoretic expected L: Im(Z_ZOH) / (omegaExact * terminalFactor).
-        // Z_ZOH = (1 − ad·e^{−jω·Ts}) / bd  →  Im(Z_ZOH) = ad·sin(ω·Ts) / bd.
-        const float omegaTs = phaseInc; // = omegaExact / fs
+        // Z_ZOH = (1 − ad·e^{−jω·Ts}) / bd, so Im(Z_ZOH) = ad·sin(ω·Ts) / bd.
+        const float omegaTs = phaseInc;
         const float imZZOH = plant.ad * std::sin(omegaTs) / plant.bd;
         const float termFactor = config.windingConfig == services::WindingConfiguration::Delta ? 0.5f : 1.5f;
         const float expectedL = imZZOH / (omegaExact * termFactor) * 1000.0f; // mH
@@ -194,7 +189,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
 
 TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_the_anaheim_bly172s)
 {
-    // Anaheim BLY172S-24V-4000 terminal values (wye): R_phase=0.405Ω → R_terminal=0.6075Ω; L_phase=0.64mH → L_terminal=0.96mH.
+    // Anaheim BLY172S-24V-4000, wye: terminal values are 1.5 times the phase values.
     const float rTerminal = 0.405f * 1.5f;
     const float lTerminalMH = 0.64f * 1.5f;
 
@@ -211,7 +206,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
 
 TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_the_teknic_m2310p)
 {
-    // Teknic M-2310P-LN-04K terminal values (wye): R_phase=0.36Ω → R_terminal=0.54Ω; L_phase=0.20mH → L_terminal=0.30mH.
+    // Teknic M-2310P-LN-04K, wye: terminal values are 1.5 times the phase values.
     const float rTerminal = 0.36f * 1.5f;
     const float lTerminalMH = 0.20f * 1.5f;
 
@@ -267,7 +262,6 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
             result = r;
         });
 
-    // Provide a DC current signal (incoherent with f_inj).
     for (std::size_t k = 0; k < totalSamples; ++k)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
@@ -278,7 +272,6 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
 
 TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty_result_immediately)
 {
-    // samplesPerPeriod == 0 guard: injectionFrequency == 0 → onDone(Result{}) immediately
     services::SinusoidalInductanceEstimator::Config config{};
     config.injectionFrequency = hal::Hertz{ 0 };
 
@@ -295,8 +288,6 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty
 
 TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inductance_with_fit_quality)
 {
-    // zImag <= 0.0f branch: feed a signal that produces negative imaginary impedance.
-    // With the correction rotation, a negative-phase sinusoid (or reversed sign) produces zImag <= 0.
     services::SinusoidalInductanceEstimator::Config config{
         hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 0, services::WindingConfiguration::Wye
     };
@@ -320,9 +311,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
             result = r;
         });
 
-    // Feed a cosine signal (90° phase-shifted from injection sine) so Goertzel gives Im > 0 but Re < 0,
-    // making zImag = -vTerm * N/2 * iRe / magSquared positive only when iRe < 0.
-    // To get zImag <= 0, feed iRe > 0, i.e. a cosine signal.
+    // A cosine, 90° off the injection sine, gives iRe > 0 and so zImag <= 0.
     const float phaseInc = twoPi * fs / static_cast<float>(samplesPerPeriod) / fs;
     float phase = 0.0f;
     for (std::size_t k = 0; k < totalSamples; ++k)
@@ -333,7 +322,6 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
     }
     ExecuteAllActions();
 
-    // zImag <= 0 → nullopt inductance but fitQuality is computed
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_GT(result.fitQuality, 0.0f);
 }
@@ -405,7 +393,6 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
 
 TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_correctly)
 {
-    // Delta winding configuration test with terminalFactor = 0.5
     const float rTerminal = 0.75f;
     const float lTerminalMH = 0.75f;
 

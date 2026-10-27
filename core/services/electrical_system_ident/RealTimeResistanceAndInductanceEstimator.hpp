@@ -7,8 +7,7 @@
 
 namespace services
 {
-    // Assumes a non-salient motor (Ld ≈ Lq, i.e., surface-mounted PMSM); an interior PMSM
-    // would need a 3-parameter model separating Ld and Lq. Estimates start at zero until Seed().
+    // Assumes a non-salient motor (Ld ≈ Lq, surface-mounted PMSM); estimates are zero until Seed().
     class RealTimeResistanceAndInductanceEstimator
         : public foc::OnlineElectricalEstimator
     {
@@ -21,7 +20,6 @@ namespace services
 
         void Seed(foc::Ohm resistance, foc::MilliHenry inductance);
 
-        // OnlineElectricalEstimator
         void SetInitialEstimate(foc::Ohm resistance, foc::MilliHenry inductance) override;
 
         void Update(const foc::ElectricalWindow& window) override;
