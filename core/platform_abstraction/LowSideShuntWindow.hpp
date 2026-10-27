@@ -19,11 +19,23 @@ namespace foc
         const auto lowest = std::min({ duties.a.Value(), duties.b.Value(), duties.c.Value() });
         const auto middle = duties.a.Value() + duties.b.Value() + duties.c.Value() - highest - lowest;
         const auto shift = std::min(highest - limit, lowest);
-        const auto within = [](uint32_t bound, uint32_t value)
+        const auto shiftedMiddle = middle - shift;
+        const auto shiftedHighest = highest - shift;
+
+        // The tighter of the two bounds, chosen by cross-multiplying so only one ratio is divided out
+        uint32_t bound = 1;
+        uint32_t value = 1;
+        if (shiftedMiddle > limit)
         {
-            return value > bound ? static_cast<float>(bound) / static_cast<float>(value) : 1.0f;
-        };
-        const auto scale = std::min(within(limit, middle - shift), within(maxDuty.Value(), highest - shift));
+            bound = limit;
+            value = shiftedMiddle;
+        }
+        if (shiftedHighest > maxDuty.Value() && uint64_t{ maxDuty.Value() } * value < uint64_t{ bound } * shiftedHighest)
+        {
+            bound = maxDuty.Value();
+            value = shiftedHighest;
+        }
+        const auto scale = value != bound ? static_cast<float>(bound) / static_cast<float>(value) : 1.0f;
 
         const auto keep = [shift, scale](hal::DutyCycle duty)
         {

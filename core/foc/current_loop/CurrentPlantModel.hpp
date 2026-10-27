@@ -45,7 +45,10 @@ namespace foc
     {
         const auto squaredMagnitude = voltages.d * voltages.d + voltages.q * voltages.q;
 
-        const auto scale = 1.0f / math::Sqrt(squaredMagnitude > 1.0f ? squaredMagnitude : 1.0f);
+        if (squaredMagnitude <= 1.0f)
+            return voltages;
+
+        const auto scale = 1.0f / math::Sqrt(squaredMagnitude);
 
         return { voltages.d * scale, voltages.q * scale };
     }

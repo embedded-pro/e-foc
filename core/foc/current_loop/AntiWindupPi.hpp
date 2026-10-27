@@ -1,40 +1,42 @@
 #pragma once
 
-#include "numerical/controllers/implementations/PidIncremental.hpp"
-#include "numerical/controllers/interfaces/PidController.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
-#include <limits>
 
 namespace foc
 {
+    // Incremental PI: the realized output committed back becomes the base of the next step
     class AntiWindupPi
     {
     public:
         void SetTunings(float proportional, float integral)
         {
-            pid.SetTunings({ proportional, integral, 0.0f });
+            errorGain = proportional + integral;
+            previousErrorGain = -proportional;
         }
 
         void Reset()
         {
-            pid.Reset();
+            output = 0.0f;
+            error = 0.0f;
         }
 
         ALWAYS_INLINE_HOT float Propose(float reference, float measured)
         {
-            pid.SetPoint(reference);
-            return pid.Process(measured);
+            const auto previousError = error;
+            error = reference - measured;
+            output = output + errorGain * error + previousErrorGain * previousError;
+            return output;
         }
 
         ALWAYS_INLINE_HOT void CommitRealized(float applied)
         {
-            pid.SetPreviousOutput(applied);
+            output = applied;
         }
 
     private:
-        controllers::PidIncrementalSynchronous<float> pid{
-            { 0.0f, 0.0f, 0.0f },
-            { -std::numeric_limits<float>::max(), std::numeric_limits<float>::max() }
-        };
+        float errorGain{ 0.0f };
+        float previousErrorGain{ 0.0f };
+        float output{ 0.0f };
+        float error{ 0.0f };
     };
 }

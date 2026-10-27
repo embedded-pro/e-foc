@@ -501,13 +501,17 @@ undone, and again after it, for a fault raised while `Start()` ran. Either check
 `FaultDetected` dispatch, which the table queues and drains before the `Enable` dispatch returns; the whole
 enable sequence is therefore atomic with respect to the fault and `CmdEnable` reports `abortedByFault`.
 
-The same reasoning applies one level down, inside `Runner::Enable()`. Its steps — take the phase-current slot,
-enable the control law, start the inverter, set the `enabled` flag — are individually interruptible, and a
-`Stop()` from the faulting context between any two of them would be undone by the steps that follow it,
-re-arming the bridge on hardware that has just faulted, with no control loop attached to update it. `Enable()`
-therefore clears a `stopRequested` flag that `Disable()` sets, re-checks it after every step, and unwinds
-through `Disable()` once it is set. A stop landing after the last check needs no unwinding: it runs after
-every write the sequence makes. The flag is written from the faulting context as well as the mainline, so it
+The same reasoning applies one level down, inside `Runner`. The phase-current slot is what connects the
+control loop to the bridge, so the runner holds it only while the bridge runs: `Enable()` clears the slot,
+enables the control law, starts the inverter and takes the slot last; `Disable()` releases the slot first,
+then stops the inverter and the control law. A conversion that lands while the slot is clear does nothing, so
+no per-sample flag is needed, and once `Disable()` has released the slot no sample can write a duty — on the
+TI PWM, a duty written to a stopped generator would restart it. The steps of `Enable()` are individually
+interruptible, and a `Stop()` from the faulting context between any two of them would be undone by the steps
+that follow it, re-arming the bridge on hardware that has just faulted. `Enable()` therefore clears a
+`stopRequested` flag that `Disable()` sets, re-checks it after every step, and unwinds through `Disable()`
+once it is set. A stop landing after the last check needs no unwinding: it runs after every write the
+sequence makes. The flag is written from the faulting context as well as the mainline, so it
 is set and cleared outright rather than counted — a read-modify-write shared with an interrupt is exactly what
 REQ-SM-021 excludes.
 

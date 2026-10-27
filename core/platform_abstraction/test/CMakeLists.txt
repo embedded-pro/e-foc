@@ -14,4 +14,5 @@ target_sources(e_foc.platform_abstraction_test PRIVATE
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
     TestLowSideShuntWindow.cpp
+    TestQuadratureEncoderDecorator.cpp
 )

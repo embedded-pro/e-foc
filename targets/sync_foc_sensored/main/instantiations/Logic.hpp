@@ -56,7 +56,9 @@ namespace application
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
         infra::WithSharedAccess<services::PhaseCurrentOffsetCompensation> currentOffsets;
+        drivers::DeadTimeLoss deadTimeLoss;
         services::DeadTimeCompensation deadTimeCompensation;
+        drivers::ThreePhaseInverter& compensatedInverter;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         services::RotorStandstillImpl rotorStandstill;

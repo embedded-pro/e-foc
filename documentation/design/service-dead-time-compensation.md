@@ -56,6 +56,11 @@ already have the sensors' offsets removed, and corrects the next duty written wi
 closed loop the duty follows the sample it was computed from in the same interrupt, so the
 correction always uses the current of that period.
 
+A board that states no loss, or a dead band other than the one its loss was measured at, would get
+every duty back unchanged. The application then leaves the service out of the chain altogether, and
+the current-offset correction is the inverter the loop and the procedures see, which keeps the
+correction's cost out of the 20 kHz path on those boards.
+
 The voltage the current loop asks for is unchanged. The anti-windup limits and the online
 estimators see that voltage, and the correction makes the winding receive it, which is why the
 online resistance estimate then measures the winding alone. The platform's rule that keeps the
