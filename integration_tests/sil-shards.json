@@ -1,0 +1,25 @@
+{
+  "shards": [
+    [
+      "integration_tests/features/control_robustness.feature",
+      "integration_tests/features/watchdog.feature"
+    ],
+    [
+      "integration_tests/features/control_loop_timing.feature",
+      "integration_tests/features/controller_settings.feature",
+      "integration_tests/features/disturbance_rejection.feature",
+      "integration_tests/features/identification_robustness.feature",
+      "integration_tests/features/motor_disconnected.feature",
+      "integration_tests/features/nvm_integrity.feature",
+      "integration_tests/features/plant_characteristics.feature"
+    ],
+    [
+      "integration_tests/features/control_modes.feature",
+      "integration_tests/features/control_performance.feature",
+      "integration_tests/features/controller_matrix.feature",
+      "integration_tests/features/motor_control.feature",
+      "integration_tests/features/parameter_identification.feature",
+      "integration_tests/features/protection_faults.feature"
+    ]
+  ]
+}
