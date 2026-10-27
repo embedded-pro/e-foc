@@ -3,42 +3,20 @@
 #include "can-lite/client/CanProtocolClient.hpp"
 #include "core/can/CanFrameOrigin.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
-#include "core/can/FocMotorMessages.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/Can.hpp"
-#include <cstdint>
 
 namespace can
 {
     class FocMotorCanClient
     {
     public:
-        FocMotorCanClient(hal::Can& can, uint16_t nodeId);
-
-        void SetNodeId(uint16_t nodeId);
-
-        bool Start();
-        bool Stop();
-        bool ClearFault();
-        bool EmergencyStop();
-        bool SelectControlMode(FocMotorMode mode);
-        bool SetTorque(foc::Ampere value);
-        bool SetSpeed(foc::RadiansPerSecond value);
-        bool SetPosition(foc::Radians value);
-
-        bool SetCurrentBandwidth(float bandwidth);
-        bool SetSpeedBandwidth(float bandwidth);
-        bool SetPositionBandwidth(float bandwidth);
-        bool QueryContractVersion();
-
-        ContractCompatibility Compatibility() const;
+        explicit FocMotorCanClient(hal::Can& can);
 
         services::CanProtocolClient& ProtocolClient();
         FocMotorCategoryClient& CategoryClient();
         const FocMotorCategoryClient& CategoryClient() const;
 
     private:
-        uint16_t nodeId;
         CanFrameOriginTracker originTracker;
         services::CanProtocolClient protocolClient;
         FocMotorCategoryClient categoryClient;

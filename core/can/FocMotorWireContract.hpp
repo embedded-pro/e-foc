@@ -214,12 +214,6 @@ namespace can
         return std::nullopt;
     }
 
-    constexpr uint8_t PayloadSizeOf(uint8_t id)
-    {
-        const auto descriptor = FindDescriptor(id);
-        return descriptor.has_value() ? descriptor->PayloadSize() : 0;
-    }
-
     inline bool PayloadExact(const hal::Can::Message& data, uint8_t id)
     {
         const auto descriptor = FindDescriptor(id);

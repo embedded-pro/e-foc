@@ -66,12 +66,6 @@ namespace application
             return PlatformFactory::BoardProtectionState::unknown;
         }
 
-        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
-        {
-            if (onBoardProtection != nullptr)
-                onBoardProtection(reason);
-        }
-
         // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
         void Start() override;
         uint32_t ElapsedCycles() override;

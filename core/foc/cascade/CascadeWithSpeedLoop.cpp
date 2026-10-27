@@ -178,11 +178,6 @@ namespace foc
         return { RadiansPerSecond{ lastMechanicalSpeed }, Ampere{ lastMeanIq }, RadiansPerSecond{ speedReference }, Radians{ 0.0f } };
     }
 
-    float CascadeWithSpeedLoop::PolePairs() const
-    {
-        return polePairs;
-    }
-
     LowPriorityInterrupt& CascadeWithSpeedLoop::GetLowPriorityInterrupt()
     {
         return lowPriorityInterrupt;
@@ -210,11 +205,6 @@ namespace foc
 
         estimators.UpdateElectrical(vdcInvScale, Ampere{ directCurrentReference });
         directCurrentReference = directAxisExcitation.Advance();
-    }
-
-    void CascadeWithSpeedLoop::SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency)
-    {
-        directAxisExcitation = DirectAxisExcitation{ amplitude, frequency, outerLoopFrequency, excitationBurst, excitationCycle };
     }
 
     void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)

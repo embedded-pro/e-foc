@@ -251,16 +251,6 @@ namespace application
         return tracer;
     }
 
-    drivers::ThreePhaseInverter& FocStateMachineCommon::GetInverter()
-    {
-        return calibrationContext.GetInverter();
-    }
-
-    foc::Volts FocStateMachineCommon::GetVdc() const
-    {
-        return calibrationContext.GetVdc();
-    }
-
     const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
     {
         return calibrationContext.Data();

@@ -779,9 +779,4 @@ namespace state_machine
         return pendingSelectCallback != nullptr || configWriter.HasPendingPersist();
     }
 
-    bool ControlModeStateMachine::HasPendingConfigPersist() const
-    {
-        return configWriter.HasPendingPersist();
-    }
-
 }

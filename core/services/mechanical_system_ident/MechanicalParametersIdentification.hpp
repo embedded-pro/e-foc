@@ -17,12 +17,6 @@ namespace services
         ~MechanicalParametersIdentification() = default;
 
     public:
-        struct IdentificationResult
-        {
-            foc::NewtonMeterSecondPerRadian friction;
-            foc::NewtonMeterSecondSquared inertia;
-        };
-
         // targetSpeed and dwellSpeed are the two levels of the excitation trajectory; the run alternates
         // between them every dwellTime so that each transition excites the acceleration column of the
         // regressor. maxCurrent and maxSpeed bound the motion the trajectory is allowed to produce, and
