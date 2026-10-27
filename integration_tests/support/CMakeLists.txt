@@ -3,6 +3,24 @@ add_subdirectory(interactor/qemu)
 add_subdirectory(interactor/hardware)
 add_subdirectory(response)
 
+add_library(e_foc.integration_tests.plant STATIC
+    nvm/NvmImageBuilder.hpp
+    nvm/NvmImageBuilder.cpp
+    plant/PlantConfigWriter.hpp
+    plant/PlantConfigWriter.cpp
+    plant/PlantPresets.hpp
+)
+
+target_include_directories(e_foc.integration_tests.plant PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../..>"
+)
+
+target_link_libraries(e_foc.integration_tests.plant PUBLIC
+    e_foc.foc.model
+    e_foc.services.non_volatile_memory
+    infra.util
+)
+
 add_library(e_foc.integration_tests.support OBJECT
     CanParameters.hpp
     CanParameters.cpp
@@ -10,11 +28,6 @@ add_library(e_foc.integration_tests.support OBJECT
     ControllerSelection.cpp
     Fixture.hpp
     Fixture.cpp
-    nvm/NvmImageBuilder.hpp
-    nvm/NvmImageBuilder.cpp
-    plant/PlantConfigWriter.hpp
-    plant/PlantConfigWriter.cpp
-    plant/PlantPresets.hpp
     TerminalFixture.hpp
     TerminalFixture.cpp
 )
@@ -25,6 +38,7 @@ target_include_directories(e_foc.integration_tests.support PUBLIC
 
 target_link_libraries(e_foc.integration_tests.support PUBLIC
     e_foc.integration_tests.interactor.interfaces
+    e_foc.integration_tests.plant
     e_foc.integration_tests.response
     e_foc.state_machine
     e_foc.services.non_volatile_memory

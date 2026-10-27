@@ -12,6 +12,13 @@ Feature: FOC Control Performance
   two-DOF trades speed for overshoot, deadbeat settles in a sample, sliding mode
   keeps a boundary-layer band.
 
+  Each loop keeps its default PID row here, which measures the envelope through
+  the emulated target end to end. The rows of every other law, and the setpoint
+  changes of either sign, run in the host model-in-the-loop tests
+  (integration_tests/model_in_the_loop), which build the firmware's control-mode
+  state machine against the same plant model, measure the same windows and
+  assert the same limits in a fraction of the time.
+
   The rise_ms and tail_pct columns were left permissive when they were added and
   are now pinned, each to twice the worst value six repeated runs of this suite
   measured for its row, rounded up. Twice rather than closer because a run
@@ -88,9 +95,6 @@ Feature: FOC Control Performance
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 10       | 60        | 15            | 20      | 6        | 0.5   |
-      | adrc      | 10       | 80        | 15            | 50      | 6        | 0.5   |
-      | twodof    | 10       | 60        | 15            | 30      | 6        | 0.5   |
-      | lqi       | 10       | 60        | 15            | 25      | 6        | 0.5   |
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop follows a setpoint change to <target> rad/s while running
@@ -117,13 +121,6 @@ Feature: FOC Control Performance
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 40     | 10       | 60        | 15            | 25      | 5        | 0.5   |
-      | pid       | -20    | 10       | 60        | 15            | 20      | 4        | 0.5   |
-      | adrc      | 40     | 10       | 80        | 15            | 50      | 6        | 0.5   |
-      | adrc      | -20    | 10       | 80        | 15            | 40      | 4        | 0.5   |
-      | twodof    | 40     | 10       | 60        | 15            | 40      | 6        | 0.5   |
-      | twodof    | -20    | 10       | 60        | 15            | 30      | 4        | 0.5   |
-      | lqi       | 40     | 10       | 60        | 15            | 35      | 6        | 0.5   |
-      | lqi       | -20    | 10       | 60        | 15            | 30      | 4        | 0.5   |
 
   @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop steps from rest to 1.5 rad
@@ -143,14 +140,12 @@ Feature: FOC Control Performance
     And the position response tail shall stay within <tail_pct> % of the step
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
+    When the motor is disabled
+    Then the state machine shall be in the Ready state
 
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 10       | 200       | 15            | 185     | 8        | 0.1   |
-      | cascadep  | 10       | 200       | 10            | 210     | 1        | 0.02  |
-      | lqr       | 10       | 60        | 15            | 30      | 1        | 0.01  |
-      | lqi       | 10       | 60        | 50            | 10      | 1        | 0.01  |
-      | twodof    | 10       | 300       | 15            | 310     | 8        | 0.1   |
 
   @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop follows a setpoint change to <target> rad while holding
@@ -176,10 +171,6 @@ Feature: FOC Control Performance
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | -1.5   | 10       | 200       | 15            | 195     | 6        | 0.15  |
-      | cascadep  | -1.5   | 10       | 200       | 10            | 210     | 1        | 0.02  |
-      | lqr       | -1.5   | 10       | 60        | 15            | 30      | 1        | 0.01  |
-      | lqi       | -1.5   | 10       | 60        | 40            | 15      | 1        | 0.01  |
-      | twodof    | -1.5   | 10       | 300       | 15            | 320     | 6        | 0.15  |
 
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop steps from rest to 0.5 A
@@ -199,14 +190,13 @@ Feature: FOC Control Performance
     And the current response tail shall stay within <tail_pct> % of the step
     And the steady-state current error shall be below <error> A
     And the response shall have no dropped samples
+    When the motor is disabled
+    Then the state machine shall be in the Ready state
 
     @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 25       | 3         | 30            | 15      | 35       | 0.12  |
-      | decoupled | 10       | 3         | 30            | 4       | 1        | 0.05  |
-      | deadbeat  | 10       | 1         | 30            | 1       | 7        | 0.05  |
-      | sliding   | 10       | 3         | 30            | 1       | 13       | 0.05  |
 
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running

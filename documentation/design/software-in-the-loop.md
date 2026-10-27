@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.9.0
+version: 1.10.0
 component: "software-in-the-loop"
-date: 2026-10-25
+date: 2026-10-27
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.9.0                       |
+| Version   | 1.10.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-10-25                  |
+| Date      | 2026-10-27                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -132,8 +132,17 @@ frames, one text line per frame in each direction, so a frame can never be split
 or taken for one. Whatever the firmware prints, traces and terminal output alike, goes to the
 emulator's console and is the scenario's debug log: it is written to the scenario directory, and a
 failed scenario's report carries its last lines. The plant's record (Part G) is a file the firmware
-writes into the same directory. The host takes the first heartbeat on the CAN port as the sign that
-the target is up; it never waits for a line of console output.
+writes into the same directory. The host asks for the target's status on the CAN port every 50 ms
+from the moment the emulator starts, and takes the heartbeat that answers as the sign that the
+target is up; it never waits for a line of console output. The answer comes about half a second
+after the emulator starts, where the first unprompted heartbeat comes a full heartbeat period
+later, and every scenario boots at least once.
+
+A session ends by signalling the emulator to terminate. Closing its sockets does not end it: the
+emulator keeps running with its serial ports unconnected and ignores the broken pipe. The session
+once waited out a two-second deadline before killing it, at the boot that applies a scenario's
+plant and again after the scenario, which was four of the five and a half seconds a typical
+scenario took.
 
 ```mermaid
 sequenceDiagram
@@ -146,6 +155,7 @@ sequenceDiagram
     H->>H: write both images into the scenario directory
     H->>T: start the emulator there
     T->>T: read the plant, restore the configuration
+    H->>T: status request, every 50 ms
     T-->>H: CAN heartbeat
     S->>T: CAN commands
     T-->>S: acknowledgements and telemetry
@@ -729,25 +739,27 @@ timing scenarios fail on each when it is put back:
 
 ## Scenario Taxonomy
 
-| Area                     | What it establishes                                                                                               |
-|--------------------------|-------------------------------------------------------------------------------------------------------------------|
-| Control modes            | Torque, speed and position each align, enable, take a setpoint, disable                                           |
-| Controller algorithms    | Every algorithm of every loop runs, plus combinations across the loops                                            |
-| Plant characteristics    | Control holds up across noise, temperature, load and a different winding                                          |
-| Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault          |
-| Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                        |
-| Board protection         | Trips reach the state machine and are reported                                                                    |
-| Control performance      | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running    |
-| Control robustness       | The same response measured on a noisy, hot, loaded or differently wound plant, and the law reported still running |
-| Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
-| Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
-| Control loop timing      | The control interrupt holds its budget and a pinned worst case in calibration, alignment and closed-loop running  |
+| Area                     | What it establishes                                                                                                 |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------|
+| Control modes            | Each mode calibrates or refuses to without mechanical parameters; a mode switch keeps the alignment                 |
+| Controller algorithms    | Every algorithm of every loop is selected through the stored configuration and reported running, in combinations    |
+| Plant characteristics    | Alignment refuses a noisy encoder; heavy current noise does not stop torque control                                 |
+| Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault            |
+| Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                          |
+| Board protection         | Trips reach the state machine and are reported                                                                      |
+| Control performance      | Each loop's default law stays inside its envelope, from rest and while running                                      |
+| Control robustness       | The noisy plant keeps the speed and position envelopes; every position law holds against the bench's cogging       |
+| Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from, linearly and through saturation    |
+| Parameter identification | Each identification requirement holds once on the bench motor, through its power stage and current-sense chain      |
+| Control loop timing      | The control interrupt holds its budget and a pinned worst case in calibration, alignment and closed-loop running    |
 
-Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
-adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
-speed reference and run through the speed loop, and those that produce a current reference and
-bypass it. The full cross product is an order of magnitude more scenarios for coverage the sweep
-already provides.
+Every requirement a scenario verifies keeps at least one scenario here. The sweeps across laws,
+plants, signs and seeds run on the host instead (Part N).
+
+The controller combinations are chosen to exercise every algorithm of every loop at least once and
+both kinds of position law: those that produce a speed reference and run through the speed loop,
+and those that produce a current reference and bypass it. The full cross product is an order of
+magnitude more scenarios for coverage the combinations already provide.
 
 ### Part K — A plant that behaves like the bench
 
@@ -994,6 +1006,65 @@ What the plant cannot show: interrupt preemption at an arbitrary instruction, th
 drivers, the event queue under a hardware error storm, and power-rail behaviour. The emulated
 platform replaces the HAL, so a defect that lives in it, such as the per-error scheduling of the
 CAN driver, is outside what a scenario can reach and belongs to a test of that driver.
+
+### Part N — What the emulator keeps, and what runs on the host
+
+An emulated scenario costs its plant time in host time: the instruction-counted clock (Part B2)
+runs the guest at roughly the speed of the hardware, and the control interrupt carries the plant,
+so an identification that excites the motor for six seconds takes six seconds. The suite had grown
+to two hundred scenarios, most of them the same procedure swept over laws, plants, torque signs and
+seeds, and ran for twenty-four minutes.
+
+What a sweep measures is the control law or the estimator against the plant model, which the host
+can run as well as the emulator can. The host model-in-the-loop tests (`integration_tests/
+model_in_the_loop`) build the firmware's control-mode state machine, its calibration services and
+its non-volatile memory the way the application does, minus the CAN server, and drive them against
+the same plant model:
+
+- The simulated drive is the emulated platform's control interrupt carried over: it steps the
+  plant at the control rate, applies each duty a period late when the plant says so, keeps the
+  low-side shunts readable, decimates the phase currents to the rate a procedure asks for, fires
+  the scheduled torque step and encoder freeze, and records the trajectory with the same recorder.
+- The plant is configured from the same plant description by the same function the emulated
+  platform uses, so a field added to one cannot be missed by the other.
+- The outer loop runs after the control interrupt, as the low-priority interrupt does, and timers
+  advance by one control period per step. The recorder is drained sixteen lines a millisecond, as
+  the emulated platform drains it, and a command waits a few milliseconds after completing, as a
+  CAN round trip does, so an alignment ending and an enable starting never land on the same tick.
+- Steps, windows and metrics are those of the scenarios: the same response windows, the same
+  metric functions, the same limits.
+
+Run against the scenarios they replace, the two agree to the printed precision: the speed step of
+the PID law rises in 8 ms and overshoots by 9.37 % in both, and the hot winding's online resistance
+reads 0.4531 Ω in both. The whole host suite runs in about five seconds.
+
+```mermaid
+graph TD
+    REQ["Requirement"] --> SIL["One emulated scenario, end to end:<br/>CAN, NVM image, emulated board, real binary"]
+    REQ --> MIL["Host model-in-the-loop sweep:<br/>every law, plant, sign and seed"]
+    SIL --> ELF["Firmware binary under the emulator"]
+    MIL --> SM["Control-mode state machine and services,<br/>composed as the application composes them"]
+    ELF --> PLANT["Plant model"]
+    SM --> PLANT
+```
+
+The split follows one rule: every requirement keeps at least one emulated scenario, on the plant
+closest to the hardware, so the binary, the CAN surface, the memory image, the emulated board and
+the instruction-counted timing are exercised end to end; the sweeps move to the host. What stays
+emulated regardless: anything that reads the emulated board's protection (the current-limited
+supply's undervoltage trip, the protection faults), the control loop's timing, wiring faults that
+the encoder plausibility monitor reports, the watchdog, and the scenarios that speak to the target
+over CAN for their own sake.
+
+The host composition is written next to the application's, not shared with it, which is the cost:
+a change to how the application wires a service has to be made in both. The emulated scenario each
+requirement keeps is what catches the two drifting apart.
+
+The emulated scenarios that remain run in three CI jobs at once. The plan of which feature runs
+where, balanced by the time each takes, is a file next to the features
+(`integration_tests/sil-shards.json`), and every job checks that the plan lists every feature with
+an emulated scenario exactly once before it runs its share, so a new feature cannot be left out. A
+last job gathers the three reports into the one check the suite always published.
 
 ---
 
