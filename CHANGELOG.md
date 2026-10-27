@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/embedded-pro/e-foc/compare/v1.3.0...v1.4.0) (2026-10-27)
+
+
+### Features
+
+* Keep the rotor aligned across mode switches; setpoint knobs and refused-command advice in the CAN Commander ([#434](https://github.com/embedded-pro/e-foc/issues/434)) ([96e3cb1](https://github.com/embedded-pro/e-foc/commit/96e3cb1aa84c0c2bfe0b33195dbdb2834280d325))
+
 ## [1.3.0](https://github.com/embedded-pro/e-foc/compare/v1.2.1...v1.3.0) (2026-10-26)
 
 
