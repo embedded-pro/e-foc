@@ -15,14 +15,23 @@ target_link_libraries(e_foc.foc.cascade PUBLIC
 )
 
 target_sources(e_foc.foc.cascade PRIVATE
+    CascadeWithSpeedLoop.cpp
+    CascadeWithSpeedLoop.hpp
+    DirectAxisExcitation.cpp
+    DirectAxisExcitation.hpp
+    EstimatorChannel.cpp
+    EstimatorChannel.hpp
+    EstimatorWindowAccumulator.cpp
+    EstimatorWindowAccumulator.hpp
+    MechanicalWindowAccumulator.hpp
     PositionCascade.cpp
     PositionCascade.hpp
     SpeedCascade.cpp
     SpeedCascade.hpp
+    SpeedDifferentiator.cpp
+    SpeedDifferentiator.hpp
     TorqueCascade.cpp
     TorqueCascade.hpp
-    CascadeWithSpeedLoop.cpp
-    CascadeWithSpeedLoop.hpp
     TripleBuffer.hpp
 )
 

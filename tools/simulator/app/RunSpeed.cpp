@@ -1,4 +1,5 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -51,7 +52,7 @@ namespace simulator
         auto mechanics = foc::MechanicalModelParameters{};
         mechanics.inertia = foc::NewtonMeterSecondSquared{ motorParams.J.Value() };
         mechanics.viscousFriction = motorParams.B;
-        mechanics.torqueConstant = foc::NewtonMeter{ 1.5f * motorParams.p * motorParams.psi_f.Value() };
+        mechanics.torqueConstant = foc::TorqueConstantFor(motorParams.p, motorParams.psi_f);
         mechanics.maxCurrent = foc::Ampere{ defaults::maxCurrentAmps };
         mechanics.samplingFrequency = hal::Hertz{ defaults::lowPriorityFrequencyHz };
         controller.ConfigureMechanics(mechanics);
@@ -80,7 +81,7 @@ namespace simulator
         infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ *model, *model };
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ *model, *model, vdc };
         infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> mechanicalIdent{ controller, controller, controller, *model, *model };
-        const foc::NewtonMeter torqueConstant{ 1.5f * static_cast<float>(motorParams.p) * motorParams.psi_f.Value() };
+        const auto torqueConstant = foc::TorqueConstantFor(motorParams.p, motorParams.psi_f);
 
         auto& gui = simulation.GetGui();
 

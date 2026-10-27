@@ -1,4 +1,4 @@
-#include "core/foc/math/TorqueConstant.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include <gtest/gtest.h>
 
 TEST(TorqueConstantTest, is_three_halves_of_pole_pairs_times_flux_linkage)

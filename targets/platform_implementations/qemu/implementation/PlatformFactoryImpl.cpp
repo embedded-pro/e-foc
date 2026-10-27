@@ -1,5 +1,5 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
-#include "core/foc/math/LowSideShuntWindow.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
@@ -169,12 +169,13 @@ namespace application
             responseRecorder.Configure(baseHz / plantConfig->responseSampleRateHz, plantConfig->responseMaxSamples);
         }
 
-        torqueStep.Configure({ plantConfig->torqueStepNm,
-            static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u) });
+        torqueStepTorque = foc::NewtonMeter{ plantConfig->torqueStepNm };
+        const auto torqueStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u);
+        torqueStep.Configure(plantConfig->torqueStepNm != 0.0f ? std::make_optional(torqueStepDelay) : std::nullopt);
 
         // The delay is carried in centiseconds because it reuses a byte the record already had.
-        encoderFreeze.Configure(static_cast<uint32_t>(
-            static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u));
+        const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
+        encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
 
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
             watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
@@ -387,9 +388,9 @@ namespace application
         const uint32_t tick = controlTick.load(std::memory_order_relaxed) + 1;
         controlTick.store(tick, std::memory_order_relaxed);
 
-        if (const auto torque = torqueStep.Fire(tick))
+        if (torqueStep.Fire(tick))
         {
-            model.SetExternalTorque(foc::NewtonMeter{ *torque });
+            model.SetExternalTorque(torqueStepTorque);
             responseRecorder.Note(foc::PlantResponseKind::torqueStep, PlantSampleAt(tick));
         }
 

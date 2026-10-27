@@ -1,8 +1,8 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <cmath>
 

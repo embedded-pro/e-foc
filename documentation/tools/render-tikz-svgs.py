@@ -7,7 +7,7 @@ them without a LaTeX toolchain at render time.
 
 Run this script whenever a .tex file in documentation/tikz/ is modified:
 
-    python scripts/render-tikz-svgs.py
+    python documentation/tools/render-tikz-svgs.py
 
 Requirements:
     xelatex (or pdflatex / lualatex) — part of any standard TeX Live install
@@ -26,7 +26,7 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 TIKZ_DIR = ROOT / "documentation" / "tikz"
 OUT_DIR = TIKZ_DIR / "images"
 

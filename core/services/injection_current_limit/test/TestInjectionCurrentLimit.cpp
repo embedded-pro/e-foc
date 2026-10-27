@@ -1,4 +1,4 @@
-#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include <gmock/gmock.h>
 
 namespace

@@ -11,13 +11,12 @@ target_link_libraries(e_foc.foc.model_test PUBLIC
 target_sources(e_foc.foc.model_test PRIVATE
     TestAdcNoise.cpp
     TestCurrentSense.cpp
-    TestEncoderFreezeScheduler.cpp
     TestEncoderNoise.cpp
     TestFaultInjection.cpp
     TestMotorModel.cpp
+    TestOneShotDelay.cpp
     TestPlantNonidealities.cpp
     TestPlantResponseRecorder.cpp
     TestPowerStage.cpp
     TestThermalModel.cpp
-    TestTorqueStepScheduler.cpp
 )

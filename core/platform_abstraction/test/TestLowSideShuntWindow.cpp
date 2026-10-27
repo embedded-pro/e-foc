@@ -1,4 +1,4 @@
-#include "core/foc/math/LowSideShuntWindow.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include <gmock/gmock.h>
 
 namespace

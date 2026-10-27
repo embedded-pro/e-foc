@@ -139,8 +139,9 @@ which is why the modulation limiter clamps on |V| ≤ 1 rather than on 2/√3.
 
 **Duty cycle output:**
 
-Each offset phase voltage is scaled by 1/√3, biased by 0.5 to centre it in the PWM period, and clamped:
-`d = clamp(v/√3 + 0.5, 0, 1)`. A reference of unit magnitude therefore spans exactly [0, 1].
+Each offset phase voltage is scaled by 1/√3, biased by 0.5 to centre it in the PWM period, clamped once and
+rounded to the nearest duty-cycle step: `d = clamp(v/√3 + 0.5, 0, 1)`. A reference of unit magnitude therefore
+spans exactly [0, 1]. A non-finite phase lands on zero duty.
 
 **Constraints:**
 - Input Vα, Vβ are per-unit relative to `V_dc/√3` (dimensionless, inside the unit circle for linear operation).
@@ -153,7 +154,7 @@ Each offset phase voltage is scaled by 1/√3, biased by 0.5 to centre it in the
 graph LR
     Va["Vα, Vβ (per-unit)"] --> Inv["Inverse Clarke\n(vA, vB, vC)"]
     Inv --> Cm["Common-mode injection\n-(max+min)/2"]
-    Cm --> Duty["Scale, bias, clamp\n[0.0, 1.0]"]
+    Cm --> Duty["Scale, bias, clamp\n[0.0, 1.0], quantise"]
 ```
 
 ### Fast Trigonometry — Lookup-Table Sine and Cosine
@@ -225,7 +226,7 @@ form.
 | Synchronous frame   | Id, Iq     | Ampere (float)        | ± rated current | Output of Park forward                          |
 | Voltage demand      | Vd, Vq     | Dimensionless (float) | [−1, +1]        | Normalised to DC bus                            |
 | Stationary voltage  | Vα, Vβ     | Dimensionless (float) | [−1, +1]        | Output of inverse Park / input to SVM           |
-| Phase duty cycles   | Da, Db, Dc | Dimensionless (float) | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
+| Phase duty cycles   | Da, Db, Dc | `hal::DutyCycle`      | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
 | Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole_pairs; normalised before LUT indexing |
 | LUT                 | Sine table | float[512]            | [−1.0, +1.0]    | constexpr; 2 KB ROM; 16-byte aligned            |
 

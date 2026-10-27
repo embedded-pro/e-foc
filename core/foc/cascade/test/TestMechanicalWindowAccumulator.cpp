@@ -1,4 +1,4 @@
-#include "core/foc/math/MechanicalWindowAccumulator.hpp"
+#include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
 #include <gmock/gmock.h>
 
 namespace

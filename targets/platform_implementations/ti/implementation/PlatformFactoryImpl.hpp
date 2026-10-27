@@ -4,9 +4,9 @@
 #include <type_traits>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
-#include "core/foc/math/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "core/services/cli/SerialCommunicationMirror.hpp"

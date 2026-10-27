@@ -1,6 +1,6 @@
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
-#include "core/foc/math/DutyConversion.hpp"
-#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/foc/transforms/SpaceVectorModulation.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <numeric>
 
