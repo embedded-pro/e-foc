@@ -39,6 +39,8 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     MotorPanel.cpp
     MotorParametersTab.hpp
     MotorParametersTab.cpp
+    SetpointKnob.hpp
+    SetpointKnob.cpp
     SettingEditor.hpp
     SettingEditor.cpp
     SettingsPage.hpp

@@ -493,6 +493,10 @@ namespace tool
             {
                 RefreshMotor(*motor);
             });
+        connect(motor, &MotorPanel::ShowRequested, this, [this, motor]()
+            {
+                motorTabs->setCurrentWidget(motor);
+            });
 
         motorTabs->addTab(motor, StatusIcon(motor->Level()), motor->Title());
         motorArea->setCurrentWidget(motorTabs);

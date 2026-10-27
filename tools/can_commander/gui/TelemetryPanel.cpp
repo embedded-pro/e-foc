@@ -1,6 +1,7 @@
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "tools/can_commander/gui/DisplayFormat.hpp"
+#include "tools/can_commander/logic/SetpointAxis.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QFormLayout>
@@ -35,11 +36,11 @@ namespace tool
             return FieldSpec{ id, ui::model::noGroup, FieldKind::ReadOut, label, suffix, { 0.0, 0.0, 0.0, 0.0, static_cast<std::uint8_t>(decimals), 0.0, style }, {}, {}, {} };
         }
 
-        constexpr std::array<FieldSpec, 5> measurementFields{
+        const std::array<FieldSpec, 5> measurementFields{
             ReadOut(idCurrent, "Id current:", " A", DecimalsFor(can::focCurrentScale)),
             ReadOut(iqCurrent, "Iq current:", " A", DecimalsFor(can::focCurrentScale)),
-            ReadOut(speed, "Speed:", " rad/s", DecimalsFor(can::focSpeedScale)),
-            ReadOut(position, "Position:", " rad", DecimalsFor(can::focPositionScale)),
+            ReadOut(speed, "Speed:", SpeedAxis().Suffix(), SpeedAxis().Decimals()),
+            ReadOut(position, "Position:", PositionAxis().Suffix(), PositionAxis().Decimals()),
             ReadOut(busVoltage, "Bus voltage:", " V", DecimalsFor(can::focVoltageScale))
         };
 
@@ -138,8 +139,8 @@ namespace tool
 
     void TelemetryPanel::OnSpeedPosition(float speedValue, float positionValue)
     {
-        Show(measurements, speed, static_cast<double>(speedValue));
-        Show(measurements, position, static_cast<double>(positionValue));
+        Show(measurements, speed, SpeedAxis().DisplayOfSi(speedValue));
+        Show(measurements, position, PositionAxis().DisplayOfSi(positionValue));
     }
 
     void TelemetryPanel::OnBusVoltage(float voltage)
