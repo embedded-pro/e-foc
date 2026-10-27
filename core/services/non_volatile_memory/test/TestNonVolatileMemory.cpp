@@ -589,6 +589,58 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
     ExpectConfigDataEqual(loaded, defaults);
 }
 
+TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_magic_mismatch)
+{
+    bool saveDone = false;
+    nvm.SaveConfig(MakeTestConfig(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    configRegion.storage[recordMagicOffset] ^= 0xFF;
+
+    services::ConfigData loaded{};
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadConfig(loaded, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::Ok);
+    ExpectConfigDataEqual(loaded, services::MakeDefaultConfigData());
+}
+
+TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_stale_version)
+{
+    bool saveDone = false;
+    nvm.SaveConfig(MakeTestConfig(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    configRegion.storage[recordVersionOffset] = services::ConfigLayoutVersion - 1;
+
+    services::ConfigData loaded{};
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadConfig(loaded, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::Ok);
+    ExpectConfigDataEqual(loaded, services::MakeDefaultConfigData());
+}
+
 TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hardware_fault)
 {
     // Override Read to return corrupted data so the readback comparison fails.

@@ -2,9 +2,9 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.5.0
+version: 1.6.0
 component: integration-testing
-date: 2026-10-25
+date: 2026-10-27
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.5.0                      |
+| Version   | 1.6.0                      |
 | Component | integration-testing        |
-| Date      | 2026-10-25                 |
+| Date      | 2026-10-27                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are
 > structured*. It expands on the architecture by specifying component responsibilities, data flows,
@@ -48,6 +48,13 @@ motor-controller scenario on hardware is tagged `@hil_motor`.
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the
 > state machine directly. No such fixture exists, and none is planned: mocking the platform and
 > then asserting on the state machine tests the wiring of the test, not the product.
+>
+> The host model-in-the-loop tests (`integration_tests/model_in_the_loop`) are not that fixture.
+> They mock nothing: they compose the firmware's control-mode state machine, calibration services
+> and memory stack against the plant model the emulated target carries, and carry the sweeps over
+> laws, plants and seeds that used to be emulated scenarios. They are ordinary unit-test binaries,
+> not a target of this suite, and every requirement they cover keeps at least one `@sil` scenario
+> here. See Part N of `documentation/design/software-in-the-loop.md`.
 
 ---
 
@@ -172,7 +179,9 @@ enabled drive whose client falls silent (see the CAN service design).
 The transport addresses the node whose heartbeat it waits for at the start of a scenario. A board
 answers as its configured base plus the board ID read from its jumpers, so the suite takes the node
 ID from the first server heartbeat it sees rather than assuming node 1; the emulated target, with
-no jumpers, is node 1.
+no jumpers, is node 1. While it waits it broadcasts a status request every 50 ms, which a server
+answers with a heartbeat at once, so a target is found as soon as its CAN server is up rather than
+a heartbeat period later.
 
 ### Required from the system under test
 

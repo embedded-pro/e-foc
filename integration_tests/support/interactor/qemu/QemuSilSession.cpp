@@ -30,6 +30,7 @@ namespace
     constexpr std::string_view kTransmittedPrefix{ "CAN_TX " };
     constexpr auto kPumpSlice = std::chrono::milliseconds{ 10 };
     constexpr auto kGdbAttachTimeout = std::chrono::milliseconds{ 300000 };
+    constexpr auto kStopTimeout = std::chrono::milliseconds{ 2000 };
 
     bool SilVerbose()
     {
@@ -326,8 +327,10 @@ namespace sil
 
         unlink(terminalPath.c_str());
 
+        kill(pid, SIGTERM);
+
         int status = 0;
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ 2000 };
+        const auto deadline = std::chrono::steady_clock::now() + kStopTimeout;
         while (std::chrono::steady_clock::now() < deadline)
         {
             if (waitpid(pid, &status, WNOHANG) == pid)
@@ -335,7 +338,7 @@ namespace sil
                 pid = -1;
                 return;
             }
-            usleep(10000);
+            usleep(1000);
         }
 
         kill(pid, SIGKILL);

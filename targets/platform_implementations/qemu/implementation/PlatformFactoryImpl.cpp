@@ -3,6 +3,7 @@
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
+#include "targets/platform_implementations/qemu/implementation/SilPlantModel.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -71,16 +72,7 @@ namespace application
         if (!config.has_value())
             return fallback;
 
-        return foc::ThreePhaseMotorModel::Parameters{
-            .R = foc::Ohm{ config->statorResistanceOhm },
-            .Ld = foc::Henry{ config->dAxisInductanceHenry },
-            .Lq = foc::Henry{ config->qAxisInductanceHenry },
-            .psi_f = foc::Weber{ config->fluxLinkageWeber },
-            .p = config->polePairs,
-            .J = foc::KilogramMeterSquared{ config->rotorInertiaKgM2 },
-            .B = foc::NewtonMeterSecondPerRadian{ config->viscousDampingNmSPerRad },
-            .maxSupportedCurrent = foc::Ampere{ config->maxSupportedCurrentAmpere },
-        };
+        return sil::MotorParameters(*config);
     }
 
     foc::Volts PlatformFactoryImpl::SupplyVoltageFrom(const std::optional<sil::SilPlantConfig>& config)
@@ -101,43 +93,8 @@ namespace application
         if (!plantConfig.has_value())
             return;
 
-        model.SetRandomSeed(plantConfig->randomSeed);
-        model.SetAdcNoise({
-            .sigmaAmpere = plantConfig->noiseSigmaAmpere,
-            .biasAmpereA = plantConfig->noiseBiasAmpereA,
-            .biasAmpereB = plantConfig->noiseBiasAmpereB,
-            .biasAmpereC = plantConfig->noiseBiasAmpereC,
-        });
-        model.SetThermalConfig({
-            .ambientCelsius = plantConfig->ambientCelsius,
-            .thermalResistance = plantConfig->thermalResistance,
-            .thermalCapacitance = plantConfig->thermalCapacitance,
-            .copperTempCoeff = plantConfig->copperTempCoeff,
-            .ironInductanceCoeff = plantConfig->ironInductanceCoeff,
-        });
-        model.SetEncoderNoise({
-            .sigmaRadians = plantConfig->encoderSigmaRadians,
-            .biasRadians = plantConfig->encoderBiasRadians,
-        });
-        bootFaultInjection = {
-            .openPhaseA = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseA) != 0,
-            .openPhaseB = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseB) != 0,
-            .openPhaseC = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseC) != 0,
-            .encoderStuck = (plantConfig->faultFlags & sil::PlantFaultFlag::encoderStuck) != 0,
-            .supplyVoltageScale = plantConfig->supplyVoltageScale,
-        };
-        model.SetFaultInjection(bootFaultInjection);
-        model.SetSupply({
-            .sourceResistanceOhm = plantConfig->supplySourceResistanceOhm,
-            .currentLimitAmpere = plantConfig->supplyCurrentLimitAmpere,
-        });
-        model.SetPowerStage({
-            .deadTimeSeconds = plantConfig->deadTimeNanoseconds * 1e-9f,
-            .switchNodeCapacitanceFarad = plantConfig->switchNodeCapacitancePicofarad * 1e-12f,
-            .onResistanceOhm = plantConfig->switchOnResistanceOhm,
-            .diodeForwardVolts = plantConfig->diodeForwardVolts,
-            .minimumPulseSeconds = plantConfig->minimumPulseNanoseconds * 1e-9f,
-        });
+        sil::ConfigureModel(model, *plantConfig);
+        bootFaultInjection = sil::BootFaultInjection(*plantConfig);
         ApplyCurrentSense(SampleAndHold::shortest);
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
@@ -145,10 +102,6 @@ namespace application
             maxDuty = hal::DutyCycle::FromPercent(plantConfig->maxDutyPercent);
         shuntReadout = foc::LowSideShuntReadout{ maxReadableDuty };
         dutyDelayed = plantConfig->dutyDelayPeriods != 0;
-        model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
-        model.SetCogging(foc::NewtonMeter{ plantConfig->coggingTorqueNm }, plantConfig->coggingCyclesPerRevolution);
-        model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
-        model.ResetTemperature();
 
         boardProtection.Configure({
             .overCurrentAmpere = plantConfig->overCurrentTripAmpere,
@@ -156,9 +109,6 @@ namespace application
             .underVoltageVolts = plantConfig->underVoltageTripVolts,
             .overTemperatureCelsius = plantConfig->overTemperatureTripCelsius,
         });
-
-        if (plantConfig->loadTorqueNm != 0.0f)
-            model.SetLoad(foc::NewtonMeter{ plantConfig->loadTorqueNm });
 
         const uint32_t baseHz = BaseFrequencyFrom(plantConfig).Value();
 
@@ -321,16 +271,7 @@ namespace application
 
         static constexpr std::array<uint32_t, 5> sampleHoldClocks{ 4, 16, 32, 64, 256 };
 
-        model.SetCurrentSense({
-            .adcClockHertz = plantConfig->adcClockMegahertz * 1e6f,
-            .sampleHoldClocks = plantConfig->adcSampleHoldClocks != 0 ? plantConfig->adcSampleHoldClocks : sampleHoldClocks.at(static_cast<std::size_t>(requested)),
-            .conversionClocks = plantConfig->adcConversionClocks,
-            .averagedConversions = plantConfig->adcAveragedConversions,
-            .triggerDelaySeconds = plantConfig->adcTriggerDelayNanoseconds * 1e-9f,
-            .amplifierTimeConstantSeconds = plantConfig->currentAmplifierTimeConstantNanoseconds * 1e-9f,
-            .fullScaleAmpere = plantConfig->currentFullScaleAmpere,
-            .resolutionBits = plantConfig->adcResolutionBits,
-        });
+        model.SetCurrentSense(sil::CurrentSense(*plantConfig, sampleHoldClocks.at(static_cast<std::size_t>(requested))));
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold sampleAndHold)

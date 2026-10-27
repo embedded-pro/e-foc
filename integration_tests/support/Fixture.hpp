@@ -67,6 +67,7 @@ namespace integration
         uint8_t nextSequence{ 0 };
 
     private:
+        void RequestStatus();
         void SendClientHeartbeat();
         std::optional<uint16_t> FindHeartbeatNode(CaptureMark from) const;
 

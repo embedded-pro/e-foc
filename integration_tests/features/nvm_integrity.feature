@@ -2,7 +2,10 @@ Feature: Non-Volatile Memory Integrity
   Stored calibration and configuration each carry a magic number, a layout
   version and a CRC. Damaged calibration must not be trusted, so the target
   falls back to an uncalibrated start rather than driving on bad parameters.
-  Damaged configuration falls back to defaults, which are always usable.
+  Damaged configuration falls back to defaults, which are always usable. How each
+  kind of damage (a wrong magic, a stale layout version, a bad CRC) is detected is
+  covered by the NonVolatileMemoryImpl unit tests; here one damaged calibration
+  record and one damaged configuration record check what the target does with them.
 
   @sil @REQ-SM-010
   Scenario Outline: A calibration record with a <damage> checksum is not trusted
@@ -15,8 +18,6 @@ Feature: Non-Volatile Memory Integrity
     Examples:
       | damage  |
       | corrupt |
-      | wrong   |
-      | stale   |
 
   @sil @REQ-SM-010
   Scenario Outline: A configuration record with a <damage> checksum falls back to defaults
@@ -31,5 +32,3 @@ Feature: Non-Volatile Memory Integrity
     Examples:
       | damage  |
       | corrupt |
-      | wrong   |
-      | stale   |

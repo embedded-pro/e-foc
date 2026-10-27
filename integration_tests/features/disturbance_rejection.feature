@@ -38,7 +38,10 @@ Feature: Disturbance Rejection
   the disturbance off. The zero now sits at a quarter of the bandwidth.
 
   The rows carry the envelope the product holds on the nominal plant (the Teknic
-  M-2310P-LN-04K reference motor).
+  M-2310P-LN-04K reference motor). Each loop keeps its PID row here, against a
+  positive torque, end to end through the emulated target; every law against a
+  torque of either sign runs in the host model-in-the-loop tests
+  (integration_tests/model_in_the_loop) with the same limits.
 
   The position rows run a torque of either sign. PID and two-DOF once carried
   only the positive one, because their PI placed its integral zero at a
@@ -70,13 +73,6 @@ Feature: Disturbance Rejection
     Examples:
       | algorithm | torque | deviation | band | recovery_ms |
       | pid       | 0.002  | 4.0       | 2.0  | 50          |
-      | pid       | -0.002 | 4.0       | 2.0  | 50          |
-      | adrc      | 0.002  | 4.0       | 2.0  | 50          |
-      | adrc      | -0.002 | 4.0       | 2.0  | 50          |
-      | twodof    | 0.002  | 4.0       | 2.0  | 50          |
-      | twodof    | -0.002 | 4.0       | 2.0  | 50          |
-      | lqi       | 0.002  | 4.0       | 2.0  | 50          |
-      | lqi       | -0.002 | 4.0       | 2.0  | 50          |
 
   @sil @REQ-POS-010
   Scenario Outline: The <algorithm> position loop holds 1.5 rad against a <torque> Nm torque step
@@ -99,15 +95,6 @@ Feature: Disturbance Rejection
     Examples:
       | algorithm | torque | deviation | band | recovery_ms |
       | pid       | 0.002  | 0.1       | 0.08 | 50          |
-      | pid       | -0.002 | 0.1       | 0.08 | 50          |
-      | cascadep  | 0.002  | 0.1       | 0.08 | 50          |
-      | cascadep  | -0.002 | 0.1       | 0.08 | 50          |
-      | lqr       | 0.002  | 0.1       | 0.08 | 50          |
-      | lqr       | -0.002 | 0.1       | 0.08 | 50          |
-      | lqi       | 0.002  | 0.05      | 0.02 | 50          |
-      | lqi       | -0.002 | 0.05      | 0.02 | 50          |
-      | twodof    | 0.002  | 0.1       | 0.08 | 50          |
-      | twodof    | -0.002 | 0.1       | 0.08 | 50          |
 
   @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop recovers through a saturated current command
@@ -131,6 +118,3 @@ Feature: Disturbance Rejection
     Examples:
       | algorithm |
       | pid       |
-      | adrc      |
-      | twodof    |
-      | lqi       |

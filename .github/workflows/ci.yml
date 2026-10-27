@@ -250,12 +250,18 @@ jobs:
           name: e_foc.sync_foc_sensored.qemu.elf
           path: build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf
           if-no-files-found: error
-  software_in_the_loop_tests:
-    name: Software-in-the-Loop Tests
+  software_in_the_loop_shard:
+    name: Software-in-the-Loop Shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
     needs: [host_build_test_ubuntu, qemu_foc_sensored_build]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      SIL_SHARDS: 3
     steps:
       - name: Configure Git
         run: |
@@ -266,6 +272,9 @@ jobs:
         with:
           persist-credentials: false
           submodules: false
+      - name: Select the shard's features
+        id: shard
+        run: echo "features=$(python3 integration_tests/sil-shard.py --shard ${{ matrix.shard }} --of "$SIL_SHARDS")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e_foc.integration_tests
@@ -281,35 +290,41 @@ jobs:
           command -v qemu-system-arm >/dev/null || { echo "::error::qemu-system-arm not found; SIL scenarios would skip silently"; exit 1; }
           test -f "$QEMU_SIL_ELF" || { echo "::error::SIL ELF $QEMU_SIL_ELF missing; SIL scenarios would skip silently"; exit 1; }
       - name: Run software-in-the-loop tests
+        shell: bash
         env:
           QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sync_foc_sensored.main.elf
+          SIL_FEATURES: ${{ steps.shard.outputs.features }}
         run: |
           chmod +x sil_runner/e_foc.integration_tests
+          read -ra features <<< "$SIL_FEATURES"
           sil_runner/e_foc.integration_tests \
             --mode sil \
-            integration_tests/features \
+            "${features[@]}" \
             -t "@sil" \
             --format summary \
             --format pretty \
-            --format "junit:sil-test-report.xml"
+            --format "junit:sil-test-report-${{ matrix.shard }}.xml"
       - name: Generate SIL test summary
         if: always()
         shell: bash
+        env:
+          SIL_REPORT: sil-test-report-${{ matrix.shard }}.xml
         run: |
-          if [[ ! -f sil-test-report.xml ]]; then
+          if [[ ! -f "$SIL_REPORT" ]]; then
             {
-              echo "## Software-in-the-Loop Test Results"
+              echo "## Software-in-the-Loop Test Results (shard ${{ matrix.shard }})"
               echo ""
               echo "_Report not generated — test step did not produce output._"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           {
-            echo "## Software-in-the-Loop Test Results"
+            echo "## Software-in-the-Loop Test Results (shard ${{ matrix.shard }})"
             echo ""
             python3 -c "
+          import os
           import xml.etree.ElementTree as ET
-          tree = ET.parse('sil-test-report.xml')
+          tree = ET.parse(os.environ['SIL_REPORT'])
           root = tree.getroot()
           suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
           features = {}
@@ -330,20 +345,35 @@ jobs:
               print()
           "
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sil-test-report-${{ matrix.shard }}
+          path: sil-test-report-${{ matrix.shard }}.xml
+          if-no-files-found: ignore
+  software_in_the_loop_tests:
+    name: Software-in-the-Loop Tests
+    runs-on: ubuntu-latest
+    needs: [software_in_the_loop_shard]
+    if: ${{ always() }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: sil-test-report-*
+          merge-multiple: true
       - uses: EnricoMi/publish-unit-test-result-action@7622c5bf3d112a72ab4fa3951c2aa5723d8ab92d # v2.25.0
         if: always()
         with:
           check_name: Software-in-the-Loop Test Results
           comment_title: Software-in-the-Loop Test Results
           comment_mode: off
-          files: sil-test-report.xml
+          files: sil-test-report-*.xml
           report_individual_runs: true
           report_suite_logs: info
-      - name: Upload test report
+      - name: Require every shard to pass
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: sil-test-report
-          path: sil-test-report.xml
-          if-no-files-found: ignore
-
+        env:
+          SHARDS_RESULT: ${{ needs.software_in_the_loop_shard.result }}
+        run: |
+          [[ "$SHARDS_RESULT" == "success" ]] || { echo "::error::Software-in-the-loop shards finished with: $SHARDS_RESULT"; exit 1; }

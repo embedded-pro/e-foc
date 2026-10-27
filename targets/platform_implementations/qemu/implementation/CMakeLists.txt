@@ -19,6 +19,7 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     SemihostingRecordFile.cpp
     SemihostingRecordFile.hpp
     SilPlantConfig.hpp
+    SilPlantModel.hpp
     QemuTimer.cpp
     QemuTimer.hpp
     PlatformFactoryImpl.cpp

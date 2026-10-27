@@ -16,60 +16,13 @@ Feature: Parameter Identification Against a Known Plant
   before the load arrives. See Part J of
   documentation/design/software-in-the-loop.md.
 
-  @sil @REQ-CAL-012
-  Scenario Outline: Electrical identification reports the plant's resistance, inductance and pole pairs (<motor>)
-    Given a <motor> motor plant
-    And the motor boots in torque mode
-    When the target boots
-    And electrical identification is run
-    Then the identified resistance shall be within 5 % of the plant
-    And the identified inductance shall be within 20 % of the plant
-    And the identified pole pairs shall match the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-012
-  Scenario Outline: Electrical identification holds up against measurement noise (<motor>)
-    Given a <motor> motor plant
-    And a motor plant with:
-      | adc_noise_sigma_ampere      | 0.05   |
-      | adc_bias_ampere_a           | 0.02   |
-      | encoder_noise_sigma_radians | 0.0002 |
-    And the motor boots in torque mode
-    When the target boots
-    And electrical identification is run
-    Then the identified resistance shall be within 10 % of the plant
-    And the identified inductance shall be within 25 % of the plant
-    And the identified pole pairs shall match the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-015
-  Scenario Outline: The full calibration measures the current sensors' offsets (<motor>)
-    Given a <motor> motor plant
-    And a motor plant with:
-      | adc_noise_sigma_ampere | 0.035  |
-      | adc_bias_ampere_a      | 0.027  |
-      | adc_bias_ampere_b      | -0.018 |
-      | adc_bias_ampere_c      | 0.054  |
-    And the motor boots in torque mode
-    When the target boots
-    And the full calibration is run
-    Then the identified current offsets shall be within 5 mA of the plant
-    And the identified resistance shall be within 5 % of the plant
-    And the identified pole pairs shall match the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-      | bench   |
+  Each requirement keeps one scenario here, on the bench motor, end to end
+  through the emulated target. The sweeps over both reference motors, noise,
+  seeds, speed and current laws, partial cogging, a shaft torque and a hot
+  winding run in the host model-in-the-loop tests (integration_tests/
+  model_in_the_loop), which drive the firmware's control-mode state machine and
+  its identification services against the same plant model with the same
+  limits.
 
   @sil @REQ-CAL-015
   Scenario: The full calibration measures the offsets through the bench's current-sense chain
@@ -101,73 +54,6 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
-
-  @sil @REQ-CAL-013
-  Scenario Outline: The full calibration identifies the mechanical parameters (<motor>)
-    Given a <motor> motor plant
-    And the motor is already calibrated
-    And the stored calibration is off by:
-      | resistance | 1.3 |
-      | inductance | 0.7 |
-      | inertia    | 2.0 |
-      | friction   | 0.5 |
-    And the motor boots in speed mode
-    When the target boots
-    And the full calibration is run
-    Then the identified resistance shall be within 5 % of the plant
-    And the identified inductance shall be within 20 % of the plant
-    And the identified pole pairs shall match the plant
-    And the identified inertia shall be within 5 % of the plant
-    And the identified friction shall be within 10 % of the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-014
-  Scenario Outline: The online estimators converge from a wrong seed under excitation (<motor>)
-    Given a <motor> motor plant
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And the motor is already calibrated
-    And the stored calibration is off by:
-      | resistance | 1.3 |
-      | inductance | 0.7 |
-      | inertia    | 2.0 |
-      | friction   | 0.5 |
-    And the motor boots in speed mode
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
-    And the online estimates are read
-    Then the online inertia estimate shall be within 2 % of the plant
-    And the online friction estimate shall be within 5 % of the plant
-    And the online inductance estimate shall be within 10 % of the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-014
-  Scenario: The online estimators converge through the bench motor's 4000-count encoder and current noise
-    Given a bench motor plant
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And the motor is already calibrated
-    And the stored calibration is off by:
-      | inductance | 0.7 |
-      | inertia    | 2.0 |
-      | friction   | 0.5 |
-    And the motor boots in speed mode
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
-    And the online estimates are read
-    Then the online inertia estimate shall be within 2 % of the plant
-    And the online friction estimate shall be within 5 % of the plant
-    And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CAL-014
   Scenario: The online estimators converge through the bench's current-sense chain
@@ -211,32 +97,6 @@ Feature: Parameter Identification Against a Known Plant
     Then the online friction estimate shall be within 10 % of the plant
     And the online inertia estimate shall be within 2 % of the plant
 
-  @sil @REQ-CAL-016
-  Scenario Outline: A stop through zero leaves the online friction where the speed levels put it (<speed> speed loop)
-    Given a bench motor plant
-    And the plant's shaft has the bench's dry friction and cogging
-    And a motor plant with:
-      | viscous_damping_nm_s_per_rad | 0.00001 |
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And the motor is already calibrated
-    And the motor boots in speed mode
-    And the speed loop runs the <speed> algorithm
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the speed setpoint is held at 30 rad/s for 2500 ms
-    And the speed setpoint is held at 60 rad/s for 2500 ms
-    And the speed setpoint is held at -30 rad/s for 2500 ms
-    And the speed setpoint is held at 0 rad/s for 2500 ms
-    And the online estimates are read
-    Then the online friction estimate shall be within 10 % of the plant
-
-    Examples:
-      | speed |
-      | pid   |
-      | lqi   |
-      | adrc  |
-
   @sil @REQ-CAL-017
   Scenario Outline: The online electrical estimates hold under the <current> current law when each duty acts a period late
     Given a bench motor plant
@@ -258,9 +118,6 @@ Feature: Parameter Identification Against a Known Plant
     Examples:
       | current   |
       | pid       |
-      | decoupled |
-      | deadbeat  |
-      | sliding   |
 
   @sil @REQ-CAL-019
   Scenario: The d-axis test current runs in a burst after enable and then pauses
@@ -285,83 +142,3 @@ Feature: Parameter Identification Against a Known Plant
     And the full calibration is run
     Then the identified cogging shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
-
-  @sil @REQ-CAL-018
-  Scenario: The full calibration maps a cogging a quarter of the bench's
-    Given a bench motor plant
-    And a motor plant with:
-      | coulomb_friction_nm           | 0.0037 |
-      | cogging_torque_nm             | 0.001  |
-      | cogging_cycles_per_revolution | 24     |
-    And the motor boots in speed mode
-    When the target boots
-    And the full calibration is run
-    Then the identified cogging shall be within 30 % of the plant
-
-  @sil @REQ-CAL-018
-  Scenario: The full calibration stores no cogging map for a motor without cogging
-    Given a bench motor plant
-    And a motor plant with:
-      | coulomb_friction_nm | 0.0037 |
-    And the motor boots in speed mode
-    When the target boots
-    And the full calibration is run
-    Then the calibration shall store no cogging map
-    And the identified inertia shall be within 5 % of the plant
-
-  @sil @REQ-CAL-014
-  Scenario Outline: The online resistance estimate follows the plant (<motor>)
-    Given a <motor> motor plant
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And the motor is already calibrated
-    And the stored calibration is off by:
-      | resistance | 1.3 |
-    And the motor boots in speed mode
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
-    And the online estimates are read
-    Then the online resistance estimate shall be within 10 % of the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-014
-  Scenario Outline: A constant shaft torque does not bias the online mechanical estimates (<motor>)
-    Given a <motor> motor plant
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And a torque step of 0.01 Nm applied 500 ms after enable
-    And the motor is already calibrated
-    And the stored calibration is off by:
-      | inertia  | 2.0 |
-      | friction | 0.5 |
-    And the motor boots in speed mode
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the response is captured for 700 ms after enable
-    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
-    And the online estimates are read
-    Then the online inertia estimate shall be within 2 % of the plant
-    And the online friction estimate shall be within 15 % of the plant
-
-    Examples:
-      | motor   |
-      | teknic  |
-      | anaheim |
-
-  @sil @REQ-CAL-014
-  Scenario: Winding heating is tracked by the online resistance estimate
-    Given a hot motor plant
-    And the plant response is recorded at 100 Hz for up to 2000 samples
-    And the motor is already calibrated
-    And the motor boots in speed mode
-    When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
-    And the online estimates are read
-    Then the online resistance estimate shall be within 10 % of the plant at 90 celsius
