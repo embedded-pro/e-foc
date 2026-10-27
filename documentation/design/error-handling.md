@@ -81,7 +81,9 @@ Every platform reports `unknown` today:
 - **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
   whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO; steps 3 to 5
   are redirected to comparators 0, 1 and 2 through the SSOP register and never reach the FIFO, so the phase-current
-  adapter still receives exactly three samples. Comparator 0 watches the total current (PB4, AIN10), and 1 and 2 the
+  adapter still receives exactly three samples. The ADC driver empties the FIFO on every run and drops the first run
+  after each arm, because arming can land while a run is half converted. Any later run with a different number of
+  samples fails an assertion (see Assertion failures below): it means a conversion was missed or overran. Comparator 0 watches the total current (PB4, AIN10), and 1 and 2 the
   bus voltage (PB5, AIN11) against the overvoltage and the undervoltage threshold; their outputs feed bits 0, 1 and 2
   of PWM fault source 1 (`FLTSRC1`), which tristates every motor PWM output the instant a threshold is crossed.
   Their counts come from the motor board's `BoardCharacteristics`; the
