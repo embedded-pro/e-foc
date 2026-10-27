@@ -93,11 +93,6 @@ namespace foc
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f } };
     }
 
-    CurrentControllerSelector& TorqueCascade::CurrentLoop()
-    {
-        return currentLoop;
-    }
-
     PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
