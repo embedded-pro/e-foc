@@ -123,17 +123,17 @@ sequenceDiagram
     participant CO as Calibration Orchestrator
     participant RS as Rotor Standstill
     participant ENC as Encoder
-    participant OFF as Current Offsets
+    participant CUR as Current Offsets
 
     CO->>RS: Await
     RS->>ENC: Read (anchor)
     loop every 10 ms
         RS->>ENC: Read
-        note over RS: within 2 mrad of the anchor? count, else re-anchor
+        note over RS: within 2 mrad of the anchor counts, outside it re-anchors
     end
     alt ten samples in band
         RS-->>CO: at rest
-        CO->>OFF: Measure
+        CO->>CUR: Measure
     else 10 s elapsed
         RS-->>CO: not at rest
         note over CO: calibration fails
