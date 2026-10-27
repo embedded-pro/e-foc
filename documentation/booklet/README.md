@@ -70,7 +70,7 @@ Install the dependencies used by CI (mermaid-cli, Pandoc, and a XeLaTeX toolchai
 both outputs:
 
 ```
-python scripts/build-foc-booklet.py --format all
+python documentation/tools/build-foc-booklet.py --format all
 ```
 
 Outputs land in `build/booklet/`:

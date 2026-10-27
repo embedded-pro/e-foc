@@ -7,6 +7,7 @@ target_include_directories(e_foc.tool.simulator.adapter PUBLIC
 
 target_link_libraries(e_foc.tool.simulator.adapter PUBLIC
     Qt6::Core
+    e_foc.foc.cascade
     e_foc.foc.model
     e_foc.foc.interfaces
     e_foc.services.electrical_system_ident

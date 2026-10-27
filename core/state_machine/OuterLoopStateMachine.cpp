@@ -1,7 +1,7 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
-#include "core/foc/math/TorqueConstant.hpp"
 #include <cmath>
 
 namespace

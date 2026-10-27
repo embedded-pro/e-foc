@@ -1,4 +1,4 @@
-#include "core/foc/math/MechanicalWindowAccumulator.hpp"
+#include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include <array>
 #include <cmath>

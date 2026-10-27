@@ -7,16 +7,17 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 ## Architecture
 
 - `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
-- `core/foc/transforms/` — Clarke/Park transforms, SVM
-- `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp` (header-only, not FOC-specific)
-- `core/foc/cascade/` — Cascade orchestration + gain design; no hardware dependency
+- `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
+- `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)
+- `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
+- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
-- `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`
+- `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
-- `core/services/` — Alignment, CLI, system ID, NVM
+- `core/services/` — Alignment, CLI, system ID, NVM, standstill, offsets, dead-time and cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
-- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`)
+- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake
 - `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
@@ -109,6 +110,7 @@ Documentation-first: update `documentation/` **before or alongside** behavioral 
 - `documentation/theory/` — FOC algorithm or motor model changes
 - `documentation/performance-optimization/README.md` — timing-critical changes
 - All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art. Markdown image syntax is allowed only for the pre-rendered preview of a TikZ figure (`documentation/tikz/images/*.svg`) placed next to its `{=latex}` block; no other image references
+- TikZ previews: after editing `documentation/tikz/*.tex`, regenerate them with `python documentation/tools/render-tikz-svgs.py`
 - Templates: `documentation/templates/`
 
 ## Build

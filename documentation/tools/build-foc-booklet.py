@@ -18,7 +18,7 @@ Outputs (under build/booklet/):
     book.md           the assembled single-document Markdown (PDF source)
 
 Usage:
-    python scripts/build-foc-booklet.py [--format pdf|html|all] [--assemble-only]
+    python documentation/tools/build-foc-booklet.py [--format pdf|html|all] [--assemble-only]
                                         [--skip-diagrams]
 
 Exit codes:
@@ -39,7 +39,7 @@ import sys
 import tempfile
 from datetime import date
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 BOOKLET_DIR = ROOT / "documentation" / "booklet"
 INDEX = BOOKLET_DIR / "README.md"
 ASSETS = BOOKLET_DIR / "assets"

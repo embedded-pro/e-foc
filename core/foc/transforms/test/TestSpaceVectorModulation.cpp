@@ -1,13 +1,15 @@
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
-#include "numerical/math/Tolerance.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <gmock/gmock.h>
+#include <limits>
 #include <numbers>
 
 namespace
 {
+    constexpr float oneStep = 1.0f / static_cast<float>(hal::DutyCycle::fullScale);
+
     foc::TwoPhase CreateTwoPhaseFrame(float d, float q)
     {
         return { d, q };
@@ -20,99 +22,92 @@ namespace
         return { magnitude * std::cos(angle), magnitude * std::sin(angle) };
     }
 
+    float Fraction(hal::DutyCycle duty)
+    {
+        return foc::DutyFraction(duty);
+    }
+
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
+
     class TestSpaceVectorModulation
         : public ::testing::Test
     {
     public:
-        std::optional<foc::SpaceVectorModulation> spaceVectorModulation;
+        foc::SpaceVectorModulation spaceVectorModulation;
+    };
 
-        void SetUp() override
+    class TestDutyConversion
+        : public ::testing::Test
+    {
+    public:
+        static float Nan()
         {
-            spaceVectorModulation.emplace();
+            return std::numeric_limits<float>::quiet_NaN();
+        }
+
+        static float Inf()
+        {
+            return std::numeric_limits<float>::infinity();
         }
     };
 }
 
 TEST_F(TestSpaceVectorModulation, zero_voltage)
 {
-    auto twoPhaseVoltage = CreateTwoPhaseFrame(0.0f, 0.0f);
+    auto pwm = spaceVectorModulation.Generate(CreateTwoPhaseFrame(0.0f, 0.0f));
 
-    auto pwm = spaceVectorModulation->Generate(twoPhaseVoltage);
-    float tolerance = math::Tolerance<float>();
-
-    EXPECT_NEAR(pwm.a, 0.5f, tolerance);
-    EXPECT_NEAR(pwm.b, 0.5f, tolerance);
-    EXPECT_NEAR(pwm.c, 0.5f, tolerance);
+    EXPECT_NEAR(Fraction(pwm.a), 0.5f, oneStep);
+    EXPECT_NEAR(Fraction(pwm.b), 0.5f, oneStep);
+    EXPECT_NEAR(Fraction(pwm.c), 0.5f, oneStep);
 }
 
 TEST_F(TestSpaceVectorModulation, overmodulation)
 {
-    auto twoPhaseVoltage = CreateTwoPhaseFrame(0.5f, 0.5f);
-    auto pwm = spaceVectorModulation->Generate(twoPhaseVoltage);
+    auto pwm = spaceVectorModulation.Generate(CreateTwoPhaseFrame(0.5f, 0.5f));
 
-    EXPECT_GE(pwm.a, 0.0f);
-    EXPECT_LE(pwm.a, 1.0f);
-    EXPECT_GE(pwm.b, 0.0f);
-    EXPECT_LE(pwm.b, 1.0f);
-    EXPECT_GE(pwm.c, 0.0f);
-    EXPECT_LE(pwm.c, 1.0f);
+    EXPECT_LE(pwm.a.Value(), hal::DutyCycle::fullScale);
+    EXPECT_LE(pwm.b.Value(), hal::DutyCycle::fullScale);
+    EXPECT_LE(pwm.c.Value(), hal::DutyCycle::fullScale);
 }
 
 TEST_F(TestSpaceVectorModulation, common_mode_injection)
 {
-    auto twoPhaseVoltage = CreateTwoPhaseFrame(0.5f, 0.0f);
-    auto pwm = spaceVectorModulation->Generate(twoPhaseVoltage);
-    float tolerance = math::Tolerance<float>();
+    auto pwm = spaceVectorModulation.Generate(CreateTwoPhaseFrame(0.5f, 0.0f));
 
-    float min_duty = std::min({ pwm.a, pwm.b, pwm.c });
-    float max_duty = std::max({ pwm.a, pwm.b, pwm.c });
+    float minDuty = std::min({ Fraction(pwm.a), Fraction(pwm.b), Fraction(pwm.c) });
+    float maxDuty = std::max({ Fraction(pwm.a), Fraction(pwm.b), Fraction(pwm.c) });
 
-    EXPECT_NEAR(min_duty + max_duty, 1.0f, tolerance);
+    EXPECT_NEAR(minDuty + maxDuty, 1.0f, 2.0f * oneStep);
 }
 
 TEST_F(TestSpaceVectorModulation, duty_cycle_bounds)
 {
-    auto test_points = {
+    auto testPoints = {
         CreateTwoPhaseFrame(0.5f, 0.0f),
         CreateTwoPhaseFrame(0.0f, 0.5f),
         CreateTwoPhaseFrame(0.35f, 0.35f)
     };
 
-    for (const auto& dq : test_points)
+    for (const auto& dq : testPoints)
     {
-        auto pwm = spaceVectorModulation->Generate(dq);
-        EXPECT_GE(pwm.a, 0.0f);
-        EXPECT_LE(pwm.a, 1.0f);
-        EXPECT_GE(pwm.b, 0.0f);
-        EXPECT_LE(pwm.b, 1.0f);
-        EXPECT_GE(pwm.c, 0.0f);
-        EXPECT_LE(pwm.c, 1.0f);
+        auto pwm = spaceVectorModulation.Generate(dq);
+        EXPECT_LE(pwm.a.Value(), hal::DutyCycle::fullScale);
+        EXPECT_LE(pwm.b.Value(), hal::DutyCycle::fullScale);
+        EXPECT_LE(pwm.c.Value(), hal::DutyCycle::fullScale);
     }
 }
 
 TEST_F(TestSpaceVectorModulation, output_linearity)
 {
-    auto dq_small = CreateTwoPhaseFrame(0.05f, 0.0f);
-    auto dq_large = CreateTwoPhaseFrame(0.1f, 0.0f);
+    auto pwmSmall = spaceVectorModulation.Generate(CreateTwoPhaseFrame(0.05f, 0.0f));
+    auto pwmLarge = spaceVectorModulation.Generate(CreateTwoPhaseFrame(0.1f, 0.0f));
 
-    auto pwm_small = spaceVectorModulation->Generate(dq_small);
-    auto pwm_large = spaceVectorModulation->Generate(dq_large);
-
-    float tolerance = math::Tolerance<float>();
-    float small_dev = std::abs(pwm_small.a - 0.5f);
-    float large_dev = std::abs(pwm_large.a - 0.5f);
-    EXPECT_NEAR(large_dev / small_dev, 2.0f, tolerance);
-}
-
-TEST_F(TestSpaceVectorModulation, zero_voltage_centering)
-{
-    auto zero_voltage = CreateTwoPhaseFrame(0.0f, 0.0f);
-    auto pwm = spaceVectorModulation->Generate(zero_voltage);
-
-    float tolerance = math::Tolerance<float>();
-    EXPECT_NEAR(pwm.a, 0.5f, tolerance);
-    EXPECT_NEAR(pwm.b, 0.5f, tolerance);
-    EXPECT_NEAR(pwm.c, 0.5f, tolerance);
+    float smallDeviation = std::abs(Fraction(pwmSmall.a) - 0.5f);
+    float largeDeviation = std::abs(Fraction(pwmLarge.a) - 0.5f);
+    EXPECT_NEAR(largeDeviation / smallDeviation, 2.0f, 1e-3f);
 }
 
 TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector_boundary)
@@ -126,18 +121,17 @@ TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector
         SCOPED_TRACE(boundary);
         const float angle = static_cast<float>(boundary) * sectorWidth;
 
-        auto below = spaceVectorModulation->Generate(VectorAt(magnitude, angle - deltaAngle));
-        auto above = spaceVectorModulation->Generate(VectorAt(magnitude, angle + deltaAngle));
+        auto below = spaceVectorModulation.Generate(VectorAt(magnitude, angle - deltaAngle));
+        auto above = spaceVectorModulation.Generate(VectorAt(magnitude, angle + deltaAngle));
 
-        EXPECT_NEAR(below.a, above.a, maxStep);
-        EXPECT_NEAR(below.b, above.b, maxStep);
-        EXPECT_NEAR(below.c, above.c, maxStep);
+        EXPECT_NEAR(Fraction(below.a), Fraction(above.a), maxStep);
+        EXPECT_NEAR(Fraction(below.b), Fraction(above.b), maxStep);
+        EXPECT_NEAR(Fraction(below.c), Fraction(above.c), maxStep);
     }
 }
 
 TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_switching_state)
 {
-    constexpr float tolerance = 1e-5f;
     const float vertexReach = 2.0f / std::numbers::sqrt3_v<float>;
     constexpr std::array<std::array<float, 3>, 6> switchingStates{ {
         { 1.0f, 0.0f, 0.0f },
@@ -151,17 +145,16 @@ TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_
     for (int vertex = 0; vertex != 6; ++vertex)
     {
         SCOPED_TRACE(vertex);
-        auto pwm = spaceVectorModulation->Generate(VectorAt(vertexReach, static_cast<float>(vertex) * sectorWidth));
+        auto pwm = spaceVectorModulation.Generate(VectorAt(vertexReach, static_cast<float>(vertex) * sectorWidth));
 
-        EXPECT_NEAR(pwm.a, switchingStates[vertex][0], tolerance);
-        EXPECT_NEAR(pwm.b, switchingStates[vertex][1], tolerance);
-        EXPECT_NEAR(pwm.c, switchingStates[vertex][2], tolerance);
+        EXPECT_NEAR(Fraction(pwm.a), switchingStates[vertex][0], oneStep);
+        EXPECT_NEAR(Fraction(pwm.b), switchingStates[vertex][1], oneStep);
+        EXPECT_NEAR(Fraction(pwm.c), switchingStates[vertex][2], oneStep);
     }
 }
 
 TEST_F(TestSpaceVectorModulation, sector_centres_reach_the_limit_at_unit_magnitude)
 {
-    constexpr float tolerance = 1e-5f;
     constexpr std::array<std::array<float, 3>, 6> centreDuties{ {
         { 1.0f, 0.5f, 0.0f },
         { 0.5f, 1.0f, 0.0f },
@@ -174,11 +167,11 @@ TEST_F(TestSpaceVectorModulation, sector_centres_reach_the_limit_at_unit_magnitu
     for (int sector = 0; sector != 6; ++sector)
     {
         SCOPED_TRACE(sector);
-        auto pwm = spaceVectorModulation->Generate(VectorAt(1.0f, (static_cast<float>(sector) + 0.5f) * sectorWidth));
+        auto pwm = spaceVectorModulation.Generate(VectorAt(1.0f, (static_cast<float>(sector) + 0.5f) * sectorWidth));
 
-        EXPECT_NEAR(pwm.a, centreDuties[sector][0], tolerance);
-        EXPECT_NEAR(pwm.b, centreDuties[sector][1], tolerance);
-        EXPECT_NEAR(pwm.c, centreDuties[sector][2], tolerance);
+        EXPECT_NEAR(Fraction(pwm.a), centreDuties[sector][0], oneStep);
+        EXPECT_NEAR(Fraction(pwm.b), centreDuties[sector][1], oneStep);
+        EXPECT_NEAR(Fraction(pwm.c), centreDuties[sector][2], oneStep);
     }
 }
 
@@ -187,9 +180,63 @@ TEST_F(TestSpaceVectorModulation, duty_cycles_stay_within_range_across_a_full_re
     for (int step = 0; step < 360; ++step)
     {
         const float angle = static_cast<float>(step) * std::numbers::pi_v<float> / 180.0f;
-        auto pwm = spaceVectorModulation->Generate(CreateTwoPhaseFrame(std::cos(angle), std::sin(angle)));
+        auto pwm = spaceVectorModulation.Generate(CreateTwoPhaseFrame(std::cos(angle), std::sin(angle)));
 
-        EXPECT_GE(std::min({ pwm.a, pwm.b, pwm.c }), 0.0f) << "step " << step;
-        EXPECT_LE(std::max({ pwm.a, pwm.b, pwm.c }), 1.0f) << "step " << step;
+        EXPECT_LE(std::max({ pwm.a.Value(), pwm.b.Value(), pwm.c.Value() }), hal::DutyCycle::fullScale) << "step " << step;
     }
+}
+
+TEST_F(TestDutyConversion, a_normalised_output_maps_onto_the_percent_range)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ 0.0f, 0.5f, 1.0f });
+
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 50);
+    EXPECT_EQ(DutyPercent(duties.c), 100);
+}
+
+TEST_F(TestDutyConversion, a_normalised_output_rounds_to_the_nearest_q16_step)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ 0.5004f, 0.12345f, 0.9999f });
+
+    EXPECT_EQ(duties.a.Value(), 32794u);
+    EXPECT_EQ(duties.b.Value(), 8090u);
+    EXPECT_EQ(duties.c.Value(), 65529u);
+}
+
+TEST_F(TestDutyConversion, a_normalised_output_keeps_sub_percent_resolution)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ 0.5004f, 0.12345f, 0.9999f });
+
+    constexpr float oneStepInPercent = 100.0f * oneStep;
+    EXPECT_NEAR(DutyPercent(duties.a), 50.04f, oneStepInPercent);
+    EXPECT_NEAR(DutyPercent(duties.b), 12.345f, oneStepInPercent);
+    EXPECT_NEAR(DutyPercent(duties.c), 99.99f, oneStepInPercent);
+}
+
+TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wrapped)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ -5.0f, 1.5f, 0.25f });
+
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 100);
+    EXPECT_EQ(DutyPercent(duties.c), 25);
+}
+
+TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ Nan(), Nan(), Nan() });
+
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 0);
+    EXPECT_EQ(DutyPercent(duties.c), 0);
+}
+
+TEST_F(TestDutyConversion, an_infinite_modulation_saturates_to_a_defined_endpoint)
+{
+    const auto duties = foc::ToDutyCycles(foc::ThreePhase{ Inf(), -Inf(), 0.5f });
+
+    EXPECT_EQ(DutyPercent(duties.a), 100);
+    EXPECT_EQ(DutyPercent(duties.b), 0);
+    EXPECT_EQ(DutyPercent(duties.c), 50);
 }

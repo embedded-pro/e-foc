@@ -24,4 +24,10 @@ namespace foc
         Ampere maxCurrent{ 0.0f };
         hal::Hertz samplingFrequency{ 0 };
     };
+
+    // Amplitude-invariant Clarke: T = 3/2 · p · ψf · iq, the factor the plant model applies too
+    inline NewtonMeter TorqueConstantFor(std::size_t polePairs, Weber fluxLinkage)
+    {
+        return NewtonMeter{ 1.5f * static_cast<float>(polePairs) * fluxLinkage.Value() };
+    }
 }

@@ -1,4 +1,4 @@
-#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/cascade/SpeedDifferentiator.hpp"
 #include <gtest/gtest.h>
 
 namespace

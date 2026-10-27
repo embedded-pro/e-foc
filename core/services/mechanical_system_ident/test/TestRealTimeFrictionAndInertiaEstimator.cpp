@@ -1,5 +1,5 @@
+#include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <array>

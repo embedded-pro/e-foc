@@ -305,7 +305,7 @@ Every record handed to the NVM is traced first as `[SM] Calibration record: R=�
 
 The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
 
-The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`), the factor the plant model itself applies.
+The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/interfaces/MotorModel.hpp`), the factor the plant model itself applies.
 
 A motor whose flux linkage is set with `set_flux_linkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
 

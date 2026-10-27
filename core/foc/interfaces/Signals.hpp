@@ -19,6 +19,11 @@ namespace foc
         hal::DutyCycle c;
     };
 
+    inline float DutyFraction(hal::DutyCycle duty)
+    {
+        return static_cast<float>(duty.Value()) * (1.0f / static_cast<float>(hal::DutyCycle::fullScale));
+    }
+
     struct ThreePhase
     {
         float a;

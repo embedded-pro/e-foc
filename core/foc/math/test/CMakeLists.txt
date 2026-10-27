@@ -10,10 +10,7 @@ target_link_libraries(e_foc.foc.math_test PUBLIC
 target_sources(e_foc.foc.math_test PRIVATE
     TestAngleWrap.cpp
     TestCoggingFeedForward.cpp
-    TestDutyConversion.cpp
     TestFastTrigonometry.cpp
-    TestLowSideShuntWindow.cpp
-    TestMechanicalWindowAccumulator.cpp
+    TestFiniteGuard.cpp
     TestParameterValidation.cpp
-    TestTorqueConstant.cpp
 )

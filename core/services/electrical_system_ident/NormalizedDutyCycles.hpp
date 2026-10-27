@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/transforms/SpaceVectorModulation.hpp"
 
 namespace services::detail
 {

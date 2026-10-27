@@ -1,5 +1,5 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
-#include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"

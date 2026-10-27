@@ -5,6 +5,7 @@ emil_add_test(e_foc.services.mechanical_system_ident_test)
 target_link_libraries(e_foc.services.mechanical_system_ident_test PUBLIC
     gmock_main
     e_foc.services.mechanical_system_ident
+    e_foc.foc.cascade
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper

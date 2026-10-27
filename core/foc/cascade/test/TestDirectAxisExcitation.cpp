@@ -1,4 +1,4 @@
-#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/cascade/DirectAxisExcitation.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
 
