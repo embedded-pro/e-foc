@@ -36,7 +36,6 @@ namespace foc
         drivers::Encoder& encoder;
         FocImpl& foc;
         infra::HotSwapFunction<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
-        volatile bool enabled{ false };
         volatile bool stopRequested{ false };
     };
 
@@ -45,9 +44,7 @@ namespace foc
         : inverter{ inverter }
         , encoder{ encoder }
         , foc{ foc }
-    {
-        RegisterPhaseCurrents();
-    }
+    {}
 
     template<typename FocImpl>
     Runner<FocImpl>::~Runner()
@@ -60,14 +57,7 @@ namespace foc
     {
         stopRequested = false;
 
-        RegisterPhaseCurrents();
-
-        if (stopRequested)
-        {
-            Disable();
-            return;
-        }
-
+        ReleasePhaseCurrents();
         foc.Enable();
 
         if (stopRequested)
@@ -84,19 +74,19 @@ namespace foc
             return;
         }
 
-        enabled = true;
+        RegisterPhaseCurrents();
 
         if (stopRequested)
             Disable();
     }
 
+    // The phase-current slot is the gate: released before the bridge stops, taken only once it runs
     template<typename FocImpl>
     void Runner<FocImpl>::Disable()
     {
         stopRequested = true;
-        enabled = false;
-        inverter.Stop();
         ReleasePhaseCurrents();
+        inverter.Stop();
         foc.Disable();
     }
 
@@ -130,9 +120,6 @@ namespace foc
     template<typename FocImpl>
     OPTIMIZE_FOR_SPEED void Runner<FocImpl>::OnPhaseCurrents(const PhaseCurrents& currentPhases)
     {
-        if (!enabled)
-            return;
-
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
 
