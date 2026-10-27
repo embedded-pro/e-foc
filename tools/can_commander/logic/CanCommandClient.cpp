@@ -10,7 +10,7 @@ namespace tool
     using namespace services;
 
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
-        : focClient{ adapter, uint16_t{ 0 } }
+        : focClient{ adapter }
         , statusRefresh{ statusRefreshInterval, [this]()
             {
                 RefreshStatus();

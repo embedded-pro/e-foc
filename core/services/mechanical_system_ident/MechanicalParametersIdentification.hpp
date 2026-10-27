@@ -17,12 +17,6 @@ namespace services
         ~MechanicalParametersIdentification() = default;
 
     public:
-        struct IdentificationResult
-        {
-            foc::NewtonMeterSecondPerRadian friction;
-            foc::NewtonMeterSecondSquared inertia;
-        };
-
         struct Config
         {
             foc::RadiansPerSecond targetSpeed{ 52.36f };

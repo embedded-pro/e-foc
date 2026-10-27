@@ -62,20 +62,9 @@ namespace application
             onBoardProtection = onProtection;
         }
 
-        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason) const
-        {
-            if (onBoardProtection != nullptr)
-                onBoardProtection(reason);
-        }
-
         PlatformFactory::BoardProtectionState BoardProtectionStatus() override
         {
-            return boardProtectionState;
-        }
-
-        void SetBoardProtectionState(PlatformFactory::BoardProtectionState state)
-        {
-            boardProtectionState = state;
+            return PlatformFactory::BoardProtectionState::unknown;
         }
 
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -211,6 +200,5 @@ namespace application
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
-        PlatformFactory::BoardProtectionState boardProtectionState{ PlatformFactory::BoardProtectionState::unknown };
     };
 }

@@ -226,7 +226,7 @@ The CAN service layer (`core/can/`) provides the FOC motor CAN category as a ser
 
 **Client half** (runs on the desktop host — CAN Commander, SIL tests):
 - `FocMotorCategoryClient` — a `CanCategoryClient` subclass. Encodes typed setpoints into CAN frames and decodes response frames into typed callbacks.
-- `FocMotorCanClient` — user-facing API that composes `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` internally. Takes a `hal::Can&` and a node ID; exposes `Start`, `Stop`, `SetTorque`, `SetSpeed`, and `SetPosition` methods.
+- `FocMotorCanClient` — composes `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` on one `hal::Can&`; callers send through its category client with a node ID per command.
 
 Tracing is applied at every layer boundary via the `can-lite` tracing decorators (`TracingCan`, `TracingCanProtocolServerObserver`, `TracingCanProtocolClientObserver`).
 
@@ -303,7 +303,7 @@ identification for speed/position modes), and responds to hardware fault notific
 the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be
 enabled.
 
-In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal.
+In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. It registers the setpoint, bandwidth and algorithm-selection commands on the same terminal and dispatches them to the active control mode.
 
 ### 5. Tools (was §4)
 

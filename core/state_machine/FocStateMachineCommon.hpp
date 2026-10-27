@@ -83,8 +83,6 @@ namespace application
         services::DispatchResult Dispatch(const state_machine::Event& event);
 
         services::Tracer& GetTracer();
-        drivers::ThreePhaseInverter& GetInverter();
-        foc::Volts GetVdc() const;
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);

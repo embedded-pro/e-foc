@@ -64,12 +64,6 @@ namespace application
             return PlatformFactory::BoardProtectionState::unknown;
         }
 
-        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
-        {
-            if (onBoardProtection != nullptr)
-                onBoardProtection(reason);
-        }
-
         // Also satisfies ThreePhaseInverter::Start; no-op on ST
         void Start() override;
         uint32_t ElapsedCycles() override;

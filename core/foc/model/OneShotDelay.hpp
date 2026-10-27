@@ -11,7 +11,7 @@ namespace foc
     class OneShotDelay
     {
     public:
-        void Configure(std::optional<uint32_t> delayTicks);
+        void Configure(std::optional<uint32_t> delay);
 
         void Begin();
 
@@ -25,10 +25,10 @@ namespace foc
         uint32_t beginTick{ 0 };
     };
 
-    inline void OneShotDelay::Configure(std::optional<uint32_t> delayTicks)
+    inline void OneShotDelay::Configure(std::optional<uint32_t> delay)
     {
-        scheduled = delayTicks.has_value();
-        this->delayTicks = delayTicks.value_or(0);
+        scheduled = delay.has_value();
+        delayTicks = delay.value_or(0);
     }
 
     inline void OneShotDelay::Begin()

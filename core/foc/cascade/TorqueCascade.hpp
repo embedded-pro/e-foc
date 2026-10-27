@@ -26,8 +26,6 @@ namespace foc
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
         MotionObservation ObserveMotion() const override;
 
-        CurrentControllerSelector& CurrentLoop();
-
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
         IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;

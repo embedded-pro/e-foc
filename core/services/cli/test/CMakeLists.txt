@@ -10,16 +10,11 @@ target_link_libraries(e_foc.services.cli_test PUBLIC
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper
-    e_foc.foc_mock
 )
 
 target_sources(e_foc.services.cli_test PRIVATE
     TestSerialCommunicationMirror.cpp
-    TestTerminalBase.cpp
     TestTerminalDiagnostics.cpp
     TestTerminalHelper.cpp
-    TestTerminalPosition.cpp
-    TestTerminalSpeed.cpp
-    TestTerminalTorque.cpp
     TestTerminalWithBanner.cpp
 )
