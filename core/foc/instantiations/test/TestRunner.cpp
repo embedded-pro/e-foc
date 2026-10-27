@@ -1,6 +1,6 @@
 #include "core/foc/instantiations/Runner.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

@@ -144,15 +144,6 @@ emil_folderize_all_targets()
 emil_exclude_directory_from_coverage(infra/embedded-infra-lib)
 emil_coverage_targets(DIRECTORIES .)
 
-include(scripts/development_environment.cmake)
-
-if (DEFINED TARGET_MCU)
-    generate_development_environment_script(
-        TARGET_MCU "${TARGET_MCU}"
-        GDB_PORT "2334"
-    )
-endif()
-
 set(CPACK_GENERATOR "ZIP;TGZ")
 set(CPACK_SOURCE_IGNORE_FILES ".vs/;.git/;build/")
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")

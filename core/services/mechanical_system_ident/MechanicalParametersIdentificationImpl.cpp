@@ -2,7 +2,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <algorithm>
 #include <cmath>

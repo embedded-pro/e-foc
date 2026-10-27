@@ -16,7 +16,6 @@
         "CascadeWithSpeedLoop::SetSpeedReference",
         "CascadeWithSpeedLoop::SetDirectCurrentReference",
         "CascadeWithSpeedLoop::CurrentMechanicalAngle",
-        "CascadeWithSpeedLoop::PolePairs",
         "SpeedDifferentiator::Measure",
         "PidSpeedController::Compute",
         "LqiSpeedController::Compute",

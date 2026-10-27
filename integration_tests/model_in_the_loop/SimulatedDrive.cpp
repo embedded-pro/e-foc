@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <optional>
 
 namespace mil
 {
@@ -76,17 +77,21 @@ namespace mil
             responseRecorder.Configure(baseHz / plant.responseSampleRateHz, plant.responseMaxSamples);
         }
 
-        torqueStep.Configure({ plant.torqueStepNm, static_cast<uint32_t>(static_cast<uint64_t>(plant.torqueStepDelayMs) * baseHz / millisecondsPerSecond) });
-        encoderFreeze.Configure(static_cast<uint32_t>(static_cast<uint64_t>(plant.encoderFreezeDelayCentiseconds) * 10u * baseHz / millisecondsPerSecond));
+        torqueStepTorque = foc::NewtonMeter{ plant.torqueStepNm };
+        const auto torqueStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plant.torqueStepDelayMs) * baseHz / millisecondsPerSecond);
+        torqueStep.Configure(plant.torqueStepNm != 0.0f ? std::make_optional(torqueStepDelay) : std::nullopt);
+
+        const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plant.encoderFreezeDelayCentiseconds) * 10u * baseHz / millisecondsPerSecond);
+        encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
     }
 
     void SimulatedDrive::ControlTick()
     {
         const uint32_t tick = ++controlTick;
 
-        if (const auto torque = torqueStep.Fire(tick))
+        if (torqueStep.Fire(tick))
         {
-            model.SetExternalTorque(foc::NewtonMeter{ *torque });
+            model.SetExternalTorque(torqueStepTorque);
             responseRecorder.Note(foc::PlantResponseKind::torqueStep, SampleAt(tick));
         }
 

@@ -1,4 +1,4 @@
-#include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/model/PowerStage.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/dead_time_compensation/DeadTimeCompensation.hpp"

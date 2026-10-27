@@ -56,7 +56,6 @@ namespace application
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
         void StartAdc(PlatformFactory::SampleAndHold sampleAndHold);
-        bool IsAdcBufferPopulated() const;
         void RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle);
 
         struct IdentificationState

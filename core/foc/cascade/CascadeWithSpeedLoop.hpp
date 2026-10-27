@@ -1,171 +1,22 @@
 #pragma once
 
-#include "core/foc/cascade/TripleBuffer.hpp"
+#include "core/foc/cascade/DirectAxisExcitation.hpp"
+#include "core/foc/cascade/EstimatorChannel.hpp"
+#include "core/foc/cascade/EstimatorWindowAccumulator.hpp"
+#include "core/foc/cascade/SpeedDifferentiator.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
-#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
-#include <atomic>
-#include <chrono>
 
 namespace foc
 {
-    struct EstimatorSnapshot
-    {
-        float meanIq{ 0.0f };
-        float meanId{ 0.0f };
-        float idAtEnd{ 0.0f };
-        float meanNormalizedVd{ 0.0f };
-        float meanElectricalSpeedTimesIq{ 0.0f };
-        MechanicalWindow mechanical{};
-    };
-
-    class EstimatorWindowAccumulator
-    {
-    public:
-        EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow, uint32_t dutyUpdateDelayPeriods = 0);
-
-        void Restart();
-
-        ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs, float coggingCurrent)
-        {
-            const auto mechanicalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) : 0.0f;
-            const auto electricalRotation = mechanicalRotation * polePairs;
-            previousMechanicalAngle = mechanicalAngle;
-            rotationPrimed = true;
-
-            mechanical.Accumulate(measured.q - coggingCurrent, mechanicalRotation);
-
-            const auto meanIq = 0.5f * (measured.q + previousIq);
-
-            const auto& applied = dutyLate ? earlierNormalizedVoltage : previousNormalizedVoltage;
-
-            iqSum += meanIq;
-            idSum += 0.5f * (measured.d + previousId);
-            vdSum += applied.d + 0.5f * electricalRotation * applied.q;
-            rotationTimesIqSum += electricalRotation * meanIq;
-
-            previousIq = measured.q;
-            previousId = measured.d;
-            earlierNormalizedVoltage = previousNormalizedVoltage;
-            previousNormalizedVoltage = normalizedVoltage;
-            ++ticks;
-        }
-
-        ALWAYS_INLINE_HOT EstimatorSnapshot Close()
-        {
-            const auto inverseTicks = ticks != 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;
-            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, vdSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency, mechanical.Close() };
-
-            iqSum = 0.0f;
-            idSum = 0.0f;
-            vdSum = 0.0f;
-            rotationTimesIqSum = 0.0f;
-            ticks = 0;
-
-            return snapshot;
-        }
-
-    private:
-        float iqSum{ 0.0f };
-        float idSum{ 0.0f };
-        float vdSum{ 0.0f };
-        float rotationTimesIqSum{ 0.0f };
-        float previousIq{ 0.0f };
-        float previousId{ 0.0f };
-        RotatingFrame previousNormalizedVoltage{};
-        RotatingFrame earlierNormalizedVoltage{};
-        float previousMechanicalAngle{ 0.0f };
-        bool rotationPrimed{ false };
-        float tickFrequency{ 0.0f };
-        uint32_t ticksPerWindow;
-        bool dutyLate;
-        MechanicalWindowAccumulator mechanical;
-        uint32_t ticks{ 0 };
-    };
-
-    class DirectAxisExcitation
-    {
-    public:
-        DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency, std::chrono::seconds burst, std::chrono::seconds cycle);
-
-        void Restart();
-        float Advance();
-
-    private:
-        float amplitude;
-        uint32_t halfPeriodSamples;
-        uint32_t burstSamples;
-        uint32_t cycleSamples;
-        uint32_t sample{ 0 };
-        uint32_t cycleSample{ 0 };
-        bool positive{ true };
-    };
-
-    class EstimatorChannel
-    {
-    public:
-        ALWAYS_INLINE_HOT void Publish(const EstimatorSnapshot& snapshot)
-        {
-            buffer.Publish(snapshot);
-        }
-
-        void SetMechanical(OnlineMechanicalEstimator& estimator);
-        void SetElectrical(OnlineElectricalEstimator& estimator);
-        bool HasElectrical() const;
-        void UpdateMechanical();
-        void UpdateElectrical(float vdcInvScale, Ampere directCurrentReference);
-
-    private:
-        OnlineMechanicalEstimator* mechanical{ nullptr };
-        OnlineElectricalEstimator* electrical{ nullptr };
-        TripleBuffer<EstimatorSnapshot> buffer;
-    };
-
-    class SpeedDifferentiator
-    {
-    public:
-        explicit SpeedDifferentiator(hal::Hertz outerLoopFrequency);
-
-        void Restart();
-
-        ALWAYS_INLINE_HOT void Track(float mechanicalAngle)
-        {
-            currentAngle = mechanicalAngle;
-        }
-
-        ALWAYS_INLINE_HOT float CurrentAngle() const
-        {
-            return currentAngle;
-        }
-
-        ALWAYS_INLINE_HOT void CloseWindow()
-        {
-            windowAngle = currentAngle;
-            windowIndex = windowIndex + 1;
-        }
-
-        float Measure();
-
-    private:
-        float samplePeriod;
-        volatile float currentAngle{ 0.0f };
-        volatile float windowAngle{ 0.0f };
-        volatile uint32_t windowIndex{ 0 };
-        float previousAngle{ 0.0f };
-        uint32_t previousIndex{ 0 };
-        float lastSpeed{ 0.0f };
-        bool previousAngleValid{ false };
-    };
-
     class CascadeWithSpeedLoop
     {
     protected:
@@ -192,14 +43,12 @@ namespace foc
 
         float CurrentMechanicalAngle() const;
         MotionObservation ObserveSpeedLoopMotion() const;
-        float PolePairs() const;
         LowPriorityInterrupt& GetLowPriorityInterrupt();
 
         void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
         void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
         void UpdateOnlineMechanicalEstimator();
         void UpdateOnlineElectricalEstimator();
-        void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
 

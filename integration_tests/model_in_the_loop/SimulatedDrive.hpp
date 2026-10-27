@@ -1,10 +1,9 @@
 #pragma once
 
-#include "core/foc/math/LowSideShuntWindow.hpp"
-#include "core/foc/model/EncoderFreezeScheduler.hpp"
+#include "core/foc/model/OneShotDelay.hpp"
 #include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "core/foc/model/TorqueStepScheduler.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/HotSwapFunction.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
@@ -48,8 +47,9 @@ namespace mil
         const hal::Hertz baseFrequency;
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;
-        foc::TorqueStepScheduler torqueStep;
-        foc::EncoderFreezeScheduler encoderFreeze;
+        foc::OneShotDelay torqueStep;
+        foc::NewtonMeter torqueStepTorque{ 0.0f };
+        foc::OneShotDelay encoderFreeze;
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection;
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         uint32_t controlTick{ 0 };

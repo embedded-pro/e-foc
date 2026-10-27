@@ -13,7 +13,8 @@ target_link_libraries(e_foc.foc.cascade_test PUBLIC
 
 target_sources(e_foc.foc.cascade_test PRIVATE
     TestDirectAxisExcitation.cpp
-    TestEstimatorChannel.cpp
+    TestEstimatorWindowAccumulator.cpp
+    TestMechanicalWindowAccumulator.cpp
     TestPositionCascade.cpp
     TestSpeedCascade.cpp
     TestSpeedDifferentiator.cpp

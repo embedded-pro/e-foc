@@ -1,6 +1,5 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/Math.hpp"
@@ -93,11 +92,6 @@ namespace foc
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f } };
     }
 
-    CurrentControllerSelector& TorqueCascade::CurrentLoop()
-    {
-        return currentLoop;
-    }
-
     PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
@@ -116,9 +110,7 @@ namespace foc
         lastIq = idAndIq.q;
         const auto& setPoint = setPointBuffer.Acquire();
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), setPoint.second.Value() }, electricalSpeed });
-        auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
-
-        return ToDutyCycles(output);
+        return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
     }
 
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)

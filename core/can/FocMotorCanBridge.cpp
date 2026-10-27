@@ -1,6 +1,5 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCommandOutcome.hpp"
-#include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
 #include <limits>

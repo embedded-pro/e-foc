@@ -1,8 +1,8 @@
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "numerical/math/Tolerance.hpp"
 #include <array>

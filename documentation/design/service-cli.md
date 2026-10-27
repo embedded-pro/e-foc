@@ -31,14 +31,14 @@ date: 2026-04-07
 **Is responsible for:**
 - Providing a human-readable serial command-line interface for commissioning, diagnostics, and runtime control of the motor
 - Parsing user-typed command strings into typed arguments (numeric values, enums) using `TerminalHelper`, and returning structured `StatusWithMessage` responses on success or failure
-- Routing commands to the appropriate control mode interface (`FocTorque`, `FocSpeed`, `FocPosition`) based on which interactor is active
+- Routing commands to the appropriate control mode interface (`FocTorque`, `FocSpeed`, `FocPosition`) based on which control mode is active
 - Delegating motor lifecycle and calibration to the `FocStateMachine` when lifecycle commands such as `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` are issued
 - Printing a welcome banner with version information and available commands when the terminal first connects
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
 
 **Is NOT responsible for:**
 - Physical serial framing, character echo, or byte-level UART management — those are handled by the `TerminalWithStorage` infrastructure component
-- Choosing which control mode is active — the active interactor is configured at construction by the application
+- Choosing which control mode is active — the control-mode coordinator owns that choice
 - Executing identification or alignment procedures itself — commands are forwarded to the relevant service; results are printed asynchronously when the service callback fires
 
 ---
@@ -163,17 +163,13 @@ Counters saturate rather than wrap, so a long run cannot present itself as a hea
 
 - Firmware version string
 - Board/hardware identifier
-- A list of available commands (derived from the registered interactor)
+- A list of available commands (the commands registered on the terminal)
 
 After the banner is printed, all subsequent inputs and outputs pass through to the underlying `TerminalWithStorage` unchanged. The banner is printed at most once per connection — reconnecting the serial terminal causes the banner to be printed again.
 
 ### `TerminalHelper` — Argument Parsing
 
-`TerminalHelper` is a stateless utility that is invoked by each command handler to convert bounded-string tokens extracted from the command line into typed values. It handles:
-
-- **Floating-point numbers** — parsed from a bounded-string token; out-of-range or malformed input produces a `StatusWithMessage` with a human-readable description and a non-ok status so that the interactor can return the error directly to the caller without further processing.
-- **Enumerations** — matched case-insensitively against a compile-time list of valid string representations; unknown values produce an error with the list of valid options in the message.
-- **Integer values** — parsed with range checking against a caller-supplied minimum and maximum.
+`TerminalHelper` is a stateless utility that command handlers use to convert a bounded-string token extracted from the command line into a number. A whole or decimal number within a caller-supplied minimum and maximum is accepted; a malformed or out-of-range token yields no value, and the command handler answers with a non-ok `StatusWithMessage` describing the expected input.
 
 `TerminalHelper` operates entirely on `infra::BoundedString` tokens — no dynamic string allocation occurs.
 
@@ -202,22 +198,22 @@ The terminal writes the message to the serial output verbatim. For asynchronous 
 sequenceDiagram
     participant User as Serial terminal
     participant TWS as TerminalWithStorage
-    participant Interactor as TerminalFocSpeedInteractor
+    participant CMSM as ControlModeStateMachine
     participant Helper as TerminalHelper
     participant FocSpeed
 
-    User->>TWS: types "set-speed 100.0"
-    TWS->>Interactor: dispatch("set-speed", ["100.0"])
-    Interactor->>Helper: ParseFloat("100.0", min, max)
-    Helper-->>Interactor: {ok, 100.0}
-    Interactor->>FocSpeed: SetPoint(100.0 rad/s)
-    Interactor-->>TWS: StatusWithMessage{ok, "Speed set to 100.0 rad/s"}
-    TWS-->>User: "Speed set to 100.0 rad/s\r\n"
+    User->>TWS: types "set_speed 100.0"
+    TWS->>CMSM: dispatch("set_speed", ["100.0"])
+    CMSM->>Helper: ParseInput("100.0", min, max)
+    Helper-->>CMSM: 100.0
+    CMSM->>FocSpeed: SetPoint(100.0 rad/s)
+    CMSM-->>TWS: StatusWithMessage{success}
+    TWS-->>User: prompt
 ```
 
 ### Asynchronous Command Flow
 
-For commands that trigger asynchronous services, the interactor initiates the service and returns `{ok, "Operation started"}` immediately. The service's `onDone` callback captures a reference to the `TerminalWithStorage` and writes the final result:
+For commands that trigger asynchronous services, the command handler initiates the service and returns `{ok, "Operation started"}` immediately. The service's `onDone` callback captures a reference to the `TerminalWithStorage` and writes the final result:
 
 ```mermaid
 sequenceDiagram
@@ -249,19 +245,16 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface                                    | Purpose                                                                                                                                                                               | Contract                                                                              |
-|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_current_bandwidth` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                         | Transparent to the underlying terminal after the banner has been printed              |
+| Interface            | Purpose                                                                       | Contract                                                                 |
+|----------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection | Transparent to the underlying terminal after the banner has been printed |
+| `TerminalHelper`     | Parses a command token into a number within caller-supplied bounds            | Yields no value for a malformed or out-of-range token                    |
 
 ### Required
 
-| Interface                                | Purpose                                                                                                | Contract                                                                             |
-|------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| `TerminalWithStorage`                    | Receives and dispatches parsed command tokens; writes string responses to the serial output            | Must be connected to the physical serial driver before any interactor is constructed |
-| `CurrentLoopTunable`                     | Provides `SetCurrentTunings()`, shared by all control modes                                            | Must remain valid for the lifetime of the interactor                                 |
-| `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
-| DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |
+| Interface             | Purpose                                                                                     | Contract                                                                         |
+|-----------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | Must be connected to the physical serial driver before any command is registered |
 
 ---
 

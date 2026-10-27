@@ -274,7 +274,7 @@ jobs:
           submodules: false
       - name: Select the shard's features
         id: shard
-        run: echo "features=$(python3 scripts/sil-shard.py --shard ${{ matrix.shard }} --of "$SIL_SHARDS")" >> "$GITHUB_OUTPUT"
+        run: echo "features=$(python3 integration_tests/sil-shard.py --shard ${{ matrix.shard }} --of "$SIL_SHARDS")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e_foc.integration_tests

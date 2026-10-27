@@ -3,22 +3,28 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <numbers>
 
 namespace foc
 {
+    ALWAYS_INLINE_HOT PhasePwmDutyCycles ToDutyCycles(const ThreePhase& normalized)
+    {
+        const auto toDutyCycle = [](float value)
+        {
+            const auto bounded = value > 0.0f ? (value < 1.0f ? value : 1.0f) : 0.0f;
+
+            return hal::DutyCycle{ static_cast<uint32_t>(bounded * static_cast<float>(hal::DutyCycle::fullScale) + 0.5f) };
+        };
+
+        return PhasePwmDutyCycles{ toDutyCycle(normalized.a), toDutyCycle(normalized.b), toDutyCycle(normalized.c) };
+    }
+
     class SpaceVectorModulation
     {
     public:
-        struct Output
-        {
-            float a;
-            float b;
-            float c;
-        };
-
         OPTIMIZE_FOR_SPEED
-        Output Generate(const TwoPhase& voltagePhase) const
+        PhasePwmDutyCycles Generate(const TwoPhase& voltagePhase) const
         {
             const float alphaHalf = voltagePhase.alpha * half;
             const float betaSqrt3 = voltagePhase.beta * sqrt3Div2;
@@ -31,18 +37,16 @@ namespace foc
             const auto vMin = std::min({ vA, vB, vC });
             const auto vCommon = (vMax + vMin) * -half;
 
-            return Output{ Clip(vA + vCommon), Clip(vB + vCommon), Clip(vC + vCommon) };
+            return ToDutyCycles(ThreePhase{ Normalized(vA + vCommon), Normalized(vB + vCommon), Normalized(vC + vCommon) });
         }
 
     private:
         OPTIMIZE_FOR_SPEED
-        float Clip(float dutyCycle) const
+        float Normalized(float phaseVoltage) const
         {
-            return std::clamp(dutyCycle * invSqrt3 + half, zero, one);
+            return phaseVoltage * invSqrt3 + half;
         }
 
-        static constexpr float zero{ 0.0f };
-        static constexpr float one{ 1.0f };
         static constexpr float half{ 0.5f };
         static constexpr float invSqrt3{ std::numbers::inv_sqrt3_v<float> };
         static constexpr float sqrt3Div2{ std::numbers::sqrt3_v<float> * 0.5f };

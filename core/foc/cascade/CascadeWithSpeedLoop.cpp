@@ -1,140 +1,17 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 #include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include <algorithm>
+#include <chrono>
 
 namespace foc
 {
-
-    SpeedDifferentiator::SpeedDifferentiator(hal::Hertz outerLoopFrequency)
-        : samplePeriod{ 1.0f / static_cast<float>(outerLoopFrequency.Value()) }
-    {}
-
-    void SpeedDifferentiator::Restart()
-    {
-        currentAngle = 0.0f;
-        windowAngle = 0.0f;
-        previousAngle = 0.0f;
-        lastSpeed = 0.0f;
-        previousAngleValid = false;
-    }
-
-    float SpeedDifferentiator::Measure()
-    {
-        // The window interrupt preempts this reader, so a changed index means the angle may belong to a newer window
-        uint32_t index{};
-        float angle{};
-        do
-        {
-            index = windowIndex;
-            angle = windowAngle;
-        } while (index != windowIndex);
-
-        if (!previousAngleValid)
-        {
-            previousAngle = angle;
-            previousIndex = index;
-            previousAngleValid = true;
-            return 0.0f;
-        }
-
-        const auto windows = index - previousIndex;
-        if (windows == 0)
-            return lastSpeed;
-
-        lastSpeed = detail::PositionWithWrapAround(angle - previousAngle) / (static_cast<float>(windows) * samplePeriod);
-        previousAngle = angle;
-        previousIndex = index;
-        return lastSpeed;
-    }
-
     namespace
     {
         constexpr float excitationCurrentFraction{ 0.025f };
         const hal::Hertz excitationFrequency{ 50 };
         constexpr std::chrono::seconds excitationBurst{ 4 };
         constexpr std::chrono::seconds excitationCycle{ 60 };
-    }
-
-    EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow, uint32_t dutyUpdateDelayPeriods)
-        : tickFrequency{ static_cast<float>(tickFrequency.Value()) }
-        , ticksPerWindow{ ticksPerWindow }
-        , dutyLate{ dutyUpdateDelayPeriods != 0 }
-        , mechanical{ ticksPerWindow }
-    {
-        really_assert(dutyUpdateDelayPeriods <= 1);
-    }
-
-    void EstimatorWindowAccumulator::Restart()
-    {
-        *this = EstimatorWindowAccumulator{ hal::Hertz{ static_cast<uint32_t>(tickFrequency) }, ticksPerWindow, dutyLate ? 1u : 0u };
-    }
-
-    DirectAxisExcitation::DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency, std::chrono::seconds burst, std::chrono::seconds cycle)
-        : amplitude{ amplitude.Value() }
-        , halfPeriodSamples{ frequency.Value() != 0 ? std::max<uint32_t>(outerLoopFrequency.Value() / (2 * frequency.Value()), 1) : 0 }
-        , burstSamples{ static_cast<uint32_t>(burst.count()) * outerLoopFrequency.Value() }
-        , cycleSamples{ std::max<uint32_t>(static_cast<uint32_t>(cycle.count()) * outerLoopFrequency.Value(), 1) }
-    {}
-
-    void DirectAxisExcitation::Restart()
-    {
-        sample = 0;
-        cycleSample = 0;
-        positive = true;
-    }
-
-    float DirectAxisExcitation::Advance()
-    {
-        if (halfPeriodSamples == 0)
-            return 0.0f;
-
-        if (++cycleSample >= cycleSamples)
-            Restart();
-
-        if (cycleSample >= burstSamples)
-            return 0.0f;
-
-        if (++sample >= halfPeriodSamples)
-        {
-            sample = 0;
-            positive = !positive;
-        }
-
-        return positive ? amplitude : -amplitude;
-    }
-
-    void EstimatorChannel::SetMechanical(OnlineMechanicalEstimator& estimator)
-    {
-        mechanical = &estimator;
-    }
-
-    void EstimatorChannel::SetElectrical(OnlineElectricalEstimator& estimator)
-    {
-        electrical = &estimator;
-    }
-
-    bool EstimatorChannel::HasElectrical() const
-    {
-        return electrical != nullptr;
-    }
-
-    void EstimatorChannel::UpdateMechanical()
-    {
-        if (mechanical == nullptr)
-            return;
-
-        mechanical->Update(buffer.Acquire().mechanical);
-    }
-
-    void EstimatorChannel::UpdateElectrical(float vdcInvScale, Ampere directCurrentReference)
-    {
-        if (electrical == nullptr)
-            return;
-
-        const auto& snapshot = buffer.Acquire();
-        electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq, directCurrentReference });
     }
 
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
@@ -250,7 +127,7 @@ namespace foc
         const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -maxCurrent.Value(), maxCurrent.Value());
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
 
-        auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
         estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
 
@@ -265,7 +142,7 @@ namespace foc
             lowPriorityInterrupt.Trigger();
         }
 
-        return ToDutyCycles(output);
+        return duties;
     }
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
@@ -301,11 +178,6 @@ namespace foc
         return { RadiansPerSecond{ lastMechanicalSpeed }, Ampere{ lastMeanIq }, RadiansPerSecond{ speedReference }, Radians{ 0.0f } };
     }
 
-    float CascadeWithSpeedLoop::PolePairs() const
-    {
-        return polePairs;
-    }
-
     LowPriorityInterrupt& CascadeWithSpeedLoop::GetLowPriorityInterrupt()
     {
         return lowPriorityInterrupt;
@@ -333,11 +205,6 @@ namespace foc
 
         estimators.UpdateElectrical(vdcInvScale, Ampere{ directCurrentReference });
         directCurrentReference = directAxisExcitation.Advance();
-    }
-
-    void CascadeWithSpeedLoop::SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency)
-    {
-        directAxisExcitation = DirectAxisExcitation{ amplitude, frequency, outerLoopFrequency, excitationBurst, excitationCycle };
     }
 
     void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)

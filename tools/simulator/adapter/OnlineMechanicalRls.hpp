@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"

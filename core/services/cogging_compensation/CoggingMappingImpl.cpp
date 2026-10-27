@@ -2,7 +2,7 @@
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
-#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <algorithm>

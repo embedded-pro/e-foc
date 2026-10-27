@@ -1,6 +1,6 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 

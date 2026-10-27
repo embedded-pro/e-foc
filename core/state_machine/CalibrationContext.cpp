@@ -140,14 +140,4 @@ namespace application
         tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth();
         return tunings;
     }
-
-    drivers::ThreePhaseInverter& CalibrationContext::GetInverter()
-    {
-        return inverter;
-    }
-
-    foc::Volts CalibrationContext::GetVdc() const
-    {
-        return vdc;
-    }
 }

@@ -1,5 +1,5 @@
 #include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
-#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <cmath>
 

@@ -6,12 +6,10 @@ on:
     branches: [main]
     paths:
       - "documentation/**"
-      - "scripts/build-foc-booklet.py"
       - ".github/workflows/build-booklet.yml"
   pull_request:
     paths:
       - "documentation/**"
-      - "scripts/build-foc-booklet.py"
       - ".github/workflows/build-booklet.yml"
   release:
     types: [published]
@@ -62,7 +60,7 @@ jobs:
         run: npm install -g @mermaid-js/mermaid-cli
 
       - name: Build booklet (PDF + site)
-        run: python scripts/build-foc-booklet.py --format all
+        run: python documentation/tools/build-foc-booklet.py --format all
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

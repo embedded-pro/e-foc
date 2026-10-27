@@ -1,11 +1,10 @@
 #pragma once
 
-#include "core/foc/math/LowSideShuntWindow.hpp"
-#include "core/foc/model/EncoderFreezeScheduler.hpp"
+#include "core/foc/model/OneShotDelay.hpp"
 #include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -217,8 +216,9 @@ namespace application
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;
         SemihostingRecordFile plantRecord{ "plant.rec" };
-        foc::TorqueStepScheduler torqueStep;
-        foc::EncoderFreezeScheduler encoderFreeze;
+        foc::OneShotDelay torqueStep;
+        foc::NewtonMeter torqueStepTorque{ 0.0f };
+        foc::OneShotDelay encoderFreeze;
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
         std::optional<EmulatedCanBusAdapter> canBusAdapter;

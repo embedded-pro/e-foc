@@ -1,7 +1,7 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
-#include "core/foc/math/DutyConversion.hpp"
 #include <array>
 #include <cmath>
 #include <gmock/gmock.h>

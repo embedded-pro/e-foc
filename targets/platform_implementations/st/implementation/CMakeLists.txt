@@ -7,6 +7,7 @@ target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} P
 
 target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     e_foc.platform_abstraction
+    e_foc.platform_abstraction.peripheral_stubs
     infra.event
     infra.timer
     services.tracer

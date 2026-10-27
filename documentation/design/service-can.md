@@ -361,9 +361,7 @@ The bridge validates that the correct control mode is active before accepting a 
 
 ### Part E — FocMotorCanClient
 
-A self-contained client object for use in host tools and SIL tests. Internally composes the frame-origin tracker, `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` as value members (no heap). Constructed with a `hal::Can&` reference and a target node ID; tools that command several nodes address the category client directly with each node ID.
-
-Provides the same `Send*` API as `FocMotorCategoryClient` but hides the transport and protocol client, so callers only need a CAN bus reference and a node ID.
+A self-contained client object for use in host tools and SIL tests. Internally composes the frame-origin tracker, `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` as value members (no heap) and registers the category with the protocol client. Constructed with a `hal::Can&` reference only; callers send through the category client, passing the node ID with each command, so one client can command several nodes.
 
 ### Part F — `CanLivenessWatchdog`
 
@@ -439,11 +437,11 @@ carries (`can-lite` tracks eight servers).
 
 ### Provided
 
-| Interface                      | Purpose                                                                            | Contract                                                                       |
-|--------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| FocMotorCategoryServerObserver | Observer interface for the server category                                         | Callbacks must not block or allocate; called from the event dispatcher context |
-| FocMotorCategoryClientObserver | Observer interface for the client category                                         | Callbacks must not block or allocate                                           |
-| FocMotorCanClient public API   | User-facing send methods (`Start`, `Stop`, `SetTorque`, `SetSpeed`, `SetPosition`) | Returns `bool` indicating whether the frame was queued; ACK is delivered async |
+| Interface                      | Purpose                                                            | Contract                                                                       |
+|--------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| FocMotorCategoryServerObserver | Observer interface for the server category                         | Callbacks must not block or allocate; called from the event dispatcher context |
+| FocMotorCategoryClientObserver | Observer interface for the client category                         | Callbacks must not block or allocate                                           |
+| FocMotorCanClient              | Wires the protocol client and the category client onto one CAN bus | Callers send through `CategoryClient()`; each `Send*` returns `bool` queued    |
 
 ### Required
 
@@ -590,7 +588,7 @@ graph LR
         CPC --> CPCO["TracingCanProtocolClientObserver"]
         CPC --> MCC["FocMotorCategoryClient"]
         FOT -. "sender of the frame being dispatched" .-> MCC
-        MCC --> FMC["FocMotorCanClient (user API)"]
+        FMC["FocMotorCanClient"] --> MCC
     end
 ```
 

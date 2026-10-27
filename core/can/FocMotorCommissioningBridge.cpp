@@ -1,6 +1,6 @@
 #include "core/can/FocMotorCommissioningBridge.hpp"
 #include "core/can/FocMotorCommandOutcome.hpp"
-#include "core/foc/math/TorqueConstant.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include <limits>
 #include <variant>
 

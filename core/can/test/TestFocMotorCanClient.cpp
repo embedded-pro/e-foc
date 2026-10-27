@@ -29,72 +29,22 @@ namespace
                 EXPECT_CALL(canMock, ReceiveData(_)).Times(AnyNumber());
             } };
 
-        can::FocMotorCanClient client{ canMock, 1 };
+        can::FocMotorCanClient client{ canMock };
 
         uint8_t lastSentMsgType{};
         uint16_t lastSentNodeId{};
     };
 }
 
-TEST_F(FocMotorCanClientTest, SetNodeId_AddressesLaterCommandsToTheNewNode)
-{
-    client.Start();
-    EXPECT_EQ(lastSentNodeId, 1u);
-
-    client.SetNodeId(5);
-    client.Start();
-    EXPECT_EQ(lastSentNodeId, 5u);
-}
-
-TEST_F(FocMotorCanClientTest, Start_TransmitsStartFrame)
-{
-    client.Start();
-    EXPECT_EQ(lastSentMsgType, can::focStartId);
-}
-
-TEST_F(FocMotorCanClientTest, Stop_TransmitsStopFrame)
-{
-    client.Stop();
-    EXPECT_EQ(lastSentMsgType, can::focStopId);
-}
-
-TEST_F(FocMotorCanClientTest, ClearFault_TransmitsClearFaultFrame)
-{
-    client.ClearFault();
-    EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
-}
-
-TEST_F(FocMotorCanClientTest, EmergencyStop_TransmitsEmergencyStopFrame)
-{
-    client.EmergencyStop();
-    EXPECT_EQ(lastSentMsgType, can::focEmergencyStopId);
-}
-
-TEST_F(FocMotorCanClientTest, SetTorque_TransmitsTorqueSetpointFrame)
-{
-    client.SetTorque(foc::Ampere{ 1.5f });
-    EXPECT_EQ(lastSentMsgType, can::focSetTorqueSetpointId);
-}
-
-TEST_F(FocMotorCanClientTest, SetSpeed_TransmitsSpeedSetpointFrame)
-{
-    client.SetSpeed(foc::RadiansPerSecond{ 100.0f });
-    EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointId);
-}
-
-TEST_F(FocMotorCanClientTest, SetPosition_TransmitsPositionSetpointFrame)
-{
-    client.SetPosition(foc::Radians{ 1.0f });
-    EXPECT_EQ(lastSentMsgType, can::focSetPositionSetpointId);
-}
-
-TEST_F(FocMotorCanClientTest, SelectControlMode_TransmitsSelectControlModeFrame)
-{
-    client.SelectControlMode(can::FocMotorMode::speed);
-    EXPECT_EQ(lastSentMsgType, can::focSelectControlModeId);
-}
-
 TEST_F(FocMotorCanClientTest, CategoryClientIsRegisteredWithProtocolClient)
 {
     EXPECT_EQ(client.CategoryClient().Id(), can::focMotorCategoryId);
+}
+
+TEST_F(FocMotorCanClientTest, CategoryClientSendsThroughTheBus)
+{
+    client.CategoryClient().SendStart(5);
+
+    EXPECT_EQ(lastSentMsgType, can::focStartId);
+    EXPECT_EQ(lastSentNodeId, 5u);
 }

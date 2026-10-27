@@ -60,7 +60,6 @@ jobs:
           mkdir -p "$staging"
           find build/host/tools/simulator -name "e_foc.tool.simulator" -type f -executable -exec cp {} "$staging/" \;
           test -x "$staging/e_foc.tool.simulator"
-          cp tools/simulator/config/*.json "$staging/"
           tar -czf "e_foc-simulator-${version}-linux-x86_64.tar.gz" -C staging simulator
       - name: Package CAN Commander
         run: |
@@ -193,7 +192,6 @@ jobs:
           find build/tools -name "e_foc.tool.simulator.exe" -type f -exec cp {} "$staging/" \;
           test -f "$staging/e_foc.tool.simulator.exe"
           windeployqt --release --no-translations "$staging/e_foc.tool.simulator.exe"
-          cp tools/simulator/config/*.json "$staging/"
           7z a "e_foc-simulator-${version}-windows-x86_64.zip" "./staging/simulator/*"
       - name: Package CAN Commander
         shell: bash
