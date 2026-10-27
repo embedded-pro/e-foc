@@ -1,61 +1,28 @@
-#include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <cmath>
 
 namespace services
 {
-    PhaseCurrentOffsetCompensation::PhaseCurrentOffsetCompensation(drivers::ThreePhaseInverter& inverter)
-        : PhaseCurrentOffsetCompensation(inverter, Config{})
+    PhaseCurrentOffsetMeasurement::PhaseCurrentOffsetMeasurement(drivers::ThreePhaseInverter& inverter, InverterCompensation& compensation)
+        : PhaseCurrentOffsetMeasurement(inverter, compensation, Config{})
     {}
 
-    PhaseCurrentOffsetCompensation::PhaseCurrentOffsetCompensation(drivers::ThreePhaseInverter& inverter, const Config& config)
+    PhaseCurrentOffsetMeasurement::PhaseCurrentOffsetMeasurement(drivers::ThreePhaseInverter& inverter, InverterCompensation& compensation, const Config& config)
         : inverter(inverter)
+        , compensation(compensation)
         , config(config)
     {}
 
-    PhaseCurrentOffsetCompensation::~PhaseCurrentOffsetCompensation()
+    PhaseCurrentOffsetMeasurement::~PhaseCurrentOffsetMeasurement()
     {
         noSampleTimer.Cancel();
         if (onMeasured)
             inverter.Stop();
     }
 
-    void PhaseCurrentOffsetCompensation::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
-    {
-        onCorrectedCurrents.Set(onDone);
-        inverter.PhaseCurrentsReady(baseFrequency, [this](foc::PhaseCurrents currents)
-            {
-                ForwardCorrected(currents);
-            });
-    }
-
-    void PhaseCurrentOffsetCompensation::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
-    {
-        inverter.ThreePhasePwmOutput(dutyPhases);
-    }
-
-    void PhaseCurrentOffsetCompensation::Start()
-    {
-        inverter.Start();
-    }
-
-    void PhaseCurrentOffsetCompensation::Stop()
-    {
-        inverter.Stop();
-    }
-
-    hal::Hertz PhaseCurrentOffsetCompensation::BaseFrequency() const
-    {
-        return inverter.BaseFrequency();
-    }
-
-    foc::Ampere PhaseCurrentOffsetCompensation::MaxCurrentSupported() const
-    {
-        return inverter.MaxCurrentSupported();
-    }
-
-    void PhaseCurrentOffsetCompensation::Measure(const infra::Function<void(std::optional<foc::PhaseCurrents>)>& onDone)
+    void PhaseCurrentOffsetMeasurement::Measure(const infra::Function<void(std::optional<foc::PhaseCurrents>)>& onDone)
     {
         ++run;
         finishing = false;
@@ -81,17 +48,17 @@ namespace services
         StartSampleWatchdog();
     }
 
-    void PhaseCurrentOffsetCompensation::Apply(const foc::PhaseCurrents& newOffsets)
+    void PhaseCurrentOffsetMeasurement::Apply(const foc::PhaseCurrents& offsets)
     {
-        offsets = newOffsets;
+        compensation.ApplyOffsets(offsets);
     }
 
-    bool PhaseCurrentOffsetCompensation::IsRunning() const
+    bool PhaseCurrentOffsetMeasurement::IsRunning() const
     {
         return static_cast<bool>(onMeasured);
     }
 
-    void PhaseCurrentOffsetCompensation::Abort()
+    void PhaseCurrentOffsetMeasurement::Abort()
     {
         if (!onMeasured)
             return;
@@ -101,7 +68,7 @@ namespace services
         onMeasured = nullptr;
     }
 
-    void PhaseCurrentOffsetCompensation::OnMeasurementSample(foc::PhaseCurrents currents)
+    void PhaseCurrentOffsetMeasurement::OnMeasurementSample(foc::PhaseCurrents currents)
     {
         if (!onMeasured || finishing)
             return;
@@ -128,7 +95,7 @@ namespace services
             Finish(true);
     }
 
-    void PhaseCurrentOffsetCompensation::StartSampleWatchdog()
+    void PhaseCurrentOffsetMeasurement::StartSampleWatchdog()
     {
         sampleSeen = false;
         noSampleTimer.Start(config.noSampleTimeout, [this]()
@@ -140,7 +107,7 @@ namespace services
             });
     }
 
-    void PhaseCurrentOffsetCompensation::FailMeasurement()
+    void PhaseCurrentOffsetMeasurement::FailMeasurement()
     {
         if (finishing)
             return;
@@ -153,14 +120,14 @@ namespace services
     }
 
     // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
-    void PhaseCurrentOffsetCompensation::Finish(bool measured)
+    void PhaseCurrentOffsetMeasurement::Finish(bool measured)
     {
         inverter.Stop();
         measurementComplete = measured;
         finishing = true;
 
         infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [finishingRun = run](const infra::SharedPtr<PhaseCurrentOffsetCompensation>& self)
+            [finishingRun = run](const infra::SharedPtr<PhaseCurrentOffsetMeasurement>& self)
             {
                 if (self->run != finishingRun)
                     return;
@@ -170,7 +137,7 @@ namespace services
             WeakFromThis());
     }
 
-    void PhaseCurrentOffsetCompensation::Complete()
+    void PhaseCurrentOffsetMeasurement::Complete()
     {
         noSampleTimer.Cancel();
 
@@ -178,7 +145,7 @@ namespace services
             onMeasured(measurementComplete ? MeasuredOffsets() : std::nullopt);
     }
 
-    std::optional<foc::PhaseCurrents> PhaseCurrentOffsetCompensation::MeasuredOffsets() const
+    std::optional<foc::PhaseCurrents> PhaseCurrentOffsetMeasurement::MeasuredOffsets() const
     {
         const auto count = static_cast<float>(config.averagedSamples);
         const foc::PhaseCurrents measured{ foc::Ampere{ sums.a / count }, foc::Ampere{ sums.b / count }, foc::Ampere{ sums.c / count } };

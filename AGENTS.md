@@ -14,7 +14,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
-- `core/services/` — Alignment, CLI, system ID, NVM, standstill, offsets, dead-time and cogging compensation, `injection_current_limit/`
+- `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)

@@ -12,12 +12,12 @@ target_link_libraries(e_foc.services.current_offsets PUBLIC
     e_foc.platform_abstraction
     e_foc.foc.interfaces
     e_foc.services.injection_current_limit
-    numerical.math
+    e_foc.services.inverter_compensation
 )
 
 target_sources(e_foc.services.current_offsets PRIVATE
-    PhaseCurrentOffsetCompensation.cpp
-    PhaseCurrentOffsetCompensation.hpp
+    PhaseCurrentOffsetMeasurement.cpp
+    PhaseCurrentOffsetMeasurement.hpp
     PhaseCurrentOffsets.hpp
 )
 

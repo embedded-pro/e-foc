@@ -14,7 +14,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.foc.cascade
     e_foc.services.cli
     e_foc.services.current_offsets
-    e_foc.services.dead_time_compensation
+    e_foc.services.inverter_compensation
     e_foc.services.electrical_system_ident
     e_foc.services.alignment
     e_foc.services.non_volatile_memory

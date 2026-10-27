@@ -35,7 +35,8 @@ bench rotor's viscous friction (`documentation/design/software-in-the-loop.md`, 
 
 **Is responsible for:**
 - Measuring each phase sensor's zero-current reading at the start of the full calibration
-- Removing the offsets in force from every phase-current sample before any consumer receives it
+- Handing the offsets in force to the inverter compensation stage, which removes them from every
+  phase-current sample before any consumer receives it
 - Failing a measurement whose readings cannot be offsets
 
 **Is NOT responsible for:**
@@ -49,11 +50,14 @@ bench rotor's viscous friction (`documentation/design/software-in-the-loop.md`, 
 
 ### Part A — Where the correction sits
 
-The service stands between the platform's inverter and everything that reads phase currents: the
-current loop, the online estimators, and the identification and alignment procedures. To them it is
-the inverter. It passes duty commands, start, stop, the base frequency and the current limit through
-unchanged, and subtracts the offsets in force from each sample before handing it on. The cost in the
-control interrupt is one call and three subtractions.
+The offsets are removed by the inverter compensation stage, which stands between the platform's
+inverter and everything that reads phase currents: the current loop, the online estimators, and the
+identification and alignment procedures. To them it is the inverter. It subtracts the offsets in
+force from each sample before handing it on, and the same stage corrects each duty for the dead-time
+loss (`service-dead-time-compensation.md`). A sample therefore crosses one stage on its way in and a
+duty one on its way out; the offsets cost three subtractions inside that stage's call.
+
+This service measures the offsets and hands them to the stage. It does not stand in the path itself.
 
 The hardware over-current comparators and the hardware-test target keep the raw samples. The emulated
 platform's board protection does too, as the real comparators would.
@@ -100,6 +104,7 @@ A record written before this step existed carries zero offsets, which applies no
 sequenceDiagram
     participant SM as Calibration sequence
     participant CO as Current offsets
+    participant IC as Inverter compensation
     participant INV as Platform inverter
     participant EI as Electrical ident
 
@@ -110,11 +115,12 @@ sequenceDiagram
     CO->>INV: Stop
     CO-->>SM: offsets, or failure (event loop)
     SM->>CO: Apply(offsets)
+    CO->>IC: offsets in force
     SM->>EI: EstimateNumberOfPolePairs
-    EI->>CO: duties and sample requests
-    CO->>INV: forwarded unchanged
-    INV-->>CO: raw samples
-    CO-->>EI: samples with the offsets removed
+    EI->>IC: duties and sample requests
+    IC->>INV: duties corrected for the dead time
+    INV-->>IC: raw samples
+    IC-->>EI: samples with the offsets removed
 ```
 
 ---
@@ -123,21 +129,21 @@ sequenceDiagram
 
 ### Provided
 
-| Interface  | Purpose                                | Contract                                                                      |
-|------------|----------------------------------------|-------------------------------------------------------------------------------|
-| Inverter   | The bridge, for every current consumer | Same as the platform's; each sample arrives with the offsets in force removed |
-| Measure    | Measure the three offsets              | Asynchronous; reports three offsets or none; leaves the bridge stopped        |
-| Apply      | Set the offsets in force               | Takes effect on the next sample                                               |
-| Abort      | Abandon a measurement                  | Stops the bridge; the measurement reports nothing                             |
-| Is running | Whether a measurement is in flight     | True from Measure until its result is delivered or it is aborted              |
+| Interface  | Purpose                            | Contract                                                               |
+|------------|------------------------------------|------------------------------------------------------------------------|
+| Measure    | Measure the three offsets          | Asynchronous; reports three offsets or none; leaves the bridge stopped |
+| Apply      | Set the offsets in force           | Takes effect on the next sample the compensation stage hands on        |
+| Abort      | Abandon a measurement              | Stops the bridge; the measurement reports nothing                      |
+| Is running | Whether a measurement is in flight | True from Measure until its result is delivered or it is aborted       |
 
 ### Required
 
-| Interface         | Purpose                                  | Contract                                                  |
-|-------------------|------------------------------------------|-----------------------------------------------------------|
-| Platform inverter | Duties, start, stop and the raw samples  | One sample callback at a time; the last registration wins |
-| Event dispatcher  | Deliver the result outside the interrupt | —                                                         |
-| Timer             | Detect a bridge that sends no samples    | —                                                         |
+| Interface             | Purpose                                         | Contract                                                  |
+|-----------------------|-------------------------------------------------|-----------------------------------------------------------|
+| Platform inverter     | Duties, stop and the raw samples, for measuring | One sample callback at a time; the last registration wins |
+| Inverter compensation | Remove the offsets in force from every sample   | The offsets apply from the next sample                    |
+| Event dispatcher      | Deliver the result outside the interrupt        | —                                                         |
+| Timer                 | Detect a bridge that sends no samples           | —                                                         |
 
 ---
 

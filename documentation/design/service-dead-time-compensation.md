@@ -37,7 +37,8 @@ has, which is why the online resistance estimate reads about 20 % high on the ri
 
 **Is responsible for:**
 - Correcting every duty the drive commands by the loss its leg's current will cause
-- Passing the phase currents, start, stop, the base frequency and the current limit through unchanged
+- Removing the sensors' offsets from every phase current on the way in (`service-current-offsets.md`)
+- Passing start, stop, the base frequency and the current limit through unchanged
 
 **Is NOT responsible for:**
 - Measuring the loss, which the board states (Part C)
@@ -49,17 +50,20 @@ has, which is why the online resistance estimate reads about 20 % high on the ri
 
 ### Part A — Where the correction sits
 
-The service stands between the current-offset correction (`service-current-offsets.md`) and
-everything that commands duties: the current loop and the identification and alignment
-procedures. To them it is the inverter. It remembers the last phase currents it handed on, which
-already have the sensors' offsets removed, and corrects the next duty written with them. In the
-closed loop the duty follows the sample it was computed from in the same interrupt, so the
-correction always uses the current of that period.
+The correction lives in the inverter compensation stage, which stands between the platform's
+inverter and everything that commands duties or reads currents: the current loop and the
+identification and alignment procedures. To them it is the inverter. On the way in it removes the
+sensors' offsets from each sample (`service-current-offsets.md`) and remembers the result; on the
+way out it corrects the next duty with those currents. In the closed loop the duty follows the
+sample it was computed from in the same interrupt, so the correction always uses the current of
+that period.
+
+Both corrections share the stage so that a sample and a duty each cross one call, not two. They
+used to be two stages, one wrapping the other, and each passed the other's traffic through.
 
 A board that states no loss, or a dead band other than the one its loss was measured at, would get
-every duty back unchanged. The application then leaves the service out of the chain altogether, and
-the current-offset correction is the inverter the loop and the procedures see, which keeps the
-correction's cost out of the 20 kHz path on those boards.
+every duty back unchanged. The stage then hands its duties to the platform as they are, without the
+arithmetic, which keeps the correction's cost out of the 20 kHz path on those boards.
 
 The voltage the current loop asks for is unchanged. The anti-windup limits and the online
 estimators see that voltage, and the correction makes the winding receive it, which is why the
@@ -81,8 +85,8 @@ The ramp is a simplification. The switch node's real curve bends more gradually 
 loss, and against that curve the online resistance stays about 3 % high (Verification). The rig's
 sweep could not tell the two shapes apart: both fit it within 3 to 5 mV.
 
-The cost in the control interrupt is one more call on each side, and two multiplications and two
-clamps per leg.
+The cost in the control interrupt is two multiplications and two clamps per leg; the calls are the
+ones the offset correction needs anyway.
 
 ### Part C — The numbers
 
@@ -128,18 +132,15 @@ The resistance identification therefore samples at the PWM's own rate.
 ```mermaid
 sequenceDiagram
     participant INV as Platform inverter
-    participant CO as Current offsets
-    participant DT as Dead-time compensation
+    participant IC as Inverter compensation
     participant CL as Current loop
 
-    INV-->>CO: raw samples (interrupt)
-    CO-->>DT: samples with the offsets removed
-    note over DT: remember the three currents
-    DT-->>CL: the same samples
-    CL->>DT: duties for the asked voltage
-    note over DT: each leg moved by its share of the loss
-    DT->>CO: corrected duties
-    CO->>INV: forwarded unchanged
+    INV-->>IC: raw samples (interrupt)
+    note over IC: remove the offsets, remember the three currents
+    IC-->>CL: samples with the offsets removed
+    CL->>IC: duties for the asked voltage
+    note over IC: each leg moved by its share of the loss
+    IC->>INV: corrected duties
 ```
 
 ---
@@ -148,16 +149,17 @@ sequenceDiagram
 
 ### Provided
 
-| Interface | Purpose                                    | Contract                                                                       |
-|-----------|--------------------------------------------|--------------------------------------------------------------------------------|
-| Inverter  | The bridge, for every duty-commanding user | Same as the current-offset correction's; each duty corrected by its leg's loss |
+| Interface | Purpose                                                        | Contract                                                                                       |
+|-----------|----------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| Inverter  | The bridge, for every duty-commanding and current-reading user | Same as the platform's; samples with the offsets removed, duties corrected by their leg's loss |
+| Offsets   | Set the sensor offsets in force                                | Takes effect on the next sample                                                                |
 
 ### Required
 
-| Interface    | Purpose                                          | Contract                                                  |
-|--------------|--------------------------------------------------|-----------------------------------------------------------|
-| Inverter     | Duties, start, stop and offset-corrected samples | One sample callback at a time; the last registration wins |
-| Board's loss | The effective dead time and knee                 | Stated for one dead band; none for any other              |
+| Interface         | Purpose                                 | Contract                                                  |
+|-------------------|-----------------------------------------|-----------------------------------------------------------|
+| Platform inverter | Duties, start, stop and the raw samples | One sample callback at a time; the last registration wins |
+| Board's loss      | The effective dead time and knee        | Stated for one dead band; none for any other              |
 
 ---
 

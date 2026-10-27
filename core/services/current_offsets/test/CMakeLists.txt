@@ -11,5 +11,5 @@ target_link_libraries(e_foc.services.current_offsets_test PUBLIC
 )
 
 target_sources(e_foc.services.current_offsets_test PRIVATE
-    TestPhaseCurrentOffsetCompensation.cpp
+    TestPhaseCurrentOffsetMeasurement.cpp
 )
