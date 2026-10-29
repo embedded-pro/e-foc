@@ -321,13 +321,8 @@ bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. A
 
 ### Sensitivity Analysis
 
-| Parameter          | Effect on Control Quality                                                                                        |
-|--------------------|------------------------------------------------------------------------------------------------------------------|
-| $R_s$ error        | Current controller steady-state error (for non-integral controllers); compensated by integral term where present |
-| $L_s$ error        | Controller bandwidth deviation; no steady-state error for integral-action controllers                            |
-| $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error                                               |
-| $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended                                                  |
-| ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                                                              |
+How errors in $R_s$, $L_s$, $\theta_e$, $V_{dc}$ and the current-sensor offsets affect control quality, and
+the other disturbances the loops see, are in [disturbances and noise](disturbances-and-noise.md).
 
 ---
 

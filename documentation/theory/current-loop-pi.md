@@ -100,8 +100,8 @@ $$
 K_p^{norm} = K_p \cdot \frac{\sqrt{3}}{V_{dc}} = L_s\, \omega_{bw} \cdot \frac{\sqrt{3}}{V_{dc}}
 $$
 
-$V_{dc}$ is measured dynamically and used to update normalisation in real time. Without this scaling
-the effective bandwidth changes with bus voltage.
+$V_{dc}$ is measured once at boot and used for this normalisation. A bus that sags under load lowers the
+effective bandwidth in proportion (`documentation/theory/disturbances-and-noise.md` §3).
 
 ### Incremental (Velocity) Form
 
