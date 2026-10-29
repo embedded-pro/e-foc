@@ -213,18 +213,18 @@ A new motor is unknown: its offsets, pole pairs, resistance, inductance, rotor a
 friction and cogging. The calibration measures them in an order where each step needs only what the earlier ones
 produced (`documentation/design/state-machine.md`, *Calibration Sequence*):
 
-| Step                                      | What it does                                                                     | Needs                                                                    |
-|-------------------------------------------|----------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| 0. Standstill                             | Waits until the encoder is still within 2 mrad for 100 ms                        | Nothing                                                                  |
-| 1. Current offsets                        | All legs at 50 %; 2000 samples averaged; applied at once                         | A still rotor: a turning one drives current through the shorted windings |
-| 2. Pole pairs                             | Turns an open-loop vector five electrical revolutions; $p$ from the encoder      | Correct currents                                                         |
-| 3. Resistance, inductance                 | DC step for $R_s$; 700 Hz injection and a Goertzel filter for $L_s$              | Offsets; dead-time compensation                                          |
-| 4. Alignment                              | Holds a d-axis current at $\theta_e = 0$ until the rotor settles; sets the zero  | Pole pairs, a current level                                              |
-| 5. Flux linkage                           | Spins to 40 rad/s, coasts at zero current, fits $v_q$ against $\omega_e$         | Alignment, a current loop from $R_s$, $L_s$                              |
-| 6. Provisional plant                      | Applies the electrical model and a cautious speed loop                           | Steps 3–5                                                                |
-| 7. Mechanical (speed and position modes)  | Alternating speed steps; RLS for $J$, $B_f$; two agreeing runs                   | $K_t$ from the flux linkage, a speed loop                                |
-| 8. Cogging map (speed and position modes) | 10 rad/s both ways; 48-bin map                                                   | $J$ for the inertia correction, the tuned speed loop                     |
-| 9. Store                                  | Calibration record with magic, layout version and CRC-32; read back and verified | All of the above                                                         |
+| Step                                      | What it does                                                                                                        | Needs                                                                    |
+|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| 0. Standstill                             | Waits until the encoder is still within 2 mrad for 100 ms                                                           | Nothing                                                                  |
+| 1. Current offsets                        | All legs at 50 %; mean of two 2000-sample windows that agree within 10 mA (a third if they do not); applied at once | A still rotor: a turning one drives current through the shorted windings |
+| 2. Pole pairs                             | Turns an open-loop vector five electrical revolutions; $p$ from the encoder                                         | Correct currents                                                         |
+| 3. Resistance, inductance                 | DC step for $R_s$; 700 Hz injection and a Goertzel filter for $L_s$                                                 | Offsets; dead-time compensation                                          |
+| 4. Alignment                              | Holds a d-axis current at $\theta_e = 0$ until the rotor settles; sets the zero                                     | Pole pairs, a current level                                              |
+| 5. Flux linkage                           | Spins to 40 rad/s, coasts at zero current, fits $v_q$ against $\omega_e$                                            | Alignment, a current loop from $R_s$, $L_s$                              |
+| 6. Provisional plant                      | Applies the electrical model and a cautious speed loop                                                              | Steps 3–5                                                                |
+| 7. Mechanical (speed and position modes)  | Alternating speed steps; RLS for $J$, $B_f$; two agreeing runs                                                      | $K_t$ from the flux linkage, a speed loop                                |
+| 8. Cogging map (speed and position modes) | 10 rad/s both ways; 48-bin map                                                                                      | $J$ for the inertia correction, the tuned speed loop                     |
+| 9. Store                                  | Calibration record with magic, layout version and CRC-32; read back and verified                                    | All of the above                                                         |
 
 Any failed step ends in `Fault`; a missing cogging map does not. A layout change of the record (version 3 to 4 when
 the map was added) makes every stored calibration invalid and forces a new one (`documentation/design/service-nvm.md`).

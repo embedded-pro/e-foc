@@ -134,8 +134,11 @@ the ADC reference, so that both move together, cancels the supply's part of it.
 
 A residual offset rotates in dq at the electrical frequency and makes a torque ripple $K_t|\mathbf{o}|$ at $f_e$
 ([disturbances and noise](disturbances-and-noise.md) §4). *e-foc today:* offsets are measured with the rotor at
-rest, all legs at 50 %, 200 samples discarded and 2000 averaged (110 ms, noise below 1 mA), at every calibration
-and before an electrical identification over CAN, and restored from the calibration record at boot
+rest, all legs at 50 %, at every calibration and before an electrical identification over CAN, and restored from
+the calibration record at boot. Each window discards 200 samples and averages 2000 (110 ms, noise below 1 mA); a
+measurement keeps the mean of two windows whose offsets agree within 10 mA on every phase, takes a third when they
+do not, and fails without an agreeing pair, so a single disturbed window is never stored. On the bench a
+back-to-back calibration once read one phase 52 mA low in one window, which the second window now catches
 (`documentation/design/service-current-offsets.md`). Drift after warm-up is not tracked; the
 hardware-characterisation plan measures each condition cold and after ten minutes of PWM to separate it from
 noise.
@@ -272,16 +275,16 @@ graph LR
 
 ## Numerical Properties
 
-| Property                    | Value                                               |
-|-----------------------------|-----------------------------------------------------|
-| Current range and LSB       | ±8.25 A, 4.03 mA                                    |
-| Current noise               | 31–39 mA RMS per averaged sample                    |
-| Amplifier settling (12 bit) | ≈ 1.7 µs after an edge (derived)                    |
-| Last-phase hold instant     | 5.25 µs after the trigger (4-clock sample-and-hold) |
-| Readable duty               | 70 % (measured); 79 % before settling (derived)     |
-| Offset calibration          | 2000 samples, 110 ms, residual < 1 mA               |
-| Encoder                     | 4000 counts; 0.36° electrical                       |
-| Bus measurement             | 17 mV per LSB, read at boot                         |
+| Property                    | Value                                                                               |
+|-----------------------------|-------------------------------------------------------------------------------------|
+| Current range and LSB       | ±8.25 A, 4.03 mA                                                                    |
+| Current noise               | 31–39 mA RMS per averaged sample                                                    |
+| Amplifier settling (12 bit) | ≈ 1.7 µs after an edge (derived)                                                    |
+| Last-phase hold instant     | 5.25 µs after the trigger (4-clock sample-and-hold)                                 |
+| Readable duty               | 70 % (measured); 79 % before settling (derived)                                     |
+| Offset calibration          | Two agreeing windows of 2000 samples, 220 ms (330 ms with a third); residual < 1 mA |
+| Encoder                     | 4000 counts; 0.36° electrical                                                       |
+| Bus measurement             | 17 mV per LSB, read at boot                                                         |
 
 ---
 

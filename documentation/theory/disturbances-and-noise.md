@@ -207,8 +207,9 @@ $$
 a ripple at **$1 f_e$** of amplitude $|\mathbf{o}|$. Inside the current-loop bandwidth the loop makes the
 measured current follow the reference, so the real current carries the opposite ripple and the torque ripples
 by $K_t |\mathbf{o}|$ at $f_e$. The bench board's raw offsets were +27, −18 and +54 mA, a 42 mA vector after
-the Clarke transform and 1.6 mN·m of ripple on the Teknic. *e-foc today:* measured at calibration with the rotor at rest, 2000 samples averaged
-(noise below 1 mA), and subtracted from every sample (`documentation/design/service-current-offsets.md`). Where
+the Clarke transform and 1.6 mN·m of ripple on the Teknic. *e-foc today:* measured at calibration with the rotor
+at rest, as the mean of two 2000-sample windows that agree within 10 mA (noise below 1 mA), and subtracted from
+every sample (`documentation/design/service-current-offsets.md`). Where
 the offsets come from, and how they drift, is in [the sensing chain](sensing-chain.md) §3.
 
 **Current gain mismatch.** If phase a reads $(1 + \varepsilon)$ times its current, the three-sensor Clarke

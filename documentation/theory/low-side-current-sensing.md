@@ -258,23 +258,23 @@ that slope times the delay: up to 71 mA on the Anaheim and 0.40 A on the Teknic 
 
 ### 9. Configuration Checklist
 
-| Setting               | Recommendation                                                                    | Why                                                 | e-foc on EK-TM4C1294XL + E-FOC-HARDWARE      |
-|-----------------------|-----------------------------------------------------------------------------------|-----------------------------------------------------|----------------------------------------------|
-| Counter mode          | Centre-aligned (up-down)                                                          | One common window, symmetric ripple, no edge inside | Centre-aligned                               |
-| Output polarity       | High side on around the counter's top                                             | The common interval at zero must be 000, not 111    | As recommended                               |
-| Compare update        | Shadowed, loaded at the counter's zero, all legs together                         | No duty change mid-period; legs stay in step        | Global update at zero; one-period duty delay |
-| Dead band             | In hardware, as short as the driver and switches allow, never shorter             | It eats the window and adds a voltage error         | 500 ns; 70 ns effective loss, compensated    |
-| ADC trigger           | Hardware, from the PWM at the counter's zero, or from a compare just before it    | Jitter-free and inside the window                   | Generator 1 at the counter's zero            |
-| Conversion order      | Fixed with a rebuilt hidden phase, or dynamic with the highest-duty phase dropped | The highest-duty phase has the shortest window      | A, B, C fixed, hidden phase rebuilt          |
-| Sample-and-hold       | Shortest that still charges the sampling capacitor from the amplifier             | Longer pushes the last conversion out of the window | 4 clocks                                     |
-| Averaging             | Hardware ×2 if the window allows                                                  | Less noise, more time                               | ×2                                           |
-| Readable-duty limit   | Measured on the board, with margin                                                | Settling, ringing and recovery are board properties | 70 %                                         |
-| Maximum duty          | From the gate driver's bootstrap                                                  | The high side loses its gate otherwise              | 95 %                                         |
-| Duty post-processing  | Shift down when needed; scale along the vector only if two phases are hidden      | Common mode is free; voltage only when unavoidable  | `KeepLowSideShuntsReadable`                  |
-| Hidden-phase decision | From both periods the window spans                                                | The window straddles a duty update                  | `LowSideShuntReadout`                        |
-| PWM frequency         | Chosen with the window in mind                                                    | The window's absolute length scales with the period | 20 kHz                                       |
-| Offset calibration    | All legs at 50 %, rotor still                                                     | Widest windows, zero winding voltage                | At every calibration                         |
-| Fault inputs          | Comparators wired to the PWM's fault input                                        | Shutdown without software                           | Bus over- and under-voltage                  |
+| Setting               | Recommendation                                                                    | Why                                                                | e-foc on EK-TM4C1294XL + E-FOC-HARDWARE      |
+|-----------------------|-----------------------------------------------------------------------------------|--------------------------------------------------------------------|----------------------------------------------|
+| Counter mode          | Centre-aligned (up-down)                                                          | One common window, symmetric ripple, no edge inside                | Centre-aligned                               |
+| Output polarity       | High side on around the counter's top                                             | The common interval at zero must be 000, not 111                   | As recommended                               |
+| Compare update        | Shadowed, loaded at the counter's zero, all legs together                         | No duty change mid-period; legs stay in step                       | Global update at zero; one-period duty delay |
+| Dead band             | In hardware, as short as the driver and switches allow, never shorter             | It eats the window and adds a voltage error                        | 500 ns; 70 ns effective loss, compensated    |
+| ADC trigger           | Hardware, from the PWM at the counter's zero, or from a compare just before it    | Jitter-free and inside the window                                  | Generator 1 at the counter's zero            |
+| Conversion order      | Fixed with a rebuilt hidden phase, or dynamic with the highest-duty phase dropped | The highest-duty phase has the shortest window                     | A, B, C fixed, hidden phase rebuilt          |
+| Sample-and-hold       | Shortest that still charges the sampling capacitor from the amplifier             | Longer pushes the last conversion out of the window                | 4 clocks                                     |
+| Averaging             | Hardware ×2 if the window allows                                                  | Less noise, more time                                              | ×2                                           |
+| Readable-duty limit   | Measured on the board, with margin                                                | Settling, ringing and recovery are board properties                | 70 %                                         |
+| Maximum duty          | From the gate driver's bootstrap                                                  | The high side loses its gate otherwise                             | 95 %                                         |
+| Duty post-processing  | Shift down when needed; scale along the vector only if two phases are hidden      | Common mode is free; voltage only when unavoidable                 | `KeepLowSideShuntsReadable`                  |
+| Hidden-phase decision | From both periods the window spans                                                | The window straddles a duty update                                 | `LowSideShuntReadout`                        |
+| PWM frequency         | Chosen with the window in mind                                                    | The window's absolute length scales with the period                | 20 kHz                                       |
+| Offset calibration    | All legs at 50 %, rotor still, confirmed by a second window                       | Widest windows, zero winding voltage; a disturbed window is caught | At every calibration, two agreeing windows   |
+| Fault inputs          | Comparators wired to the PWM's fault input                                        | Shutdown without software                                          | Bus over- and under-voltage                  |
 
 ---
 
