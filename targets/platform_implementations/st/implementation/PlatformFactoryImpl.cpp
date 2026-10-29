@@ -5,7 +5,11 @@
 #include DEVICE_HEADER
 #include <atomic>
 
+#if defined(STM32G4)
+unsigned int hse_value = 24'000'000;
+#else
 unsigned int hse_value = 8'000'000;
+#endif
 
 namespace
 {
@@ -22,7 +26,7 @@ namespace
             return application::ResetCause::brownOut;
         if (rst & RCC_RSR_PINRSTF)
             return application::ResetCause::hardware;
-#elif defined(STM32F4)
+#elif defined(STM32G4)
         const uint32_t rst = RCC->CSR;
         RCC->CSR |= RCC_CSR_RMVF;
         if (rst & RCC_CSR_SFTRSTF)

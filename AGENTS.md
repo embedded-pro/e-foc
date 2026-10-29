@@ -123,7 +123,7 @@ ctest --preset host                                         # run tests
 cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # embedded
 ```
 
-Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the Software-in-the-Loop Tests job.
 

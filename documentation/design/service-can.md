@@ -426,7 +426,7 @@ flowchart LR
 | Board                                                      | ID jumpers                                                             | Board ID |
 |------------------------------------------------------------|------------------------------------------------------------------------|----------|
 | EK-TM4C1294XL                                              | PK0 (bit 0), PK1 (bit 1), PK2 (bit 2); a jumper to ground sets the bit | 0–7      |
-| EK-TM4C123GXL, STM32F407G-DISC1, NUCLEO-H563ZI, host, QEMU | none                                                                   | 0        |
+| EK-TM4C123GXL, NUCLEO-G474RE, NUCLEO-H563ZI, host, QEMU    | none                                                                   | 0        |
 
 With the default base, eight EK-TM4C1294XL boards jumpered 0–7 answer as nodes 1–8, the most one bus
 carries (`can-lite` tracks eight servers).

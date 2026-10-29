@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: ["EK-TM4C1294XL", "EK-TM4C123GXL", "STM32F407G-DISC1", "NUCLEO-H563ZI"]
+        target: ["EK-TM4C1294XL", "EK-TM4C123GXL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
         configuration: ["RelWithDebInfo"]
         gcc: ["13.2.Rel1"]
     steps:
@@ -234,7 +234,7 @@ jobs:
             "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
-            "e_foc-firmware-STM32F407G-DISC1-${v}.tar.gz" \
+            "e_foc-firmware-NUCLEO-G474RE-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
             "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
