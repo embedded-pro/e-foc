@@ -19,8 +19,9 @@ namespace
             return application::ResetCause::software;
         if (csr & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
             return application::ResetCause::watchdog;
+        // There is no power-on flag: every power-up sets BORRSTF, so a brown-out cannot be told from one
         if (csr & RCC_CSR_BORRSTF)
-            return application::ResetCause::brownOut;
+            return application::ResetCause::powerUp;
         if (csr & RCC_CSR_PINRSTF)
             return application::ResetCause::hardware;
         return application::ResetCause::powerUp;
@@ -31,7 +32,7 @@ namespace application
 {
     namespace
     {
-        // At 42.5 MHz, the nearest sampling times at or above the TM4C129 choices of 4, 16, 32, 64 and 256 cycles at 16 MHz
+        // At 42.5 MHz, close to the TM4C129's 0.25, 1, 2, 4 and 16 us; five channels at the longest outlast a 20 kHz period
         constexpr std::array<uint32_t, 5> toSamplingTime{ {
             ADC_SAMPLETIME_12CYCLES_5,
             ADC_SAMPLETIME_47CYCLES_5,
@@ -89,8 +90,16 @@ namespace application
         , uart{ transmitStream, Peripheral::LpUartIndex, Pins::uartTx, Pins::uartRx, hal::lpUart, ConsoleConfig() }
     {}
 
-    PlatformFactoryImpl::Peripherals::Peripherals()
-        : powerSupplyAdc{ Peripheral::PowerSupplyAdcIndex, Peripheral::powerSupplyAdcChannel, PowerSupplyAdcConfig() }
+    PlatformFactoryImpl::Cortex::Cortex(PlatformFactoryImpl& platform)
+        : eventDispatcher{ watchdog, watchdogExpirationTimeout, [&platform]()
+            {
+                platform.OnWatchdogExpired();
+            } }
+    {}
+
+    PlatformFactoryImpl::Peripherals::Peripherals(PlatformFactoryImpl& platform)
+        : cortex{ platform }
+        , powerSupplyAdc{ powerSupplyConverter, Peripheral::powerSupplyAdcChannel, PowerSupplyAdcConfig() }
         , eepromI2c{ Peripheral::EepromI2cIndex, Pins::eepromScl, Pins::eepromSda, EepromI2cConfig() }
     {}
 
@@ -106,7 +115,7 @@ namespace application
         }
 
         ConfigureBoardIdPins();
-        peripherals.emplace();
+        peripherals.emplace(*this);
         boardId = ReadBoardIdPins();
 
         // The driver starts the early warning at highest priority; lowest, so a hung handler starves it
@@ -232,8 +241,10 @@ namespace application
         return config;
     }
 
-    void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
+    // Latched like a protection trip, so the control loop does not re-arm the bridge before the reset follows
+    void PlatformFactoryImpl::OnWatchdogExpired()
     {
+        protectionTripped = true;
         CutPowerStage();
     }
 
@@ -292,8 +303,10 @@ namespace application
             hal::AdcPinConfig{ Pins::currentTotal, samplingTime },
             hal::AdcPinConfig{ Pins::powerSupplyVoltage, samplingTime });
 
-        // Highest: the DMA completion runs the control loop, as the ADC interrupt does on the TM4C129
-        NVIC_SetPriority(Peripheral::phaseCurrentDmaIrq, 0);
+        // The circular DMA channel registers at normal priority, but its completion runs the control loop
+        auto& dmaHandler = *hal::cortex::InterruptTable::Instance().Handler(Peripheral::phaseCurrentDmaIrq);
+        dmaHandler.Unregister();
+        dmaHandler.Register(Peripheral::phaseCurrentDmaIrq, InterruptPriorities::phaseCurrentAdc);
     }
 
     void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)
@@ -313,14 +326,17 @@ namespace application
     }
 
     // PWM mode 1 centres the high-side pulse on the counter valley, so the low-side shunts conduct around the peak.
-    // OC4REF rises one tick before the peak and its edge on TRGO starts the ADC sequence there. An odd repetition
-    // count written before the counter starts moves every update event to the peak: a new duty never lands mid-pulse.
+    // OC4REF rises shortly before the peak and its edge on TRGO starts the ADC sequence there; it stays high for
+    // twice the lead, several ADC clocks, so the converter never misses it. The compare is written before the mode,
+    // which would otherwise raise OC4REF at once. An odd repetition count written before the counter starts moves
+    // every update event to the peak: a new duty never lands mid-pulse.
     void PlatformFactoryImpl::ConfigureSamplingTrigger()
     {
+        constexpr uint32_t triggerLeadTicks{ 8 };
         auto timer = hal::peripheralTimer[Peripheral::PwmTimerIndex - 1];
 
+        LL_TIM_OC_SetCompareCH4(timer, LL_TIM_GetAutoReload(timer) - triggerLeadTicks);
         LL_TIM_OC_SetMode(timer, LL_TIM_CHANNEL_CH4, LL_TIM_OCMODE_PWM2);
-        LL_TIM_OC_SetCompareCH4(timer, LL_TIM_GetAutoReload(timer) - 1);
         LL_TIM_SetRepetitionCounter(timer, 1);
     }
 
@@ -396,7 +412,7 @@ namespace application
     void PlatformFactoryImpl::ConfigureCanBus(uint32_t bitRate, bool testMode)
     {
         hal::FdCanStm::Config canConfig;
-        canConfig.bitRate = bitRate;
+        canConfig.timing = hal::FdCanStm::BitRate{ bitRate };
         canConfig.testMode = testMode;
         canConfig.interruptPriority = InterruptPriorities::can;
 

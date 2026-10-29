@@ -41,6 +41,7 @@ namespace application
 {
     struct InterruptPriorities
     {
+        static constexpr auto phaseCurrentAdc{ hal::cortex::InterruptPriority::highest };
         static constexpr auto can{ hal::cortex::InterruptPriority::normal };
         static constexpr auto uart{ hal::cortex::InterruptPriority::low };
     };
@@ -104,13 +105,11 @@ namespace application
             static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
 
             static hal::WatchDogStm::Config WatchdogConfig();
-            static void OnWatchdogExpired();
+
+            explicit Cortex(PlatformFactoryImpl& platform);
 
             hal::WatchDogStm watchdog{ WatchdogConfig() };
-            services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<Resources::eventDispatcherSize> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
-                {
-                    OnWatchdogExpired();
-                } };
+            services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<Resources::eventDispatcherSize> eventDispatcher;
             hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
             hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         };
@@ -148,9 +147,29 @@ namespace application
 
         static CanBusAdapter::CanError ToAdapterError(hal::FdCanStm::Error error);
 
+        void OnWatchdogExpired();
+
+        // The EEPROM driver takes an unacknowledged transfer for a missing or busy device; the default hooks abort
+        class EepromI2cStm
+            : public hal::I2cStm
+        {
+        public:
+            using hal::I2cStm::I2cStm;
+
+        protected:
+            void DeviceNotFound() override
+            {}
+
+            void BusError() override
+            {}
+
+            void ArbitrationLost() override
+            {}
+        };
+
         struct Peripherals
         {
-            Peripherals();
+            explicit Peripherals(PlatformFactoryImpl& platform);
 
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
@@ -158,8 +177,9 @@ namespace application
             TerminalAndTracer terminalAndTracer{ dma };
             hal::AdcStm phaseCurrentConverter{ Peripheral::PhaseCurrentAdcIndex };
             hal::DmaStm::ReceiveStream phaseCurrentStream{ dma, hal::DmaChannelId{ Peripheral::DmaIndex, Peripheral::PhaseCurrentDmaChannel, Peripheral::phaseCurrentDmaRequest } };
+            hal::AdcStm powerSupplyConverter{ Peripheral::PowerSupplyAdcIndex };
             hal::SynchronousAdcStm powerSupplyAdc;
-            hal::I2cStm eepromI2c;
+            EepromI2cStm eepromI2c;
             drivers::Eeprom24xx eeprom{ eepromI2c, drivers::Eeprom24xx::Config{} };
 
             std::optional<AdcPhaseCurrentMeasurementImpl<PhaseCurrentAdc>> phaseCurrentAdc;

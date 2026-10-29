@@ -57,9 +57,9 @@ platform interface as the EK-TM4C1294XL, so the application runs unchanged.
 ### Part A — wiring
 
 Every signal goes to a pin that is free on the Nucleo as shipped: the crystal pins (PF0/PF1, PC14/PC15), the
-debug pins (PA13/PA14, PB3), the virtual COM port (PA2/PA3), the user LED and button (PA5, PC13) and the
-BOOT0-shared PB8 are left alone. PB8 matters most: the board pulls I²C high with 10 kΩ, which on PB8 would boot
-the system memory.
+debug pins (PA13/PA14, PB3), the virtual COM port (PA2/PA3), the user LED and button (PA5, PC13) and PB8, which
+doubles as BOOT0, are left alone. The option bytes of a stock board boot from flash whatever PB8 does, but a board
+whose option bytes take BOOT0 from the pin would boot the system memory with the I²C pull-ups on it.
 
 Header positions follow ST's morpho numbering (CN7 left, CN10 right) and the Arduino labels; they were taken
 from the Zephyr board description of the NUCLEO-G474RE and should be checked against ST user manual UM2505
@@ -67,27 +67,27 @@ before the first power-up.
 
 J6, the 2×12 signal header:
 
-| J6                   | Signal            | STM32G474 | Function             | Nucleo header |
-|----------------------|-------------------|-----------|----------------------|---------------|
-| 1                    | GND               | GND       | —                    | any GND       |
-| 2                    | +3.3 V            | —         | leave open           | —             |
-| 3                    | VOLT_TOTAL        | PB0       | ADC1 IN15, ADC3 IN12 | A3, CN7-34    |
-| 4                    | CUR_TOTAL         | PC1       | ADC1 IN7, COMP3 IN+  | A4, CN7-36    |
-| 5                    | CUR_C             | PC0       | ADC1 IN6             | A5, CN7-38    |
-| 6                    | CUR_B             | PA1       | ADC1 IN2             | A1, CN7-30    |
-| 8                    | CUR_A             | PA0       | ADC1 IN1             | A0, CN7-28    |
-| 13                   | I2C_SCL           | PC8       | I2C3 SCL             | CN10-2        |
-| 15                   | CAN_RX            | PA11      | FDCAN1 RX            | CN10-14       |
-| 16                   | I2C_SDA           | PC9       | I2C3 SDA             | CN10-1        |
-| 17                   | POWER_GOOD        | PB2       | input, pull-up       | CN10-22       |
-| 18                   | CAN_TX            | PA12      | FDCAN1 TX            | CN10-12       |
-| 19                   | PWM_C_H           | PA10      | TIM1 CH3             | D2, CN10-33   |
-| 20                   | PWM_C_L           | PB15      | TIM1 CH3N            | CN10-26       |
-| 21                   | PWM_B_H           | PA9       | TIM1 CH2             | D8, CN10-21   |
-| 22                   | PWM_B_L           | PB14      | TIM1 CH2N            | CN10-28       |
-| 23                   | PWM_A_H           | PA8       | TIM1 CH1             | D7, CN10-23   |
-| 24                   | PWM_A_L           | PB13      | TIM1 CH1N            | CN10-30       |
-| 7, 9, 10, 11, 12, 14 | flash SPI, serial | —         | not used             | —             |
+| J6                   | Signal            | STM32G474 | Function                           | Nucleo header |
+|----------------------|-------------------|-----------|------------------------------------|---------------|
+| 1                    | GND               | GND       | —                                  | any GND       |
+| 2                    | +3.3 V            | —         | leave open                         | —             |
+| 3                    | VOLT_TOTAL        | PB0       | ADC1 IN15, ADC3 IN12               | A3, CN7-34    |
+| 4                    | CUR_TOTAL         | PC1       | ADC1 IN7, COMP3 IN+                | A4, CN7-36    |
+| 5                    | CUR_C             | PC0       | ADC1 IN6                           | A5, CN7-38    |
+| 6                    | CUR_B             | PA1       | ADC1 IN2                           | A1, CN7-30    |
+| 8                    | CUR_A             | PA0       | ADC1 IN1                           | A0, CN7-28    |
+| 13                   | I2C_SCL           | PC8       | I2C3 SCL                           | CN10-2        |
+| 15                   | CAN_RX            | PA11      | FDCAN1 RX                          | CN10-14       |
+| 16                   | I2C_SDA           | PC9       | I2C3 SDA                           | CN10-1        |
+| 17                   | POWER_GOOD        | PB2       | input, pull-up; high in regulation | CN10-22       |
+| 18                   | CAN_TX            | PA12      | FDCAN1 TX                          | CN10-12       |
+| 19                   | PWM_C_H           | PA10      | TIM1 CH3                           | D2, CN10-33   |
+| 20                   | PWM_C_L           | PB15      | TIM1 CH3N                          | CN10-26       |
+| 21                   | PWM_B_H           | PA9       | TIM1 CH2                           | D8, CN10-21   |
+| 22                   | PWM_B_L           | PB14      | TIM1 CH2N                          | CN10-28       |
+| 23                   | PWM_A_H           | PA8       | TIM1 CH1                           | D7, CN10-23   |
+| 24                   | PWM_A_L           | PB13      | TIM1 CH1N                          | CN10-30       |
+| 7, 9, 10, 11, 12, 14 | flash SPI, serial | —         | not used                           | —             |
 
 J7, the 2×6 operator header:
 
@@ -117,12 +117,14 @@ measures against the Nucleo's; the current-offset calibration absorbs the differ
 
 The core runs at 170 MHz from the Nucleo's 24 MHz crystal. TIM1 counts centre-aligned from the same clock, so
 a 20 kHz PWM is 4250 ticks up and 4250 down. Each phase is a channel and its complementary output, active high
-as the FAN7888 inputs expect, with the requested dead time inserted by the timer. With the main output disabled,
-every gate input sits at its idle low level, so all six FETs are off.
+as the FAN7888 inputs expect, with the requested dead time inserted by the timer. Whether the bridge is stopped or
+cut, the timer keeps driving every gate input at its idle low level, so all six FETs are off. The inputs only
+float while the PWM is rebuilt, at reset and before the first configuration; then nothing but the gate driver's
+input pull-downs holds them low, which is still to be confirmed against the FAN7888 on the bench.
 
 The high-side pulse is centred on the counter valley, which puts the low-side window, when the shunts conduct,
-around the counter peak. An internal fourth channel produces an edge one tick before the peak; the timer passes
-that edge to the ADC as its trigger. The repetition counter makes the timer load new duty cycles at the peak
+around the counter peak. An internal fourth channel rises eight ticks (47 ns) before the peak and stays high for
+twice that, several converter clocks, so the ADC never misses the edge the timer passes it as its trigger. The repetition counter makes the timer load new duty cycles at the peak
 only, so a duty written in the control loop never lands half-way through a pulse.
 
 ```
@@ -130,7 +132,7 @@ only, so a duty written in the control loop never lands half-way through a pulse
 counter   0 ─── counting up ──▶ ARR ── down ──▶ 0 ─── counting up ──▶ ARR
 high side ███                                  ███████                 
 low side     ███████████████████████████████████       ████████████████
-ADC start                      ▲ ARR − 1                                ▲
+ADC start                      ▲ ARR − 8                                ▲
 duty load                      ▲ update event                           ▲
 control loop                    [5 conversions ▸ DMA ▸ FOC ▸ new duties ]
 ```
@@ -139,7 +141,9 @@ ADC1 converts CUR_A, CUR_B, CUR_C, CUR_TOTAL and VOLT_TOTAL in that order and DM
 completion interrupt, at the highest priority, runs the control loop, as the ADC interrupt does on the
 TM4C129. At the 42.5 MHz converter clock and the shortest sampling time, the three phases are sampled within
 about 1.5 µs of the trigger, well inside the low-side window that the 70 % duty limit keeps open. The five
-sample-and-hold choices map to the converter's sampling times nearest above the TM4C129 ones.
+sample-and-hold choices map to the converter's sampling times closest to the TM4C129's 0.25, 1, 2, 4 and 16 µs;
+at the longest, five conversions take 77 µs, more than a 20 kHz period, so the converter skips every other
+trigger.
 
 ### Part C — board protection
 
@@ -154,7 +158,7 @@ then hands the phase currents on:
 | Under-voltage | VOLT_TOTAL | 18 V (1051 counts)      |
 
 A trip cuts the bridge at once, refuses duty commands and starts until the bridge is stopped, and reports its
-reason to the application from the event loop. The TM4C129 makes the same comparisons in its ADC's digital
+reason to the application from the event loop. The watchdog's early warning latches the same way. The TM4C129 makes the same comparisons in its ADC's digital
 comparators, which also evaluate once per PWM period; here they cost a few instructions in the control-loop
 interrupt and add its latency, a few microseconds. Like the TM4C129, the platform answers *unknown* for the
 protection state while stopped, because nothing is sampled then.
@@ -169,24 +173,28 @@ about 50 µs per reading. ADC1 keeps the pin in analog mode; ADC3 never configur
 
 The calibration and configuration records live in the power board's 24LC04 (512 bytes), not in the MCU. The
 device takes one word-address byte; the ninth address bit selects one of two 256-byte blocks through the device
-address. Both 128-byte records sit in the first block. Writes go in 16-byte pages, each followed by the 5 ms
-write cycle on a timer, so the event loop never waits. A transfer the device does not acknowledge — no board
-connected — still completes: reads return erased bytes and writes do nothing, so the records' magic and CRC
-report the fault, as they would for a corrupt EEPROM. The bus runs at 100 kHz on the board's 10 kΩ pull-ups.
+address. Both 128-byte records sit in the first block. Writes go in 16-byte pages; after each page the device
+is polled until it acknowledges again, which ends its write cycle, and a page it does not acknowledge is
+retried. Both give up after 10 ms, so a missing board still completes: reads return erased bytes and writes do
+nothing, and the records' magic and CRC report the fault, as they would for a corrupt EEPROM. A not-acknowledged
+transfer reaches the driver as a result rather than aborting the firmware. The bus runs at 100 kHz on the
+board's 10 kΩ pull-ups.
 
 ### Part F — watchdog
 
 The window watchdog resets one counter tick after its early warning. At 170 MHz, prescaler 1 would leave the
 early-warning handler 24 µs, less than a control-loop interrupt can delay it; prescaler 8 gives it 193 µs, at an
 early-warning period of 12.1 ms. Watchdog expiry and every fault cut the bridge by disabling the timer's main
-output, which needs no driver state.
+output, which needs no driver state; the expiry also latches the protection, so the control loop cannot re-arm
+the bridge in the ticks before the reset.
 
 ### Part G — CAN and console
 
 FDCAN1 runs classic CAN frames from the 24 MHz crystal, with the most time quanta that divide the clock exactly
 and the sample point near 87.5 %; 1 Mbit/s is 24 quanta. Like the TM4C129 driver it keeps one frame in flight,
 queues received frames in the interrupt and delivers them, and its errors, from the event loop. Test mode
-loops transmitted frames back internally while still driving the bus.
+loops transmitted frames back internally while still driving the bus. Bus off fails the frame in flight and,
+with the recovery the platform enables, returns to the bus after 129 × 11 recessive bits.
 
 The console runs at 921 600 baud on LPUART1, the ST-LINK virtual COM port, and is mirrored on SEGGER RTT when
 the build includes it.
@@ -227,7 +235,7 @@ sequenceDiagram
     participant ADC as ADC1 + DMA
     participant P as Platform (DMA interrupt)
     participant FOC as Control loop
-    TIM->>ADC: trigger one tick before the peak
+    TIM->>ADC: trigger eight ticks before the peak
     ADC->>ADC: convert five channels
     ADC->>P: transfer complete
     P->>P: compare CUR_TOTAL and VOLT_TOTAL with the thresholds
