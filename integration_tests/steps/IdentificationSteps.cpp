@@ -121,22 +121,6 @@ namespace
         EXPECT_LE(errorPercent, limitPercent) << source << " " << quantity << " is " << *value << " against a plant of " << *truth;
     }
 
-    void ExpectAbovePlant(const ScenarioSetup& setup, const IdentifiedParameters& parameters, const char* source, const std::string& quantity, float minimumPercent)
-    {
-        const auto truth = PlantTruth(setup, quantity, kReferenceCelsius);
-        ASSERT_TRUE(truth.has_value()) << "Unknown quantity: " << quantity;
-        ASSERT_NE(*truth, 0.0f) << "The plant's " << quantity << " is zero; a relative error is undefined";
-
-        const auto value = Estimate(parameters, quantity);
-        ASSERT_TRUE(value.has_value()) << "No " << source << " " << quantity << " was captured";
-
-        const float excessPercent = (*value - *truth) / std::fabs(*truth) * 100.0f;
-        std::fprintf(stderr, "[METRIC] ident %s %s %s plant=%.6g value=%.6g excess_pct=%.2f\n",
-            source, quantity.c_str(), setup.plantName.c_str(), *truth, *value, excessPercent);
-
-        EXPECT_GE(excessPercent, minimumPercent) << source << " " << quantity << " is " << *value << " against a plant of " << *truth;
-    }
-
     void FeedTrace(ScenarioSetup& setup, std::chrono::milliseconds timeout = std::chrono::milliseconds{ 0 })
     {
         for (const auto& line : TargetInteractor::Instance().TakePlantRecord(timeout))
@@ -240,11 +224,6 @@ WHEN(R"(the speed setpoint alternates between {float} and {float} rad\/s every {
     AlternateSpeedSetpoint(context.Get<Fixture>(), context.Get<ScenarioSetup>(), low, high, dwellMs, totalMs);
 }
 
-WHEN(R"(the speed setpoint is held at {float} rad\/s for {int} ms)", (float speed, int durationMs))
-{
-    AlternateSpeedSetpoint(context.Get<Fixture>(), context.Get<ScenarioSetup>(), speed, speed, durationMs, durationMs);
-}
-
 WHEN(R"(the online estimates are read)")
 {
     auto& fixture = context.Get<Fixture>();
@@ -264,17 +243,6 @@ THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::st
 {
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.identified, "identified", quantity, limitPercent, kReferenceCelsius);
-}
-
-THEN(R"(the calibration shall store no cogging map)")
-{
-    const auto& setup = context.Get<ScenarioSetup>();
-    ASSERT_TRUE(setup.identified.coggingPeakNm.has_value()) << "No calibration record was captured";
-
-    std::fprintf(stderr, "[METRIC] ident identified cogging %s plant=%.6g value=%.6g\n",
-        setup.plantName.c_str(), setup.plant.coggingTorqueNm, *setup.identified.coggingPeakNm);
-
-    EXPECT_EQ(*setup.identified.coggingPeakNm, 0.0f) << "A cogging map with a peak of " << *setup.identified.coggingPeakNm << " N·m was stored";
 }
 
 THEN(R"(the identified current offsets shall be within {float} mA of the plant)", (float limitMilliAmpere))
@@ -300,22 +268,4 @@ THEN(R"(the online {word} estimate shall be within {float} % of the plant)", (st
 {
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, kReferenceCelsius);
-}
-
-THEN(R"(the online {word} estimate shall be within {float} % of the plant at {float} celsius)", (std::string quantity, float limitPercent, float windingCelsius))
-{
-    const auto& setup = context.Get<ScenarioSetup>();
-    CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, windingCelsius);
-}
-
-THEN(R"(the online {word} estimate shall read at least {float} % above the plant)", (std::string quantity, float minimumPercent))
-{
-    const auto& setup = context.Get<ScenarioSetup>();
-    ExpectAbovePlant(setup, setup.online, "online", quantity, minimumPercent);
-}
-
-THEN(R"(the identified {word} shall read at least {float} % above the plant)", (std::string quantity, float minimumPercent))
-{
-    const auto& setup = context.Get<ScenarioSetup>();
-    ExpectAbovePlant(setup, setup.identified, "identified", quantity, minimumPercent);
 }

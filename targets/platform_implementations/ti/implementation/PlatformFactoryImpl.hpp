@@ -70,8 +70,6 @@ namespace application
         hal::GpioPin& WarningLed() override;
         hal::GpioPin& FailureLed() override;
         uint8_t BoardId() const override;
-        bool PowerStatus() const override;
-        hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
@@ -275,7 +273,6 @@ namespace application
         {
             Peripherals() = default;
 
-            hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
@@ -287,17 +284,6 @@ namespace application
             std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
             std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
-
-            struct PerformanceTrackerImpl
-                : hal::PerformanceTracker
-            {
-                explicit PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin);
-                void Start() override;
-                uint32_t ElapsedCycles() override;
-
-                hal::cortex::DataWatchpointAndTrace& dwt;
-                hal::OutputPin& pin;
-            } performanceTrackerImpl{ cortex.dataWatchPointAndTrace, performance };
         };
 
         template<typename Fn>

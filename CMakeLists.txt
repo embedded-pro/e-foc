@@ -1,13 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
-if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    set(E_FOC_STANDALONE On)
-endif()
-
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
-option(E_FOC_INCLUDE_DEFAULT_INIT "Include default initialization code; turn off when providing custom initialization" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
-option(E_FOC_BUILD_HIL_TESTS "Build hardware-in-the-loop tests" Off)
 option(E_FOC_BUILD_SIMULATOR "Enable build of the Qt simulator applications" Off)
 option(E_FOC_EMBEDDED_BUILD "Building for an embedded target" Off)
 
@@ -48,8 +42,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptimizations.cmake")
-
-set(E_FOC_EXCLUDE_FROM_ALL "")
 
 set(EMIL_INCLUDE_ECHO Off CACHE BOOL "" FORCE)
 set(EMIL_FETCH_ECHO_COMPILERS Off CACHE BOOL "" FORCE)

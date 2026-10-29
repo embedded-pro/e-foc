@@ -42,10 +42,4 @@ namespace foc
         float d;
         float q;
     };
-
-    enum class Direction : uint8_t
-    {
-        forward,
-        reverse,
-    };
 }

@@ -27,7 +27,6 @@
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
         "E_FOC_TARGET_PLATFORM": "host",
         "E_FOC_BUILD_TESTS": true,
-        "E_FOC_BUILD_HIL_TESTS": true,
         "E_FOC_BUILD_SIMULATOR": true,
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
       },
@@ -42,29 +41,6 @@
         "E_FOC_TARGET_PLATFORM": "host",
         "E_FOC_BUILD_TESTS": true
       }
-    },
-    {
-      "name": "windows",
-      "displayName": "Cross-compilation Linux \u2192 Windows (clang-cl + xwin)",
-      "inherits": "defaults",
-      "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-clang-x86_64-pc-windows-msvc.cmake",
-      "environment": {
-        "CCACHE_DEPEND": "true",
-        "CCACHE_COMPILERTYPE": "clang-cl"
-      },
-      "cacheVariables": {
-        "CMAKE_COMPILE_WARNING_AS_ERROR": "Off",
-        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
-        "CMAKE_PREFIX_PATH": "/opt/qt6-windows/6.10.2/msvc2022_64",
-        "QT_HOST_PATH": "/usr",
-        "QT_HOST_PATH_CMAKE_DIR": "/usr/lib/x86_64-linux-gnu/cmake",
-        "WINDOWS_SDK_ROOT": "/winsdk",
-        "E_FOC_TARGET_PLATFORM": "host",
-        "E_FOC_BUILD_TESTS": true,
-        "E_FOC_BUILD_HIL_TESTS": true,
-        "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
-      },
-      "generator": "Ninja Multi-Config"
     },
     {
       "name": "coverage",
@@ -189,7 +165,6 @@
         "E_FOC_TARGET_PLATFORM": "qemu",
         "E_FOC_BUILD_TESTS": "Off",
         "E_FOC_BUILD_SIMULATOR": "Off",
-        "E_FOC_BUILD_HIL_TESTS": "Off",
         "E_FOC_EMBEDDED_BUILD": "On",
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
         "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an386;-nographic;-semihosting-config;enable=on,target=native;-kernel",
@@ -213,11 +188,6 @@
       ]
     },
     {
-      "name": "host-RelWithDebInfo",
-      "configuration": "RelWithDebInfo",
-      "configurePreset": "host"
-    },
-    {
       "name": "host-Debug",
       "configuration": "Debug",
       "configurePreset": "host"
@@ -235,21 +205,6 @@
       "name": "host-single-Debug",
       "configuration": "Debug",
       "configurePreset": "host-single-Debug"
-    },
-    {
-      "name": "windows-RelWithDebInfo",
-      "configuration": "RelWithDebInfo",
-      "configurePreset": "windows"
-    },
-    {
-      "name": "windows-Debug",
-      "configuration": "Debug",
-      "configurePreset": "windows"
-    },
-    {
-      "name": "windows-Release",
-      "configuration": "Release",
-      "configurePreset": "windows"
     },
     {
       "name": "coverage",
@@ -272,28 +227,13 @@
       "configurePreset": "EK-TM4C123GXL"
     },
     {
-      "name": "EK-TM4C123GXL-Debug",
-      "configuration": "Debug",
-      "configurePreset": "EK-TM4C123GXL"
-    },
-    {
       "name": "STM32F407G-DISC1-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
       "configurePreset": "STM32F407G-DISC1"
     },
     {
-      "name": "STM32F407G-DISC1-Debug",
-      "configuration": "Debug",
-      "configurePreset": "STM32F407G-DISC1"
-    },
-    {
       "name": "NUCLEO-H563ZI-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
-      "configurePreset": "NUCLEO-H563ZI"
-    },
-    {
-      "name": "NUCLEO-H563ZI-Debug",
-      "configuration": "Debug",
       "configurePreset": "NUCLEO-H563ZI"
     },
     {

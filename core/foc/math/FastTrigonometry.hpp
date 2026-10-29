@@ -126,16 +126,6 @@ namespace foc
 
             return { tableSine * offsetCosine + tableCosine * offsetSine, tableCosine * offsetCosine - tableSine * offsetSine };
         }
-
-        ALWAYS_INLINE static float Arctangent(float value) noexcept
-        {
-            return math::Atan(value);
-        }
-
-        ALWAYS_INLINE static float Phase(float real, float imag) noexcept
-        {
-            return math::Atan2(imag, real);
-        }
     };
 
 }

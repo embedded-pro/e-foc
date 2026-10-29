@@ -27,8 +27,6 @@ namespace application
         MOCK_METHOD(hal::GpioPin&, WarningLed, (), (override));
         MOCK_METHOD(hal::GpioPin&, FailureLed, (), (override));
         MOCK_METHOD(uint8_t, BoardId, (), (const, override));
-        MOCK_METHOD(bool, PowerStatus, (), (const, override));
-        MOCK_METHOD(hal::PerformanceTracker&, PerformanceTimer, (), (override));
         MOCK_METHOD(hal::Hertz, SystemClock, (), (const, override));
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));

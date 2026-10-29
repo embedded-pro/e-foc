@@ -199,16 +199,6 @@ namespace application
         return 0;
     }
 
-    bool PlatformFactoryImpl::PowerStatus() const
-    {
-        return true;
-    }
-
-    hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
-    {
-        return performanceTracker;
-    }
-
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz{ kQemuSystemClockHz };

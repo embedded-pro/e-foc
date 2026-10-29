@@ -34,7 +34,7 @@ date: 2026-10-29
 - **Constraint**: The system targets 32-bit ARM Cortex-M microcontrollers (STM32 and TI Tiva families). Host builds are supported for unit testing and simulation only.
 - **Assumption**: A single motor is controlled per instantiation. Multi-motor configurations require multiple independent instantiations.
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
-- **Assumption**: Rotor position is measured by a quadrature encoder. Hall-sensor support is defined in the driver interface but is a secondary configuration.
+- **Assumption**: Rotor position is measured by a quadrature encoder.
 - **Assumption**: All motor electrical and mechanical parameters (resistance, inductance, pole pairs, inertia, friction) can be identified at startup or loaded from non-volatile storage.
 - **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle. The CLI command `active_mode` reports the currently active mode. No mode switch is permitted while the motor is enabled.
 

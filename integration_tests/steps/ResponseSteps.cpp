@@ -369,15 +369,3 @@ THEN(R"(the response shall have no dropped samples)")
     EXPECT_EQ(setup.trace.Dropped(), 0u) << "The recorder dropped samples";
     EXPECT_EQ(setup.trace.Gaps(), 0u) << "The captured samples are not uniformly spaced";
 }
-
-THEN(R"(the encoder shall have frozen during the response)")
-{
-    auto& setup = context.Get<ScenarioSetup>();
-    FeedRecord(setup, std::chrono::milliseconds{ 0 });
-
-    const auto onset = setup.trace.EventTick("encoder_freeze");
-    ASSERT_TRUE(onset.has_value()) << "The encoder freeze was scheduled but never fired";
-
-    ASSERT_TRUE(setup.trace.StartTick().has_value()) << "No PLANT_START marker: was the plant response recorded?";
-    EXPECT_GT(*onset, *setup.trace.StartTick()) << "The encoder froze on the tick recording began, not while the motor ran";
-}
