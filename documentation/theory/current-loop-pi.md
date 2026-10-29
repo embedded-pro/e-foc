@@ -2,9 +2,9 @@
 title: "Current Loop — PI (Baseline)"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.0.1
 component: "current-loop-pi"
-date: 2026-08-31
+date: 2026-10-29
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Current Loop — PI (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.0.0                        |
+| Version   | 1.0.1                        |
 | Component | current-loop-pi              |
-| Date      | 2026-08-31                   |
+| Date      | 2026-10-29                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -41,7 +41,7 @@ Operates exclusively in the **20 kHz FOC ISR**.
 |----------------|-------------------------------------------|-------|
 | $R_s$          | Stator resistance per phase               | Ω     |
 | $L_s$          | Stator inductance ($L_d = L_q$)           | H     |
-| $V_{dc}$       | DC bus voltage (measured dynamically)     | V     |
+| $V_{dc}$       | DC bus voltage (measured once at boot)    | V     |
 | $T_s^i$        | Current loop sample period ($= 50\ \mu$s) | s     |
 | $\omega_{bw}$  | Desired closed-loop current bandwidth     | rad/s |
 | $A_d^i, B_d^i$ | Discrete RL plant matrices                | —     |
@@ -54,7 +54,7 @@ See `documentation/theory/foc-plant-models.md` for all base symbols and ZOH deri
 
 ### Plant Model
 
-After feedforward decoupling the cross-coupling terms (see `documentation/theory/foc.md` §4), each
+After feedforward decoupling the cross-coupling terms (see `documentation/theory/foc.md` §3), each
 dq axis reduces to an independent first-order RL plant with decoupled input $v'$:
 
 $$
@@ -88,8 +88,9 @@ $$
 K_p = L_s\, \omega_{bw}, \qquad K_i = R_s\, \omega_{bw}
 $$
 
-**Practical limit**: $\omega_{bw} \leq \pi / T_s^i$ (Nyquist). The maximum achievable bandwidth
-at 20 kHz is roughly $\omega_{bw} \leq 10000$ rad/s; conservative designs use $2000$–$5000$ rad/s.
+**Practical limit**: the loop delay of about $1.5\,T_s^i$ costs $\omega_{bw} \cdot 1.5\,T_s^i$ of phase at
+crossover, which leaves 45° of margin at roughly $\omega_{bw} \approx 10000$ rad/s at 20 kHz
+(`documentation/theory/closed-loop-control.md` §7); conservative designs use $2000$–$5000$ rad/s.
 
 ### Gain Normalisation
 
@@ -100,8 +101,8 @@ $$
 K_p^{norm} = K_p \cdot \frac{\sqrt{3}}{V_{dc}} = L_s\, \omega_{bw} \cdot \frac{\sqrt{3}}{V_{dc}}
 $$
 
-$V_{dc}$ is measured dynamically and used to update normalisation in real time. Without this scaling
-the effective bandwidth changes with bus voltage.
+$V_{dc}$ is measured once at boot and used for this normalisation. A bus that sags under load lowers the
+effective bandwidth in proportion (`documentation/theory/disturbances-and-noise.md` §3).
 
 ### Incremental (Velocity) Form
 
@@ -143,7 +144,7 @@ projection is the identity and the law reduces to the plain velocity form.
 
 Every current controller in this loop emits a normalised dq voltage pair passed to inverse Park and
 then to SVM. The modulator remains linear only inside the circle inscribed in the voltage hexagon
-(`documentation/theory/foc.md` §6):
+(`documentation/theory/foc.md` §4):
 
 $$
 \sqrt{(v_d')^2 + (v_q')^2} \leq 1
@@ -169,7 +170,7 @@ driving the modulator into over-modulation over roughly three-quarters of the el
 | Robustness to Rs/Ls error | High — integral action corrects mismatch |
 | Requires RLS convergence  | No — motor datasheet values sufficient   |
 | Requires $\psi_f$         | No                                       |
-| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ live)    |
+| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ at boot) |
 
 ---
 

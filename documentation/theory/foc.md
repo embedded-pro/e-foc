@@ -2,9 +2,9 @@
 title: "Field-Oriented Control (FOC)"
 type: theory
 status: approved
-version: 1.0.0
+version: 1.1.0
 component: "foc"
-date: 2025-01-01
+date: 2026-10-29
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2025-01-01
 | Title     | Field-Oriented Control (FOC) |
 | Type      | theory                       |
 | Status    | approved                     |
-| Version   | 1.0.0                        |
+| Version   | 1.1.0                        |
 | Component | foc                          |
-| Date      | 2025-01-01                   |
+| Date      | 2026-10-29                   |
 
 ## Overview
 
@@ -30,6 +30,11 @@ In the rotating (dq) reference frame the three-phase stator currents reduce to t
 Current controllers in the rotating frame regulate these DC quantities without phase lag caused by the AC coupling. The
 inverse transforms and Space Vector Modulation (SVM) reconstruct the three-phase PWM duty cycles that drive the
 inverter.
+
+The transforms and the dq model are derived in [the motor model](motor-model.md); the physics behind them is in
+[the physical picture](motor-physics.md), and the reasons for the cascade of loops in
+[closed-loop control](closed-loop-control.md). This chapter gives the forms the firmware evaluates every control
+period, the modulator that turns a voltage vector into duty cycles, and the complete loop.
 
 ---
 
@@ -58,36 +63,11 @@ $$
 
 ## Mathematical Foundation
 
-### 1. PMSM Voltage Model (abc frame)
-
-The PMSM stator voltage equations in the stationary abc reference frame are:
-
-$$
-v_a = R_s i_a + L_s \frac{di_a}{dt} + e_a
-$$
-$$
-v_b = R_s i_b + L_s \frac{di_b}{dt} + e_b
-$$
-$$
-v_c = R_s i_c + L_s \frac{di_c}{dt} + e_c
-$$
-
-where $e_a, e_b, e_c$ are the back-EMF voltages produced by the rotating permanent magnets:
-
-$$
-e_a = -\psi_f \omega_e \sin(\theta_e), \quad
-e_b = -\psi_f \omega_e \sin\!\left(\theta_e - \tfrac{2\pi}{3}\right), \quad
-e_c = -\psi_f \omega_e \sin\!\left(\theta_e + \tfrac{2\pi}{3}\right)
-$$
-
-These equations are coupled through the mutual inductance and back-EMF, making direct control difficult.
-The Clarke and Park transforms decouple them into independently controllable quantities.
-
-### 2. Clarke Transform — abc → αβ (Stationary Frame)
+### 1. Clarke Transform — as Computed
 
 The Clarke transform projects the three-phase quantities onto a two-dimensional orthogonal stationary frame
-($\alpha$–$\beta$). The **amplitude-invariant** form (factor $\tfrac{2}{3}$) preserves the physical voltage
-and current magnitudes:
+($\alpha$–$\beta$); [the motor model](motor-model.md) §2–3 derives it from the space vector. The
+**amplitude-invariant** form (factor $\tfrac{2}{3}$) preserves the physical voltage and current magnitudes:
 
 $$
 \begin{pmatrix} i_\alpha \\ i_\beta \end{pmatrix}
@@ -114,7 +94,8 @@ $$
 The stator current space vector in the $\alpha$–$\beta$ frame thus has magnitude $I$ and rotates at
 $\omega_e$: $\mathbf{I}_s = i_\alpha + j\,i_\beta = I e^{j\theta_e}$.
 
-**Full three-sensor form** (when all three currents are available):
+**Full three-sensor form** (when all three currents are available). This is the form e-foc evaluates; a phase
+its low-side window hides is first rebuilt from the other two ([low-side shunt current sensing](low-side-current-sensing.md)):
 
 $$
 i_\alpha = \tfrac{2}{3}\!\left(i_a - \tfrac{1}{2}i_b - \tfrac{1}{2}i_c\right),
@@ -122,9 +103,10 @@ i_\alpha = \tfrac{2}{3}\!\left(i_a - \tfrac{1}{2}i_b - \tfrac{1}{2}i_c\right),
 i_\beta = \tfrac{1}{\sqrt{3}}\!\left(i_b - i_c\right)
 $$
 
-### 3. Park Transform — αβ → dq (Rotating Frame)
+### 2. Park and Inverse Park — as Computed
 
-The Park transform rotates the $\alpha$–$\beta$ space vector by $-\theta_e$ into the rotor-fixed dq frame:
+The Park transform rotates the $\alpha$–$\beta$ space vector by $-\theta_e$ into the rotor-fixed dq frame
+([the motor model](motor-model.md) §4):
 
 $$
 \begin{pmatrix} i_d \\ i_q \end{pmatrix}
@@ -163,43 +145,38 @@ $$
 v_\beta  = v_d \sin\theta_e + v_q \cos\theta_e
 $$
 
-### 4. PMSM Model in the dq Frame
+### 3. What the Current Controllers See
 
-After applying the Park transform, the PMSM voltage equations in the rotating dq frame become:
+In the dq frame the motor is two RL circuits coupled by speed voltages, with the back-EMF on the q-axis
+(derivation: [the motor model](motor-model.md) §4):
 
 $$
-v_d = R_s i_d + L_s \frac{di_d}{dt} - \omega_e L_s i_q
-$$
-$$
+v_d = R_s i_d + L_s \frac{di_d}{dt} - \omega_e L_s i_q, \qquad
 v_q = R_s i_q + L_s \frac{di_q}{dt} + \omega_e L_s i_d + \omega_e \psi_f
 $$
 
-The cross-coupling terms $\omega_e L_s i_q$ and $\omega_e L_s i_d$ are decoupled by feed-forward compensation.
-The back-EMF term $\omega_e \psi_f$ can also be added as a feed-forward. After decoupling, both d and q channels
-reduce to independent first-order RL systems:
+The cross-coupling terms $\omega_e L_s i_q$ and $\omega_e L_s i_d$ can be cancelled by feed-forward, and the
+back-EMF $\omega_e \psi_f$ added the same way. After decoupling, both axes reduce to independent first-order
+RL systems:
 
 $$
 v_d' = R_s i_d + L_s \frac{di_d}{dt}, \qquad v_q' = R_s i_q + L_s \frac{di_q}{dt}
 $$
 
-These are regulated by independent current controllers, one per dq axis.
-
-### 5. Electrical Torque
-
-The electromagnetic torque produced by the motor is:
+These are regulated by independent current controllers, one per dq axis. The torque they produce is linear in
+the q current ([the motor model](motor-model.md) §5):
 
 $$
 \boxed{\tau_e = \frac{3}{2}\, p\, \psi_f\, i_q}
 $$
 
-Since $\psi_f$ and $p$ are motor constants, torque is directly proportional to $i_q$. Setting the $i_q$
-reference from an outer speed or position loop gives a torque-current-mode inner loop — the fundamental
-advantage of FOC over scalar control.
+Setting the $i_q$ reference from an outer speed or position loop gives a torque-current-mode inner loop, the
+fundamental advantage of FOC over scalar control, and $i_d^* = 0$ gives the most torque per ampere.
 
 The dq-axis current regulators are interchangeable at runtime. Gain design and normalisation depend on
 the active algorithm — see the current loop controller chapters in `documentation/theory/`.
 
-### 6. Space Vector Modulation (SVM)
+### 4. Space Vector Modulation (SVM)
 
 SVM synthesises any reference voltage vector $\mathbf{V}_{ref} = V_\alpha + j V_\beta$ as a time-average of
 the eight inverter states. The three-phase half-bridge inverter produces 8 switching states:
@@ -221,7 +198,11 @@ normalised units — that is the length of each vertex vector in the table above
 \approx 0.577$, corresponding to $V_{dc}/\sqrt{3}$ in physical volts. The two agree: it is the
 circumradius that is $\tfrac{2}{3}$, and reading that as the linear range overstates it by 15%.
 
-**See**: `documentation/theory/images/svm_hexagon.svg` (generated by `documentation/tools/generate_plots.gp`)
+![A reference vector sweeping the SVM hexagon, the active sector shaded, and the three duty cycles of common-mode injection](../animations/svm-hexagon.svg)
+
+The animation runs the common-mode injection below at a modulation of 0.9: the reference vector stays inside
+the dashed linear-limit circle, the sector it crosses is shaded, and the three duty cycles take the
+characteristic saddle shape.
 
 #### Common-Mode Injection Method
 
@@ -251,8 +232,8 @@ d_k = \mathrm{clamp}\!\left(\frac{v_k + v_{common}}{\sqrt{3}} + 0.5,\ 0,\ 1\righ
 $$
 
 The factor $1/\sqrt{3}$ in the duty cycle formula arises from the normalisation: at the hexagon boundary,
-the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ of the bus voltage, and the
-factor maps this to the [0, 1] duty cycle range centred at 0.5.
+the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ in per-unit, $V_{dc}/2$ in volts, and
+the factor maps this to the [0, 1] duty cycle range centred at 0.5.
 
 **Advantages over sector-based SVM**:
 - No angle or sector lookup required.
@@ -270,7 +251,7 @@ $$
 
 Beyond this circle, one or more phases saturate (clamp) and the output enters over-modulation.
 
-### 9. Trigonometric Lookup Table
+### 5. Trigonometric Lookup Table
 
 The Park/inverse-Park transforms require $\sin\theta_e$ and $\cos\theta_e$ at the FOC control rate (20 kHz).
 To avoid calling `sinf/cosf` in the ISR:
@@ -283,9 +264,9 @@ To avoid calling `sinf/cosf` in the ISR:
 
 The fixed-step table introduces a bounded angle-quantisation error of at most $\pi/512 \approx 0.35°$ when
 truncating to the nearest entry. The implementation interpolates linearly between adjacent entries, which
-bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. At 3000 rpm with $p = 5$ the
-electrical angle advances $\omega_e/20000 = 0.0785\ \text{rad} \approx 4.5°$ per step, roughly 6.4 table
-entries, so it is the interpolation rather than the table density that bounds the error.
+bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. At the Teknic's rated 6000 rpm
+($p = 4$) the electrical angle advances $\omega_e/20000 = 0.126\ \text{rad} \approx 7.2°$ per step, roughly
+10 table entries, so it is the interpolation rather than the table density that bounds the error.
 
 ---
 
@@ -323,8 +304,6 @@ entries, so it is the interpolation rather than the table density that bounds th
 \input{foc-coordinates.tex}
 ```
 
-See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/theory/images/svm_hexagon.svg`
-
 ---
 
 ## Numerical Properties
@@ -343,26 +322,16 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 
 ### Sensitivity Analysis
 
-| Parameter          | Effect on Control Quality                                                                                        |
-|--------------------|------------------------------------------------------------------------------------------------------------------|
-| $R_s$ error        | Current controller steady-state error (for non-integral controllers); compensated by integral term where present |
-| $L_s$ error        | Controller bandwidth deviation; no steady-state error for integral-action controllers                            |
-| $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error                                               |
-| $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended                                                  |
-| ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                                                              |
+How errors in $R_s$, $L_s$, $\theta_e$, $V_{dc}$ and the current-sensor offsets affect control quality, and
+the other disturbances the loops see, are in [disturbances and noise](disturbances-and-noise.md).
 
 ---
 
 ## Worked Example
 
-Motor parameters: $R_s = 1.2\ \Omega$, $L_s = 0.5\ \text{mH}$, $p = 4$, $\psi_f = 0.05\ \text{Wb}$,
-$V_{dc} = 24\ \text{V}$.
+Torque and steady-state voltages of the reference motors are worked in [the motor model](motor-model.md).
 
-**Step 1 — Torque at $i_q = 5\ \text{A}$:**
-
-$$\tau_e = \frac{3}{2} \times 4 \times 0.05 \times 5 = 1.5\ \text{N·m}$$
-
-**Step 2 — SVM for $V_\alpha = 8\ \text{V}$, $V_\beta = 5\ \text{V}$** ($V_{dc} = 24\ \text{V}$):
+**SVM for $V_\alpha = 8\ \text{V}$, $V_\beta = 5\ \text{V}$** ($V_{dc} = 24\ \text{V}$, the Anaheim's bus):
 
 The modulator takes per-unit voltages, where $1\ \text{pu} = V_{dc}/\sqrt{3} = 13.86\ \text{V}$. Since
 $|V_{ref}| = \sqrt{64+25} \approx 9.43\ \text{V} < 13.86\ \text{V}$, the reference lies inside the linear
@@ -398,12 +367,14 @@ NVM persistence, and CLI/CAN interface — is documented in `documentation/desig
 
 ## Limitations & Assumptions
 
-- **Assumes**: Surface-mounted PMSM with $L_d = L_q$ (non-salient). For interior PMSM ($L_d \neq L_q$),
-  MTPA condition changes and the torque equation gains an additional reluctance term.
+- **Assumes**: the model's assumptions, listed in [the motor model](motor-model.md): surface-mounted PMSM
+  ($L_d = L_q$), linear magnetics, sinusoidal back-EMF.
 - **Assumes**: Balanced three-phase supply ($i_a + i_b + i_c = 0$). If a phase is open, Clarke reduction
   from two sensors is invalid.
 - **Assumes**: The electrical rotor angle $\theta_e$ is accurately known (from encoder + alignment offset).
   Angle errors directly degrade torque production and can cause instability.
+- **Assumes**: The modulator stays in its linear region; beyond the inscribed circle the clamp distorts the
+  phase voltages.
 - **Does not handle**: Flux weakening above base speed (field weakening via non-zero $i_d$).
 - **Does not handle**: Sensorless operation (this implementation uses an encoder for $\theta_e$).
 

@@ -59,6 +59,9 @@ jobs:
       - name: Install diagram tooling
         run: npm install -g @mermaid-js/mermaid-cli
 
+      - name: Check animations are up to date
+        run: python documentation/tools/generate-animations.py --check
+
       - name: Build booklet (PDF + site)
         run: python documentation/tools/build-foc-booklet.py --format all
 

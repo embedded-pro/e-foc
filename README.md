@@ -333,12 +333,14 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Theory
 
-| Document                                                                                       | Description                                              |
-|------------------------------------------------------------------------------------------------|----------------------------------------------------------|
-| [FOC Theory](documentation/theory/foc.md)                                                      | Field-Oriented Control theory and control block diagrams |
-| [Motor Alignment](documentation/theory/alignment.md)                                           | Motor alignment and offset detection theory              |
-| [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory                              |
-| [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md)           | Mechanical parameter estimation theory                   |
+| Document                                                                                       | Description                                                                    |
+|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| [Theory Chapter Index](documentation/theory/README.md)                                         | All theory chapters in reading order, from motor physics to noise              |
+| [Motor Physics](documentation/theory/motor-physics.md)                                         | How the motor works: coils, magnets, rotating field, back-EMF, with animations |
+| [FOC Theory](documentation/theory/foc.md)                                                      | Field-Oriented Control theory and control block diagrams                       |
+| [Motor Alignment](documentation/theory/alignment.md)                                           | Motor alignment and offset detection theory                                    |
+| [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory                                                    |
+| [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md)           | Mechanical parameter estimation theory                                         |
 
 ### Performance
 

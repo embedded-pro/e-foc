@@ -2,9 +2,9 @@
 title: "Position Loop — P (Baseline)"
 type: theory
 status: draft
-version: 1.2.0
+version: 1.2.1
 component: "position-loop-pid"
-date: 2026-10-22
+date: 2026-10-29
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Position Loop — P (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.2.0                        |
+| Version   | 1.2.1                        |
 | Component | position-loop-pid            |
-| Date      | 2026-10-22                   |
+| Date      | 2026-10-29                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -200,9 +200,9 @@ $$
   addresses it without the integral's phase cost.
 - A setpoint between two cogging detents sits where the cogging torque pushes the rotor away from it.
   The loop holds there only while its stiffness, $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, exceeds the
-  cogging's, the detent count times its depth. On the bench at the default bandwidths the two are
-  about equal, 0.10 against 0.096 N·m/rad, and the rotor steps between the neighbouring detents
-  instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
+  cogging's, the detent count times its depth. On the bench at the default bandwidths (50 rad/s
+  speed, 18.8 rad/s position) the loop's 0.023 N·m/rad is a quarter of the cogging's 0.096, and the
+  rotor steps between the neighbouring detents instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
   map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
   with it every position law holds 3.0 rad (REQ-POS-012).
 - No disturbance rejection beyond what the speed loop provides.

@@ -2,9 +2,9 @@
 title: "Current Loop — A1: Decoupled PID + Feedforward"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.0.1
 component: "current-loop-decoupled-pid"
-date: 2026-08-31
+date: 2026-10-29
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Current Loop — A1: Decoupled PID + Feedforward |
 | Type      | theory                                         |
 | Status    | draft                                          |
-| Version   | 1.0.0                                          |
+| Version   | 1.0.1                                          |
 | Component | current-loop-decoupled-pid                     |
-| Date      | 2026-08-31                                     |
+| Date      | 2026-10-29                                     |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -101,7 +101,7 @@ $$
 closed-loop transfer function.
 
 **RLS dependency**: $L_s$ from the electrical RLS estimator. $\psi_f$ is a motor constant calibrated
-during alignment. $V_{dc}$ is measured dynamically.
+during alignment. $V_{dc}$ is measured once at boot.
 
 **Performance**: At $\omega_e = 1000$ rad/s with $L_s = 0.5$ mH and $i_q = 5$ A, the uncorrected
 coupling is $\omega_e L_s i_q = 2.5$ V — 10% of a 24 V bus. This is the dominant current control

@@ -2,9 +2,9 @@
 title: "FOC Plant Models — Discretization and State-Space Foundations"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "foc-plant-models"
-date: 2026-09-21
+date: 2026-10-29
 ---
 
 | Field     | Value                                                         |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | FOC Plant Models — Discretization and State-Space Foundations |
 | Type      | theory                                                        |
 | Status    | draft                                                         |
-| Version   | 0.2.0                                                         |
+| Version   | 0.2.1                                                         |
 | Component | foc-plant-models                                              |
-| Date      | 2026-09-21                                                    |
+| Date      | 2026-10-29                                                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -29,8 +29,8 @@ This document derives the discrete-time state-space plant models used by all adv
 It is a shared prerequisite for:
 - the current, speed and position loop controllers indexed in `documentation/theory/advanced-controllers.md`
 
-The reader is assumed familiar with Clarke/Park transforms, SVM, and PI current control as described
-in `documentation/theory/foc.md`.
+The reader is assumed familiar with the dq model of `documentation/theory/motor-model.md` and with
+Clarke/Park transforms, SVM, and PI current control as described in `documentation/theory/foc.md`.
 
 ---
 
@@ -59,17 +59,9 @@ in `documentation/theory/foc.md`.
 
 ### 1. PMSM Current Loop Plant (dq Frame)
 
-The PMSM voltage equations in the rotor-synchronous dq frame (from `documentation/theory/foc.md`
-Section 4), assuming a surface-mounted motor with $L_d = L_q = L_s$:
-
-$$
-v_d = R_s i_d + L_s \frac{di_d}{dt} - \omega_e L_s i_q
-$$
-$$
-v_q = R_s i_q + L_s \frac{di_q}{dt} + \omega_e L_s i_d + \omega_e \psi_f
-$$
-
-Rearranged as explicit state equations:
+The PMSM voltage equations in the rotor-synchronous dq frame are derived in
+`documentation/theory/motor-model.md` §4. For a surface-mounted motor with $L_d = L_q = L_s$, written as
+explicit state equations:
 
 $$
 \frac{di_d}{dt} = -\frac{R_s}{L_s} i_d + \omega_e i_q + \frac{1}{L_s} v_d
@@ -231,13 +223,13 @@ graph LR
 
 ## Numerical Properties
 
-| Property             |           Current plant           |           Speed plant           |      Position plant       |
-|----------------------|:---------------------------------:|:-------------------------------:|:-------------------------:|
-| States               |        1 per axis (Id, Iq)        |             1 (ωm)              |        2 (θm, ωm)         |
-| Inputs               |       1 per axis (v'd, v'q)       |             1 (Iq*)             |          1 (Iq*)          |
-| Time constant        |      $L_s/R_s$ (typ. 0.4 ms)      |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
-| Discretization error | $< 1\%$ for $R_s T_s / L_s < 0.1$ | $< 1\%$ for $B_f T_s / J < 0.1$ | Row approx valid at 1 kHz |
-| Parameter source     |          Electrical RLS           |         Mechanical RLS          |      Mechanical RLS       |
+| Property           |                           Current plant                           |           Speed plant           |      Position plant       |
+|--------------------|:-----------------------------------------------------------------:|:-------------------------------:|:-------------------------:|
+| States             |                        1 per axis (Id, Iq)                        |             1 (ωm)              |        2 (θm, ωm)         |
+| Inputs             |                       1 per axis (v'd, v'q)                       |             1 (Iq*)             |          1 (Iq*)          |
+| Time constant      |                    $L_s/R_s$ (0.56 – 1.58 ms)                     |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
+| Euler vs exact ZOH | $A_d$: $x^2/2$; $B_d$: $x/2$ ($x = R_s T_s/L_s$); exact pair used | $< 1\%$ for $B_f T_s / J < 0.1$ | Row approx valid at 1 kHz |
+| Parameter source   |                          Electrical RLS                           |         Mechanical RLS          |      Mechanical RLS       |
 
 ---
 
@@ -274,7 +266,11 @@ How the numbers were obtained:
   ($\omega_m = 104.7$ rad/s, $\omega_e = p\,\omega_m$):
   $\psi_f = K_e / (\sqrt{3}\,\omega_e)$. Teknic: $4.64 / (\sqrt{3} \cdot 418.9) = 6.40$ mWb.
   TI reports the Anaheim flux as $0.03416$ V/Hz, a peak phase voltage per electrical hertz, so
-  $\psi_f = 0.03416 / 2\pi = 5.44$ mWb.
+  $\psi_f = 0.03416 / 2\pi = 5.44$ mWb. The Anaheim sheet's 3.35 V/krpm, read the same way as the
+  Teknic's, gives $3.35 / (\sqrt{3} \cdot 418.9) = 4.62$ mWb, 15 % less. The model keeps TI's
+  identified value; with the sheet's, $K_t$ would be 27.7 mN·m/A instead of 32.6, the rated current
+  4.6 A instead of 3.9 A and the no-load speed at 24 V 750 rad/s instead of 637. The Anaheim figures
+  derived in these chapters carry that uncertainty.
 - **Inertia.** $1\ \text{oz·in·s}^2 = 7.0616 \times 10^{-3}\ \text{kg·m}^2$: 0.00068 oz·in·s²
   (Anaheim) and 0.001 oz·in·s² (Teknic).
 - **Viscous friction.** Neither vendor publishes a viscous term or a no-load current to derive one
