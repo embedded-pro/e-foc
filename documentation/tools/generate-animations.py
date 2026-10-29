@@ -308,6 +308,8 @@ def legend(x, y, items, size=11, vertical=False):
         elif style == "arrow":
             parts.append(tag("line", x1=cx, y1=cy, x2=cx + 18, y2=cy, stroke=color, stroke_width=3,
                              marker_end=arrow_ref(color)))
+        elif style == "dot":
+            parts.append(tag("circle", cx=cx + 10, cy=cy, r=3.5, fill=color))
         elif style == "fill":
             parts.append(tag("rect", x=cx, y=cy - 6, width=20, height=12, fill=color,
                              fill_opacity=0.25, stroke=color, stroke_width=1))
@@ -815,7 +817,220 @@ class SvmHexagon(Figure):
         ])
 
 
-FIGURES = (RotatingField(), TorqueAngle(), BackEmf(), SixStep(), ParkTransform(), SvmHexagon())
+DEAD_TIME = 0.075
+HIGH_ON = 0.25
+HIGH_OFF = 0.75
+
+
+def _high_gate(t):
+    return HIGH_ON + DEAD_TIME <= t < HIGH_OFF
+
+
+def _low_gate(t):
+    return t < HIGH_ON or t >= HIGH_OFF + DEAD_TIME
+
+
+def _half_bridge_state(t):
+    if _high_gate(t):
+        return "high"
+    if _low_gate(t):
+        return "low"
+    return "dead"
+
+
+def _mosfet(x, y, label, size):
+    """A switch drawn as a box between drain (top) and source (bottom)."""
+    return "".join([
+        tag("line", x1=x, y1=y - 34, x2=x, y2=y - 18, stroke=INK, stroke_width=2),
+        tag("line", x1=x, y1=y + 18, x2=x, y2=y + 34, stroke=INK, stroke_width=2),
+        tag("line", x1=x - 46, y1=y, x2=x - 22, y2=y, stroke=MUTED, stroke_width=1.5),
+        text(x - 50, y + size * 0.36, label.replace("Q", "G"), size=size * 0.85, fill=MUTED, anchor="end"),
+        text(x, y + size * 0.36, label, size=size, weight="bold"),
+    ])
+
+
+def _diode(x, y, label, size):
+    """A body diode, cathode up, between the drain and source rails of its switch."""
+    return "".join([
+        tag("line", x1=x, y1=y - 34, x2=x, y2=y - 9, stroke=INK, stroke_width=1.5),
+        tag("line", x1=x, y1=y + 9, x2=x, y2=y + 34, stroke=INK, stroke_width=1.5),
+        tag("polygon", points=f"{_num(x - 9)},{_num(y + 9)} {_num(x + 9)},{_num(y + 9)} {_num(x)},{_num(y - 7)}",
+            fill=CARD, stroke=INK, stroke_width=1.5),
+        tag("line", x1=x - 9, y1=y - 8, x2=x + 9, y2=y - 8, stroke=INK, stroke_width=2),
+        text(x + 13, y + size * 0.36, label, size=size * 0.85, fill=MUTED, anchor="start"),
+    ])
+
+
+class HalfBridgeDeadTime(Figure):
+    name = "half-bridge-dead-time"
+    title = "One half-bridge leg through a PWM period, dead time exaggerated"
+    frame_times = (0.125, 0.29, 0.5, 0.79)
+
+    def frame_label(self, t):
+        return {"high": "high side on", "low": "low side on", "dead": "dead time"}[_half_bridge_state(t)]
+
+    def diagram(self, scene):
+        size = scene.font(12)
+        qx, dx, node_y = 120, 178, 150
+        high_y, low_y = 92, 208
+
+        def lit(state):
+            return lambda t: 1.0 if _half_bridge_state(t) == state else 0.0
+
+        def boxes(x, y, state):
+            return scene.el("rect", {"x": x - 22, "y": y - 18, "width": 44, "height": 36, "rx": 5,
+                                     "fill": FIELD, "stroke": INK, "stroke-width": 1.5},
+                            dyn={"fill-opacity": lambda t: 0.35 if _half_bridge_state(t) == state else 0.0},
+                            discrete=True)
+
+        path = {"stroke": FIELD, "stroke-width": 4, "fill": "none", "stroke-linejoin": "round",
+                "stroke-dasharray": "7 4", "stroke-linecap": "round"}
+        current_paths = [
+            ("high", f"M{qx},40 L{qx},{node_y} L262,{node_y}"),
+            ("low", f"M{qx},262 L{qx},{node_y} L262,{node_y}"),
+            ("dead", f"M{dx},262 L{dx},{node_y} L262,{node_y}"),
+        ]
+        node_labels = [
+            ("high", "v_{sw} = V_{dc}"),
+            ("low", "v_{sw} ≈ 0"),
+            ("dead", "v_{sw} = −V_f"),
+        ]
+        coil = " ".join(f"A6,6 0 0 1 {_num(206 + 12 * (k + 1))},{node_y}" for k in range(4))
+        paths = [scene.el("path", dict(path, d=d), dyn={"opacity": lit(state)}, discrete=True)
+                 for state, d in current_paths]
+        parts = [
+            tag("line", x1=40, y1=40, x2=dx + 30, y2=40, stroke=INK, stroke_width=2.5),
+            text(36, 44, "V_{dc}", size=size, anchor="end", weight="bold"),
+            tag("line", x1=40, y1=262, x2=dx + 30, y2=262, stroke=INK, stroke_width=2.5),
+            text(36, 266, "0 V", size=size, anchor="end", weight="bold"),
+            tag("line", x1=qx, y1=40, x2=qx, y2=high_y - 34, stroke=INK, stroke_width=2),
+            tag("line", x1=qx, y1=high_y + 34, x2=qx, y2=low_y - 34, stroke=INK, stroke_width=2),
+            tag("line", x1=qx, y1=low_y + 34, x2=qx, y2=262, stroke=INK, stroke_width=2),
+            tag("line", x1=dx, y1=40, x2=dx, y2=high_y - 34, stroke=INK, stroke_width=1.5),
+            tag("line", x1=dx, y1=high_y + 34, x2=dx, y2=low_y - 34, stroke=INK, stroke_width=1.5),
+            tag("line", x1=dx, y1=low_y + 34, x2=dx, y2=262, stroke=INK, stroke_width=1.5),
+            tag("line", x1=qx, y1=node_y, x2=206, y2=node_y, stroke=INK, stroke_width=2),
+            tag("path", d=f"M206,{node_y} {coil}", fill="none", stroke=INK, stroke_width=2),
+            tag("line", x1=254, y1=node_y, x2=272, y2=node_y, stroke=INK, stroke_width=2),
+            text(240, node_y + 24, "phase L", size=size * 0.85, fill=MUTED),
+            static_vector(232, node_y - 18, 268, node_y - 18, PHASE["A"], 2),
+            text(250, node_y - 26, "i > 0", size=size * 0.85, fill=PHASE["A"]),
+            *paths,
+            tag("circle", cx=qx, cy=node_y, r=4, fill=INK),
+            boxes(qx, high_y, "high"),
+            boxes(qx, low_y, "low"),
+            _mosfet(qx, high_y, "Q_H", size),
+            _mosfet(qx, low_y, "Q_L", size),
+            _diode(dx, high_y, "D_H", size),
+            _diode(dx, low_y, "D_L", size),
+        ]
+        for state, label in node_labels:
+            parts.append(scene.el("text", {"x": 14, "y": node_y + size * 0.36, "font-size": size * 0.9,
+                                           "fill": FIELD, "font-weight": "bold"},
+                                  dyn={"opacity": lit(state)}, discrete=True, body=rich(label, size * 0.9)))
+        return "".join(parts)
+
+    def plot(self, scene, marks):
+        ticks = [(0.0, "0"), (0.25, "T/4"), (0.5, "T/2"), (0.75, "3T/4"), (1.0, "T")]
+        gate_h = Plot(46, 10, 316, 44, (-0.2, 1.2), (0, 1), None, "G_H", x_ticks=())
+        gate_l = Plot(46, 72, 316, 44, (-0.2, 1.2), (0, 1), None, "G_L", x_ticks=())
+        node = Plot(46, 134, 316, 92, (-0.2, 1.2), (0, 1), "time in one PWM period", "v_sw / V_dc",
+                    x_ticks=ticks)
+        high = (lambda u: 1.0 if _high_gate(u) else 0.0, INK)
+        low = (lambda u: 1.0 if _low_gate(u) else 0.0, INK)
+        ideal = (lambda u: 1.0 if HIGH_ON <= u < HIGH_OFF else 0.0, MUTED)
+        actual = (lambda u: 1.0 if _high_gate(u) else 0.0, PHASE["A"])
+        lost = tag("rect", x=node.px(HIGH_ON), y=node.py(1.0), width=node.px(HIGH_ON + DEAD_TIME) - node.px(HIGH_ON),
+                   height=node.py(0.0) - node.py(1.0), fill=PHASE["A"], fill_opacity=0.18)
+        dead = "".join(tag("rect", x=gate_h.px(a), y=gate_h.y, width=gate_h.px(a + DEAD_TIME) - gate_h.px(a),
+                           height=node.y + node.h - gate_h.y, fill=FIELD, fill_opacity=0.08)
+                       for a in (HIGH_ON, HIGH_OFF))
+        return "".join([
+            dead,
+            gate_h.axes(), gate_h.curve(*high, steps=400), gate_h.tracker(scene, [high], marks),
+            gate_l.axes(), gate_l.curve(*low, steps=400), gate_l.tracker(scene, [low], marks),
+            node.axes(), lost,
+            node.curve(ideal[0], MUTED, dash="5 3", steps=400),
+            node.curve(*actual, steps=400),
+            node.tracker(scene, [actual], marks),
+            legend(46, 278, [("ideal v_{sw}", MUTED, "dash"), ("actual, i > 0", PHASE["A"], "line")]),
+            legend(46, 296, [("dead time", FIELD, "fill"), ("lost volt-seconds", PHASE["A"], "fill")]),
+        ])
+
+
+SLOTS = 12
+POLES = 8
+COGGING_PERIODS = 24
+
+
+def _annular_sector(cx, cy, r_in, r_out, a0, a1, steps=8):
+    outer = [pol(cx, cy, r_out, a0 + (a1 - a0) * k / steps) for k in range(steps + 1)]
+    inner = [pol(cx, cy, r_in, a1 - (a1 - a0) * k / steps) for k in range(steps + 1)]
+    return " ".join(f"{_num(x)},{_num(y)}" for x, y in outer + inner)
+
+
+class CoggingTorque(Figure):
+    name = "cogging-torque"
+    title = "Cogging: magnets pulled towards the stator teeth with no current"
+    frame_times = (0.0, 1 / 24, 1 / 12, 1 / 8)
+    sweep = 90.0
+
+    def frame_label(self, t):
+        return f"θ_m = {self.sweep * t:g}°"
+
+    def diagram(self, scene):
+        cx = cy = 150
+        size = scene.font(11)
+        parts = [tag("circle", cx=cx, cy=cy, r=128, fill=STEEL, stroke=STEEL_EDGE, stroke_width=1.5),
+                 tag("circle", cx=cx, cy=cy, r=104, fill=CARD, stroke=STEEL_EDGE, stroke_width=1)]
+        pitch = 360 / SLOTS
+        for k in range(SLOTS):
+            centre = 90 + k * pitch
+            parts.append(tag("polygon", points=_annular_sector(cx, cy, 76, 105, centre - pitch * 0.3,
+                                                               centre + pitch * 0.3),
+                             fill=STEEL, stroke=STEEL_EDGE, stroke_width=1))
+        magnets = []
+        pole_pitch = 360 / POLES
+        for k in range(POLES):
+            centre = 90 + k * pole_pitch
+            colour = NORTH if k % 2 == 0 else SOUTH
+            magnets.append(tag("polygon", points=_annular_sector(cx, cy, 52, 72, centre - pole_pitch * 0.42,
+                                                                 centre + pole_pitch * 0.42),
+                               fill=colour, stroke=CARD, stroke_width=1))
+            lx, ly = pol(cx, cy, 62, centre)
+            magnets.append(text(lx, ly + size * 0.36, "N" if k % 2 == 0 else "S", size=size * 0.9, fill=CARD,
+                                weight="bold"))
+        magnets.append(tag("circle", cx=cx, cy=cy, r=52, fill=STEEL, stroke=STEEL_EDGE, stroke_width=1))
+        magnets.append(tag("line", x1=cx, y1=cy, x2=cx, y2=cy - 50, stroke=INK, stroke_width=2))
+        magnets.append(tag("circle", cx=cx, cy=cy, r=4, fill=INK))
+        parts.append(scene.el("g", rotate=(lambda t: self.sweep * t, cx, cy), body="".join(magnets)))
+        parts.append(tag("line", x1=cx, y1=cy - 132, x2=cx, y2=cy - 108, stroke=INK, stroke_width=1.5,
+                         stroke_dasharray="3 3"))
+        if scene.animated:
+            parts.append(text(cx, cy + 148, f"{SLOTS} slots, {POLES} poles: lcm(12, 8) = {COGGING_PERIODS} per turn",
+                              size=size, fill=MUTED))
+        return "".join(parts)
+
+    def plot(self, scene, marks):
+        ticks = [(k / 6, f"{int(self.sweep * k / 6)}°") for k in range(7)]
+        p = Plot(46, 10, 316, 200, (-5.5, 5.5), (-4, -2, 0, 2, 4), "rotor angle θ_m (mechanical)",
+                 "cogging torque (mN·m)", x_ticks=ticks)
+        periods = COGGING_PERIODS * self.sweep / 360
+        torque = (lambda u: -4.0 * math.sin(2 * math.pi * periods * u), TORQUE)
+        detents = "".join(tag("circle", cx=p.px(k / periods), cy=p.py(0), r=3.5, fill=INK)
+                          for k in range(int(periods) + 1))
+        return "".join([
+            p.axes(),
+            p.curve(*torque),
+            detents,
+            p.tracker(scene, [torque], marks),
+            legend(46, 262, [("τ_{cog}, 4 mN·m deep (bench motor)", TORQUE, "line")]),
+            legend(46, 282, [("detent: stable rest position", INK, "dot")]),
+        ])
+
+
+FIGURES = (RotatingField(), TorqueAngle(), BackEmf(), SixStep(), ParkTransform(), SvmHexagon(),
+           HalfBridgeDeadTime(), CoggingTorque())
 
 
 def generate(out_dir):
