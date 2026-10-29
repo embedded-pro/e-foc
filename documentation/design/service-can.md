@@ -183,10 +183,10 @@ connection (`integration-testing.md`, "Commands and Verdicts over CAN Only").
 | `0x19` | `ClearDiagnostics` | command   | —      | acknowledge once the control-loop and CAN statistics are reset |
 
 `Calibrate` runs the sequence of `state-machine.md` — current offsets, pole pairs, resistance and inductance,
-alignment and, in speed and position modes, the mechanical identification and the cogging map — and stores
-the record, as the terminal's `calibrate` does. Like the identifications it is answered when it ends, so a
-client allows it two minutes. `ClearCalibration` invalidates the stored record, as `clear_cal` does, and the
-drive returns to `Idle`. Both are refused unless the drive is stopped:
+alignment, the flux linkage and, in speed and position modes, the mechanical identification and the cogging
+map — and stores the record, as the terminal's `calibrate` does. Like the identifications it is answered when
+it ends, so a client allows it two minutes. `ClearCalibration` invalidates the stored record, as `clear_cal`
+does, and the drive returns to `Idle`. Both are refused unless the drive is stopped:
 
 | Situation                                                 | Answer                             |
 |-----------------------------------------------------------|------------------------------------|
