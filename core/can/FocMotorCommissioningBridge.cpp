@@ -7,11 +7,15 @@
 namespace can
 {
     FocMotorCommissioningBridge::FocMotorCommissioningBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
-        services::ElectricalParametersIdentification& electricalIdent, services::MechanicalParametersIdentification* mechIdent)
+        services::ElectricalParametersIdentification& electricalIdent, services::MechanicalParametersIdentification* mechIdent,
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
         : server(server)
         , controlMode(controlMode)
         , electricalIdent(electricalIdent)
         , mechIdent(mechIdent)
+        , currentOffsets(currentOffsets)
+        , standstill(standstill)
     {}
 
     void FocMotorCommissioningBridge::Align(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -47,8 +51,49 @@ namespace can
 
         pendingElectricalR.reset();
         pendingElectricalL.reset();
+        pendingOffsets = foc::PhaseCurrents{};
         pendingElectricalIdentDoneCallback = onDone;
 
+        // The offset step shorts the windings, so a turning rotor would drive current that is stored as sensor bias
+        if (!standstill)
+        {
+            MeasureCurrentOffsets();
+            return;
+        }
+
+        standstill->get().Await([this](bool atRest)
+            {
+                if (atRest)
+                    MeasureCurrentOffsets();
+                else
+                    FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
+            });
+    }
+
+    void FocMotorCommissioningBridge::MeasureCurrentOffsets()
+    {
+        if (!currentOffsets)
+        {
+            EstimateResistanceAndInductance();
+            return;
+        }
+
+        currentOffsets->get().Measure([this](std::optional<foc::PhaseCurrents> offsets)
+            {
+                if (!offsets.has_value())
+                {
+                    FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
+                    return;
+                }
+
+                pendingOffsets = *offsets;
+                currentOffsets->get().Apply(*offsets);
+                EstimateResistanceAndInductance();
+            });
+    }
+
+    void FocMotorCommissioningBridge::EstimateResistanceAndInductance()
+    {
         electricalIdent.EstimateResistanceAndInductance({},
             [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
@@ -88,6 +133,9 @@ namespace can
         data.lQ = pendingElectricalL->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs);
         data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
+        data.currentOffsetA = pendingOffsets.a.Value();
+        data.currentOffsetB = pendingOffsets.b.Value();
+        data.currentOffsetC = pendingOffsets.c.Value();
         pendingElectricalR.reset();
         pendingElectricalL.reset();
 

@@ -291,10 +291,14 @@ creep cannot pass one encoder count at a time. A rotor already at rest costs the
 
 The offsets apply as soon as they are measured, so the identification and alignment steps after
 them read corrected currents (`service-current-offsets.md`). An electrical identification that
-arrives over CAN does not measure them and keeps the ones in force, and keeps the cogging map too.
-It keeps the mechanical parameters and the loop bandwidths of the record as well: it measures
-neither, and replacing an inertia entered or identified earlier with nothing would leave a speed or
-position mode uncalibrated again.
+arrives over CAN measures them too: the CAN bridge waits for the rotor to come to rest, measures and
+applies the offsets before it estimates resistance and inductance, and the record it completes
+carries them. Without that step a drive commissioned over CAN after a cleared calibration ran on
+zero offsets, which on the bench board left +25, −17 and +45 mA uncorrected, both in the current
+loop and in the phase-A current the resistance estimate is computed from. It keeps the cogging
+map, the mechanical parameters and the loop bandwidths of the record: it measures none of them, and
+replacing an inertia entered or identified earlier with nothing would leave a speed or position mode
+uncalibrated again.
 
 The cogging map is measured with the speed loop configured from the identified mechanics, and a
 run that measures no map does not fail the calibration (`service-cogging-compensation.md`).
@@ -348,8 +352,8 @@ when it lands. The command is therefore answered `aborted` (`abortedByFault` ove
 `busy`, and a client reads the value back.
 
 Two consequences of entering parameters by hand are left to the operator. A record completed by hand
-has no measured current offsets — they are measured only by the first step of `Calibrate` — so a drive
-commissioned from its datasheet should be calibrated once before it is relied on. And a motor
+has no measured current offsets — they are measured only by `Calibrate` and by an electrical
+identification over CAN — so a drive commissioned from its datasheet should be calibrated once before it is relied on. And a motor
 parameter is stored even when the active speed LQI or position LQR/LQI law cannot be designed from it
 with the operator's settings: that law keeps the design derived from the automatic settings, the drive
 traces `Speed settings not applied` or `Position settings not applied`, and the settings read back are
@@ -443,7 +447,7 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, like every command that starts asynchronous work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. Its guard refuses the command while another command is still pending, so a second completion sent while the first is aligning is rejected instead of overwriting the pending record. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data`, the current-sensor offsets the client measured included, in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. Its guard refuses the command while another command is still pending, so a second completion sent while the first is aligning is rejected instead of overwriting the pending record. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 

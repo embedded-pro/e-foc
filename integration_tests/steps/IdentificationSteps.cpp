@@ -176,6 +176,15 @@ WHEN(R"(electrical identification is run)")
     setup.identified.polePairs = (*payload)[4];
 }
 
+WHEN(R"(the calibration record is read)")
+{
+    auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+
+    ReadCalibrationRecord(fixture, setup.identified);
+    ASSERT_TRUE(setup.identified.resistanceOhm.has_value()) << "The target did not report its calibration record over CAN";
+}
+
 WHEN(R"(the full calibration is run)")
 {
     auto& fixture = context.Get<Fixture>();

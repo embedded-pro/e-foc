@@ -64,16 +64,13 @@ namespace application
         return false;
     }
 
-    // An external identification leaves offsets, cogging, mechanics and bandwidths as recorded.
+    // An external identification brings its own sensor offsets, and leaves cogging, mechanics and bandwidths as recorded.
     void CalibrationFlow::BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
         const auto& held = env.context.Data();
 
         env.pending.Accept(command.onDone);
         calibrating.pendingData = command.data;
-        calibrating.pendingData.currentOffsetA = held.currentOffsetA;
-        calibrating.pendingData.currentOffsetB = held.currentOffsetB;
-        calibrating.pendingData.currentOffsetC = held.currentOffsetC;
         calibrating.pendingData.coggingTorque = held.coggingTorque;
         calibrating.pendingData.coggingTorqueScale = held.coggingTorqueScale;
         calibrating.pendingData.inertia = held.inertia;

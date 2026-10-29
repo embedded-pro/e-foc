@@ -13,6 +13,7 @@
 #include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
+#include <functional>
 #include <optional>
 
 namespace can
@@ -35,7 +36,9 @@ namespace can
             const Platform& platform,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
-            services::Tracer& tracer);
+            services::Tracer& tracer,
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
+            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt);
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };

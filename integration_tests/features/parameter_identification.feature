@@ -16,10 +16,10 @@ Feature: Parameter Identification Against a Known Plant
   before the load arrives. See Part J of
   documentation/design/software-in-the-loop.md.
 
-  Each requirement keeps one scenario here, on the bench motor, end to end
-  through the emulated target. The sweeps over both reference motors, noise,
-  seeds, speed and current laws, partial cogging, a shaft torque and a hot
-  winding run in the host model-in-the-loop tests (integration_tests/
+  Each requirement keeps one scenario here for each path it constrains, on the
+  bench motor, end to end through the emulated target. The sweeps over both
+  reference motors, noise, seeds, speed and current laws, partial cogging, a
+  shaft torque and a hot winding run in the host model-in-the-loop tests (integration_tests/
   model_in_the_loop), which drive the firmware's control-mode state machine and
   its identification services against the same plant model with the same
   limits.
@@ -31,6 +31,17 @@ Feature: Parameter Identification Against a Known Plant
     And the motor boots in torque mode
     When the target boots
     And the full calibration is run
+    Then the identified current offsets shall be within 5 mA of the plant
+    And the identified resistance shall be within 5 % of the plant
+
+  @sil @REQ-CAL-015
+  Scenario: An electrical identification over CAN measures the offsets through the bench's current-sense chain
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the motor boots in torque mode
+    When the target boots
+    And electrical identification is run
+    And the calibration record is read
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
 
