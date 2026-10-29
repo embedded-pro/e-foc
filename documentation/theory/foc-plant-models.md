@@ -29,8 +29,8 @@ This document derives the discrete-time state-space plant models used by all adv
 It is a shared prerequisite for:
 - the current, speed and position loop controllers indexed in `documentation/theory/advanced-controllers.md`
 
-The reader is assumed familiar with Clarke/Park transforms, SVM, and PI current control as described
-in `documentation/theory/foc.md`.
+The reader is assumed familiar with the dq model of `documentation/theory/motor-model.md` and with
+Clarke/Park transforms, SVM, and PI current control as described in `documentation/theory/foc.md`.
 
 ---
 
@@ -59,17 +59,9 @@ in `documentation/theory/foc.md`.
 
 ### 1. PMSM Current Loop Plant (dq Frame)
 
-The PMSM voltage equations in the rotor-synchronous dq frame (from `documentation/theory/foc.md`
-Section 4), assuming a surface-mounted motor with $L_d = L_q = L_s$:
-
-$$
-v_d = R_s i_d + L_s \frac{di_d}{dt} - \omega_e L_s i_q
-$$
-$$
-v_q = R_s i_q + L_s \frac{di_q}{dt} + \omega_e L_s i_d + \omega_e \psi_f
-$$
-
-Rearranged as explicit state equations:
+The PMSM voltage equations in the rotor-synchronous dq frame are derived in
+`documentation/theory/motor-model.md` §4. For a surface-mounted motor with $L_d = L_q = L_s$, written as
+explicit state equations:
 
 $$
 \frac{di_d}{dt} = -\frac{R_s}{L_s} i_d + \omega_e i_q + \frac{1}{L_s} v_d
@@ -235,7 +227,7 @@ graph LR
 |----------------------|:---------------------------------:|:-------------------------------:|:-------------------------:|
 | States               |        1 per axis (Id, Iq)        |             1 (ωm)              |        2 (θm, ωm)         |
 | Inputs               |       1 per axis (v'd, v'q)       |             1 (Iq*)             |          1 (Iq*)          |
-| Time constant        |      $L_s/R_s$ (typ. 0.4 ms)      |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
+| Time constant        |    $L_s/R_s$ (0.56 – 1.58 ms)     |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
 | Discretization error | $< 1\%$ for $R_s T_s / L_s < 0.1$ | $< 1\%$ for $B_f T_s / J < 0.1$ | Row approx valid at 1 kHz |
 | Parameter source     |          Electrical RLS           |         Mechanical RLS          |      Mechanical RLS       |
 

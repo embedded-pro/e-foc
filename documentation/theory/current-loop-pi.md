@@ -54,7 +54,7 @@ See `documentation/theory/foc-plant-models.md` for all base symbols and ZOH deri
 
 ### Plant Model
 
-After feedforward decoupling the cross-coupling terms (see `documentation/theory/foc.md` §4), each
+After feedforward decoupling the cross-coupling terms (see `documentation/theory/foc.md` §3), each
 dq axis reduces to an independent first-order RL plant with decoupled input $v'$:
 
 $$
@@ -143,7 +143,7 @@ projection is the identity and the law reduces to the plain velocity form.
 
 Every current controller in this loop emits a normalised dq voltage pair passed to inverse Park and
 then to SVM. The modulator remains linear only inside the circle inscribed in the voltage hexagon
-(`documentation/theory/foc.md` §6):
+(`documentation/theory/foc.md` §4):
 
 $$
 \sqrt{(v_d')^2 + (v_q')^2} \leq 1
