@@ -80,7 +80,6 @@ namespace foc
             Disable();
     }
 
-    // The phase-current slot is the gate: released before the bridge stops, taken only once it runs
     template<typename FocImpl>
     void Runner<FocImpl>::Disable()
     {

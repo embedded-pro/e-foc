@@ -22,7 +22,6 @@ namespace foc
         const auto shiftedMiddle = middle - shift;
         const auto shiftedHighest = highest - shift;
 
-        // The tighter of the two bounds, chosen by cross-multiplying so only one ratio is divided out
         uint32_t bound = 1;
         uint32_t value = 1;
         if (shiftedMiddle > limit)

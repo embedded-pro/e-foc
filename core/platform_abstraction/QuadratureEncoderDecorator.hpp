@@ -44,7 +44,6 @@ namespace application
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
-    // The count stays below the resolution, so the angle needs at most one 2π to land in [−π, π)
     OPTIMIZE_FOR_SPEED foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
     {
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
