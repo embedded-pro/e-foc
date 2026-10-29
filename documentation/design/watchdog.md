@@ -103,22 +103,25 @@ must not be able to preempt any interrupt that could hang:
 
 ### Part D — platforms
 
-| Platform         | Hardware                            | Early-warning period              | Expiration timeout            |
-|------------------|-------------------------------------|-----------------------------------|-------------------------------|
-| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                             | 100 ms                        |
-| ST (STM32)       | Window watchdog, prescaler 1        | Fixed by PCLK1 (≈16 ms at 16 MHz) | 100 ms (seven early warnings) |
-| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                             | 100 ms                        |
-| Host             | none                                | —                                 | —                             |
+| Platform         | Hardware                            | Early-warning period               | Expiration timeout           |
+|------------------|-------------------------------------|------------------------------------|------------------------------|
+| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                       |
+| ST NUCLEO-G474RE | Window watchdog, prescaler 8        | Fixed by PCLK1 (≈12 ms at 170 MHz) | 100 ms (nine early warnings) |
+| ST NUCLEO-H563ZI | Window watchdog, prescaler 1        | Fixed by PCLK1                     | 100 ms                       |
+| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                              | 100 ms                       |
+| Host             | none                                | —                                  | —                            |
 
 - **ST:** the vendor driver pins the window watchdog to the highest priority when it starts. The platform
   lowers it to the lowest NVIC level straight after the dispatcher is constructed, for the reason given in
   Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
-  bits and the STM32 parts implement four. The cutoff is empty while the ST platform drives no bridge.
+  bits and the STM32 parts implement four. On the NUCLEO-G474RE the cutoff disables TIM1's main output; on
+  the NUCLEO-H563ZI, which drives no bridge yet, it is empty.
 
-  The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1, 256 µs at
-  16 MHz with prescaler 1), so the early-warning handler must run within that tick. Prescaler 1 keeps the
-  early-warning period short, and with it the rounding of the timeout; a larger prescaler buys handler
-  latency at the cost of a later expiry.
+  The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1), so the
+  early-warning handler must run within that tick. A small prescaler keeps the early-warning period short,
+  and with it the rounding of the timeout; a larger one buys handler latency at the cost of a later expiry.
+  At 170 MHz prescaler 1 would leave 24 µs, less than the control-loop interrupt can hold off the handler, so
+  the NUCLEO-G474RE uses prescaler 8: 193 µs.
 - **Emulated target:** the MPS2 machine wires its watchdog to NMI, which cannot be lowered. So on the
   emulated target a hung interrupt is caught only when the event loop is inside an action. That is
   acceptable for a target that drives a simulated plant.
@@ -251,8 +254,8 @@ With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
   detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
 - The hardware reset follows one period later, at most *(N+2)·P* after the action started.
 - With TI at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
-- With ST at *P* ≈ 16 ms (PCLK1 at 16 MHz) and *N* = 7, that is about 113–129 ms to the cutoff and at most
-  about 145 ms to the reset.
+- With the NUCLEO-G474RE at *P* ≈ 12.1 ms (PCLK1 at 170 MHz, prescaler 8) and *N* = 9, that is about
+  109–121 ms to the cutoff and at most about 134 ms to the reset.
 
 A legitimate action must finish well inside *N·P*. Long work is already split across actions:
 - the TI EEPROM mass erase is polled from a timer rather than waited for;
@@ -283,7 +286,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
 | Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
 | Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                                 |
-| ST target                       | Cutoff is empty while the platform drives no bridge                                                             |
+| ST targets                      | Cutoff disables TIM1's main output on the NUCLEO-G474RE; empty on the NUCLEO-H563ZI, which drives no bridge     |
 | Interrupt work                  | An interrupt that runs longer than the early-warning timeout resets the target, so interrupts only collect data |
 | Host build                      | No watchdog                                                                                                     |
 | Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead           |

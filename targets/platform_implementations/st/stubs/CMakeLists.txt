@@ -1,0 +1,30 @@
+add_library(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM})
+
+target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../../..>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+
+target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
+    e_foc.platform_abstraction
+    e_foc.platform_abstraction.peripheral_stubs
+    infra.event
+    infra.timer
+    services.tracer
+    services.util.watchdog
+    e_foc.error_handling_cortex_m
+    e_foc.platform_abstraction_cortex_m_common
+    e_foc.platform_abstraction_${E_FOC_TARGET_BOARD}
+    e_foc.motor_board
+)
+
+target_compile_definitions(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
+    HARDWARE_PINS_AND_PERIPHERALS_HEADER="targets/platform_implementations/${E_FOC_TARGET_PLATFORM}/${E_FOC_TARGET_BOARD}/PinsAndPeripherals.hpp"
+)
+
+target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../../error_handling_cortex_m/FaultHandler.cpp
+    CutPowerStage.cpp
+    PlatformFactoryImpl.cpp
+    PlatformFactoryImpl.hpp
+)

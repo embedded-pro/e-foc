@@ -28,6 +28,8 @@ target_sources(e_foc.platform_abstraction PRIVATE
     ControlLoopMetrics.cpp
     DecimatingThreePhaseInverter.hpp
     DecimatingThreePhaseInverter.cpp
+    Eeprom24xx.hpp
+    Eeprom24xx.cpp
     LowSideShuntWindow.hpp
     PlatformDiagnostics.hpp
     PlatformDiagnostics.cpp

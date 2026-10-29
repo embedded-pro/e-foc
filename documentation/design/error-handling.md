@@ -59,10 +59,10 @@ drives every `pwmN` output low and so turns all six gate signals off. It is a ha
 loop and no dependency on driver state, and it touches no unclocked peripheral — a write to one would fault
 again, and a nested fault here is the lockup this call exists to prevent.
 
-On ST the definition is empty, and says so: that target does not drive a bridge yet — both
-`PinsAndPeripherals.hpp` are empty and the encoder reports a resolution of zero — so there is no timer instance
-to name. Cutting the stage there means clearing `TIM_BDTR_MOE` on whichever advanced-control timer the board
-wires to the gate drivers, and that belongs with the work that makes the target functional.
+On the NUCLEO-G474RE the definition clears the main-output enable of TIM1, the advanced-control timer wired to
+the gate drivers, when its clock is on. With the off-state selections set, every gate input then sits at its idle
+low level, so all six FETs are off; like the TI definition it reads no driver state. On the NUCLEO-H563ZI the
+definition is empty, and says so: that target does not drive a bridge yet, so there is no timer to name.
 
 ### Board protection state — `BoardProtectionStatus()`
 
@@ -109,7 +109,9 @@ Every platform reports `unknown` today:
   overvoltage against `BoardCharacteristics::OvervoltageThresholdCounts` — or a software/continuous ADC trigger
   in `hal-ti` so the comparators keep evaluating. Overcurrent is arguably not observable at all while stopped:
   no current flows through a disabled bridge.
-- **ST, QEMU** — neither wires board protection, so there is no condition to observe.
+- **NUCLEO-G474RE** — `unknown`, for the TM4C129's reason: its checks run on the PWM-triggered samples, which
+  stop with the bridge.
+- **NUCLEO-H563ZI, QEMU** — neither wires board protection, so there is no condition to observe.
 - **host** — settable, so tests can hold the condition asserted across a re-arm attempt.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus

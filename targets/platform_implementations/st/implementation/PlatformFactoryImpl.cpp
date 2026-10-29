@@ -1,51 +1,93 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
+#include "generated/stm32fxxx/PinoutTableDefault.hpp"
+#include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
-#include <atomic>
-
-#if defined(STM32G4)
-unsigned int hse_value = 24'000'000;
-#else
-unsigned int hse_value = 8'000'000;
-#endif
+#include "stm32g4xx_ll_tim.h"
+#include <cmath>
 
 namespace
 {
     application::ResetCause ReadAndClearResetCause()
     {
-#if defined(STM32H5)
-        const uint32_t rst = RCC->RSR;
-        RCC->RSR |= RCC_RSR_RMVF;
-        if (rst & RCC_RSR_SFTRSTF)
-            return application::ResetCause::software;
-        if (rst & (RCC_RSR_IWDGRSTF | RCC_RSR_WWDGRSTF))
-            return application::ResetCause::watchdog;
-        if (rst & RCC_RSR_BORRSTF)
-            return application::ResetCause::brownOut;
-        if (rst & RCC_RSR_PINRSTF)
-            return application::ResetCause::hardware;
-#elif defined(STM32G4)
-        const uint32_t rst = RCC->CSR;
+        const uint32_t csr = RCC->CSR;
         RCC->CSR |= RCC_CSR_RMVF;
-        if (rst & RCC_CSR_SFTRSTF)
+
+        if (csr & RCC_CSR_SFTRSTF)
             return application::ResetCause::software;
-        if (rst & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
+        if (csr & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
             return application::ResetCause::watchdog;
-        if (rst & RCC_CSR_BORRSTF)
+        if (csr & RCC_CSR_BORRSTF)
             return application::ResetCause::brownOut;
-        if (rst & RCC_CSR_PINRSTF)
+        if (csr & RCC_CSR_PINRSTF)
             return application::ResetCause::hardware;
-#endif
         return application::ResetCause::powerUp;
     }
 }
 
 namespace application
 {
+    namespace
+    {
+        // At 42.5 MHz, the nearest sampling times at or above the TM4C129 choices of 4, 16, 32, 64 and 256 cycles at 16 MHz
+        constexpr std::array<uint32_t, 5> toSamplingTime{ {
+            ADC_SAMPLETIME_12CYCLES_5,
+            ADC_SAMPLETIME_47CYCLES_5,
+            ADC_SAMPLETIME_92CYCLES_5,
+            ADC_SAMPLETIME_247CYCLES_5,
+            ADC_SAMPLETIME_640CYCLES_5,
+        } };
+
+        constexpr float adcToAmpereSlope = BoardCharacteristics::AdcToAmpereSlope(Peripheral::adcReferenceVoltage, Peripheral::adcResolution);
+        constexpr float adcToAmpereOffset = BoardCharacteristics::AdcToAmpereOffset(Peripheral::adcReferenceVoltage);
+        constexpr float adcToVoltsFactor = BoardCharacteristics::AdcToVoltsFactor(Peripheral::adcReferenceVoltage, Peripheral::adcResolution);
+
+        // 100 kHz standard mode from the 170 MHz PCLK1, sized for a 1 us rise time on the board's 10 k pull-ups
+        constexpr uint32_t eepromI2cTiming{ 0xf0d42c35 };
+
+        bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c)
+        {
+            constexpr float limit{ BoardCharacteristics::overcurrentThresholdAmps };
+
+            return std::abs(a.Value()) > limit || std::abs(b.Value()) > limit || std::abs(c.Value()) > limit;
+        }
+
+        hal::I2cStm::Config EepromI2cConfig()
+        {
+            hal::I2cStm::Config config;
+            config.timing = eepromI2cTiming;
+            return config;
+        }
+
+        hal::UartStmDma::Config ConsoleConfig()
+        {
+            hal::UartStmDma::Config config;
+            config.baudrate = 921600;
+            config.priority = InterruptPriorities::uart;
+            return config;
+        }
+    }
+
+    PlatformFactoryImpl::HalInitialization::HalInitialization()
+    {
+        HAL_Init();
+        Clocks::Initialize();
+    }
+
+    PlatformFactoryImpl::TerminalAndTracer::TerminalAndTracer(hal::DmaStm& dma)
+        : transmitStream{ dma, hal::DmaChannelId{ Peripheral::DmaIndex, Peripheral::UartTxDmaChannel, Peripheral::uartTxDmaRequest } }
+        , uart{ transmitStream, Peripheral::LpUartIndex, Pins::uartTx, Pins::uartRx, hal::lpUart, ConsoleConfig() }
+    {}
+
+    PlatformFactoryImpl::Peripherals::Peripherals()
+        : eepromI2c{ Peripheral::EepromI2cIndex, Pins::eepromScl, Pins::eepromSda, EepromI2cConfig() }
+    {}
+
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
-        : onInitialized(onInitialized)
+        : gpio(hal::pinoutTableDefaultStm, hal::analogTableDefaultStm)
+        , onInitialized(onInitialized)
         , resetCause(ReadAndClearResetCause())
     {
         if (persistentFaultData.IsValid())
@@ -54,74 +96,89 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
-        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it.
+        ConfigureBoardIdPins();
+        peripherals.emplace();
+        boardId = ReadBoardIdPins();
+
+        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
 
-        services::SetGlobalTracerInstance(terminalAndTracer.tracer);
+        services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
         this->onInitialized();
-    }
-
-    PlatformFactoryImpl::HalInitialization::HalInitialization()
-    {
-        HAL_Init();
-    }
-
-    hal::WatchDogStm::Config PlatformFactoryImpl::WatchdogConfig()
-    {
-        // The shortest early-warning period keeps the expiry close to the timeout, which is rounded up to whole periods
-        hal::WatchDogStm::Config config;
-        config.prescaler = WWDG_PRESCALER_1;
-        return config;
-    }
-
-    void PlatformFactoryImpl::OnWatchdogExpired()
-    {
-        CutPowerStage();
     }
 
     void PlatformFactoryImpl::Run()
     {
-        eventDispatcher.Run();
+        peripherals->cortex.eventDispatcher.Run();
     }
 
     services::Tracer& PlatformFactoryImpl::Tracer()
     {
-        return terminalAndTracer.tracer;
+        return peripherals->terminalAndTracer.tracer;
     }
 
     services::TerminalWithCommands& PlatformFactoryImpl::Terminal()
     {
-        return terminalAndTracer.terminal;
+        return peripherals->terminalAndTracer.terminal;
     }
 
     hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return operationalPin;
+        return Pins::operationalLed;
     }
 
     hal::GpioPin& PlatformFactoryImpl::WarningLed()
     {
-        return warningPin;
+        return Pins::warningLed;
     }
 
     hal::GpioPin& PlatformFactoryImpl::FailureLed()
     {
-        return failurePin;
+        return Pins::failureLed;
     }
 
     uint8_t PlatformFactoryImpl::BoardId() const
     {
-        return 0;
+        return boardId;
     }
 
+    void PlatformFactoryImpl::ConfigureBoardIdPins()
+    {
+        if constexpr (Peripheral::hasBoardIdPins)
+        {
+            Pins::boardId0.Config(hal::PinConfigType::input);
+            Pins::boardId1.Config(hal::PinConfigType::input);
+            Pins::boardId2.Config(hal::PinConfigType::input);
+        }
+
+        if constexpr (Peripheral::hasPowerStatusPin)
+            Pins::powerStatus.Config(hal::PinConfigType::input);
+    }
+
+    // A closed switch pulls its line to ground and sets the bit
+    uint8_t PlatformFactoryImpl::ReadBoardIdPins()
+    {
+        if constexpr (!Peripheral::hasBoardIdPins)
+            return 0;
+
+        const uint8_t bit0 = Pins::boardId0.Get() ? 0u : 1u;
+        const uint8_t bit1 = Pins::boardId1.Get() ? 0u : 1u;
+        const uint8_t bit2 = Pins::boardId2.Get() ? 0u : 1u;
+        return static_cast<uint8_t>(bit0 | (bit1 << 1u) | (bit2 << 2u));
+    }
+
+    // PGOOD is high while the LM5164 output is in regulation
     bool PlatformFactoryImpl::PowerStatus() const
     {
-        return true;
+        if constexpr (!Peripheral::hasPowerStatusPin)
+            return true;
+
+        return Pins::powerStatus.Get();
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
     {
-        return *this;
+        return peripherals->performanceTrackerImpl;
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const
@@ -131,7 +188,7 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        return foc::Volts(48.0f);
+        return foc::Volts{ static_cast<float>(peripherals->powerSupplyAdc.Measure()) * adcToVoltsFactor };
     }
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
@@ -139,66 +196,277 @@ namespace application
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
+    drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
+    {
+        if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
+            return {};
+
+        return { std::chrono::nanoseconds{ BoardCharacteristics::effectiveDeadTimeNanoseconds }, foc::Ampere{ BoardCharacteristics::deadTimeKneeAmps } };
+    }
+
+    uint32_t PlatformFactoryImpl::DutyUpdateDelayPeriods() const
+    {
+        return 1;
+    }
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
     }
 
-    void PlatformFactoryImpl::Start()
+    // One counter tick separates the early warning from the reset: prescaler 8 makes it 193 us at 170 MHz,
+    // longer than the control-loop interrupt can hold off the early-warning handler
+    hal::WatchDogStm::Config PlatformFactoryImpl::Cortex::WatchdogConfig()
     {
+        hal::WatchDogStm::Config config;
+        config.prescaler = WWDG_PRESCALER_8;
+        return config;
     }
 
-    uint32_t PlatformFactoryImpl::ElapsedCycles()
+    void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
     {
-        return 0;
+        CutPowerStage();
     }
 
-    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
+    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
+        : dwt(dwt)
+        , pin(pin)
+    {}
+
+    void PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::Start()
     {
-        phaseCurrentAdc.reset();
-        phaseCurrentAdc.emplace(0.0f, 0.0f);
-        pwm.reset();
-        pwm.emplace();
+        dwt.Start();
+        pin.Set(true);
+    }
+
+    uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
+    {
+        pin.Set(false);
+        dwt.Stop();
+        return dwt.Cycles();
+    }
+
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)
+    {
+        const auto periodCycles = baseFrequency.Value() == 0
+                                      ? 0u
+                                      : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
+        controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
+
+        ReconfigureAdc(sampleAndHold);
+        ReconfigurePwm(baseFrequency, deadTime);
         pwmBaseFrequency = baseFrequency;
+    }
+
+    void PlatformFactoryImpl::ReconfigureAdc(SampleAndHold sampleAndHold)
+    {
+        const auto samplingTime = toSamplingTime.at(static_cast<std::size_t>(sampleAndHold));
+
+        // Stopped before it goes: a converter still triggered with its DMA gone overruns, and an overrun aborts
+        if (peripherals->phaseCurrentAdc)
+            peripherals->phaseCurrentAdc->Stop();
+
+        peripherals->phaseCurrentAdc.reset();
+        peripherals->phaseCurrentAdc.emplace(
+            adcToAmpereSlope,
+            adcToAmpereOffset,
+            peripherals->phaseCurrentConverter,
+            peripherals->phaseCurrentStream,
+            Peripheral::phaseCurrentAdcTrigger,
+            [this](hal::AdcMultiChannel::Samples samples)
+            {
+                MonitorBoard(samples);
+            },
+            hal::AdcPinConfig{ Pins::currentPhaseA, samplingTime },
+            hal::AdcPinConfig{ Pins::currentPhaseB, samplingTime },
+            hal::AdcPinConfig{ Pins::currentPhaseC, samplingTime },
+            hal::AdcPinConfig{ Pins::currentTotal, samplingTime },
+            hal::AdcPinConfig{ Pins::powerSupplyVoltage, samplingTime });
+
+        // Highest: the DMA completion runs the control loop, as the ADC interrupt does on the TM4C129
+        NVIC_SetPriority(Peripheral::phaseCurrentDmaIrq, 0);
+    }
+
+    void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)
+    {
+        peripherals->pwm.reset();
+
+        hal::PwmStm::Config config;
+        config.alignment = hal::PwmStm::Alignment::centerAlignedBothCounting;
+        config.triggerOutput = hal::PwmStm::TriggerOutput::compareChannel4;
+        config.deadTime.emplace();
+        config.deadTime->duration = deadTime;
+
+        peripherals->pwm.emplace(Peripheral::PwmTimerIndex, infra::MakeRange(Peripheral::pwmPhases), config);
+        peripherals->pwm->SetBaseFrequency(baseFrequency);
+
+        ConfigureSamplingTrigger();
+    }
+
+    // PWM mode 1 centres the high-side pulse on the counter valley, so the low-side shunts conduct around the peak.
+    // OC4REF rises one tick before the peak and its edge on TRGO starts the ADC sequence there. An odd repetition
+    // count written before the counter starts moves every update event to the peak: a new duty never lands mid-pulse.
+    void PlatformFactoryImpl::ConfigureSamplingTrigger()
+    {
+        auto timer = hal::peripheralTimer[Peripheral::PwmTimerIndex - 1];
+
+        LL_TIM_OC_SetMode(timer, LL_TIM_CHANNEL_CH4, LL_TIM_OCMODE_PWM2);
+        LL_TIM_OC_SetCompareCH4(timer, LL_TIM_GetAutoReload(timer) - 1);
+        LL_TIM_SetRepetitionCounter(timer, 1);
+    }
+
+    void PlatformFactoryImpl::MonitorBoard(hal::AdcMultiChannel::Samples samples)
+    {
+        const auto currentTotal = samples[currentTotalSample];
+        const auto powerSupply = samples[powerSupplySample];
+
+        if (currentTotal > Peripheral::overcurrentThresholdCounts)
+            TripProtection(BoardProtectionReason::overCurrent);
+        else if (powerSupply > Peripheral::overvoltageThresholdCounts)
+            TripProtection(BoardProtectionReason::overVoltage);
+        else if (powerSupply < Peripheral::undervoltageThresholdCounts)
+            TripProtection(BoardProtectionReason::underVoltage);
+    }
+
+    void PlatformFactoryImpl::TripProtection(BoardProtectionReason reason)
+    {
+        CutPowerStage();
+
+        if (protectionTripped)
+            return;
+
+        protectionTripped = true;
+        infra::EventDispatcher::Instance().Schedule([this, reason]()
+            {
+                if (onFaultCallback)
+                    onFaultCallback(reason);
+            });
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
     {
-        encoder.reset();
-        encoder.emplace(resolution);
+        hal::SynchronousQuadratureEncoderStm::Config config;
+        config.resolution = resolution;
+        config.invertPhaseA = Peripheral::encoderInvertPhaseA;
+        // Jumper wires to the Nucleo pick up switching edges; 8 samples at 170 MHz reject glitches under 50 ns
+        config.filter = 3;
+
+        peripherals->encoder.reset();
+        peripherals->encoder.emplace(resolution, Peripheral::EncoderTimerIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, config);
     }
 
-    void PlatformFactoryImpl::ConfigureCanBus(uint32_t /*bitRate*/, bool /*testMode*/)
+    CanBusAdapter::CanError PlatformFactoryImpl::ToAdapterError(hal::FdCanStm::Error error)
     {
-        canBus.reset();
-        canBus.emplace();
-        diagnostics.AttachCanBus(*canBus);
+        switch (error)
+        {
+            case hal::FdCanStm::Error::busOff:
+                return CanBusAdapter::CanError::busOff;
+            case hal::FdCanStm::Error::errorPassive:
+                return CanBusAdapter::CanError::errorPassive;
+            case hal::FdCanStm::Error::errorWarning:
+                return CanBusAdapter::CanError::errorWarning;
+            case hal::FdCanStm::Error::messageLost:
+                return CanBusAdapter::CanError::messageLost;
+            case hal::FdCanStm::Error::ackError:
+                return CanBusAdapter::CanError::ackError;
+            case hal::FdCanStm::Error::stuffError:
+                return CanBusAdapter::CanError::stuffError;
+            case hal::FdCanStm::Error::formError:
+                return CanBusAdapter::CanError::formError;
+            case hal::FdCanStm::Error::crcError:
+                return CanBusAdapter::CanError::crcError;
+            case hal::FdCanStm::Error::bit0Error:
+                return CanBusAdapter::CanError::bit0Error;
+            case hal::FdCanStm::Error::bit1Error:
+                return CanBusAdapter::CanError::bit1Error;
+            default:
+                return CanBusAdapter::CanError::other;
+        }
+    }
+
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t bitRate, bool testMode)
+    {
+        hal::FdCanStm::Config canConfig;
+        canConfig.bitRate = bitRate;
+        canConfig.testMode = testMode;
+        canConfig.interruptPriority = InterruptPriorities::can;
+
+        peripherals->canBus.reset();
+        peripherals->canBus.emplace(
+            Peripheral::CanIndex,
+            Pins::canRx,
+            Pins::canTx,
+            canConfig,
+            infra::Function<void(hal::FdCanStm::Error)>([this](hal::FdCanStm::Error error)
+                {
+                    peripherals->canBus->InvokeErrorHandler(ToAdapterError(error));
+                }));
+
+        diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
     CanBusAdapter& PlatformFactoryImpl::CanBus()
     {
-        return *canBus;
+        return *peripherals->canBus;
     }
 
     void PlatformFactoryImpl::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         onPhaseCurrentsReady.Set(onDone);
-        phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
+        peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
-                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+                if (controlLoopEntered)
+                {
+                    controlLoopMetrics.RecordReentry();
+                    return;
+                }
+
+                controlLoopEntered = true;
+                const auto entryCycles = CycleCounter::Now();
+
+                const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
+
+                if (protectionTripped)
+                    CutPowerStage();
+                else if (ExceedsOverCurrent(currents.a, currents.b, currents.c))
+                    TripProtection(BoardProtectionReason::overCurrent);
+                else
+                    onPhaseCurrentsReady(currents);
+
+                controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+                controlLoopEntered = false;
             });
     }
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        if (pwm)
-            pwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+        if (protectionTripped)
+            return;
+
+        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty);
+        shuntReadout.Applied(readable);
+
+        peripherals->pwm->Start(readable.a, readable.b, readable.c);
+
+        if (protectionTripped)
+            CutPowerStage();
+    }
+
+    void PlatformFactoryImpl::Start()
+    {
+        if (protectionTripped)
+            return;
+
+        peripherals->pwm->Start(hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1));
+
+        if (protectionTripped)
+            CutPowerStage();
     }
 
     void PlatformFactoryImpl::Stop()
     {
-        if (pwm)
-            pwm->Stop();
+        peripherals->pwm->Stop();
+        protectionTripped = false;
     }
 
     hal::Hertz PlatformFactoryImpl::BaseFrequency() const
@@ -206,28 +474,39 @@ namespace application
         return pwmBaseFrequency;
     }
 
+    // The encoder exists only once the NVM load has supplied its resolution
     foc::Radians PlatformFactoryImpl::Read()
     {
-        if (!encoder)
+        if (!peripherals->encoder)
             return foc::Radians{ 0.0f };
-        return encoder->Read() - encoderOffset;
+        return peripherals->encoder->Read() - encoderOffset;
     }
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
-        if (encoder)
-            encoderOffset = encoder->Read() - value;
+        if (peripherals->encoder)
+            encoderOffset = peripherals->encoder->Read() - value;
     }
 
     void PlatformFactoryImpl::SetZero()
     {
-        if (encoder)
-            encoderOffset = encoder->Read();
+        if (peripherals->encoder)
+            encoderOffset = peripherals->encoder->Read();
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
     {
-        return eepromStub;
+        return peripherals->eeprom;
+    }
+
+    void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection)
+    {
+        onFaultCallback = onProtection;
+    }
+
+    PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
+    {
+        return PlatformFactory::BoardProtectionState::unknown;
     }
 
     void PlatformFactoryImpl::Reset()

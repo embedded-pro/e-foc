@@ -158,7 +158,7 @@
         "TARGET_MCU": "stm32g474",
         "TARGET_MCU_VARIANT": "stm32g474rxt",
         "E_FOC_TARGET_BOARD": "NUCLEO-G474RE",
-        "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
+        "E_FOC_MOTOR_BOARD": "E-FOC-HARDWARE"
       }
     },
     {

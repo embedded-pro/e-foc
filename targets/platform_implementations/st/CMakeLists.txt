@@ -1,5 +1,12 @@
 add_subdirectory(${E_FOC_TARGET_BOARD})
-add_subdirectory(implementation)
+
+# A board without a peripheral map yet sets E_FOC_ST_STUBBED_PERIPHERALS and runs on stubs
+if(E_FOC_ST_STUBBED_PERIPHERALS)
+    add_subdirectory(stubs)
+    set(E_FOC_PLATFORM_IMPLEMENTATION_DIR stubs PARENT_SCOPE)
+else()
+    add_subdirectory(implementation)
+endif()
 
 # Uses the infra mem file but the e-foc custom sections.ld (adds .error_handling)
 function(e_foc_st_target_linker_scripts target)
