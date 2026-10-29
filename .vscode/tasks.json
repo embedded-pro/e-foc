@@ -11,7 +11,7 @@
                 "--config",
                 "${input:hilBuildType}",
                 "--target",
-                "e_foc.hil_tests"
+                "e_foc.integration_tests"
             ],
             "problemMatcher": [
                 "$gcc"
