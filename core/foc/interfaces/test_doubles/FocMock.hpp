@@ -60,6 +60,16 @@ namespace foc
         MOCK_METHOD(hal::Hertz, SpeedCommandFrequency, (), (const, override));
     };
 
+    class CurrentCommandableMock
+        : public CurrentCommandable
+    {
+    public:
+        MOCK_METHOD(void, EnableCurrentCommand, (), (override));
+        MOCK_METHOD(void, DisableCurrentCommand, (), (override));
+        MOCK_METHOD(void, CommandCurrent, (Ampere quadrature), (override));
+        MOCK_METHOD(Volts, QuadratureVoltage, (), (const, override));
+    };
+
     class FocPositionMock
         : public FocPosition
     {

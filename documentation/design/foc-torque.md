@@ -107,6 +107,14 @@ stateDiagram-v2
     Enabled --> Disabled : Disable\n(returns zero duty, freezes PID state)
 ```
 
+### Current Command
+
+A calibration step can run the cascade on a q-axis current it commands directly, with $I_d = 0$,
+starting from 0 A, and read back the mean q-axis voltage the current loop applies. While the command
+is active, the inner loop adds each sample's q-axis voltage to a one-millisecond window and publishes
+the window's mean; otherwise it only finds the window closed, so the other modes pay one branch per
+sample. Disable ends the command and closes the window.
+
 ### Current Envelope
 
 The speed and position cascades bound the current reference their outer loop produces. Torque mode
@@ -143,6 +151,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call.                          |
 | SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
 | Calculate         | Executes the full 11-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
+| Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 
 ### Required
 

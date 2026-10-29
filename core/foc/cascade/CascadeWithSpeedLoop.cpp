@@ -60,6 +60,8 @@ namespace foc
 
     void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
+        currentCommandActive = false;
+        voltageWindow.Close();
         currentLoop.Reset();
         speedLoop.Reset();
 
@@ -78,6 +80,8 @@ namespace foc
     void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
         enabled = false;
+        currentCommandActive = false;
+        voltageWindow.Close();
         lastElectricalSpeed = 0.0f;
         lastMechanicalSpeed = 0.0f;
         lastMeanIq = 0.0f;
@@ -128,6 +132,7 @@ namespace foc
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
 
         const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        voltageWindow.Accumulate(voltage.q);
 
         estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
 
@@ -166,6 +171,33 @@ namespace foc
     void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
     {
         lastSpeedLoopOutput = current;
+    }
+
+    void CascadeWithSpeedLoop::EnableCurrentCommandImpl()
+    {
+        EnableSpeedLoop();
+        commandedCurrent = 0.0f;
+        voltageWindow.Open(prescaler);
+        currentCommandActive = true;
+    }
+
+    void CascadeWithSpeedLoop::CommandCurrentImpl(Ampere quadrature)
+    {
+        commandedCurrent = quadrature.Value();
+    }
+
+    Volts CascadeWithSpeedLoop::QuadratureVoltageImpl() const
+    {
+        return Volts{ voltageWindow.Mean() * vdcInvScale };
+    }
+
+    bool CascadeWithSpeedLoop::HoldCommandedCurrent()
+    {
+        if (!currentCommandActive)
+            return false;
+
+        SetDirectCurrentReference(commandedCurrent);
+        return true;
     }
 
     float CascadeWithSpeedLoop::CurrentMechanicalAngle() const

@@ -545,6 +545,71 @@ TEST_F(TestSpeedCascade, a_disabled_cascade_observes_no_motion)
     EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
 }
 
+TEST_F(TestSpeedCascade, a_current_command_bypasses_the_speed_loop)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 50.0f });
+    focSpeed->EnableCurrentCommand();
+    focSpeed->CommandCurrent(foc::Ampere{ 0.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 0.0f };
+        focSpeed->Calculate(ZeroCurrents(), held);
+    }
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians position{ 0.0f };
+    ExpectCentredDuty(focSpeed->Calculate(ZeroCurrents(), position));
+}
+
+TEST_F(TestSpeedCascade, a_current_command_reports_the_mean_q_axis_voltage_it_applies)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+
+    focSpeed->EnableCurrentCommand();
+    focSpeed->CommandCurrent(foc::Ampere{ 2.0f });
+
+    for (int window = 0; window != 3; ++window)
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ 0.0f };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    EXPECT_GT(focSpeed->QuadratureVoltage().Value(), 0.0f);
+
+    focSpeed->DisableCurrentCommand();
+    EXPECT_NEAR(focSpeed->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, outside_a_current_command_no_q_axis_voltage_is_kept)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 50.0f });
+    focSpeed->Enable();
+
+    for (int window = 0; window != 3; ++window)
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ 0.0f };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    EXPECT_NEAR(focSpeed->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
+
 namespace
 {
     std::array<int8_t, 48> CoggingWave()

@@ -648,3 +648,26 @@ TEST_F(TestPositionCascade, a_speed_commanding_algorithm_reports_the_speed_it_de
 
     EXPECT_GT(speedCommanding.cascade->ObserveMotion().demandedSpeed.Value(), 0.0f);
 }
+
+TEST_F(TestPositionCascade, a_current_command_bypasses_the_position_and_speed_loops)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+    focPosition->EnableCurrentCommand();
+    focPosition->CommandCurrent(foc::Ampere{ 0.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 0.0f };
+        focPosition->Calculate(ZeroCurrents(), held);
+    }
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians position{ 0.0f };
+    const auto duty = focPosition->Calculate(ZeroCurrents(), position);
+    EXPECT_NEAR(DutyPercent(duty.a), 50.0f, 1.0f);
+    EXPECT_NEAR(DutyPercent(duty.b), 50.0f, 1.0f);
+    EXPECT_NEAR(DutyPercent(duty.c), 50.0f, 1.0f);
+}

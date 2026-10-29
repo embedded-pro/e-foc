@@ -3,6 +3,7 @@
 #include "core/foc/cascade/DirectAxisExcitation.hpp"
 #include "core/foc/cascade/EstimatorChannel.hpp"
 #include "core/foc/cascade/EstimatorWindowAccumulator.hpp"
+#include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/cascade/SpeedDifferentiator.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Execution.hpp"
@@ -41,6 +42,11 @@ namespace foc
         void SetDirectCurrentReference(float current);
         float MeasureMechanicalSpeed();
 
+        void EnableCurrentCommandImpl();
+        void CommandCurrentImpl(Ampere quadrature);
+        Volts QuadratureVoltageImpl() const;
+        bool HoldCommandedCurrent();
+
         float CurrentMechanicalAngle() const;
         MotionObservation ObserveSpeedLoopMotion() const;
         LowPriorityInterrupt& GetLowPriorityInterrupt();
@@ -68,6 +74,8 @@ namespace foc
         volatile float lastMechanicalSpeed{ 0.0f };
         volatile float lastMeanIq{ 0.0f };
         volatile float speedReference{ 0.0f };
+        volatile float commandedCurrent{ 0.0f };
+        volatile bool currentCommandActive{ false };
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
@@ -78,5 +86,6 @@ namespace foc
         EstimatorWindowAccumulator estimatorWindow;
         DirectAxisExcitation directAxisExcitation;
         CoggingFeedForward coggingFeedForward;
+        QuadratureVoltageWindow voltageWindow;
     };
 }

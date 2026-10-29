@@ -83,10 +83,34 @@ namespace foc
     void SpeedCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
+
+        if (HoldCommandedCurrent())
+            return;
+
         RunSpeedLoop(mechanicalSpeed);
 
         UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
+    }
+
+    void SpeedCascade::EnableCurrentCommand()
+    {
+        EnableCurrentCommandImpl();
+    }
+
+    void SpeedCascade::DisableCurrentCommand()
+    {
+        Disable();
+    }
+
+    void SpeedCascade::CommandCurrent(Ampere quadrature)
+    {
+        CommandCurrentImpl(quadrature);
+    }
+
+    Volts SpeedCascade::QuadratureVoltage() const
+    {
+        return QuadratureVoltageImpl();
     }
 
     MotionObservation SpeedCascade::ObserveMotion() const

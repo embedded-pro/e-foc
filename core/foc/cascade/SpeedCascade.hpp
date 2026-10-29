@@ -8,6 +8,7 @@ namespace foc
     class SpeedCascade
         : public FocSpeed
         , public SpeedCommandable
+        , public CurrentCommandable
         , public CoggingCompensable
         , protected CascadeWithSpeedLoop
     {
@@ -35,6 +36,11 @@ namespace foc
         void DisableSpeedCommand() override;
         void CommandSpeed(RadiansPerSecond speed) override;
         hal::Hertz SpeedCommandFrequency() const override;
+
+        void EnableCurrentCommand() override;
+        void DisableCurrentCommand() override;
+        void CommandCurrent(Ampere quadrature) override;
+        Volts QuadratureVoltage() const override;
 
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;

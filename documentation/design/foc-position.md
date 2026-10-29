@@ -101,6 +101,13 @@ adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays 
 bursts, the first 4 s of every 60 s from each enable, and the setpoint is 0 A in between (see
 `service-electrical-ident.md`, Excitation).
 
+### Current Command
+
+A calibration step can bypass the position and speed loops and command the q-axis current directly,
+through the mode the speed cascade provides (see the speed-control design). The 1 kHz tick then sets
+the q-axis reference to the commanded current and runs neither loop. Enable, Disable and a speed
+command end it.
+
 ### Enable and Disable
 
 **Enable**: resets and arms all four PID controllers in cascade order (position, speed, d-axis, q-axis). The last position setpoint is preserved.
@@ -130,18 +137,19 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 ### Provided
 
-| Interface               | Purpose                                                  | Contract                                                                                                                                                                                    |
-|-------------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Configure               | Supplies the motor model, including the pole-pair count. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
-| Enable                  | Resets the position law and arms the loops beneath it.   | Safe to call repeatedly. Position setpoint is preserved.                                                                                                                                    |
-| Disable                 | Disarms all PIDs and forces zero duty cycle output.      | Safe to call from any context.                                                                                                                                                              |
-| SetCurrentTunings       | Sets the current loop closed-loop bandwidth.             | Gains are derived from the motor model and normalised internally.                                                                                                                           |
-| SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.               | Speed loop output clamped to ± maxCurrent.                                                                                                                                                  |
-| SetPositionTunings      | Sets the position loop bandwidth and cost weights.       | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live. |
-| SelectPositionAlgorithm | Selects the position algorithm.                          | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
-| SetPoint                | Sets the target position in mechanical radians.          | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
-| Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle. | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
-| ObserveMotion           | Reports the motion the drive asks for and gets.          | Window speed, mean q-axis current, demanded speed and position error, for REQ-SM-028. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.       |
+| Interface               | Purpose                                                                                                                     | Contract                                                                                                                                                                                    |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure               | Supplies the motor model, including the pole-pair count.                                                                    | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
+| Enable                  | Resets the position law and arms the loops beneath it.                                                                      | Safe to call repeatedly. Position setpoint is preserved.                                                                                                                                    |
+| Disable                 | Disarms all PIDs and forces zero duty cycle output.                                                                         | Safe to call from any context.                                                                                                                                                              |
+| SetCurrentTunings       | Sets the current loop closed-loop bandwidth.                                                                                | Gains are derived from the motor model and normalised internally.                                                                                                                           |
+| SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.                                                                                  | Speed loop output clamped to ± maxCurrent.                                                                                                                                                  |
+| SetPositionTunings      | Sets the position loop bandwidth and cost weights.                                                                          | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live. |
+| SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
+| SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
+| Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
+| ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed and position error, for REQ-SM-028. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.       |
+| Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                 |
 
 ### Required
 
