@@ -10,9 +10,11 @@ target_link_libraries(e_foc.can_test PUBLIC
     e_foc.platform_abstraction_mock
     e_foc.state_machine_mock
     e_foc.services.alignment_mock
+    e_foc.services.current_offsets_mock
     e_foc.services.electrical_system_ident_mock
     e_foc.services.mechanical_system_ident_mock
     e_foc.services.non_volatile_memory_mock
+    e_foc.services.standstill_mock
     e_foc.foc_mock
     hal.interfaces_test_doubles
     infra.timer_test_helper

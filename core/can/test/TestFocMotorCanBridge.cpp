@@ -9,9 +9,11 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
+#include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
+#include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
@@ -232,7 +234,15 @@ namespace
                     hal::Hertz{ 1000 },
                     lowPriorityInterruptMock });
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, &mechIdentMock, tracer);
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> offsets;
+            std::optional<std::reference_wrapper<services::RotorStandstill>> rest;
+            if (bridgeMeasuresOffsets)
+            {
+                offsets = currentOffsetsMock;
+                rest = standstillMock;
+            }
+
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, &mechIdentMock, tracer, offsets, rest);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -374,6 +384,9 @@ namespace
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
+        StrictMock<services::PhaseCurrentOffsetsMock> currentOffsetsMock;
+        StrictMock<services::RotorStandstillMock> standstillMock;
+        bool bridgeMeasuresOffsets{ false };
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
         infra::Execute setupTeardownExpectations{ [this]()
             {
@@ -930,6 +943,105 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AfterAnEmergencyStopAbandoned
 
     EXPECT_FALSE(categoryErrorSent);
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_MeasuresTheOffsetsAtRestBeforeTheResistanceAndStoresThem)
+{
+    bridgeMeasuresOffsets = true;
+    ConstructFixture();
+
+    const foc::PhaseCurrents measured{ foc::Ampere{ 0.025f }, foc::Ampere{ -0.017f }, foc::Ampere{ 0.045f } };
+    std::optional<services::CalibrationData> saved;
+
+    InSequence order;
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(Invoke([](const infra::Function<void(bool)>& done)
+        {
+            done(true);
+        }));
+    EXPECT_CALL(currentOffsetsMock, Measure(_)).WillOnce(Invoke([&measured](const infra::Function<void(std::optional<foc::PhaseCurrents>)>& done)
+        {
+            done(measured);
+        }));
+    EXPECT_CALL(currentOffsetsMock, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
+        {
+            EXPECT_NEAR(offsets.a.Value(), 0.025f, 1e-6f);
+            EXPECT_NEAR(offsets.b.Value(), -0.017f, 1e-6f);
+            EXPECT_NEAR(offsets.c.Value(), 0.045f, 1e-6f);
+        }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> done)
+            {
+                done(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&saved](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+            {
+                saved = data;
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    ASSERT_TRUE(saved.has_value());
+    EXPECT_NEAR(saved->currentOffsetA, 0.025f, 1e-6f);
+    EXPECT_NEAR(saved->currentOffsetB, -0.017f, 1e-6f);
+    EXPECT_NEAR(saved->currentOffsetC, 0.045f, 1e-6f);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_RotorNotAtRest_FailsAndReleasesTheReservation)
+{
+    bridgeMeasuresOffsets = true;
+    ConstructFixture();
+
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(Invoke([](const infra::Function<void(bool)>& done)
+        {
+            done(false);
+        }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedOffsetMeasurement_FailsAndReleasesTheReservation)
+{
+    bridgeMeasuresOffsets = true;
+    ConstructFixture();
+
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(Invoke([](const infra::Function<void(bool)>& done)
+        {
+            done(true);
+        }));
+    EXPECT_CALL(currentOffsetsMock, Measure(_)).WillOnce(Invoke([](const infra::Function<void(std::optional<foc::PhaseCurrents>)>& done)
+        {
+            done(std::nullopt);
+        }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_HoldsTheDriveUntilTheIdentificationEnds)

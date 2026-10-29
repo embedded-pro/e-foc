@@ -13,13 +13,15 @@ namespace can
         const Platform& platform,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
-        services::Tracer& tracer)
+        services::Tracer& tracer,
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
         : FocMotorCategoryServerObserver(server)
         , server(server)
         , controlMode(controlMode)
         , inverter(platform.inverter)
         , encoder(platform.encoder)
-        , commissioning(server, controlMode, electricalIdent, mechIdent)
+        , commissioning(server, controlMode, electricalIdent, mechIdent, currentOffsets, standstill)
         , settings(server, controlMode, platform.diagnostics, platform.resetCause)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";

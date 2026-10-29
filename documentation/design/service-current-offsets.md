@@ -91,7 +91,7 @@ delivered from the event loop.
 | Calibration record saved           | Stored with it and traced as `Ia_mA`, `Ib_mA`, `Ic_mA`                     |
 | Boot with a stored record          | Applied, whether or not the record is complete for the mode                |
 | Calibration cleared                | Zero                                                                       |
-| Electrical identification over CAN | Kept: it does not measure the sensors                                      |
+| Electrical identification over CAN | Measured at rest and applied before R/L, then stored with its record       |
 | Re-alignment                       | Kept: it copies the record                                                 |
 
 A record written before this step existed carries zero offsets, which applies no correction.
@@ -150,5 +150,6 @@ sequenceDiagram
 ## Verification
 
 Against plants whose phases are biased by +27, −18 and +54 mA with 35 mA of noise, the full
-calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor
-(REQ-CAL-015, `parameter_identification.feature`).
+calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor,
+and an electrical identification over CAN stores them within the same 5 mA (REQ-CAL-015,
+`parameter_identification.feature`).

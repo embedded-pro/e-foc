@@ -77,7 +77,7 @@ namespace application
                         .dutyUpdateDelayPeriods = this->hardware.DutyUpdateDelayPeriods() });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ this->hardware, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
-                    *electricalIdent, nullptr, this->hardware.Tracer());
+                    *electricalIdent, nullptr, this->hardware.Tracer(), *currentOffsets, rotorStandstill);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
