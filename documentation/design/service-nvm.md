@@ -230,7 +230,12 @@ stateDiagram-v2
 | encoderDirection     | —             | Polarity correction (+1 or −1)                      |
 | polePairs            | —             | Number of motor pole pairs                          |
 | stage                | —             | Whether the calibration completed                   |
+| currentNoise         | mA            | RMS current-sensor noise; 0 when not measured       |
 | coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins  |
+
+`currentNoise` took the reserved byte that completed the last word. Every record written before it holds
+zero there, which reads as not measured and keeps the automatic current-loop bandwidth an earlier
+firmware derived, so the layout stays at version 4 and no stored calibration is invalidated.
 
 **ConfigData** (76 bytes total):
 

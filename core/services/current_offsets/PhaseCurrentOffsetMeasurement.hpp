@@ -32,6 +32,7 @@ namespace services
 
         void Measure(const infra::Function<void(std::optional<foc::PhaseCurrents>)>& onDone) override;
         void Apply(const foc::PhaseCurrents& offsets) override;
+        foc::Ampere Noise() const override;
         bool IsRunning() const override;
         void Abort() override;
 
@@ -48,7 +49,7 @@ namespace services
         void FailMeasurement();
         void Finish(bool measured);
         void Complete();
-        std::optional<foc::PhaseCurrents> MeasuredOffsets() const;
+        std::optional<foc::PhaseCurrents> MeasuredOffsets();
 
         static constexpr hal::DutyCycle neutralDuty{ hal::DutyCycle::FromPercent(50) };
 
@@ -59,6 +60,8 @@ namespace services
         infra::AutoResetFunction<void(std::optional<foc::PhaseCurrents>)> onMeasured;
         infra::TimerRepeating noSampleTimer;
         Sums sums;
+        Sums squares;
+        foc::Ampere noise{ 0.0f };
         std::size_t settledSamples{ 0 };
         std::size_t averagedSamples{ 0 };
         volatile bool sampleSeen{ false };

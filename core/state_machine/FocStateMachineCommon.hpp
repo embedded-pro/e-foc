@@ -85,7 +85,7 @@ namespace application
         services::Tracer& GetTracer();
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
-        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
+        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage, foc::Ampere currentNoise);
 
     private:
         static state_machine::CommandResult ToCommandResult(services::DispatchResult result);

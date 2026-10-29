@@ -124,6 +124,7 @@ namespace application
                     pendingData->currentOffsetA = offsets->a.Value();
                     pendingData->currentOffsetB = offsets->b.Value();
                     pendingData->currentOffsetC = offsets->c.Value();
+                    pendingData->currentNoiseMilliAmpere = services::CurrentNoiseMilliAmpere(currentOffsets->get().Noise().Value());
                     currentOffsets->get().Apply(*offsets);
                     RunPolePairsStep();
                 }

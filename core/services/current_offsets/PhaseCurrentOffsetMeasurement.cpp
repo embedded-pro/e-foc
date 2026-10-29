@@ -1,6 +1,7 @@
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace services
@@ -28,6 +29,8 @@ namespace services
         finishing = false;
         measurementComplete = false;
         sums = {};
+        squares = {};
+        noise = foc::Ampere{ 0.0f };
         settledSamples = 0;
         averagedSamples = 0;
         onMeasured = onDone;
@@ -51,6 +54,11 @@ namespace services
     void PhaseCurrentOffsetMeasurement::Apply(const foc::PhaseCurrents& offsets)
     {
         compensation.ApplyOffsets(offsets);
+    }
+
+    foc::Ampere PhaseCurrentOffsetMeasurement::Noise() const
+    {
+        return noise;
     }
 
     bool PhaseCurrentOffsetMeasurement::IsRunning() const
@@ -90,6 +98,9 @@ namespace services
         sums.a += currents.a.Value();
         sums.b += currents.b.Value();
         sums.c += currents.c.Value();
+        squares.a += currents.a.Value() * currents.a.Value();
+        squares.b += currents.b.Value() * currents.b.Value();
+        squares.c += currents.c.Value() * currents.c.Value();
 
         if (++averagedSamples == config.averagedSamples)
             Finish(true);
@@ -145,7 +156,7 @@ namespace services
             onMeasured(measurementComplete ? MeasuredOffsets() : std::nullopt);
     }
 
-    std::optional<foc::PhaseCurrents> PhaseCurrentOffsetMeasurement::MeasuredOffsets() const
+    std::optional<foc::PhaseCurrents> PhaseCurrentOffsetMeasurement::MeasuredOffsets()
     {
         const auto count = static_cast<float>(config.averagedSamples);
         const foc::PhaseCurrents measured{ foc::Ampere{ sums.a / count }, foc::Ampere{ sums.b / count }, foc::Ampere{ sums.c / count } };
@@ -153,6 +164,13 @@ namespace services
 
         if (std::fabs(measured.a.Value()) > limit || std::fabs(measured.b.Value()) > limit || std::fabs(measured.c.Value()) > limit)
             return std::nullopt;
+
+        const auto variance = [count](float sum, float square)
+        {
+            const auto mean = sum / count;
+            return std::max(square / count - mean * mean, 0.0f);
+        };
+        noise = foc::Ampere{ std::sqrt((variance(sums.a, squares.a) + variance(sums.b, squares.b) + variance(sums.c, squares.c)) / 3.0f) };
 
         return measured;
     }

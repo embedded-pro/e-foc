@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
@@ -40,6 +41,7 @@ namespace application
             std::size_t polePairs,
             float bandwidth,
             foc::Weber fluxLinkage,
+            foc::Ampere currentNoise,
             foc::FocBase& controller,
             foc::CurrentLoopTunable& tunable);
 
@@ -47,8 +49,8 @@ namespace application
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         foc::Weber ActiveFluxLinkage() const;
 
-        float DefaultCurrentLoopBandwidth() const;
-        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
+        float DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const;
+        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth, foc::MilliHenry inductance, foc::Ampere currentNoise) const;
 
     private:
         drivers::ThreePhaseInverter& inverter;
@@ -60,5 +62,7 @@ namespace application
         bool rotorReferenceValid_{ false };
 
         static constexpr float nyquistFactor = 15.0f;
+        static constexpr float inaudibleVoltageNoise = 0.08f;
+        static constexpr float minimumAutomaticBandwidth = 10.0f * foc::SpeedLoopTunings{}.bandwidth;
     };
 }

@@ -105,6 +105,20 @@ TEST_F(TestPhaseCurrentOffsetMeasurement, a_measurement_averages_the_raw_current
     EXPECT_FALSE(measurement->IsRunning());
 }
 
+TEST_F(TestPhaseCurrentOffsetMeasurement, a_measurement_gives_the_rms_noise_of_the_samples_about_their_offsets)
+{
+    StartMeasurement();
+
+    Feed(Currents(0.4f, 0.4f, 0.4f), 2);
+    Feed(Currents(0.01f, -0.04f, 0.03f), 2);
+    EXPECT_CALL(inverterMock, Stop());
+    Feed(Currents(0.05f, 0.0f, 0.07f), 2);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(measured.has_value());
+    EXPECT_NEAR(measurement->Noise().Value(), 0.02f, 1e-5f);
+}
+
 TEST_F(TestPhaseCurrentOffsetMeasurement, an_offset_beyond_the_limit_fails_the_measurement)
 {
     StartMeasurement();

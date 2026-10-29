@@ -11,6 +11,7 @@ namespace services
     public:
         MOCK_METHOD(void, Measure, (const infra::Function<void(std::optional<foc::PhaseCurrents>)>& onDone), (override));
         MOCK_METHOD(void, Apply, (const foc::PhaseCurrents& offsets), (override));
+        MOCK_METHOD(foc::Ampere, Noise, (), (const, override));
         MOCK_METHOD(bool, IsRunning, (), (const, override));
         MOCK_METHOD(void, Abort, (), (override));
     };

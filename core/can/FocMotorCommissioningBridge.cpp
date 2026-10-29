@@ -52,6 +52,7 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
         pendingOffsets = foc::PhaseCurrents{};
+        pendingNoise = foc::Ampere{ 0.0f };
         pendingElectricalIdentDoneCallback = onDone;
 
         if (!standstill)
@@ -86,6 +87,7 @@ namespace can
                 }
 
                 pendingOffsets = *offsets;
+                pendingNoise = currentOffsets->get().Noise();
                 currentOffsets->get().Apply(*offsets);
                 EstimateResistanceAndInductance();
             });
@@ -135,6 +137,7 @@ namespace can
         data.currentOffsetA = pendingOffsets.a.Value();
         data.currentOffsetB = pendingOffsets.b.Value();
         data.currentOffsetC = pendingOffsets.c.Value();
+        data.currentNoiseMilliAmpere = services::CurrentNoiseMilliAmpere(pendingNoise.Value());
         pendingElectricalR.reset();
         pendingElectricalL.reset();
 

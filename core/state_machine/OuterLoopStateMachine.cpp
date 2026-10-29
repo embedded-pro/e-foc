@@ -137,7 +137,7 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L_mH=" << inductance.Value();
-            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()));
+            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()), foc::Ampere{ services::CurrentNoiseAmpere(GetCalibration().currentNoiseMilliAmpere) });
             applied.electrical = true;
         }
 
@@ -235,7 +235,7 @@ namespace application
         // Marked first: the electrical model sets the current tunings even when the plant is refused.
         MarkProvisionalControlApplied();
 
-        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending)))
+        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
             return false;
 
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);

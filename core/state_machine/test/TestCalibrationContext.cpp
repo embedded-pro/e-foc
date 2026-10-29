@@ -167,5 +167,39 @@ TEST_F(CalibrationContextTest, apply_pushes_the_stored_current_offsets_and_inval
 TEST_F(CalibrationContextTest, default_current_loop_bandwidth_uses_nyquist_factor)
 {
     const float expected = (10000.0f / 15.0f) * 2.0f * 3.14159265f;
-    EXPECT_NEAR(context.DefaultCurrentLoopBandwidth(), expected, 1.0f);
+    EXPECT_NEAR(context.DefaultCurrentLoopBandwidth(foc::MilliHenry{ 1.094f }, foc::Ampere{ 0.0f }), expected, 1.0f);
+}
+
+TEST_F(CalibrationContextTest, default_current_loop_bandwidth_keeps_the_measured_noise_at_0_08_volt)
+{
+    const float expected = 0.08f / (1.094e-3f * 0.0386f);
+    EXPECT_NEAR(context.DefaultCurrentLoopBandwidth(foc::MilliHenry{ 1.094f }, foc::Ampere{ 0.0386f }), expected, 1.0f);
+}
+
+TEST_F(CalibrationContextTest, default_current_loop_bandwidth_stays_ten_times_the_default_speed_loop_for_a_noisy_sensor)
+{
+    EXPECT_NEAR(context.DefaultCurrentLoopBandwidth(foc::MilliHenry{ 1.094f }, foc::Ampere{ 0.255f }), 10.0f * foc::SpeedLoopTunings{}.bandwidth, 1.0f);
+}
+
+TEST_F(CalibrationContextTest, default_current_loop_bandwidth_keeps_the_pwm_bound_for_a_quiet_sensor)
+{
+    const float expected = (10000.0f / 15.0f) * 2.0f * 3.14159265f;
+    EXPECT_NEAR(context.DefaultCurrentLoopBandwidth(foc::MilliHenry{ 1.094f }, foc::Ampere{ 0.001f }), expected, 1.0f);
+}
+
+TEST_F(CalibrationContextTest, apply_bounds_the_automatic_current_bandwidth_with_the_stored_noise)
+{
+    auto data = CompleteData();
+    data.lD = 1.094f;
+    data.currentLoopBandwidth = 0.0f;
+    data.currentNoiseMilliAmpere = 30;
+    context.SetData(data);
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).WillOnce(Return(true));
+    EXPECT_CALL(foc, SetCurrentTunings(_)).WillOnce(Invoke([](const foc::CurrentLoopTunings& tunings)
+        {
+            EXPECT_NEAR(tunings.bandwidth, 0.08f / (1.094e-3f * 0.030f), 1.0f);
+        }));
+
+    context.Apply(foc, foc);
 }

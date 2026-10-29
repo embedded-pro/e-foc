@@ -55,5 +55,6 @@ namespace can
         std::optional<foc::Ohm> pendingElectricalR;
         std::optional<foc::MilliHenry> pendingElectricalL;
         foc::PhaseCurrents pendingOffsets{};
+        foc::Ampere pendingNoise{ 0.0f };
     };
 }
