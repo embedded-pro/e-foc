@@ -15,7 +15,6 @@ namespace foc
         bool SetTunings(const CurrentLoopTunings& tunings);
         void Reset();
 
-        // A duty that acts a period late lands on the current the plant reaches by then, so the law acts on that prediction
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
             const auto predictedD = predictionStateGain * context.measured.d + predictionInputGain * lastInput.d;
