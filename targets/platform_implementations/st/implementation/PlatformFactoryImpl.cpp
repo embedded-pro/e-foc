@@ -176,7 +176,7 @@ namespace application
         return *canBus;
     }
 
-    void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz /*baseFrequency*/, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    void PlatformFactoryImpl::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         onPhaseCurrentsReady.Set(onDone);
         phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)

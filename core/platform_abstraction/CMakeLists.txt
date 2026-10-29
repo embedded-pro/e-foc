@@ -26,6 +26,8 @@ target_sources(e_foc.platform_abstraction PRIVATE
     CanBusAdapter.cpp
     ControlLoopMetrics.hpp
     ControlLoopMetrics.cpp
+    DecimatingThreePhaseInverter.hpp
+    DecimatingThreePhaseInverter.cpp
     LowSideShuntWindow.hpp
     PlatformDiagnostics.hpp
     PlatformDiagnostics.cpp

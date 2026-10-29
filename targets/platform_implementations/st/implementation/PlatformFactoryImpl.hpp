@@ -68,7 +68,7 @@ namespace application
         void Start() override;
         uint32_t ElapsedCycles() override;
 
-        void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
+        void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;

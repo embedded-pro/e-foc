@@ -46,8 +46,9 @@ namespace
             : compensation{ inverterMock, loss }
         {}
 
-        void Register(hal::Hertz frequency = baseFrequency)
+        void Register(hal::Hertz frequency = baseFrequency, hal::Hertz pwmFrequency = baseFrequency)
         {
+            EXPECT_CALL(inverterMock, BaseFrequency()).WillOnce(Return(pwmFrequency));
             EXPECT_CALL(inverterMock, PhaseCurrentsReady(frequency, _)).WillOnce([this](auto, const auto& onDone)
                 {
                     inverterMock.StorePhaseCurrentsCallback(onDone);
@@ -141,10 +142,18 @@ TEST_F(TestInverterCompensation, below_the_knee_the_correction_follows_the_curre
 
 TEST_F(TestInverterCompensation, the_correction_is_a_fixed_time_so_a_slower_pwm_needs_less_duty)
 {
-    Register(hal::Hertz{ 10000 });
+    Register(hal::Hertz{ 10000 }, hal::Hertz{ 10000 });
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -1.0f, 0.0f));
 
     EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ Shifted(half, 0.5f * lossCounts), Shifted(half, -0.5f * lossCounts), half }));
+}
+
+TEST_F(TestInverterCompensation, a_slower_sample_rate_leaves_the_pwm_and_so_the_correction_unchanged)
+{
+    Register(hal::Hertz{ 10000 });
+    inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -1.0f, 0.0f));
+
+    EXPECT_THAT(Output({ half, half, half }), DutiesEq(foc::PhasePwmDutyCycles{ Shifted(half, lossCounts), Shifted(half, -lossCounts), half }));
 }
 
 TEST_F(TestInverterCompensation, the_corrected_duty_stays_within_the_period)

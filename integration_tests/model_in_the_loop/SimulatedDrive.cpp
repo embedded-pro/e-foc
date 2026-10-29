@@ -109,10 +109,6 @@ namespace mil
         appliedDutyPhases = lastDutyPhases;
         responseRecorder.Capture(SampleAt(tick));
 
-        if (++samplePhase < sampleDecimation)
-            return;
-
-        samplePhase = 0;
         if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
@@ -158,14 +154,9 @@ namespace mil
         return dutyDelayed ? 1 : 0;
     }
 
-    void SimulatedDrive::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
+    void SimulatedDrive::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
     {
-        const uint32_t requested = frequency.Value();
-        really_assert(requested != 0 && baseFrequency.Value() % requested == 0);
-
         onPhaseCurrentsReady.Set(onDone);
-        sampleDecimation = baseFrequency.Value() / requested;
-        samplePhase = 0;
     }
 
     void SimulatedDrive::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)

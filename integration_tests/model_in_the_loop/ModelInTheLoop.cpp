@@ -186,12 +186,13 @@ namespace mil
     ModelInTheLoop::ModelInTheLoop(const Scenario& scenario)
         : scenario{ scenario }
         , drive{ scenario.plant }
+        , inverter{ drive }
         , eeprom{ scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage() }
         , vdc{ drive.PowerSupplyVoltage() }
         , tickPeriod{ std::chrono::nanoseconds{ 1000000000u / drive.BaseFrequency().Value() } }
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }
-        , inverterCompensation{ drive, drive.InverterDeadTimeLoss() }
-        , currentOffsets{ drive, inverterCompensation }
+        , inverterCompensation{ inverter, drive.InverterDeadTimeLoss() }
+        , currentOffsets{ inverter, inverterCompensation }
         , electricalIdent{ inverterCompensation, drive, vdc }
         , motorAlignment{ inverterCompensation, drive }
         , rotorStandstill{ drive }

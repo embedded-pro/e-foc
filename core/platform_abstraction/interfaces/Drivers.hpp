@@ -34,13 +34,27 @@ namespace drivers
         virtual std::pair<foc::HallState, foc::Direction> Read() const = 0;
     };
 
+    class ThreePhasePowerStage
+    {
+    protected:
+        ~ThreePhasePowerStage() = default;
+
+    public:
+        virtual void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) = 0;
+        virtual void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) = 0;
+        virtual void Start() = 0;
+        virtual void Stop() = 0;
+        virtual hal::Hertz BaseFrequency() const = 0;
+        virtual foc::Ampere MaxCurrentSupported() const = 0;
+    };
+
     class ThreePhaseInverter
     {
     protected:
         ~ThreePhaseInverter() = default;
 
     public:
-        virtual void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) = 0;
+        virtual void PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) = 0;
         virtual void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) = 0;
         virtual void Start() = 0;
         virtual void Stop() = 0;

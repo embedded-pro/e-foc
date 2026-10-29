@@ -45,7 +45,7 @@ namespace application
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
         MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
 
-        MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&), (override));
+        MOCK_METHOD(void, PhaseCurrentsReady, (const infra::Function<void(foc::PhaseCurrents)>&), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
         MOCK_METHOD(void, Start, (), (override));
         MOCK_METHOD(void, Stop, (), (override));

@@ -303,15 +303,9 @@ namespace application
         return *canBusAdapter;
     }
 
-    // The plant always steps at the control rate; the requested rate only sets the delivery interval.
-    void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    void PlatformFactoryImpl::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        const uint32_t requested = frequency.Value();
-        really_assert(requested != 0 && baseFrequency.Value() % requested == 0);
-
         onPhaseCurrentsReady.Set(onDone);
-        sampleDecimation = baseFrequency.Value() / requested;
-        samplePhase = 0;
     }
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
@@ -346,14 +340,7 @@ namespace application
 
         lastCurrents = model.LastMeasuredCurrents();
 
-        const bool sampleDue = ++samplePhase >= sampleDecimation;
-        if (sampleDue)
-            samplePhase = 0;
-
-        if (!sampleDue)
-        {
-        }
-        else if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
+        if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
             const auto entryCycles = QemuCycleCounter::Now();

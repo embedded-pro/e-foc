@@ -54,7 +54,9 @@ Before invoking alignment, the caller must have:
 2. Provided the number of pole pairs for the motor under test.
 3. Constructed an `AlignmentConfig` specifying:
    - **test voltage percent** — fraction of DC bus voltage (0–100 %) applied to the d-axis during the procedure
-   - **sampling frequency** — the rate at which encoder samples are taken and settlement is checked (Hz)
+   - **sampling frequency** — the rate at which encoder samples are taken and settlement is checked (Hz); a
+     divisor of the PWM frequency, since the shared `DecimatingThreePhaseInverter` hands on every Nth sample while
+     the PWM keeps switching at its own frequency
    - **max samples** — the total number of sampling ticks before the procedure times out
    - **settled threshold** — the maximum absolute encoder position change (radians) that qualifies as "not moving"
    - **settled count** — the number of consecutive below-threshold samples required to declare settlement

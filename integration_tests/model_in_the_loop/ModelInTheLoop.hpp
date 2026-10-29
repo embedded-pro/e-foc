@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -154,6 +155,7 @@ namespace mil
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<32, 4> terminalWithCommands{ serial, tracer };
         services::TerminalWithStorage::WithMaxSize<24> terminal{ terminalWithCommands, tracer };
         SimulatedDrive drive;
+        application::DecimatingThreePhaseInverter inverter;
         DeferredLowPriorityInterrupt lowPriorityInterrupt;
         MemoryEeprom eeprom;
         foc::Volts vdc;

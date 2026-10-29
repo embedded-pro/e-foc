@@ -15,11 +15,11 @@ namespace services
         offsets = newOffsets;
     }
 
-    void InverterCompensation::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
+    void InverterCompensation::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
     {
-        ScaleLoss(baseFrequency);
+        ScaleLoss(inverter.BaseFrequency());
         onCurrents.Set(onDone);
-        inverter.PhaseCurrentsReady(baseFrequency, [this](foc::PhaseCurrents currents)
+        inverter.PhaseCurrentsReady(frequency, [this](foc::PhaseCurrents currents)
             {
                 Forward(currents);
             });

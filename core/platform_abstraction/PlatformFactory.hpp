@@ -40,7 +40,7 @@ namespace application
     infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, ResetCause cause);
 
     class PlatformFactory
-        : public drivers::ThreePhaseInverter
+        : public drivers::ThreePhasePowerStage
         , public drivers::Encoder
     {
     protected:
