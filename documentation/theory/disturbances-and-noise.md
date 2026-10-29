@@ -231,7 +231,7 @@ gain turns it into voltage-command noise $\approx L_s\,\omega_{bw}\,\sigma_i$, w
 when it chooses the bandwidth (`documentation/design/controller-selection.md`).
 
 **Sampling instant.** The three phases are converted one after another after the centre trigger; the last is
-read about 6 µs later. A late reading falls outside the low-side window of a leg at high duty: with a longer
+read 5.25 µs later. A late reading falls outside the low-side window of a leg at high duty: with a longer
 sample-and-hold the last phase read 10–34 % low. With the shortest sample-and-hold all three read within 2.5 %
 up to 69 % duty (`documentation/architecture/system.md`).
 

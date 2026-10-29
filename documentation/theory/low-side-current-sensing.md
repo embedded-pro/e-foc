@@ -149,9 +149,16 @@ $$
 i_{hidden} = -\left(i_{other,1} + i_{other,2}\right)
 $$
 
-The rebuilt phase carries the noise of two samples ($\sqrt2$ times one) and the sum of their offsets and gain
-errors, and which phase is hidden changes every 60° of the reference, so the error signature shifts with it. It is a
-good fallback, not free.
+The rebuilt phase carries the noise of two samples ($\sqrt2$ times one) and their gain errors, and which phase is
+hidden changes every 60° of the reference, so the error signature shifts with it. It is a good fallback, not free.
+
+**Offsets and the rebuild.** The order of the two corrections matters. If the hidden phase is rebuilt from samples
+whose offsets are already removed, its offset is the negated sum of the other two's residuals, below a milliampere
+after calibration. *e-foc today* rebuilds first, from the raw samples, and subtracts the calibrated offsets
+afterwards (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`, then
+`core/services/inverter_compensation/InverterCompensation.hpp`). The rebuilt phase then comes out biased by the sum
+of all three calibrated offsets, $-(o_a + o_b + o_c)$: with the bench's +27, −18 and +54 mA, −63 mA, on whichever
+phase is hidden. Subtracting the offsets before the rebuild would remove it.
 
 **Two phases hidden.** In the directions where two phases share the highest duty ($\theta = 60^\circ, 180^\circ,
 300^\circ$ for common-mode injection), both windows shrink together and only one phase remains: nothing can be
@@ -197,11 +204,11 @@ same voltages are 70 %, 40 %, 10 %, all three readable.
 Shifting when needed and clamping the lowest phase to zero all the time (discontinuous PWM) read over the same
 range. They differ elsewhere:
 
-| Strategy                    | Switching                                                          | Current ripple at low modulation    | Common-mode voltage          |
-|-----------------------------|--------------------------------------------------------------------|-------------------------------------|------------------------------|
-| Plain SVM                   | All legs switch every period                                       | Lowest                              | Smooth                       |
-| Shifted when needed (e-foc) | All legs switch, except one at 0 % while shifted                   | As plain SVM until the shift starts | Steps when the shift engages |
-| Clamped low (DPWM-min)      | The clamped leg stops switching: about a third less switching loss | Higher                              | Steps every 120°             |
+| Strategy                    | Switching                                                          | Current ripple at low modulation    | Common-mode voltage                                     |
+|-----------------------------|--------------------------------------------------------------------|-------------------------------------|---------------------------------------------------------|
+| Plain SVM                   | All legs switch every period                                       | Lowest                              | Smooth                                                  |
+| Shifted when needed (e-foc) | All legs switch, except one at 0 % while shifted                   | As plain SVM until the shift starts | Continuous, with kinks where the shift starts and stops |
+| Clamped low (DPWM-min)      | The clamped leg stops switching: about a third less switching loss | Higher                              | Steps every 120°                                        |
 
 Two side effects of shifting are worth knowing. It always helps the bootstrap, because the low sides conduct longer.
 And it moves the neutral point's voltage, which a motor does not feel but its bearings and the EMC filter can.

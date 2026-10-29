@@ -191,7 +191,7 @@ read the longest after the centre. With a 16-clock sample-and-hold it finished a
 low-side window of a leg above about 50 to 60 % duty had closed: on the bench the last phase in the sequence read
 10 to 15 % low near the 50 % duty every leg holds in closed loop, and up to 34 % low at 65 %, and reversing the
 sequence moved the error to whichever phase came last. The application asks for the shortest sample-and-hold, 4
-clocks, which by the same count brings the last phase in at about 6 µs, and keeps the averaging. All three phases
+clocks, which by the same count brings the last phase in at 5.25 µs, and keeps the averaging. All three phases
 then read within 2.5 % up to 69 % duty, and the standard deviation of a zero-current sample fell from 60 to 79 mA
 per phase to 31 to 39 mA. Dropping the averaging instead read the phases as cleanly but raised that noise by 15 to
 25 %.

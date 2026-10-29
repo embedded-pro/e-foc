@@ -74,11 +74,14 @@ the counter's zero. A conversion that holds at $t_h$ after the trigger reads a v
 is still open:
 
 $$
-t_h + t_{settle} \le \frac{(1-d)\,T}{2} \quad\Longrightarrow\quad d \le 1 - \frac{2\,(t_h + t_{settle})}{T}
+d \le 1 - \frac{2\,\max\left(t_h,\ t_{db} + t_{settle} - t_{start}\right)}{T}
 $$
 
-The last phase holds 5.25 µs after the trigger with the shortest sample-and-hold, which allows $d \le 79\,\%$
-before settling; with a 16-clock sample-and-hold it held at 9.75 µs, 61 %. The board's limit is set below both,
+where the first term keeps the hold inside the closing edge and the second gives the amplifier time to settle after
+the opening edge ([low-side shunt current sensing](low-side-current-sensing.md) §3).
+
+The last phase holds 5.25 µs after the trigger with the shortest sample-and-hold, which allows $d \le 79\,\%$; with
+a 16-clock sample-and-hold it held at 9.75 µs, 61 %. The board's limit is set below both,
 from measurement, at 70 % (a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %,
 `documentation/design/hardware-characterisation.md` Part F). Above it the firmware lowers all three duties
 together and rebuilds the hidden phase from $i_a + i_b + i_c = 0$
@@ -223,17 +226,17 @@ drift of $R_s$ is tracked by the online estimator; nothing tracks the board's or
 
 ### 9. The Error Budget
 
-| Error                          | Size on E-FOC-HARDWARE                             | Signature in dq  | Handled by                                             |
-|--------------------------------|----------------------------------------------------|------------------|--------------------------------------------------------|
-| Static offsets                 | 18–54 mA raw                                       | $1 f_e$          | Offset calibration, < 1 mA residual                    |
-| Offset drift after calibration | ~2–12 mA over a 50 K warm-up (estimated)           | $1 f_e$          | Nothing yet; re-calibration                            |
-| Gain mismatch between phases   | up to a few % (component tolerances)               | $2 f_e$          | Nothing yet                                            |
-| Common gain error              | up to ~3 %                                         | DC: torque scale | Integral action absorbs it in speed and position modes |
-| Noise                          | 31–39 mA RMS                                       | Broadband        | Bandwidth cap; centre sampling                         |
-| Quantisation                   | 1.2 mA RMS                                         | Broadband        | Negligible                                             |
-| Sampling skew between phases   | up to 0.4 A on the Teknic at rated speed (derived) | Speed-dependent  | Nothing yet                                            |
-| Window closing                 | > 70 % duty                                        | Phase lost       | Duty shift and hidden-phase rebuild                    |
-| Encoder quantisation           | 0.36° electrical; 1.57 rad/s speed                 | Speed noise      | Window-mean positions in the estimators                |
+| Error                          | Size on E-FOC-HARDWARE                             | Signature in dq  | Handled by                                                                                                             |
+|--------------------------------|----------------------------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------|
+| Static offsets                 | 18–54 mA raw                                       | $1 f_e$          | Offset calibration, < 1 mA residual on a measured phase; a rebuilt phase carries $-(o_a+o_b+o_c)$, −63 mA on the bench |
+| Offset drift after calibration | ~2–12 mA over a 50 K warm-up (estimated)           | $1 f_e$          | Nothing yet; re-calibration                                                                                            |
+| Gain mismatch between phases   | up to a few % (component tolerances)               | $2 f_e$          | Nothing yet                                                                                                            |
+| Common gain error              | up to ~3 %                                         | DC: torque scale | Integral action absorbs it in speed and position modes                                                                 |
+| Noise                          | 31–39 mA RMS                                       | Broadband        | Bandwidth cap; centre sampling                                                                                         |
+| Quantisation                   | 1.2 mA RMS                                         | Broadband        | Negligible                                                                                                             |
+| Sampling skew between phases   | up to 0.4 A on the Teknic at rated speed (derived) | Speed-dependent  | Nothing yet                                                                                                            |
+| Window closing                 | > 70 % duty                                        | Phase lost       | Duty shift and hidden-phase rebuild                                                                                    |
+| Encoder quantisation           | 0.36° electrical; 1.57 rad/s speed                 | Speed noise      | Window-mean positions in the estimators                                                                                |
 
 ---
 
@@ -288,9 +291,11 @@ graph LR
 $|\mathbf{o}|$ makes a torque ripple $K_t|\mathbf{o}|$ at $f_e$. Against the speed quantum's 0.9 mN·m of torque
 noise ([disturbances and noise](disturbances-and-noise.md), *Worked Example*), an offset matters once
 $K_t|\mathbf{o}| \gtrsim 0.9$ mN·m, that is $|\mathbf{o}| \gtrsim 23$ mA. The amplifier's own drift (1.5 mA over
-50 K) never gets there. A divider bias with a 50 ppm/K mismatch drifts 0.21 mA/K and would need over 100 K; at
-100 ppm/K it gets there after about 56 K. The raw offsets (tens of mA) are past it from the start, which is why the
-calibration is not optional.
+50 K) never gets there. A drift shared by the three channels, a common bias network for example, is common mode:
+the three-sensor Clarke transform removes it entirely while all three phases are measured, and an offset on a single
+phase enters the vector at only two-thirds of its size, so the thresholds here are conservative. A rebuilt phase
+breaks that: built from two channels, it carries twice their common drift with the opposite sign. The raw offsets
+(tens of mA) are past the threshold from the start, which is why the calibration is not optional.
 
 ---
 

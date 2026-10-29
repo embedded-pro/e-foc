@@ -167,7 +167,10 @@ the rotor stepped between detents instead (`documentation/theory/position-loop-p
 
 **Breakaway.** To start the rotor, the drive must exceed cogging and dry friction together: 0.135–0.23 A of q
 current on the bench. That is 5.7–9.7 mN·m with the configured 7 mWb flux linkage, or 3.7–6.3 mN·m with the
-4.6 mWb the flux-linkage identification measured on the same motor (`documentation/design/state-machine.md`).
+4.6 mWb the flux-linkage identification measured on the same motor (`documentation/design/state-machine.md`). The
+second range sits below the plant's 4 mN·m of cogging plus 3.7 mN·m of dry friction, so the bench's torque figures
+appear to rest on the configured 7 mWb; the currents are what was measured, and the torques scale with whichever
+flux linkage converts them.
 
 **Alignment.** The alignment pulls the rotor to the electrical zero against the cogging, so it can settle a
 little to either side, which limits the repeatability of everything referenced to it, a cogging map included

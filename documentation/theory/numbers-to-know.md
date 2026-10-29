@@ -99,7 +99,7 @@ The ladder of time scales, from the switching edge to the mechanics, spans seven
 
 ```mermaid
 graph LR
-    DT["Dead time<br/>70 ns loss<br/>500 ns band"] --> ADC["Phase sampling<br/>≈ 6 µs after the centre"]
+    DT["Dead time<br/>70 ns loss<br/>500 ns band"] --> ADC["Phase sampling<br/>last phase 5.25 µs after the centre"]
     ADC --> PWM["PWM / current loop<br/>50 µs"]
     PWM --> TE["Electrical τ<br/>0.56–1.58 ms"]
     TE --> OUT["Speed / position loop<br/>1 ms"]

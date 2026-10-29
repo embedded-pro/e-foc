@@ -61,12 +61,13 @@ the theory.
 
 Three execution contexts share the CPU, by priority:
 
-| Context                       | Rate                 | Triggered by                                              | Runs                                                       |
-|-------------------------------|----------------------|-----------------------------------------------------------|------------------------------------------------------------|
-| Control interrupt (highest)   | 20 kHz               | ADC sequence complete, started by the PWM at counter zero | Currents, transforms, current loop, modulation, duty write |
-| PWM fault interrupt (highest) | On a comparator trip | ADC digital comparators through the PWM fault input       | Fault latch                                                |
-| Outer loop, PendSV (lowest)   | 1 kHz                | Every 20th control interrupt                              | Speed estimate, speed or position loop, online estimators  |
-| Event loop (`main`)           | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, CLI, NVM         |
+| Context                         | Rate                 | Triggered by                                              | Runs                                                       |
+|---------------------------------|----------------------|-----------------------------------------------------------|------------------------------------------------------------|
+| Control interrupt (highest)     | 20 kHz               | ADC sequence complete, started by the PWM at counter zero | Currents, transforms, current loop, modulation, duty write |
+| PWM fault interrupt (highest)   | On a comparator trip | ADC digital comparators through the PWM fault input       | Fault latch                                                |
+| Outer loop, PendSV (lowest)     | 1 kHz                | Every 20th control interrupt                              | Speed estimate, speed or position loop, online estimators  |
+| Watchdog early warning (lowest) | 25 ms                | Watchdog timer                                            | Power-stage cut before the reset                           |
+| Event loop (`main`)             | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, CLI, NVM         |
 
 Sources: `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp` (priorities),
 `documentation/architecture/system.md`. CAN and UART interrupts sit in between, at normal and low priority.
@@ -83,8 +84,9 @@ Sources: `targets/platform_implementations/ti/implementation/PlatformFactoryImpl
 7. Correct each duty for dead time; keep the low-side shunts readable; write the duties.
 8. Record the cycle count.
 
-Nothing in it waits, allocates or calls out to a service. Everything that can wait is posted to the event loop:
-a fault detected in the interrupt is latched and the bridge stopped there, but reported from the event loop.
+Nothing in it waits or allocates. During calibration the active service's sample callback also runs in it (the
+offset measurement, for example, accumulates there), but everything that can wait is posted to the event loop: a
+fault detected in the interrupt is latched and the bridge stopped there, but reported from the event loop.
 
 ```mermaid
 sequenceDiagram
@@ -116,8 +118,11 @@ loop, the communication interrupts and the event loop, which run only in the tim
 The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
 counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a
 re-entry, an interrupt that started before the previous one finished; a GPIO pin can also be toggled for a scope.
-Measured on silicon, the whole interrupt takes **1074–1353 cycles** (9–11 µs, 18–23 % of the period), of which the
-FOC calculation is 739–860; the emulator, which counts instructions, gives 937 of a 1250 budget
+The measurement covers the application callback inside the interrupt (encoder read, control law, PWM write) and
+leaves out the hardware's interrupt entry and exit, for which the requirement reserves the remaining quarter of the
+period (`documentation/design/error-handling.md`). Measured on silicon, the callback takes **1074–1353 cycles**
+(9–11 µs, 18–23 % of the period), of which the FOC calculation is 739–860. The emulator has no cycle counter; it reads
+an instruction-counted timer whose period is 1250 ticks, with the same three-quarter budget, 937 ticks
 (`documentation/performance-optimization/README.md`, `documentation/design/software-in-the-loop.md`).
 
 ### 3. The One-Period Duty Delay
@@ -191,8 +196,10 @@ Each context writes what another reads, without locks (a lock in an interrupt ca
 
 - **Control interrupt ↔ outer loop**: single-writer, single-reader **triple buffers**. The writer always has a free
   slot that the reader does not hold, so neither side waits and the reader always gets a complete, consistent
-  value (`core/foc/cascade/TripleBuffer.hpp`). The speed loop's current reference and the estimator snapshots cross
-  this way.
+  value (`core/foc/cascade/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
+  loop this way, and the torque-mode set point from the event loop to the control interrupt. A single 32-bit value
+  needs no buffer: the speed loop's current reference is one `volatile float`, which the Cortex-M writes and reads in
+  one access (`core/foc/cascade/CascadeWithSpeedLoop.hpp`).
 - **Interrupts → event loop**: the interrupt latches a flag or a result and posts a closure to the event dispatcher;
   the service that owns the result handles it in thread context. A closure that may outlive its owner holds a weak
   reference (`documentation/design/async-callback-lifetime.md`).
@@ -224,13 +231,13 @@ the map was added) makes every stored calibration invalid and forces a new one (
 
 ### 8. Supervision in Software
 
-| Monitor              | Detects                                        | Rate / window                                              | Action                               |
-|----------------------|------------------------------------------------|------------------------------------------------------------|--------------------------------------|
-| Over-current         | A rebuilt phase current above 6.6 A            | Every control period                                       | PWM disabled, all gates off, latched |
-| Encoder plausibility | Effort without motion: a stuck or lost encoder | Every 10 ms over 100 ms                                    | `encoderLoss` fault                  |
-| Control-loop metrics | Overruns, missed deadlines, re-entries         | Every control period                                       | Counted and reported                 |
-| Watchdog             | A stalled event loop or interrupt              | 25 ms early warning, 100 ms expiry                         | Power stage cut, then reset          |
-| Fault clearing       | Repeated faults                                | 250 ms dwell, at most 3 clears, budget restored after 10 s | Stays in `Fault`                     |
+| Monitor              | Detects                                        | Rate / window                                                                                                                  | Action                                                                                                                |
+|----------------------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Over-current         | A rebuilt phase current above 6.6 A            | Every control period                                                                                                           | PWM disabled, all gates off, latched                                                                                  |
+| Encoder plausibility | Effort without motion: a stuck or lost encoder | Every 10 ms over 100 ms                                                                                                        | `encoderLoss` fault                                                                                                   |
+| Control-loop metrics | Overruns, missed deadlines, re-entries         | Every control period                                                                                                           | Counted and reported                                                                                                  |
+| Watchdog             | A stalled event loop or interrupt              | 25 ms early warning, 100 ms expiry                                                                                             | Event-loop stall: power stage cut, then reset; a hung interrupt starves the lowest-priority early warning: reset only |
+| Fault clearing       | Repeated faults                                | At most 3 clears, budget restored after 10 s (a 250 ms dwell where the platform reports protection status; TI reports unknown) | Stays in `Fault`                                                                                                      |
 
 Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `core/platform_abstraction/ControlLoopMetrics.hpp`,
 `documentation/design/watchdog.md`, `documentation/design/error-handling.md`. The hardware protection paths are in
@@ -291,7 +298,8 @@ graph LR
 ## Worked Example
 
 **Could e-foc run its PWM at 40 kHz?** The period halves to 25 µs and $N_{cyc}$ to 3000; the 75 % budget is 2250
-cycles. The measured 1353 cycles fit, at 45 % of the period. The loop delay halves to 37.5 µs, which doubles the
+cycles. The measured 1353 cycles of the callback fit, at 45 % of the period, with the interrupt entry and exit on
+top of that. The loop delay halves to 37.5 µs, which doubles the
 current-loop bandwidth the delay allows ([closed-loop control](closed-loop-control.md) §7) to about
 $2\times10^4$ rad/s, and halves the PWM current ripple. Against that: switching losses double
 ([power stage](power-stage.md) §5), the fixed effective dead time becomes 0.28 % of the period instead of 0.14 %,

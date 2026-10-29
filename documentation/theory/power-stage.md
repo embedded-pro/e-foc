@@ -177,9 +177,9 @@ rig measured 0.18–0.21 A.
 **What the node actually sees.** The MCU commands a 500 ns band. The node's dead time is that band plus the
 driver's turn-on delay minus its turn-off delay, and the transitions themselves take part of it. The rig sweep
 is the authority: stepping one leg in single PWM counts at 24 V, the loss the winding saw saturated at 0.12–0.16 %
-of the period, an **effective 70 ns** at the 500 ns band, with the knee at 0.2 A. Widening the band in 500 ns
-steps raised the loss by about 80 ns each time, so roughly 420 ns of every band never reaches the node
-(`documentation/design/service-dead-time-compensation.md`). That is also why the band must not be narrowed
+of the period, an **effective 70 ns** at the 500 ns band, with the knee at 0.2 A. Widening the band to 1000, 1500
+and 2000 ns moved the loss up in 500 ns steps, each staying about 420 ns short of the band: the driver's and the
+switches' delays take that much of every band back (`documentation/design/service-dead-time-compensation.md`). That is also why the band must not be narrowed
 without measuring the node on a scope: the margin it leaves against shoot-through is not visible from the
 firmware.
 
@@ -196,12 +196,17 @@ $$
 d_k \leftarrow d_k + \frac{t_{eff}}{T}\cdot \operatorname{clamp}\!\left(\frac{i_k}{i_{knee}},\ -1,\ 1\right)
 $$
 
-The ramp through the knee follows the small-current regime and avoids chattering between $\pm t_{eff}/T$ when the
-current is near zero and its sign uncertain (`core/services/inverter_compensation/InverterCompensation.hpp`).
+The ramp is a straight-line stand-in for the small-current regime: the physical loss grows as
+$i\,t_d^2/(2C_{node}T)$ and only approaches its saturated value above the knee (at $i = C_{node}V_{dc}/t_d$ it is
+half of it), while the ramp reaches full correction at the measured knee. Its purpose is to avoid chattering between
+$\pm t_{eff}/T$ when the current is near zero and its sign uncertain
+(`core/services/inverter_compensation/InverterCompensation.hpp`).
 
-**Minimum pulse.** A commanded conduction shorter than the switching transitions does not happen. The firmware
-has no minimum-pulse handling; duties near 0 and 100 % are kept away from it by the readable and bootstrap
-limits.
+**Minimum pulse.** A commanded conduction shorter than the dead band and the switching transitions does not
+happen as commanded. The firmware has no minimum-pulse handling. The top is guarded by the 95 % bootstrap cap; the
+bottom is not: shifting the duties down for the shunts ([low-side shunt current sensing](low-side-current-sensing.md)
+§5) drives the lowest duty continuously to exactly 0 %, so it passes through high-side pulses shorter than the
+500 ns band (15 PWM counts) on the way.
 
 ### 5. Losses
 
@@ -254,12 +259,12 @@ but less than its rated 40 V.
 
 ### 7. Protection
 
-| Fault         | Threshold (E-FOC-HARDWARE)             | Detected by                                                        | Action                                         |
-|---------------|----------------------------------------|--------------------------------------------------------------------|------------------------------------------------|
-| Over-current  | 6.6 A (80 % of the 8.25 A sense range) | Software check of every rebuilt phase sample; CUR_TOTAL comparator | Software: PWM disabled, all gates off, latched |
-| Over-voltage  | 58 V                                   | ADC digital comparator on the bus channel                          | PWM fault input tristates the outputs          |
-| Under-voltage | 18 V                                   | ADC digital comparator on the bus channel                          | PWM fault input tristates the outputs          |
-| Software hang | 25 ms early warning, 100 ms expiry     | Watchdog                                                           | Power stage cut, then reset                    |
+| Fault         | Threshold (E-FOC-HARDWARE)             | Detected by                                                        | Action                                                                                            |
+|---------------|----------------------------------------|--------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| Over-current  | 6.6 A (80 % of the 8.25 A sense range) | Software check of every rebuilt phase sample; CUR_TOTAL comparator | Software: PWM disabled, all gates off, latched; comparator: PWM fault input tristates the outputs |
+| Over-voltage  | 58 V                                   | ADC digital comparator on the bus channel                          | PWM fault input tristates the outputs                                                             |
+| Under-voltage | 18 V                                   | ADC digital comparator on the bus channel                          | PWM fault input tristates the outputs                                                             |
+| Software hang | 25 ms early warning, 100 ms expiry     | Watchdog                                                           | Event-loop hang: power stage cut, then reset; hung interrupt: reset only                          |
 
 Sources: `BoardCharacteristics.hpp`, `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`,
 `documentation/design/error-handling.md`, `documentation/design/watchdog.md`.
@@ -267,15 +272,18 @@ Sources: `BoardCharacteristics.hpp`, `targets/platform_implementations/ti/implem
 Three properties of this scheme matter in practice:
 
 - **Detection is once per PWM period.** The comparators sit on ADC steps triggered by the PWM, and the software
-  check runs in the current interrupt: up to 50 µs pass between a fault and its detection. In that time a winding
-  driven by the full bus rises by up to $V_{dc}\,T/L_s$: 1.1 A on the bench motor, 1.9 A on the Anaheim, **10 A on
-  the low-inductance Teknic at 40 V**. The sense range has to cover the trip level plus that rise, or the fault
+  check runs in the current interrupt: up to 50 µs pass between a fault and its detection. A wye winding sees at
+  most $\tfrac{2}{3}V_{dc}$ across one phase (one leg high, two low), so in that time its current rises by up to
+  $\tfrac{2}{3}V_{dc}\,T/L_s$: 0.75 A on the bench motor, 1.25 A on the Anaheim, **6.7 A on the low-inductance
+  Teknic at 40 V**. The sense range has to cover the trip level plus that rise, or the fault
   current saturates the ADC before it is seen.
 - **The CUR_TOTAL comparator cannot see bus current on this board.** Its shunt carries the three low-side
   returns, sampled at the PWM counter's zero where they sum to zero; over-current protection rests on the
   per-phase software check (`documentation/design/error-handling.md`).
 - **A fault leaves the motor coasting**, not braked: every gate off, the bridge latched until the fault is
-  cleared (at most three clears, a 250 ms dwell each, the budget restored after 10 s of clean running).
+  cleared: at most three clears, the budget restored after 10 s of clean running. A 250 ms dwell before a clear
+  applies on platforms that report their protection status; the TI platform reports it as unknown, so there only
+  the budget applies (`documentation/design/error-handling.md`).
 
 On the FRDM-MC-LVPMSM board with the TM4C123 there are no comparators; the shared software check is the only
 over-current protection.
@@ -327,16 +335,16 @@ graph TD
 
 ## Numerical Properties
 
-| Property                           | Value                                                                      |
-|------------------------------------|----------------------------------------------------------------------------|
-| PWM                                | 20 kHz, centre-aligned, 1500 counts per period (33 ns per count edge pair) |
-| Commanded dead band                | 500 ns (1 % of the period)                                                 |
-| Effective dead-time loss           | 70 ns, 0.14 % of the period; knee 0.2 A                                    |
-| Duty limits                        | 70 % readable, 95 % bootstrap                                              |
-| Switch resistance                  | 12.5 mΩ per switch                                                         |
-| Semiconductor loss at 3 A          | < 0.3 W                                                                    |
-| Fault detection latency            | ≤ 1 PWM period, 50 µs                                                      |
-| Current rise in one period (bound) | $V_{dc}T/L_s$: 1.1 A (bench), 1.9 A (Anaheim), 10 A (Teknic, 40 V)         |
+| Property                           | Value                                                                             |
+|------------------------------------|-----------------------------------------------------------------------------------|
+| PWM                                | 20 kHz, centre-aligned, 1500 counts per period (33 ns per count edge pair)        |
+| Commanded dead band                | 500 ns (1 % of the period)                                                        |
+| Effective dead-time loss           | 70 ns, 0.14 % of the period; knee 0.2 A                                           |
+| Duty limits                        | 70 % readable, 95 % bootstrap                                                     |
+| Switch resistance                  | 12.5 mΩ per switch                                                                |
+| Semiconductor loss at 3 A          | < 0.3 W                                                                           |
+| Fault detection latency            | ≤ 1 PWM period, 50 µs                                                             |
+| Current rise in one period (bound) | $\tfrac{2}{3}V_{dc}T/L_s$: 0.75 A (bench), 1.25 A (Anaheim), 6.7 A (Teknic, 40 V) |
 
 ---
 
@@ -346,10 +354,12 @@ graph TD
 
 1. Voltage error per leg: $24 \times 70\ \text{ns}/50\ \mu\text{s} = 34$ mV.
 2. At the online estimator's excitation, 2.5 % of 3 A = 75 mA, the winding's own drop is
-   $1.10 \times 0.075 = 83$ mV. The dead-time error is 40 % of it: uncorrected, the resistance it infers is
-   badly wrong, and this is a current below the knee, where the error is itself proportional to current.
-3. At 1–2 A, where the calibration measures, the drop is 1.1–2.2 V and the error is 1.5–3 %.
-4. Hence the compensation and the knee: without them, small-current identification is not possible.
+   $1.10 \times 0.075 = 83$ mV. This current is below the 0.2 A knee, where the loss is proportional to current:
+   about $34 \times 0.075/0.2 = 12.8$ mV, 15 % of the drop. Proportional to current, it reads as resistance: the
+   estimate comes out about 15 % high, in line with the 18 % measured without compensation.
+3. At 1–2 A, where the calibration measures, the loss is saturated at 34 mV against a 1.1–2.2 V drop: 1.5–3 %.
+4. Hence the compensation and its knee: below the knee the error is a resistance error the estimator cannot tell
+   from the winding's.
 
 **Regeneration check for the Teknic** at 40 V, braking from 6000 rpm: 1.39 J in the rotor. For the bus to stay
 under the 58 V trip with all of it returned, $C \ge 2E/(58^2 - 40^2) = 1.6$ mF. A smaller bus capacitor needs
