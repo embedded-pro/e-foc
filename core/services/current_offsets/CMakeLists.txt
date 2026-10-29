@@ -16,6 +16,8 @@ target_link_libraries(e_foc.services.current_offsets PUBLIC
 )
 
 target_sources(e_foc.services.current_offsets PRIVATE
+    ConfirmedPhaseCurrentOffsets.cpp
+    ConfirmedPhaseCurrentOffsets.hpp
     PhaseCurrentOffsetMeasurement.cpp
     PhaseCurrentOffsetMeasurement.hpp
     PhaseCurrentOffsets.hpp

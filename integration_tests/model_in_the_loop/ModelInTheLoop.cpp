@@ -195,6 +195,7 @@ namespace mil
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }
         , inverterCompensation{ inverter, drive.InverterDeadTimeLoss() }
         , currentOffsets{ inverter, inverterCompensation }
+        , confirmedCurrentOffsets{ *currentOffsets }
         , electricalIdent{ inverterCompensation, drive, vdc }
         , motorAlignment{ inverterCompensation, drive }
         , rotorStandstill{ drive }
@@ -208,7 +209,7 @@ namespace mil
                     application::TerminalAndTracer{ terminal, tracer },
                     application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods() },
                     nvm,
-                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
+                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
                     faultNotifier,
                     configData,
                     state_machine::ControlModeStateMachine::OuterLoopArgs{
