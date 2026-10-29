@@ -2,6 +2,7 @@
 
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -84,6 +85,7 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
+        application::DecimatingThreePhaseInverter inverter;
         IdentificationState identState;
         PeripheralConfiguration peripheralConfiguration;
         bool adcActive_{ false };

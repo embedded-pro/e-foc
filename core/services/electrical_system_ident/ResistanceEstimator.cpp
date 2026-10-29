@@ -62,7 +62,6 @@ namespace services
 
     void ResistanceEstimator::StartSettlePhase()
     {
-        // The PWM's own rate: a slower one re-clocks the target's PWM but only decimates the emulator's.
         driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currents)
             {
                 if (!this->onDone || finishing)

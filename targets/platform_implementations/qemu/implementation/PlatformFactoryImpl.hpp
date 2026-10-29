@@ -69,7 +69,7 @@ namespace application
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
 
-        void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
+        void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
         void Stop() override;
@@ -226,8 +226,6 @@ namespace application
         infra::TimerRepeating protectionPollTimer;
         infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
-        volatile uint32_t sampleDecimation{ 1 };
-        uint32_t samplePhase{ 0 };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhasePwmDutyCycles appliedDutyPhases{};

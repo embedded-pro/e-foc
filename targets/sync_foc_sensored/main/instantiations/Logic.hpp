@@ -9,6 +9,7 @@
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalDiagnostics.hpp"
@@ -55,6 +56,7 @@ namespace application
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
+        application::DecimatingThreePhaseInverter inverter;
         services::InverterCompensation inverterCompensation;
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;

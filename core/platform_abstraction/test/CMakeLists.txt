@@ -7,12 +7,14 @@ target_link_libraries(e_foc.platform_abstraction_test PUBLIC
     e_foc.platform_abstraction
     can_lite.test_util
     infra.timer_test_helper
+    e_foc.drivers_mock
 )
 
 target_sources(e_foc.platform_abstraction_test PRIVATE
     TestAdcPhaseCurrentMeasurement.cpp
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
+    TestDecimatingThreePhaseInverter.cpp
     TestLowSideShuntWindow.cpp
     TestQuadratureEncoderDecorator.cpp
 )

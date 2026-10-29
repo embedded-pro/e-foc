@@ -85,7 +85,8 @@ namespace application
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , hardware{ hardware }
-        , identState{ hardware, hardware, hardware.PowerSupplyVoltage() }
+        , inverter{ hardware }
+        , identState{ inverter, hardware, hardware.PowerSupplyVoltage() }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
@@ -453,7 +454,7 @@ namespace application
         adcReporting_ = false;
         queueOfPhaseCurrents.clear();
         adcActive_ = true;
-        hardware.PhaseCurrentsReady(peripheralConfiguration.pwmFrequency, [this](foc::PhaseCurrents phases)
+        hardware.PhaseCurrentsReady([this](foc::PhaseCurrents phases)
             {
                 if (!adcActive_)
                     return;

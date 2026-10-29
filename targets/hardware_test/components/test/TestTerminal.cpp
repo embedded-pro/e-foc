@@ -42,7 +42,7 @@ namespace
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
         MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
 
-        MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&), (override));
+        MOCK_METHOD(void, PhaseCurrentsReady, (const infra::Function<void(foc::PhaseCurrents)>&), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
         MOCK_METHOD(void, Start, (), (override));
         MOCK_METHOD(void, Stop, (), (override));
@@ -106,7 +106,7 @@ namespace
 
             EXPECT_CALL(platformFactoryMock, SetEncoderResolution(4000)).Times(1);
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shortest)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onPhaseCurrentsReady));
 
             terminalInteractor.emplace(terminal, platformFactoryMock);
         }
@@ -248,7 +248,7 @@ TEST_F(TestHardwareTerminal, pwm_command)
     InvokeCommand("pwm 500 10000", [this]()
         {
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, testing::_)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -259,7 +259,7 @@ TEST_F(TestHardwareTerminal, pwm_alias)
     InvokeCommand("p 750 15000", [this]()
         {
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 15000 }, std::chrono::nanoseconds{ 750 }, testing::_)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -271,7 +271,7 @@ TEST_F(TestHardwareTerminal, adc_command)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -283,7 +283,7 @@ TEST_F(TestHardwareTerminal, adc_alias)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shortest)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -805,7 +805,7 @@ TEST_F(TestHardwareTerminal, adc_shorter)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shorter)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -817,7 +817,7 @@ TEST_F(TestHardwareTerminal, adc_longer)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longer)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -829,7 +829,7 @@ TEST_F(TestHardwareTerminal, adc_longest)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longest)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -948,7 +948,7 @@ TEST_F(TestHardwareTerminal, pwm_boundary_values_valid)
     InvokeCommand("pwm 2000 20000", [this]()
         {
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 20000 }, std::chrono::nanoseconds{ 2000 }, testing::_)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -1051,7 +1051,7 @@ TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
         {
             ::testing::InSequence _;
             EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
-            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_)).WillOnce(testing::SaveArg<0>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();

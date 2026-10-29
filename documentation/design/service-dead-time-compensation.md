@@ -77,8 +77,8 @@ current over the knee current held between minus one and one. A current flowing 
 raises its duty, one flowing in lowers it. The result is held between 0 and 100 %.
 
 The loss is a fixed time out of every period, so its share of the duty scales with the PWM
-frequency. The service takes that frequency from the sample rate a consumer asks for, which is the
-rate the PWM runs at. The knee scales with the bus voltage, and the board's figure holds for the
+frequency. The service takes that frequency from the inverter's PWM frequency, not from the sample
+rate a consumer asks for. The knee scales with the bus voltage, and the board's figure holds for the
 bus it was measured at.
 
 The ramp is a simplification. The switch node's real curve bends more gradually into the saturated
@@ -120,10 +120,9 @@ shorter than the band, so the band should not be narrowed without measuring that
   moves it by up to the full loss. Space-vector modulation keeps the legs off the rails except at
   full modulation, where the effect is a fraction of a percent.
 
-A consumer that samples below the PWM rate has to know the platform: the target re-clocks its PWM
-to the rate asked for, which keeps the scale right, but the emulator keeps its PWM rate and drops
-samples, so the correction there would be scaled for a period twice as long as the one switching.
-The resistance identification therefore samples at the PWM's own rate.
+A consumer may sample below the PWM rate: the PWM keeps its own frequency, the shared [decimating
+inverter](platform-phase-current-rate.md) hands on every Nth sample, and the correction is scaled
+for the PWM's own period, not for the rate the consumer asked for.
 
 ---
 

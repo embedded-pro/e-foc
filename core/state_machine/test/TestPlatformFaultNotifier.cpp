@@ -1,3 +1,4 @@
+#include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "core/platform_abstraction/test_doubles/PlatformFactoryMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
@@ -45,6 +46,7 @@ namespace
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
+        application::DecimatingThreePhaseInverter inverter{ platformFactory };
         StrictMock<application::CanBusAdapterMock> canBusMock;
         infra::Function<void(application::CanBusAdapter::CanError)> storedCanErrorHandler;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
@@ -72,7 +74,7 @@ namespace
                     .Times(AnyNumber())
                     .WillRepeatedly(SaveArg<0>(&storedCanErrorHandler));
                 EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
-                EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
+                EXPECT_CALL(platformFactory, PhaseCurrentsReady(_)).Times(AnyNumber());
                 EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());
                 EXPECT_CALL(platformFactory, Read()).Times(AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
                 EXPECT_CALL(platformFactory, Set(_)).Times(AnyNumber());
@@ -107,7 +109,7 @@ namespace
         {
             return application::TorqueStateMachine{
                 application::TerminalAndTracer{ terminal, tracer },
-                application::MotorHardware{ platformFactory, platformFactory, vdc },
+                application::MotorHardware{ inverter, platformFactory, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 *faultNotifier,
@@ -246,9 +248,9 @@ TEST_F(TestPlatformFaultNotifier, a_fault_while_the_phase_current_slot_is_taken_
     bool enabling = false;
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
-    EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _))
+    EXPECT_CALL(platformFactory, PhaseCurrentsReady(_))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this, &enabling](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&)
+        .WillRepeatedly(Invoke([this, &enabling](const infra::Function<void(foc::PhaseCurrents)>&)
             {
                 if (!enabling)
                     return;

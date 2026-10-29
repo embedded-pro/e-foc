@@ -14,7 +14,7 @@
 namespace mil
 {
     class SimulatedDrive
-        : public drivers::ThreePhaseInverter
+        : public drivers::ThreePhasePowerStage
         , public drivers::Encoder
     {
     public:
@@ -29,7 +29,7 @@ namespace mil
         drivers::DeadTimeLoss InverterDeadTimeLoss() const;
         uint32_t DutyUpdateDelayPeriods() const;
 
-        void PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
+        void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
         void Stop() override;
@@ -53,8 +53,6 @@ namespace mil
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection;
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         uint32_t controlTick{ 0 };
-        uint32_t sampleDecimation{ 1 };
-        uint32_t samplePhase{ 0 };
         bool controlLoopEntered{ false };
         bool dutyDelayed;
         hal::DutyCycle maxReadableDuty;

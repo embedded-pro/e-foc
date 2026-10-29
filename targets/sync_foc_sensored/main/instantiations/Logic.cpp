@@ -34,8 +34,9 @@ namespace application
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }
-        , inverterCompensation{ hardware, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
-        , currentOffsets{ hardware, inverterCompensation }
+        , inverter{ hardware }
+        , inverterCompensation{ inverter, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
+        , currentOffsets{ inverter, inverterCompensation }
         , electricalIdent{ inverterCompensation, hardware, vdc }
         , motorAlignment{ inverterCompensation, hardware }
         , rotorStandstill{ hardware }
@@ -75,7 +76,7 @@ namespace application
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode,
-                    can::FocMotorCanBridge::Platform{ this->hardware, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
+                    can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
                     *electricalIdent, nullptr, this->hardware.Tracer(), *currentOffsets, rotorStandstill);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
