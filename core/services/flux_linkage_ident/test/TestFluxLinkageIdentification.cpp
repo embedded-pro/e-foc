@@ -4,6 +4,7 @@
 #include "core/services/flux_linkage_ident/FluxLinkageIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <gmock/gmock.h>
@@ -27,6 +28,7 @@ namespace
         float current{ 0.0f };
         float dryFriction{ 3.0e-3f };
         float voltageOffset{ 0.0f };
+        float backEmfScale{ 1.0f };
         float torqueScale{ 1.0f };
         float residualCurrent{ 0.0f };
         float voltage{ 0.0f };
@@ -43,7 +45,7 @@ namespace
                 speed = (speed != 0.0f && next * speed < 0.0f) ? 0.0f : next;
             }
 
-            voltage = fluxLinkage * static_cast<float>(polePairs) * speed + resistance * flowing + voltageOffset;
+            voltage = backEmfScale * fluxLinkage * static_cast<float>(polePairs) * speed + resistance * flowing + voltageOffset;
 
             return foc::MotionObservation{ foc::RadiansPerSecond{ speed }, foc::Ampere{ flowing }, foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f } };
         }
@@ -79,9 +81,9 @@ namespace
                 }));
         }
 
-        void Identify(std::size_t pairs = polePairs)
+        void Identify(std::size_t pairs = polePairs, const services::FluxLinkageIdentification::Config& config = {}, float ohm = resistance)
         {
-            identification.Identify(pairs, foc::Ohm{ resistance }, services::FluxLinkageIdentification::Config{}, [this](const auto& outcome)
+            identification.Identify(pairs, foc::Ohm{ ohm }, config, [this](const auto& outcome)
                 {
                     result = outcome;
                 });
@@ -241,5 +243,159 @@ TEST_F(TestFluxLinkageIdentification, an_unusable_request_is_refused_without_mov
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->outcome, Outcome::notIdentified);
+    EXPECT_FALSE(identification.IsRunning());
+}
+
+TEST_F(TestFluxLinkageIdentification, an_unusable_configuration_or_resistance_is_refused_without_moving_the_rotor)
+{
+    using Config = services::FluxLinkageIdentification::Config;
+    const std::array<void (*)(Config&), 13> unusable{
+        [](Config& config)
+        {
+            config.spinCurrent = foc::Ampere{ 0.0f };
+        },
+        [](Config& config)
+        {
+            config.lowestSpeed = foc::RadiansPerSecond{ 0.0f };
+        },
+        [](Config& config)
+        {
+            config.lowestSpeed = config.releaseSpeed;
+        },
+        [](Config& config)
+        {
+            config.releaseSpeed = config.maxSpeed;
+        },
+        [](Config& config)
+        {
+            config.stoppedSpeed = foc::RadiansPerSecond{ -1.0f };
+        },
+        [](Config& config)
+        {
+            config.requiredSamples = 9;
+        },
+        [](Config& config)
+        {
+            config.maxCoasts = 0;
+        },
+        [](Config& config)
+        {
+            config.maxRelativeError = 0.0f;
+        },
+        [](Config& config)
+        {
+            config.maxInterceptFraction = 0.0f;
+        },
+        [](Config& config)
+        {
+            config.pointPeriod = std::chrono::microseconds{ 500 };
+        },
+        [](Config& config)
+        {
+            config.coastLimit = infra::Duration::zero();
+        },
+        [](Config& config)
+        {
+            config.brakeLimit = infra::Duration::zero();
+        },
+        [](Config& config)
+        {
+            config.timeout = infra::Duration::zero();
+        },
+    };
+
+    for (const auto& makeUnusable : unusable)
+    {
+        Config config;
+        makeUnusable(config);
+        result.reset();
+        Identify(polePairs, config);
+
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->outcome, Outcome::notIdentified);
+        EXPECT_FALSE(identification.IsRunning());
+    }
+
+    result.reset();
+    Identify(polePairs, {}, 0.0f);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outcome, Outcome::notIdentified);
+}
+
+TEST_F(TestFluxLinkageIdentification, a_second_request_while_running_is_refused_and_leaves_the_first_running)
+{
+    ExpectMotion();
+    Identify();
+    ForwardTime(std::chrono::milliseconds{ 20 });
+
+    std::optional<services::FluxLinkageIdentification::Result> second;
+    identification.Identify(polePairs, foc::Ohm{ resistance }, services::FluxLinkageIdentification::Config{}, [&second](const auto& outcome)
+        {
+            second = outcome;
+        });
+
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(second->outcome, Outcome::notIdentified);
+    EXPECT_TRUE(identification.IsRunning());
+
+    ForwardTime(std::chrono::seconds{ 5 });
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outcome, Outcome::identified);
+}
+
+TEST_F(TestFluxLinkageIdentification, abort_without_a_measurement_does_nothing)
+{
+    identification.Abort();
+
+    EXPECT_FALSE(identification.IsRunning());
+}
+
+TEST_F(TestFluxLinkageIdentification, a_rotor_already_turning_backwards_is_recorded_slowed_and_braked_in_that_direction)
+{
+    rotor.dryFriction = 1.0e-4f;
+    rotor.speed = -45.0f;
+    ExpectMotion();
+    Identify();
+    ForwardTime(std::chrono::seconds{ 6 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outcome, Outcome::identified);
+    EXPECT_NEAR(result->fluxLinkage.Value(), fluxLinkage, 0.01f * fluxLinkage);
+    EXPECT_LE(std::abs(rotor.speed), services::FluxLinkageIdentification::Config{}.stoppedSpeed.Value() + 2.0f);
+}
+
+TEST_F(TestFluxLinkageIdentification, a_large_constant_voltage_offset_is_not_identified)
+{
+    rotor.voltageOffset = 0.5f;
+    ExpectMotion();
+    Identify();
+    ForwardTime(std::chrono::seconds{ 5 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outcome, Outcome::notIdentified);
+    EXPECT_NEAR(result->intercept.Value(), 0.5f, 0.05f);
+}
+
+TEST_F(TestFluxLinkageIdentification, a_flux_linkage_outside_the_parameter_limits_is_not_identified)
+{
+    rotor.backEmfScale = 3000.0f;
+    ExpectMotion();
+    Identify();
+    ForwardTime(std::chrono::seconds{ 5 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outcome, Outcome::notIdentified);
+    EXPECT_GT(result->fluxLinkage.Value(), 10.0f);
+}
+
+TEST_F(TestFluxLinkageIdentification, a_rotor_too_weak_to_stop_in_time_still_reports_and_stops_the_drive)
+{
+    rotor.dryFriction = 1.0e-4f;
+    rotor.torqueScale = 0.05f;
+    ExpectMotion();
+    Identify();
+    ForwardTime(std::chrono::seconds{ 8 });
+
+    ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(identification.IsRunning());
 }
