@@ -37,6 +37,7 @@ namespace application
         , inverter{ hardware }
         , inverterCompensation{ inverter, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
         , currentOffsets{ inverter, inverterCompensation }
+        , confirmedCurrentOffsets{ *currentOffsets }
         , electricalIdent{ inverterCompensation, hardware, vdc }
         , motorAlignment{ inverterCompensation, hardware }
         , rotorStandstill{ hardware }
@@ -68,7 +69,7 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods() },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
@@ -77,7 +78,7 @@ namespace application
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
-                    *electricalIdent, nullptr, this->hardware.Tracer(), *currentOffsets, rotorStandstill);
+                    *electricalIdent, nullptr, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
