@@ -112,8 +112,9 @@ or an explicit disturbance estimate (ADRC, `speed-loop-adrc.md`).
 constant torque opposing motion, and the Stribeck rise in breakaway torque near standstill are not linear:
 the rotor sticks until the drive overcomes breakaway, then slips. A position loop with integral action hunts
 around the setpoint; at low speed the velocity ripples. Feed-forward of the friction level removes most of it
-(`documentation/theory/position-loop-friction.md`). *e-foc today:* calibration identifies a Coulomb level and
-stores it; no cascade applies a friction feed-forward yet.
+(`documentation/theory/position-loop-friction.md`). *e-foc today:* the mechanical estimator fits a Coulomb term
+internally but does not output it (`documentation/design/service-mechanical-ident.md`); the calibration record
+has a field for it that stays zero, and no cascade applies a friction feed-forward.
 
 **Cogging.** The magnets' attraction to the stator teeth gives a torque, independent of current, that repeats
 $N_{cog} = \operatorname{lcm}(N_s, 2p)$ times per mechanical revolution for $N_s$ slots
@@ -130,8 +131,11 @@ the loop is stiffer than the cogging. *e-foc today:* compensated by a 48-bin map
 fed forward as current (`documentation/design/service-cogging-compensation.md`).
 
 **Inertia change.** A load coupled to the shaft adds inertia. A speed loop tuned for $\hat{J}$ on a shaft with
-inertia $J$ has its bandwidth scaled by $\hat{J}/J$: a load that doubles the inertia halves the bandwidth and
-doubles the load dip of the formula above.
+inertia $J$ has its bandwidth scaled by $\hat{J}/J$, but not its load dip: rejection is set by the loop's
+stiffness $K_t K_p$, which does not depend on $J$. Doubling the inertia under the implementation's speed PI turns
+the roots $-0.29$ and $-1.71\,\omega_{bw}$ into a double root at $-0.5\,\omega_{bw}$. Simulated for the Teknic at
+100 rad/s with a 20 mN·m step, the dip falls from 11.5 to 10.4 rad/s and its peak moves from 12.5 to 20 ms; the
+reference response slows to half the bandwidth. The dip formula above holds for $J = \hat{J}$.
 
 ### 3. Electrical Non-Idealities
 

@@ -226,8 +226,8 @@ controller tuned against a current loop that later changes is tuned against the 
 | Position | P4 | Iterative Learning Control  | [position-loop-ilc.md](position-loop-ilc.md)                   |
 | Any      | —  | Friction Compensation       | [position-loop-friction.md](position-loop-friction.md)         |
 
-Friction compensation is the one entry that is theory only today: the calibration identifies a Coulomb
-level and stores it, but no cascade applies a friction feed-forward yet. Cogging, the other low-speed
+Friction compensation is the one entry that is theory only today: the mechanical estimator fits a Coulomb
+term internally but does not output it, and no cascade applies a friction feed-forward. Cogging, the other low-speed
 torque disturbance, is compensated (`documentation/design/service-cogging-compensation.md`).
 
 ---

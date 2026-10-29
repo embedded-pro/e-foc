@@ -174,20 +174,20 @@ accordingly:
 
 ### 5. Resolution and Quantisation
 
-| Quantity                          | Expression                                | Value                                                      |
-|-----------------------------------|-------------------------------------------|------------------------------------------------------------|
-| Current LSB                       | $3.3\ \text{V}/4096 \times 5\ \text{A/V}$ | 4.03 mA                                                    |
-| Current noise                     | measured, per averaged sample             | 31–39 mA (8–10 LSB); about 1.2 % of 3 A                    |
-| Torque per current LSB            | $K_t \times 4.03$ mA                      | 0.13 mN·m (Anaheim), 0.15 mN·m (Teknic)                    |
-| Duty step                         | 1/1500 of the period                      | 0.067 %: 16 mV per leg at 24 V, 27 mV at 40 V              |
-| Commanded dead band               | 500 ns / 50 µs                            | 1.0 % of the period                                        |
-| Effective dead-time loss          | 70 ns / 50 µs × $V_{dc}$                  | 34 mV at 24 V, 56 mV at 40 V, per leg                      |
-| Bus-voltage LSB                   | $3.3\ \text{V}/4096 \times 21.25$         | 17 mV                                                      |
-| Encoder angle                     | $2\pi/N_{enc}$                            | 1.57 mrad = 0.09° mechanical; 0.36° electrical ($p = 4$)   |
-| Speed quantum                     | $2\pi/(N_{enc}\, T_s^o)$                  | 1.57 rad/s = 15 rpm per count per 1 ms window              |
-| … relative, at 1000 rpm / 100 rpm | quantum / speed                           | 1.5 % / 15 %                                               |
-| Sine table                        | 512 entries, interpolated                 | amplitude error $1.9 \times 10^{-5}$                       |
-| `float` resolution                | $2^{-23}$ relative                        | $1.2 \times 10^{-7}$; $1.9 \times 10^{-7}$ rad at $\pm\pi$ |
+| Quantity                          | Expression                                | Value                                                                 |
+|-----------------------------------|-------------------------------------------|-----------------------------------------------------------------------|
+| Current LSB                       | $3.3\ \text{V}/4096 \times 5\ \text{A/V}$ | 4.03 mA                                                               |
+| Current noise                     | measured, per averaged sample             | 31–39 mA (8–10 LSB); about 1.2 % of 3 A                               |
+| Torque per current LSB            | $K_t \times 4.03$ mA                      | 0.13 mN·m (Anaheim), 0.15 mN·m (Teknic)                               |
+| Duty step                         | 1/1500 of the period                      | 0.067 %: 16 mV per leg at 24 V, 27 mV at 40 V                         |
+| Commanded dead band               | 500 ns / 50 µs                            | 1.0 % of the period                                                   |
+| Effective dead-time loss          | 70 ns / 50 µs × $V_{dc}$                  | 34 mV at 24 V, 56 mV at 40 V, per leg                                 |
+| Bus-voltage LSB                   | $3.3\ \text{V}/4096 \times 21.25$         | 17 mV                                                                 |
+| Encoder angle                     | $2\pi/N_{enc}$                            | 1.57 mrad = 0.09° mechanical; 0.36° electrical ($p = 4$)              |
+| Speed quantum                     | $2\pi/(N_{enc}\, T_s^o)$                  | 1.57 rad/s = 15 rpm per count per 1 ms window                         |
+| … relative, at 1000 rpm / 100 rpm | quantum / speed                           | 1.5 % / 15 %                                                          |
+| Sine table                        | 512 entries, interpolated                 | amplitude error $1.9 \times 10^{-5}$                                  |
+| `float` resolution                | $2^{-23}$ relative                        | $1.2 \times 10^{-7}$; one ulp at $\pm\pi$ is $2.4 \times 10^{-7}$ rad |
 
 Two comparisons from this table carry through the design. The dead-time loss (34–56 mV) is comparable to the
 resistive drop of a small current, $R_s \times 0.2\ \text{A} = 72$–$81$ mV: it is negligible at load and
@@ -210,16 +210,16 @@ computation.
 
 ### 7. Rules of Thumb
 
-| If …                                                     | … then expect                                                                                                                            |
-|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| $R_s T_s / L_s < 0.1$                                    | Euler and exact ZOH discretisation agree within about 1 %                                                                                |
-| Loop delay $T_d = 1.5\,T_s^i = 75$ µs                    | Current-loop bandwidth ≤ about $10^4$ rad/s for 45° of margin                                                                            |
-| Current bandwidth $\omega_{bw}$, sensor noise $\sigma_i$ | Voltage-command noise $\approx L_s\,\omega_{bw}\,\sigma_i$; keep under 0.08 V RMS                                                        |
-| Inner bandwidth $k$ times the outer crossover            | Outer loop loses $\arctan(1/k)$: 5.7° at $k = 10$, 11.3° at $k = 5$                                                                      |
-| $f_e$ rises towards $f_s/20$                             | The applied voltage lags $\theta_e$ by $1.5 \times 360^\circ f_e/f_s$, 27° at $f_e = f_s/20$; the current loop sees it as cross-coupling |
-| Back-EMF approaches $0.81\,V_{max}$ on E-FOC-HARDWARE    | No headroom left to push current: top speed                                                                                              |
-| A torque ripple at $6 f_e$                               | Dead time or back-EMF harmonics ([disturbances and noise](disturbances-and-noise.md))                                                    |
-| Speed resolution needed at $n$ rpm with 1 ms windows     | 15 rpm per count: average over more windows, or more counts per revolution                                                               |
+| If …                                                     | … then expect                                                                                                                                                     |
+|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| $R_s T_s / L_s < 0.1$                                    | Euler and exact ZOH agree on $A_d$ within $x^2/2$ (0.5 %) but on $B_d$ only within $x/2$ (5 %), $x = R_sT_s/L_s$; e-foc uses the exact pair for the current plant |
+| Loop delay $T_d = 1.5\,T_s^i = 75$ µs                    | Current-loop bandwidth ≤ about $10^4$ rad/s for 45° of margin                                                                                                     |
+| Current bandwidth $\omega_{bw}$, sensor noise $\sigma_i$ | Voltage-command noise $\approx L_s\,\omega_{bw}\,\sigma_i$; keep under 0.08 V RMS                                                                                 |
+| Inner bandwidth $k$ times the outer crossover            | Outer loop loses $\arctan(1/k)$: 5.7° at $k = 10$, 11.3° at $k = 5$                                                                                               |
+| $f_e$ rises towards $f_s/20$                             | The applied voltage lags $\theta_e$ by $1.5 \times 360^\circ f_e/f_s$, 27° at $f_e = f_s/20$; the current loop sees it as cross-coupling                          |
+| Back-EMF approaches $0.81\,V_{max}$ on E-FOC-HARDWARE    | No headroom left to push current: top speed                                                                                                                       |
+| A torque ripple at $6 f_e$                               | Dead time or back-EMF harmonics ([disturbances and noise](disturbances-and-noise.md))                                                                             |
+| Speed resolution needed at $n$ rpm with 1 ms windows     | 15 rpm per count: average over more windows, or more counts per revolution                                                                                        |
 
 ---
 

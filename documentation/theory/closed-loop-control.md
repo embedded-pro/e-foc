@@ -121,8 +121,9 @@ Read the equations term by term:
 margin $\varphi_m$. Margins of 45–70° give a well-damped response. Below about 30° the loop rings, and at
 zero it oscillates. Delay (§7) eats phase margin first.
 
-**The waterbed.** For any loop with delay or right-half-plane zeros, pushing $|S|$ down over one band of
-frequencies pushes it up over another (Bode's sensitivity integral). A loop cannot be made faster for free:
+**The waterbed.** For a stable loop whose gain falls at least as $1/s^2$ at high frequency, which every
+physical loop does, pushing $|S|$ down over one band of frequencies pushes it up over another (Bode's
+sensitivity integral); delay and right-half-plane zeros make the trade worse. A loop cannot be made faster for free:
 past a point, more gain only moves the error to another frequency, where it appears as overshoot and noise.
 
 **Integral action.** A controller with a pole at $s = 0$ makes $|L| \to \infty$ at DC, so $S(0) = 0$: no
@@ -138,7 +139,7 @@ graph LR
     TH["θ*"] --> POS["Position<br/>controller<br/>1 kHz"]
     POS -->|"ω*, limited"| SPD["Speed<br/>controller<br/>1 kHz"]
     SPD -->|"iq*, clamped to ±Imax"| CUR["Current<br/>controllers d, q<br/>20 kHz"]
-    ID["id* = 0"] --> CUR
+    ID["id* = 0, plus the online estimator's<br/>small d-axis excitation"] --> CUR
     CUR -->|"vd, vq, inside the Vdc/√3 circle"| MOT["Inverse Park, SVM,<br/>inverter, motor"]
     MOT -->|"ia, ib → Clarke, Park"| CUR
     MOT -->|"θm → ω (1 ms windows)"| SPD
@@ -183,9 +184,9 @@ the same rule (`documentation/theory/speed-loop-pi.md`).
 A loop is only as good as what it measures.
 
 - **Phase currents.** Shunts in the low-side legs are sampled once per PWM period, at the centre of the
-  low-side conduction window, where the switching ripple crosses its average. Two phases are measured and
-  the third follows from $i_a + i_b + i_c = 0$; above 70 % duty a phase's shunt is not conducting long
-  enough to read, and that phase is the one reconstructed (`core/platform_abstraction/LowSideShuntWindow.hpp`).
+  low-side conduction window, where the switching ripple crosses its average. All three phases are
+  converted; above 70 % duty a phase's shunt is not conducting long enough to read, and that phase is rebuilt
+  from the other two through $i_a + i_b + i_c = 0$ (`core/platform_abstraction/LowSideShuntWindow.hpp`).
   Offsets are measured at calibration (`documentation/design/service-current-offsets.md`).
 - **Rotor angle.** A quadrature encoder, 4000 counts per mechanical revolution by default, gives
   $\theta_m$; the alignment offset turns it into $\theta_e = p\,(\theta_m - \theta_0)$
@@ -239,8 +240,11 @@ overshoots. This is **windup**. Every PI in e-foc is protected against it:
 - the **speed loop** clamps the incremental update to $\pm I_{max}$, which gives the same effect
   (`speed-loop-pi.md`).
 
-When the voltage vector is too long, e-foc scales both components by the same factor. The current vector
-keeps its angle and only its growth slows, so torque per ampere is preserved during saturation.
+When the voltage vector is too long, e-foc scales both components by the same factor, which keeps the
+*voltage* angle. Near standstill that keeps the current on its axis too. At speed it does not: with the
+back-EMF and the speed voltages in the balance, a voltage scaled by $k < 1$ settles with
+$i_d = -(1 - k)\,\omega_e^2 L_s \psi_f / (R_s^2 + \omega_e^2 L_s^2)$, negative, so the current turns off the q-axis
+and torque per ampere falls while the loop stays saturated.
 
 ### 7. Digital Control: Sampling and Delay
 
@@ -273,8 +277,9 @@ The delay alone caps the current loop near $10^4$ rad/s at 20 kHz, the same figu
 models the delay explicitly (the two-step deadbeat of `current-loop-deadbeat.md`).
 
 The **speed loop** has its own delay. The 1 ms window difference is the average speed over the last
-millisecond, half a window old on average; the new current reference then applies for the next
-millisecond. With $T_d \approx 1.5$ ms, a 100 rad/s speed loop loses 8.6°, a 300 rad/s loop 26°.
+millisecond, half a window old. The speed controller runs as soon as the window closes, and the current
+reference it produces is picked up by the next 20 kHz period and held for the next millisecond, half a window
+late on average. With $T_d \approx 1$ ms, a 100 rad/s speed loop loses 5.7°, a 300 rad/s loop 17°.
 
 **Sampling the right instant.** Sampling the phase currents at the centre of the PWM period, where the
 symmetric ripple crosses its mean, takes the average current without filtering it, so the current loop
@@ -287,8 +292,8 @@ Each loop's bandwidth is bounded from above and below:
 | Loop     | Rate   | Typical $\omega_{bw}$                   | Bounded above by                                                          | Bounded below by        |
 |----------|--------|-----------------------------------------|---------------------------------------------------------------------------|-------------------------|
 | Current  | 20 kHz | 2000–8400 rad/s                         | Delay (§7); sensor noise through $K_p = L_s\omega_{bw}$; voltage headroom | ≥ 10 × speed loop       |
-| Speed    | 1 kHz  | 50–300 rad/s                            | Current loop ÷ 10; speed quantum through $K_p$; 1.5 ms delay              | Load rejection required |
-| Position | 1 kHz  | ≈ 19 rad/s ($2\pi \cdot 3$ Hz, default) | Speed loop ÷ 3–5                                                          | Stiffness required      |
+| Speed    | 1 kHz  | 50–300 rad/s                            | Current loop ÷ 10; speed quantum through $K_p$; 1 ms delay                | Load rejection required |
+| Position | 1 kHz  | ≈ 19 rad/s ($2\pi \cdot 3$ Hz, default) | Speed loop ÷ 5                                                            | Stiffness required      |
 
 The current loop's noise bound is explicit in e-foc: the automatic bandwidth is held below the value at
 which $L_s\,\omega_{bw}$ turns the measured current-sensor noise into 0.08 V RMS of voltage
@@ -332,7 +337,7 @@ graph LR
 | Outer loop period                     | 1 ms (1 kHz), prescaler 20                                     |
 | Current-loop delay                    | $\approx 1.5\,T_s^i = 75$ µs                                   |
 | Current-loop bandwidth for 45° margin | $\approx 10^4$ rad/s                                           |
-| Speed-loop delay                      | $\approx 1.5$ ms                                               |
+| Speed-loop delay                      | $\approx 1$ ms                                                 |
 | Speed quantum                         | 1.57 rad/s per encoder count per 1 ms window (4000 counts/rev) |
 | Cascade separation                    | current ≥ 10 × speed (automatic bandwidth)                     |
 | Integral action                       | Current and speed loops; anti-windup on every integrator       |
@@ -362,7 +367,7 @@ K_p = \frac{2\,J\,\omega_{bw}}{K_t} = \frac{2 \times 7.06 \times 10^{-6} \times 
 $$
 
 One speed quantum, 1.57 rad/s, moves $i_q^*$ by 58 mA, a torque step of 2.2 mN·m, 0.8 % of rated torque. The
-separation is $5000/100 = 50$, the inner loop costs 1.1° at the outer crossover and the delay 8.6°.
+separation is $5000/100 = 50$, the inner loop costs 1.1° at the outer crossover and the delay 5.7°.
 
 ---
 

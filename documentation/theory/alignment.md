@@ -2,9 +2,9 @@
 title: "Motor Alignment — Encoder Zero-Point Calibration"
 type: theory
 status: approved
-version: 1.0.0
+version: 1.0.1
 component: "service-alignment"
-date: 2025-01-01
+date: 2026-10-29
 ---
 
 | Field     | Value                                            |
@@ -12,9 +12,9 @@ date: 2025-01-01
 | Title     | Motor Alignment — Encoder Zero-Point Calibration |
 | Type      | theory                                           |
 | Status    | approved                                         |
-| Version   | 1.0.0                                            |
+| Version   | 1.0.1                                            |
 | Component | service-alignment                                |
-| Date      | 2025-01-01                                       |
+| Date      | 2026-10-29                                       |
 
 ## Overview
 
@@ -53,7 +53,7 @@ $$
 
 ## Mathematical Foundation
 
-### 1. Physical Principle — Reluctance Torque at Start
+### 1. Physical Principle — Synchronising Torque at Start
 
 A PMSM permanent magnet rotor experiences a torque whenever the stator magnetic field is not aligned
 with the rotor d-axis. Applying a constant stator current at electrical angle $\theta_e^{field}$ produces a
@@ -61,14 +61,15 @@ stator MMF (magnetomotive force) at that electrical angle in the air gap. The in
 permanent magnet flux creates a synchronising torque:
 
 $$
-\tau_{sync} = -K_T \cdot I_d^{field} \cdot \sin(\theta_e^{field} - \theta_r)
-= -K_{mag} \cdot \sin(\delta)
+\tau_{sync} = K_T \cdot I_d^{field} \cdot \sin(\theta_e^{field} - \theta_r)
+= K_{mag} \cdot \sin(\delta)
 $$
 
 where $\delta = \theta_e^{field} - \theta_r$ is the angle between the stator field and the rotor d-axis
 (the north pole of the permanent magnet), and $K_{mag} > 0$ is a motor-dependent constant.
 
-This is the classical restoring torque of a synchronous machine: $\tau = -K_{mag}\sin(\delta)$.
+This is the classical synchronising torque of a synchronous machine: $\tau = K_{mag}\sin(\delta)$, positive
+while the field leads the rotor, so it always pulls the rotor towards the field.
 
 **Equilibrium**: $\tau_{sync} = 0$ when $\delta = 0$ or $\delta = \pi$. The stable equilibrium is $\delta = 0$,
 i.e. the rotor d-axis aligns with the applied stator field. The $\delta = \pi$ equilibrium is unstable.
@@ -78,7 +79,7 @@ i.e. the rotor d-axis aligns with the applied stator field. The $\delta = \pi$ e
 The rotor motion during alignment is governed by the Newton-Euler equation:
 
 $$
-J \ddot{\theta}_r + B \dot{\theta}_r = \tau_{sync} = -K_{mag} \sin(\theta_e^{field} - \theta_r)
+J \ddot{\theta}_r + B \dot{\theta}_r = \tau_{sync} = K_{mag} \sin(\theta_e^{field} - \theta_r)
 $$
 
 Linearising around the equilibrium $\theta_r \rightarrow \theta_e^{field}$ (small $\delta$, $\sin\delta \approx \delta$):

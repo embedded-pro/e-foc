@@ -41,7 +41,7 @@ Operates exclusively in the **20 kHz FOC ISR**.
 |----------------|-------------------------------------------|-------|
 | $R_s$          | Stator resistance per phase               | Ω     |
 | $L_s$          | Stator inductance ($L_d = L_q$)           | H     |
-| $V_{dc}$       | DC bus voltage (measured dynamically)     | V     |
+| $V_{dc}$       | DC bus voltage (measured once at boot)    | V     |
 | $T_s^i$        | Current loop sample period ($= 50\ \mu$s) | s     |
 | $\omega_{bw}$  | Desired closed-loop current bandwidth     | rad/s |
 | $A_d^i, B_d^i$ | Discrete RL plant matrices                | —     |
@@ -88,8 +88,9 @@ $$
 K_p = L_s\, \omega_{bw}, \qquad K_i = R_s\, \omega_{bw}
 $$
 
-**Practical limit**: $\omega_{bw} \leq \pi / T_s^i$ (Nyquist). The maximum achievable bandwidth
-at 20 kHz is roughly $\omega_{bw} \leq 10000$ rad/s; conservative designs use $2000$–$5000$ rad/s.
+**Practical limit**: the loop delay of about $1.5\,T_s^i$ costs $\omega_{bw} \cdot 1.5\,T_s^i$ of phase at
+crossover, which leaves 45° of margin at roughly $\omega_{bw} \approx 10000$ rad/s at 20 kHz
+(`documentation/theory/closed-loop-control.md` §7); conservative designs use $2000$–$5000$ rad/s.
 
 ### Gain Normalisation
 
@@ -169,7 +170,7 @@ driving the modulator into over-modulation over roughly three-quarters of the el
 | Robustness to Rs/Ls error | High — integral action corrects mismatch |
 | Requires RLS convergence  | No — motor datasheet values sufficient   |
 | Requires $\psi_f$         | No                                       |
-| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ live)    |
+| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ at boot) |
 
 ---
 

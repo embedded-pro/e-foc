@@ -390,7 +390,9 @@ graph LR
   $i_{q,max}(\omega_e) = \sqrt{(V_{max}/\omega_e)^2 - \psi_f^2}\,/\,L_s$ and falls to zero at
   $\omega_e = V_{max}/\psi_f$.
 - **Field weakening** would go further by injecting negative $i_d$, moving the current towards the centre of
-  the voltage circle. e-foc does not implement it; its current controllers keep $i_d^* = 0$.
+  the voltage circle. e-foc does not implement it; its cascades keep $i_d^* = 0$, apart from a ±2.5 % of
+  $I_{max}$, 50 Hz square wave they inject for 4 s in every 60 s while the online electrical estimator runs
+  (`core/foc/cascade/CascadeWithSpeedLoop.cpp`).
 
 Keeping $R_s$, the exact speed limit at a q current $I$ solves
 $(R_s I + \omega_e \psi_f)^2 + (\omega_e L_s I)^2 = V_{max}^2$. The worked example applies it.

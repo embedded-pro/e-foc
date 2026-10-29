@@ -101,7 +101,7 @@ $$
 closed-loop transfer function.
 
 **RLS dependency**: $L_s$ from the electrical RLS estimator. $\psi_f$ is a motor constant calibrated
-during alignment. $V_{dc}$ is measured dynamically.
+during alignment. $V_{dc}$ is measured once at boot.
 
 **Performance**: At $\omega_e = 1000$ rad/s with $L_s = 0.5$ mH and $i_q = 5$ A, the uncorrected
 coupling is $\omega_e L_s i_q = 2.5$ V — 10% of a 24 V bus. This is the dominant current control

@@ -231,8 +231,8 @@ d_k = \mathrm{clamp}\!\left(\frac{v_k + v_{common}}{\sqrt{3}} + 0.5,\ 0,\ 1\righ
 $$
 
 The factor $1/\sqrt{3}$ in the duty cycle formula arises from the normalisation: at the hexagon boundary,
-the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ of the bus voltage, and the
-factor maps this to the [0, 1] duty cycle range centred at 0.5.
+the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ in per-unit, $V_{dc}/2$ in volts, and
+the factor maps this to the [0, 1] duty cycle range centred at 0.5.
 
 **Advantages over sector-based SVM**:
 - No angle or sector lookup required.
