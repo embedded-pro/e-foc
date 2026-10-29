@@ -823,6 +823,12 @@ What the plant has shown so far:
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's
   2–6×. The platform now states the delay and the estimator pairs accordingly
   (`documentation/design/service-electrical-ident.md`; REQ-CAL-017).
+- **The same late duty put the deadbeat law into a 3.4 kHz limit cycle on the rig**, swinging to the
+  voltage limit with the rotor at rest. Inverting the plant on the measured current leaves the pole
+  pair $z^2 - A_d z + A_d = 0$; on the bench motor with the duty a period late the model showed the
+  same thing as a 102 % overshoot that took 12.8 ms to settle. The law now acts on the current it
+  predicts for when its duty lands, which settles in 0.1 ms with 5 % overshoot
+  (`documentation/theory/current-loop-deadbeat.md`; REQ-TRQ-010).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.

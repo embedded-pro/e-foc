@@ -134,6 +134,21 @@ TEST_F(CalibrationContextTest, apply_calls_foc_configure_and_sets_current_tuning
     context.Apply(foc, foc);
 }
 
+TEST_F(CalibrationContextTest, apply_gives_the_controller_the_board_pwm_update_delay)
+{
+    application::CalibrationContext lateDuty{ inverter, foc::Volts{ 24.0f }, foc::Weber{ 0.005f }, std::nullopt, 1 };
+    lateDuty.SetData(CompleteData());
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).WillOnce(Invoke([](const foc::MotorModelParameters& parameters)
+        {
+            EXPECT_EQ(parameters.dutyUpdateDelayPeriods, 1u);
+            return true;
+        }));
+    EXPECT_CALL(foc, SetCurrentTunings(_));
+
+    lateDuty.Apply(foc, foc);
+}
+
 TEST_F(CalibrationContextTest, apply_pushes_the_stored_current_offsets_and_invalidate_clears_them)
 {
     StrictMock<services::PhaseCurrentOffsetsMock> currentOffsets;

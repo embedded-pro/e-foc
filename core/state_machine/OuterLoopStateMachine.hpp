@@ -19,7 +19,6 @@ namespace application
         hal::Hertz baseFrequency;
         foc::LowPriorityInterrupt& lowPriorityInterrupt;
         hal::Hertz outerLoopFrequency{ 1000 };
-        uint32_t dutyUpdateDelayPeriods{ 0 };
     };
 
     class OuterLoopStateMachine

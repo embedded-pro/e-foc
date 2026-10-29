@@ -109,6 +109,31 @@ Deadbeat is the natural progression after Decoupled PID has validated RLS conver
 added to $v'$ before the modulation-circle limit. Without them $\omega_e L_s i_q$ enters as an
 unmodelled disturbance and the one-step settling property is lost at speed.
 
+**A duty that acts a period late**: on a board whose PWM loads the new compare values at the next
+period boundary (E-FOC-HARDWARE), the voltage computed from $i[k]$ is applied from $k+1$, and
+$v'[k-1]$ is what drives the plant meanwhile:
+
+$$
+i[k+1] = A_d^i\, i[k] + B_d^i\, v'[k-1]
+$$
+
+The law above, applied unchanged, gives the closed loop $z^2 - A_d^i z + A_d^i = 0$: a pole pair of
+radius $\sqrt{A_d^i}$ at angle $\arccos\!\left(\sqrt{A_d^i}/2\right)$. On the bench motor
+($A_d^i \approx 0.95$ at 20 kHz) that is $|z| = 0.974$ at about 3.4 kHz, which the rig showed as a
+3.4–3.7 kHz limit cycle swinging to the voltage limit. When the platform states the delay
+(`DutyUpdateDelayPeriods() = 1`), the law acts on the current it predicts for the moment its own
+duty lands, from the measurement and the voltage still in flight:
+
+$$
+\hat{i}[k+1] = A_d^i\, i[k] + B_d^i\, v'[k-1], \qquad
+v'[k] = \frac{i^* - A_d^i\, \hat{i}[k+1]}{B_d^i}
+$$
+
+With an exact model the one-step law then reaches the reference one period later than without the
+delay, and the two-step law keeps its pole. The voltage in flight is the one the plant receives: the
+decoupled output after the modulation-circle limit, less the decoupling terms, so a saturated step
+is predicted as applied rather than as requested.
+
 **Normalisation**: $v'[k]$ (physical volts) normalised identically to the PI output:
 $v'_{norm}[k] = v'[k] \cdot \sqrt{3}/V_{dc}$.
 
@@ -132,14 +157,14 @@ Deadbeat has no integral action, so it is unaffected by windup at the voltage li
 
 ## Numerical Properties
 
-| Property                  | Value                                     |
-|---------------------------|-------------------------------------------|
-| ISR cost                  | ~4 MACs (cheapest advanced controller)    |
-| Settling time             | 1 sample (one-step); geometric (two-step) |
-| Robustness to Rs/Ls error | Low — exact model required                |
-| Requires $\psi_f$         | No (but A1 feedforward does)              |
-| Requires RLS convergence  | Yes — tight convergence required          |
-| Tuning knobs              | 0 (variant choice only)                   |
+| Property                  | Value                                                                |
+|---------------------------|----------------------------------------------------------------------|
+| ISR cost                  | ~4 MACs (cheapest advanced controller); ~8 with a late duty          |
+| Settling time             | 1 sample (one-step); geometric (two-step); one more with a late duty |
+| Robustness to Rs/Ls error | Low — exact model required                                           |
+| Requires $\psi_f$         | No (but A1 feedforward does)                                         |
+| Requires RLS convergence  | Yes — tight convergence required                                     |
+| Tuning knobs              | 0 (variant choice only)                                              |
 
 ---
 

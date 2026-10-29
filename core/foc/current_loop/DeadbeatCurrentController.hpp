@@ -13,14 +13,20 @@ namespace foc
 
         bool Configure(const MotorModelParameters& motorParameters);
         bool SetTunings(const CurrentLoopTunings& tunings);
-        void Reset() const;
+        void Reset();
 
-        OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context) const
+        // A duty that acts a period late lands on the current the plant reaches by then, so the law acts on that prediction
+        OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            const auto d = referenceGain * context.reference.d - feedbackGain * context.measured.d;
-            const auto q = referenceGain * context.reference.q - feedbackGain * context.measured.q;
+            const auto predictedD = predictionStateGain * context.measured.d + predictionInputGain * lastInput.d;
+            const auto predictedQ = predictionStateGain * context.measured.q + predictionInputGain * lastInput.q;
+            const RotatingFrame command{ referenceGain * context.reference.d - feedbackGain * predictedD, referenceGain * context.reference.q - feedbackGain * predictedQ };
 
-            return LimitToModulationCircle(decoupling.Apply({ d, q }, context));
+            const auto decoupled = decoupling.Apply(command, context);
+            const auto applied = LimitToModulationCircle(decoupled);
+            lastInput = RotatingFrame{ command.d + applied.d - decoupled.d, command.q + applied.q - decoupled.q };
+
+            return applied;
         }
 
     private:
@@ -31,6 +37,9 @@ namespace foc
         bool twoStep{ CurrentLoopTunings{}.twoStepDeadbeat };
         float referenceGain{ 0.0f };
         float feedbackGain{ 0.0f };
+        float predictionStateGain{ 1.0f };
+        float predictionInputGain{ 0.0f };
+        RotatingFrame lastInput{ 0.0f, 0.0f };
     };
 
     static_assert(CurrentController<DeadbeatCurrentController>);

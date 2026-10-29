@@ -65,7 +65,7 @@ namespace application
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ inverterCompensation, this->hardware, vdc },
+                    MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods() },
                     nvm,
                     CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
                     *platformFaultNotifier,
@@ -73,8 +73,7 @@ namespace application
                     ControlMode::OuterLoopArgs{
                         .maxCurrent = this->hardware.MaxCurrentSupported(),
                         .baseFrequency = this->hardware.BaseFrequency(),
-                        .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt(),
-                        .dutyUpdateDelayPeriods = this->hardware.DutyUpdateDelayPeriods() });
+                        .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ this->hardware, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
                     *electricalIdent, nullptr, this->hardware.Tracer(), *currentOffsets, rotorStandstill);

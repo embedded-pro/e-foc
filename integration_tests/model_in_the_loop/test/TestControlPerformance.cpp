@@ -106,6 +106,14 @@ TEST_F(TestControlPerformance, every_current_law_steps_from_rest_to_0_5_A)
         mil::StepFromRest(mil::Scenario{}.CurrentLoop(algorithm), currentLoop, row);
 }
 
+TEST_F(TestControlPerformance, the_deadbeat_current_law_steps_from_rest_to_0_5_A_when_each_duty_acts_a_period_late)
+{
+    auto scenario = mil::Scenario{}.Plant("bench").CurrentLoop(foc::CurrentAlgorithm::deadbeat);
+    sil::DescribeBoardPwmUpdate(scenario.plant);
+
+    mil::StepFromRest(scenario, currentLoop, { "deadbeat, duty a period late", 0.5f, 10.0f, 1.0f, 30.0f, 1.0f, 7.0f, 0.05f });
+}
+
 TEST_F(TestControlPerformance, the_pid_current_law_follows_a_setpoint_change_while_running)
 {
     StepWhileRunning(mil::Scenario{}.CurrentLoop(foc::CurrentAlgorithm::pid), currentLoop, 5000, 10000, 15.0f, 60.0f,

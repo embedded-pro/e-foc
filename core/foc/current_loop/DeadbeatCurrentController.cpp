@@ -32,14 +32,17 @@ namespace foc
         return ApplyGains();
     }
 
-    void DeadbeatCurrentController::Reset() const
+    void DeadbeatCurrentController::Reset()
     {
+        lastInput = RotatingFrame{ 0.0f, 0.0f };
     }
 
     bool DeadbeatCurrentController::ApplyGains()
     {
         referenceGain = 0.0f;
         feedbackGain = 0.0f;
+        predictionStateGain = 1.0f;
+        predictionInputGain = 0.0f;
 
         if (!AreElectricalParametersValid(parameters))
             return false;
@@ -54,6 +57,13 @@ namespace foc
 
         referenceGain = reference * scale;
         feedbackGain = feedback * scale;
+
+        if (parameters.dutyUpdateDelayPeriods != 0)
+        {
+            predictionStateGain = plant.ad;
+            predictionInputGain = plant.bd / scale;
+        }
+
         return true;
     }
 }

@@ -31,6 +31,13 @@ namespace
         return physicalVoltage * std::numbers::sqrt3_v<float> / busVoltage;
     }
 
+    foc::MotorModelParameters ParametersWithALateDuty()
+    {
+        auto parameters = ValidParameters();
+        parameters.dutyUpdateDelayPeriods = 1;
+        return parameters;
+    }
+
     class TestDeadbeatCurrentController
         : public ::testing::Test
     {
@@ -151,4 +158,50 @@ TEST_F(TestDeadbeatCurrentController, reset_does_not_change_the_stateless_output
 
     EXPECT_NEAR(before.d, after.d, tolerance);
     EXPECT_NEAR(before.q, after.q, tolerance);
+}
+
+TEST_F(TestDeadbeatCurrentController, with_a_late_duty_the_law_acts_on_the_current_it_predicts_for_when_the_duty_lands)
+{
+    controller.Configure(ParametersWithALateDuty());
+
+    const float reference = 0.1f;
+    const float measured = 0.05f;
+    auto output = controller.Compute({ { measured, measured }, { reference, reference }, 0.0f });
+
+    const float expected = Normalized((reference - Ad() * Ad() * measured) / Bd());
+    EXPECT_NEAR(output.d, expected, tolerance);
+    EXPECT_NEAR(output.q, expected, tolerance);
+}
+
+TEST_F(TestDeadbeatCurrentController, with_a_late_duty_the_one_step_law_reaches_the_reference_one_period_later)
+{
+    controller.Configure(ParametersWithALateDuty());
+
+    const float denormalize = busVoltage / std::numbers::sqrt3_v<float>;
+    const float reference = 1.0f;
+    float current = 0.0f;
+    float pendingVoltage = 0.0f;
+
+    for (int step = 0; step < 2; ++step)
+    {
+        auto output = controller.Compute({ { current, 0.0f }, { reference, 0.0f }, 0.0f });
+        current = Ad() * current + Bd() * pendingVoltage;
+        pendingVoltage = output.d * denormalize;
+    }
+
+    EXPECT_NEAR(Ad() * current + Bd() * pendingVoltage, reference, tolerance);
+}
+
+TEST_F(TestDeadbeatCurrentController, reset_forgets_the_duty_still_in_flight)
+{
+    controller.Configure(ParametersWithALateDuty());
+    const foc::CurrentControlContext context{ { 0.05f, 0.05f }, { 0.1f, 0.1f }, 0.0f };
+    auto first = controller.Compute(context);
+    controller.Compute(context);
+
+    controller.Reset();
+    auto afterReset = controller.Compute(context);
+
+    EXPECT_NEAR(first.d, afterReset.d, tolerance);
+    EXPECT_NEAR(first.q, afterReset.q, tolerance);
 }
