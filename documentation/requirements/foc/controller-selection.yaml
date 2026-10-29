@@ -157,10 +157,10 @@
   shall: >
     The current-sensor offset measurement shall also measure the RMS noise of the phase-current
     samples about their offsets, and the calibration record shall store it in milliamperes. The
-    automatic current-loop bandwidth shall be the lower of 2π times a fifteenth of the PWM
+    automatic current-loop bandwidth shall be the lower of 2 pi times a fifteenth of the PWM
     frequency and the bandwidth whose proportional gain, the inductance times the bandwidth, turns
     that noise into 0.08 V RMS of commanded voltage, but not below ten times the default speed-loop
-    bandwidth. A record that holds no noise measurement shall keep 2π times a fifteenth of the PWM
+    bandwidth. A record that holds no noise measurement shall keep 2 pi times a fifteenth of the PWM
     frequency. Against a plant whose current sensors carry a known noise, the stored noise shall be
     within 10 percent of it, and the automatic bandwidth shall be the one the stored noise and the
     identified inductance give.
