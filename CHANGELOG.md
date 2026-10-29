@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.5.0](https://github.com/embedded-pro/e-foc/compare/v1.4.0...v1.5.0) (2026-10-29)
+
+
+### Features
+
+* **calibration:** Identify the flux linkage after alignment, before the mechanical step ([#454](https://github.com/embedded-pro/e-foc/issues/454)) ([85df3c0](https://github.com/embedded-pro/e-foc/commit/85df3c02694394fe1aa9c80fe92a96ea2e529fa2))
+* **foc:** A q-axis current command in every cascade, with its applied voltage ([#455](https://github.com/embedded-pro/e-foc/issues/455)) ([fe4aad8](https://github.com/embedded-pro/e-foc/commit/fe4aad885a26eeaff4e739650e7c9fe009f3d291))
+* **foc:** Bound the automatic current-loop bandwidth by the measured sensor noise ([#451](https://github.com/embedded-pro/e-foc/issues/451)) ([a4605fe](https://github.com/embedded-pro/e-foc/commit/a4605fe8df99ffff91a67c3ecd7518adc483c409))
+* **services:** Confirm the current offsets with a second measurement ([#460](https://github.com/embedded-pro/e-foc/issues/460)) ([ee6472d](https://github.com/embedded-pro/e-foc/commit/ee6472d3cf7a36cd3b6092068018c0b51907233c))
+* **services:** Identify the flux linkage from the back-EMF while the rotor coasts ([#456](https://github.com/embedded-pro/e-foc/issues/456)) ([a5ea0c6](https://github.com/embedded-pro/e-foc/commit/a5ea0c673dc4c47f5b97109df1052c0f1ce56165))
+
+
+### Bug Fixes
+
+* **adc:** Make a short ADC read a failure in the TI driver, and make that failure cut the bridge ([#443](https://github.com/embedded-pro/e-foc/issues/443)) ([4af3259](https://github.com/embedded-pro/e-foc/commit/4af32598672272886da185afbd49b321ebda32ab))
+* **can_commander:** Show the current bandwidth for deadbeat and name the flux-linkage step ([#458](https://github.com/embedded-pro/e-foc/issues/458)) ([bf85d6c](https://github.com/embedded-pro/e-foc/commit/bf85d6c22e19eb1268005c1578f64607b50e4c6a))
+* **can:** Measure the current-sensor offsets in an electrical identification over CAN ([#448](https://github.com/embedded-pro/e-foc/issues/448)) ([0e59279](https://github.com/embedded-pro/e-foc/commit/0e59279cf3cfd4c968897f8c143a645cab1a9f00))
+* **foc:** Deadbeat predicts the late duty and removes the voltage error its model misses ([#449](https://github.com/embedded-pro/e-foc/issues/449)) ([7c4f71e](https://github.com/embedded-pro/e-foc/commit/7c4f71ea0857f4393398d64e754b5f0866370ed7))
+* **integration-tests:** Print why the target setup failed before the run aborts ([#452](https://github.com/embedded-pro/e-foc/issues/452)) ([0f8e574](https://github.com/embedded-pro/e-foc/commit/0f8e57446611c8b315f91caac1f0bd72fc769606))
+* **platform:** Decimate phase currents in one shared adapter, not in each platform ([#453](https://github.com/embedded-pro/e-foc/issues/453)) ([3fd3347](https://github.com/embedded-pro/e-foc/commit/3fd33472e1e8accd928aa90fb7a302b8ba9db528))
+* **services:** Release the flux-linkage spin-up ahead of a fast rotor ([#459](https://github.com/embedded-pro/e-foc/issues/459)) ([b9a9f08](https://github.com/embedded-pro/e-foc/commit/b9a9f08a6f931c0622d78243cd3a3cae51fd38d7))
+* Take the hal-ti change that drops a misaligned ADC batch instead of aborting ([#447](https://github.com/embedded-pro/e-foc/issues/447)) ([eac48c4](https://github.com/embedded-pro/e-foc/commit/eac48c425cdb2ead2d8be2199f0b30518526bb37))
+
+
+### Performance Improvements
+
+* **foc:** Keep only the open check of the q-axis voltage window inline ([#457](https://github.com/embedded-pro/e-foc/issues/457)) ([ae8cac1](https://github.com/embedded-pro/e-foc/commit/ae8cac11490d84facf52316d7c50efe30fec105d))
+* Take the hal-ti PWM and EMIL HotSwapFunction speed-ups ([#446](https://github.com/embedded-pro/e-foc/issues/446)) ([33b6ee3](https://github.com/embedded-pro/e-foc/commit/33b6ee3cf6e462b7ed57bdb3b2c85e9d162441f3))
+* Trim per-tick work from the 20 kHz path ([#440](https://github.com/embedded-pro/e-foc/issues/440)) ([99feb79](https://github.com/embedded-pro/e-foc/commit/99feb791677d43560bbaadc188fff220e45b9703))
+
+
+### Documentation
+
+* **theory:** A reading path from motor physics to noise, a practical part, and animations ([#461](https://github.com/embedded-pro/e-foc/issues/461)) ([107d563](https://github.com/embedded-pro/e-foc/commit/107d5633caf07fc00d0af41115d472f681816dd7))
+* Trim code comments to one line and document the rotor standstill service ([#438](https://github.com/embedded-pro/e-foc/issues/438)) ([20003bf](https://github.com/embedded-pro/e-foc/commit/20003bfe1e968f50e812ec6fbda3c14547e20214))
+
 ## [1.4.0](https://github.com/embedded-pro/e-foc/compare/v1.3.0...v1.4.0) (2026-10-27)
 
 
