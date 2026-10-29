@@ -54,7 +54,6 @@ namespace can
         pendingOffsets = foc::PhaseCurrents{};
         pendingElectricalIdentDoneCallback = onDone;
 
-        // The offset step shorts the windings, so a turning rotor would drive current that is stored as sensor bias
         if (!standstill)
         {
             MeasureCurrentOffsets();
