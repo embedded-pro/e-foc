@@ -47,7 +47,6 @@ namespace tool
         void OnSpeedPosition(float speed, float position);
         void OnBusVoltage(float voltage);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
-        void OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2);
         void OnAlgorithms(const can::FocAlgorithms& algorithms);
         void OnParameter(can::FocParameter parameter, can::FocParameterValue value);
 

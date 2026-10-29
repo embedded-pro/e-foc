@@ -57,7 +57,6 @@ namespace
         MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnAlign, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnIdentifyElectrical, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnIdentifyMechanical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnSetEncoderResolution, (uint32_t, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnConfigureTelemetryRate, (uint32_t, (const infra::Function<void()>&)), (override));
@@ -272,14 +271,6 @@ TEST_F(FocMotorCategoryServerTest, SendCategoryError_EmitsCategoryErrorFrame)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleQueryMotorType_AcksNotImplemented)
-{
-    server.HandleMessage(can::focQueryMotorTypeId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
-}
-
 TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ParsesBandwidthAndInvokesObserver)
 {
     EXPECT_CALL(observer, OnSetPidCurrent(_, _))
@@ -349,20 +340,6 @@ TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
             }));
 
     server.HandleMessage(can::focIdentifyElectricalId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleIdentifyMechanical_InvokesObserver)
-{
-    EXPECT_CALL(observer, OnIdentifyMechanical(_))
-        .WillOnce(Invoke([](const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focIdentifyMechanicalId, MakePayload(1));
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
@@ -466,33 +443,6 @@ TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ParsesRateAndInv
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_EncodesFrictionAndInertiaAsNanoUnits)
-{
-    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ 1.5e-5f }, foc::NewtonMeterSecondSquared{ 7.06e-6f });
-
-    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
-    const auto expected = MakeMessage({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 });
-    EXPECT_EQ(lastSentMsg, expected);
-}
-
-TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_ClampsNegativeAndNanToZero)
-{
-    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ -1.0f }, foc::NewtonMeterSecondSquared{ std::nanf("") });
-
-    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
-    const auto expected = MakeMessage({ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
-    EXPECT_EQ(lastSentMsg, expected);
-}
-
-TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_SaturatesAtUint32Max)
-{
-    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ 5.0f }, foc::NewtonMeterSecondSquared{ 1.0f });
-
-    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
-    const auto expected = MakeMessage({ 0xFF, 0xFF, 0xFF, 0xFF, 0x3B, 0x9A, 0xCA, 0x00 });
-    EXPECT_EQ(lastSentMsg, expected);
 }
 
 TEST_F(FocMotorCategoryServerTest, HandleSelectAlgorithm_AnswersWithTheModeAndEveryLoopsAlgorithm)

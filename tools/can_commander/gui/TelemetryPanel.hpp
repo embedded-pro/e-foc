@@ -28,7 +28,6 @@ namespace tool
         void OnBusVoltage(float voltage);
         void OnFaultEvent(FocFaultCode fault);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
-        void OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2);
 
         void Clear();
 

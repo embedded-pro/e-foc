@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.7.0
+version: 0.7.1
 component: "tool-can-commander"
-date: 2026-10-27
+date: 2026-10-29
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.7.0                |
+| Version   | 0.7.1                |
 | Component | tool-can-commander   |
-| Date      | 2026-10-27           |
+| Date      | 2026-10-29           |
 
 ---
 
@@ -145,11 +145,10 @@ Each command outcome is logged in words and prefixed with its motor: accepted, t
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally
 and never sent, or a command that received no answer in time.
 
-Align, Identify Electrical, Identify Mechanical and Calibrate move the rotor and answer only when they
+Align, Identify Electrical and Calibrate move the rotor and answer only when they
 finish, so the tool waits up to two minutes for them instead of two seconds; the panel says the rotor will
 move before the button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
-in progress (Part J). A controller that answers Identify Mechanical with "not implemented" gets that button
-disabled, with the reason, until its tab is closed.
+in progress (Part J).
 
 ### Part L — refused commands
 
@@ -163,7 +162,7 @@ the last status the controller reported:
 |------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------|
 | Idle, or no status yet | Start Motor, a setpoint                            | Align the rotor, then start; the reference is lost at start-up and on a pole-pair change   | Align Rotor           |
 | Idle                   | Align Rotor (no complete calibration for the mode) | Calibrate, or enter the motor parameters (inertia and friction in speed and position mode) | Open Motor Parameters |
-| Partially calibrated   | any operating command                              | Identify or enter inertia and friction, then align and start                               | Open Motor Parameters |
+| Partially calibrated   | any operating command                              | Calibrate, or enter inertia and friction, then align and start                             | Open Motor Parameters |
 | Fault                  | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
 | Fault                  | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
 | Calibrating            | any operating command                              | Wait until it finishes                                                                     | —                     |
@@ -210,8 +209,9 @@ flowchart LR
   shown for deadbeat too, which estimates its voltage error at that bandwidth. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
 - **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (measured by Calibrate, or the
-  platform default), inertia and viscous friction, and the commissioning actions Align, Identify Electrical,
-  Identify Mechanical and Calibrate, the whole sequence of the firmware's calibration. Changing the pole pairs
+  platform default), inertia and viscous friction, and the commissioning actions Align, Identify Electrical
+  and Calibrate, the whole sequence of the firmware's calibration, which includes the mechanical
+  identification in speed and position mode. Changing the pole pairs
   says that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
   after the user confirms it in a dialog, since the motor cannot start again until it is calibrated; a
   successful Calibrate or Clear Calibration reads the motor parameters and the diagnostics again.

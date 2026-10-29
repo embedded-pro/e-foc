@@ -37,7 +37,6 @@ namespace can
         virtual void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnIdentifyElectrical(const infra::Function<void()>& onDone) = 0;
-        virtual void OnIdentifyMechanical(const infra::Function<void()>& onDone) = 0;
         virtual void OnRequestTelemetry(const infra::Function<void()>& onDone) = 0;
         virtual void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) = 0;
         virtual void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) = 0;
@@ -69,7 +68,6 @@ namespace can
         void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
             foc::RadiansPerSecond speed, foc::Radians position);
         void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
-        void BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
         void SendAlgorithmsResponse(const FocAlgorithms& algorithms);
         void SendParameterResponse(FocParameter parameter, FocParameterValue value);
 
@@ -88,7 +86,6 @@ namespace can
         bool HandleSetPidPosition(const hal::Can::Message& data);
         bool HandleRequestTelemetry(const hal::Can::Message& data);
         bool HandleSetEncoderResolution(const hal::Can::Message& data);
-        bool HandleQueryMotorType(const hal::Can::Message& data);
         bool HandleConfigureTelemetryRate(const hal::Can::Message& data);
         bool HandleQueryContractVersion(const hal::Can::Message& data);
         bool HandleSelectAlgorithm(const hal::Can::Message& data);
@@ -110,7 +107,6 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> setPidPosition{ focSetPidPositionId, *this, &FocMotorCategoryServer::HandleSetPidPosition };
         services::CanMessageHandler<FocMotorCategoryServer> requestTelemetry{ focRequestTelemetryId, *this, &FocMotorCategoryServer::HandleRequestTelemetry };
         services::CanMessageHandler<FocMotorCategoryServer> setEncoderResolution{ focSetEncoderResolutionId, *this, &FocMotorCategoryServer::HandleSetEncoderResolution };
-        services::CanMessageHandler<FocMotorCategoryServer> queryMotorType{ focQueryMotorTypeId, *this, &FocMotorCategoryServer::HandleQueryMotorType };
         services::CanMessageHandler<FocMotorCategoryServer> configureTelemetryRate{ focConfigureTelemetryRateId, *this, &FocMotorCategoryServer::HandleConfigureTelemetryRate };
         services::CanMessageHandler<FocMotorCategoryServer> queryContractVersion{ focQueryContractVersionId, *this, &FocMotorCategoryServer::HandleQueryContractVersion };
 
@@ -134,14 +130,12 @@ namespace can
         private:
             bool HandleAlign(const hal::Can::Message& data);
             bool HandleIdentifyElectrical(const hal::Can::Message& data);
-            bool HandleIdentifyMechanical(const hal::Can::Message& data);
             bool HandleCalibrate(const hal::Can::Message& data);
             bool HandleClearCalibration(const hal::Can::Message& data);
 
             FocMotorCategoryServer& server;
             services::CanMessageHandler<CommissioningMessages> align;
             services::CanMessageHandler<CommissioningMessages> identifyElectrical;
-            services::CanMessageHandler<CommissioningMessages> identifyMechanical;
             services::CanMessageHandler<CommissioningMessages> calibrate;
             services::CanMessageHandler<CommissioningMessages> clearCalibration;
         };

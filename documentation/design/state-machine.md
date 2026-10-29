@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: state-machine
-date: 2026-10-27
+date: 2026-10-29
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.5.0                      |
+| Version   | 0.5.1                      |
 | Component | state-machine              |
-| Date      | 2026-10-27                 |
+| Date      | 2026-10-29                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -484,9 +484,9 @@ The two-command split ensures the FSM enters `Calibrating` before any open-loop 
 
 3. **`CmdReleaseExternalCalibration()`** — synchronous. Gives up a reservation whose estimation failed, or whose completion was rejected, so the node does not stay in `Calibrating` until an emergency stop. It returns to `Ready` when a valid calibration is held and to `Idle` otherwise, and is accepted only while the reservation came from `CmdReserveExternalCalibration` (`Calibrating::externalReservation`), no command is pending and no run is in flight — a CLI calibration cannot be released from CAN, and a completion that is already aligning finishes first.
 
-The CAN bridge also takes this reservation for `OnIdentifyMechanical`, which spins the motor: holding `Calibrating` for the run refuses `CmdEnable`, mode selection and setpoints meanwhile, and the bridge releases it when the estimation reports. The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
+The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
 
-The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` covers the electrical steps only (REQ-INT-011), so it must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
 

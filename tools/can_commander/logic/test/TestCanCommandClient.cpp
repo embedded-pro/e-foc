@@ -20,6 +20,8 @@ namespace
     using testing::Invoke;
     using testing::StrictMock;
 
+    constexpr uint8_t undecodedResponseId{ 0x80 };
+
     class TestCanCommandClient
         : public testing::Test
         , public infra::ClockFixture
@@ -275,7 +277,7 @@ TEST_F(TestCanCommandClient, a_received_frame_reports_its_sender_online_before_i
     EXPECT_CALL(observer, OnNodeOnlineChanged(3, true));
     EXPECT_CALL(observer, OnFrameLog(false, _, _));
 
-    LogReceived(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, can::focMotorTypeResponseId, 3), Message({ 0 }));
+    LogReceived(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, undecodedResponseId, 3), Message({ 0 }));
 }
 
 TEST_F(TestCanCommandClient, a_silent_node_goes_offline_after_the_server_timeout)
@@ -320,7 +322,7 @@ TEST_F(TestCanCommandClient, closing_the_bus_reports_nodes_offline_and_ends_pend
 
 TEST_F(TestCanCommandClient, a_node_heard_again_after_reconnecting_is_reported_online_again)
 {
-    const auto statusId = FocId(services::CanPriority::telemetry, can::focMotorTypeResponseId, 1);
+    const auto statusId = FocId(services::CanPriority::telemetry, undecodedResponseId, 1);
     EXPECT_CALL(observer, OnFrameLog(false, statusId, _)).Times(2);
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true)).Times(2);
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, false));
@@ -380,12 +382,11 @@ TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
     EXPECT_TRUE(client.SendClearFault(11));
     EXPECT_TRUE(client.SendAlign(12));
     EXPECT_TRUE(client.SendIdentifyElectrical(13));
-    EXPECT_TRUE(client.SendIdentifyMechanical(14));
-    EXPECT_TRUE(client.SendSetEncoderResolution(15, 4096));
-    EXPECT_TRUE(client.SendSelectAlgorithm(16, can::FocControlLoop::speed, 1));
-    EXPECT_TRUE(client.SendSetParameter(17, can::FocParameter::inertia, 1.0e-5f));
+    EXPECT_TRUE(client.SendSetEncoderResolution(14, 4096));
+    EXPECT_TRUE(client.SendSelectAlgorithm(15, can::FocControlLoop::speed, 1));
+    EXPECT_TRUE(client.SendSetParameter(16, can::FocParameter::inertia, 1.0e-5f));
 
-    for (uint16_t node = 1; node <= 17; ++node)
+    for (uint16_t node = 1; node <= 16; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 
@@ -559,11 +560,11 @@ TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
     Receive(FocId(services::CanPriority::telemetry, can::focTelemetryElectricalResponseId, 1), Message({ 0, 240, 0, 0, 0, 50, 0, 30 }));
 }
 
-TEST_F(TestCanCommandClient, motor_type_response_received_does_not_call_any_observer)
+TEST_F(TestCanCommandClient, an_undecoded_response_does_not_call_any_observer)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
 
-    Receive(FocId(services::CanPriority::response, can::focMotorTypeResponseId, 1), Message({ static_cast<uint8_t>(can::FocMotorMode::speed) }));
+    Receive(FocId(services::CanPriority::response, undecodedResponseId, 1), Message({ static_cast<uint8_t>(can::FocMotorMode::speed) }));
 }
 
 TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
@@ -572,14 +573,6 @@ TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
     EXPECT_CALL(observer, OnElectricalParametersReceived(1, testing::FloatNear(0.5f, 0.001f), testing::FloatNear(1.0f, 0.001f), 7));
 
     Receive(FocId(services::CanPriority::response, can::focElectricalParamsResponseId, 1), Message({ 0x01, 0xF4, 0x03, 0xE8, 7 }));
-}
-
-TEST_F(TestCanCommandClient, mechanical_params_response_notifies_observer)
-{
-    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
-    EXPECT_CALL(observer, OnMechanicalParametersReceived(1, testing::FloatNear(1.5e-5f, 1e-7f), testing::FloatNear(7.06e-6f, 1e-8f)));
-
-    Receive(FocId(services::CanPriority::response, can::focMechanicalParamsResponseId, 1), Message({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 }));
 }
 
 TEST_F(TestCanCommandClient, select_control_mode_response_acknowledges_the_mode_and_ends_the_command)
@@ -909,14 +902,12 @@ TEST_F(TestCanCommandClient, alignment_and_identification_wait_two_minutes_for_t
 {
     client.SendAlign(1);
     client.SendIdentifyElectrical(2);
-    client.SendIdentifyMechanical(3);
 
     ForwardTime(std::chrono::seconds(10));
     EXPECT_TRUE(client.IsBusy(1));
 
     EXPECT_CALL(observer, OnCommandTimeout(1, can::focAlignId));
     EXPECT_CALL(observer, OnCommandTimeout(2, can::focIdentifyElectricalId));
-    EXPECT_CALL(observer, OnCommandTimeout(3, can::focIdentifyMechanicalId));
     ForwardTime(CanCommandClient::motionCommandTimeout - std::chrono::seconds(10));
 }
 

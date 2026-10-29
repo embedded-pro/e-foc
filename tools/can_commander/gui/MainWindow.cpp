@@ -787,12 +787,6 @@ namespace tool
             motor->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
     }
 
-    void MainWindow::OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2)
-    {
-        if (auto* motor = Motor(nodeId))
-            motor->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
-    }
-
     void MainWindow::OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms)
     {
         if (auto* motor = Motor(nodeId))

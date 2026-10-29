@@ -218,13 +218,6 @@ namespace tool
                         return client.SendIdentifyElectrical(nodeId);
                     });
             });
-        connect(&tab, &MotorParametersTab::IdentifyMechanicalRequested, this, [this]()
-            {
-                Send("Identify Mechanical", can::focIdentifyMechanicalId, [this]()
-                    {
-                        return client.SendIdentifyMechanical(nodeId);
-                    });
-            });
         connect(&tab, &MotorParametersTab::CalibrateRequested, this, [this]()
             {
                 Send("Calibrate", can::focCalibrateId, [this]()
@@ -560,10 +553,6 @@ namespace tool
         if (!ownCategory)
             return;
 
-        if (commandType == can::focIdentifyMechanicalId && status == services::CanAckStatus::notImplemented)
-            commandPanel->MotorParameters().SetMechanicalIdentificationUnavailable(
-                "This controller's firmware does not identify the mechanical parameters over CAN: enter inertia and friction above instead.");
-
         if (commandType == can::focSelectControlModeId && !accepted)
             ForgetControlMode();
 
@@ -676,12 +665,6 @@ namespace tool
     {
         telemetryPanel->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
         Report(IssueSeverity::info, QString("electrical parameters R = %1 Ω, L = %2 mH, %3 pole pairs").arg(resistanceOhm).arg(inductanceMilliHenry).arg(polePairs));
-    }
-
-    void MotorPanel::OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2)
-    {
-        telemetryPanel->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
-        Report(IssueSeverity::info, QString("mechanical parameters B = %1 N·m·s/rad, J = %2 kg·m²").arg(frictionNmSPerRad).arg(inertiaKgM2));
     }
 
     void MotorPanel::OnAlgorithms(const can::FocAlgorithms& algorithms)
