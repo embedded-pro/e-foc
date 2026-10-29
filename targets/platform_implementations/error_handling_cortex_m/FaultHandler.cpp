@@ -82,7 +82,6 @@ extern "C"
         __builtin_unreachable();
     }
 
-    // Replaces EMIL's weak abort(), which spins with the bridge switching; a hung interrupt starves the watchdog's cutoff
     [[noreturn]] void abort()
     {
         constexpr uintptr_t dhcsrAddress = 0xE000EDF0u;
