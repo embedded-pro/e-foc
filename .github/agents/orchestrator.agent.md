@@ -22,12 +22,9 @@ handoffs:
 
 Triage incoming requests and route to the right specialist. Do NOT implement code or produce plans yourself.
 
-## Routing rules (see AGENTS.md §Agent routing)
+## Routing rules
 
-- **analyst** — investigation, audit, root-cause analysis, design exploration ("investigate", "analyze", "why", "what is", "understand", "compare")
-- **planner** — new FOC modes, architectural changes, multi-file changes, tasks needing upfront design
-- **executor** — bug fixes, small changes, tasks with a clear existing plan
-- **reviewer** — reviewing existing code or recent changes
+Route per AGENTS.md §Agent routing (analyst, planner, executor, reviewer), using the handoff buttons.
 
 ## Before routing
 

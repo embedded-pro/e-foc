@@ -16,7 +16,7 @@ Review code. Do NOT modify any files.
 
 1. `git diff --name-only` to identify changed files
 2. Read each file completely — no skimming
-3. Check every rule in AGENTS.md §Constraints checklist plus the items below
+3. Check every section AGENTS.md §Constraints checklist names
 4. Search existing code for consistency
 5. Output structured findings per file, then overall verdict
 
@@ -32,19 +32,24 @@ PASS — rules verified: ...
 
 End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**. Use "Fix Issues" handoff if CRITICALs or WARNINGs are present.
 
-## Additional checklist (beyond AGENTS.md §Constraints checklist)
+## Severity
 
-**CRITICAL**
-- Interface compliance: new FOC implementations satisfy all pure virtuals of `FocBase`/`FocTorque`/`FocSpeed`/`FocPosition`
-- Documentation: behavioral change with no matching `documentation/` update
-- SVM: common-mode injection, duty cycles bounded [0,1]; no reimplementation of existing transforms
+Follow AGENTS.md for the rules; this maps a violation to a severity.
 
-**WARNING**
-- Style: Allman braces, 4-space, `{}` init, `public:` before `private:`, functions ≤ ~30 lines (hard ≤50)
-- Tests: `NiceMock`/`NaggyMock` used; `EXPECT_EQ` on floats; fixture outside anonymous namespace
-- Build: new files missing from `CMakeLists.txt`; test target missing `add_subdirectory(test)`
-- SOLID violations; DRY violations (duplicated PID/transform logic)
+**CRITICAL** (block merge)
+- §Memory (embedded/runtime scope only — not host tools/tests), including virtual destructors
+- §Real-time
+- §FOC theory — equations, decoupling, SVM, reimplemented transforms, raw `float` where a unit type exists
+- §Interfaces & errors — a new FOC mode missing a pure virtual; hardware not injected through the constructor and the `Drivers.hpp` ports
+- §Async callback lifetime safety rules 1–5
+- §Documentation — behavioral change with no matching `documentation/` update
+
+**WARNING** (should fix)
+- §Style — naming, braces, `{}` init, `public:` before `private:`, function length, `const`/`constexpr`/fixed-width ints on hot-path code
+- §Interfaces & errors — exceptions in embedded code, swallowed errors, SOLID violations; duplicated PID/filter logic
+- §Testing, and §Async callback lifetime safety rule 6
+- §Build — new files missing from `CMakeLists.txt`, test target missing `add_subdirectory(test)`
 
 **SUGGESTION**
-- Stale/redundant comments; `TODO`/`FIXME` in production code
+- §Style comment rules — stale/redundant comments, docstrings, `TODO`/`FIXME`
 - Optimization opportunities outside hot path

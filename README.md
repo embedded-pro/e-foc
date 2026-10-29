@@ -350,11 +350,11 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Development References
 
-| Document                                                        | Description                                               |
-|-----------------------------------------------------------------|-----------------------------------------------------------|
-| [Copilot / Agent Instructions](.github/copilot-instructions.md) | Development guidelines, patterns, and constraints         |
-| [embedded-infra-lib](infra/embedded-infra-lib/README.md)        | Bounded containers and infrastructure library reference   |
-| [numerical-toolbox](infra/numerical-toolbox/README.md)          | Reusable numerical algorithms (PID, filters, fixed-point) |
+| Document                                                 | Description                                               |
+|----------------------------------------------------------|-----------------------------------------------------------|
+| [Agent Instructions](AGENTS.md)                          | Development guidelines, patterns, and constraints         |
+| [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference   |
+| [numerical-toolbox](infra/numerical-toolbox/README.md)   | Reusable numerical algorithms (PID, filters, fixed-point) |
 
 ## License
 
