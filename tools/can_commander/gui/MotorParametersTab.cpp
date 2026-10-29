@@ -8,7 +8,7 @@ namespace tool
 {
     namespace
     {
-        constexpr const char* calibrateHint = "Run the whole calibration: current offsets, pole pairs, resistance and inductance, alignment and, in speed and position mode, the mechanical identification and the cogging map";
+        constexpr const char* calibrateHint = "Run the whole calibration: current offsets, pole pairs, resistance and inductance, alignment, the flux linkage and, in speed and position mode, the mechanical identification and the cogging map";
         constexpr const char* clearCalibrationHint = "Forget the stored calibration record; the motor has to be calibrated again before it can start";
     }
 

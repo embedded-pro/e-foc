@@ -36,6 +36,7 @@ namespace services
 
         void Tick();
         void Accelerate();
+        void Spin(float speed);
         void Settle();
         void StartRecording();
         void Record(float speed, const foc::MotionObservation& observation);
@@ -63,7 +64,7 @@ namespace services
         float resistance{ 0.0f };
         float spinCurrent{ 0.0f };
         float recordingCeiling{ 0.0f };
-        float previousPointSpeed{ 0.0f };
+        float previousSpeed{ 0.0f };
         uint32_t phaseTicks{ 0 };
         uint8_t coasts{ 0 };
         float pointSpeed{ 0.0f };

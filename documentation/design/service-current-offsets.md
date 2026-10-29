@@ -2,9 +2,9 @@
 title: "Service: Current Sensor Offsets"
 type: design
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: service-current-offsets
-date: 2026-10-23
+date: 2026-10-29
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: Current Sensor Offsets |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.1.1                           |
+| Version   | 0.1.2                           |
 | Component | service-current-offsets         |
-| Date      | 2026-10-23                      |
+| Date      | 2026-10-29                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -35,6 +35,7 @@ bench rotor's viscous friction (`documentation/design/software-in-the-loop.md`, 
 
 **Is responsible for:**
 - Measuring each phase sensor's zero-current reading at the start of the full calibration
+- Confirming each measurement with a second one, so a single disturbed window is never stored
 - Handing the offsets in force to the inverter compensation stage, which removes them from every
   phase-current sample before any consumer receives it
 - Failing a measurement whose readings cannot be offsets
@@ -79,7 +80,20 @@ its phase's offset. The calibration record stores it in whole milliamperes, and 
 current-loop bandwidth is held where its proportional gain keeps that noise out of earshot
 (`controller-selection.md`, *Automatic bandwidth*; REQ-CTRL-017).
 
-It fails and stops the bridge in three cases:
+One such average is a window. A measurement takes two windows and keeps their mean, offsets and noise
+alike, when every phase agrees within 10 mA. With 35 mA of sample noise two undisturbed windows differ
+by about 1 mA RMS, so the tolerance only turns away a disturbed one. When they disagree it takes a third
+window and keeps its mean with whichever earlier window it agrees with, the first if both do. With no
+agreeing pair among the three, the measurement fails. It takes 220 ms at 20 kHz, 330 ms with a third
+window.
+
+On the bench a back-to-back calibration once read phase B 52 mA low while A and C read as usual, and
+the noise rose from 38 to 43 mA. The flux-linkage fit that followed was the worst of the session. A
+second window catches such a disturbance whatever its cause; the stored record is not consulted, since
+the offsets drift by several milliamperes between calibrations and none exists after the calibration
+is cleared.
+
+A window fails and stops the bridge in three cases, and a failed window fails the measurement:
 - a sample exceeds the inverter's maximum current, which means the rotor was turning or the sensing
   is broken;
 - an offset exceeds 0.5 A, far beyond any amplifier or mid-rail error;
@@ -116,8 +130,11 @@ sequenceDiagram
     SM->>CO: Measure
     CO->>INV: all legs at 50 % duty, samples at the control frequency
     INV-->>CO: raw samples (interrupt)
-    note over CO: discard 200, average 2000 per phase
-    CO->>INV: Stop
+    loop two windows, a third on disagreement
+        note over CO: discard 200, average 2000 per phase
+        CO->>INV: Stop
+    end
+    note over CO: keep the mean of two windows within 10 mA per phase
     CO-->>SM: offsets, or failure (event loop)
     SM->>CO: Apply(offsets)
     CO->>IC: offsets in force
@@ -134,13 +151,13 @@ sequenceDiagram
 
 ### Provided
 
-| Interface  | Purpose                            | Contract                                                               |
-|------------|------------------------------------|------------------------------------------------------------------------|
-| Measure    | Measure the three offsets          | Asynchronous; reports three offsets or none; leaves the bridge stopped |
-| Noise      | The noise of the last measurement  | RMS about the offsets over the three phases; zero before a measurement |
-| Apply      | Set the offsets in force           | Takes effect on the next sample the compensation stage hands on        |
-| Abort      | Abandon a measurement              | Stops the bridge; the measurement reports nothing                      |
-| Is running | Whether a measurement is in flight | True from Measure until its result is delivered or it is aborted       |
+| Interface  | Purpose                            | Contract                                                                                             |
+|------------|------------------------------------|------------------------------------------------------------------------------------------------------|
+| Measure    | Measure the three offsets          | Asynchronous; reports three offsets or none; leaves the bridge stopped                               |
+| Noise      | The noise of the last measurement  | RMS about the offsets over the three phases, mean of the two windows kept; zero before a measurement |
+| Apply      | Set the offsets in force           | Takes effect on the next sample the compensation stage hands on                                      |
+| Abort      | Abandon a measurement              | Stops the bridge; the measurement reports nothing                                                    |
+| Is running | Whether a measurement is in flight | True from Measure until its result is delivered or it is aborted                                     |
 
 ### Required
 
@@ -159,3 +176,7 @@ Against plants whose phases are biased by +27, −18 and +54 mA with 35 mA of no
 calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor,
 and an electrical identification over CAN stores them within the same 5 mA (REQ-CAL-015,
 `parameter_identification.feature`).
+
+In the model in the loop, phase B read 52 mA low for the first 105 ms of the measurement, which covers
+most of the first window. Without the confirmation the stored phase B offset was 49 mA off; with it,
+the first window is outvoted and all three offsets are within 5 mA of the biases (REQ-CAL-015).

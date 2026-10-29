@@ -2,7 +2,7 @@
 title: "Service: Flux Linkage Identification"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-flux-linkage-ident
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | Service: Flux Linkage Identification |
 | Type      | design                               |
 | Status    | draft                                |
-| Version   | 0.1.0                                |
+| Version   | 0.1.1                                |
 | Component | service-flux-linkage-ident           |
 | Date      | 2026-10-29                           |
 
@@ -69,7 +69,7 @@ low through the flux linkage. The 10 ms mean leaves a tenth of that noise.
 stateDiagram-v2
     direction LR
     [*] --> Accelerating : spin current
-    Accelerating --> Settling : 40 rad/s reached, current to 0
+    Accelerating --> Settling : 40 rad/s ahead of the speed gain, current to 0
     Settling --> Recording : 10 ms later
     Recording --> Accelerating : below 10 rad/s, too few points
     Recording --> Slowing : coast too slow to span the speeds, or speeding up above 45 rad/s
@@ -100,6 +100,15 @@ above the recording ceiling and higher than the point before ends the coast; the
 15 rad/s and recorded again as it speeds up. The fit subtracts $R_s i_q$ with the measured current, so
 the current it leaves does not bias the slope. The overshoot past the release speed falls from one
 point to the next, so it does not end a coast.
+
+The release happens ahead of the release speed by twice the speed gained over the last tick. The
+measured speed is a 1 ms mean, a period behind the rotor, and the current falls to zero a period
+after it is set, so a rotor gaining speed fast is already well past the speed it is released at. In
+simulation the low-inertia reference motor gained 4 rad/s per tick on the spin current: released when
+its measured speed passed 40 rad/s, it was at 47 rad/s and peaked at 50.4 rad/s, an overspeed. Counting
+two ticks of gain releases it below 40 rad/s, and it peaks below 45 rad/s. The bench motor gains about
+1 rad/s per tick and its 1000-count encoder reads the speed in steps of 1.6 rad/s, so it is released a
+few rad/s earlier than before; the coast still spans more than three to one.
 
 ### Part C — Accepting the result
 
@@ -161,7 +170,9 @@ sequenceDiagram
 Unit tests drive the service against a simulated rotor and check the fitted flux linkage for a
 coasting rotor, a constant voltage offset, a rotor that barely slows, and a rotor the current law
 keeps driving at 0 A. They also check braking to rest, the current limit, an overspeed, a rotor that
-never reaches the release speed, an abort and a refused request.
+never reaches the release speed, an abort and a refused request. Rotors gaining 3.9 to 5.4 rad/s per
+tick, seen a period late, are released early enough to peak below 45 rad/s; released at the measured
+40 rad/s they reached 54 rad/s and were reported as an overspeed.
 
 In the model-in-the-loop, calibrating against plants whose flux linkage differs from the configured
 7.0 mWb, the stored flux linkage is within 0.2 % of 4.6 mWb on the bench motor and within 0.1 % on

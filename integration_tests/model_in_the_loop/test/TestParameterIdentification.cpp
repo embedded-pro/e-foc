@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <numbers>
 #include <string>
+#include <variant>
 
 namespace
 {
@@ -81,6 +82,50 @@ TEST_F(TestParameterIdentification, the_full_calibration_measures_the_current_se
         mil::ExpectIdentified(mil, Quantity::resistance, 5.0f);
         mil::ExpectPolePairsMatch(mil);
     }
+}
+
+TEST_F(TestParameterIdentification, a_current_offset_window_one_phase_reads_wrong_in_is_outvoted_by_the_next_two)
+{
+    mil::Scenario scenario;
+    scenario.Plant("bench").BootsIn(state_machine::ControlMode::torque);
+    scenario.plant.noiseSigmaAmpere = 0.035f;
+    scenario.plant.noiseBiasAmpereA = 0.027f;
+    scenario.plant.noiseBiasAmpereB = -0.018f;
+    scenario.plant.noiseBiasAmpereC = 0.054f;
+
+    mil::ModelInTheLoop mil{ scenario };
+    const auto readPhaseBWithBias = [&mil, &scenario](float biasAmpereB)
+    {
+        mil.Drive().Model().SetAdcNoise({ .sigmaAmpere = scenario.plant.noiseSigmaAmpere,
+            .biasAmpereA = scenario.plant.noiseBiasAmpereA,
+            .biasAmpereB = biasAmpereB,
+            .biasAmpereC = scenario.plant.noiseBiasAmpereC });
+    };
+
+    std::optional<state_machine::CommandResult> result;
+    mil.ControlMode().ActiveStateMachine().CmdCalibrate([&result](state_machine::CommandResult outcome)
+        {
+            result = outcome;
+        });
+
+    ASSERT_TRUE(mil.RunUntil([&mil]()
+        {
+            const auto* calibrating = std::get_if<state_machine::Calibrating>(&mil.ControlMode().ActiveStateMachine().CurrentState());
+            return calibrating != nullptr && calibrating->step == state_machine::CalibrationStep::currentOffsets;
+        },
+        15s));
+
+    readPhaseBWithBias(-0.070f);
+    mil.Run(105ms);
+    readPhaseBWithBias(scenario.plant.noiseBiasAmpereB);
+
+    ASSERT_TRUE(mil.RunUntil([&result]()
+        {
+            return result.has_value();
+        },
+        180s));
+    EXPECT_EQ(*result, state_machine::CommandResult::ok);
+    mil::ExpectOffsetsWithin(scenario, mil.CalibrationRecord(), 5.0f);
 }
 
 TEST_F(TestParameterIdentification, the_full_calibration_measures_the_sensor_noise_and_bounds_the_automatic_current_bandwidth_with_it)

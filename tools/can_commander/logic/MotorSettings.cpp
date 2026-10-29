@@ -36,8 +36,8 @@ namespace tool
 
         constexpr std::array<SettingPresentation, 40> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
-                "Closed-loop bandwidth of the current loop. Automatic takes it from the calibration record, or from the PWM rate without one.",
-                "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::slidingMode }) },
+                "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
+                "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
             { FocParameter::currentSwitchingGain, "Current loop switching gain", "Switching gain:", " A",
                 "Switching gain of the sliding-mode law. It must stay below the boundary layer.", {}, Uses({ Current::slidingMode }) },
             { FocParameter::currentBoundaryLayer, "Current loop boundary layer", "Boundary layer:", " A",
@@ -69,7 +69,7 @@ namespace tool
             { FocParameter::resistance, "Resistance", "Resistance:", ohm, "Stator phase resistance.", {} },
             { FocParameter::inductance, "Inductance", "Inductance:", " mH", "Stator inductance, used for both axes.", {} },
             { FocParameter::polePairs, "Pole pairs", "Pole pairs:", {}, "Rotor pole pairs. After a change the rotor has to be aligned again before the motor can start.", {} },
-            { FocParameter::fluxLinkage, "Flux linkage", "Flux linkage:", " Wb", "Permanent-magnet flux linkage. Platform default uses the value built into the firmware.", "Platform default" },
+            { FocParameter::fluxLinkage, "Flux linkage", "Flux linkage:", " Wb", "Permanent-magnet flux linkage. Calibrate measures it; Platform default uses the value built into the firmware.", "Platform default" },
             { FocParameter::inertia, "Inertia", "Inertia:", kilogramSquareMetre, "Inertia of the rotor and its load.", {} },
             { FocParameter::viscousFriction, "Viscous friction", "Viscous friction:", frictionUnit, "Viscous friction coefficient of the rotor and its load.", {} },
             { FocParameter::encoderResolution, "Encoder resolution", "Encoder resolution:", " counts/rev", "Encoder counts per mechanical revolution.", {} },

@@ -14,6 +14,7 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalDiagnostics.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
+#include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
@@ -59,6 +60,7 @@ namespace application
         application::DecimatingThreePhaseInverter inverter;
         services::InverterCompensation inverterCompensation;
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
+        services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         services::RotorStandstillImpl rotorStandstill;

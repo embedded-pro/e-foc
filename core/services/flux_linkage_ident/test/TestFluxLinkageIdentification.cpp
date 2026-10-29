@@ -32,22 +32,35 @@ namespace
         float torqueScale{ 1.0f };
         float residualCurrent{ 0.0f };
         float voltage{ 0.0f };
+        float rotorInertia{ inertia };
+        bool late{ false };
+        float commanded{ 0.0f };
+
+        void Command(float ampere)
+        {
+            commanded = ampere;
+            if (!late)
+                current = ampere;
+        }
 
         foc::MotionObservation Step()
         {
+            const auto reported = speed;
             const auto flowing = current + residualCurrent;
             const auto drive = torqueScale * torqueConstant * flowing;
 
             if (speed != 0.0f || std::abs(drive) > dryFriction)
             {
                 const auto direction = speed != 0.0f ? std::copysign(1.0f, speed) : std::copysign(1.0f, drive);
-                const auto next = speed + (drive - direction * dryFriction) / inertia * tickSeconds;
+                const auto next = speed + (drive - direction * dryFriction) / rotorInertia * tickSeconds;
                 speed = (speed != 0.0f && next * speed < 0.0f) ? 0.0f : next;
             }
 
             voltage = backEmfScale * fluxLinkage * static_cast<float>(polePairs) * speed + resistance * flowing + voltageOffset;
+            if (late)
+                current = commanded;
 
-            return foc::MotionObservation{ foc::RadiansPerSecond{ speed }, foc::Ampere{ flowing }, foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f } };
+            return foc::MotionObservation{ foc::RadiansPerSecond{ late ? reported : speed }, foc::Ampere{ flowing }, foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f } };
         }
     };
 
@@ -62,7 +75,7 @@ namespace
             EXPECT_CALL(controllerMock, EnableCurrentCommand());
             EXPECT_CALL(controllerMock, CommandCurrent(_)).WillRepeatedly(Invoke([this](foc::Ampere current)
                 {
-                    rotor.current = current.Value();
+                    rotor.Command(current.Value());
                 }));
             EXPECT_CALL(motionMock, ObserveMotion()).WillRepeatedly(Invoke([this]()
                 {
@@ -135,6 +148,33 @@ TEST_F(TestFluxLinkageIdentification, a_rotor_that_barely_slows_is_braked_to_a_l
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->outcome, Outcome::identified);
     EXPECT_NEAR(result->fluxLinkage.Value(), fluxLinkage, 0.01f * fluxLinkage);
+}
+
+TEST_F(TestFluxLinkageIdentification, a_fast_rotor_seen_a_period_late_is_released_early_enough_to_stay_below_the_speed_limit)
+{
+    for (const float rotorInertia : { 3.0e-6f, 3.3e-6f, 3.6e-6f, 3.9e-6f, 4.2e-6f })
+    {
+        SCOPED_TRACE(rotorInertia);
+        rotor = Rotor{};
+        rotor.rotorInertia = rotorInertia;
+        rotor.dryFriction = 3.0e-4f;
+        rotor.late = true;
+        result.reset();
+        float peakSpeed = 0.0f;
+        ExpectMotion();
+        EXPECT_CALL(motionMock, ObserveMotion()).WillRepeatedly(Invoke([this, &peakSpeed]()
+            {
+                const auto observation = rotor.Step();
+                peakSpeed = std::max(peakSpeed, std::abs(rotor.speed));
+                return observation;
+            }));
+        Identify();
+        ForwardTime(std::chrono::seconds{ 6 });
+
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->outcome, Outcome::identified);
+        EXPECT_LT(peakSpeed, services::FluxLinkageIdentification::Config{}.releaseSpeed.Value() + 5.0f);
+    }
 }
 
 TEST_F(TestFluxLinkageIdentification, a_rotor_the_current_law_keeps_driving_is_slowed_and_recorded_as_it_speeds_up)
