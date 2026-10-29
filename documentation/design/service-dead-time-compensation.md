@@ -120,9 +120,9 @@ shorter than the band, so the band should not be narrowed without measuring that
   moves it by up to the full loss. Space-vector modulation keeps the legs off the rails except at
   full modulation, where the effect is a fraction of a percent.
 
-A consumer may sample below the PWM rate: the PWM keeps its own frequency, the shared
-`DecimatingThreePhaseInverter` hands on every Nth sample, and the correction is scaled for the PWM's
-own period, not for the rate the consumer asked for.
+A consumer may sample below the PWM rate: the PWM keeps its own frequency, the shared [decimating
+inverter](platform-phase-current-rate.md) hands on every Nth sample, and the correction is scaled
+for the PWM's own period, not for the rate the consumer asked for.
 
 ---
 
