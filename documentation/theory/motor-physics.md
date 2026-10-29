@@ -354,7 +354,8 @@ small ripple at the PWM frequency. The three legs give $2^3 = 8$ switch states: 
 vector to the motor and two (all low, all high) that apply none. Averaging the six active vectors over a PWM
 period can make any voltage inside a hexagon; the largest circle inside it, a sinusoidal phase voltage of
 amplitude $V_{dc}/\sqrt{3}$, is the linear limit. The [FOC chapter](foc.md) derives this
-space-vector modulation and animates it.
+space-vector modulation and animates it; [the power stage](power-stage.md) covers the switches, the gate drive and
+the dead time.
 
 ### 10. Physical Limits
 

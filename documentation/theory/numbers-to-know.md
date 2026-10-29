@@ -162,7 +162,8 @@ $$
 $$
 
 A vector that turns at constant length therefore stays undistorted only up to about $0.81\,V_{max}$ on
-E-FOC-HARDWARE; beyond it the vector is flattened in those three directions. The speed limits change
+E-FOC-HARDWARE; beyond it the vector is flattened in those three directions. The timing behind both limits is in
+[low-side shunt current sensing](low-side-current-sensing.md). The speed limits change
 accordingly:
 
 | Speed limit at the rated bus | Anaheim (24 V) | Teknic (40 V) |

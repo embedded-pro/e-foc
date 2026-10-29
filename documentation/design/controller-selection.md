@@ -556,7 +556,7 @@ repeat the selection after every power cycle. The motor state machine will trans
 | MotorModelParameters | Ls                   | Henry (float)     | > 0                                           | From electrical RLS                                              |
 | MotorModelParameters | psiF                 | Weber (float)     | > 0                                           | From alignment calibration                                       |
 | MotorModelParameters | polePairs            | uint8             | ≥ 1                                           | Motor constant                                                   |
-| MotorModelParameters | Vdc                  | Volt (float)      | > 0                                           | Measured dynamically                                             |
+| MotorModelParameters | Vdc                  | Volt (float)      | > 0                                           | Measured once at boot                                            |
 | MotorModelParameters | currentLoopRate      | Hertz (uint32)    | > 0                                           | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC |
 | MotorModelParameters | J                    | kg·m² (float)     | > 0                                           | From mechanical RLS                                              |
 | MotorModelParameters | Bf                   | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                              |

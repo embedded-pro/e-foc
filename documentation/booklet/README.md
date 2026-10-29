@@ -1,11 +1,12 @@
 # e-foc — Design Booklet
 
-The design reference for **e-foc**, a real-time Field-Oriented Control firmware for BLDC/PMSM
-motors on bare-metal embedded systems. The booklet has four parts. The theory foundations read in order,
-from the motor itself to the closed loops around it, the trade-offs between controllers, the numbers that
-matter and the disturbances the loops must live with. The theory reference holds one chapter per controller
-algorithm and identification method. The architecture part structures the firmware, and the design part
-describes each component.
+The design reference for **e-foc**, a real-time Field-Oriented Control firmware for BLDC/PMSM motors on
+bare-metal embedded systems. The booklet has five parts. The theory foundations read in order, from the
+motor itself to the closed loops around it, the trade-offs between controllers, the numbers that matter
+and the disturbances the loops must live with. The practical part covers what the hardware and the
+firmware add: the power stage, the sensing chain and low-side shunts, the motor's imperfections and the
+implementation. The theory reference holds one chapter per controller algorithm and identification
+method. The architecture part structures the firmware, and the design part describes each component.
 
 No source code appears here. Each chapter describes behaviour, structure, and responsibilities at the
 level a hardware or control engineer needs to understand the system without reading implementation
@@ -23,6 +24,16 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [FOC Controllers — Map and Trade-offs](../theory/advanced-controllers.md)     | What each algorithm assumes, gains and costs; decision flow                        |
 | [The Numbers That Matter](../theory/numbers-to-know.md)                       | Time scales, constants, voltage budget, resolutions, rules of thumb                |
 | [Disturbances, Non-Idealities and Noise](../theory/disturbances-and-noise.md) | Where errors enter, their frequency signatures, mitigations                        |
+
+## Theory — Practical Implementation
+
+| Chapter                                                                                                     | What it covers                                                                                 |
+|-------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| [The Power Stage — MOSFETs, Half-Bridges and Dead Time](../theory/power-stage.md)                           | Switches, gate drive and bootstrap, shoot-through, dead time, losses, DC link, protection      |
+| [The Sensing Chain — Shunts, Amplifiers, ADC and Encoder](../theory/sensing-chain.md)                       | Shunt topologies, op-amp offset and drift, gain errors, ADC timing, encoder, error budget      |
+| [Low-Side Shunt Current Sensing and How to Configure the PWM for It](../theory/low-side-current-sensing.md) | Shunt states, the common 000 window, hidden phases, duty shifting, PWM and ADC checklist       |
+| [Cogging and Other Motor Imperfections](../theory/cogging-and-motor-imperfections.md)                       | Cogging periodicity, effects, measurement and feed-forward; harmonics, saturation, temperature |
+| [From Equations to Firmware — Practical Implementation](../theory/firmware-implementation.md)               | Interrupt structure, cycle budget, duty delay, numerics, determinism, calibration order        |
 
 ## Theory — Controller and Identification Reference
 

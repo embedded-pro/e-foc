@@ -123,8 +123,9 @@ $C_T = 1$ is best: the contributions are spread evenly and largely cancel.
 | 12 / 10       | 60        | 2     | 12                    | Low                    |
 | 24 / 4        | 24        | 4     | 12                    | High unless skewed     |
 
-The bench motor's 12 slots and 8 poles give 24 detents a revolution, six per electrical period, 4 mN·m deep
-(`documentation/design/software-in-the-loop.md` Part K).
+The bench motor shows 24 detents a revolution, six per electrical period, 4 mN·m deep. Its rest positions,
+scattered by torque pulses, cluster at 24 a revolution, which is what 12 slots and 8 poles give; the slot count is
+inferred from that, not read from a datasheet (`documentation/design/software-in-the-loop.md` Part K).
 
 ### 2. What the Motor Designer Can Do
 
@@ -164,8 +165,9 @@ $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.10 N·m/rad at the default bandwidths: ba
 the rotor stepped between detents instead (`documentation/theory/position-loop-pid.md`,
 *Limitations & Assumptions*).
 
-**Breakaway.** To start the rotor, the drive must exceed cogging and dry friction together: 5.7–9.7 mN·m on the
-bench, 0.135–0.23 A of q current.
+**Breakaway.** To start the rotor, the drive must exceed cogging and dry friction together: 0.135–0.23 A of q
+current on the bench. That is 5.7–9.7 mN·m with the configured 7 mWb flux linkage, or 3.7–6.3 mN·m with the
+4.6 mWb the flux-linkage identification measured on the same motor (`documentation/design/state-machine.md`).
 
 **Alignment.** The alignment pulls the rotor to the electrical zero against the cogging, so it can settle a
 little to either side, which limits the repeatability of everything referenced to it, a cogging map included
@@ -286,7 +288,8 @@ graph TD
 
 ## Worked Example
 
-The bench motor, 12 slots and 8 poles, $J = 12.4\ \mu$kg·m², cogging 4 mN·m deep.
+The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles), $J = 12.4\ \mu$kg·m², cogging
+4 mN·m deep.
 
 1. **Periods.** $N_{cog} = \operatorname{lcm}(12, 8) = 24$; $C_T = 8 \times 12 / 24 = 4$, a high-cogging
    combination; $24/4 = 6$ periods per electrical period.

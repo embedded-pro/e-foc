@@ -154,7 +154,8 @@ fundamental component that reduces the voltage and odd harmonics, the 5th and 7t
 **$6 f_e$ ripple** in dq. Near each current zero crossing the current flattens ("zero-crossing distortion").
 On E-FOC-HARDWARE the effective loss is 70 ns against a 500 ns commanded band: 34 mV at 24 V, 56 mV at 40 V
 per leg. *e-foc today:* every duty is corrected for the board's loss, with a ramp through the 0.2 A knee
-(`documentation/design/service-dead-time-compensation.md`).
+(`documentation/design/service-dead-time-compensation.md`). The switch-level picture is in
+[the power stage](power-stage.md) §4.
 
 **Back-EMF harmonics.** A motor whose magnet flux is not perfectly sinusoidal has 5th, 7th, … harmonics in its
 back-EMF. With sinusoidal currents they produce torque ripple at $6 f_e$, $12 f_e$. *e-foc today:* not
@@ -207,7 +208,8 @@ a ripple at **$1 f_e$** of amplitude $|\mathbf{o}|$. Inside the current-loop ban
 measured current follow the reference, so the real current carries the opposite ripple and the torque ripples
 by $K_t |\mathbf{o}|$ at $f_e$. The bench board's raw offsets were +27, −18 and +54 mA, a 42 mA vector after
 the Clarke transform and 1.6 mN·m of ripple on the Teknic. *e-foc today:* measured at calibration with the rotor at rest, 2000 samples averaged
-(noise below 1 mA), and subtracted from every sample (`documentation/design/service-current-offsets.md`).
+(noise below 1 mA), and subtracted from every sample (`documentation/design/service-current-offsets.md`). Where
+the offsets come from, and how they drift, is in [the sensing chain](sensing-chain.md) §3.
 
 **Current gain mismatch.** If phase a reads $(1 + \varepsilon)$ times its current, the three-sensor Clarke
 form the firmware evaluates ([FOC](foc.md) §1) gives an error vector on the $\alpha$ axis only:

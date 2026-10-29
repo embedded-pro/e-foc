@@ -1029,8 +1029,126 @@ class CoggingTorque(Figure):
         ])
 
 
+READABLE_DUTY = 0.70
+MAX_DUTY = 0.95
+SHUNT_MODULATION = 0.9
+HALF_PERIOD_US = 25.0
+CONVERSIONS_US = ((0.25, 1.25), (2.25, 3.25), (4.25, 5.25))
+
+
+def keep_shunts_readable(duties, limit=READABLE_DUTY, max_duty=MAX_DUTY):
+    """Floating-point twin of foc::KeepLowSideShuntsReadable: shift down, then scale only if still needed."""
+    highest = max(duties)
+    if highest <= limit:
+        return list(duties), False
+    lowest = min(duties)
+    middle = sum(duties) - highest - lowest
+    shift = min(highest - limit, lowest)
+    bound, value = 1.0, 1.0
+    if middle - shift > limit:
+        bound, value = limit, middle - shift
+    if highest - shift > max_duty and max_duty * value < bound * (highest - shift):
+        bound, value = max_duty, highest - shift
+    scale = bound / value
+    return [(d - shift) * scale for d in duties], scale < 1.0 - 1e-9
+
+
+def _written_duties(t):
+    return keep_shunts_readable(svm_duties(360 * t, SHUNT_MODULATION))
+
+
+class LowSideShuntWindow(Figure):
+    name = "low-side-shunt-window"
+    title = "Low-side shunts: sampling inside the common low-side window"
+    diagram_size = (360, 300)
+    plot_size = (380, 300)
+    frame_times = (0.0, 30 / 360, 60 / 360)
+
+    def frame_label(self, t):
+        return f"θ_e = {round(360 * t)}°"
+
+    def diagram(self, scene):
+        x0, x1 = 50, 350
+        size = scene.font(11)
+
+        def tx(us):
+            return x0 + (us + HALF_PERIOD_US) / (2 * HALF_PERIOD_US) * (x1 - x0)
+
+        def half_window(t, k):
+            return (1 - _written_duties(t)[0][k]) * HALF_PERIOD_US
+
+        def common_half(t):
+            return (1 - max(_written_duties(t)[0])) * HALF_PERIOD_US
+
+        top, bottom = 34, 80
+        carrier = " ".join(f"{_num(tx(u))},{_num(bottom - (bottom - top) * abs(u) / HALF_PERIOD_US)}"
+                           for u in (-HALF_PERIOD_US, 0.0, HALF_PERIOD_US))
+        parts = [
+            text(x0 - 6, (top + bottom) / 2 + 4, "counter", size=size * 0.9, fill=MUTED, anchor="end"),
+            tag("polyline", points=carrier, fill="none", stroke=INK, stroke_width=1.5),
+        ]
+        rows = (100, 132, 164)
+        for k, name in enumerate("ABC"):
+            color = PHASE[name]
+            y = rows[k]
+            level = (lambda t, k=k: bottom - (bottom - top) * (1 - _written_duties(t)[0][k]))
+            parts.append(scene.el("line", {"x1": x0, "x2": x1, "stroke": color, "stroke-width": 1,
+                                           "stroke-dasharray": "4 3"},
+                                  dyn={"y1": level, "y2": level}))
+            parts.append(tag("rect", x=x0, y=y, width=x1 - x0, height=20, fill=STEEL))
+            parts.append(scene.el("rect", {"x": x0, "y": y, "height": 20, "fill": color},
+                                  dyn={"width": lambda t, k=k: tx(-half_window(t, k)) - x0}))
+            parts.append(scene.el("rect", {"y": y, "height": 20, "fill": color},
+                                  dyn={"x": lambda t, k=k: tx(half_window(t, k)),
+                                       "width": lambda t, k=k: x1 - tx(half_window(t, k))}))
+            parts.append(text(x0 - 6, y + 14, name, size=size * 1.1, fill=color, anchor="end", weight="bold"))
+            parts.append(scene.el(
+                "text", {"x": x1 - 4, "y": y + 14, "font-size": size * 0.85, "fill": CARD,
+                         "text-anchor": "end", "font-weight": "bold"},
+                dyn={"opacity": lambda t, k=k: 1.0 if _written_duties(t)[0][k] > READABLE_DUTY + 1e-6 else 0.0},
+                discrete=True, body="hidden: rebuilt"))
+        parts.append(scene.el("rect", {"y": rows[0] - 4, "height": rows[2] + 28 - rows[0], "fill": FIELD,
+                                       "fill-opacity": 0.22, "stroke": FIELD, "stroke-width": 1.2},
+                              dyn={"x": lambda t: tx(-common_half(t)),
+                                   "width": lambda t: tx(common_half(t)) - tx(-common_half(t))}))
+        adc_y = 204
+        parts.append(text(x0 - 6, adc_y + 12, "ADC", size=size * 0.9, fill=MUTED, anchor="end"))
+        for (a, b), name in zip(CONVERSIONS_US, "ABC"):
+            parts.append(tag("rect", x=tx(a), y=adc_y, width=tx(b) - tx(a), height=16, fill=PHASE[name]))
+        parts.append(tag("line", x1=tx(0), y1=top - 8, x2=tx(0), y2=adc_y + 22, stroke=INK, stroke_width=1,
+                         stroke_dasharray="3 3"))
+        parts.append(text(tx(0), top - 12, "counter zero: ADC trigger", size=size * 0.9, fill=MUTED))
+        for us, label in ((-HALF_PERIOD_US, "−T/2"), (0.0, "0"), (HALF_PERIOD_US, "T/2")):
+            parts.append(text(tx(us), adc_y + 38, label, size=size * 0.9, fill=MUTED))
+        parts.append(scene.el(
+            "text", {"x": (x0 + x1) / 2, "y": adc_y + 56, "font-size": size, "fill": FIELD,
+                     "text-anchor": "middle", "font-weight": "bold"},
+            dyn={"opacity": lambda t: 1.0 if _written_duties(t)[1] else 0.0},
+            discrete=True, body="two phases above 70 %: vector scaled"))
+        if scene.animated:
+            parts.append(legend(x0, 286, [("high side on", PHASE["A"], "line"), ("low side on", SOUTH, "fill"),
+                                          ("common window", FIELD, "fill")], size=10))
+        return "".join(parts)
+
+    def plot(self, scene, marks):
+        p = Plot(46, 10, 316, 200, (0, 1), (0, 0.25, 0.5, 0.7, 0.95), "reference angle θ_e", "duty")
+        written = [(lambda u, k=k: _written_duties(u)[0][k], PHASE[n]) for k, n in enumerate("ABC")]
+        plain = [(lambda u, k=k: svm_duties(360 * u, SHUNT_MODULATION)[k], PHASE[n]) for k, n in enumerate("ABC")]
+        limits = "".join(tag("line", x1=p.x, y1=p.py(v), x2=p.x + p.w, y2=p.py(v), stroke=color, stroke_width=1.2,
+                             stroke_dasharray="5 3") for v, color in ((READABLE_DUTY, FIELD), (MAX_DUTY, INK)))
+        return "".join([
+            p.axes(),
+            limits,
+            *(p.curve(fn, color, width=1.2, dash="2 3") for fn, color in plain),
+            *(p.curve(fn, color) for fn, color in written),
+            p.tracker(scene, written, marks),
+            legend(46, 262, [("written d_A, d_B, d_C", PHASE["A"], "line"), ("plain SVM", MUTED, "dash")]),
+            legend(46, 282, [("readable 70 %", FIELD, "dash"), ("bootstrap 95 %", INK, "dash")]),
+        ])
+
+
 FIGURES = (RotatingField(), TorqueAngle(), BackEmf(), SixStep(), ParkTransform(), SvmHexagon(),
-           HalfBridgeDeadTime(), CoggingTorque())
+           HalfBridgeDeadTime(), CoggingTorque(), LowSideShuntWindow())
 
 
 def generate(out_dir):

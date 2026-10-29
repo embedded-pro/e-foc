@@ -16,6 +16,16 @@ which lists the same chapters; keep the two in step.
 | [The Numbers That Matter](numbers-to-know.md)                       | Time scales, constants, voltage budget, resolutions, rules of thumb                |
 | [Disturbances, Non-Idealities and Noise](disturbances-and-noise.md) | Where errors enter, their frequency signatures, mitigations                        |
 
+## Practical Implementation
+
+| Chapter                                                                                           | What it covers                                                                                 |
+|---------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| [The Power Stage — MOSFETs, Half-Bridges and Dead Time](power-stage.md)                           | Switches, gate drive and bootstrap, shoot-through, dead time, losses, DC link, protection      |
+| [The Sensing Chain — Shunts, Amplifiers, ADC and Encoder](sensing-chain.md)                       | Shunt topologies, op-amp offset and drift, gain errors, ADC timing, encoder, error budget      |
+| [Low-Side Shunt Current Sensing and How to Configure the PWM for It](low-side-current-sensing.md) | Shunt states, the common 000 window, hidden phases, duty shifting, PWM and ADC checklist       |
+| [Cogging and Other Motor Imperfections](cogging-and-motor-imperfections.md)                       | Cogging periodicity, effects, measurement and feed-forward; harmonics, saturation, temperature |
+| [From Equations to Firmware — Practical Implementation](firmware-implementation.md)               | Interrupt structure, cycle budget, duty delay, numerics, determinism, calibration order        |
+
 ## Controller and Identification Reference
 
 | Chapter                                                                     | What it covers                                              |
