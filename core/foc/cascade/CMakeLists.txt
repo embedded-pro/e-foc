@@ -26,6 +26,7 @@ target_sources(e_foc.foc.cascade PRIVATE
     MechanicalWindowAccumulator.hpp
     PositionCascade.cpp
     PositionCascade.hpp
+    QuadratureVoltageWindow.cpp
     QuadratureVoltageWindow.hpp
     SpeedCascade.cpp
     SpeedCascade.hpp
