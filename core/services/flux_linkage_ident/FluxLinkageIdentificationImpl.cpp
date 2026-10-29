@@ -13,6 +13,7 @@ namespace services
         constexpr float maximumSpeedSpanRatio{ 0.5f };
         constexpr float slowingMargin{ 1.5f };
         constexpr float recordingCeilingFraction{ 0.5f };
+        constexpr float releaseLeadTicks{ 2.0f };
 
         bool IsUsableConfig(const FluxLinkageIdentification::Config& config)
         {
@@ -104,8 +105,7 @@ namespace services
         switch (phase)
         {
             case Phase::accelerating:
-                if (std::abs(speed) >= config.releaseSpeed.Value())
-                    Settle();
+                Spin(speed);
                 break;
             case Phase::settling:
                 if (++phaseTicks >= TicksIn(config.settleTime))
@@ -129,7 +129,18 @@ namespace services
     {
         phase = Phase::accelerating;
         phaseTicks = 0;
+        previousTickSpeed = config.maxSpeed.Value();
         controller.CommandCurrent(foc::Ampere{ spinCurrent });
+    }
+
+    void FluxLinkageIdentificationImpl::Spin(float speed)
+    {
+        const auto magnitude = std::abs(speed);
+        const auto gainPerTick = std::max(magnitude - previousTickSpeed, 0.0f);
+        previousTickSpeed = magnitude;
+
+        if (magnitude + releaseLeadTicks * gainPerTick >= config.releaseSpeed.Value())
+            Settle();
     }
 
     void FluxLinkageIdentificationImpl::Settle()
