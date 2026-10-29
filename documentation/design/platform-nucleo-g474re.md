@@ -209,10 +209,11 @@ the build includes it.
 
 ### Required
 
-| Interface      | Purpose                                     | Contract                                                   |
-|----------------|---------------------------------------------|------------------------------------------------------------|
-| E-FOC-HARDWARE | Gate drive, conditioned sense signals, CAN  | Wired as in Part A; grounds joined, 3.3 V rails kept apart |
-| hal-st drivers | Timer PWM, ADC with DMA, encoder, I²C, UART | As provided for the STM32G4 family                         |
+| Interface               | Purpose                                                                             | Contract                                                   |
+|-------------------------|-------------------------------------------------------------------------------------|------------------------------------------------------------|
+| E-FOC-HARDWARE          | Gate drive, conditioned sense signals, CAN                                          | Wired as in Part A; grounds joined, 3.3 V rails kept apart |
+| hal-st drivers          | Timer PWM, externally triggered ADC sequence, polled ADC, FDCAN, encoder, I²C, UART | As provided for the STM32G4 family                         |
+| EMIL 24xx EEPROM driver | The board's 24LC04 behind the EEPROM interface                                      | One word-address byte; block select in the device address  |
 
 ---
 
@@ -286,9 +287,9 @@ graph LR
 
 ## Verification
 
-CI builds the NUCLEO-G474RE preset with warnings as errors. Unit tests drive an I²C master mock through the
-EEPROM driver: reads across the block boundary, page-split writes that wait out the write cycle, erase, and
-transfers the device does not acknowledge. Bring-up on hardware, in order: the gate signals and dead time on an
+CI builds the NUCLEO-G474RE preset with warnings as errors. The EEPROM driver's unit tests, in EMIL, drive an
+I²C master mock through reads across the block boundary, page-split writes that wait out the write cycle, erase,
+and transfers the device does not acknowledge. Bring-up on hardware, in order: the gate signals and dead time on an
 oscilloscope with the bus unpowered; the ADC trigger against the PWM peak on the timing pin; the bus-voltage
 reading against a meter; the EEPROM records surviving a reset; CAN at 1 Mbit/s against the CAN Commander; then
 the current-offset calibration and a closed current loop at low bus voltage.

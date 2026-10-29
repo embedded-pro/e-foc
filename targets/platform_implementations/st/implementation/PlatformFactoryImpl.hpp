@@ -6,22 +6,24 @@
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/platform_abstraction/Eeprom24xx.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "core/services/cli/SerialCommunicationMirror.hpp"
+#include "drivers/eeprom/Eeprom24xx.hpp"
 #include "hal/cortex_m/DataWatchpointAndTrace.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal_st/stm32fxxx/AnalogToDigitalPinStm.hpp"
 #include "hal_st/stm32fxxx/DmaStm.hpp"
+#include "hal_st/stm32fxxx/FdCanStm.hpp"
 #include "hal_st/stm32fxxx/GpioStm.hpp"
 #include "hal_st/stm32fxxx/I2cStm.hpp"
 #include "hal_st/stm32fxxx/PwmStm.hpp"
 #include "hal_st/stm32fxxx/UartStmDma.hpp"
 #include "hal_st/stm32fxxx/WatchDogStm.hpp"
+#include "hal_st/synchronous_stm32fxxx/SynchronousAdcStm.hpp"
 #include "hal_st/synchronous_stm32fxxx/SynchronousQuadratureEncoderStm.hpp"
 #include "infra/util/HotSwapFunction.hpp"
 #include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
@@ -32,8 +34,6 @@
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include "targets/platform_implementations/st/implementation/AdcTriggeredByPwmStm.hpp"
-#include "targets/platform_implementations/st/implementation/FdCanStm.hpp"
-#include "targets/platform_implementations/st/implementation/SynchronousAdcChannelStm.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -158,9 +158,9 @@ namespace application
             TerminalAndTracer terminalAndTracer{ dma };
             hal::AdcStm phaseCurrentConverter{ Peripheral::PhaseCurrentAdcIndex };
             hal::DmaStm::ReceiveStream phaseCurrentStream{ dma, hal::DmaChannelId{ Peripheral::DmaIndex, Peripheral::PhaseCurrentDmaChannel, Peripheral::phaseCurrentDmaRequest } };
-            SynchronousAdcChannelStm powerSupplyAdc{ Peripheral::PowerSupplyAdcIndex, Pins::powerSupplyVoltage, ADC_SAMPLETIME_247CYCLES_5 };
+            hal::SynchronousAdcStm powerSupplyAdc;
             hal::I2cStm eepromI2c;
-            Eeprom24xx eeprom{ eepromI2c, Eeprom24xx::Config{} };
+            drivers::Eeprom24xx eeprom{ eepromI2c, drivers::Eeprom24xx::Config{} };
 
             std::optional<AdcPhaseCurrentMeasurementImpl<PhaseCurrentAdc>> phaseCurrentAdc;
             std::optional<hal::PwmStm> pwm;

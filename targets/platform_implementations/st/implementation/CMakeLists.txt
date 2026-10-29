@@ -7,6 +7,7 @@ target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} P
 
 target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     e_foc.platform_abstraction
+    drivers.eeprom
     e_foc.foc.math
     e_foc.services.cli
     infra.event
@@ -28,12 +29,8 @@ target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../${E_FOC_TARGET_BOARD}/PinsAndPeripherals.cpp
     AdcTriggeredByPwmStm.hpp
     CutPowerStage.cpp
-    FdCanStm.cpp
-    FdCanStm.hpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
-    SynchronousAdcChannelStm.cpp
-    SynchronousAdcChannelStm.hpp
 )
 
 if(EMIL_INCLUDE_SEGGER_RTT)

@@ -54,6 +54,14 @@ namespace application
             return std::abs(a.Value()) > limit || std::abs(b.Value()) > limit || std::abs(c.Value()) > limit;
         }
 
+        hal::SynchronousAdcStm::Config PowerSupplyAdcConfig()
+        {
+            hal::SynchronousAdcStm::Config config;
+            config.samplingTime = ADC_SAMPLETIME_247CYCLES_5;
+            config.oversampling = hal::SynchronousAdcStm::Oversampling::x8;
+            return config;
+        }
+
         hal::I2cStm::Config EepromI2cConfig()
         {
             hal::I2cStm::Config config;
@@ -82,7 +90,8 @@ namespace application
     {}
 
     PlatformFactoryImpl::Peripherals::Peripherals()
-        : eepromI2c{ Peripheral::EepromI2cIndex, Pins::eepromScl, Pins::eepromSda, EepromI2cConfig() }
+        : powerSupplyAdc{ Peripheral::PowerSupplyAdcIndex, Peripheral::powerSupplyAdcChannel, PowerSupplyAdcConfig() }
+        , eepromI2c{ Peripheral::EepromI2cIndex, Pins::eepromScl, Pins::eepromSda, EepromI2cConfig() }
     {}
 
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
@@ -188,7 +197,7 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        return foc::Volts{ static_cast<float>(peripherals->powerSupplyAdc.Measure()) * adcToVoltsFactor };
+        return foc::Volts{ static_cast<float>(peripherals->powerSupplyAdc.Measure(1).front()) * adcToVoltsFactor };
     }
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const

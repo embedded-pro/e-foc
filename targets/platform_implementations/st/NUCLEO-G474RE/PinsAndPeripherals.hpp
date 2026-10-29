@@ -61,6 +61,8 @@ namespace application
         constexpr static uint8_t PhaseCurrentAdcIndex{ 1 };
         constexpr static uint32_t phaseCurrentAdcTrigger{ ADC_EXTERNALTRIG_T1_TRGO };
         constexpr static uint8_t PowerSupplyAdcIndex{ 3 };
+        // PB0 seen from ADC3; ADC1's sequence owns the pin
+        constexpr static uint32_t powerSupplyAdcChannel{ ADC_CHANNEL_12 };
         constexpr static uint8_t DmaIndex{ 1 };
         constexpr static uint8_t PhaseCurrentDmaChannel{ 1 };
         constexpr static uint8_t phaseCurrentDmaRequest{ DMA_REQUEST_ADC1 };
