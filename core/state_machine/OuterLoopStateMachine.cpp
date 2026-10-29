@@ -149,6 +149,12 @@ namespace application
         RunMechanicalIdentStep(calibrating);
     }
 
+    bool OuterLoopStateMachine::ApplyProvisionalCurrentControl(const services::CalibrationData& pending)
+    {
+        ClearCoggingCompensation();
+        return FocStateMachineCommon::ApplyProvisionalCurrentControl(pending);
+    }
+
     bool OuterLoopStateMachine::RunPostMechanicalStep(state_machine::Calibrating& calibrating)
     {
         auto* mapping = CoggingMappingImpl();

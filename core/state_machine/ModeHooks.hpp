@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -17,6 +18,8 @@ namespace application
         virtual foc::FocBase& GetFoc() = 0;
         virtual foc::Controllable& GetFocControl() = 0;
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
+        virtual services::FluxLinkageIdentification* FluxLinkageIdent() = 0;
+        virtual bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) = 0;
         virtual void RunPostAlignmentStep(state_machine::Calibrating& calibrating) = 0;
         virtual bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) = 0;
 

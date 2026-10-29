@@ -20,7 +20,8 @@ namespace state_machine
         resistanceAndInductance,
         alignment,
         frictionAndInertia,
-        coggingMap
+        coggingMap,
+        fluxLinkage
     };
 
     struct Idle

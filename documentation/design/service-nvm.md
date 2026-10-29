@@ -218,7 +218,7 @@ stateDiagram-v2
 | rPhase               | Ω             | Measured phase resistance                           |
 | lD                   | H             | Measured d-axis inductance                          |
 | lQ                   | H             | Measured q-axis inductance                          |
-| fluxLinkage          | Wb            | Rotor flux linkage                                  |
+| fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF    |
 | currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor   |
 | inertia              | kg·m²         | Estimated rotor inertia                             |
 | frictionCoulomb      | N·m           | Coulomb (constant) friction                         |

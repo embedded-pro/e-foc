@@ -15,7 +15,8 @@ namespace mil
         inductance,
         inertia,
         friction,
-        cogging
+        cogging,
+        fluxLinkage
     };
 
     constexpr float referenceCelsius = 25.0f;
@@ -35,6 +36,8 @@ namespace mil
                 return "friction";
             case Quantity::cogging:
                 return "cogging";
+            case Quantity::fluxLinkage:
+                return "fluxLinkage";
         }
         return "?";
     }
@@ -53,6 +56,8 @@ namespace mil
                 return plant.viscousDampingNmSPerRad;
             case Quantity::cogging:
                 return plant.coggingTorqueNm;
+            case Quantity::fluxLinkage:
+                return plant.fluxLinkageWeber;
         }
         return 0.0f;
     }
@@ -71,6 +76,8 @@ namespace mil
                 return record.frictionViscous;
             case Quantity::cogging:
                 return services::CoggingPeak(record.coggingTorque, record.coggingTorqueScale).Value();
+            case Quantity::fluxLinkage:
+                return record.fluxLinkage;
         }
         return 0.0f;
     }
@@ -88,6 +95,7 @@ namespace mil
             case Quantity::friction:
                 return estimates.viscousFriction.Value();
             case Quantity::cogging:
+            case Quantity::fluxLinkage:
                 return 0.0f;
         }
         return 0.0f;

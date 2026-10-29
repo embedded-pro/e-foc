@@ -3,6 +3,7 @@
 #include <chrono>
 #include <gtest/gtest.h>
 #include <numbers>
+#include <string>
 
 namespace
 {
@@ -249,4 +250,43 @@ TEST_F(TestParameterIdentification, winding_heating_is_tracked_by_the_online_res
     mil::ModelInTheLoop mil{ scenario };
     Excite(mil);
     mil::ExpectOnline(mil, Quantity::resistance, 10.0f, 90.0f);
+}
+
+TEST_F(TestParameterIdentification, the_full_calibration_identifies_the_flux_linkage_from_the_back_emf)
+{
+    for (const auto* motor : { "bench", "teknic", "anaheim" })
+        for (const auto mode : { state_machine::ControlMode::torque, state_machine::ControlMode::speed })
+        {
+            SCOPED_TRACE(motor);
+            mil::Scenario scenario;
+            scenario.Plant(motor).BootsIn(mode);
+            scenario.plant.fluxLinkageWeber = std::string{ motor } == "bench" ? 0.0046f : scenario.plant.fluxLinkageWeber;
+
+            mil::ModelInTheLoop mil{ scenario };
+            ASSERT_TRUE(mil.Calibrate());
+            mil::ExpectIdentified(mil, Quantity::fluxLinkage, 3.0f);
+
+            if (mode == state_machine::ControlMode::speed)
+                mil::ExpectIdentified(mil, Quantity::inertia, 5.0f);
+        }
+}
+
+TEST_F(TestParameterIdentification, the_flux_linkage_identification_holds_through_the_bench_noise_and_late_duty_under_every_current_law)
+{
+    for (const auto algorithm : { foc::CurrentAlgorithm::pid, foc::CurrentAlgorithm::decoupledPid, foc::CurrentAlgorithm::deadbeat, foc::CurrentAlgorithm::slidingMode })
+    {
+        SCOPED_TRACE(static_cast<int>(algorithm));
+        mil::Scenario scenario;
+        scenario.Plant("bench").CurrentLoop(algorithm);
+        scenario.plant.fluxLinkageWeber = 0.0046f;
+        scenario.plant.noiseSigmaAmpere = 0.0385f;
+        sil::DescribeBoardPwmUpdate(scenario.plant);
+        scenario.Calibrated().StoredCalibrationOffBy("fluxLinkage", 1.5f).BootsIn(state_machine::ControlMode::torque);
+
+        mil::ModelInTheLoop mil{ scenario };
+        ASSERT_TRUE(mil.Align());
+        EXPECT_TRUE(mil::RunsSelectedAlgorithm(mil, integration::response::Signal::currentQ));
+        ASSERT_TRUE(mil.Calibrate());
+        mil::ExpectIdentified(mil, Quantity::fluxLinkage, 5.0f);
+    }
 }

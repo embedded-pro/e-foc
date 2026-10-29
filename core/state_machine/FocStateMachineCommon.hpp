@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/services/flux_linkage_ident/FluxLinkageIdentificationImpl.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/BootSequence.hpp"
 #include "core/state_machine/CalibrationContext.hpp"
@@ -70,6 +71,15 @@ namespace application
         void ProvisionalControlSuperseded() override;
         void RestoreControlAfterProvisionalIdentification() override;
         void MarkProvisionalControlApplied();
+        bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
+
+        static services::FluxLinkageIdentification* ResolveFluxLinkageIdent(
+            const CalibrationServices& calibServices,
+            std::optional<services::FluxLinkageIdentificationImpl>& ownFluxIdent,
+            foc::CurrentCommandable& currentCommandable,
+            foc::Controllable& drive,
+            const foc::FocBase& motion,
+            drivers::ThreePhaseInverter& inverter);
 
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;

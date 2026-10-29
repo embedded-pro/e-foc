@@ -47,6 +47,7 @@ namespace application
         void PrepareForEnabled() override;
         void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
+        bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
         void AbortModeSpecificServices() override;
 

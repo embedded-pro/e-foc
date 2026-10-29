@@ -170,6 +170,8 @@ namespace simulator
                             return QStringLiteral("Calibrating: B/J\xe2\x80\xa6");
                         case state_machine::CalibrationStep::coggingMap:
                             return QStringLiteral("Calibrating: cogging\xe2\x80\xa6");
+                        case state_machine::CalibrationStep::fluxLinkage:
+                            return QStringLiteral("Calibrating: flux linkage\xe2\x80\xa6");
                     }
                     return QStringLiteral("Calibrating\xe2\x80\xa6");
                 }

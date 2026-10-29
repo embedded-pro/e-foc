@@ -29,8 +29,11 @@ namespace application
         foc::Controllable& GetFocControl() override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         foc::CurrentLoopTunable& CurrentTunable() override;
+        services::FluxLinkageIdentification* FluxLinkageIdent() override;
 
     private:
         foc::FocTorqueController focController;
+        std::optional<services::FluxLinkageIdentificationImpl> ownFluxIdent;
+        services::FluxLinkageIdentification* resolvedFluxIdent;
     };
 }

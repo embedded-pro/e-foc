@@ -230,6 +230,38 @@ namespace
             };
         }
 
+        TestedStateMachine CreateStateMachineIdentifyingFluxLinkage()
+        {
+            EXPECT_CALL(fluxIdentMock, IsRunning()).WillRepeatedly(Return(false));
+            EXPECT_CALL(fluxIdentMock, Abort()).Times(AnyNumber());
+
+            return TestedStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .fluxLinkage = configuredFluxLinkage, .fluxIdentOverride = fluxIdentMock },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                nvmActivity
+            };
+        }
+
+        void ExpectFluxLinkageIdentification(services::FluxLinkageIdentification::Outcome outcome, float fluxLinkage)
+        {
+            EXPECT_CALL(fluxIdentMock, Identify(7, foc::Ohm{ 0.5f }, _, _))
+                .WillOnce(Invoke([outcome, fluxLinkage](std::size_t, foc::Ohm, const auto&, const infra::Function<void(const services::FluxLinkageIdentification::Result&)>& onDone)
+                    {
+                        services::FluxLinkageIdentification::Result result{};
+                        result.outcome = outcome;
+                        result.fluxLinkage = foc::Weber{ fluxLinkage };
+                        result.samples = 300;
+                        onDone(result);
+                    }));
+        }
+
+        StrictMock<services::FluxLinkageIdentificationMock> fluxIdentMock;
+        foc::Weber configuredFluxLinkage{ 0.007f };
+
         void AlignAfterBoot(TestedStateMachine& sm)
         {
             EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
@@ -852,6 +884,72 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_records_resistance_in_ready_state
 
     const auto& ready = std::get<state_machine::Ready>(sm.CurrentState());
     EXPECT_NEAR(ready.loadedData.rPhase, 0.5f, 1e-5f);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, calibrate_identifies_the_flux_linkage_after_alignment_and_records_it)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectCalibrationSequence();
+    ExpectFluxLinkageIdentification(services::FluxLinkageIdentification::Outcome::identified, 0.0046f);
+    auto sm = CreateStateMachineIdentifyingFluxLinkage();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    const auto& ready = std::get<state_machine::Ready>(sm.CurrentState());
+    EXPECT_NEAR(ready.loadedData.fluxLinkage, 0.0046f, 1e-7f);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_flux_linkage_that_is_not_identified_keeps_the_configured_one)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectCalibrationSequence();
+    ExpectFluxLinkageIdentification(services::FluxLinkageIdentification::Outcome::notIdentified, 0.0f);
+    auto sm = CreateStateMachineIdentifyingFluxLinkage();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    const auto& ready = std::get<state_machine::Ready>(sm.CurrentState());
+    EXPECT_NEAR(ready.loadedData.fluxLinkage, configuredFluxLinkage.Value(), 1e-7f);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_overspeed_during_flux_linkage_identification_fails_the_calibration)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+            {
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    ExpectFluxLinkageIdentification(services::FluxLinkageIdentification::Outcome::overspeed, 0.0f);
+    auto sm = CreateStateMachineIdentifyingFluxLinkage();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_does_not_identify_the_flux_linkage)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachineIdentifyingFluxLinkage();
+
+    AlignAfterBoot(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, calibrate_from_enabled_is_rejected)

@@ -2,6 +2,7 @@
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 
@@ -9,6 +10,8 @@ namespace
 {
     constexpr float microPerUnit = 1.0e6f;
     constexpr float milliPerUnit = 1.0e3f;
+    constexpr float percentPerUnit = 100.0f;
+    constexpr float maxTracedPercent = 999.0f;
 }
 
 namespace application
@@ -124,7 +127,58 @@ namespace application
         if (calibrating.alignmentOnly)
             Save(calibrating);
         else
+            RunFluxLinkageStep(calibrating);
+    }
+
+    void CalibrationFlow::RunFluxLinkageStep(state_machine::Calibrating& calibrating)
+    {
+        auto* identification = env.mode.FluxLinkageIdent();
+
+        if (identification == nullptr || calibrating.externalReservation || calibrating.mechanicalAttempts != 0)
+        {
             env.mode.RunPostAlignmentStep(calibrating);
+            return;
+        }
+
+        calibrating.step = state_machine::CalibrationStep::fluxLinkage;
+        const auto& pending = calibrating.pendingData;
+
+        if (!env.mode.ApplyProvisionalCurrentControl(pending))
+        {
+            env.tracer.Trace() << "[SM] Flux linkage identification refused: the current loop would not move the rotor";
+            env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+            return;
+        }
+
+        env.tracer.Trace() << "[SM] Identifying flux linkage";
+        identification->Identify(pending.polePairs, foc::Ohm{ pending.rPhase }, services::FluxLinkageIdentification::Config{}, [this](const services::FluxLinkageIdentification::Result& result)
+            {
+                env.machine.Dispatch(state_machine::FluxLinkageIdentified{ result });
+            });
+    }
+
+    void CalibrationFlow::OnFluxLinkageIdentified(state_machine::Calibrating& calibrating, const state_machine::FluxLinkageIdentified& event)
+    {
+        using Outcome = services::FluxLinkageIdentification::Outcome;
+        const auto& result = event.result;
+        const auto errorPercent = std::min(result.relativeError * percentPerUnit, maxTracedPercent);
+
+        if (result.outcome == Outcome::overspeed)
+        {
+            env.tracer.Trace() << "[SM] Flux linkage identification stopped: the rotor exceeded its speed limit";
+            env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+            return;
+        }
+
+        if (result.outcome == Outcome::identified)
+        {
+            calibrating.pendingData.fluxLinkage = result.fluxLinkage.Value();
+            env.tracer.Trace() << "[SM] Flux linkage: psi_mWb=" << result.fluxLinkage.Value() * milliPerUnit << " c_mV=" << result.intercept.Value() * milliPerUnit << " n=" << result.samples << " se_pct=" << errorPercent;
+        }
+        else
+            env.tracer.Trace() << "[SM] Flux linkage not identified (psi_mWb=" << result.fluxLinkage.Value() * milliPerUnit << " c_mV=" << result.intercept.Value() * milliPerUnit << " n=" << result.samples << " se_pct=" << errorPercent << "), keeping psi_mWb=" << calibrating.pendingData.fluxLinkage * milliPerUnit;
+
+        env.mode.RunPostAlignmentStep(calibrating);
     }
 
     std::optional<state_machine::MechanicalRun> CalibrationFlow::AgreedMechanicalRun(const state_machine::Calibrating& calibrating) const
@@ -228,6 +282,7 @@ namespace application
         env.tracer.Trace() << "[SM] Calibration record: R=" << data.rPhase
                            << " L_mH=" << data.lD
                            << " p=" << static_cast<uint32_t>(data.polePairs)
+                           << " psi_mWb=" << data.fluxLinkage * milliPerUnit
                            << " J_uNms2=" << data.inertia * microPerUnit
                            << " B_uNms=" << data.frictionViscous * microPerUnit
                            << " Ia_mA=" << data.currentOffsetA * milliPerUnit
@@ -302,7 +357,13 @@ namespace application
 
     bool CalibrationFlow::IsRunning() const
     {
-        return orchestrator.IsRunning();
+        return orchestrator.IsRunning() || IsIdentifyingFluxLinkage();
+    }
+
+    bool CalibrationFlow::IsIdentifyingFluxLinkage() const
+    {
+        const auto* identification = env.mode.FluxLinkageIdent();
+        return identification != nullptr && identification->IsRunning();
     }
 
     bool CalibrationFlow::HasRunInFlight() const
@@ -322,6 +383,10 @@ namespace application
         saveCompletion = nullptr;
 
         orchestrator.Abort();
+
+        if (auto* identification = env.mode.FluxLinkageIdent())
+            identification->Abort();
+
         env.mode.AbortModeSpecificServices();
         env.mode.RestoreControlAfterProvisionalIdentification();
     }

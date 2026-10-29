@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: state-machine
 date: 2026-10-27
 ---
@@ -12,7 +12,7 @@ date: 2026-10-27
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.4.0                      |
+| Version   | 0.5.0                      |
 | Component | state-machine              |
 | Date      | 2026-10-27                 |
 
@@ -234,6 +234,7 @@ sequenceDiagram
     participant CO as Current Offsets
     participant EI as Electrical Ident
     participant MA as Motor Alignment
+    participant FL as Flux Linkage Ident
     participant MI as Mech Ident (speed modes)
     participant CM as Cogging Mapping (speed modes)
     participant FOC as FOC Controller
@@ -250,6 +251,9 @@ sequenceDiagram
     EI-->>SM: result (R, L or failure)
     SM->>MA: ForceAlignment(polePairs)
     MA-->>SM: result (encoderOffset or failure)
+    SM->>FOC: Configure(measured R, L, pole pairs, flux)
+    SM->>FL: Identify(spin to 40 rad/s, coast at 0 A)
+    FL-->>SM: flux linkage, configured one kept, or overspeed
     note over SM,MI: Speed and position modes only
     SM->>FOC: Configure(measured R, L, pole pairs, flux)
     SM->>FOC: ConfigureMechanics(provisional J, B)
@@ -274,6 +278,7 @@ sequenceDiagram
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                               |
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                      |
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                       |
+| 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified   |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
 | 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured |
@@ -305,7 +310,7 @@ run that measures no map does not fail the calibration (`service-cogging-compens
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
-Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=… cog_mNm=…`, where `cog_mNm` is the peak of the cogging map, 0 when there is none. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… psi_mWb=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=… In_mA=… cog_mNm=…`, where `In_mA` is the measured current noise, 0 when not measured, and `cog_mNm` is the peak of the cogging map, 0 when there is none. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
 
 The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
 
@@ -360,11 +365,37 @@ traces `Speed settings not applied` or `Position settings not applied`, and the 
 still the operator's. Refusing such a parameter needs a design check of the edited model before it is
 stored, which the cascades do not offer yet.
 
+### Identifying the flux linkage
+
+The flux linkage sets the back-EMF feedforward of the decoupled, deadbeat and sliding current laws and,
+through $K_t = \tfrac{3}{2} p \psi_f$, every mechanical consumer. Until this step it was only ever the
+target's configured value, which on the bench motor was 7.0 mWb against the motor's 4.6 mWb. Identified
+inertia, viscous friction and the cogging map all scale with that ratio, and the deadbeat law settled
+with a current offset that grew with speed.
+
+After alignment, and before mechanical identification, the state machine applies the electrical model it
+has just measured to the live current loop and asks the flux linkage service to spin the rotor with a
+small q-axis current, release it to a 0 A setpoint and fit the q-axis voltage against the electrical speed
+while it coasts (`service-flux-linkage-ident.md`). The step runs in every control mode, torque included,
+since the current loop is all it needs.
+
+| Outcome        | Effect on the calibration                                                          |
+|----------------|------------------------------------------------------------------------------------|
+| Identified     | `fluxLinkage` of the pending record is replaced, and later steps use it            |
+| Not identified | The configured value is kept, the reason is traced, and the calibration carries on |
+| Overspeed      | The step fails and the machine enters `Fault`, as for any failed step              |
+
+The step runs once per calibration: a mechanical run that aligns again for a second attempt does not
+spin it a second time. A re-alignment and an electrical identification over CAN do not run it, since
+neither may move the rotor beyond the alignment. The step is traced as `[SM] Identifying flux linkage`
+and then `[SM] Flux linkage: psi_mWb=… c_mV=… n=… se_pct=…`, or `[SM] Flux linkage not identified (…),
+keeping psi_mWb=…` (REQ-CAL-021).
+
 ### Making the loops live before mechanical identification
 
-Mechanical identification is the only calibration step that asks the drive to *move*: it commands a speed
-trajectory and identifies the plant from the motion that results. Every earlier step injects current into a
-stationary rotor and needs no closed loop at all.
+Mechanical identification commands a speed trajectory and identifies the plant from the motion that
+results; with the flux-linkage step it is one of two calibration steps that move the rotor. Every earlier
+step injects current into a stationary rotor and needs no closed loop at all.
 
 Until a model is applied, the current loop holds inert gains — it is configured from resistance, inductance
 and pole pairs, none of which are known before the electrical steps run — and the speed loop holds a zero

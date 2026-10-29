@@ -30,6 +30,7 @@ namespace application
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
             , resolvedCoggingMapping(ResolveCoggingMapping(calibServices, ownCoggingMapping, focController, focController, focController, hardware.inverter, hardware.encoder))
+            , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
@@ -77,6 +78,11 @@ namespace application
         foc::CurrentLoopTunable& CurrentTunable() override
         {
             return focController;
+        }
+
+        services::FluxLinkageIdentification* FluxLinkageIdent() override
+        {
+            return resolvedFluxIdent;
         }
 
         services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() override
@@ -129,5 +135,7 @@ namespace application
         std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
         std::optional<infra::WithSharedAccess<services::CoggingMappingImpl>> ownCoggingMapping;
         services::CoggingMapping* resolvedCoggingMapping;
+        std::optional<services::FluxLinkageIdentificationImpl> ownFluxIdent;
+        services::FluxLinkageIdentification* resolvedFluxIdent;
     };
 }

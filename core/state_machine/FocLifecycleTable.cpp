@@ -51,7 +51,7 @@ namespace application
         };
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 15> FocLifecycleTable::CalibrationRows()
+    constexpr std::array<FocLifecycleTable::Transition, 16> FocLifecycleTable::CalibrationRows()
     {
         return services::JoinRows(CalibrationEntryRows<state_machine::Idle>(), CalibrationEntryRows<state_machine::Ready>(),
             std::array{
@@ -110,6 +110,15 @@ namespace application
                     [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified&)
                     {
                         return calibrating.step == state_machine::CalibrationStep::frictionAndInertia;
+                    }),
+                Machine::InternalRow<state_machine::Calibrating, state_machine::FluxLinkageIdentified>(
+                    [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::FluxLinkageIdentified& event)
+                    {
+                        context.calibration.OnFluxLinkageIdentified(calibrating, event);
+                    },
+                    [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::FluxLinkageIdentified&)
+                    {
+                        return calibrating.step == state_machine::CalibrationStep::fluxLinkage;
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::CoggingMapped>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event)
@@ -359,7 +368,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 49> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 50> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }
