@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-SM-012: a coding rule (no heap), kept in AGENTS.md
+
 - id: REQ-SM-001
   title: Initial state after reset
   shall: >
@@ -78,12 +81,6 @@
   shall: >
     Calibration data produced during a successful calibration run shall be saved
     to non-volatile memory so that it survives power cycles.
-
-- id: REQ-SM-012
-  title: No heap allocation in state transitions
-  shall: >
-    All state machine transitions and calibration service calls shall execute
-    without dynamic memory allocation.
 
 - id: REQ-SM-013
   title: Emergency stop is accepted from every state

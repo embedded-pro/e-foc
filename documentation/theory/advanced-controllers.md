@@ -2,7 +2,7 @@
 title: "FOC Controllers — Map and Trade-offs"
 type: theory
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: "foc-controllers"
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | FOC Controllers — Map and Trade-offs |
 | Type      | theory                               |
 | Status    | draft                                |
-| Version   | 0.4.0                                |
+| Version   | 0.4.1                                |
 | Component | foc-controllers                      |
 | Date      | 2026-10-29                           |
 
@@ -42,11 +42,10 @@ graph TD
     ENC(["Encoder θm"])
     ADC(["ADC ia, ib"])
     subgraph POS["Position loop — 1 kHz"]
-        PC["P · Cascade P · LQR/LQI · Two-DOF · ILC"]
+        PC["P · Cascade P · LQR/LQI · Two-DOF"]
     end
     subgraph SPD["Speed loop — 1 kHz"]
         SC["PI · LQI · ADRC · Two-DOF"]
-        FC["+ Friction comp. Iq_ff"]
     end
     subgraph CUR["Current loop — 20 kHz ISR"]
         CC["PI · Decoupled PID · Deadbeat · Sliding-mode"]
@@ -117,11 +116,11 @@ decoupling in A1) removes the predictable part of the tracking error before feed
 
 ### 4. Model-Based versus Model-Free
 
-| Needs                    | Algorithms                                      | Parameters come from                               |
-|--------------------------|-------------------------------------------------|----------------------------------------------------|
-| Nothing beyond the gains | PI (current, speed), P, Cascade P, Two-DOF, ILC | Bandwidth settings                                 |
-| Electrical model         | Decoupled PID, Deadbeat, Sliding-mode           | Electrical identification ($R_s$, $L_s$), $\psi_f$ |
-| Mechanical model         | LQI, ADRC, LQR/LQI                              | Mechanical identification ($J$, $B_f$, $K_t$)      |
+| Needs                    | Algorithms                                 | Parameters come from                               |
+|--------------------------|--------------------------------------------|----------------------------------------------------|
+| Nothing beyond the gains | PI (current, speed), P, Cascade P, Two-DOF | Bandwidth settings                                 |
+| Electrical model         | Decoupled PID, Deadbeat, Sliding-mode      | Electrical identification ($R_s$, $L_s$), $\psi_f$ |
+| Mechanical model         | LQI, ADRC, LQR/LQI                         | Mechanical identification ($J$, $B_f$, $K_t$)      |
 
 Parameters drift: $R_s$ rises about 0.39 %/K with winding temperature and $\psi_f$ falls about 0.1 %/K with
 magnet temperature ([disturbances and noise](disturbances-and-noise.md)). A model-based law tuned on a cold
@@ -134,7 +133,7 @@ Every current-loop algorithm runs inside the 20 kHz interrupt, whose inner-loop 
 (`documentation/performance-optimization/README.md`), so none of the algorithms below is limited by
 computation; the limit on all of them is the 1.5-period loop delay of
 [closed-loop control](closed-loop-control.md) §7. The outer loops run at 1 kHz with a 20 000-cycle budget,
-where even a stored ILC array is cheap.
+which none of the speed or position laws comes near either.
 
 ---
 
@@ -162,13 +161,12 @@ Summary comparison across all loops — see each per-algorithm chapter for full 
 
 **Position loop** — 1 kHz handler:
 
-| ID | Algorithm    | Ops/cycle      | Steady-state error  | Requires RLS | Relies on                       | When the model is wrong                         | Noise sensitivity                                           | Best for                            |
-|----|--------------|----------------|---------------------|--------------|---------------------------------|-------------------------------------------------|-------------------------------------------------------------|-------------------------------------|
-| —  | P (baseline) | 2 MACs         | Zero at rest        | No           | Speed loop ≥ 5 × bandwidth      | —                                               | Encoder angle                                               | Point-to-point holding              |
-| P1 | LQR / LQI    | 4 MACs         | Zero (LQI)          | Yes (J, Bf)  | $J$, $B_f$, $K_t$               | Optimality lost; current-loop delay unmodelled  | Angle and its derivative                                    | Principled $\theta$/$\omega$ trade  |
-| P2 | Cascade P    | 2 MACs         | Speed-loop dep.     | No           | $K_v \le \omega_{speed}/5$      | —                                               | Encoder angle; velocity feedforward needs a clean reference | Industrial servo; moving references |
-| P3 | Two-DOF      | ~8 MACs        | Configurable        | No           | Pre-filter faster than the loop | —                                               | As P2                                                       | Tracking and stiffness tuned apart  |
-| P4 | ILC          | 2 MACs + array | Near-zero (learned) | No           | A strictly repeated trajectory  | A changed trajectory replays the old correction | Learns the repeatable part only                             | Repetitive moves                    |
+| ID | Algorithm    | Ops/cycle | Steady-state error | Requires RLS | Relies on                       | When the model is wrong                        | Noise sensitivity                                           | Best for                            |
+|----|--------------|-----------|--------------------|--------------|---------------------------------|------------------------------------------------|-------------------------------------------------------------|-------------------------------------|
+| —  | P (baseline) | 2 MACs    | Zero at rest       | No           | Speed loop ≥ 5 × bandwidth      | —                                              | Encoder angle                                               | Point-to-point holding              |
+| P1 | LQR / LQI    | 4 MACs    | Zero (LQI)         | Yes (J, Bf)  | $J$, $B_f$, $K_t$               | Optimality lost; current-loop delay unmodelled | Angle and its derivative                                    | Principled $\theta$/$\omega$ trade  |
+| P2 | Cascade P    | 2 MACs    | Speed-loop dep.    | No           | $K_v \le \omega_{speed}/5$      | —                                              | Encoder angle; velocity feedforward needs a clean reference | Industrial servo; moving references |
+| P3 | Two-DOF      | ~8 MACs   | Configurable       | No           | Pre-filter faster than the loop | —                                              | As P2                                                       | Tracking and stiffness tuned apart  |
 
 ---
 
@@ -192,9 +190,7 @@ graph TD
         S1 -->|"no"| SLQ["LQI (S1) or PI"]
     end
     subgraph Position["Position loop"]
-        P0{"Trajectory repeats<br/>exactly?"} -->|"yes"| PILC["ILC (P4) over P2 or P3"]
-        P0 -->|"no"| P1{"Reference moves<br/>continuously?"}
-        P1 -->|"yes"| PCP["Cascade P with velocity<br/>feedforward (P2) or Two-DOF (P3)"]
+        P1{"Reference moves<br/>continuously?"} -->|"yes"| PCP["Cascade P with velocity<br/>feedforward (P2) or Two-DOF (P3)"]
         P1 -->|"no"| P2{"Mechanical model<br/>identified?"}
         P2 -->|"yes"| PLQ["LQR/LQI (P1)"]
         P2 -->|"no"| PB["P baseline"]
@@ -223,26 +219,24 @@ controller tuned against a current loop that later changes is tuned against the 
 | Position | P1 | LQR / LQI                   | [position-loop-lqr-lqi.md](position-loop-lqr-lqi.md)           |
 | Position | P2 | Cascade P→PI                | [position-loop-cascade-p.md](position-loop-cascade-p.md)       |
 | Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
-| Position | P4 | Iterative Learning Control  | [position-loop-ilc.md](position-loop-ilc.md)                   |
-| Any      | —  | Friction Compensation       | [position-loop-friction.md](position-loop-friction.md)         |
 
-Friction compensation is the one entry that is theory only today: the mechanical estimator fits a Coulomb
-term internally but does not output it, and no cascade applies a friction feed-forward. Cogging, the other low-speed
-torque disturbance, is compensated (`documentation/design/service-cogging-compensation.md`).
+Friction compensation is not implemented: the mechanical estimator fits a Coulomb term internally but does not
+output it, and no cascade applies a friction feed-forward. Cogging, the other low-speed torque disturbance, is
+compensated (`documentation/design/service-cogging-compensation.md`).
 
 ---
 
 ## Parameter Sources
 
-| Source                  | Parameters                                                      | Available after                 |
-|-------------------------|-----------------------------------------------------------------|---------------------------------|
-| Motor datasheet         | Pole pairs $p$, flux linkage $\psi_f$, peak current $I_{q,max}$ | Before first run                |
-| Electrical RLS          | $R_s$, $L_s$, $V_{dc}$                                          | After electrical identification |
-| Mechanical RLS          | $J$, $B_f$, $K_t$                                               | After mechanical identification |
-| Friction identification | $T_c$, $T_s$, $\omega_{st}$                                     | After dedicated friction sweep  |
+| Source          | Parameters                                                      | Available after                 |
+|-----------------|-----------------------------------------------------------------|---------------------------------|
+| Motor datasheet | Pole pairs $p$, flux linkage $\psi_f$, peak current $I_{q,max}$ | Before first run                |
+| Bus measurement | $V_{dc}$                                                        | At boot                         |
+| Electrical RLS  | $R_s$, $L_s$                                                    | After electrical identification |
+| Mechanical RLS  | $J$, $B_f$, $K_t$                                               | After mechanical identification |
 
 Current-loop algorithms A1–A3 become selectable after electrical identification. Speed and position
-algorithms S1, S2, P1 additionally require mechanical identification. P2, P3, P4, and S3 require
+algorithms S1, S2, P1 additionally require mechanical identification. P2, P3 and S3 require
 neither and are always available once the motor is calibrated.
 
 ---
@@ -255,8 +249,6 @@ Full reference lists are in each per-algorithm chapter. Foundational references:
 2. Åström, K.J. & Wittenmark, B. — *Computer-Controlled Systems*, 3rd ed., Prentice Hall, 1997.
 3. Han, J. — "From PID to Active Disturbance Rejection Control", *IEEE Trans. Ind. Electron.*,
    56(3):900–906, 2009.
-4. Bristow, D.A. et al. — "A Survey of Iterative Learning Control",
-   *IEEE Control Systems Magazine*, 26(3):96–114, 2006.
-5. Armstrong-Hélouvry, B. et al. — "A Survey of Models … for Machines with Friction",
+4. Armstrong-Hélouvry, B. et al. — "A Survey of Models … for Machines with Friction",
    *Automatica*, 30(7):1083–1138, 1994.
-6. Åström, K.J. & Murray, R.M. — *Feedback Systems*, 2nd ed., Princeton University Press, 2021.
+5. Åström, K.J. & Murray, R.M. — *Feedback Systems*, 2nd ed., Princeton University Press, 2021.

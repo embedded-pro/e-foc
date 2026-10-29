@@ -2,7 +2,7 @@
 title: "The Power Stage — MOSFETs, Half-Bridges and Dead Time"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "power-stage"
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | The Power Stage — MOSFETs, Half-Bridges and Dead Time |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.0                                                 |
+| Version   | 0.1.1                                                 |
 | Component | power-stage                                           |
 | Date      | 2026-10-29                                            |
 
@@ -38,7 +38,7 @@ winding:
 - the **losses**, the **DC link** and regeneration, and the **protection** paths.
 
 Figures are those of the E-FOC-HARDWARE board on the EK-TM4C1294XL. The board's own design files live in the
-`e-foc-hardware` submodule, which is not checked out with the firmware; the component figures here are those
+separate [e-foc-hardware](https://github.com/embedded-pro/e-foc-hardware) repository; the component figures here are those
 the software-in-the-loop characterisation took from the parts and the rig
 (`documentation/design/software-in-the-loop.md` Part L).
 
