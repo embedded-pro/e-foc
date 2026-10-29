@@ -208,7 +208,7 @@ namespace mil
                     application::TerminalAndTracer{ terminal, tracer },
                     application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods() },
                     nvm,
-                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
+                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
                     faultNotifier,
                     configData,
                     state_machine::ControlModeStateMachine::OuterLoopArgs{

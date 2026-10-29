@@ -24,6 +24,7 @@ namespace application
         void RunSequence(state_machine::Calibrating& calibrating);
         void RunAlignmentOnly(state_machine::Calibrating& calibrating);
         void OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle);
+        void OnFluxLinkageIdentified(state_machine::Calibrating& calibrating, const state_machine::FluxLinkageIdentified& event);
         void OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event);
         void OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event);
         void Save(state_machine::Calibrating& calibrating);
@@ -38,6 +39,8 @@ namespace application
         void Abort();
 
     private:
+        void RunFluxLinkageStep(state_machine::Calibrating& calibrating);
+        bool IsIdentifyingFluxLinkage() const;
         void TraceRecord(const services::CalibrationData& data) const;
         void OnSaved(services::NvmStatus status);
         void RetrySave();

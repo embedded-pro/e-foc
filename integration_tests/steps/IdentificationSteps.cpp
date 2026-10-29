@@ -56,6 +56,7 @@ namespace
         out.currentOffsetAmpereB = ReadParameterValue(fixture, can::FocParameter::currentOffsetB);
         out.currentOffsetAmpereC = ReadParameterValue(fixture, can::FocParameter::currentOffsetC);
         out.coggingPeakNm = ReadParameterValue(fixture, can::FocParameter::coggingPeak);
+        out.fluxLinkageWeber = ReadParameterValue(fixture, can::FocParameter::fluxLinkage);
     }
 
     void CompareOffsetWithPlant(const ScenarioSetup& setup, const char* phase, std::optional<float> identified, float bias, float limitMilliAmpere)
@@ -82,6 +83,8 @@ namespace
             return plant.viscousDampingNmSPerRad;
         if (quantity == "cogging")
             return plant.coggingTorqueNm;
+        if (quantity == "fluxLinkage")
+            return plant.fluxLinkageWeber;
         return std::nullopt;
     }
 
@@ -97,6 +100,8 @@ namespace
             return parameters.frictionNmSPerRad;
         if (quantity == "cogging")
             return parameters.coggingPeakNm;
+        if (quantity == "fluxLinkage")
+            return parameters.fluxLinkageWeber;
         return std::nullopt;
     }
 

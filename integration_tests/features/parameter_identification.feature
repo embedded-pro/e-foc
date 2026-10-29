@@ -153,3 +153,26 @@ Feature: Parameter Identification Against a Known Plant
     And the full calibration is run
     Then the identified cogging shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
+
+  @sil @REQ-CAL-021
+  Scenario: The full calibration identifies the flux linkage through the bench's current-sense chain
+    Given a bench motor plant
+    And a motor plant with:
+      | flux_linkage_weber | 0.0046 |
+    And the plant reads its currents through the bench's current-sense chain
+    And the plant applies each duty a period late, as the board does
+    And the motor boots in torque mode
+    When the target boots
+    And the full calibration is run
+    Then the identified fluxLinkage shall be within 5 % of the plant
+
+  @sil @REQ-CAL-021
+  Scenario: The mechanical identification reads the inertia through the identified flux linkage
+    Given a bench motor plant
+    And a motor plant with:
+      | flux_linkage_weber | 0.0046 |
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run
+    Then the identified fluxLinkage shall be within 3 % of the plant
+    And the identified inertia shall be within 5 % of the plant

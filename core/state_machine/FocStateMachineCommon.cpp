@@ -1,4 +1,5 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/FocLifecycleTable.hpp"
 #include "core/state_machine/LifecycleCliCommands.hpp"
 
@@ -181,6 +182,33 @@ namespace application
     void FocStateMachineCommon::MarkProvisionalControlApplied()
     {
         provisionalControlApplied = true;
+    }
+
+    bool FocStateMachineCommon::ApplyProvisionalCurrentControl(const services::CalibrationData& pending)
+    {
+        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFinitePositive(pending.lD) || pending.polePairs == 0)
+            return false;
+
+        MarkProvisionalControlApplied();
+        return ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) });
+    }
+
+    services::FluxLinkageIdentification* FocStateMachineCommon::ResolveFluxLinkageIdent(
+        const CalibrationServices& calibServices,
+        std::optional<services::FluxLinkageIdentificationImpl>& ownFluxIdent,
+        foc::CurrentCommandable& currentCommandable,
+        foc::Controllable& drive,
+        const foc::FocBase& motion,
+        drivers::ThreePhaseInverter& inverter)
+    {
+        if (calibServices.fluxIdentOverride.has_value())
+            return &calibServices.fluxIdentOverride->get();
+
+        if (!calibServices.identifyFluxLinkage)
+            return nullptr;
+
+        ownFluxIdent.emplace(currentCommandable, drive, motion, inverter);
+        return &*ownFluxIdent;
     }
 
     // A committed calibration replaces the provisional plant; nothing is left to restore.

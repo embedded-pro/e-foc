@@ -6,6 +6,7 @@
 #include "core/services/cogging_compensation/test_doubles/CoggingMappingMock.hpp"
 #include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
+#include "core/services/flux_linkage_ident/test_doubles/FluxLinkageIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PositionStateMachine.hpp"

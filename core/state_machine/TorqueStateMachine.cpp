@@ -13,6 +13,7 @@ namespace application
         RotorReference rotorReference)
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
         , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
+        , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
@@ -52,6 +53,11 @@ namespace application
     foc::CurrentLoopTunable& TorqueStateMachine::CurrentTunable()
     {
         return focController;
+    }
+
+    services::FluxLinkageIdentification* TorqueStateMachine::FluxLinkageIdent()
+    {
+        return resolvedFluxIdent;
     }
 
     void TorqueStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)

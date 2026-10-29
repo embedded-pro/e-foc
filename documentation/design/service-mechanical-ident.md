@@ -428,7 +428,7 @@ The mechanical equation of motion for the motor shaft is:
 
 $$T_e = J \cdot \dot{\omega} + B \cdot \omega + c_\pm, \qquad c_\pm = \tau_L \pm \tau_c$$
 
-The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
+The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. The calibration identifies that flux linkage from the back-EMF just before this step (`service-flux-linkage-ident.md`): with the target's configured 7.0 mWb against the bench motor's 4.6 mWb the identified inertia read 52 % high. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
 
 When the calibration holds a cogging map, the cascade adds the map's current to what the speed loop asks for
 (`service-cogging-compensation.md`), and $I_q$ here is the current without that addition. The compensation and

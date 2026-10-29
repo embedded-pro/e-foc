@@ -204,7 +204,9 @@
     While an online electrical estimator is attached, the speed and position cascades shall add
     their d-axis square wave for the first 4 s after each enable and for the first 4 s of every
     60 s after that, and shall hold the d-axis reference at zero in between, where the estimator
-    shall take no update and keep its estimates. On the bench motor driven between 30 and 50 rad/s,
+    shall take no update and keep its estimates. While a calibration runs either cascade on a
+    commanded q-axis current, the d-axis reference shall stay at zero and the estimators shall take
+    no update. On the bench motor driven between 30 and 50 rad/s,
     the plant's d-axis current shall be above 60 mA RMS from 0.2 to 3.8 s after enable and below
     10 mA RMS from 4.2 to 9 s after enable.
 
@@ -215,3 +217,20 @@
     a 100 ms window began, and shall fail if the rotor has not come to rest within 10 s. Started 25 ms
     after the bench motor, with the current sensor biases of REQ-CAL-015, is disabled at 52 rad/s, the
     full calibration shall store offsets within 5 mA of the plant's biases.
+
+- id: REQ-CAL-021
+  title: Calibration identifies the flux linkage from the back-EMF
+  shall: >
+    After alignment, in every control mode, the full calibration shall spin the rotor with a q-axis
+    current of at most 0.6 A and a quarter of the drive's current, keep it below 50 rad/s, set the
+    current to zero and fit the q-axis voltage less the resistive drop against the electrical speed
+    while the rotor coasts, and shall store the slope as the flux linkage when the fit spans speeds
+    of at least two to one, its slope is known within 5 percent and its intercept is at most 15
+    percent of the largest voltage. Otherwise it shall keep the flux linkage it had, and a speed
+    above 50 rad/s shall fail the calibration. The steps after it, the mechanical identification
+    included, shall use the flux linkage it stores, and the step shall run once per calibration and
+    not in a re-alignment or an electrical identification over CAN. On the bench motor with a flux
+    linkage of 4.6 mWb against the configured 7.0 mWb, the stored flux linkage shall be within 5
+    percent of 4.6 mWb through the bench's current-sense chain with each duty a period late, and
+    in speed mode within 3 percent with the identified inertia within 5 percent, where keeping the
+    configured flux linkage reads the inertia 52 percent high.

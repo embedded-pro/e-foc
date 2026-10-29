@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
@@ -103,6 +104,12 @@ namespace state_machine
         float speedLoopBandwidth;
     };
 
+    struct FluxLinkageIdentified
+    {
+        static constexpr const char* name{ "FluxLinkageIdentified" };
+        services::FluxLinkageIdentification::Result result;
+    };
+
     struct CoggingMapped
     {
         static constexpr const char* name{ "CoggingMapped" };
@@ -191,6 +198,7 @@ namespace state_machine
         AlignmentSucceeded,
         CalibrationStepFailed,
         MechanicalParametersIdentified,
+        FluxLinkageIdentified,
         CoggingMapped,
         CalibrationSaved,
         Enable,
