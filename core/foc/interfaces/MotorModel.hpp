@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include <cstddef>
+#include <cstdint>
 
 namespace foc
 {
@@ -14,6 +15,7 @@ namespace foc
         Volts busVoltage{ 0.0f };
         hal::Hertz samplingFrequency{ 0 };
         std::size_t polePairs{ 0 };
+        uint32_t dutyUpdateDelayPeriods{ 0 };
     };
 
     struct MechanicalModelParameters

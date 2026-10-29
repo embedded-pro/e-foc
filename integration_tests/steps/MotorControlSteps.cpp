@@ -40,28 +40,34 @@ WHEN(R"(the motor is disabled)")
 WHEN(R"(a torque setpoint of {float} A is applied)", (float iq))
 {
     auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+    const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetTorqueSetpointId,
         EncodeFixed16BE(iq, can::focCurrentScale)))
         << "Torque setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetTorqueSetpointId, iq, fixture.ServerNodeId() };
+    setup.lastSetpoint = Setpoint{ can::focSetTorqueSetpointId, iq, fixture.ServerNodeId(), commandsBefore };
 }
 
 WHEN(R"(a speed setpoint of {float} rad\/s is applied)", (float radiansPerSecond))
 {
     auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+    const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId,
         EncodeFixed16BE(radiansPerSecond, can::focSpeedScale)))
         << "Speed setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, radiansPerSecond, fixture.ServerNodeId() };
+    setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, radiansPerSecond, fixture.ServerNodeId(), commandsBefore };
 }
 
 WHEN(R"(a position setpoint of {float} rad is applied)", (float rad))
 {
     auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+    const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetPositionSetpointId,
         EncodeFixed16BE(rad, can::focPositionScale)))
         << "Position setpoint command rejected";
-    context.Get<ScenarioSetup>().lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad, fixture.ServerNodeId() };
+    setup.lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad, fixture.ServerNodeId(), commandsBefore };
 }
 
 THEN(R"(the state machine shall be in the running state)")

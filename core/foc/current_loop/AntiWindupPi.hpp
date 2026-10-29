@@ -4,7 +4,6 @@
 
 namespace foc
 {
-    // Incremental PI: the realized output committed back becomes the base of the next step
     class AntiWindupPi
     {
     public:

@@ -64,9 +64,13 @@ namespace
         if (!setup.lastSetpoint || !setup.trace.StartTick())
             return std::nullopt;
 
-        const auto stamp = setup.trace.CommandTick(CommandRawId(*setup.lastSetpoint));
-        if (stamp && *stamp >= *setup.trace.StartTick())
-            return stamp;
+        const auto& commands = setup.trace.Commands();
+        const auto rawId = CommandRawId(*setup.lastSetpoint);
+
+        for (auto index = commands.size(); index > setup.lastSetpoint->commandsBefore; --index)
+            if (commands[index - 1].rawId == rawId)
+                return commands[index - 1].tick >= *setup.trace.StartTick() ? std::optional{ commands[index - 1].tick } : std::nullopt;
+
         return std::nullopt;
     }
 

@@ -88,3 +88,27 @@
     the board's 70 % readable limit and 95 % maximum duty, the bench motor shall hold a speed
     setpoint of 400 rad/s within 0.5 rad/s, where keeping all three phases readable stops it
     near 356 rad/s.
+
+- id: REQ-TRQ-010
+  title: The deadbeat law accounts for a duty that acts a period late
+  shall: >
+    On a board that applies each duty a PWM period after it is computed, the deadbeat current law
+    shall act on the current it predicts for the period its duty lands in, from the measured
+    current and the voltage still in flight after the modulation limit. On the bench motor with
+    each duty applied a period late, the deadbeat law shall bring the q-axis current from zero to
+    a 0.5 A setpoint and enter and then stay inside a 10 percent band within 1 ms, with an
+    overshoot below 30 percent and its tail within 7 percent of the step, where acting on the
+    measured current overshoots by about 100 percent and takes over 12 ms to settle.
+
+- id: REQ-TRQ-011
+  title: The deadbeat law removes a voltage error its model does not account for
+  shall: >
+    The deadbeat current law shall estimate the voltage its model does not account for from the
+    difference between each measured current and the current it predicted for that sample, at the
+    current loop's bandwidth, and shall subtract that estimate from its command, starting afresh
+    whenever the loop is reset. On the bench motor with each duty applied a period late and a stored
+    flux linkage 1.5 times the motor's, after 120 ms at 0.5 A the deadbeat law shall bring the
+    q-axis current to a 0 A setpoint and enter and then stay inside a 10 percent band within 1 ms,
+    with an overshoot below 30 percent, its tail within 7 percent of the step and a steady-state
+    error below 0.02 A, where without the estimate the current stays near 0.39 A and keeps the
+    rotor accelerating.

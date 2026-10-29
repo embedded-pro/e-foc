@@ -6,12 +6,22 @@
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include "integration_tests/support/interactor/interfaces/TerminalInteractor.hpp"
+#include <cstdio>
+#include <exception>
 #include <gtest/gtest.h>
 #include <utility>
 
 HOOK_BEFORE_ALL(.name = "Setup target")
 {
-    integration::TargetInteractor::Instance().Setup();
+    try
+    {
+        integration::TargetInteractor::Instance().Setup();
+    }
+    catch (const std::exception& e)
+    {
+        std::fprintf(stderr, "Setup target failed: %s\n", e.what());
+        throw;
+    }
 }
 
 HOOK_AFTER_ALL(.name = "Teardown target")

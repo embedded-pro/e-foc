@@ -106,6 +106,32 @@ TEST_F(TestControlPerformance, every_current_law_steps_from_rest_to_0_5_A)
         mil::StepFromRest(mil::Scenario{}.CurrentLoop(algorithm), currentLoop, row);
 }
 
+TEST_F(TestControlPerformance, the_deadbeat_current_law_steps_from_rest_to_0_5_A_when_each_duty_acts_a_period_late)
+{
+    auto scenario = mil::Scenario{}.Plant("bench").CurrentLoop(foc::CurrentAlgorithm::deadbeat);
+    sil::DescribeBoardPwmUpdate(scenario.plant);
+
+    mil::StepFromRest(scenario, currentLoop, { "deadbeat, duty a period late", 0.5f, 10.0f, 1.0f, 30.0f, 1.0f, 7.0f, 0.05f });
+}
+
+TEST_F(TestControlPerformance, the_deadbeat_current_law_holds_0_A_at_speed_when_the_stored_flux_linkage_is_half_again_too_large)
+{
+    auto scenario = mil::Scenario{}.Plant("bench").CurrentLoop(foc::CurrentAlgorithm::deadbeat);
+    sil::DescribeBoardPwmUpdate(scenario.plant);
+    scenario.Recorded(5000, 10000).Calibrated().StoredCalibrationOffBy("fluxLinkage", 1.5f).BootsIn(currentLoop.mode);
+
+    mil::ModelInTheLoop mil{ scenario };
+    ASSERT_TRUE(mil.Align());
+    ASSERT_TRUE(mil.Enable());
+    ASSERT_TRUE(mil.SetTorque(0.5f));
+    mil.Run(std::chrono::milliseconds{ 120 });
+    ASSERT_TRUE(mil.SetTorque(0.0f));
+    ASSERT_TRUE(mil.CaptureAfterSetpoint(60.0f));
+
+    mil::ExpectStepEnvelope(mil::MeasureStep(mil, currentLoop.signal, 10.0f, "deadbeat to 0 A at speed"), 1.0f, 30.0f, 1.0f, 7.0f, 0.02f);
+    mil::ExpectNoDroppedSamples(mil);
+}
+
 TEST_F(TestControlPerformance, the_pid_current_law_follows_a_setpoint_change_while_running)
 {
     StepWhileRunning(mil::Scenario{}.CurrentLoop(foc::CurrentAlgorithm::pid), currentLoop, 5000, 10000, 15.0f, 60.0f,
