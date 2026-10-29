@@ -95,6 +95,11 @@ GitHub Pages on `main`, and attaches the PDF to every published release.
 1. Check that the material does not belong to an existing document. Theory belongs in
    `documentation/theory/`, architecture decisions in `documentation/architecture/system.md`,
    component design in `documentation/design/`. No source code in any chapter.
-2. Create the file with a single top-level heading and section numbering (`## 1.`, `## 2.`).
+2. Create the file from its template in `documentation/templates/`. Keep the template's `##` section
+   headings exactly as written (the documentation validator looks for them); number the `###`
+   subsections beneath them (`### 1.`, `### 2.`).
 3. Link it from the table above under the correct Part — the index drives both outputs.
 4. Author diagrams as ```` ```mermaid ```` fences. A fence that fails to parse fails the build.
+   Theory chapters may also embed animations from `documentation/animations/`
+   (`python documentation/tools/generate-animations.py`); the site shows them animated, the PDF prints
+   their `-frames.svg` strip, and a missing strip fails the build.
