@@ -10,10 +10,12 @@ namespace application
         drivers::ThreePhaseInverter& inverter,
         foc::Volts vdc,
         foc::Weber configuredFluxLinkage,
-        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets)
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
+        uint32_t dutyUpdateDelayPeriods)
         : inverter(inverter)
         , vdc(vdc)
         , configuredFluxLinkage(configuredFluxLinkage)
+        , dutyUpdateDelayPeriods(dutyUpdateDelayPeriods)
         , currentOffsets(currentOffsets)
     {}
 
@@ -111,7 +113,8 @@ namespace application
             fluxLinkage,
             vdc,
             inverter.BaseFrequency(),
-            polePairs });
+            polePairs,
+            dutyUpdateDelayPeriods });
 
         tunable.SetCurrentTunings(CurrentTuningsFor(bandwidth, inductance, currentNoise));
 

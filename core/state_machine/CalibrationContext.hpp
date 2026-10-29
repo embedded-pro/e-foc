@@ -6,6 +6,7 @@
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include <cstdint>
 #include <functional>
 #include <optional>
 
@@ -18,7 +19,8 @@ namespace application
             drivers::ThreePhaseInverter& inverter,
             foc::Volts vdc,
             foc::Weber configuredFluxLinkage,
-            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt);
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
+            uint32_t dutyUpdateDelayPeriods = 0);
 
         const services::CalibrationData& Data() const;
         services::CalibrationData& MutableData();
@@ -56,6 +58,7 @@ namespace application
         drivers::ThreePhaseInverter& inverter;
         foc::Volts vdc;
         foc::Weber configuredFluxLinkage;
+        uint32_t dutyUpdateDelayPeriods;
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
 
         services::CalibrationData calibrationData{};

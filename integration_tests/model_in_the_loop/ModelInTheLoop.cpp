@@ -32,6 +32,8 @@ namespace mil
                 calibration.inertia *= factor;
             else if (quantity == "friction")
                 calibration.frictionViscous *= factor;
+            else if (quantity == "fluxLinkage")
+                calibration.fluxLinkage *= factor;
             else
                 return false;
 
@@ -203,7 +205,7 @@ namespace mil
 
                 controlMode.emplace(
                     application::TerminalAndTracer{ terminal, tracer },
-                    application::MotorHardware{ inverterCompensation, drive, vdc },
+                    application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods() },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
                     faultNotifier,
@@ -211,8 +213,7 @@ namespace mil
                     state_machine::ControlModeStateMachine::OuterLoopArgs{
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
-                        .lowPriorityInterrupt = lowPriorityInterrupt,
-                        .dutyUpdateDelayPeriods = drive.DutyUpdateDelayPeriods() });
+                        .lowPriorityInterrupt = lowPriorityInterrupt });
             });
 
         Run(kBootTime);

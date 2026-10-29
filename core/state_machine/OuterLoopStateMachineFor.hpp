@@ -25,7 +25,7 @@ namespace application
             NvmActivity& nvmActivity,
             RotorReference rotorReference = RotorReference::lost)
             : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
-            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, outerLoopArgs.dutyUpdateDelayPeriods)
+            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))

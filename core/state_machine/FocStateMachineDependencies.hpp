@@ -10,6 +10,7 @@
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
+#include <cstdint>
 #include <functional>
 #include <optional>
 
@@ -26,6 +27,7 @@ namespace application
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         foc::Volts vdc;
+        uint32_t dutyUpdateDelayPeriods{ 0 };
     };
 
     // Kept across a mode switch out of an aligned Ready: the encoder zero is shared hardware.

@@ -115,9 +115,10 @@ TEST_F(TestCurrentControllerSelector, dispatch_reaches_the_selected_algorithm)
 
     const foc::CurrentControlContext context{ { 0.05f, 0.05f }, { 0.1f, 0.1f }, 0.0f };
     auto output = selector.Compute(context);
+    auto expectedOutput = expected.Compute(context);
 
-    EXPECT_NEAR(output.d, expected.Compute(context).d, tolerance);
-    EXPECT_NEAR(output.q, expected.Compute(context).q, tolerance);
+    EXPECT_NEAR(output.d, expectedOutput.d, tolerance);
+    EXPECT_NEAR(output.q, expectedOutput.q, tolerance);
 }
 
 TEST_F(TestCurrentControllerSelector, selection_configures_and_resets_the_new_controller)
