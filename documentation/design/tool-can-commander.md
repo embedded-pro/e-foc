@@ -206,12 +206,13 @@ flowchart LR
 
 - **Controllers** shows the loops the active control mode runs: the current loop in torque mode, current and
   speed in speed mode, all three in position mode. Each loop has its algorithm and the settings that
-  algorithm uses; the other settings of the loop are hidden, not deleted. A bandwidth can be left
+  algorithm uses; the other settings of the loop are hidden, not deleted. The current-loop bandwidth is
+  shown for deadbeat too, which estimates its voltage error at that bandwidth. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
-- **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (or the platform default),
-  inertia and viscous friction, and the commissioning actions Align, Identify Electrical, Identify
-  Mechanical and Calibrate, the whole sequence of the firmware's calibration. Changing the pole pairs says
-  that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
+- **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (measured by Calibrate, or the
+  platform default), inertia and viscous friction, and the commissioning actions Align, Identify Electrical,
+  Identify Mechanical and Calibrate, the whole sequence of the firmware's calibration. Changing the pole pairs
+  says that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
   after the user confirms it in a dialog, since the motor cannot start again until it is calibrated; a
   successful Calibrate or Clear Calibration reads the motor parameters and the diagnostics again.
 - **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.

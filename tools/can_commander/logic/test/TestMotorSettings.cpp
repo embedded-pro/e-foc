@@ -120,7 +120,8 @@ TEST_F(TestMotorSettings, shows_each_setting_with_the_algorithms_that_use_it)
     const auto& currentBandwidth = PresentationOf(FocParameter::currentBandwidth);
     EXPECT_TRUE(IsUsedBy(currentBandwidth, Raw(can::FocCurrentAlgorithm::pid)));
     EXPECT_TRUE(IsUsedBy(currentBandwidth, Raw(can::FocCurrentAlgorithm::slidingMode)));
-    EXPECT_FALSE(IsUsedBy(currentBandwidth, Raw(can::FocCurrentAlgorithm::deadbeat)));
+    EXPECT_TRUE(IsUsedBy(currentBandwidth, Raw(can::FocCurrentAlgorithm::deadbeat)));
+    EXPECT_FALSE(IsUsedBy(PresentationOf(FocParameter::currentSwitchingGain), Raw(can::FocCurrentAlgorithm::deadbeat)));
 
     EXPECT_TRUE(IsUsedBy(PresentationOf(FocParameter::currentTwoStepDeadbeat), Raw(can::FocCurrentAlgorithm::deadbeat)));
     EXPECT_FALSE(IsUsedBy(PresentationOf(FocParameter::currentSwitchingGain), Raw(can::FocCurrentAlgorithm::decoupledPid)));
