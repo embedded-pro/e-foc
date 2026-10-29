@@ -13,6 +13,7 @@ namespace services
         constexpr float maximumSpeedSpanRatio{ 0.5f };
         constexpr float slowingMargin{ 1.5f };
         constexpr float recordingCeilingFraction{ 0.5f };
+        constexpr float releaseLeadTicks{ 2.0f };
 
         bool IsUsableConfig(const FluxLinkageIdentification::Config& config)
         {
@@ -104,8 +105,7 @@ namespace services
         switch (phase)
         {
             case Phase::accelerating:
-                if (std::abs(speed) >= config.releaseSpeed.Value())
-                    Settle();
+                Spin(speed);
                 break;
             case Phase::settling:
                 if (++phaseTicks >= TicksIn(config.settleTime))
@@ -129,7 +129,18 @@ namespace services
     {
         phase = Phase::accelerating;
         phaseTicks = 0;
+        previousSpeed = config.maxSpeed.Value();
         controller.CommandCurrent(foc::Ampere{ spinCurrent });
+    }
+
+    void FluxLinkageIdentificationImpl::Spin(float speed)
+    {
+        const auto magnitude = std::abs(speed);
+        const auto gainPerTick = std::max(magnitude - previousSpeed, 0.0f);
+        previousSpeed = magnitude;
+
+        if (magnitude + releaseLeadTicks * gainPerTick >= config.releaseSpeed.Value())
+            Settle();
     }
 
     void FluxLinkageIdentificationImpl::Settle()
@@ -146,7 +157,7 @@ namespace services
         pointSpeed = 0.0f;
         pointVoltage = 0.0f;
         pointTicks = 0;
-        previousPointSpeed = config.maxSpeed.Value();
+        previousSpeed = config.maxSpeed.Value();
     }
 
     void FluxLinkageIdentificationImpl::Record(float speed, const foc::MotionObservation& observation)
@@ -174,8 +185,8 @@ namespace services
         pointVoltage = 0.0f;
         pointTicks = 0;
 
-        const bool speedingUp = meanSpeed > recordingCeiling && meanSpeed > previousPointSpeed;
-        previousPointSpeed = meanSpeed;
+        const bool speedingUp = meanSpeed > recordingCeiling && meanSpeed > previousSpeed;
+        previousSpeed = meanSpeed;
 
         if (speedingUp)
             EndCoast(meanSpeed);
