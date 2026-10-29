@@ -161,9 +161,10 @@ $$
 
 24 × 4 mN·m = 0.096 N·m/rad on the bench. A position setpoint between two detents sits on a slope that pushes the
 rotor away; the loop holds it only if its own stiffness is larger. For the cascade it is
-$2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.10 N·m/rad at the default bandwidths: barely more, and with dry friction
-the rotor stepped between detents instead (`documentation/theory/position-loop-pid.md`,
-*Limitations & Assumptions*).
+$2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.023 N·m/rad at the default 50 rad/s speed and 18.8 rad/s position
+bandwidths: a quarter of the cogging's, and the rotor steps between detents instead
+(`documentation/theory/position-loop-pid.md`, *Limitations & Assumptions*). Holding without the map would take a
+speed bandwidth above about 210 rad/s.
 
 **Breakaway.** To start the rotor, the drive must exceed cogging and dry friction together: 0.135–0.23 A of q
 current on the bench. That is 5.7–9.7 mN·m with the configured 7 mWb flux linkage, or 3.7–6.3 mN·m with the
@@ -299,8 +300,9 @@ The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles),
 2. **Frequency at 10 rad/s.** $24 \times 10 = 240$ rad/s, 38 Hz: above a 50 rad/s speed loop.
 3. **Speed ripple without compensation.** $0.004 / (12.4\times10^{-6} \times 24 \times 10) = 1.34$ rad/s, 13 % of
    the speed.
-4. **Detent stiffness.** $24 \times 0.004 = 0.096$ N·m/rad against the position cascade's 0.10 N·m/rad: a
-   setpoint between detents is marginal without the map and held with it.
+4. **Detent stiffness.** $24 \times 0.004 = 0.096$ N·m/rad against the position cascade's
+   $2 \times 12.4\times10^{-6} \times 50 \times 18.8 = 0.023$ N·m/rad: a setpoint between detents is lost without
+   the map and held with it.
 5. **Map fidelity.** Eight bins per cogging period lose 2.5 % of the fundamental; the residual after
    compensation is a few per cent of 4 mN·m, about 0.1 mN·m, at the level of the map's noise floor.
 

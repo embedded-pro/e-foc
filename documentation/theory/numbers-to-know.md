@@ -64,21 +64,21 @@ The headline numbers:
 
 The figures of the `sync_foc_sensored` application on the EK-TM4C1294XL with the E-FOC-HARDWARE power board:
 
-| Figure               | Value                                                                     | Source                                                                                                                   |
-|----------------------|---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| PWM and current loop | 20 kHz, centre-aligned                                                    | `targets/sync_foc_sensored/main/instantiations/Logic.hpp` (`controlLoopFrequencyHz`)                                     |
-| Outer loops          | 1 kHz, every 20th current-loop period                                     | `core/state_machine/OuterLoopStateMachine.hpp`, `core/foc/cascade/CascadeWithSpeedLoop.cpp`                              |
-| CPU                  | 120 MHz Cortex-M4F                                                        | `targets/platform_implementations/ti/EK-TM4C1294XL/PinsAndPeripherals.hpp`                                               |
-| Inner-loop budget    | 4500 of 6000 cycles per period (37.5 µs); measured 1074–1353              | `documentation/performance-optimization/README.md`, `documentation/requirements/performance/real-time-requirements.yaml` |
-| Duty resolution      | 1500 PWM counts per period (60 MHz PWM clock)                             | `documentation/design/service-dead-time-compensation.md`                                                                 |
-| Duty delay           | A new duty takes effect one period after its sample                       | `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp` (`DutyUpdateDelayPeriods`)                  |
-| Current sense        | 12-bit ADC, 3.3 V reference, 5 A/V around mid-rail: ±8.25 A               | `targets/platform_implementations/motor_boards/E-FOC-HARDWARE/BoardCharacteristics.hpp`                                  |
-| Current noise        | 31–39 mA per averaged sample (2× hardware averaging)                      | `documentation/architecture/system.md`                                                                                   |
-| Low-side window      | Phase readable up to 70 % duty; no leg above 95 % (bootstrap)             | `BoardCharacteristics.hpp`, `core/platform_abstraction/LowSideShuntWindow.hpp`                                           |
-| Dead time            | 500 ns commanded; 70 ns effective loss, 0.2 A knee                        | `Logic.hpp` (`pwmDeadTimeNs`), `BoardCharacteristics.hpp`                                                                |
-| Encoder              | 4000 counts per revolution (default)                                      | `core/services/non_volatile_memory/ConfigData.hpp`                                                                       |
-| Bus voltage          | Divider 21.25; read once at boot                                          | `BoardCharacteristics.hpp`, `targets/sync_foc_sensored/main/instantiations/Logic.cpp`                                    |
-| Protection           | Rated 3 A; over-current trip 6.6 A; over-voltage 58 V; under-voltage 18 V | `BoardCharacteristics.hpp`                                                                                               |
+| Figure               | Value                                                                     | Source                                                                                                                                                                              |
+|----------------------|---------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PWM and current loop | 20 kHz, centre-aligned                                                    | `targets/sync_foc_sensored/main/instantiations/Logic.hpp` (`controlLoopFrequencyHz`), `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp` (centre-aligned) |
+| Outer loops          | 1 kHz, every 20th current-loop period                                     | `core/state_machine/OuterLoopStateMachine.hpp`, `core/foc/cascade/CascadeWithSpeedLoop.cpp`                                                                                         |
+| CPU                  | 120 MHz Cortex-M4F                                                        | `targets/platform_implementations/ti/EK-TM4C1294XL/PinsAndPeripherals.hpp`                                                                                                          |
+| Inner-loop budget    | 4500 of 6000 cycles per period (37.5 µs); measured 1074–1353              | `documentation/performance-optimization/README.md`, `documentation/requirements/performance/real-time-requirements.yaml`                                                            |
+| Duty resolution      | 1500 PWM counts per period (60 MHz PWM clock)                             | `documentation/design/service-dead-time-compensation.md`                                                                                                                            |
+| Duty delay           | A new duty takes effect one period after its sample                       | `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp` (`DutyUpdateDelayPeriods`)                                                                             |
+| Current sense        | 12-bit ADC, 3.3 V reference, 5 A/V around mid-rail: ±8.25 A               | `targets/platform_implementations/motor_boards/E-FOC-HARDWARE/BoardCharacteristics.hpp`                                                                                             |
+| Current noise        | 31–39 mA per averaged sample (2× hardware averaging)                      | `documentation/architecture/system.md`                                                                                                                                              |
+| Low-side window      | Phase readable up to 70 % duty; no leg above 95 % (bootstrap)             | `BoardCharacteristics.hpp`, `core/platform_abstraction/LowSideShuntWindow.hpp`                                                                                                      |
+| Dead time            | 500 ns commanded; 70 ns effective loss, 0.2 A knee                        | `Logic.hpp` (`pwmDeadTimeNs`), `BoardCharacteristics.hpp`                                                                                                                           |
+| Encoder              | 4000 counts per revolution (default)                                      | `core/services/non_volatile_memory/ConfigData.hpp`                                                                                                                                  |
+| Bus voltage          | Divider 21.25; read once at boot                                          | `BoardCharacteristics.hpp`, `targets/sync_foc_sensored/main/instantiations/Logic.cpp`                                                                                               |
+| Protection           | Rated 3 A; over-current trip 6.6 A; over-voltage 58 V; under-voltage 18 V | `BoardCharacteristics.hpp`                                                                                                                                                          |
 
 ### 2. Time Scales
 
@@ -158,13 +158,13 @@ duty, $\theta = 60^\circ, 180^\circ, 300^\circ$, common-mode injection gives tho
 $0.866\,m$ above the lowest at modulation $m$, so
 
 $$
-0.866\, m \le 0.70 \quad\Rightarrow\quad m \le 0.81
+0.866\, m \le 0.70 \quad\Rightarrow\quad m \le 0.808
 $$
 
 A vector that turns at constant length therefore stays undistorted only up to about $0.81\,V_{max}$ on
 E-FOC-HARDWARE; beyond it the vector is flattened in those three directions. The timing behind both limits is in
 [low-side shunt current sensing](low-side-current-sensing.md). The speed limits change
-accordingly:
+accordingly, computed at $m = 0.808$:
 
 | Speed limit at the rated bus | Anaheim (24 V) | Teknic (40 V) |
 |------------------------------|----------------|---------------|
@@ -263,12 +263,12 @@ Which input moves which result:
 1. **Current.** The board allows 3 A, so torque is $0.0384 \times 3 = 0.115$ N·m, 42 % of rated.
 2. **Voltage at 6000 rpm and 3 A.** $\omega_e = 2513$ rad/s. $V_q = 0.36 \times 3 + 2513 \times 0.0064 = 17.2$ V,
    $V_d = -2513 \times 0.0002 \times 3 = -1.51$ V, $|V| = 17.2$ V.
-3. **Available voltage.** $0.81 \times 23.09 = 18.7$ V. The demand is 92 % of it.
+3. **Available voltage.** $0.808 \times 23.09 = 18.7$ V. The demand is 92 % of it.
 4. **Verdict.** Yes, with 1.4 V to spare for transients, consistent with the 6530 rpm limit of §4. At 6000 rpm
    each control period sees 7.2° of rotation, and the voltage it computes is applied about 10.8° late.
 
 **The Anaheim at 24 V, 4000 rpm, 3 A** gives $V_q = 0.405 \times 3 + 1675.5 \times 0.00544 = 10.33$ V,
-$V_d = -1675.5 \times 0.00064 \times 3 = -3.22$ V, $|V| = 10.8$ V against $0.81 \times 13.86 = 11.2$ V: 97 %, at
+$V_d = -1675.5 \times 0.00064 \times 3 = -3.22$ V, $|V| = 10.8$ V against $0.808 \times 13.86 = 11.2$ V: 97 %, at
 the edge, matching the 4160 rpm limit of §4.
 
 ---
@@ -278,8 +278,9 @@ the edge, matching the 4160 rpm limit of §4.
 - **Assumes**: the reference motors' parameters as modelled; $B_f$ is assumed, not published, so $\tau_m$ is
   indicative.
 - **Assumes**: steady state for the voltage budgets; transients need extra headroom.
-- **Derived, not measured**: the 0.81 modulation limit follows from the two duty limits and common-mode
-  injection; the simulation results of `documentation/architecture/system.md` are consistent with it.
+- **Derived, not measured**: the 0.81 modulation limit follows from the 70 % readable limit and common-mode
+  injection; the 95 % cap never binds below it, since the spread between highest and lowest duty is at most $m$.
+  The simulation results of `documentation/architecture/system.md` are consistent with it.
 - **Board-specific**: §1 and every figure derived from it hold for E-FOC-HARDWARE on the EK-TM4C1294XL;
   another board has its own `BoardCharacteristics`.
 

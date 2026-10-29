@@ -141,13 +141,13 @@ reference response slows to half the bandwidth. The dip formula above holds for 
 
 **Dead time and switch drops.** Between one switch of a leg turning off and the other turning on, both are
 off and the phase current alone decides the switch-node voltage. At large current the node is clamped at once
-by a body diode, and the leg loses
+by a body diode, and the leg's average voltage is off by
 
 $$
-\Delta v = \operatorname{sgn}(i)\,(V_{dc} + 2V_f)\,\frac{t_d}{T}
+\Delta v = -\operatorname{sgn}(i)\,(V_{dc} + 2V_f)\,\frac{t_d}{T}
 $$
 
-of its average voltage. At small current the node is still swinging when the complement turns on, the loss is
+a loss for current out of the leg, a gain for current into it. At small current the node is still swinging when the complement turns on, the loss is
 proportional to the current and looks like extra resistance (`documentation/design/software-in-the-loop.md`
 Part L). Because the loss follows the sign of each phase current, it is a square wave in each phase: a
 fundamental component that reduces the voltage and odd harmonics, the 5th and 7th of which give a
@@ -381,14 +381,14 @@ graph TD
 The Teknic at 3000 rpm: $f_m$ = 50 Hz, $f_e$ = 200 Hz, current loop at 5000 rad/s (796 Hz), speed loop at
 100 rad/s (16 Hz).
 
-| Source                  | Frequency | Against the loops                            | Outcome                                                                       |
-|-------------------------|-----------|----------------------------------------------|-------------------------------------------------------------------------------|
-| Residual offset, 1 mA   | 200 Hz    | Inside the current bandwidth: reproduced     | 0.04 mN·m ripple, negligible                                                  |
-| Gain mismatch, if 2 %   | 400 Hz    | Inside the current bandwidth: reproduced     | 0.7 % of $I$ at 400 Hz, the same in torque                                    |
-| Dead time / cogging     | 1200 Hz   | Above the current bandwidth: partly rejected | Filtered by inertia before it reaches speed                                   |
-| Eccentricity, if 1 mrad | 50 Hz     | Inside the speed bandwidth? No: above 16 Hz  | Speed error $a\omega_m$ = 0.31 rad/s, passed to torque by $K_p$               |
-| Speed quantum           | Broadband | Through $K_p$ of the speed loop              | 24 mA RMS of $i_q^*$, 0.9 mN·m                                                |
-| Load step 20 mN·m       | Step      | Rejected through $S$ of the speed loop       | Dip $0.41 \times 0.02/(7.06\times10^{-6} \times 100)$ = 11.6 rad/s at 12.5 ms |
+| Source                  | Frequency | Against the loops                            | Outcome                                                                        |
+|-------------------------|-----------|----------------------------------------------|--------------------------------------------------------------------------------|
+| Residual offset, 1 mA   | 200 Hz    | Inside the current bandwidth: reproduced     | 0.04 mN·m ripple, negligible                                                   |
+| Gain mismatch, if 2 %   | 400 Hz    | Inside the current bandwidth: reproduced     | 0.7 % of $I$ at 400 Hz, the same in torque                                     |
+| Dead time / cogging     | 1200 Hz   | Above the current bandwidth: partly rejected | Filtered by inertia before it reaches speed                                    |
+| Eccentricity, if 1 mrad | 50 Hz     | Inside the speed bandwidth? No: above 16 Hz  | Speed error $a\omega_m$ = 0.31 rad/s, passed to torque by $K_p$                |
+| Speed quantum           | Broadband | Through $K_p$ of the speed loop              | 24 mA RMS of $i_q^*$, 0.9 mN·m                                                 |
+| Load step 20 mN·m       | Step      | Rejected through $S$ of the speed loop       | Dip $0.407 \times 0.02/(7.06\times10^{-6} \times 100)$ = 11.5 rad/s at 12.5 ms |
 
 The table reads as a priority list: the speed quantum and the load dip dominate what this rotor feels, the
 offset and dead time are already handled, and the gain mismatch is the largest unmeasured term.

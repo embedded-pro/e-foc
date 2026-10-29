@@ -67,7 +67,7 @@ not yet measure.
 E-FOC-HARDWARE has a shunt under each low-side switch, an amplifier per phase and one ADC that converts the
 three phases in sequence from a trigger at the PWM counter's zero, the centre of the low-side window, plus a
 fourth shunt on the common low-side return for the over-current comparator
-(`documentation/design/software-in-the-loop.md` Part M).
+(`documentation/design/software-in-the-loop.md` Part M, `documentation/design/error-handling.md`).
 
 **The window.** In a centre-aligned period a leg at duty $d$ conducts on its low side for $(1-d)\,T$, centred on
 the counter's zero. A conversion that holds at $t_h$ after the trigger reads a valid current only if the window
@@ -167,14 +167,16 @@ avoided by timing instead, sampling where the symmetric ripple crosses its mean
 
 ### 6. The ADC: Timing, Quantisation and Noise
 
-The three phases are converted one after another. The hold instant of conversion $k$ is
+The three phases are converted one after another, each step averaged over two conversions, so six conversions
+follow the trigger. The hold instant of conversion $k = 0 \dots 5$ is
 
 $$
 t_k = t_{trig} + \frac{k\,(N_{sh} + N_{conv}) + N_{sh}}{f_{ADC}}
 $$
 
-with $N_{sh}$ sample-and-hold clocks and $N_{conv}$ = 12 conversion clocks at a 16 MHz converter clock, and each
-step averaged over two conversions (`software-in-the-loop.md` Part M). Three consequences:
+with $N_{sh}$ sample-and-hold clocks and $N_{conv}$ = 12 conversion clocks at a 16 MHz converter clock
+(`software-in-the-loop.md` Part M). Phase A averages conversions 0 and 1, C conversions 4 and 5: with 4 clocks
+the last holds at $(5 \times 16 + 4)/16$ MHz = 5.25 µs. Three consequences:
 
 - **Sample-and-hold length is a trade.** A longer one lets the sampling capacitor charge through the source
   impedance; a shorter one keeps the last phase inside the window. On the bench, 16 clocks read the last phase
@@ -198,8 +200,8 @@ proportional gain keeps that noise under 0.08 V of voltage command
 A quadrature encoder gives two square waves, A and B, a quarter cycle apart; their order tells the direction.
 Counting both edges of both channels (×4 decoding) gives four counts per line: the default 4000 counts per
 revolution of e-foc is a 1000-line encoder read this way. The QEI counter is converted to an angle as
-$2\pi\,n/N_{enc}$, wrapped to $[-\pi, \pi)$, and the alignment offset subtracted
-(`core/platform_abstraction/QuadratureEncoderDecorator.hpp`).
+$2\pi\,n/N_{enc}$ and wrapped to $[-\pi, \pi)$ (`core/platform_abstraction/QuadratureEncoderDecorator.hpp`); the
+platform then subtracts the alignment offset (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`).
 
 | Property         | E-FOC-HARDWARE / e-foc                                                                                                      | Consequence                                                                                            |
 |------------------|-----------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|

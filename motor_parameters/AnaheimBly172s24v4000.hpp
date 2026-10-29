@@ -5,9 +5,10 @@
 namespace foc
 {
     // Anaheim Automation BLY172S-24V-4000, a 42 mm 24 V BLDC (4000 rpm, 53 W, 0.127 N·m). Per-phase R, L
-    // and flux from TI's InstaSPIN identification of this motor (user.h), consistent with the BLY17
-    // datasheet's 1.20 mH line-to-line and 3.35 V/krpm; J from 0.00068 oz·in·s². B is not published and
-    // is assumed. Sources and derivation: documentation/theory/foc-plant-models.md, "Reference motors".
+    // and flux from TI's InstaSPIN identification of this motor (user.h). L agrees with the BLY17
+    // datasheet's 1.20 mH line-to-line; the datasheet's 3.35 V/krpm would give 4.62 mWb, 15 % below TI's
+    // flux. J from 0.00068 oz·in·s². B is not published and is assumed. Sources and derivation:
+    // documentation/theory/foc-plant-models.md, "Reference motors".
     struct BLY172S_24V_4000
     {
         static inline const foc::Volts ratedSupply{ 24.0f };

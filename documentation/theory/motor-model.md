@@ -167,8 +167,8 @@ $$
 $$
 
 This is the Clarke transform. The component it drops, $x_0 = \tfrac{1}{3}(x_a + x_b + x_c)$, is zero for a
-wye winding without a neutral connection, so nothing is lost. The forms the firmware evaluates, from two
-or three measured currents, are in the [FOC chapter](foc.md) §1.
+wye winding without a neutral connection, so nothing is lost. The three-current form the firmware evaluates,
+and the two-sensor simplification, are in the [FOC chapter](foc.md) §1.
 
 With amplitude-invariant scaling, power is not preserved one-to-one; the instantaneous power into the motor
 is

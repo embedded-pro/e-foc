@@ -1007,7 +1007,7 @@ class CoggingTorque(Figure):
         parts.append(tag("line", x1=cx, y1=cy - 132, x2=cx, y2=cy - 108, stroke=INK, stroke_width=1.5,
                          stroke_dasharray="3 3"))
         if scene.animated:
-            parts.append(text(cx, cy + 148, f"{SLOTS} slots, {POLES} poles: lcm(12, 8) = {COGGING_PERIODS} per turn",
+            parts.append(text(cx, cy + 148, f"{SLOTS} slots (inferred), {POLES} poles: lcm = {COGGING_PERIODS} per turn",
                               size=size, fill=MUTED))
         return "".join(parts)
 

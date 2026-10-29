@@ -202,12 +202,12 @@ Each signal's errors enter the loop through $T$, at full strength inside the ban
 
 Feedback reacts after an error appears. What is known in advance can be added to the command directly:
 
-| Feedforward     | Term                                     | Where in e-foc                                                     |
-|-----------------|------------------------------------------|--------------------------------------------------------------------|
-| Axis decoupling | $-\omega_e L_s i_q$, $+\omega_e L_s i_d$ | Decoupled PID current controller (`current-loop-decoupled-pid.md`) |
-| Back-EMF        | $\omega_e \psi_f$ on $v_q$               | Decoupled PID; deadbeat (`current-loop-deadbeat.md`)               |
-| Cogging         | $-\tau_{cog}(\theta_e)/K_t$ on $i_q^*$   | Cogging map (`design/service-cogging-compensation.md`)             |
-| Velocity        | $\dot\theta^*$ on $\omega^*$             | Cascade P position controller (`position-loop-cascade-p.md`)       |
+| Feedforward     | Term                                     | Where in e-foc                                                       |
+|-----------------|------------------------------------------|----------------------------------------------------------------------|
+| Axis decoupling | $-\omega_e L_s i_q$, $+\omega_e L_s i_d$ | Decoupled PID current controller (`current-loop-decoupled-pid.md`)   |
+| Back-EMF        | $\omega_e \psi_f$ on $v_q$               | Decoupled PID; deadbeat (`current-loop-deadbeat.md`)                 |
+| Cogging         | $-\tau_{cog}(\theta_e)/K_t$ on $i_q^*$   | Cogging map (`documentation/design/service-cogging-compensation.md`) |
+| Velocity        | $\dot\theta^*$ on $\omega^*$             | Cascade P position controller (`position-loop-cascade-p.md`)         |
 
 A feedforward term is only as good as the model behind it, and its error falls back to the feedback loop.
 It cannot destabilise the loop when it is computed from references, and barely can when it uses a slow
@@ -251,11 +251,11 @@ and torque per ampere falls while the loop stays saturated.
 The controllers are discrete. Between the instant a current is sampled and the instant the inverter
 applies the voltage computed from it, time passes:
 
-| Contribution                               | e-foc current loop                                                                                                    | Delay                            |
-|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------|
-| Computation, then duty applied next period | Duty takes effect one period after the sample (`ti/implementation/PlatformFactoryImpl.cpp`, `DutyUpdateDelayPeriods`) | $T_s^i$ = 50 µs                  |
-| Zero-order hold                            | A duty held for a whole period acts on average half a period late                                                     | $T_s^i/2$ = 25 µs                |
-| **Total**                                  |                                                                                                                       | $T_d \approx 1.5\,T_s^i$ = 75 µs |
+| Contribution                               | e-foc current loop                                                                                                                                     | Delay                            |
+|--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|
+| Computation, then duty applied next period | Duty takes effect one period after the sample (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`, `DutyUpdateDelayPeriods`) | $T_s^i$ = 50 µs                  |
+| Zero-order hold                            | A duty held for a whole period acts on average half a period late                                                                                      | $T_s^i/2$ = 25 µs                |
+| **Total**                                  |                                                                                                                                                        | $T_d \approx 1.5\,T_s^i$ = 75 µs |
 
 A pure delay has unit gain and a phase of $-\omega T_d$. For a PI current controller that cancels the
 plant pole ([current-loop-pi.md](current-loop-pi.md)), the loop gain is

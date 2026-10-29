@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: system
-date: 2026-10-22
+date: 2026-10-29
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.1.0                     |
+| Version   | 0.1.2                     |
 | Component | system                    |
-| Date      | 2026-04-07                |
+| Date      | 2026-10-29                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >

@@ -166,7 +166,7 @@ rebuilt. The only remedy is less voltage. There, the two high duties sit $0.866\
 the middle one readable requires
 
 $$
-0.866\, m \le d_{read} \quad\Rightarrow\quad m \le \frac{0.70}{0.866} = 0.81
+0.866\, m \le d_{read} \quad\Rightarrow\quad m \le \frac{0.70}{0.866} = 0.808
 $$
 
 A vector that turns at constant length stays undistorted only up to $0.81\,V_{dc}/\sqrt3$ on this board

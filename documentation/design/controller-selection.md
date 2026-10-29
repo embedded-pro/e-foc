@@ -2,9 +2,9 @@
 title: "Runtime Controller Selection"
 type: design
 status: accepted
-version: 0.4.0
+version: 0.4.1
 component: "controller-selection"
-date: 2026-10-25
+date: 2026-10-29
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
 | Status    | accepted                     |
-| Version   | 0.4.0                        |
+| Version   | 0.4.1                        |
 | Component | controller-selection         |
-| Date      | 2026-10-25                   |
+| Date      | 2026-10-29                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -322,19 +322,20 @@ be available before that algorithm can be selected, and who is responsible for p
 
 #### Parameter Sources
 
-Parameters come from three distinct sources with different availability windows:
+Parameters come from four distinct sources with different availability windows:
 
 | Source                     | Parameters                                                      | Available after                 |
 |----------------------------|-----------------------------------------------------------------|---------------------------------|
 | Motor datasheet (static)   | Pole pairs $p$, flux linkage $\psi_f$, peak current $I_{q,max}$ | Before any run                  |
-| Electrical RLS calibration | $R_s$, $L_s$, $V_{dc}$                                          | After electrical identification |
+| Bus measurement            | $V_{dc}$                                                        | At boot                         |
+| Electrical RLS calibration | $R_s$, $L_s$                                                    | After electrical identification |
 | Mechanical RLS calibration | $J$, $B_f$, $K_t = \tfrac{3}{2} p \psi_f$                       | After mechanical identification |
 
 $\psi_f$ is the only datasheet value not directly observable by the RLS estimators. If unavailable from
 the datasheet, it can be derived from the rated torque constant: $\psi_f = K_{t,rated} \cdot 2/(3p)$.
 
-$V_{dc}$ is measured dynamically during operation; a nominal value must be known at configuration
-time for gain normalisation.
+$V_{dc}$ is measured once at boot and used for gain normalisation from then on; the gains do not track
+later bus changes.
 
 #### Per-Algorithm Parameter Requirements
 

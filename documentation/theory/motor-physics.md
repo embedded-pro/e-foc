@@ -421,7 +421,8 @@ The reference motors (values from `documentation/theory/foc-plant-models.md` "Re
 | No-load speed estimate at rated bus      | $V_{dc}/(\sqrt3 p \psi_f)$        | 637 rad/s (6080 rpm)     | 902 rad/s (8610 rpm)  |
 
 The line-to-line figure reproduces the Teknic datasheet's 4.64 V/krpm. The Anaheim's 3.95 V follows from
-TI's identified flux, which the model uses; the Anaheim sheet itself quotes 3.35 V/krpm. Both no-load speeds
+TI's identified flux, which the model uses; the Anaheim sheet itself quotes 3.35 V/krpm, which would mean 15 % less
+flux ([plant models](foc-plant-models.md), *Reference Motors*). Both no-load speeds
 sit above the rated speeds (4000 and 6000 rpm), leaving voltage for the resistive and inductive drops under
 load.
 

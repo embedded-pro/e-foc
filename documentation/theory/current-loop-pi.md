@@ -2,9 +2,9 @@
 title: "Current Loop — PI (Baseline)"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.0.1
 component: "current-loop-pi"
-date: 2026-08-31
+date: 2026-10-29
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Current Loop — PI (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.0.0                        |
+| Version   | 1.0.1                        |
 | Component | current-loop-pi              |
-| Date      | 2026-08-31                   |
+| Date      | 2026-10-29                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any

@@ -2,9 +2,9 @@
 title: "FOC Plant Models — Discretization and State-Space Foundations"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "foc-plant-models"
-date: 2026-09-21
+date: 2026-10-29
 ---
 
 | Field     | Value                                                         |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | FOC Plant Models — Discretization and State-Space Foundations |
 | Type      | theory                                                        |
 | Status    | draft                                                         |
-| Version   | 0.2.0                                                         |
+| Version   | 0.2.1                                                         |
 | Component | foc-plant-models                                              |
-| Date      | 2026-09-21                                                    |
+| Date      | 2026-10-29                                                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -266,7 +266,11 @@ How the numbers were obtained:
   ($\omega_m = 104.7$ rad/s, $\omega_e = p\,\omega_m$):
   $\psi_f = K_e / (\sqrt{3}\,\omega_e)$. Teknic: $4.64 / (\sqrt{3} \cdot 418.9) = 6.40$ mWb.
   TI reports the Anaheim flux as $0.03416$ V/Hz, a peak phase voltage per electrical hertz, so
-  $\psi_f = 0.03416 / 2\pi = 5.44$ mWb.
+  $\psi_f = 0.03416 / 2\pi = 5.44$ mWb. The Anaheim sheet's 3.35 V/krpm, read the same way as the
+  Teknic's, gives $3.35 / (\sqrt{3} \cdot 418.9) = 4.62$ mWb, 15 % less. The model keeps TI's
+  identified value; with the sheet's, $K_t$ would be 27.7 mN·m/A instead of 32.6, the rated current
+  4.6 A instead of 3.9 A and the no-load speed at 24 V 750 rad/s instead of 637. The Anaheim figures
+  derived in these chapters carry that uncertainty.
 - **Inertia.** $1\ \text{oz·in·s}^2 = 7.0616 \times 10^{-3}\ \text{kg·m}^2$: 0.00068 oz·in·s²
   (Anaheim) and 0.001 oz·in·s² (Teknic).
 - **Viscous friction.** Neither vendor publishes a viscous term or a no-load current to derive one

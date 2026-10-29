@@ -94,7 +94,8 @@ $$
 The stator current space vector in the $\alpha$–$\beta$ frame thus has magnitude $I$ and rotates at
 $\omega_e$: $\mathbf{I}_s = i_\alpha + j\,i_\beta = I e^{j\theta_e}$.
 
-**Full three-sensor form** (when all three currents are available):
+**Full three-sensor form** (when all three currents are available). This is the form e-foc evaluates; a phase
+its low-side window hides is first rebuilt from the other two ([low-side shunt current sensing](low-side-current-sensing.md)):
 
 $$
 i_\alpha = \tfrac{2}{3}\!\left(i_a - \tfrac{1}{2}i_b - \tfrac{1}{2}i_c\right),

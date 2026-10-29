@@ -132,8 +132,10 @@ Two practical limits follow:
 - **The driver's supply must stay in regulation.** Its 15 V rail is fed from the bus, which is why the board's
   under-voltage trip sits at 18 V.
 
-The duty cap is one of the two board limits that, with the shunts' readable window, hold the undistorted
-voltage circle to $0.81\,V_{dc}/\sqrt3$ ([numbers that matter](numbers-to-know.md) §4).
+The duty cap does not limit the undistorted voltage circle: at modulation $m$ the highest duty sits at most $m$
+above the lowest, so the shift that keeps the shunts readable stays inside 95 % up to $m = 0.95$. The shunts' 70 %
+readable window binds first and holds the circle to $0.81\,V_{dc}/\sqrt3$ ([numbers that matter](numbers-to-know.md)
+§4).
 
 ### 4. Shoot-Through and Dead Time
 

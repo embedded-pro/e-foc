@@ -89,8 +89,8 @@ $$
 $$
 
 e-foc bounds this at 0.08 V RMS when it chooses the bandwidth itself
-(`documentation/design/controller-selection.md`): on the bench board, 38.5 mA of sensor noise at the
-PWM-derived 8378 rad/s gave 0.40 V and an audible hiss. A deadbeat law has the largest gain of all,
+(`documentation/design/controller-selection.md`): on the bench board and motor, not one of the reference motors,
+38.5 mA of sensor noise at the PWM-derived 8378 rad/s gave 0.40 V and an audible hiss. A deadbeat law has the largest gain of all,
 $1/B_d^i \approx L_s/T_s^i$: 4 V/A for the Teknic, 12.8 V/A for the Anaheim, against 1 V/A for a 5000 rad/s
 PI on the Teknic. In the speed loop the speed quantum (1.57 rad/s per count per window) plays the role of
 the noise, and $K_p = 2J\omega_{bw}/K_t$ turns it into current-reference steps.
