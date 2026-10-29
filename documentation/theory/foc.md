@@ -197,7 +197,7 @@ normalised units — that is the length of each vertex vector in the table above
 \approx 0.577$, corresponding to $V_{dc}/\sqrt{3}$ in physical volts. The two agree: it is the
 circumradius that is $\tfrac{2}{3}$, and reading that as the linear range overstates it by 15%.
 
-![Animation: a reference vector sweeping the SVM hexagon, the active sector highlighted, and the three duty cycles of common-mode injection](../animations/svm-hexagon.svg)
+![A reference vector sweeping the SVM hexagon, the active sector shaded, and the three duty cycles of common-mode injection](../animations/svm-hexagon.svg)
 
 The animation runs the common-mode injection below at a modulation of 0.9: the reference vector stays inside
 the dashed linear-limit circle, the sector it crosses is shaded, and the three duty cycles take the

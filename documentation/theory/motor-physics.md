@@ -210,7 +210,7 @@ a field of **constant** length $\tfrac{3}{2}I$ that turns at exactly $\omega_e$.
 in space add up to one steady field that rotates. Swapping any two phases reverses the direction of
 rotation. The factor $\tfrac{3}{2}$ reappears in the Clarke transform's scaling and in the torque equation.
 
-![Animation: three phase currents 120° apart; each coil's field pulses on its own axis while their sum rotates with constant length](../animations/rotating-field.svg)
+![Three phase currents 120° apart: each coil's field pulses on its own axis while their sum rotates with constant length](../animations/rotating-field.svg)
 
 The figure animates this. Each thin arrow is one coil's field and moves only along its axis. The thick
 arrow is their sum. It stays on the dashed circle and turns once per electrical cycle, in step with the
@@ -234,7 +234,7 @@ with $\tau_{max}$ proportional to the stator current $I$ and to the magnet flux 
 - $\delta = 180^\circ$: field and magnet are opposed. No torque, but the equilibrium is unstable.
 - Beyond $180^\circ$ the torque reverses.
 
-![Animation: left, a rotor turned by hand through a fixed field, torque gauge following sin δ; right, a field kept 90° ahead of a turning rotor gives constant maximum torque](../animations/rotor-torque-angle.svg)
+![The torque on the rotor follows sin δ, δ being the angle from the rotor's north pole to the stator field; field-oriented control holds δ at 90°](../animations/rotor-torque-angle.svg)
 
 In steady state the rotor turns at exactly the speed of the field, which is why the machine is called
 *synchronous*. If the load asks for more than $\tau_{max}$, the rotor falls behind, $\delta$ passes
@@ -267,7 +267,7 @@ and the other two phases the same, shifted by $\pm 120^\circ$. Two things matter
 proportional to speed**, $\hat{e} = \omega_e \psi_f$, and the back-EMF is a quarter cycle ahead of the flux
 that makes it.
 
-![Animation: a spinning rotor; the flux it drives through coil A follows cos θ and the induced back-EMF follows −sin θ](../animations/back-emf.svg)
+![A spinning rotor drives a flux cos θ through coil A and induces a back-EMF −sin θ](../animations/back-emf.svg)
 
 It is called *back*-EMF because, in a motor, it opposes the supply. To push current into a phase the
 inverter must apply more than the back-EMF. Once the back-EMF approaches the voltage the inverter can make,
@@ -325,7 +325,7 @@ Sinusoidal commutation needs the rotor angle continuously, from an encoder or an
 independently controlled currents. In return the field turns smoothly at $90^\circ$ ahead of the rotor and
 the torque is flat. That is what e-foc does.
 
-![Animation: left, a six-step drive whose field jumps 60° and whose torque ripples; right, a sinusoidal drive whose field stays 90° ahead and whose torque is flat](../animations/six-step-vs-sinusoidal.svg)
+![Six-step commutation jumps the field 60° and ripples the torque by 13 %; sinusoidal commutation keeps the field 90° ahead and the torque flat](../animations/six-step-vs-sinusoidal.svg)
 
 ### 8. Cogging and Saliency
 

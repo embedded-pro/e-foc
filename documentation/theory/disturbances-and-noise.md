@@ -357,15 +357,15 @@ graph TD
 
 ### Magnitudes on the Reference Hardware
 
-| Item                       | Size                                                 | Frequency in dq |
-|----------------------------|------------------------------------------------------|-----------------|
-| Current noise              | 31–39 mA RMS                                         | Broadband       |
-| Raw current offsets        | +27, −18, +54 mA (< 1 mA after calibration)          | $1 f_e$         |
-| Dead-time loss             | 34 mV (24 V) – 56 mV (40 V) per leg, 70 ns effective | $6 f_e$ and DC  |
-| Cogging (bench motor)      | 4 mN·m, 24 per revolution                            | $6 f_e$         |
-| Speed quantum              | 1.57 rad/s peak, 0.64 rad/s RMS                      | Broadband       |
-| Delay angle at rated speed | 7.2° (Anaheim), 10.8° (Teknic)                       | DC, ∝ speed     |
-| PWM ripple                 | up to 0.28 A (Anaheim), 1.5 A (Teknic) peak-to-peak  | $f_s$           |
+| Item                       | Size                                                 | Frequency in dq     |
+|----------------------------|------------------------------------------------------|---------------------|
+| Current noise              | 31–39 mA RMS                                         | Broadband           |
+| Raw current offsets        | +27, −18, +54 mA (< 1 mA after calibration)          | $1 f_e$             |
+| Dead-time loss             | 34 mV (24 V) – 56 mV (40 V) per leg, 70 ns effective | $6 f_e$ and DC      |
+| Cogging (bench motor)      | 4 mN·m, 24 per revolution                            | $6 f_e$             |
+| Speed quantum              | 1.57 rad/s peak, 0.64 rad/s RMS                      | Broadband           |
+| Delay angle at rated speed | 7.2° (Anaheim), 10.8° (Teknic)                       | DC, $\propto$ speed |
+| PWM ripple                 | up to 0.28 A (Anaheim), 1.5 A (Teknic) peak-to-peak  | $f_s$               |
 
 ---
 

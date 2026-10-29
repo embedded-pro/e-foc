@@ -209,7 +209,7 @@ The **d-axis** points along the rotor's north pole, the magnet flux. The **q-axi
 the direction of maximum torque. A current vector that turns with the rotor at a fixed angle has constant
 $d$ and $q$ components.
 
-![Animation: a current vector rotating in the stationary αβ frame, with the dq frame turning with it; αβ components are sinusoids, dq components are constant](../animations/park-transform.svg)
+![One current vector seen from the stationary αβ frame, where its components are sinusoids, and from the rotating dq frame, where they are constant](../animations/park-transform.svg)
 
 **The dq voltage equations.** Substitute $\mathbf{i} = \mathbf{i}_{dq} e^{j\theta_e}$ into the
 space-vector equation of §2. The product rule is the whole derivation:

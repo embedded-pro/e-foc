@@ -244,14 +244,14 @@ graph TD
 
 Which input moves which result:
 
-| Input             | Moves                                                              | Sensitivity                               |
-|-------------------|--------------------------------------------------------------------|-------------------------------------------|
-| $V_{dc}$          | Top speed, modulator per-unit, gain normalisation                  | Top speed ∝ $V_{dc}$                      |
-| $\psi_f$          | Torque per ampere, back-EMF, top speed                             | Torque ∝ $\psi_f$; top speed ∝ $1/\psi_f$ |
-| $L_s$             | Current-loop gains, inductive drop, noise into the voltage command | $K_p \propto L_s$                         |
-| $R_s$             | Integral gain, copper loss, low-speed voltage                      | Loss ∝ $R_s$                              |
-| $N_{enc}$         | Speed quantum, angle resolution                                    | Quantum ∝ $1/N_{enc}$                     |
-| Outer-loop window | Speed quantum, speed-loop delay                                    | Quantum ∝ 1/window; delay ∝ window        |
+| Input             | Moves                                                              | Sensitivity                                           |
+|-------------------|--------------------------------------------------------------------|-------------------------------------------------------|
+| $V_{dc}$          | Top speed, modulator per-unit, gain normalisation                  | Top speed $\propto V_{dc}$                            |
+| $\psi_f$          | Torque per ampere, back-EMF, top speed                             | Torque $\propto \psi_f$; top speed $\propto 1/\psi_f$ |
+| $L_s$             | Current-loop gains, inductive drop, noise into the voltage command | $K_p \propto L_s$                                     |
+| $R_s$             | Integral gain, copper loss, low-speed voltage                      | Loss $\propto R_s$                                    |
+| $N_{enc}$         | Speed quantum, angle resolution                                    | Quantum $\propto 1/N_{enc}$                           |
+| Outer-loop window | Speed quantum, speed-loop delay                                    | Quantum $\propto$ 1/window; delay $\propto$ window    |
 
 ---
 
