@@ -1,30 +1,33 @@
 ---
-title: "Advanced FOC Controllers — Index"
+title: "FOC Controllers — Map and Trade-offs"
 type: theory
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: "foc-controllers"
-date: 2026-08-31
+date: 2026-10-29
 ---
 
-| Field     | Value                            |
-|-----------|----------------------------------|
-| Title     | Advanced FOC Controllers — Index |
-| Type      | theory                           |
-| Status    | draft                            |
-| Version   | 0.3.0                            |
-| Component | foc-controllers                  |
-| Date      | 2026-08-31                       |
+| Field     | Value                                |
+|-----------|--------------------------------------|
+| Title     | FOC Controllers — Map and Trade-offs |
+| Type      | theory                               |
+| Status    | draft                                |
+| Version   | 0.4.0                                |
+| Component | foc-controllers                      |
+| Date      | 2026-10-29                           |
 
 ---
 
 ## Overview
 
-This index covers the controller algorithms available for the three nested FOC loops. Each loop
-exposes a runtime-selectable controller slot configured via CLI or CAN without a firmware rebuild.
-Per-algorithm chapters contain the full mathematical foundation and design equations.
+This chapter covers the controller algorithms available for the three nested FOC loops: what each one
+assumes, what it gains, what it costs, and what happens when its assumptions fail. Each loop exposes a
+runtime-selectable controller slot configured via CLI or CAN without a firmware rebuild. Per-algorithm
+chapters contain the full mathematical foundation and design equations.
 
-The shared plant models (dq current, mechanical speed, position) and discretisation are in
+The loop structure, the $S + T = 1$ trade, the bandwidth limits that delay and sampling impose, and
+anti-windup are in [closed-loop control](closed-loop-control.md); every algorithm below lives inside those
+limits. The shared plant models (dq current, mechanical speed, position) and discretisation are in
 `documentation/theory/foc-plant-models.md`.
 
 The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
@@ -75,6 +78,64 @@ Full derivations, ZOH discretisation, and parameter sources are in
 `documentation/theory/foc-plant-models.md`. Per-algorithm design equations are in the
 individual chapters listed in *Algorithm Index* below.
 
+### 1. Bandwidth versus Noise
+
+A faster loop has larger gains, and every gain multiplies the noise of the signal it acts on. In the current
+loop the proportional gain of a pole-zero-cancelling PI is $K_p = L_s\,\omega_{bw}$, so a sensor noise
+$\sigma_i$ becomes a voltage-command noise
+
+$$
+\sigma_v \approx L_s\, \omega_{bw}\, \sigma_i
+$$
+
+e-foc bounds this at 0.08 V RMS when it chooses the bandwidth itself
+(`documentation/design/controller-selection.md`): on the bench board, 38.5 mA of sensor noise at the
+PWM-derived 8378 rad/s gave 0.40 V and an audible hiss. A deadbeat law has the largest gain of all,
+$1/B_d^i \approx L_s/T_s^i$: 4 V/A for the Teknic, 12.8 V/A for the Anaheim, against 1 V/A for a 5000 rad/s
+PI on the Teknic. In the speed loop the speed quantum (1.57 rad/s per count per window) plays the role of
+the noise, and $K_p = 2J\omega_{bw}/K_t$ turns it into current-reference steps.
+
+### 2. Stiffness versus Robustness
+
+Model-based laws invert the plant: deadbeat computes the exact voltage that reaches the reference in one
+step, LQR the optimal gains for the identified $J$ and $B_f$. With the right model they reject disturbances
+faster than anything else. With the wrong one they lose that performance first and, if the error is large,
+stability. Model-free laws (PI, sliding mode, the baseline position law) give up some speed and gain
+tolerance: an integral removes any constant error whatever the parameters, a sliding-mode switching gain
+covers any disturbance up to its size. The sensitivity peak $M_s = \max_\omega \lvert S(j\omega)\rvert$ measures
+the margin: $M_s \le 1.3$ guarantees at least 45° of phase margin, $M_s \le 2$ at least 29° and a gain margin
+of 2. A loop that relies on cancellation has its $M_s$ set by how good the cancellation is.
+
+### 3. Tracking versus Disturbance Rejection
+
+In a single-degree-of-freedom loop the same gains decide how the output follows the reference and how it
+rejects load. A stiff loop overshoots reference steps; a gentle one sags under load. The speed PI shows it
+directly: the integral zero that sets load recovery also enters the reference path and sets the step
+overshoot (`documentation/theory/speed-loop-pi.md`, *What the implementation uses*). Two-DOF laws (S3, P3)
+add a reference pre-filter so the feedback can be tuned for rejection alone; feedforward (velocity in P2,
+decoupling in A1) removes the predictable part of the tracking error before feedback sees it.
+
+### 4. Model-Based versus Model-Free
+
+| Needs                    | Algorithms                                      | Parameters come from                               |
+|--------------------------|-------------------------------------------------|----------------------------------------------------|
+| Nothing beyond the gains | PI (current, speed), P, Cascade P, Two-DOF, ILC | Bandwidth settings                                 |
+| Electrical model         | Decoupled PID, Deadbeat, Sliding-mode           | Electrical identification ($R_s$, $L_s$), $\psi_f$ |
+| Mechanical model         | LQI, ADRC, LQR/LQI                              | Mechanical identification ($J$, $B_f$, $K_t$)      |
+
+Parameters drift: $R_s$ rises about 0.39 %/K with winding temperature and $\psi_f$ falls about 0.1 %/K with
+magnet temperature ([disturbances and noise](disturbances-and-noise.md)). A model-based law tuned on a cold
+motor is running on a mismatched model once the motor is warm, unless an online estimator follows it.
+
+### 5. Cost versus Rate
+
+Every current-loop algorithm runs inside the 20 kHz interrupt, whose inner-loop budget is 4500 cycles
+(37.5 µs at 120 MHz). The measured inner loop takes 1074–1353 cycles on the TM4C1294
+(`documentation/performance-optimization/README.md`), so none of the algorithms below is limited by
+computation; the limit on all of them is the 1.5-period loop delay of
+[closed-loop control](closed-loop-control.md) §7. The outer loops run at 1 kHz with a 20 000-cycle budget,
+where even a stored ILC array is cheap.
+
 ---
 
 ## Numerical Properties
@@ -83,31 +144,66 @@ Summary comparison across all loops — see each per-algorithm chapter for full 
 
 **Current loop** — 20 kHz ISR:
 
-| ID | Algorithm     | ISR cost | Robustness          | Requires RLS |
-|----|---------------|----------|---------------------|--------------|
-| —  | PI (baseline) | ~6 MACs  | High (integral)     | No           |
-| A1 | Decoupled PID | ~10 MACs | Low (model-dep.)    | Partial      |
-| A2 | Deadbeat      | ~4 MACs  | Low (exact model)   | Yes (tight)  |
-| A3 | Sliding-mode  | ~12 MACs | High (gain-bounded) | Partial      |
+| ID | Algorithm     | ISR cost | Robustness          | Requires RLS | Relies on                       | When the model is wrong                                                                        | Noise sensitivity                        | Best for                                            |
+|----|---------------|----------|---------------------|--------------|---------------------------------|------------------------------------------------------------------------------------------------|------------------------------------------|-----------------------------------------------------|
+| —  | PI (baseline) | ~6 MACs  | High (integral)     | No           | $L_s$, $R_s$ for the gains only | $L_s$ error scales the bandwidth; the integral still removes all error                         | $K_p = L_s\omega_{bw}$                   | Default; any motor, before identification           |
+| A1 | Decoupled PID | ~10 MACs | Low (model-dep.)    | Partial      | $L_s$, $\psi_f$, measured speed | 20 % $L_s$ error leaves 20 % of the coupling; integral takes the rest                          | PI plus speed noise via feedforward      | High electrical speed, large $\omega_e L_s i$       |
+| A2 | Deadbeat      | ~4 MACs  | Low (exact model)   | Yes (tight)  | $A_d^i$, $B_d^i$ exactly        | Most sensitive: overshoot, then limit cycle; stable for $L_s$ within 0.5–1.5× up to 8378 rad/s | Highest: $L_s/T_s^i$; two-step halves it | Maximum stiffness with a converged model            |
+| A3 | Sliding-mode  | ~12 MACs | High (gain-bounded) | Partial      | Disturbance bound $K_{sw}$      | Tolerated while the mismatch stays inside $K_{sw}$                                             | Boundary layer $\phi$ sets the band      | Before identification converges; thermal transients |
 
 **Speed loop** — 1 kHz handler:
 
-| ID | Algorithm     | Ops/cycle | Disturbance rejection | Requires RLS |
-|----|---------------|-----------|-----------------------|--------------|
-| —  | PI (baseline) | ~6 MACs   | Integral quality      | No           |
-| S1 | LQI           | 2 MACs    | Integral quality      | Yes (J, Bf)  |
-| S2 | ADRC          | 6 MACs    | Explicit cancellation | Yes (Kt, J)  |
-| S3 | Two-DOF       | ~8 MACs   | Integral quality      | No           |
+| ID | Algorithm     | Ops/cycle | Disturbance rejection | Requires RLS | Relies on                | When the model is wrong                                  | Noise sensitivity                                          | Best for                               |
+|----|---------------|-----------|-----------------------|--------------|--------------------------|----------------------------------------------------------|------------------------------------------------------------|----------------------------------------|
+| —  | PI (baseline) | ~6 MACs   | Integral quality      | No           | $J$, $K_t$ for the gains | $J$ error scales the bandwidth                           | $K_p$ × speed quantum                                      | Default                                |
+| S1 | LQI           | 2 MACs    | Integral quality      | Yes (J, Bf)  | $J$, $B_f$               | Weights keep their meaning only for the identified plant | As PI                                                      | Systematic tuning by weights           |
+| S2 | ADRC          | 6 MACs    | Explicit cancellation | Yes (Kt, J)  | $b_0 = K_t/J$            | Observer absorbs moderate error; large error oscillates  | Grows with observer bandwidth $\omega_o$ ($\le 0.4/T_s^o$) | Load steps; unknown, changing loads    |
+| S3 | Two-DOF       | ~8 MACs   | Integral quality      | No           | Pre-filter time constant | As PI                                                    | As PI                                                      | Fast tracking without losing stiffness |
 
 **Position loop** — 1 kHz handler:
 
-| ID | Algorithm    | Ops/cycle      | Steady-state error  | Requires RLS |
-|----|--------------|----------------|---------------------|--------------|
-| —  | P (baseline) | 2 MACs         | Zero at rest        | No           |
-| P1 | LQR / LQI    | 4 MACs         | Zero (LQI)          | Yes (J, Bf)  |
-| P2 | Cascade P    | 2 MACs         | Speed-loop dep.     | No           |
-| P3 | Two-DOF      | ~8 MACs        | Configurable        | No           |
-| P4 | ILC          | 2 MACs + array | Near-zero (learned) | No           |
+| ID | Algorithm    | Ops/cycle      | Steady-state error  | Requires RLS | Relies on                       | When the model is wrong                         | Noise sensitivity                                           | Best for                            |
+|----|--------------|----------------|---------------------|--------------|---------------------------------|-------------------------------------------------|-------------------------------------------------------------|-------------------------------------|
+| —  | P (baseline) | 2 MACs         | Zero at rest        | No           | Speed loop ≥ 5 × bandwidth      | —                                               | Encoder angle                                               | Point-to-point holding              |
+| P1 | LQR / LQI    | 4 MACs         | Zero (LQI)          | Yes (J, Bf)  | $J$, $B_f$, $K_t$               | Optimality lost; current-loop delay unmodelled  | Angle and its derivative                                    | Principled $\theta$/$\omega$ trade  |
+| P2 | Cascade P    | 2 MACs         | Speed-loop dep.     | No           | $K_v \le \omega_{speed}/5$      | —                                               | Encoder angle; velocity feedforward needs a clean reference | Industrial servo; moving references |
+| P3 | Two-DOF      | ~8 MACs        | Configurable        | No           | Pre-filter faster than the loop | —                                               | As P2                                                       | Tracking and stiffness tuned apart  |
+| P4 | ILC          | 2 MACs + array | Near-zero (learned) | No           | A strictly repeated trajectory  | A changed trajectory replays the old correction | Learns the repeatable part only                             | Repetitive moves                    |
+
+---
+
+## Choosing a Controller
+
+```mermaid
+graph TD
+    subgraph Current["Current loop"]
+        C0{"Electrical model<br/>identified?"} -->|"no"| CPI["PI"]
+        C0 -->|"not yet trusted"| CSM["Sliding-mode (A3)"]
+        C0 -->|"yes"| C1{"Speed voltages ωe·Ls·i<br/>large at operating speed?"}
+        C1 -->|"yes"| CA1["Decoupled PID (A1)"]
+        C1 -->|"no"| C2{"Maximum stiffness,<br/>low sensor noise?"}
+        C2 -->|"yes"| CA2["Deadbeat (A2),<br/>two-step if noisy"]
+        C2 -->|"no"| CPI2["PI"]
+    end
+    subgraph Speed["Speed loop"]
+        S0{"Mechanical model<br/>identified?"} -->|"no"| SPI["PI, or Two-DOF (S3)<br/>for fast tracking"]
+        S0 -->|"yes"| S1{"Load steps<br/>dominate?"}
+        S1 -->|"yes"| SAD["ADRC (S2)"]
+        S1 -->|"no"| SLQ["LQI (S1) or PI"]
+    end
+    subgraph Position["Position loop"]
+        P0{"Trajectory repeats<br/>exactly?"} -->|"yes"| PILC["ILC (P4) over P2 or P3"]
+        P0 -->|"no"| P1{"Reference moves<br/>continuously?"}
+        P1 -->|"yes"| PCP["Cascade P with velocity<br/>feedforward (P2) or Two-DOF (P3)"]
+        P1 -->|"no"| P2{"Mechanical model<br/>identified?"}
+        P2 -->|"yes"| PLQ["LQR/LQI (P1)"]
+        P2 -->|"no"| PB["P baseline"]
+    end
+```
+
+The baselines (PI current, PI speed, P position) are what a drive runs before any identification and what
+every other algorithm is measured against. Change one loop at a time, from the inside out: a speed
+controller tuned against a current loop that later changes is tuned against the wrong plant.
 
 ---
 
@@ -129,6 +225,10 @@ Summary comparison across all loops — see each per-algorithm chapter for full 
 | Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
 | Position | P4 | Iterative Learning Control  | [position-loop-ilc.md](position-loop-ilc.md)                   |
 | Any      | —  | Friction Compensation       | [position-loop-friction.md](position-loop-friction.md)         |
+
+Friction compensation is the one entry that is theory only today: the calibration identifies a Coulomb
+level and stores it, but no cascade applies a friction feed-forward yet. Cogging, the other low-speed
+torque disturbance, is compensated (`documentation/design/service-cogging-compensation.md`).
 
 ---
 
@@ -159,3 +259,4 @@ Full reference lists are in each per-algorithm chapter. Foundational references:
    *IEEE Control Systems Magazine*, 26(3):96–114, 2006.
 5. Armstrong-Hélouvry, B. et al. — "A Survey of Models … for Machines with Friction",
    *Automatica*, 30(7):1083–1138, 1994.
+6. Åström, K.J. & Murray, R.M. — *Feedback Systems*, 2nd ed., Princeton University Press, 2021.
