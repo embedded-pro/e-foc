@@ -137,6 +137,18 @@ namespace foc
         virtual hal::Hertz SpeedCommandFrequency() const = 0;
     };
 
+    class CurrentCommandable
+    {
+    protected:
+        ~CurrentCommandable() = default;
+
+    public:
+        virtual void EnableCurrentCommand() = 0;
+        virtual void DisableCurrentCommand() = 0;
+        virtual void CommandCurrent(Ampere quadrature) = 0;
+        virtual Volts QuadratureVoltage() const = 0;
+    };
+
     class FocSpeed
         : public FocBase
         , public CurrentLoopTunable

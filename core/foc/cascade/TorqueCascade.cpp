@@ -3,6 +3,8 @@
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/Math.hpp"
+#include <algorithm>
+#include <numbers>
 
 namespace foc
 {
@@ -19,6 +21,7 @@ namespace foc
 
     void TorqueCascade::Enable()
     {
+        voltageWindow.Close();
         currentLoop.Reset();
         enabled = true;
         speedFilter.Reset();
@@ -31,6 +34,7 @@ namespace foc
     void TorqueCascade::Disable()
     {
         enabled = false;
+        voltageWindow.Close();
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
     }
@@ -55,6 +59,8 @@ namespace foc
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
         electricalSpeedScale = polePairs * samplingFrequency;
+        voltageScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
+        samplesPerMillisecond = std::max<uint32_t>(1, parameters.samplingFrequency.Value() / 1000);
         speedFilter.SetAlpha(1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency)));
         return ok;
     }
@@ -92,6 +98,28 @@ namespace foc
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f } };
     }
 
+    void TorqueCascade::EnableCurrentCommand()
+    {
+        requestedSetPoint = IdAndIqPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
+        Enable();
+        voltageWindow.Open(samplesPerMillisecond);
+    }
+
+    void TorqueCascade::DisableCurrentCommand()
+    {
+        Disable();
+    }
+
+    void TorqueCascade::CommandCurrent(Ampere quadrature)
+    {
+        SetPoint(IdAndIqPoint{ Ampere{ 0.0f }, quadrature });
+    }
+
+    Volts TorqueCascade::QuadratureVoltage() const
+    {
+        return Volts{ voltageWindow.Mean() * voltageScale };
+    }
+
     PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
@@ -110,6 +138,7 @@ namespace foc
         lastIq = idAndIq.q;
         const auto& setPoint = setPointBuffer.Acquire();
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), setPoint.second.Value() }, electricalSpeed });
+        voltageWindow.Accumulate(voltage.q);
         return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
     }
 

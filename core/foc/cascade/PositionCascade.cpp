@@ -123,6 +123,28 @@ namespace foc
         DisableSpeedLoop();
     }
 
+    void PositionCascade::EnableCurrentCommand()
+    {
+        speedCommandActive = false;
+        EnableCurrentCommandImpl();
+        enabled = true;
+    }
+
+    void PositionCascade::DisableCurrentCommand()
+    {
+        Disable();
+    }
+
+    void PositionCascade::CommandCurrent(Ampere quadrature)
+    {
+        CommandCurrentImpl(quadrature);
+    }
+
+    Volts PositionCascade::QuadratureVoltage() const
+    {
+        return QuadratureVoltageImpl();
+    }
+
     void PositionCascade::CommandSpeed(RadiansPerSecond speed)
     {
         speedCommand = speed;
@@ -148,6 +170,12 @@ namespace foc
     void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
+
+        if (HoldCommandedCurrent())
+        {
+            commandsCurrent = true;
+            return;
+        }
 
         if (speedCommandActive)
         {

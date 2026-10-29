@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
@@ -12,6 +13,7 @@ namespace foc
 {
     class TorqueCascade
         : public FocTorque
+        , public CurrentCommandable
     {
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
@@ -25,6 +27,11 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
         MotionObservation ObserveMotion() const override;
+
+        void EnableCurrentCommand() override;
+        void DisableCurrentCommand() override;
+        void CommandCurrent(Ampere quadrature) override;
+        Volts QuadratureVoltage() const override;
 
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
@@ -42,6 +49,9 @@ namespace foc
 
         float electricalSpeedScale{ 0.0f };
         filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };
+        QuadratureVoltageWindow voltageWindow;
+        float voltageScale{ 0.0f };
+        uint32_t samplesPerMillisecond{ 1 };
         float previousMechanicalAngle{ 0.0f };
         bool previousAngleValid{ false };
         volatile float lastElectricalSpeed{ 0.0f };

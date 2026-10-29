@@ -372,3 +372,63 @@ TEST_F(TestTorqueCascade, a_disabled_cascade_observes_no_motion)
     EXPECT_NEAR(observation.measuredSpeed.Value(), 0.0f, 1e-6f);
     EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
 }
+
+TEST_F(TestTorqueCascade, a_current_command_drives_the_q_axis_current_it_asks_for)
+{
+    focTorque->EnableCurrentCommand();
+    focTorque->CommandCurrent(foc::Ampere{ 2.0f });
+    foc::Radians position{ 0.0f };
+    const auto commanded = focTorque->Calculate(ZeroCurrents(), position);
+
+    foc::TorqueCascade reference{ testMaxCurrent };
+    reference.Configure(MotorParameters(polePairs));
+    reference.Enable();
+    reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 2.0f } });
+    foc::Radians referencePosition{ 0.0f };
+    const auto expected = reference.Calculate(ZeroCurrents(), referencePosition);
+
+    EXPECT_NEAR(DutyPercent(commanded.a), DutyPercent(expected.a), 1e-3f);
+    EXPECT_NEAR(DutyPercent(commanded.b), DutyPercent(expected.b), 1e-3f);
+    EXPECT_NEAR(DutyPercent(commanded.c), DutyPercent(expected.c), 1e-3f);
+}
+
+TEST_F(TestTorqueCascade, a_current_command_starts_from_zero_whatever_setpoint_was_held)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 5.0f } });
+    focTorque->Disable();
+
+    focTorque->EnableCurrentCommand();
+    foc::Radians position{ 0.0f };
+
+    ExpectCentredDuty(focTorque->Calculate(ZeroCurrents(), position));
+}
+
+TEST_F(TestTorqueCascade, a_current_command_reports_the_mean_q_axis_voltage_it_applies)
+{
+    focTorque->EnableCurrentCommand();
+    focTorque->CommandCurrent(foc::Ampere{ 2.0f });
+
+    for (int tick = 0; tick != 100; ++tick)
+    {
+        foc::Radians position{ 0.0f };
+        focTorque->Calculate(ZeroCurrents(), position);
+    }
+
+    EXPECT_GT(focTorque->QuadratureVoltage().Value(), 0.0f);
+
+    focTorque->DisableCurrentCommand();
+    EXPECT_NEAR(focTorque->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascade, outside_a_current_command_no_q_axis_voltage_is_kept)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 2.0f } });
+
+    for (int tick = 0; tick != 100; ++tick)
+    {
+        foc::Radians position{ 0.0f };
+        focTorque->Calculate(ZeroCurrents(), position);
+    }
+
+    EXPECT_NEAR(focTorque->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
