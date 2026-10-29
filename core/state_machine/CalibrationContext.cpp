@@ -1,5 +1,7 @@
 #include "core/state_machine/CalibrationContext.hpp"
+#include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include <algorithm>
 #include <numbers>
 
 namespace application
@@ -79,6 +81,7 @@ namespace application
             calibrationData.polePairs,
             calibrationData.currentLoopBandwidth,
             EffectiveFluxLinkage(),
+            foc::Ampere{ services::CurrentNoiseAmpere(calibrationData.currentNoiseMilliAmpere) },
             controller,
             tunable);
     }
@@ -98,6 +101,7 @@ namespace application
         std::size_t polePairs,
         float bandwidth,
         foc::Weber fluxLinkage,
+        foc::Ampere currentNoise,
         foc::FocBase& controller,
         foc::CurrentLoopTunable& tunable)
     {
@@ -109,7 +113,7 @@ namespace application
             inverter.BaseFrequency(),
             polePairs });
 
-        tunable.SetCurrentTunings(CurrentTuningsFor(bandwidth));
+        tunable.SetCurrentTunings(CurrentTuningsFor(bandwidth, inductance, currentNoise));
 
         return configured;
     }
@@ -129,15 +133,22 @@ namespace application
         return EffectiveFluxLinkage();
     }
 
-    float CalibrationContext::DefaultCurrentLoopBandwidth() const
+    float CalibrationContext::DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const
     {
-        return (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+        const auto switchingBound = (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+        const auto henry = foc::InductanceInHenry(inductance);
+
+        if (!foc::IsFinitePositive(currentNoise.Value()) || !foc::IsFinitePositive(henry))
+            return switchingBound;
+
+        const auto noiseBound = std::max(inaudibleVoltageNoise / (henry * currentNoise.Value()), minimumAutomaticBandwidth);
+        return std::min(switchingBound, noiseBound);
     }
 
-    foc::CurrentLoopTunings CalibrationContext::CurrentTuningsFor(float bandwidth) const
+    foc::CurrentLoopTunings CalibrationContext::CurrentTuningsFor(float bandwidth, foc::MilliHenry inductance, foc::Ampere currentNoise) const
     {
         auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth();
+        tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth(inductance, currentNoise);
         return tunings;
     }
 }

@@ -74,6 +74,11 @@ samples while the bridge and the sensing settle, then averages the next 2000 for
 20 kHz, which brings 35 mA of sample noise below 1 mA. It reads the raw samples, whatever offsets are
 applied at the time.
 
+The same samples give the sensors' noise: the RMS over the three phases of each sample's distance from
+its phase's offset. The calibration record stores it in whole milliamperes, and the automatic
+current-loop bandwidth is held where its proportional gain keeps that noise out of earshot
+(`controller-selection.md`, *Automatic bandwidth*; REQ-CTRL-017).
+
 It fails and stops the bridge in three cases:
 - a sample exceeds the inverter's maximum current, which means the rotor was turning or the sensing
   is broken;
@@ -132,6 +137,7 @@ sequenceDiagram
 | Interface  | Purpose                            | Contract                                                               |
 |------------|------------------------------------|------------------------------------------------------------------------|
 | Measure    | Measure the three offsets          | Asynchronous; reports three offsets or none; leaves the bridge stopped |
+| Noise      | The noise of the last measurement  | RMS about the offsets over the three phases; zero before a measurement |
 | Apply      | Set the offsets in force           | Takes effect on the next sample the compensation stage hands on        |
 | Abort      | Abandon a measurement              | Stops the bridge; the measurement reports nothing                      |
 | Is running | Whether a measurement is in flight | True from Measure until its result is delivered or it is aborted       |

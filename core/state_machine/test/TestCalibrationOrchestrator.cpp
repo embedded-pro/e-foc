@@ -319,6 +319,7 @@ TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, the_offsets_are_measured_f
     EXPECT_EQ(steps.front(), state_machine::CalibrationStep::currentOffsets);
 
     InSequence sequence;
+    EXPECT_CALL(currentOffsets, Noise()).WillOnce(Return(foc::Ampere{ 0.0386f }));
     EXPECT_CALL(currentOffsets, Apply(OffsetsEq(offsets)));
     ExpectPolePairCall();
     storedOffsetsCb(offsets);
@@ -327,6 +328,7 @@ TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, the_offsets_are_measured_f
     EXPECT_NEAR(pendingData.currentOffsetA, 0.027f, 1e-6f);
     EXPECT_NEAR(pendingData.currentOffsetB, -0.018f, 1e-6f);
     EXPECT_NEAR(pendingData.currentOffsetC, 0.054f, 1e-6f);
+    EXPECT_EQ(pendingData.currentNoiseMilliAmpere, 39);
 }
 
 TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, a_failed_offset_measurement_fails_the_calibration)

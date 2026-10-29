@@ -233,6 +233,7 @@ namespace application
                            << " Ia_mA=" << data.currentOffsetA * milliPerUnit
                            << " Ib_mA=" << data.currentOffsetB * milliPerUnit
                            << " Ic_mA=" << data.currentOffsetC * milliPerUnit
+                           << " In_mA=" << static_cast<uint32_t>(data.currentNoiseMilliAmpere)
                            << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit;
     }
 

@@ -424,9 +424,14 @@ knob, its bandwidth; its integral zero and reference weight are design constants
 (`documentation/theory/position-loop-pid.md`), so the weights do not reach it.
 
 **Automatic bandwidth.** A bandwidth the operator has not set is *automatic*: the firmware keeps
-deriving it as it always has — the current loop from the calibration record or, without one, from
-the PWM rate (a fifteenth of the switching frequency); the speed loop from the calibration record
-or 50 rad/s; the position loop at 2π·3 rad/s. Setting a bandwidth replaces the derivation until it
+deriving it — the current loop from the calibration record or, without one, from the PWM rate (a
+fifteenth of the switching frequency); the speed loop from the calibration record or 50 rad/s; the
+position loop at 2π·3 rad/s. The automatic current loop is also held below the bandwidth at which its
+proportional gain, L·ω, turns the current-sensor noise the calibration measured into 0.08 V RMS of
+commanded voltage, and kept at least ten times the default speed-loop bandwidth (REQ-CTRL-017). On
+the bench board the sense chain carries 38.5 mA RMS of noise; at the PWM-derived 8378 rad/s that
+became 0.40 V of voltage noise and an audible hiss, which was gone at 0.08 V. A record that holds no
+noise measurement keeps the PWM-derived value. Setting a bandwidth replaces the derivation until it
 is set back to automatic. A drive whose settings were never touched therefore runs exactly the
 loops it ran before the settings existed.
 

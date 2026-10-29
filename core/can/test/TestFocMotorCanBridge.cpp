@@ -962,6 +962,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_MeasuresTheOffsetsAtRestBefor
         {
             done(measured);
         }));
+    EXPECT_CALL(currentOffsetsMock, Noise()).WillOnce(Return(foc::Ampere{ 0.0386f }));
     EXPECT_CALL(currentOffsetsMock, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
         {
             EXPECT_NEAR(offsets.a.Value(), 0.025f, 1e-6f);
@@ -1000,6 +1001,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_MeasuresTheOffsetsAtRestBefor
     EXPECT_NEAR(saved->currentOffsetA, 0.025f, 1e-6f);
     EXPECT_NEAR(saved->currentOffsetB, -0.017f, 1e-6f);
     EXPECT_NEAR(saved->currentOffsetC, 0.045f, 1e-6f);
+    EXPECT_EQ(saved->currentNoiseMilliAmpere, 39);
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }

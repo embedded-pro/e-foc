@@ -1016,7 +1016,7 @@ sequenceDiagram
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                                                                         |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                                                                                |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                                                                                     |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                                                                                 |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017                                                          |
 | `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`                                       |
 
 `watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage

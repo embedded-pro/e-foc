@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -14,7 +15,7 @@ namespace services
 
     inline constexpr std::size_t coggingMapBins = 48;
 
-    // Padding-free schema: four-byte fields first, reserved1 completes the word; see service-nvm.md.
+    // Padding-free schema: four-byte fields first, the current noise completes the word; see service-nvm.md.
     struct CalibrationData
     {
         float rPhase = 0.0f;
@@ -34,11 +35,21 @@ namespace services
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
         CalibrationStage stage = CalibrationStage::none;
-        uint8_t reserved1 = 0;
+        uint8_t currentNoiseMilliAmpere = 0;
         std::array<int8_t, coggingMapBins> coggingTorque{};
     };
 
     static_assert(sizeof(CalibrationData) == 108, "CalibrationData layout must be free of implicit padding");
+
+    inline uint8_t CurrentNoiseMilliAmpere(float noiseAmpere)
+    {
+        return static_cast<uint8_t>(std::clamp(noiseAmpere * 1000.0f + 0.5f, 0.0f, 255.0f));
+    }
+
+    inline float CurrentNoiseAmpere(uint8_t noiseMilliAmpere)
+    {
+        return static_cast<float>(noiseMilliAmpere) * 0.001f;
+    }
 
     enum class MotorParameter : uint8_t
     {

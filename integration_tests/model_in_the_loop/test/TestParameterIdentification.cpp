@@ -2,6 +2,7 @@
 #include <array>
 #include <chrono>
 #include <gtest/gtest.h>
+#include <numbers>
 
 namespace
 {
@@ -79,6 +80,38 @@ TEST_F(TestParameterIdentification, the_full_calibration_measures_the_current_se
         mil::ExpectIdentified(mil, Quantity::resistance, 5.0f);
         mil::ExpectPolePairsMatch(mil);
     }
+}
+
+TEST_F(TestParameterIdentification, the_full_calibration_measures_the_sensor_noise_and_bounds_the_automatic_current_bandwidth_with_it)
+{
+    for (const float noise : { 0.02f, 0.035f })
+    {
+        SCOPED_TRACE(noise);
+        mil::Scenario scenario;
+        scenario.Plant("bench").BootsIn(state_machine::ControlMode::torque);
+        scenario.plant.noiseSigmaAmpere = noise;
+
+        mil::ModelInTheLoop mil{ scenario };
+        ASSERT_TRUE(mil.Calibrate());
+
+        const auto stored = services::CurrentNoiseAmpere(mil.CalibrationRecord().currentNoiseMilliAmpere);
+        EXPECT_NEAR(stored, noise, 0.1f * noise);
+
+        const auto expected = 0.08f / (mil.CalibrationRecord().lD * 1e-3f * stored);
+        EXPECT_NEAR(mil.ControlMode().EffectiveCurrentTunings().bandwidth, expected, 0.01f * expected);
+    }
+}
+
+TEST_F(TestParameterIdentification, a_calibration_on_a_quiet_sensor_keeps_the_pwm_derived_current_bandwidth)
+{
+    mil::Scenario scenario;
+    scenario.Plant("nominal").BootsIn(state_machine::ControlMode::torque);
+
+    mil::ModelInTheLoop mil{ scenario };
+    ASSERT_TRUE(mil.Calibrate());
+
+    const auto pwmBound = static_cast<float>(scenario.plant.baseFrequencyHz) / 15.0f * 2.0f * std::numbers::pi_v<float>;
+    EXPECT_NEAR(mil.ControlMode().EffectiveCurrentTunings().bandwidth, pwmBound, 1.0f);
 }
 
 TEST_F(TestParameterIdentification, the_full_calibration_identifies_the_mechanical_parameters)
