@@ -1,6 +1,8 @@
 #include "core/foc/current_loop/DeadbeatCurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "numerical/controllers/implementations/DeadbeatControl.hpp"
+#include "numerical/math/Math.hpp"
 
 namespace
 {
@@ -29,20 +31,26 @@ namespace foc
     bool DeadbeatCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
         twoStep = tunings.twoStepDeadbeat;
+        bandwidth = tunings.bandwidth;
         return ApplyGains();
     }
 
     void DeadbeatCurrentController::Reset()
     {
         lastInput = RotatingFrame{ 0.0f, 0.0f };
+        expected = RotatingFrame{ 0.0f, 0.0f };
+        disturbance = RotatingFrame{ 0.0f, 0.0f };
+        primed = false;
     }
 
     bool DeadbeatCurrentController::ApplyGains()
     {
         referenceGain = 0.0f;
         feedbackGain = 0.0f;
-        predictionStateGain = 1.0f;
-        predictionInputGain = 0.0f;
+        plantStateGain = 1.0f;
+        plantInputGain = 0.0f;
+        disturbanceGain = 0.0f;
+        delayed = false;
 
         if (!AreElectricalParametersValid(parameters))
             return false;
@@ -57,12 +65,12 @@ namespace foc
 
         referenceGain = reference * scale;
         feedbackGain = feedback * scale;
+        plantStateGain = plant.ad;
+        plantInputGain = plant.bd / scale;
+        delayed = parameters.dutyUpdateDelayPeriods != 0;
 
-        if (parameters.dutyUpdateDelayPeriods != 0)
-        {
-            predictionStateGain = plant.ad;
-            predictionInputGain = plant.bd / scale;
-        }
+        if (IsFinitePositive(bandwidth))
+            disturbanceGain = (1.0f - math::Exp(-bandwidth * SamplePeriod(parameters.samplingFrequency))) / plantInputGain;
 
         return true;
     }

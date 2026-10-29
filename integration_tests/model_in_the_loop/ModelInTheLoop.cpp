@@ -32,6 +32,8 @@ namespace mil
                 calibration.inertia *= factor;
             else if (quantity == "friction")
                 calibration.frictionViscous *= factor;
+            else if (quantity == "fluxLinkage")
+                calibration.fluxLinkage *= factor;
             else
                 return false;
 

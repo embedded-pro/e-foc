@@ -134,11 +134,44 @@ delay, and the two-step law keeps its pole. The voltage in flight is the one the
 decoupled output after the modulation-circle limit, less the decoupling terms, so a saturated step
 is predicted as applied rather than as requested.
 
+**A voltage the model does not account for**: back-EMF fed forward from a flux linkage that is not
+the motor's, what is left of the dead time, or a resistance error each add a voltage $d$ the law does
+not see. With no integral action the law settles with an offset of $B_d^i\, d$, or
+$B_d^i (1 + A_d^i)\, d$ with a late duty, since the prediction runs the error through the plant a
+second time. On the bench motor a stored flux linkage of 7.0 mWb against the motor's 4.6 mWb left
++0.23 A at a 0 A setpoint by 275 rad/s, which kept the rotor accelerating. The law therefore
+estimates $d$ from how far each measured current lands from the current it predicted for that
+sample, and subtracts the estimate from its command:
+
+$$
+\hat{d}[k] = \hat{d}[k-1] + \frac{g}{B_d^i}\left(i[k] - \hat{i}[k]\right), \qquad
+g = 1 - e^{-\omega_c T_s}
+$$
+
+$$
+\hat{i}[k+1] = A_d^i\, i[k] + B_d^i \left(v'_{\text{acting}} + \hat{d}[k]\right), \qquad
+v'[k] = \frac{i^* - A_d^i\, \hat{i}[k+1]}{B_d^i} - \hat{d}[k]
+$$
+
+where $v'_{\text{acting}}$ is the voltage that drives the plant from $k$ to $k+1$: $v'[k-1]$ with a
+late duty and $v'[k]$ without one, in which case the law itself acts on $i[k]$ as before. $\omega_c$
+is the current loop's bandwidth setting. With an exact model each prediction comes true, so the
+estimate leaves the response to the reference untouched; a constant $d$ is removed at a first-order
+rate $\omega_c$, the rate at which a PI loop of that bandwidth rejects it. The estimate is driven by
+the voltage the plant receives after the modulation limit, so it does not wind up. The first sample
+after a reset only seeds the prediction, since what acted before it is unknown.
+
+The cost is noise: the estimate turns the noise of the measured current into voltage. On the bench
+motor's model a simulation with 38.5 mA of sensor noise puts about a fifth more noise on the command
+at $\omega_c$ = 1885 rad/s and about 85 % more at 8378 rad/s. The same simulation, with a late duty,
+stays stable for inductance errors from half to one and a half times the motor's up to 8378 rad/s,
+and from 0.7 to 1.3 times at the 20000 rad/s limit.
+
 **Normalisation**: $v'[k]$ (physical volts) normalised identically to the PI output:
 $v'_{norm}[k] = v'[k] \cdot \sqrt{3}/V_{dc}$.
 
-**Tuning**: None — fully determined by $A_d^i, B_d^i$ from RLS. Only design choice: one-step vs.
-two-step variant.
+**Tuning**: The law is fully determined by $A_d^i, B_d^i$ from RLS; the current loop's bandwidth
+sets only how fast the voltage estimate follows. Design choice: one-step vs. two-step variant.
 
 ---
 
@@ -151,20 +184,21 @@ $$
 $$
 
 See `documentation/theory/current-loop-pi.md` — *Output Voltage Limit* — for the full derivation.
-Deadbeat has no integral action, so it is unaffected by windup at the voltage limit.
+Deadbeat has no integral action, and its voltage estimate is driven by the voltage the plant
+receives after the limit, so it is unaffected by windup at the voltage limit.
 
 ---
 
 ## Numerical Properties
 
-| Property                  | Value                                                                |
-|---------------------------|----------------------------------------------------------------------|
-| ISR cost                  | ~4 MACs (cheapest advanced controller); ~8 with a late duty          |
-| Settling time             | 1 sample (one-step); geometric (two-step); one more with a late duty |
-| Robustness to Rs/Ls error | Low — exact model required                                           |
-| Requires $\psi_f$         | No (but A1 feedforward does)                                         |
-| Requires RLS convergence  | Yes — tight convergence required                                     |
-| Tuning knobs              | 0 (variant choice only)                                              |
+| Property                  | Value                                                                                 |
+|---------------------------|---------------------------------------------------------------------------------------|
+| ISR cost                  | ~4 MACs (cheapest advanced controller); ~12 with the voltage estimate and a late duty |
+| Settling time             | 1 sample (one-step); geometric (two-step); one more with a late duty                  |
+| Robustness to Rs/Ls error | Low for transients; a steady voltage error is removed at the bandwidth                |
+| Requires $\psi_f$         | No (A1 feedforward uses it; an error in it is removed by the estimate)                |
+| Requires RLS convergence  | Yes — tight convergence required                                                      |
+| Tuning knobs              | 1: the bandwidth, for the voltage estimate (plus the variant choice)                  |
 
 ---
 

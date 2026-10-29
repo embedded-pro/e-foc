@@ -99,3 +99,16 @@
     a 0.5 A setpoint and enter and then stay inside a 10 percent band within 1 ms, with an
     overshoot below 30 percent and its tail within 7 percent of the step, where acting on the
     measured current overshoots by about 100 percent and takes over 12 ms to settle.
+
+- id: REQ-TRQ-011
+  title: The deadbeat law removes a voltage error its model does not account for
+  shall: >
+    The deadbeat current law shall estimate the voltage its model does not account for from the
+    difference between each measured current and the current it predicted for that sample, at the
+    current loop's bandwidth, and shall subtract that estimate from its command, starting afresh
+    whenever the loop is reset. On the bench motor with each duty applied a period late and a stored
+    flux linkage 1.5 times the motor's, after 120 ms at 0.5 A the deadbeat law shall bring the
+    q-axis current to a 0 A setpoint and enter and then stay inside a 10 percent band within 1 ms,
+    with an overshoot below 30 percent, its tail within 7 percent of the step and a steady-state
+    error below 0.02 A, where without the estimate the current stays near 0.39 A and keeps the
+    rotor accelerating.

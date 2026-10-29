@@ -244,6 +244,29 @@ Feature: FOC Control Performance
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
+  @sil @REQ-TRQ-011
+  Scenario: The deadbeat current loop holds 0 A at speed when the stored flux linkage is half again too large
+    Given a bench motor plant
+    And the plant applies each duty a period late, as the board does
+    And the plant response is recorded at 5000 Hz for up to 10000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | fluxLinkage | 1.5 |
+    And the motor boots in torque mode
+    And the current loop runs the deadbeat algorithm
+    When the target boots
+    And the rotor is aligned
+    Then the current loop shall be running the deadbeat algorithm
+    When the motor is enabled
+    And a torque setpoint of 0.5 A is applied
+    And the response is captured for 120 ms after the last setpoint
+    And a torque setpoint of 0 A is applied
+    And the response is captured for 60 ms after the last setpoint
+    Then the current step response shall settle into a 10 % band within 1 ms with overshoot below 30 %
+    And the current response tail shall stay within 7 % of the step
+    And the steady-state current error shall be below 0.02 A
+    And the response shall have no dropped samples
+
   @sil @REQ-TRQ-009
   Scenario: The bench motor reaches 400 rad/s with two of its three phases readable
     Given a bench motor plant

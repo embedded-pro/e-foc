@@ -343,11 +343,12 @@ time for gain normalisation.
 | Parameter                     |           PID            |      Decoupled PID       |         Deadbeat         |       Sliding-mode        |
 |-------------------------------|:------------------------:|:------------------------:|:------------------------:|:-------------------------:|
 | $R_s$, $L_s$ (electrical RLS) |         Required         |         Required         |     Required (tight)     |         Required          |
-| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |       Not required       |  Required — back-EMF FF   |
+| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |  Optional — back-EMF FF  |  Required — back-EMF FF   |
 | $V_{dc}$                      | Required — normalisation | Required — normalisation | Required — normalisation | Required — normalisation  |
 | $I_{q,max}$                   |     For output clamp     |     For output clamp     |        For clamp         | For switching gain sizing |
 
-Deadbeat requires the tightest RLS convergence.
+Deadbeat requires the tightest RLS convergence. Its back-EMF feedforward uses $\psi_f$ when it is
+known, and the voltage it leaves wrong is estimated and removed at the loop's bandwidth (REQ-TRQ-011).
 
 Sliding-mode applies the same decoupling feedforward as Decoupled PID, and for the same reason: its
 sliding surface is designed on the decoupled per-axis RL plant, so the cross-coupling and the
@@ -386,12 +387,12 @@ algorithm reads each field, as the code designs them.
 
 **Current loop:**
 
-| Knob             | Default   | Consumed by                      |
-|------------------|-----------|----------------------------------|
-| Bandwidth        | automatic | PID, Decoupled PID, Sliding-mode |
-| Switching gain   | 0.2 A     | Sliding-mode                     |
-| Boundary layer   | 0.5 A     | Sliding-mode                     |
-| Two-step variant | off       | Deadbeat                         |
+| Knob             | Default   | Consumed by                                                   |
+|------------------|-----------|---------------------------------------------------------------|
+| Bandwidth        | automatic | PID, Decoupled PID, Sliding-mode, Deadbeat (voltage estimate) |
+| Switching gain   | 0.2 A     | Sliding-mode                                                  |
+| Boundary layer   | 0.5 A     | Sliding-mode                                                  |
+| Two-step variant | off       | Deadbeat                                                      |
 
 The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
 below the boundary layer, so the ratio of the two is bounded by design. This is why the back-EMF is

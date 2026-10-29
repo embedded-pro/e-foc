@@ -829,6 +829,14 @@ What the plant has shown so far:
   same thing as a 102 % overshoot that took 12.8 ms to settle. The law now acts on the current it
   predicts for when its duty lands, which settles in 0.1 ms with 5 % overshoot
   (`documentation/theory/current-loop-deadbeat.md`; REQ-TRQ-010).
+- **On the rig the deadbeat law then drove the rotor at a 0 A setpoint.** The stored flux linkage
+  was 7.0 mWb against the motor's 4.6 mWb, so the back-EMF fed forward was half again too large, and
+  with no integral action the law settled at +0.23 A by 275 rad/s, which kept the rotor accelerating.
+  With the duty a period late the prediction runs that error through the plant twice, doubling the
+  offset. The model showed it with a stored flux linkage 1.5 times the plant's: after 120 ms at
+  0.5 A the current stayed near 0.39 A at a 0 A setpoint. The law now estimates the voltage it does
+  not model from what it mispredicts and subtracts it, which holds the setpoint within 0.5 mA
+  (`documentation/theory/current-loop-deadbeat.md`; REQ-TRQ-011).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.
