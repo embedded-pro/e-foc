@@ -57,14 +57,15 @@ files.
 | 21 | [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures       |
 | 22 | [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for |
 | 23 | [Service: Cogging Compensation](../design/service-cogging-compensation.md)             | Cogging torque map at calibration, current feed-forward in the cascades             |
-| 24 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                               |
-| 25 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                       |
-| 26 | [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                       |
-| 27 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                     |
-| 28 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                         |
-| 29 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry       |
-| 30 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                           |
-| 31 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers           |
+| 24 | [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step   |
+| 25 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                               |
+| 26 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                       |
+| 27 | [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                       |
+| 28 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                     |
+| 29 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                         |
+| 30 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry       |
+| 31 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                           |
+| 32 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers           |
 
 ## Building the booklet
 
