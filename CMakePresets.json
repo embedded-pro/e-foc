@@ -227,13 +227,28 @@
       "configurePreset": "EK-TM4C123GXL"
     },
     {
+      "name": "EK-TM4C123GXL-Debug",
+      "configuration": "Debug",
+      "configurePreset": "EK-TM4C123GXL"
+    },
+    {
       "name": "STM32F407G-DISC1-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
       "configurePreset": "STM32F407G-DISC1"
     },
     {
+      "name": "STM32F407G-DISC1-Debug",
+      "configuration": "Debug",
+      "configurePreset": "STM32F407G-DISC1"
+    },
+    {
       "name": "NUCLEO-H563ZI-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
+      "configurePreset": "NUCLEO-H563ZI"
+    },
+    {
+      "name": "NUCLEO-H563ZI-Debug",
+      "configuration": "Debug",
       "configurePreset": "NUCLEO-H563ZI"
     },
     {
