@@ -101,6 +101,15 @@ jobs:
             inner-max-cycles: 6375
             outer-max-cycles: 28333
             identification-max-cycles: 8500
+          # Report only: at 80 MHz the inner loop does not fit its 37.5 us slice, so the budgets are shown, not enforced.
+          - target: EK-TM4C123GXL
+            budget-analysis: true
+            report-only: true
+            clock-mhz: 80
+            linker-script: infra/hal/ti/tiva/ldscripts/mem_tm4c123gh6pm.ld
+            inner-max-cycles: 3000
+            outer-max-cycles: 13333
+            identification-max-cycles: 4000
     env:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -141,7 +150,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/inner
-          fail-over-max-cycles: ${{ matrix.inner-max-cycles }}
+          fail-over-max-cycles: ${{ !matrix.report-only && matrix.inner-max-cycles || '' }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-inner
       - name: Run outer loop cycle analysis
@@ -155,7 +164,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/outer
-          fail-over-max-cycles: ${{ matrix.outer-max-cycles }}
+          fail-over-max-cycles: ${{ !matrix.report-only && matrix.outer-max-cycles || '' }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-outer
       - name: Run identification path cycle analysis
@@ -169,7 +178,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/identification
-          fail-over-max-cycles: ${{ matrix.identification-max-cycles }}
+          fail-over-max-cycles: ${{ !matrix.report-only && matrix.identification-max-cycles || '' }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-identification
       - name: Compose cycle analysis banner
@@ -186,6 +195,7 @@ jobs:
           --analysis "Outer loop" cycle-analysis/outer "${{ matrix.outer-max-cycles }}"
           --analysis "Identification path" cycle-analysis/identification "${{ matrix.identification-max-cycles }}"
           --output cycle-analysis/banner.md
+          ${{ matrix.report-only && '--report-only' || '' }}
       - name: Post cycle analysis banner
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' && env.POST_PR_COMMENT == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
