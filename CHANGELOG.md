@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.6.0](https://github.com/embedded-pro/e-foc/compare/v1.5.0...v1.6.0) (2026-10-30)
+
+
+### Features
+
+* **can:** Stream window-mean Id, Iq and rotor position at the telemetry rate ([#515](https://github.com/embedded-pro/e-foc/issues/515)) ([7800f64](https://github.com/embedded-pro/e-foc/commit/7800f64146ff5f604ab807c05dfc83ba524f4407))
+* **supervision:** Report a held rotor as a stall, configurable over CAN ([#514](https://github.com/embedded-pro/e-foc/issues/514)) ([8514ba7](https://github.com/embedded-pro/e-foc/commit/8514ba70db4f4a2139dfeac3bc8569b89321b3b4))
+* **targets:** Replace STM32F407G-DISC1 with a NUCLEO-G474RE that drives E-FOC-HARDWARE ([#509](https://github.com/embedded-pro/e-foc/issues/509)) ([059d138](https://github.com/embedded-pro/e-foc/commit/059d13842ad531ec2f80ba3bbec3932dcb898327))
+
+
+### Bug Fixes
+
+* Report position within half a turn of the alignment zero, and a one-turn position knob ([#513](https://github.com/embedded-pro/e-foc/issues/513)) ([87ee897](https://github.com/embedded-pro/e-foc/commit/87ee8974c13cc36f7e77cf7d37132b9a8b2daae7))
+
+
+### Performance Improvements
+
+* **targets:** Drop FaultTracer from ST images, pool TI GPIO interrupts, TM4C123 budget banners ([#512](https://github.com/embedded-pro/e-foc/issues/512)) ([ff4551e](https://github.com/embedded-pro/e-foc/commit/ff4551e6747a4dece070f4f103976fd1d3c33519))
+
+
+### Continuous Integration
+
+* One cycle banner per MCU, and cycle and memory budgets for NUCLEO-G474RE ([#511](https://github.com/embedded-pro/e-foc/issues/511)) ([6fd94e1](https://github.com/embedded-pro/e-foc/commit/6fd94e1481233e94df87bf76d81c4231a3071f7b))
+
 ## [1.5.0](https://github.com/embedded-pro/e-foc/compare/v1.4.0...v1.5.0) (2026-10-29)
 
 
