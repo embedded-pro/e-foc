@@ -2,9 +2,9 @@
 title: "Current Loop — PI (Baseline)"
 type: theory
 status: draft
-version: 1.0.1
+version: 1.0.2
 component: "current-loop-pi"
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Current Loop — PI (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.0.1                        |
+| Version   | 1.0.2                        |
 | Component | current-loop-pi              |
-| Date      | 2026-10-29                   |
+| Date      | 2026-10-30                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -163,14 +163,14 @@ driving the modulator into over-modulation over roughly three-quarters of the el
 
 ## Numerical Properties
 
-| Property                  | Value                                    |
-|---------------------------|------------------------------------------|
-| ISR cost                  | ~6 MACs (2 axes × 3 operations)          |
-| Settling time             | ~$1/\omega_{bw}$                         |
-| Robustness to Rs/Ls error | High — integral action corrects mismatch |
-| Requires RLS convergence  | No — motor datasheet values sufficient   |
-| Requires $\psi_f$         | No                                       |
-| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ at boot) |
+| Property                  | Value                                           |
+|---------------------------|-------------------------------------------------|
+| ISR cost                  | ~6 MACs (2 axes × 3 operations)                 |
+| Time constant             | $1/\omega_{bw}$; 2 % settling $3.9/\omega_{bw}$ |
+| Robustness to Rs/Ls error | High — integral action corrects mismatch        |
+| Requires RLS convergence  | No — motor datasheet values sufficient          |
+| Requires $\psi_f$         | No                                              |
+| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ at boot)        |
 
 ---
 
