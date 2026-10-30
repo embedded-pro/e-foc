@@ -173,7 +173,8 @@ QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebIn
 
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 
-Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000).
+Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build, on EK-TM4C1294XL (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000 at 120 MHz)
+and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). Each MCU gets one cycle banner and one memory banner on the PR.
 It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
 
 **Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
