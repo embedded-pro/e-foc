@@ -3,7 +3,8 @@
 
 Each run is passed as LABEL OUTPUT_DIR MAX_CYCLES: the overview table always shows one row per run,
 the per-stage breakdowns go into a collapsed section. A run that wrote no cycle_metrics.json is
-reported as having produced no result rather than dropped.
+reported as having produced no result rather than dropped. With --report-only the budgets are shown but not
+enforced, so a path over budget is flagged as a warning instead of a failure.
 """
 
 import argparse
@@ -23,6 +24,7 @@ def parse_arguments():
     parser.add_argument("--marker", required=True)
     parser.add_argument("--artifact-prefix", required=True)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--report-only", action="store_true")
     parser.add_argument(
         "--analysis",
         nargs=3,
@@ -52,13 +54,16 @@ def period_cycles(clock_mhz, rate_khz):
     return int(clock_mhz * 1000 / rate_khz)
 
 
-def overview_row(label, metrics, max_cycles, clock_mhz):
+def overview_row(label, metrics, max_cycles, clock_mhz, report_only):
     if metrics is None:
         return f"| {label} | — | — | {max_cycles} | ⚠️ no result |"
     rate = loop_rate_khz(metrics)
     period = period_cycles(clock_mhz, rate)
     worst = metrics["summary"]["estimated_max_cycles"]
-    status = "✅ within budget" if worst <= max_cycles else "❌ over budget"
+    if worst <= max_cycles:
+        status = "✅ within budget"
+    else:
+        status = "⚠️ over budget (not enforced)" if report_only else "❌ over budget"
     return (
         f"| {label} | {rate:g} kHz | {worst} ({worst / period:.1%}) "
         f"| {max_cycles} ({max_cycles / period:.1%}) | {status} |"
@@ -104,10 +109,18 @@ def compose(arguments):
         f"`{arguments.build_config}` · Cortex-{arguments.cortex.upper()} · {arguments.clock_mhz} MHz "
         "· percentages are of the loop period",
         "",
-        "| Path | Rate | Max cycles | Budget | Status |",
-        "|------|------|-----------:|-------:|--------|",
     ]
-    lines.extend(overview_row(label, metrics, limit, arguments.clock_mhz) for label, metrics, limit in runs)
+    if arguments.report_only:
+        lines.extend(("> ℹ️ Report only: the budgets below are shown for comparison and do not fail the build.", ""))
+    lines.extend(
+        (
+            "| Path | Rate | Max cycles | Budget | Status |",
+            "|------|------|-----------:|-------:|--------|",
+        )
+    )
+    lines.extend(
+        overview_row(label, metrics, limit, arguments.clock_mhz, arguments.report_only) for label, metrics, limit in runs
+    )
     lines.extend(("", "<details>", "<summary>Path breakdowns</summary>", ""))
     for label, metrics, _ in runs:
         lines.extend(breakdown(label, metrics))

@@ -30,6 +30,11 @@ extern "C"
             "b    HardFault_Handler_C \n");
     }
 
+    // Strong, so the ST vector table does not fall back to EMIL FaultTracer's weak handlers and the dump code they pull in
+    void MemManage_Handler() noexcept __attribute__((alias("HardFault_Handler")));
+    void BusFault_Handler() noexcept __attribute__((alias("HardFault_Handler")));
+    void UsageFault_Handler() noexcept __attribute__((alias("HardFault_Handler")));
+
     void HardFault_Handler_C(const uint32_t* stack, uint32_t)
     {
         using application::PersistentFaultData;
