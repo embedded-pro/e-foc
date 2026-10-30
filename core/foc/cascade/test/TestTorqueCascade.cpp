@@ -1,8 +1,10 @@
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
@@ -431,4 +433,56 @@ TEST_F(TestTorqueCascade, outside_a_current_command_no_q_axis_voltage_is_kept)
     }
 
     EXPECT_NEAR(focTorque->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+{
+    foc::CurrentStream stream;
+    focTorque->SetCurrentStream(stream);
+    stream.Start(1);
+
+    foc::Radians position{ 0.0f };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-4f);
+    EXPECT_NEAR(sample->meanIq.Value(), 0.0f, 1e-4f);
+    EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_stationary_ones)
+{
+    foc::CurrentStream stream;
+    focTorque->SetCurrentStream(stream);
+    stream.Start(1);
+
+    const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
+    foc::Radians position{ mechanicalAngle };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), 0.0f, 1e-2f);
+    EXPECT_NEAR(sample->meanIq.Value(), -1.0f, 1e-2f);
+    EXPECT_NEAR(sample->position.Value(), mechanicalAngle, 1e-6f);
+}
+
+TEST_F(TestTorqueCascade, enabling_restarts_the_stream_window)
+{
+    foc::CurrentStream stream;
+    focTorque->SetCurrentStream(stream);
+    stream.Start(2);
+
+    foc::Radians position{ 0.0f };
+    focTorque->Calculate({ foc::Ampere{ 3.0f }, foc::Ampere{ -1.5f }, foc::Ampere{ -1.5f } }, position);
+    focTorque->Disable();
+    focTorque->Enable();
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+    EXPECT_FALSE(stream.Take().has_value());
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-4f);
 }

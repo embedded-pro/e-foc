@@ -113,7 +113,7 @@ namespace can
             return;
         }
 
-        if (rateHz == 0 || rateHz > 10000)
+        if (rateHz > focMaxTelemetryRateHz)
         {
             server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
             return;

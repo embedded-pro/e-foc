@@ -54,9 +54,8 @@ namespace tool
         void OnContractVersion(uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible) override;
         void OnControlModeAcknowledged(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnMotorStatusReceived(uint16_t nodeId, FocMotorState state, FocFaultCode fault) override;
-        void OnCurrentMeasurementReceived(uint16_t nodeId, float idCurrent, float iqCurrent) override;
+        void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) override;
         void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) override;
-        void OnBusVoltageReceived(uint16_t nodeId, float voltage) override;
         void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) override;
         void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
         void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace integration
 {
@@ -15,6 +16,14 @@ namespace integration
         float value{ 0.0f };
         uint16_t nodeId{ 1 };
         std::size_t commandsBefore{ 0 };
+    };
+
+    struct StreamedCurrent
+    {
+        uint8_t sequence{ 0 };
+        float idAmpere{ 0.0f };
+        float iqAmpere{ 0.0f };
+        float positionRadian{ 0.0f };
     };
 
     struct IdentifiedParameters
@@ -41,5 +50,6 @@ namespace integration
         response::PlantTrace trace;
         IdentifiedParameters identified;
         IdentifiedParameters online;
+        std::vector<StreamedCurrent> streamedCurrents;
     };
 }

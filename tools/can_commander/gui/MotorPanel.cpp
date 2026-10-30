@@ -654,19 +654,14 @@ namespace tool
             Refresh();
     }
 
-    void MotorPanel::OnCurrentMeasurement(float idCurrent, float iqCurrent)
+    void MotorPanel::OnCurrentStream(float idCurrent, float iqCurrent, float position)
     {
-        telemetryPanel->OnCurrentMeasurement(idCurrent, iqCurrent);
+        telemetryPanel->OnCurrentStream(idCurrent, iqCurrent, position);
     }
 
     void MotorPanel::OnSpeedPosition(float speed, float position)
     {
         telemetryPanel->OnSpeedPosition(speed, position);
-    }
-
-    void MotorPanel::OnBusVoltage(float voltage)
-    {
-        telemetryPanel->OnBusVoltage(voltage);
     }
 
     void MotorPanel::OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)

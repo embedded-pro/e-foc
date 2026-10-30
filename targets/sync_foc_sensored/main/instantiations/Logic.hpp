@@ -6,6 +6,8 @@
 #include "core/can/CanLivenessWatchdog.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorCurrentStreamer.hpp"
+#include "core/can/UntracedStreamCan.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
@@ -67,13 +69,16 @@ namespace application
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         services::ConfigData configData;
+        foc::CurrentStream currentStream;
 
         std::optional<services::TracingCan> tracingCan;
+        std::optional<can::UntracedStreamCan> canBus;
         std::optional<services::CanProtocolServer> canServer;
         std::optional<services::TracingCanProtocolServerObserver> tracingServerObserver;
         std::optional<can::FocMotorCategoryServer> motorCanServer;
         std::optional<ControlMode> controlMode;
         std::optional<can::FocMotorCanBridge> canBridge;
         std::optional<can::CanLivenessWatchdog> canLivenessWatchdog;
+        std::optional<can::FocMotorCurrentStreamer> currentStreamer;
     };
 }

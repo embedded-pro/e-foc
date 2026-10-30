@@ -2,7 +2,7 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.1.2
+version: 0.1.3
 component: foc-speed
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.1.1             |
+| Version   | 0.1.3             |
 | Component | foc-speed         |
 | Date      | 2026-10-22        |
 
@@ -56,7 +56,7 @@ Speed control builds on the torque control loop by adding a supervisory outer lo
 | Inner loop | 20 kHz | High-priority FOC ISR  | Phase currents, θm       | PWM duty cycles      |
 | Outer loop | 1 kHz  | Low-priority interrupt | θm from last inner cycle | Iq setpoint (Ampere) |
 
-The inner loop is identical to the torque control loop described in the FOC Torque Control design document. The outer loop adds the speed PID and the speed estimation step.
+The inner loop is identical to the torque control loop described in the FOC Torque Control design document, including the current-stream window (`service-can.md` Part J), which the position cascade shares. The outer loop adds the speed PID and the speed estimation step.
 
 ```mermaid
 graph TB
@@ -151,6 +151,7 @@ stateDiagram-v2
 | OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                                            | Pure query; no side effects. Can be called before Enable.                                                                                                                                                                                     |
 | SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                                                 | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
 | SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                                                 | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |
+| SetCurrentStream             | Attaches the current stream whose window the inner loop fills (`service-can.md` Part J).                      | Called once, before the first `Calculate()`. The stream outlives the controller.                                                                                                                                                              |
 | ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.                                     | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-INT-014) and the encoder plausibility monitor (REQ-SM-028).                                                                                                 |
 | Current command              | Bypasses the speed loop and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts, and zero outside the command.                                                                                     |
 

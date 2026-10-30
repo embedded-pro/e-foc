@@ -44,6 +44,7 @@ namespace hil
             std::chrono::milliseconds& elapsed) override;
         std::size_t ReceivedCanFrameCount() const override;
         std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const override;
+        std::vector<hal::Can::Message> FindReceivedCanFrames(hal::Can::Id id, std::size_t fromFrame) const override;
         std::optional<hal::Can::Id> FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>& matches, std::size_t fromFrame) const override;
     };
 }

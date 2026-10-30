@@ -4,6 +4,7 @@
 #include "ui/backend/qt/QtFormView.hpp"
 #include "ui/model/FormModel.hpp"
 #include <QLabel>
+#include <QTimer>
 #include <QWidget>
 #include <array>
 #include <optional>
@@ -23,9 +24,8 @@ namespace tool
 
     public slots:
         void OnMotorStatus(FocMotorState state, FocFaultCode fault);
-        void OnCurrentMeasurement(float idCurrent, float iqCurrent);
+        void OnCurrentStream(float idCurrent, float iqCurrent, float position);
         void OnSpeedPosition(float speed, float position);
-        void OnBusVoltage(float voltage);
         void OnFaultEvent(FocFaultCode fault);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
 
@@ -44,6 +44,7 @@ namespace tool
         static void ShowPlaceholders(const Form& form);
 
         void ShowFault(FocFaultCode fault);
+        void ShowLatestStreamSample();
 
         // The state and fault rows stay native: they read as words rather than numbers, and
         // ui::model has no text read-out by design. The fault row is also what StyleStatusLabel
@@ -51,7 +52,18 @@ namespace tool
         QLabel* motorStateLabel;
         QLabel* faultLabel;
 
-        std::array<ui::model::FieldValue, 5> measurementValues{};
+        struct StreamSample
+        {
+            float idCurrent{ 0.0f };
+            float iqCurrent{ 0.0f };
+            float position{ 0.0f };
+        };
+
+        // Up to 1000 stream samples per second arrive per node; only the latest is painted, at the refresh rate.
+        std::optional<StreamSample> latestStreamSample;
+        QTimer streamRefresh;
+
+        std::array<ui::model::FieldValue, 4> measurementValues{};
         std::array<ui::model::FieldValue, 5> parameterValues{};
         Form measurements;
         Form parameters;

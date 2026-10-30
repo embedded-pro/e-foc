@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.8.1
 component: "tool-can-commander"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.8.0                |
+| Version   | 0.8.1                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-30           |
 
@@ -107,10 +107,14 @@ graph TD
 | Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value | that node's setpoint acknowledgement    |
 | Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted        | that node's parameter responses         |
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's status (read every second)  |
+| Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                 | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                               |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
-that node goes offline, so stale numbers never read as live. A fault on one motor stays visible in the
+that node goes offline, so stale numbers never read as live. The current stream (`service-can.md` Part J)
+delivers up to 1000 samples a second from each node; the panel keeps only each node's latest sample and
+paints it on a 40 ms timer, so nine streaming nodes cost the event loop at most 225 repaints a second, and
+stream frames stay out of the raw frame log. A fault on one motor stays visible in the
 overview row and on its tab while another motor is being commanded.
 
 ### Part D — commands and the emergency stop

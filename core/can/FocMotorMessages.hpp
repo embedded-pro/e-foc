@@ -6,8 +6,8 @@ namespace can
 {
     static constexpr uint8_t focMotorCategoryId = 0x02;
 
-    // Retired in contract 2.3 and never reused: 0x00 QueryMotorType, 0x07 IdentifyMechanical,
-    // 0x80 MotorTypeResponse, 0x87 MechanicalParamsResponse
+    // Retired and never reused: 0x00 QueryMotorType, 0x07 IdentifyMechanical, 0x80 MotorTypeResponse,
+    // 0x87 MechanicalParamsResponse (contract 2.3); 0x88 TelemetryElectrical (contract 2.5)
     static constexpr uint8_t focStartId = 0x01;
     static constexpr uint8_t focStopId = 0x02;
     static constexpr uint8_t focSetPidCurrentId = 0x03;
@@ -34,8 +34,8 @@ namespace can
     static constexpr uint8_t focClearDiagnosticsId = 0x19;
 
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
-    static constexpr uint8_t focTelemetryElectricalResponseId = 0x88;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
+    static constexpr uint8_t focTelemetryCurrentsId = 0x8A;
     static constexpr uint8_t focSelectControlModeResponseId = 0x8E;
     static constexpr uint8_t focContractVersionResponseId = 0x92;
     static constexpr uint8_t focAlgorithmsResponseId = 0x93;
@@ -200,8 +200,11 @@ namespace can
     static constexpr int32_t focCurrentScale = 10;
     static constexpr int32_t focSpeedScale = 1;
     static constexpr int32_t focPositionScale = 100;
-    static constexpr int32_t focVoltageScale = 10;
     static constexpr int32_t focResistanceScale = 1000;
     static constexpr int32_t focInductanceScale = 1000;
     static constexpr int32_t focPidScale = 1;
+    static constexpr int32_t focStreamCurrentScale = 1000;
+    static constexpr int32_t focStreamPositionScale = 10000;
+
+    static constexpr uint32_t focMaxTelemetryRateHz = 1000;
 }

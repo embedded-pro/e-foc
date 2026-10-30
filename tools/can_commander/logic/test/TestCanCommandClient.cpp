@@ -569,13 +569,20 @@ TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
         Message({ static_cast<uint8_t>(FocMotorState::fault), static_cast<uint8_t>(FocFaultCode::overCurrent), 0, 0, 0, 0 }));
 }
 
-TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
+TEST_F(TestCanCommandClient, a_current_stream_frame_notifies_the_sample_of_its_node)
 {
-    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
-    EXPECT_CALL(observer, OnCurrentMeasurementReceived(1, testing::FloatNear(3.0f, 0.01f), testing::FloatNear(5.0f, 0.01f)));
-    EXPECT_CALL(observer, OnBusVoltageReceived(1, testing::FloatNear(24.0f, 0.01f)));
+    EXPECT_CALL(observer, OnNodeOnlineChanged(4, true));
+    EXPECT_CALL(observer, OnCurrentStreamReceived(4, 0x2A, testing::FloatNear(0.512f, 0.0001f), testing::FloatNear(-1.0f, 0.0001f), testing::FloatNear(-3.1416f, 0.0001f)));
 
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryElectricalResponseId, 1), Message({ 0, 240, 0, 0, 0, 50, 0, 30 }));
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryCurrentsId, 4), Message({ 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48 }));
+}
+
+TEST_F(TestCanCommandClient, current_stream_frames_stay_out_of_the_frame_log)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(4, true));
+
+    for (uint8_t sequence = 0; sequence != 3; ++sequence)
+        LogReceived(FocId(services::CanPriority::telemetry, can::focTelemetryCurrentsId, 4), Message({ sequence, 0, 0, 0, 0, 0, 0 }));
 }
 
 TEST_F(TestCanCommandClient, an_undecoded_response_does_not_call_any_observer)

@@ -30,8 +30,10 @@ target_sources(e_foc.can_test PRIVATE
     TestFocMotorCategoryClient.cpp
     TestFocMotorCanBridge.cpp
     TestFocMotorCanClient.cpp
+    TestFocMotorCurrentStreamer.cpp
     TestFocMotorWireContract.cpp
     TestFocMotorSettings.cpp
+    TestUntracedStreamCan.cpp
     TestWireContractDocumentation.cpp
 )
 

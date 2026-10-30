@@ -40,9 +40,8 @@ namespace tool
         virtual void OnControlModeAcknowledged(uint16_t nodeId, can::FocMotorMode activeMode) = 0;
 
         virtual void OnMotorStatusReceived(uint16_t nodeId, FocMotorState state, FocFaultCode fault) = 0;
-        virtual void OnCurrentMeasurementReceived(uint16_t nodeId, float idCurrent, float iqCurrent) = 0;
+        virtual void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) = 0;
         virtual void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) = 0;
-        virtual void OnBusVoltageReceived(uint16_t nodeId, float voltage) = 0;
         virtual void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) = 0;
         virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
@@ -151,7 +150,7 @@ namespace tool
         void OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
         void OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) override;
-        void OnTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) override;
+        void OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position) override;
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
@@ -164,7 +163,6 @@ namespace tool
 
         bool HandleCommandAck(uint32_t id, const services::CanFrame& data);
         void DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const;
-        void DecodeTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) const;
 
         can::FocMotorCanClient focClient;
         std::map<uint16_t, NodeCommand> commands;

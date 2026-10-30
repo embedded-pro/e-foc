@@ -34,6 +34,8 @@ namespace application
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
+            if (hardware.currentStream != nullptr)
+                focController.SetCurrentStream(*hardware.currentStream);
             RegisterFaultHandler(faultNotifier);
             RegisterCliIfNeeded(transitionPolicy);
             Boot(rotorReference);

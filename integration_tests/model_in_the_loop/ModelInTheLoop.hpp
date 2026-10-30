@@ -86,6 +86,7 @@ namespace mil
         bool IsReady() const;
         bool HasFault() const;
         state_machine::ControlModeStateMachine& ControlMode();
+        foc::CurrentStream& CurrentStream();
         std::optional<state_machine::OnlineEstimates> OnlineEstimates();
         const services::CalibrationData& CalibrationRecord() const;
 
@@ -173,6 +174,7 @@ namespace mil
         services::RotorStandstillImpl rotorStandstill;
         state_machine::NoOpFaultNotifier faultNotifier;
         services::ConfigData configData;
+        foc::CurrentStream currentStream;
         std::optional<state_machine::ControlModeStateMachine> controlMode;
 
         std::vector<std::string> recordLines;

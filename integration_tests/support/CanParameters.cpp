@@ -13,7 +13,7 @@ namespace integration
         constexpr std::size_t kParameterResponseBytes = 6;
         constexpr std::size_t kAlgorithmsResponseBytes = 4;
 
-        hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
+        hal::Can::Id ResponseId(Fixture& fixture, uint8_t messageType)
         {
             return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
         }

@@ -573,6 +573,17 @@ namespace can
         SendTelemetry(focTelemetryStatusResponseId, payload);
     }
 
+    bool FocMotorCategoryServer::BroadcastTelemetryCurrents(uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position,
+        const infra::Function<void(bool sent)>& onDone)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(sequence);
+        payload.WriteFixed16(id.Value(), focStreamCurrentScale);
+        payload.WriteFixed16(iq.Value(), focStreamCurrentScale);
+        payload.WriteFixed16(position.Value(), focStreamPositionScale);
+        return payload.Valid() && Transport().SendFrame(services::CanPriority::telemetry, Id(), focTelemetryCurrentsId, payload.Message(), onDone);
+    }
+
     void FocMotorCategoryServer::BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs)
     {
         services::CanPayloadWriter payload;

@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.7.0
+version: 0.8.0
 component: can-service
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.7.0                    |
+| Version   | 0.8.0                    |
 | Component | can-service              |
 | Date      | 2026-10-30               |
 
@@ -38,6 +38,7 @@ date: 2026-10-30
 - Delegating the electrical identification command to `ElectricalParametersIdentification` and broadcasting its result via a response frame.
 - Persisting encoder resolution and telemetry rate changes to `NonVolatileMemory`.
 - Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
+- Streaming the measured d- and q-axis currents and the rotor position at the configured telemetry rate (Part J).
 - Selecting the control algorithm of each loop and reporting the algorithms in force.
 - Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
   parameters of the calibration record, the settings that take effect at the next start and the drive-wide
@@ -252,18 +253,32 @@ version, as `invalidParameters` was in 2.1. A 2.3 client shows the new code as a
 asks a server for the six parameters only when it reports 2.4 or newer, since an older one answers
 `invalidPayload` for each.
 
+**Contract 2.5 — current stream.** Version 2.5 adds one telemetry frame and retires one; no other message
+changes, so a 2.4 client keeps working against a 2.5 server.
+
+| ID     | Message             | Direction | Fields                                                                              | Answer |
+|--------|---------------------|-----------|-------------------------------------------------------------------------------------|--------|
+| `0x8A` | `TelemetryCurrents` | telemetry | sequence `uint8`, id `int16` (1 mA), iq `int16` (1 mA), position `int16` (0.1 mrad) | —      |
+
+`TelemetryCurrents` is sent unasked, once per stream window, while the stream runs (Part J): the window's
+mean measured d- and q-axis currents and the encoder's mechanical angle at the window's last sample, in
+[−π, π) from the alignment zero. `TelemetryElectrical` (`0x88`, bus voltage, current limit, Iq and Id at
+0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
+start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
-| Quantity   | Wire type | Scale factor | Example                                    |
-|------------|-----------|--------------|--------------------------------------------|
-| Current    | int16     | 10           | 1.5 A → 15 wire                            |
-| Speed      | int16     | 1            | 300 rad/s → 300 wire                       |
-| Position   | int16     | 100          | 3.14 rad → 314 wire                        |
-| Voltage    | int16     | 10           | 24.0 V → 240 wire                          |
-| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s             |
-| Resistance | int16     | 1000         | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire  |
-| Inductance | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire |
+| Quantity          | Wire type | Scale factor | Example                                    |
+|-------------------|-----------|--------------|--------------------------------------------|
+| Current           | int16     | 10           | 1.5 A → 15 wire                            |
+| Speed             | int16     | 1            | 300 rad/s → 300 wire                       |
+| Position          | int16     | 100          | 3.14 rad → 314 wire                        |
+| Bandwidth         | int16     | 1            | closed-loop bandwidth in rad/s             |
+| Resistance        | int16     | 1000         | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire  |
+| Inductance        | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire |
+| Streamed current  | int16     | 1000         | 0.512 A → 512 wire; saturates at ±32.767 A |
+| Streamed position | int16     | 10000        | −3.1416 rad → −31416 wire                  |
 
 The reference-motor values come from `documentation/theory/foc-plant-models.md` "Reference motors". Inertia
 and friction, around 1e-6 and 1e-5 in SI units, travel only as `float32` parameters (`SetParameter`,
@@ -285,6 +300,8 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
 | `0x17`–`0x19`, `0x80`–`0xB0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
+| `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 
 ### Part B — FocMotorCategoryServer
 
@@ -298,6 +315,7 @@ The observer interface provides callbacks for:
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CAL-015); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
 - `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-POS-013); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
+  The telemetry rate is the current stream's rate (Part J), 0–1000 Hz.
 - `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
   contract's enumerations; the result callback sends `AlgorithmsResponse` and then the acknowledgement.
 - `OnSetParameter`, `OnQueryParameter` — receive a parameter number and, for a write, a value the server has
@@ -420,13 +438,18 @@ newest lowest-priority frame when it is full, so a fault notification is not ref
 
 All tracing is applied via `can-lite`'s decorator classes:
 
-| Decorator                          | Wraps               | Traces                                       |
-|------------------------------------|---------------------|----------------------------------------------|
-| `TracingCan`                       | `hal::Can`          | Every raw CAN frame sent and received        |
-| `TracingCanProtocolServerObserver` | `CanProtocolServer` | Server online/offline events                 |
-| `TracingCanProtocolClientObserver` | `CanProtocolClient` | Server online/offline, ACK timeouts per node |
+| Decorator                          | Wraps               | Traces                                                              |
+|------------------------------------|---------------------|---------------------------------------------------------------------|
+| `TracingCan`                       | `hal::Can`          | Every raw CAN frame sent and received, except current-stream frames |
+| `TracingCanProtocolServerObserver` | `CanProtocolServer` | Server online/offline events                                        |
+| `TracingCanProtocolClientObserver` | `CanProtocolClient` | Server online/offline, ACK timeouts per node                        |
 
 These are composed in the instantiation layer (`Logic.hpp`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
+
+`UntracedStreamCan` sits between the protocol server and `TracingCan` and sends `TelemetryCurrents` frames
+straight to the bus. One traced frame is a line of about 120 characters, so a 1 kHz stream alone would need
+about 120 kB/s of trace output, more than the 921 600 bit/s trace port carries; every other frame, and every
+received frame, is still traced.
 
 ### Part I — Node Address
 
@@ -458,6 +481,86 @@ flowchart LR
 With the default base, eight EK-TM4C1294XL or NUCLEO-G474RE boards set to 0–7 answer as nodes 1–8, the
 most one bus carries (`can-lite` tracks eight servers).
 
+### Part J — Current Stream
+
+A host that rebuilds the current and position waveforms needs them at a steady rate, not one status frame
+per request. While the stream runs, the drive sends one `TelemetryCurrents` frame per window without being
+asked.
+
+**Window.** The control interrupt adds each sample's measured Id and Iq — the Park transform's output, not
+the references — to the stream window. A window is N control periods, N = round(f_control / rate), so the
+effective rate is f_control / N: exactly the configured rate at 1000, 500, 250, 200 or 100 Hz on the 20 kHz
+loop, and 298.5 Hz (N = 67) for a configured 300 Hz. At the window's last sample the interrupt stores the
+two means and that sample's mechanical angle in a sixteen-entry ring and starts the next window. The mean
+is the anti-aliasing filter of the stream: a 1 kHz stream of single samples would fold the PWM ripple and
+the sensor noise into its band, while the window average has a null at every multiple of the stream rate.
+The interrupt does a few additions per sample and nothing while the stream is stopped
+(`documentation/performance-optimization/README.md`).
+
+**Sequence.** Every window the interrupt closes takes the next value of an 8-bit counter, whether or not its
+frame reaches the bus: a window lost to a full ring or to a full send queue is a gap in the sequence, never a
+silently shifted sample. The counter wraps after 256 windows (256 ms at 1 kHz), so a client also uses the
+arrival time to tell a long outage from a wrap. Windows are counted only while a control loop runs: a stop
+and a later start show as a pause in arrival, not as a gap.
+
+**When it runs.** The stream runs while a CAN client is online (Part F's liveness, the same `clientTimeout`),
+the configured rate is not zero and a closed-loop cascade runs — torque, speed or position, including the
+calibration steps that drive the motor through the cascade (mechanical identification, cogging map). The
+open-loop steps (alignment, resistance and inductance injection) and a stopped drive produce no windows.
+
+**Rate.** The rate is `telemetryRateHz` of the configuration record, set by `ConfigureTelemetryRate`
+(`0x0D`): 0 stops the stream, 1–1000 Hz runs it; a larger value is answered `invalidPayload` and changes
+nothing. A stored change takes effect within one millisecond. The default record holds 100 Hz.
+
+**Sending.** An event-loop timer drains the ring every millisecond and hands each sample to the send queue
+at telemetry priority (12). At most two stream frames are in the send queue at once, which leaves the other
+ordinary slots of `can-lite`'s queue to responses and acknowledgements; a sample that finds two frames
+waiting stays in the ring for the next tick, and the ring holds sixteen milliseconds of samples at 1 kHz.
+Stream frames are not traced (Part H).
+
+```mermaid
+sequenceDiagram
+    participant ISR as Control interrupt (20 kHz)
+    participant RING as Stream ring (16 samples)
+    participant TMR as Stream timer (1 ms, event loop)
+    participant Q as can-lite send queue
+    participant BUS as CAN bus
+
+    loop every control period
+        ISR->>ISR: add Id, Iq to the window
+        opt window's last sample
+            ISR->>RING: sequence, mean Id, mean Iq, mechanical angle
+        end
+    end
+    TMR->>TMR: apply the stored rate
+    loop while the ring holds a sample and fewer than two frames wait
+        TMR->>RING: take the oldest sample
+        TMR->>Q: TelemetryCurrents at priority 12
+    end
+    Q->>BUS: frame
+    Q-->>TMR: sent, one fewer frame waiting
+```
+
+**Bus budget.** One `TelemetryCurrents` frame has a 29-bit identifier and seven data bytes: 123 bits
+nominal, 150 with worst-case bit stuffing (110 stuffable bits, at most 27 stuff bits).
+
+| Bitrate    | One node at 1 kHz | One node at 500 Hz | Stream frames per second within 70 % |
+|------------|-------------------|--------------------|--------------------------------------|
+| 1 Mbit/s   | 12.3–15 %         | 6.2–7.5 %          | 4666                                 |
+| 500 kbit/s | 24.6–30 %         | 12.3–15 %          | 2333                                 |
+| 250 kbit/s | 49.2–60 %         | 24.6–30 %          | 1166                                 |
+| 125 kbit/s | does not fit      | 49.2–60 %          | 583                                  |
+
+Several drives share one bus, so the budget is the sum over every node: Σ rate × 150 bit shall stay at or
+below 70 % of the bitrate, which leaves the rest for commands, responses, acknowledgements and heartbeats.
+Nine drives at 1 kHz need 1.11–1.35 Mbit/s and do not fit any classic CAN bitrate; nine at 500 Hz on
+1 Mbit/s take 67.5 % worst case, as do nine at 250 Hz on 500 kbit/s.
+
+Stream frames (priority 12) win arbitration over heartbeats (priority 16). On an over-subscribed bus an idle
+client's heartbeats starve, every drive declares the client gone after `clientTimeout` (3 s) and stops its
+motor (Part F). A node sees only its own traffic and cannot measure the bus load, so it does not throttle
+itself: choosing the rates within the budget is the integrator's job.
+
 ---
 
 ## Interfaces
@@ -469,15 +572,17 @@ most one bus carries (`can-lite` tracks eight servers).
 | FocMotorCategoryServerObserver | Observer interface for the server category                         | Callbacks must not block or allocate; called from the event dispatcher context |
 | FocMotorCategoryClientObserver | Observer interface for the client category                         | Callbacks must not block or allocate                                           |
 | FocMotorCanClient              | Wires the protocol client and the category client onto one CAN bus | Callers send through `CategoryClient()`; each `Send*` returns `bool` queued    |
+| FocMotorCurrentStreamer        | Sends the current stream while a client is online (Part J)         | Event loop only; reads the rate from the configuration record every tick       |
 
 ### Required
 
-| Interface                 | Purpose                           | Contract                                                                |
-|---------------------------|-----------------------------------|-------------------------------------------------------------------------|
-| `CanFrameTransport`       | Sends and receives raw CAN frames | Provided by `can-lite`; must be constructed before the category objects |
-| `ControlModeStateMachine` | Accepts motor control commands    | All methods are synchronous or deliver results via `infra::Function`    |
-| `hal::Can`                | Raw CAN bus access                | Required by `CanProtocolServer` and `CanProtocolClient`                 |
-| `services::Tracer`        | Diagnostic output                 | Must outlive the tracing decorator objects                              |
+| Interface                 | Purpose                            | Contract                                                                |
+|---------------------------|------------------------------------|-------------------------------------------------------------------------|
+| `CanFrameTransport`       | Sends and receives raw CAN frames  | Provided by `can-lite`; must be constructed before the category objects |
+| `ControlModeStateMachine` | Accepts motor control commands     | All methods are synchronous or deliver results via `infra::Function`    |
+| `hal::Can`                | Raw CAN bus access                 | Required by `CanProtocolServer` and `CanProtocolClient`                 |
+| `services::Tracer`        | Diagnostic output                  | Must outlive the tracing decorator objects                              |
+| `foc::CurrentStream`      | Windows filled by the control loop | Single producer (control interrupt), single consumer (event loop)       |
 
 ---
 
@@ -495,6 +600,9 @@ most one bus carries (`can-lite` tracks eight servers).
 | Parameter value       | value     | float32 wire   | the parameter's range          | IEEE 754, most significant byte first                            |
 | ParameterResponse     | flags     | bitfield uint8 | bit 0: automatic               | Other bits are zero                                              |
 | FocResetCause         | cause     | enum uint8     | 0–4                            | Value of `resetCause`, sent as its float                         |
+| TelemetryCurrents     | sequence  | uint8          | 0–255, wraps                   | One per window the control loop closes                           |
+| TelemetryCurrents     | id, iq    | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 1000 [A], window mean                          |
+| TelemetryCurrents     | position  | int16 wire     | −31416 – 31415                 | Physical = wire / 10000 [rad], at the window's last sample       |
 
 ---
 
@@ -600,10 +708,15 @@ lifecycle instead; the response carries the value the calibration record now hol
 graph LR
     subgraph "Server Path (embedded target)"
         HAL_CAN_S["hal::Can"] --> TC["TracingCan"]
-        TC --> CPS["CanProtocolServer"]
+        TC --> USC["UntracedStreamCan"]
+        HAL_CAN_S -. "TelemetryCurrents only" .-> USC
+        USC --> CPS["CanProtocolServer"]
         CPS --> CPSO["TracingCanProtocolServerObserver"]
         CPS --> MCS["FocMotorCategoryServer"]
         MCS --> BRG["FocMotorCanBridge"]
+        CPS --> STR["FocMotorCurrentStreamer"]
+        STR --> MCS
+        RING["foc::CurrentStream<br/>(filled by the control interrupt)"] --> STR
         BRG --> SM["ControlModeStateMachine"]
         BRG --> SET["FocMotorSettingsBridge"]
         SET --> SM
@@ -634,6 +747,7 @@ graph LR
 | Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                                                                      |
 | Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop                                          |
 | Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder angle from the alignment zero, in [−π, π) |
+| Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)                   |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                                  |
 
 ---
@@ -642,6 +756,6 @@ graph LR
 
 | # | Question                                                         | Resolution                                                                                                                       | Status   |
 |---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                                                      | resolved |
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | Status on demand via `OnRequestTelemetry`; currents and position pushed by the current stream (Part J)                           | resolved |
 | 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, stored as that loop's bandwidth setting (2.0 Bandwidth Commands) | resolved |
 | 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                     | resolved |

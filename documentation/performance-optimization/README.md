@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.0.0
+version: 1.0.1
 component: "foc"
 date: 2026-04-07
 ---
@@ -12,7 +12,7 @@ date: 2026-04-07
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.0.0                             |
+| Version   | 1.0.1                             |
 | Component | foc                               |
 | Date      | 2026-04-07                        |
 
@@ -250,6 +250,12 @@ The 20 kHz path should do only the work that changes from one sample to the next
 - **Divide out one ratio.** Choosing the tighter of two bounds by cross-multiplying leaves one division instead of two.
 - **Run the law that is configured.** A general controller whose limits never clamp and whose derivative gain is zero
   is replaced by the two-state law it reduces to.
+- **Publish windows, not samples.** The current stream (`documentation/design/service-can.md` Part J) adds Id and Iq
+  into a window in the interrupt and hands the event loop one mean per window, so the 20 kHz path does two additions,
+  an increment and a compare per sample. The window's reciprocal length is computed once, at the first sample after
+  the rate changes, so closing a window multiplies instead of dividing. A stopped stream costs two loads and two
+  compares, and a cascade without a stream one pointer test. Every stream function is inlined into the cascade's `Calculate`, so the
+  cycle analysis measures it there.
 
 ---
 

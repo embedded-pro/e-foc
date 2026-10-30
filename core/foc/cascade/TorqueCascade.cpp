@@ -28,6 +28,8 @@ namespace foc
         previousAngleValid = false;
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
+        if (currentStream != nullptr)
+            currentStream->Restart();
         SetPoint(requestedSetPoint);
     }
 
@@ -98,6 +100,11 @@ namespace foc
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f } };
     }
 
+    void TorqueCascade::SetCurrentStream(CurrentStream& stream)
+    {
+        currentStream = &stream;
+    }
+
     void TorqueCascade::EnableCurrentCommand()
     {
         requestedSetPoint = IdAndIqPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
@@ -136,6 +143,8 @@ namespace foc
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
+        if (currentStream != nullptr)
+            currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& setPoint = setPointBuffer.Acquire();
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), setPoint.second.Value() }, electricalSpeed });
         voltageWindow.Accumulate(voltage.q);

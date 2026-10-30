@@ -78,7 +78,7 @@ namespace
         MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t, can::FocMotorMode), (override));
         MOCK_METHOD(void, OnCategoryError, (uint16_t, uint8_t, can::FocMotorCategoryError), (override));
         MOCK_METHOD(void, OnTelemetryStatus, (uint16_t, const hal::Can::Message&), (override));
-        MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t, const hal::Can::Message&), (override));
+        MOCK_METHOD(void, OnTelemetryCurrents, (uint16_t, uint8_t, foc::Ampere, foc::Ampere, foc::Radians), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t, uint8_t, uint8_t), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t, const can::FocAlgorithms&), (override));
@@ -575,8 +575,8 @@ namespace
             { can::focClearDiagnosticsId, { 0x00 } },
 
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
-            { can::focTelemetryElectricalResponseId, { 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
+            { can::focTelemetryCurrentsId, { 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48 } },
             { can::focSelectControlModeResponseId, { 0x02 } },
             { can::focContractVersionResponseId, { can::focContractVersionMajor, can::focContractVersionMinor } },
             { can::focAlgorithmsResponseId, { 0x01, 0x00, 0x02, 0x00 } },

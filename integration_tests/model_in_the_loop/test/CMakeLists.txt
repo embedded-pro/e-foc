@@ -11,6 +11,7 @@ target_sources(e_foc.model_in_the_loop_test PRIVATE
     TestSupport.hpp
     TestControlPerformance.cpp
     TestControlRobustness.cpp
+    TestCurrentStream.cpp
     TestDisturbanceRejection.cpp
     TestIdentificationRobustness.cpp
     TestParameterIdentification.cpp

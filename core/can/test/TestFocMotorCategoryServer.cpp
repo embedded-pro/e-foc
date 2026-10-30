@@ -638,3 +638,34 @@ TEST_F(FocMotorCategoryServerTest, MaintenanceCommands_WithAPayload_AreRejected)
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focClearDiagnosticsId, MakeMessage({ 0x01, 0x00 })));
     EXPECT_FALSE(ackSpy.last.has_value());
 }
+
+TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryCurrents_SendsTheSampleAtTelemetryPriority)
+{
+    std::optional<uint32_t> rawId;
+    EXPECT_CALL(canMock, SendData(_, _, _))
+        .WillOnce(Invoke([&](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+            {
+                rawId = id.Get29BitId();
+                lastSentMsg = msg;
+                cb(true);
+            }));
+
+    bool sent{ false };
+    EXPECT_TRUE(server.BroadcastTelemetryCurrents(0x2A, foc::Ampere{ 0.512f }, foc::Ampere{ -1.0f }, foc::Radians{ -3.1416f }, [&sent](bool success)
+        {
+            sent = success;
+        }));
+
+    ASSERT_TRUE(rawId.has_value());
+    EXPECT_EQ(services::ExtractCanMessageType(*rawId), can::focTelemetryCurrentsId);
+    EXPECT_EQ(services::ExtractCanPriority(*rawId), services::CanPriority::telemetry);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48 }));
+    EXPECT_TRUE(sent);
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryCurrents_SaturatesCurrentsBeyondTheWireRange)
+{
+    EXPECT_TRUE(server.BroadcastTelemetryCurrents(0, foc::Ampere{ 40.0f }, foc::Ampere{ -40.0f }, foc::Radians{ 0.0f }, [](bool) {}));
+
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0x00, 0x7F, 0xFF, 0x80, 0x00, 0x00, 0x00 }));
+}

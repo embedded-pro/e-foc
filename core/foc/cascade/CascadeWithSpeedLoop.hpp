@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/DirectAxisExcitation.hpp"
 #include "core/foc/cascade/EstimatorChannel.hpp"
 #include "core/foc/cascade/EstimatorWindowAccumulator.hpp"
@@ -57,6 +58,7 @@ namespace foc
         void UpdateOnlineElectricalEstimator();
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
+        void SetCurrentStream(CurrentStream& stream);
 
     private:
         [[no_unique_address]] Park park;
@@ -87,5 +89,6 @@ namespace foc
         DirectAxisExcitation directAxisExcitation;
         CoggingFeedForward coggingFeedForward;
         QuadratureVoltageWindow voltageWindow;
+        CurrentStream* currentStream{ nullptr };
     };
 }

@@ -43,9 +43,8 @@ namespace tool
         void OnContractVersion(uint8_t major, uint8_t minor, bool compatible);
         void OnControlModeAcknowledged(can::FocMotorMode activeMode);
         void OnMotorStatus(FocMotorState state, FocFaultCode fault);
-        void OnCurrentMeasurement(float idCurrent, float iqCurrent);
+        void OnCurrentStream(float idCurrent, float iqCurrent, float position);
         void OnSpeedPosition(float speed, float position);
-        void OnBusVoltage(float voltage);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnAlgorithms(const can::FocAlgorithms& algorithms);
         void OnParameter(can::FocParameter parameter, can::FocParameterValue value);

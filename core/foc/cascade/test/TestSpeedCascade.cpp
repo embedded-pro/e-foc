@@ -1,3 +1,4 @@
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
@@ -641,4 +642,42 @@ TEST_F(TestSpeedCascade, a_cleared_cogging_map_no_longer_drives_the_winding)
     speedCascade.cascade->ClearCoggingMap();
 
     ExpectCentredDuty(FirstDutyAtStandstill(speedCascade, 0.03f));
+}
+
+TEST_F(TestSpeedCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+{
+    foc::CurrentStream stream;
+    focSpeed->SetCurrentStream(stream);
+    focSpeed->Enable();
+    stream.Start(1);
+
+    foc::Radians position{ 0.25f };
+    const float electricalAngle = 0.25f * static_cast<float>(polePairs);
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), std::cos(electricalAngle), 1e-2f);
+    EXPECT_NEAR(sample->meanIq.Value(), -std::sin(electricalAngle), 1e-2f);
+    EXPECT_NEAR(sample->position.Value(), 0.25f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, enabling_restarts_the_stream_window)
+{
+    foc::CurrentStream stream;
+    focSpeed->SetCurrentStream(stream);
+    focSpeed->Enable();
+    stream.Start(2);
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate({ foc::Ampere{ 3.0f }, foc::Ampere{ -1.5f }, foc::Ampere{ -1.5f } }, position);
+    focSpeed->Disable();
+    focSpeed->Enable();
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+    EXPECT_FALSE(stream.Take().has_value());
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-2f);
 }

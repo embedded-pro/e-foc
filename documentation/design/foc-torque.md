@@ -2,7 +2,7 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: foc-torque
 date: 2026-04-07
 ---
@@ -12,7 +12,7 @@ date: 2026-04-07
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.1.0              |
+| Version   | 0.2.0              |
 | Component | foc-torque         |
 | Date      | 2026-04-07         |
 
@@ -52,7 +52,7 @@ date: 2026-04-07
 
 The torque control loop is the innermost layer of the FOC cascade. It is invoked once per PWM switching period (default 20 kHz) by the hardware interrupt handler that drives the three-phase inverter. The entire loop — from phase current input to duty cycle output — must complete within the interrupt budget.
 
-The eleven-step sequence executed each cycle is:
+The twelve-step sequence executed each cycle is:
 
 1. Receive phase currents (Ia, Ib, Ic) as the `PhaseCurrents` argument.
 2. Read the rotor mechanical angle θm from the `Radians` argument (supplied by the Runner from the encoder).
@@ -60,11 +60,13 @@ The eleven-step sequence executed each cycle is:
 4. Evaluate `cos(θe)` and `sin(θe)` via the fast trigonometric LUT — one evaluation, results reused.
 5. Clarke forward: (Ia, Ib) → (Iα, Iβ); Ic is derived from the balanced-phase constraint.
 6. Park forward: (Iα, Iβ, θe) → (Id, Iq).
-7. d-axis PID: error = Id_setpoint − Id → output = Vd.
-8. q-axis PID: error = Iq_setpoint − Iq → output = Vq.
-9. Inverse Park: (Vd, Vq, θe) → (Vα, Vβ).
-10. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
-11. Return `PhasePwmDutyCycles` to the Runner for immediate PWM register update.
+7. Current stream: add Id and Iq to the stream window; on the window's last sample, store the two means and θm
+   for the event loop (`service-can.md` Part J). Skipped when no stream is attached or the stream is stopped.
+8. d-axis PID: error = Id_setpoint − Id → output = Vd.
+9. q-axis PID: error = Iq_setpoint − Iq → output = Vq.
+10. Inverse Park: (Vd, Vq, θe) → (Vα, Vβ).
+11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
+12. Return `PhasePwmDutyCycles` to the Runner for immediate PWM register update.
 
 ```mermaid
 flowchart LR
@@ -73,6 +75,7 @@ flowchart LR
     D["θm → θe\nLUT cos/sin"] --> C
     D --> H
     C --> E["Id, Iq"]
+    E --> S["Current stream window\nmeans every N samples"]
     E --> F["d-axis PID\nVd = f(Id_sp − Id)"]
     E --> G["q-axis PID\nVq = f(Iq_sp − Iq)"]
     F --> H["Inverse Park\nVd, Vq → Vα, Vβ"]
@@ -150,7 +153,8 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. `Calculate()` returns zero while disabled.                                                               |
 | SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call.                          |
 | SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
-| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
+| Calculate         | Executes the full 12-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
+| SetCurrentStream  | Attaches the current stream whose window the loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                        |
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 
 ### Required

@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: service-nvm
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.5.0                        |
+| Version   | 0.5.1                        |
 | Component | service-nvm                  |
 | Date      | 2026-10-30                   |
 
@@ -245,7 +245,7 @@ firmware derived, so the layout stays at version 4 and no stored calibration is 
 |------------------------|-----------------------|----------------------------------------------------------------------------------------------------------------|
 | canNodeId              | —                     | Base CAN node ID; board ID added at boot                                                                       |
 | canBaudrate            | bit/s                 | CAN bus baud rate                                                                                              |
-| telemetryRateHz        | Hz                    | Rate at which telemetry frames are sent                                                                        |
+| telemetryRateHz        | Hz                    | Rate of the current stream (`service-can.md` Part J): 0 stops it, 1–1000 Hz; default 100                       |
 | encoderResolution      | —                     | Encoder counts per mechanical revolution                                                                       |
 | currentLoop            | rad/s, A, —           | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
 | speedLoop              | rad/s, —, s           | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
