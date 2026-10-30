@@ -44,12 +44,16 @@ namespace integration
 
             RequestStatus();
 
+            const auto candidate = serverNodeId.value_or(kAssumedServerNodeId);
             const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
-                services::canSystemCategoryId, services::canHeartbeatMessageTypeId, serverNodeId);
+                services::canSystemCategoryId, services::canHeartbeatMessageTypeId, candidate);
             hal::Can::Message payload;
             std::chrono::milliseconds elapsed{ 0 };
             if (WaitForCanFrame(heartbeatId, payload, std::min(remaining, kHeartbeatSlice), elapsed))
+            {
+                serverNodeId = candidate;
                 return true;
+            }
 
             if (const auto node = FindHeartbeatNode(mark); node.has_value())
             {
@@ -59,9 +63,12 @@ namespace integration
         }
     }
 
-    uint16_t Fixture::ServerNodeId() const
+    uint16_t Fixture::ServerNodeId()
     {
-        return serverNodeId;
+        if (!serverNodeId.has_value() && !WaitForCanHeartbeat())
+            serverNodeId = kAssumedServerNodeId;
+
+        return *serverNodeId;
     }
 
     std::optional<uint16_t> Fixture::FindHeartbeatNode(CaptureMark from) const
@@ -82,7 +89,7 @@ namespace integration
         const hal::Can::Message& extra, std::chrono::milliseconds timeout)
     {
         const hal::Can::Id commandId = MakeId(services::CanPriority::command,
-            category, messageType, serverNodeId);
+            category, messageType, ServerNodeId());
         hal::Can::Message payload;
         payload.push_back(nextSequence);
         for (const uint8_t b : extra)
@@ -95,7 +102,7 @@ namespace integration
             return false;
 
         const hal::Can::Id ackId = MakeId(services::CanPriority::response,
-            services::canSystemCategoryId, services::canCommandAckMessageTypeId, serverNodeId);
+            services::canSystemCategoryId, services::canCommandAckMessageTypeId, ServerNodeId());
 
         // Loop to skip stale ACKs left in the pipe from previous WaitForMotorState telemetry polls.
         // The firmware ACK payload is [category, messageType, status, expectedSeq]; we must verify
@@ -149,9 +156,9 @@ namespace integration
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, serverNodeId);
+            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, serverNodeId);
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
 
         static constexpr auto kMinPollInterval = std::chrono::milliseconds{ 20 };
 
@@ -195,9 +202,9 @@ namespace integration
     bool Fixture::WaitForFaultCode(can::FocFaultCode expectedFault, std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, serverNodeId);
+            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, serverNodeId);
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
 
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline)
@@ -230,9 +237,9 @@ namespace integration
     std::optional<float> Fixture::ReadMeasuredPosition(std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, serverNodeId);
+            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, serverNodeId);
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
 
         hal::Can::Message request;
         request.push_back(nextSequence++);
@@ -250,9 +257,9 @@ namespace integration
     std::optional<float> Fixture::ReadMeasuredSpeed(std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, serverNodeId);
+            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, serverNodeId);
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
 
         hal::Can::Message request;
         request.push_back(nextSequence++);
@@ -270,9 +277,9 @@ namespace integration
     std::optional<can::FocMotorState> Fixture::ReadMotorState(std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, serverNodeId);
+            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, serverNodeId);
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
 
         hal::Can::Message request;
         request.push_back(nextSequence++);

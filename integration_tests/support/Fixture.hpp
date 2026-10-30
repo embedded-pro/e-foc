@@ -24,7 +24,7 @@ namespace integration
 
         bool WaitForCanHeartbeat(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
-        uint16_t ServerNodeId() const;
+        uint16_t ServerNodeId();
         bool SendCanCommand(uint8_t category, uint8_t messageType,
             const hal::Can::Message& payload = {},
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
@@ -75,6 +75,9 @@ namespace integration
 
         TargetInteractor& interactor;
         std::chrono::steady_clock::time_point canReference{};
-        uint16_t serverNodeId{ 1 };
+        static constexpr uint16_t kAssumedServerNodeId{ 1 };
+
+        // Learnt from the first heartbeat: a board's node follows its board ID, so it is not always 1.
+        std::optional<uint16_t> serverNodeId;
     };
 }

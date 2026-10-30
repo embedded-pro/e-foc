@@ -26,7 +26,7 @@ namespace
     constexpr float kReferenceCelsius = 25.0f;
     constexpr std::size_t kElectricalResponseBytes = 5;
 
-    hal::Can::Id ResponseId(const Fixture& fixture, uint8_t messageType)
+    hal::Can::Id ResponseId(Fixture& fixture, uint8_t messageType)
     {
         return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
     }
