@@ -17,6 +17,7 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
     infra.stream
     infra.timer
     e_foc.foc.interfaces
+    e_foc.foc.math
     e_foc.platform_abstraction.interfaces
 )
 
@@ -28,6 +29,7 @@ target_sources(e_foc.platform_abstraction PRIVATE
     ControlLoopMetrics.cpp
     DecimatingThreePhaseInverter.hpp
     DecimatingThreePhaseInverter.cpp
+    EncoderZero.hpp
     LowSideShuntWindow.hpp
     PlatformDiagnostics.hpp
     PlatformDiagnostics.cpp

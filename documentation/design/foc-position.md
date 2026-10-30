@@ -2,9 +2,9 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.1.3
+version: 0.1.4
 component: foc-position
-date: 2026-10-22
+date: 2026-10-30
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.3                |
+| Version   | 0.1.4                |
 | Component | foc-position         |
-| Date      | 2026-10-22           |
+| Date      | 2026-10-30           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -163,13 +163,13 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 | Entity              | Field               | Type / Unit              | Range                                    | Notes                                                                            |
 |---------------------|---------------------|--------------------------|------------------------------------------|----------------------------------------------------------------------------------|
-| Position setpoint   | θ_sp                | Radians (float)          | Application-defined                      | Not wrapped — application must supply single-turn-compatible target              |
-| Actual position     | θm                  | Radians (float)          | [0, 2π)                                  | Mechanical angle from encoder                                                    |
+| Position setpoint   | θ_sp                | Radians (float)          | ±2π over CAN                             | Not wrapped, but taken modulo 2π: θ_sp and θ_sp ± 2π are the same target         |
+| Actual position     | θm                  | Radians (float)          | [−π, π)                                  | Mechanical angle from the alignment zero, wrapped by the platform (REQ-POS-013)  |
 | Position PID output | ω_sp                | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s                     | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
 | Estimated speed     | ω                   | RadiansPerSecond (float) | computed from Δθ/Δt                      | Finite difference with ±π wrap correction                                        |
 | Speed PID output    | Iq_sp               | Ampere (float)           | ± maxCurrent                             | Written to inner loop                                                            |
 | d-axis setpoint     | Id_sp               | Ampere (float)           | 0 A; ±2.5 % Imax at 50 Hz with estimator | SPMSM maximum torque per ampere                                                  |
-| Previous angle      | θm_prev             | Radians (float)          | [0, 2π)                                  | Saved each outer cycle for speed estimator                                       |
+| Previous angle      | θm_prev             | Radians (float)          | [−π, π)                                  | Saved each outer cycle for speed estimator                                       |
 | Outer loop period   | Δt                  | Seconds (float)          | 1 / outer_frequency                      | Constant after construction                                                      |
 | Pole pairs          | P                   | Integer (unsigned)       | ≥ 1                                      | Motor property                                                                   |
 | Max current         | maxCurrent          | Ampere (float)           | > 0                                      | Upper bound on Iq setpoint from speed PID                                        |

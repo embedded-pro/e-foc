@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.1.3
+version: 0.1.4
 component: system
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.1.3                     |
+| Version   | 0.1.4                     |
 | Component | system                    |
-| Date      | 2026-10-29                |
+| Date      | 2026-10-30                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -372,7 +372,7 @@ These are never used directly by the FOC core or services — only by the PAL co
 |------------------------|-----------|---------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `ThreePhasePowerStage` | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge; each platform implements it    | `PhaseCurrentsReady()` installs the callback the ADC interrupt invokes once every PWM period. Must be called before `Start()`.                                                                                                           |
 | `ThreePhaseInverter`   | required  | What the FOC core and services sample through; the shared `DecimatingThreePhaseInverter` provides it over the power stage | `PhaseCurrentsReady(f)` delivers every Nth sample for a rate f that divides the PWM frequency; the PWM keeps switching at its own frequency. At the PWM frequency the platform invokes the caller directly.                              |
-| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                                         | Read must be non-blocking and complete in <= a few cycles.                                                                                                                                                                               |
+| `Encoder`              | required  | Reads the rotor mechanical angle from the alignment zero, in [−π, π), and supports zero-offset calibration                | Read must be non-blocking and complete in <= a few cycles.                                                                                                                                                                               |
 | `LowPriorityInterrupt` | required  | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop                | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. `Unregister()` detaches it: after it returns, neither an already queued nor a future trigger may invoke the handler. |
 | `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                                 | All operations are asynchronous and invoke a callback on completion.                                                                                                                                                                     |
 

@@ -15,6 +15,7 @@ target_sources(e_foc.platform_abstraction_test PRIVATE
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
     TestDecimatingThreePhaseInverter.cpp
+    TestEncoderZero.cpp
     TestLowSideShuntWindow.cpp
     TestQuadratureEncoderDecorator.cpp
 )
