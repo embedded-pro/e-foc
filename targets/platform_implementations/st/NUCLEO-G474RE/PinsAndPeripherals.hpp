@@ -106,18 +106,9 @@ namespace application
 
     namespace Clocks
     {
-        // FDCAN on the 24 MHz crystal, where 1 Mbit/s is 24 time quanta; I2C3 and LPUART1 on PCLK1, the 170 MHz
-        // that the I2C timing and the baud rate assume
         inline void Initialize()
         {
             ConfigureDefaultClockNucleoG474xxx();
-
-            RCC_PeriphCLKInitTypeDef kernelClocks{};
-            kernelClocks.PeriphClockSelection = RCC_PERIPHCLK_FDCAN | RCC_PERIPHCLK_I2C3 | RCC_PERIPHCLK_LPUART1;
-            kernelClocks.FdcanClockSelection = RCC_FDCANCLKSOURCE_HSE;
-            kernelClocks.I2c3ClockSelection = RCC_I2C3CLKSOURCE_PCLK1;
-            kernelClocks.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_PCLK1;
-            HAL_RCCEx_PeriphCLKConfig(&kernelClocks);
         }
     }
 }
