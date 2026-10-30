@@ -114,3 +114,10 @@
     which stops the stream, to 1000 Hz; a larger rate shall be answered with invalidPayload and
     change nothing. Every window the control loop closes shall take the next sequence number,
     so that a window the drive could not send appears to the client as a gap in the sequence.
+
+- id: REQ-CAN-013
+  title: A control-loop stall is reported with its own fault code
+  shall: >
+    Contract version 2.6 shall add, without changing any 2.5 message, a controlLoopStall value of
+    the fault code carried by the status telemetry and the fault event, and the drive shall report
+    FaultCode::controlLoopStall with it.

@@ -383,3 +383,32 @@ THEN(R"(the response shall have no dropped samples)")
     EXPECT_EQ(setup.trace.Dropped(), 0u) << "The recorder dropped samples";
     EXPECT_EQ(setup.trace.Gaps(), 0u) << "The captured samples are not uniformly spaced";
 }
+
+GIVEN(R"(the control interrupt stops {int} ms after enable)", (int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Only the emulated target can lose its conversion trigger";
+    ASSERT_FALSE(setup.booted) << "The loss must be scheduled before the target boots";
+    ASSERT_GT(delayMs, 0) << "A zero delay is how a scenario says the control interrupt never stops";
+
+    setup.plant.controlInterruptLossDelayMs = static_cast<uint32_t>(delayMs);
+}
+
+THEN(R"(the power stage shall stop within {float} ms of the control interrupt stopping)", (float limitMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+
+    ASSERT_TRUE(CaptureUntil(setup, [&]
+        {
+            return setup.trace.EventTick("control_interrupt_loss") && setup.trace.StopTick();
+        }))
+        << "The plant recorded no control-interrupt loss followed by a stop";
+
+    const auto lost = *setup.trace.EventTick("control_interrupt_loss");
+    const auto stopped = *setup.trace.StopTick();
+    ASSERT_GE(stopped, lost) << "The stage stopped before the control interrupt did";
+
+    const auto elapsedMs = static_cast<float>(stopped - lost) * kMilliPerSecond / static_cast<float>(setup.plant.baseFrequencyHz);
+    std::printf("[METRIC] control interrupt loss to power stage stop=%.3f ms\n", elapsedMs);
+    EXPECT_LE(elapsedMs, limitMs);
+}

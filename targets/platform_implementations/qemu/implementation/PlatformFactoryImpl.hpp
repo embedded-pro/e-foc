@@ -206,6 +206,8 @@ namespace application
         foc::OneShotDelay encoderFreeze;
         foc::OneShotDelay shaftGrip;
         foc::OneShotDelay shaftHold;
+        foc::OneShotDelay controlInterruptLoss;
+        std::atomic<bool> controlInterruptLost{ false };
         foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };

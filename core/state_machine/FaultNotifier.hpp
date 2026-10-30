@@ -16,7 +16,8 @@ namespace state_machine
         watchdogTimeout,
         hardwareFault,
         calibrationFailed,
-        stall
+        stall,
+        controlLoopStall
     };
 
     constexpr const char* FaultCodeName(FaultCode code)
@@ -43,6 +44,8 @@ namespace state_machine
                 return "calibrationFailed";
             case FaultCode::stall:
                 return "stall";
+            case FaultCode::controlLoopStall:
+                return "controlLoopStall";
         }
 
         return "unknown";

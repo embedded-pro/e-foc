@@ -84,20 +84,20 @@ a truncated or stale description is rejected rather than half-read.
 
 The description covers everything the plant needs:
 
-| Group             | Contents                                                                                                             |
-|-------------------|----------------------------------------------------------------------------------------------------------------------|
-| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping                                        |
-| Drive             | Supply voltage, control frequency, peak current, load torque                                                         |
-| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                                         |
-| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                                            |
-| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                                                 |
-| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling, an event-loop stall and when it begins |
-| Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit                          |
-| Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse                                  |
-| Current sensing   | Converter clock and timing, averaging, trigger delay, amplifier lag, full scale, resolution                          |
-| Reproducibility   | The seed both noise generators start from                                                                            |
-| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                                              |
-| Recording         | The rate at which the plant reports its trajectory, and how many samples                                             |
+| Group             | Contents                                                                                                                                               |
+|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping                                                                          |
+| Drive             | Supply voltage, control frequency, peak current, load torque                                                                                           |
+| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                                                                           |
+| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                                                                              |
+| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                                                                                   |
+| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling, an event-loop stall and when it begins, when the control interrupt stops |
+| Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit                                                            |
+| Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse                                                                    |
+| Current sensing   | Converter clock and timing, averaging, trigger delay, amplifier lag, full scale, resolution                                                            |
+| Reproducibility   | The seed both noise generators start from                                                                                                              |
+| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                                                                                |
+| Recording         | The rate at which the plant reports its trajectory, and how many samples                                                                               |
 
 The thermal group's resistance and inductance coefficients act from the temperature the
 nameplate values were measured at (25 °C), not from the ambient, so a plant described with a hot
@@ -340,6 +340,13 @@ hand takes it whatever torque the drive produces — the hand is stronger than a
 reads that motion, so the firmware sees a rotor overpowered and then stalled. The grip is three fields of
 the plant description, the delay, the duration and the angle, which took the record to layout version 10;
 an angle of zero means no hand.
+
+The control interrupt itself can be lost. A set time after enable the emulated board stops running the
+control callback while the plant keeps stepping with the last duty the firmware wrote, which is what a
+lost conversion trigger does to the real bridge. The plant notes the instant as a `control_interrupt_loss`
+event, so a scenario measures how long the drive took to stop the stage from that event to the plant's
+stop record (`control-loop-supervision.md`). The delay is one field of the plant description, which took
+the record to layout version 11; zero means the interrupt never stops.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen

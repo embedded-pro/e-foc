@@ -85,6 +85,8 @@ namespace sil
         float shaftTurnRadians;
         uint32_t shaftGripDelayMs;
         uint32_t shaftTurnMs;
+        // Zero means the control interrupt keeps completing for as long as the stage runs.
+        uint32_t controlInterruptLossDelayMs;
 
         uint8_t polePairs;
         uint8_t faultFlags;
@@ -93,10 +95,10 @@ namespace sil
         uint8_t dutyDelayPeriods;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 236, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 240, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 10;
+    static constexpr uint8_t plantConfigLayoutVersion = 11;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

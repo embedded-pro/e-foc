@@ -266,6 +266,12 @@ mean measured d- and q-axis currents and the encoder's mechanical angle at the w
 0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
 start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
 
+**Contract 2.6 — control-loop stall.** Version 2.6 adds one fault code; nothing in 2.5 changes.
+`FocFaultCode` gains `controlLoopStall` (`7`): the 20 kHz control interrupt stopped completing while the
+power stage was started, and the drive stopped the stage (`control-loop-supervision.md`). Adding the
+enumerator leaves the meaning of the existing codes unchanged, which keeps it a minor version, as `stall` was
+in 2.4. A 2.5 client shows the new code as an unknown fault.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 

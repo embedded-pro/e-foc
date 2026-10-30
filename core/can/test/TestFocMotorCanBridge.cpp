@@ -1240,6 +1240,18 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_Stall_MapsToStall)
     EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::stall));
 }
 
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_ControlLoopStall_MapsToControlLoopStall)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::controlLoopStall);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::controlLoopStall));
+}
+
 TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
 {
     ConstructFixture();

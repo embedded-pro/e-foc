@@ -28,6 +28,7 @@ namespace application
         {
             last = cycles;
             samples = Increment(samples);
+            completions = completions + 1;
 
             if (cycles < minimum)
                 minimum = cycles;
@@ -52,6 +53,7 @@ namespace application
         void Reset();
 
         Snapshot Read() const;
+        uint32_t Completions() const;
 
     private:
         static constexpr uint32_t saturated = 0xFFFFFFFFu;
@@ -72,5 +74,7 @@ namespace application
         uint32_t overrunCount{ 0 };
         uint32_t deadlineMissCount{ 0 };
         uint32_t reentryCount{ 0 };
+        // Written by the control interrupt, read by the stall supervisor; wraps, and Reset leaves it.
+        volatile uint32_t completions{ 0 };
     };
 }

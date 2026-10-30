@@ -65,7 +65,8 @@ namespace can
         underVoltage = 3,
         overTemperature = 4,
         sensorFault = 5,
-        stall = 6
+        stall = 6,
+        controlLoopStall = 7
     };
 
     enum class FocMotorCategoryError : uint8_t

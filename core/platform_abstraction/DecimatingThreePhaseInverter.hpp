@@ -19,6 +19,9 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
+        bool Started() const;
+        uint32_t Starts() const;
+
     private:
         void Decimate(foc::PhaseCurrents currents);
 
@@ -26,5 +29,8 @@ namespace application
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onDecimated;
         uint32_t samplesPerCallback{ 1 };
         uint32_t samplesSinceCallback{ 0 };
+        // A fault raised in an interrupt may stop the stage while the event loop reads this.
+        volatile bool started{ false };
+        uint32_t starts{ 0 };
     };
 }

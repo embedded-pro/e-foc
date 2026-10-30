@@ -190,7 +190,10 @@ inferred afterwards).
 that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
 omit it. This is what separates a bus with marginal termination from one that is unplugged.
 
-Both sets saturate rather than wrap. The cost on the control path is a pair of register reads and
+Both sets saturate rather than wrap, except the completion count: one counter per completed control
+interrupt that wraps and that `clear_stats` leaves alone, because the control-loop supervisor reads its
+movement to prove the interrupt is alive ([Control-Loop Supervision Design](control-loop-supervision.md)).
+The statistics themselves saturate. The cost on the control path is a pair of register reads and
 about two dozen inlined instructions, under one percent of the 20 kHz period.
 
 ---

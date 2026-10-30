@@ -35,11 +35,24 @@ namespace application
     void DecimatingThreePhaseInverter::Start()
     {
         powerStage.Start();
+        ++starts;
+        started = true;
     }
 
     void DecimatingThreePhaseInverter::Stop()
     {
+        started = false;
         powerStage.Stop();
+    }
+
+    bool DecimatingThreePhaseInverter::Started() const
+    {
+        return started;
+    }
+
+    uint32_t DecimatingThreePhaseInverter::Starts() const
+    {
+        return starts;
     }
 
     hal::Hertz DecimatingThreePhaseInverter::BaseFrequency() const

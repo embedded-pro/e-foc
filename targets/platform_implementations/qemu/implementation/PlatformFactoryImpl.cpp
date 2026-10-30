@@ -128,6 +128,9 @@ namespace application
 
         ConfigureShaftGrip(baseHz);
 
+        const auto lossDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->controlInterruptLossDelayMs) * baseHz / 1000u);
+        controlInterruptLoss.Configure(plantConfig->controlInterruptLossDelayMs != 0 ? std::make_optional(lossDelay) : std::nullopt);
+
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
             watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
     }
@@ -344,6 +347,12 @@ namespace application
         if (shaftHold.Fire(tick))
             model.GripShaft(foc::RadiansPerSecond{ 0.0f });
 
+        if (controlInterruptLoss.Fire(tick))
+        {
+            controlInterruptLost.store(true, std::memory_order_relaxed);
+            responseRecorder.Note(foc::PlantResponseKind::controlInterruptLoss, PlantSampleAt(tick));
+        }
+
         const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
         model.StepForTest(stepDuty);
         shuntReadout.Applied(stepDuty);
@@ -352,7 +361,10 @@ namespace application
 
         lastCurrents = model.LastMeasuredCurrents();
 
-        if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
+        // A lost conversion trigger: the bridge keeps the last duty and no control interrupt runs.
+        const bool controlInterruptRuns = onPhaseCurrentsReady.IsSet() && !controlInterruptLost.load(std::memory_order_relaxed);
+
+        if (controlInterruptRuns && !controlLoopEntered)
         {
             controlLoopEntered = true;
             const auto entryCycles = QemuCycleCounter::Now();
@@ -362,7 +374,7 @@ namespace application
             controlLoopMetrics.Record(QemuCycleCounter::Now() - entryCycles);
             controlLoopEntered = false;
         }
-        else if (onPhaseCurrentsReady.IsSet() && controlLoopEntered)
+        else if (controlInterruptRuns && controlLoopEntered)
             controlLoopMetrics.RecordReentry();
 
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
@@ -376,6 +388,8 @@ namespace application
         encoderFreeze.Begin();
         shaftGrip.Begin();
         shaftHold.Begin();
+        controlInterruptLost.store(false, std::memory_order_relaxed);
+        controlInterruptLoss.Begin();
         boardProtection.SetArmed(true);
     }
 
@@ -443,6 +457,9 @@ namespace application
                 break;
             case foc::PlantResponseKind::encoderFreeze:
                 length = std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu encoder_freeze %ld\n", tick, Micro(sample.thetaMech));
+                break;
+            case foc::PlantResponseKind::controlInterruptLoss:
+                length = std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu control_interrupt_loss 0\n", tick);
                 break;
             case foc::PlantResponseKind::stopped:
                 length = std::snprintf(line.data(), line.size(), "PLANT_STOP %lu %lu\n", tick, static_cast<unsigned long>(record.dropped));

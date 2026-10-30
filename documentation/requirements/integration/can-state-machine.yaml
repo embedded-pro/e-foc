@@ -102,7 +102,7 @@
     synchronous and shall not depend on any prior CAN command. FaultCode values are
     mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
     undervoltage→underVoltage, overtemperature→overTemperature, encoderLoss→sensorFault,
-    stall→stall; all other codes→none.
+    stall→stall, controlLoopStall→controlLoopStall; all other codes→none.
 
 - id: REQ-INT-014
   title: Telemetry reports the measured mechanical speed
