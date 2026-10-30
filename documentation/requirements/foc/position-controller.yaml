@@ -107,3 +107,11 @@
     full calibration, every position control law shall settle within 0.03 rad of a 3.0 rad
     setpoint, which sits where the cogging pushes the rotor away, within 4 s and hold it for 2 s,
     and then do the same at 1.0 rad.
+
+- id: REQ-POS-013
+  title: Measured position within half a turn of the alignment zero on every target
+  shall: >
+    The measured rotor position, which the position loop compares with its setpoint and the CAN
+    telemetry reports, shall be the mechanical angle from the zero the alignment set, wrapped to
+    [-pi, pi) on every target whatever that zero is, so that a rotor settled on a setpoint within
+    half a turn of the zero reports that setpoint.

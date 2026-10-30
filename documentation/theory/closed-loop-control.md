@@ -2,9 +2,9 @@
 title: "Closed-Loop Control of a PMSM"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "closed-loop-control"
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Closed-Loop Control of a PMSM |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 0.1.0                         |
+| Version   | 0.2.0                         |
 | Component | closed-loop-control           |
-| Date      | 2026-10-29                    |
+| Date      | 2026-10-30                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,7 +37,8 @@ This chapter covers what every loop in the firmware has in common, before the
   several times faster than the one around it;
 - which signals close the loops, and what is known in advance and can be fed forward instead;
 - what happens at the actuator limits, and why every integrator needs anti-windup;
-- what sampling and computation delay take away, which sets the fastest loop the hardware can run.
+- what sampling and computation delay take away, which sets the fastest loop the hardware can run;
+- what each loop's one tuning knob, its bandwidth, means, what bounds it, and how e-foc sets it.
 
 ---
 
@@ -61,6 +62,8 @@ first course in control.
 | $T_s^i$, $T_s^o$ | Inner (current) and outer (speed, position) loop periods: 50 µs, 1 ms | s     |
 | $T_d$            | Total loop delay                                                      | s     |
 | $K_p$, $K_i$     | Proportional and integral gains                                       | —     |
+| $f_{PWM}$        | PWM switching frequency: 20 kHz                                       | Hz    |
+| $\sigma_i$       | RMS current-sensor noise                                              | A     |
 
 ---
 
@@ -287,7 +290,39 @@ carries no filter delay and no aliased ripple.
 
 ### 8. Choosing Bandwidths
 
-Each loop's bandwidth is bounded from above and below:
+**What the number is.** Each loop has one tuning knob, its closed-loop bandwidth $\omega_{bw}$: the
+frequency up to which the loop's output follows its reference, close to the crossover of §2. It states how
+fast the loop should be, so it belongs to the controller, not to the motor: the same motor runs at any
+bandwidth inside the limits below.
+
+The current and position designs close to a first-order loop, $T(s) = \omega_{bw}/(s + \omega_{bw})$, so the
+bandwidth reads directly as a step-response time:
+
+| Step-response measure | Value              |
+|-----------------------|--------------------|
+| Time constant (63 %)  | $1/\omega_{bw}$    |
+| Rise time, 10–90 %    | $2.2/\omega_{bw}$  |
+| Settling to 2 %       | $3.9/\omega_{bw}$  |
+| Bandwidth in hertz    | $\omega_{bw}/2\pi$ |
+
+The speed PI closes to a second-order loop ([speed-loop-pi.md](speed-loop-pi.md)), so for it these
+figures are approximate.
+
+**Where the motor enters.** The motor does not set the bandwidth; it sets the gains that reach it. Every
+law derives its gains from the bandwidth and the identified model, so no gain is ever entered by hand:
+
+| Loop     | Gains from $\omega_{bw}$ (PI/P laws)                                        | Model it needs                 | Chapter                                      |
+|----------|-----------------------------------------------------------------------------|--------------------------------|----------------------------------------------|
+| Current  | $K_p = L_s\,\omega_{bw}$, $K_i = R_s\,\omega_{bw}$                          | $R_s$, $L_s$                   | [current-loop-pi.md](current-loop-pi.md)     |
+| Speed    | $K_p = 2J\,\omega_{bw}/K_t$, integral zero at $\max(B_f/J,\ \omega_{bw}/4)$ | $J$, $B_f$, $K_t$              | [speed-loop-pi.md](speed-loop-pi.md)         |
+| Position | $K_p = \omega_{bw}$                                                         | None: the speed loop inside it | [position-loop-pid.md](position-loop-pid.md) |
+
+A model error scales the bandwidth the loop reaches: a speed loop designed with $\hat{J}$ for a rotor of
+inertia $J$ closes at $\omega_{bw}\hat{J}/J$, and a current loop at $\omega_{bw}\hat{L}_s/L_s$
+([disturbances and noise](disturbances-and-noise.md)).
+
+**What bounds it.** The motor, the sensors and the control rate bound each loop's bandwidth from above,
+and the loop around it and the load bound it from below:
 
 | Loop     | Rate   | Typical $\omega_{bw}$                   | Bounded above by                                                          | Bounded below by        |
 |----------|--------|-----------------------------------------|---------------------------------------------------------------------------|-------------------------|
@@ -295,10 +330,24 @@ Each loop's bandwidth is bounded from above and below:
 | Speed    | 1 kHz  | 50–300 rad/s                            | Current loop ÷ 10; speed quantum through $K_p$; 1 ms delay                | Load rejection required |
 | Position | 1 kHz  | ≈ 19 rad/s ($2\pi \cdot 3$ Hz, default) | Speed loop ÷ 5                                                            | Stiffness required      |
 
-The current loop's noise bound is explicit in e-foc: the automatic bandwidth is held below the value at
-which $L_s\,\omega_{bw}$ turns the measured current-sensor noise into 0.08 V RMS of voltage
-(`documentation/design/controller-selection.md`). The trade-offs between controller algorithms within these
-bounds are the subject of the [controller chapter](advanced-controllers.md).
+**How e-foc sets it.** A bandwidth left at 0 is *automatic* (`documentation/design/controller-selection.md`):
+
+| Loop     | Automatic value                                                                       | Time constant |
+|----------|---------------------------------------------------------------------------------------|---------------|
+| Current  | $\min\!\big(2\pi f_{PWM}/15,\ \max(0.08\,\text{V}/(L_s\,\sigma_i),\ 1885)\big)$ rad/s | 0.12–0.53 ms  |
+| Speed    | 50 rad/s                                                                              | 20 ms         |
+| Position | $2\pi \cdot 3 \approx 18.8$ rad/s                                                     | 53 ms         |
+
+$\sigma_i$ is the RMS current-sensor noise the calibration measured: the second term keeps the noise
+$L_s\,\omega_{bw}$ puts on the voltage command under 0.08 V RMS. At 20 kHz the first term is 8378 rad/s.
+
+None of these is identified from the motor; the identified inductance and the measured noise only cap the
+current loop. The calibration record has a current-loop and a speed-loop bandwidth field, and a value in
+range there replaces the automatic one, but calibration measures neither: it carries the current-loop
+field over from the record it replaces, zero on a first calibration, and writes a fixed 50 rad/s into the
+speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN or the CLI, inside the
+bounds above; 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
+are the subject of the [controller chapter](advanced-controllers.md).
 
 ---
 

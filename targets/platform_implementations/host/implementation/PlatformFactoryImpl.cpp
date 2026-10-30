@@ -127,19 +127,19 @@ namespace application
     {
         if (!encoder)
             return foc::Radians{ 0.0f };
-        return encoder->Read() - encoderOffset;
+        return encoderZero.AngleOf(encoder->Read());
     }
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
         if (encoder)
-            encoderOffset = encoder->Read() - value;
+            encoderZero.Set(encoder->Read(), value);
     }
 
     void PlatformFactoryImpl::SetZero()
     {
         if (encoder)
-            encoderOffset = encoder->Read();
+            encoderZero.SetZero(encoder->Read());
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()

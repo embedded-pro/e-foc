@@ -2,9 +2,9 @@
 title: "Current Loop — A3: Sliding-Mode"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.0.1
 component: "current-loop-sliding-mode"
-date: 2026-08-31
+date: 2026-10-30
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Current Loop — A3: Sliding-Mode |
 | Type      | theory                          |
 | Status    | draft                           |
-| Version   | 1.0.0                           |
+| Version   | 1.0.1                           |
 | Component | current-loop-sliding-mode       |
-| Date      | 2026-08-31                      |
+| Date      | 2026-10-30                      |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -147,7 +147,7 @@ A3 has no integral action, so it is unaffected by windup at the voltage limit.
 | Property                  | Value                                        |
 |---------------------------|----------------------------------------------|
 | ISR cost                  | ~12 MACs (equivalent + switching, 2 axes)    |
-| Settling time             | ~$1/\omega_{bw}$ (boundary-layer limited)    |
+| Time constant             | ~$1/\omega_{bw}$ (boundary-layer limited)    |
 | Robustness to Rs/Ls error | High — gain-bounded; covers ±50% $R_s$ drift |
 | Requires $\psi_f$         | No                                           |
 | Requires RLS convergence  | Partial — stable with datasheet values       |

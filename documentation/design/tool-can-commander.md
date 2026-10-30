@@ -128,7 +128,11 @@ frame) with the advice to use the hardware stop.
 
 Input ranges and decimal places follow the wire contract: the limit is the smaller of the firmware's
 command limit and what the 16-bit wire field can carry, and the decimals match the wire resolution, so the
-tool never offers precision that the frame drops.
+tool never offers precision that the frame drops. Position is the exception: the firmware accepts ±2π,
+but the position loop is single-turn and goes to the setpoint modulo one turn
+(`documentation/design/foc-position.md`), so ±360° would name every target twice, and a setpoint of 270°
+would settle where the measured position reads −90°. The tool offers one turn instead, ±179.9° from the
+alignment zero, the same half turn either side that the measured position is reported in.
 
 The setpoint of the active control mode is chosen with a knob and the number box beside it, which follow
 each other: torque in amperes, speed in revolutions per minute, position in degrees. The wire still carries

@@ -2,6 +2,7 @@
 
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/generic/TimerServiceGeneric.hpp"
@@ -193,7 +194,7 @@ namespace application
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
-        foc::Radians encoderOffset{ 0.0f };
+        EncoderZero encoderZero;
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };

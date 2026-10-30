@@ -135,6 +135,14 @@ THEN(R"(the measured position shall hold at {float} rad within {float} rad for {
     EXPECT_LE(worst, tolerance) << "The position left " << expected << " rad by " << worst << " rad, reaching " << worstAt;
 }
 
+THEN(R"(the reported position shall read {float} rad within {float} rad without wrapping)", (float expected, float tolerance))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto position = fixture.ReadMeasuredPosition();
+    ASSERT_TRUE(position.has_value()) << "No position telemetry";
+    EXPECT_NEAR(*position, expected, tolerance) << "The reported position is not in the setpoint's turn";
+}
+
 THEN(R"(the measured speed shall exceed {float} rad\/s within {int} ms)", (float threshold, int timeoutMs))
 {
     auto& fixture = context.Get<Fixture>();

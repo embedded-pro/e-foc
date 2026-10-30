@@ -296,7 +296,7 @@ The observer interface provides callbacks for:
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CAL-015); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
-- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
+- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-POS-013); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 - `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
   contract's enumerations; the result callback sends `AlgorithmsResponse` and then the acknowledgement.
@@ -623,18 +623,18 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint              | Value / Description                                                                                       |
-|-------------------------|-----------------------------------------------------------------------------------------------------------|
-| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                    |
-| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                   |
-| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                |
-| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`             |
-| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`             |
-| Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                             |
-| Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop |
-| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder  |
-| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                         |
+| Constraint              | Value / Description                                                                                                                                |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                                                             |
+| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                                                         |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                                                            |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                                                         |
+| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`                                                      |
+| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`                                                      |
+| Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                                                                      |
+| Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop                                          |
+| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder angle from the alignment zero, in [−π, π) |
+| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                                  |
 
 ---
 

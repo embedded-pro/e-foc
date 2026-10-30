@@ -2,9 +2,9 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-alignment
-date: 2026-04-07
+date: 2026-10-30
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.0                    |
+| Version   | 0.1.1                    |
 | Component | service-alignment        |
-| Date      | 2026-04-07               |
+| Date      | 2026-10-30               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -113,7 +113,7 @@ The outcome carries the run it belongs to, so one that an abort overtook cannot 
 it. The step timeout already runs on the event loop and completes the run directly, unless an outcome is
 already queued, which it then leaves to be delivered.
 
-The encoder position at the moment of settlement declaration becomes the calibration offset. This offset represents the mechanical angle the rotor adopts when the electrical d-axis is at 0°; subtracting it from any subsequent encoder reading yields the corrected angle for the closed-loop FOC controller.
+The encoder position at the moment of settlement declaration becomes the calibration offset. This offset represents the mechanical angle the rotor adopts when the electrical d-axis is at 0°; subtracting it from any subsequent encoder reading, and wrapping the difference to [−π, π), yields the corrected angle for the closed-loop FOC controller.
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
 
