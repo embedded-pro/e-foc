@@ -162,10 +162,52 @@ TEST_F(CalibrationOrchestratorTest, alignment_failure_triggers_onFailed)
     ExpectAlignCall();
     storedRlCb(ValidRlResult());
 
+    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(false));
     storedAlignCb(std::nullopt);
 
     EXPECT_FALSE(alignedCalled);
     EXPECT_TRUE(failedCalled);
+    EXPECT_EQ(state_machine::FaultCode::calibrationFailed, orchestrator.LastFailure());
+}
+
+TEST_F(CalibrationOrchestratorTest, an_alignment_that_found_a_missing_phase_fails_as_a_missing_phase)
+{
+    ExpectAlignCall();
+    StartAlignmentOnly();
+
+    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(true));
+    storedAlignCb(std::nullopt);
+
+    EXPECT_TRUE(failedCalled);
+    EXPECT_EQ(state_machine::FaultCode::phaseMissing, orchestrator.LastFailure());
+}
+
+TEST_F(CalibrationOrchestratorTest, a_failure_after_a_missing_phase_is_a_calibration_failure_again)
+{
+    ExpectAlignCall();
+    StartAlignmentOnly();
+    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(true));
+    storedAlignCb(std::nullopt);
+
+    ExpectPolePairCall();
+    StartOrchestrator();
+    storedPolePairsCb(std::nullopt);
+
+    EXPECT_EQ(state_machine::FaultCode::calibrationFailed, orchestrator.LastFailure());
+}
+
+TEST_F(CalibrationOrchestratorTest, the_alignment_is_given_the_stored_resistance_and_the_bus_voltage)
+{
+    application::CalibrationOrchestrator withBus{ electricalIdent, motorAlignment, tracer, std::nullopt, std::nullopt, foc::Volts{ 24.0f } };
+    pendingData.polePairs = 4;
+    pendingData.rPhase = 1.1f;
+
+    services::MotorAlignment::AlignmentConfig received;
+    EXPECT_CALL(motorAlignment, ForceAlignment(4, _, _)).WillOnce(SaveArg<1>(&received));
+    withBus.StartAlignmentOnly(pendingData, [](state_machine::CalibrationStep) {}, [](foc::Radians) {}, [] {});
+
+    EXPECT_NEAR(1.1f, received.phaseResistance.Value(), 1e-6f);
+    EXPECT_NEAR(24.0f, received.busVoltage.Value(), 1e-6f);
 }
 
 TEST_F(CalibrationOrchestratorTest, abort_before_pole_pairs_callback_suppresses_result)

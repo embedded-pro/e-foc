@@ -19,17 +19,22 @@ namespace services
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
         void Abort() override;
+        bool PhaseMissing() const override;
 
     private:
         void ApplyAlignmentVoltage();
         void CalculateAlignmentOffset();
-        void ProcessPosition();
+        void ProcessPosition(const foc::PhaseCurrents& currents);
+        void Settle();
+        bool CarriesNoCurrent() const;
+        std::optional<float> ExpectedPhaseACurrent() const;
         void FailToConverge();
         void Finish(std::optional<foc::Radians> result);
         void Complete(std::optional<foc::Radians> result);
 
         constexpr static uint8_t neutralDuty = 50;
         constexpr static float alignmentAngle = 0.0f;
+        constexpr static float missingFraction = 0.25f;
 
         drivers::ThreePhaseInverter& driver;
         drivers::Encoder& encoder;
@@ -40,6 +45,10 @@ namespace services
         std::size_t consecutiveSettledSamples = 0;
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
+        float settledSumA{ 0.0f };
+        float settledSumB{ 0.0f };
+        float settledSumC{ 0.0f };
+        bool phaseMissing{ false };
         std::optional<foc::Radians> outcome;
         infra::AutoResetFunction<void(std::optional<foc::Radians>)> onAlignmentDone;
         infra::TimerSingleShot timeoutTimer;

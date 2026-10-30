@@ -23,10 +23,15 @@ namespace services
             foc::Radians settledThreshold{ 0.001f };
             std::size_t settledCount{ 10 };
             infra::Duration timeout{ std::chrono::seconds{ 2 } };
+            foc::Ohm phaseResistance{ 0.0f };
+            foc::Volts busVoltage{ 0.0f };
         };
 
         virtual void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) = 0;
 
         virtual void Abort() = 0;
+
+        // Whether the last run failed because a phase did not carry the current the alignment vector drives.
+        virtual bool PhaseMissing() const = 0;
     };
 }

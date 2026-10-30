@@ -102,6 +102,7 @@ TEST_F(TestFaultNotifier, every_fault_code_traces_by_name)
     EXPECT_STREQ("hardwareFault", state_machine::FaultCodeName(state_machine::FaultCode::hardwareFault));
     EXPECT_STREQ("calibrationFailed", state_machine::FaultCodeName(state_machine::FaultCode::calibrationFailed));
     EXPECT_STREQ("stall", state_machine::FaultCodeName(state_machine::FaultCode::stall));
+    EXPECT_STREQ("phaseMissing", state_machine::FaultCodeName(state_machine::FaultCode::phaseMissing));
 }
 
 TEST_F(TestFaultNotifier, a_fault_code_outside_the_enumeration_traces_as_unknown)

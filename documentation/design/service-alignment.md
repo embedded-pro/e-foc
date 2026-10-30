@@ -2,7 +2,7 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.1.1
+version: 0.2.0
 component: service-alignment
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.1                    |
+| Version   | 0.2.0                    |
 | Component | service-alignment        |
 | Date      | 2026-10-30               |
 
@@ -33,6 +33,7 @@ date: 2026-10-30
 - Applying an open-loop DC voltage vector at electrical angle 0° via the three-phase inverter to force the rotor to a known magnetic position
 - Detecting rotor settlement by monitoring encoder position change over consecutive samples
 - Reporting the calibrated encoder offset (in radians) via a single completion callback on success, or reporting failure if the rotor does not settle within the allowed time
+- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-EH-016): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
@@ -60,6 +61,9 @@ Before invoking alignment, the caller must have:
    - **max samples** — the total number of sampling ticks before the procedure times out
    - **settled threshold** — the maximum absolute encoder position change (radians) that qualifies as "not moving"
    - **settled count** — the number of consecutive below-threshold samples required to declare settlement
+   - **phase resistance** and **bus voltage** — the calibrated winding resistance and the measured supply, from
+     which the phase-continuity check derives the current the vector should drive; either left at zero skips the
+     part of the check that needs them
 
 These parameters are tuned by the application engineer for the specific motor and mechanical load. A typical configuration applies 10–20 % of bus voltage and requires 20 consecutive samples within 0.001 rad of one another before declaring settlement.
 
@@ -124,6 +128,38 @@ read before it was zeroed, and the calibration record persisted to NVM is diagno
 loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
 calibration must be re-run to orient the field.
 
+### Phase Continuity Check
+
+A rotor held at electrical zero by a vector the windings do not carry looks exactly like an aligned rotor:
+its reading stops changing at once. So when the rotor is declared settled, before the encoder is zeroed, the
+service compares the phase currents of the settled run with the ones the vector must drive (REQ-EH-016).
+
+The vector puts `d·Vdc/2` across phase a and `−d·Vdc/4` across phases b and c, with `d` the test voltage as a
+fraction of the bus. With the rotor at rest there is no back-EMF, so the currents settle at
+`ia = d·Vdc/(2R)` and `ib = ic = −ia/2`. The service averages each phase over the settled run — the samples it
+already takes at the sampling frequency, never the 20 kHz ones — and declares a phase missing when:
+
+- **phase a** carries less than a quarter of the expected `|ia|`. Phase a is the only one driven against the
+  other two together, so this also catches a fully disconnected motor, where nothing flows;
+- **phase b or c** carries less than a quarter of half of the expected `|ia|`. An open b or c leaves a and the
+  other one in series, so the open phase reads zero while a still carries most of its current.
+
+A quarter leaves room for what the model ignores: dead time and switch drop take a few percent of the
+alignment voltage, and the calibrated resistance can be off by more than that. A missing phase reads a few
+noise samples' worth of current, far below it.
+
+Without a resistance or a bus voltage the expected current is unknown. The check then falls back to the
+ratio between the phases: b and c must each carry at least a quarter of half of the measured `|ia|`. That
+still catches an open b or c, but not a disconnected motor or an open a, which leave nothing to compare
+against. Every caller in this firmware passes both.
+
+The check needs all three phases measured. The alignment duties (60 % and 45 % at the default 20 % vector)
+stay below every board's readable duty, so no phase is rebuilt from the other two.
+
+A missing phase ends the run like a timeout — inverter stopped, encoder untouched, completion empty — and the
+service records why. `PhaseMissing()` answers `true` after such a run until the next `ForceAlignment`, so the
+caller can enter `phaseMissing` instead of a generic calibration failure.
+
 ### State Machine
 
 The service follows a four-state machine:
@@ -146,7 +182,7 @@ While in the **Aligning** state, any further call to `ForceAlignment` is silentl
 The `onDone` callback accepts a single `std::optional<Radians>` argument:
 
 - `std::optional` with a value: alignment succeeded; the contained value is the encoder offset in mechanical radians, already applied to the encoder by the service.
-- Empty `std::optional`: alignment failed (timeout); the caller should not use any offset and may retry.
+- Empty `std::optional`: alignment failed — a timeout, an over-current, or a missing phase. The caller should not use any offset; `PhaseMissing()` tells the last apart, and only a timeout is worth retrying.
 
 The callback fires exactly once per `ForceAlignment` invocation, from the event loop and never from the sampling interrupt. The callback is reset (using `infra::AutoResetFunction` semantics) after firing so that stale references cannot cause a second invocation.
 

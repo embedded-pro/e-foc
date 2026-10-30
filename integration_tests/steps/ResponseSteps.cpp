@@ -235,6 +235,16 @@ GIVEN(R"(the encoder freezes {int} ms after enable)", (int delayMs))
     setup.plant.encoderFreezeDelayCentiseconds = static_cast<uint8_t>(delayMs / 10);
 }
 
+GIVEN(R"(the motor cable is pulled {int} ms after enable)", (int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Pulling the cable needs a simulated target";
+    ASSERT_FALSE(setup.booted) << "The cable pull must be scheduled before the target boots";
+    ASSERT_GT(delayMs, 0) << "A zero delay is how a scenario says the cable is never pulled";
+
+    setup.plant.cableDisconnectDelayMs = static_cast<uint32_t>(delayMs);
+}
+
 GIVEN(R"(a hand turns the shaft by {float} rad over {int} ms, {int} ms after enable, and holds it)", (float radians, int turnMs, int delayMs))
 {
     auto& setup = context.Get<ScenarioSetup>();

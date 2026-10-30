@@ -20,7 +20,8 @@ namespace application
     public:
         CalibrationOrchestrator(services::ElectricalParametersIdentification& electricalIdent, services::MotorAlignment& motorAlignment, services::Tracer& tracer,
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
-            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt);
+            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt,
+            foc::Volts busVoltage = foc::Volts{ 0.0f });
 
         void Start(
             services::CalibrationData& pendingData,
@@ -37,6 +38,7 @@ namespace application
         void Abort();
         bool IsRunning() const;
         bool HasRunInFlight() const;
+        state_machine::FaultCode LastFailure() const;
 
     private:
         void RunStandstillStep();
@@ -45,13 +47,15 @@ namespace application
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
-        void Fail();
+        void Fail(state_machine::FaultCode code = state_machine::FaultCode::calibrationFailed);
 
         services::ElectricalParametersIdentification& electricalIdent;
         services::MotorAlignment& motorAlignment;
         services::Tracer& tracer;
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill;
+        foc::Volts busVoltage;
+        state_machine::FaultCode lastFailure{ state_machine::FaultCode::calibrationFailed };
 
         services::CalibrationData* pendingData{ nullptr };
         infra::Function<void(state_machine::CalibrationStep)> onStepChanged;

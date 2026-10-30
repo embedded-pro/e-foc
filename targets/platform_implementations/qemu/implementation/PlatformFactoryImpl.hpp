@@ -204,6 +204,7 @@ namespace application
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;
+        foc::OneShotDelay cableDisconnect;
         foc::OneShotDelay shaftGrip;
         foc::OneShotDelay shaftHold;
         foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };

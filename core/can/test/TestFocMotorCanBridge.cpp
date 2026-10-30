@@ -791,6 +791,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_BroadcastsParamsAndAcksSucces
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
 {
     ConstructFixture();
+    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
 
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
@@ -1238,6 +1239,19 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_Stall_MapsToStall)
     EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
     ASSERT_GE(lastSentData.size(), 2u);
     EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::stall));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_PhaseMissing_MapsToPhaseMissing)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::phaseMissing);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::phaseMissing));
+    EXPECT_EQ(8u, static_cast<uint8_t>(can::FocFaultCode::phaseMissing));
 }
 
 TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)

@@ -26,6 +26,7 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
+#include "core/supervision/PhaseLossMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
@@ -68,6 +69,7 @@ namespace application
         services::RotorStandstillImpl rotorStandstill;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
+        supervision::PhaseLossMonitor phaseLoss;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 

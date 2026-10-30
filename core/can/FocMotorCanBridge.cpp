@@ -47,6 +47,8 @@ namespace can
                 return FocFaultCode::sensorFault;
             case state_machine::FaultCode::stall:
                 return FocFaultCode::stall;
+            case state_machine::FaultCode::phaseMissing:
+                return FocFaultCode::phaseMissing;
             default:
                 return FocFaultCode::none;
         }

@@ -136,9 +136,9 @@ namespace application
     {
         return {
             Machine::Row<state_machine::Calibrating, state_machine::CalibrationStepFailed, state_machine::Fault>(nullptr,
-                [](LifecycleContext& context, state_machine::Calibrating&, const state_machine::CalibrationStepFailed&)
+                [](LifecycleContext& context, state_machine::Calibrating&, const state_machine::CalibrationStepFailed& event)
                 {
-                    return context.operation.EnterFault(state_machine::FaultCode::calibrationFailed, true, state_machine::CommandResult::calibrationFailed);
+                    return context.operation.EnterFault(event.code, true, state_machine::CommandResult::calibrationFailed);
                 }),
             Machine::Row<state_machine::Calibrating, state_machine::CalibrationSaved, state_machine::Fault>(
                 [](const LifecycleContext&, const state_machine::Calibrating&, const state_machine::CalibrationSaved& event)

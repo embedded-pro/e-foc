@@ -19,6 +19,7 @@ namespace foc
         Ampere measuredTorqueCurrent{ 0.0f };
         RadiansPerSecond demandedSpeed{ 0.0f };
         Radians positionError{ 0.0f };
+        Ampere demandedTorqueCurrent{ 0.0f };
     };
 
     class FocBase

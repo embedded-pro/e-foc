@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "supervision"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.0                    |
+| Version   | 0.2.0                    |
 | Component | supervision              |
 | Date      | 2026-10-30               |
 
@@ -29,6 +29,8 @@ date: 2026-10-30
 - Raising the fault through the platform fault notifier, as a board protection trip is raised.
 - Using the drive-wide supervision settings of the configuration record from its next evaluation, and
   leaving stall reporting off when the operator turned it off (REQ-SM-033).
+- Watching an enabled drive for a current it demands but cannot make flow, and raising `phaseMissing` when the
+  motor is disconnected while it runs (REQ-EH-016, Part E).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -37,6 +39,9 @@ date: 2026-10-30
   flows, the error does not close, the reading does not change — so both are reported as `encoderLoss`.
 - Storing or range-checking settings on the wire. The CAN settings bridge validates a write against the
   wire contract and stores it in the configuration record; the supervisor only reads the record.
+- Detecting a single open phase while the motor runs. Two phases still carry current and turn the rotor, so
+  the shortfall Part E watches for does not appear; an open phase is caught at the next alignment
+  (`service-alignment.md`, phase continuity check), which runs at every power-up.
 - Protecting the motor from heat while a stall is not reported. With stall reporting off, a held rotor can
   carry up to the current limit; only the thermal protection of the board watches that.
 
@@ -125,15 +130,52 @@ the supervisor never runs on a value the wire would refuse and a query answers t
 again instead of raising anything; the supervisor keeps watching, and an encoder that stops reporting after
 the rotor is released is raised as `encoderLoss`.
 
+### Part E — Phase loss while running
+
+A second watch, the phase-loss monitor, runs on the same 10 ms period and reports `phaseMissing` through the
+same notifier. It looks for a current the drive demands but cannot make flow: an evaluation counts when
+
+- the drive is `Enabled`;
+- the torque current it demands is at least 10 % of the current limit;
+- the torque current it measures is below 20 % of that demand; and
+- the rotor turns slower than 10 rad/s.
+
+When counted evaluations span 50 ms without a break, the monitor raises the fault once and stays silent
+until the drive leaves `Enabled`. An evaluation that does not count starts the span again.
+
+The speed condition is what keeps a connected motor from tripping. At standstill there is no back-EMF and the
+whole supply drives current through the winding resistance, many times the current limit for any motor the
+drive is sized for, so a current loop that cannot reach a fifth of its demand for 50 ms is pushing into an
+open circuit. At speed the back-EMF takes most of the voltage, and a speed loop asking for
+more than the motor can reach legitimately demands the current limit while the measured current stays small.
+The 10 rad/s bound leaves the back-EMF under 0.3 V on both reference motors.
+
+A cable pulled while the rotor turns faster than that is reported once friction has slowed the rotor below
+it. A single open phase is not reported: two phases still carry current and turn the rotor, so the shortfall
+never appears. Both limits are recorded in REQ-EH-016.
+
+The demanded current is what the active drive commands its current loop: the torque setpoint after the
+current envelope in torque mode, the speed loop's output (or the current a position law commands directly)
+in speed and position modes. The thresholds are fixed; the supervision settings of Part D do not apply.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Counting : Enabled, demanding current it does not get, rotor slow
+    Counting --> Idle : evaluation does not count
+    Counting --> Reported : 50 ms counted, phaseMissing raised
+    Reported --> Idle : drive leaves Enabled
+```
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface | Purpose                                         | Contract                                                                     |
-|-----------|-------------------------------------------------|------------------------------------------------------------------------------|
-| Fault     | Reports a stall or an encoder loss to its owner | At most once per enable; called from the event loop, never from an interrupt |
+| Interface | Purpose                                                          | Contract                                                                               |
+|-----------|------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Fault     | Reports a stall, an encoder loss or a missing phase to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
 
 ### Required
 

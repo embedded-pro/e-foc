@@ -213,6 +213,8 @@ namespace tool
                 return "Sensor fault";
             case FocFaultCode::stall:
                 return "Stall";
+            case FocFaultCode::phaseMissing:
+                return "Phase missing";
             default:
                 return "Unknown";
         }
