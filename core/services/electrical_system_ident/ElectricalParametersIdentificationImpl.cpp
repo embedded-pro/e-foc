@@ -24,7 +24,6 @@ namespace services
     ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
         : driver(driver)
         , encoder(encoder)
-        , vdc(vdc)
         , resistanceEstimator(driver, vdc)
         , inductanceEstimator(driver, vdc)
     {}

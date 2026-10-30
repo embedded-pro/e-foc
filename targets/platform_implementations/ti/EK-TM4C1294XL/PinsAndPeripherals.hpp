@@ -43,15 +43,12 @@ namespace application
         extern hal::tiva::GpioPin boardId1;
         extern hal::tiva::GpioPin boardId2;
 
-        extern hal::tiva::GpioPin powerStatus;
-
         extern hal::tiva::GpioPin uartRx;
         extern hal::tiva::GpioPin uartTx;
 
         extern hal::tiva::GpioPin canRx;
         extern hal::tiva::GpioPin canTx;
 
-        extern hal::tiva::GpioPin performance;
     }
 
     namespace Peripheral
@@ -68,7 +65,6 @@ namespace application
 
         constexpr static bool hasFaultComparators = true;
         constexpr static bool hasBoardIdPins{ true };
-        constexpr static bool hasPowerStatusPin{ true };
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
         constexpr static uint8_t OvervoltageComparatorIndex = 1;
         constexpr static uint8_t UndervoltageComparatorIndex = 2;

@@ -2,9 +2,9 @@
 title: "Async Callback Lifetime Safety"
 type: design
 status: accepted
-version: 1.0.0
+version: 1.0.1
 component: async-safety
-date: 2026-09-14
+date: 2026-10-29
 ---
 
 | Field     | Value                          |
@@ -12,9 +12,9 @@ date: 2026-09-14
 | Title     | Async Callback Lifetime Safety |
 | Type      | design                         |
 | Status    | accepted                       |
-| Version   | 1.0.0                          |
+| Version   | 1.0.1                          |
 | Component | async-safety                   |
-| Date      | 2026-09-14                     |
+| Date      | 2026-10-29                     |
 
 ---
 
@@ -93,7 +93,7 @@ graph TD
     A --> C{any NVM operation in flight?}
     A --> D{Calibrating state?}
     A --> E{calibration orchestrator running?}
-    A --> F{mechIdent.IsRunning?}
+    A --> F{mechanical identification running?}
     B -- yes --> G[return true]
     C -- yes --> G
     D -- yes --> G
@@ -135,7 +135,7 @@ The base implementation (`FocStateMachineCommon`) covers:
   covers the alignment step as well, which the electrical identification alone does not see
 
 `OuterLoopStateMachine` overrides to additionally cover:
-- Direct CAN mechanical identification (`mechIdent.IsRunning()`)
+- The mechanical identification service (`IsRunning()`)
 
 Any future service that exposes identification or async operations reachable outside the `Calibrating` state must add a corresponding `IsRunning()` check here.
 

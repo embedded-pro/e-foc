@@ -1,3 +1,7 @@
+# Retired, not reused:
+#   REQ-CTRL-004: a coding rule (no heap), kept in AGENTS.md
+#   REQ-CTRL-005: a coding rule (no virtual dispatch in the hot path), kept in AGENTS.md
+
 - id: REQ-CTRL-001
   title: Runtime algorithm selection
   shall: >
@@ -23,22 +27,6 @@
     error indicating the motor must be stopped before changing the algorithm. The
     response shall be delivered before any subsequent command is processed on that
     interface.
-
-- id: REQ-CTRL-004
-  title: Heap-free algorithm storage
-  shall: >
-    All concrete controller algorithm instances shall be stored in fixed-size,
-    statically-allocated in-place storage. No dynamic memory allocation shall
-    occur during algorithm selection, construction, configuration, or per-sample
-    computation.
-
-- id: REQ-CTRL-005
-  title: Zero virtual-dispatch hot-path overhead
-  shall: >
-    The per-sample dispatch to the active controller algorithm within the 20 kHz
-    FOC interrupt context shall not use virtual function call overhead through a
-    base-class pointer. The dispatch mechanism shall allow the compiler to inline
-    and optimise the arithmetic of each concrete controller at its call site.
 
 - id: REQ-CTRL-006
   title: NVM algorithm persistence

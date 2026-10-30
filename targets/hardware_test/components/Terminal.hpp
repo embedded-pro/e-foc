@@ -1,16 +1,11 @@
 #pragma once
 
-#include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "core/services/alignment/MotorAlignmentImpl.hpp"
-#include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/BoundedDeque.hpp"
-#include "infra/util/WithSharedAccess.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 
@@ -26,14 +21,11 @@ namespace application
 
         StatusWithMessage ConfigurePwm(const infra::BoundedConstString& param);
         StatusWithMessage ConfigureAdc(const infra::BoundedConstString& param);
-        StatusWithMessage SimulateFoc(const infra::BoundedConstString& param);
-        StatusWithMessage ConfigurePid(const infra::BoundedConstString& param);
         StatusWithMessage ReadEncoder();
         StatusWithMessage Stop();
         void ProcessAdcSamples();
         void ReportAdcSamples();
         StatusWithMessage SetPwmDuty(const infra::BoundedConstString& param);
-        StatusWithMessage SetMotorParameters(const infra::BoundedConstString& param);
         StatusWithMessage CanStart(const infra::BoundedConstString& param);
         StatusWithMessage CanStop();
         StatusWithMessage CanSend(const infra::BoundedConstString& param);
@@ -46,8 +38,6 @@ namespace application
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
         StatusWithMessage StallEventLoop();
-        void RunIdent();
-        void RunAlign();
 
     private:
         // Leaves the command's response and trace time to reach the host before the event loop stops
@@ -57,20 +47,6 @@ namespace application
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
         void StartAdc(PlatformFactory::SampleAndHold sampleAndHold);
-        void RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle);
-
-        struct IdentificationState
-        {
-            IdentificationState(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
-                : electricalIdent{ driver, encoder, vdc }
-                , alignment{ driver, encoder }
-            {}
-
-            infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
-            infra::WithSharedAccess<services::MotorAlignmentImpl> alignment;
-            bool identRunning{ false };
-            bool alignRunning{ false };
-        };
 
         struct PeripheralConfiguration
         {
@@ -85,20 +61,11 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
-        application::DecimatingThreePhaseInverter inverter;
-        IdentificationState identState;
         PeripheralConfiguration peripheralConfiguration;
         bool adcActive_{ false };
         bool adcReporting_{ false };
         bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
-        hal::PerformanceTracker& performanceTimer;
-        foc::Volts Vdc;
-        hal::Hertz systemClock;
-        float speedLoopBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
-        float currentLoopBandwidth{ foc::CurrentLoopTunings{}.bandwidth };
-        std::optional<std::size_t> polePairs = 0;
-        foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
         infra::TimerSingleShot eventLoopStallTimer;
         std::array<uint8_t, 64> eepromBuffer{};

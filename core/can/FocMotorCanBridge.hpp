@@ -7,7 +7,6 @@
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
-#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
@@ -35,7 +34,6 @@ namespace can
             state_machine::ControlModeStateMachine& controlMode,
             const Platform& platform,
             services::ElectricalParametersIdentification& electricalIdent,
-            services::MechanicalParametersIdentification* mechIdent,
             services::Tracer& tracer,
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
             std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt);
@@ -59,7 +57,6 @@ namespace can
         void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnIdentifyElectrical(const infra::Function<void()>& onDone) override;
-        void OnIdentifyMechanical(const infra::Function<void()>& onDone) override;
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
         void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) override;
         void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) override;

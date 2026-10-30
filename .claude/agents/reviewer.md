@@ -15,7 +15,7 @@ Review code. Do NOT modify any files.
 
 1. `git diff --name-only` to identify changed files
 2. Read each file completely — no skimming
-3. Check every rule below; search existing code for consistency
+3. Check every section AGENTS.md §Constraints checklist names; search existing code for consistency
 4. Output structured findings per file, then overall verdict
 
 ## Output format
@@ -30,53 +30,27 @@ PASS — rules verified: ...
 
 End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**.
 
-## Checklist
+## Severity
+
+Follow AGENTS.md for the rules; this maps a violation to a severity.
 
 ### CRITICAL (block merge)
 
-**Memory** (embedded/runtime scope only — not host tools/tests):
-- No `new`/`delete`/`malloc`/`free`/`make_unique`/`make_shared`
-- No `std::vector`/`string`/`deque`/`list`/`map`/`set` — use bounded alternatives
-- No recursion; no virtual destructors — interfaces use `protected: ~I() = default;`
-
-**Real-time**:
-- No virtual dispatch in `Calculate()` hot path
-- No blocking calls or heap reachable from `Calculate()`
-- Trig uses `FastTrigonometry` — not raw `sin`/`cos`
-- No `#pragma GCC optimize` or `optimize` attribute (per-function options block inlining); `OPTIMIZE_FOR_SPEED` on header-defined hot-path methods only, never on a `.cpp` definition
-
-**FOC theory**:
-- Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`
-- Park: `Id=Iα·cos(θ)+Iβ·sin(θ)`, `Iq=−Iα·sin(θ)+Iβ·cos(θ)`
-- Electrical angle: `θe=θm·P`; anti-windup on all PIDs; decoupling feedforward present
-- No reimplementation of `TransformsClarkePark`/`SpaceVectorModulation`
-- Unit-typed aliases used — not raw `float`
-
-**Interface compliance**:
-- New FOC implementations satisfy all pure virtuals of `FocBase`/`FocTorque`/`FocSpeed`/`FocPosition`
-- Hardware injected via constructor; hardware ports from `interfaces/Drivers.hpp`
-
-**Async callback lifetime safety** (AGENTS.md §"Async callback lifetime safety", design: `documentation/design/async-callback-lifetime.md`):
-- Raw `[this]` capture in `EventDispatcherWithWeakPtr::Instance().Schedule(…)` on a non-static object → CRITICAL
-- `WeakFromThis()` used but class does not inherit `EnableSharedFromThis<T>`, or construction site is not `WithSharedAccess<T>` → CRITICAL
-- New async service bypasses `Calibrating` state without `IsRunning()` wired into `HasPendingAsyncWork()` → CRITICAL
-- Test fixture with `WithSharedAccess` member missing `TearDown()` drain or `StrictMock` missing `IsRunning()` expectation → WARNING
-
-**Documentation**:
-- Behavioral change with no matching `documentation/` update = CRITICAL
+- §Memory (embedded/runtime scope only — not host tools/tests), including virtual destructors
+- §Real-time
+- §FOC theory — equations, decoupling, SVM, reimplemented transforms, raw `float` where a unit type exists
+- §Interfaces & errors — a new FOC mode missing a pure virtual; hardware not injected through the constructor and the `Drivers.hpp` ports
+- §Async callback lifetime safety rules 1–5
+- §Documentation — behavioral change with no matching `documentation/` update
 
 ### WARNING (should fix)
 
-- Missing `constexpr`/`inline`/fixed-width ints on hot-path code
-- Naming: PascalCase types/methods, camelCase members, lowercase namespaces
-- Style: Allman braces, 4-space indent, `{}` init, `public:` before `private:`
-- Functions > ~30 lines (soft) / > ~50 lines (hard)
-- SOLID violations; DRY violations (duplicated PID/transform logic)
-- Error handling: exceptions in embedded code; swallowed errors
-- Tests: `NiceMock`/`NaggyMock` used; `EXPECT_EQ` on floats; missing `StrictMock`; fixture outside anonymous namespace
-- New files missing from `CMakeLists.txt`
+- §Style — naming, braces, `{}` init, `public:` before `private:`, function length, `const`/`constexpr`/fixed-width ints on hot-path code
+- §Interfaces & errors — exceptions in embedded code, swallowed errors, SOLID violations; duplicated PID/filter logic
+- §Testing, and §Async callback lifetime safety rule 6
+- §Build — new files missing from `CMakeLists.txt`, test target missing `add_subdirectory(test)`
 
 ### SUGGESTION
 
-- Stale/redundant comments; multi-line docstrings; `TODO`/`FIXME` in production code
+- §Style comment rules — stale/redundant comments, docstrings, `TODO`/`FIXME`
 - Optimization opportunities outside hot path

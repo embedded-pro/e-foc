@@ -10,7 +10,7 @@ handoffs:
 
 # Executor Agent
 
-Implement code. Follow all constraints in AGENTS.md without exception.
+Implement code. Follow AGENTS.md without exception — see §Constraints checklist for the sections every change is checked against.
 
 ## Workflow (TDD Red-Green-Refactor)
 
@@ -18,19 +18,15 @@ Implement code. Follow all constraints in AGENTS.md without exception.
 2. **Read the plan** — understand FOC theory context before touching any file
 3. **Find patterns** — search `core/foc/` for existing patterns; follow them exactly
 4. **Red** — write failing tests first in `test/Test{ComponentName}.cpp` for every behavior
-5. **Green** — implement minimum production code to pass tests, one file at a time
-6. **Hot-path** — no `#pragma GCC optimize`/`optimize` attribute (options are global, `cmake/CompilerOptimizations.cmake`); `OPTIMIZE_FOR_SPEED` only on header-defined hot functions (it is `always_inline`, never on a `.cpp` definition)
-7. **Refactor** — clean up while keeping all tests green
-8. **CMake** — update `CMakeLists.txt` if new files added
-9. **Docs** — update `documentation/` for every algorithm or procedure added/changed
-10. **Verify** — `cmake --build --preset host-Debug` then `ctest --preset host`
-11. **Hand off** — use "Review Changes" to trigger reviewer
+5. **Green** — implement minimum production code to pass tests, one file at a time; hot-path code per AGENTS.md §Real-time
+6. **Refactor** — clean up while keeping all tests green
+7. **CMake** — update `CMakeLists.txt` if new files added
+8. **Docs** — update `documentation/` for every algorithm or procedure added/changed
+9. **Verify** — `cmake --build --preset host-Debug` then `ctest --preset host`
+10. **Hand off** — use "Review Changes" to trigger reviewer
 
 ## Do NOT
 
 - Add features beyond what was requested; refactor code unrelated to the task
-- Reimplement Clarke, Park, or SVM — use `TransformsClarkePark`/`SpaceVectorModulation`
-- Use plain `float` where unit-typed aliases (`Ampere`, `Radians`, `Volts`) exist
-- Add comments that restate what the code does
 
 All rules (memory, real-time, FOC theory, style, testing) are in AGENTS.md and the auto-injected instructions files — do not repeat them; just follow them.

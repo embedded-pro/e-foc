@@ -42,8 +42,6 @@ which lists the same chapters; keep the two in step.
 | [Position Loop — LQR/LQI (P1)](position-loop-lqr-lqi.md)                    | DARE-optimal simultaneous θ, ω regulation                   |
 | [Position Loop — Cascade P (P2)](position-loop-cascade-p.md)                | Industry-standard Kv architecture; velocity feedforward     |
 | [Position Loop — Two-DOF (P3)](position-loop-two-dof.md)                    | Decoupled tracking and stiffness; angle-wrapping pre-filter |
-| [Position Loop — ILC (P4)](position-loop-ilc.md)                            | Near-zero error on repetitive tasks after learning cycles   |
-| [Position Loop — Friction Compensation](position-loop-friction.md)          | Coulomb + Stribeck feedforward; eliminates hunting at rest  |
 | [Resistance and Inductance Estimation](resistance-inductance-estimation.md) | RLS-based online electrical parameter identification        |
 | [Friction and Inertia Estimation](friction-inertia-estimation.md)           | RLS-based online mechanical parameter identification        |
 | [Motor Alignment](alignment.md)                                             | Rotor flux alignment procedure and angle offset calibration |

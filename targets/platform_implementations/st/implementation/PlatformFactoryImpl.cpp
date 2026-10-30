@@ -164,9 +164,6 @@ namespace application
             Pins::boardId1.Config(hal::PinConfigType::input);
             Pins::boardId2.Config(hal::PinConfigType::input);
         }
-
-        if constexpr (Peripheral::hasPowerStatusPin)
-            Pins::powerStatus.Config(hal::PinConfigType::input);
     }
 
     uint8_t PlatformFactoryImpl::ReadBoardIdPins()
@@ -178,19 +175,6 @@ namespace application
         const uint8_t bit1 = Pins::boardId1.Get() ? 0u : 1u;
         const uint8_t bit2 = Pins::boardId2.Get() ? 0u : 1u;
         return static_cast<uint8_t>(bit0 | (bit1 << 1u) | (bit2 << 2u));
-    }
-
-    bool PlatformFactoryImpl::PowerStatus() const
-    {
-        if constexpr (!Peripheral::hasPowerStatusPin)
-            return true;
-
-        return Pins::powerStatus.Get();
-    }
-
-    hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
-    {
-        return peripherals->performanceTrackerImpl;
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const
@@ -237,24 +221,6 @@ namespace application
     {
         protectionTripped = true;
         CutPowerStage();
-    }
-
-    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
-        : dwt(dwt)
-        , pin(pin)
-    {}
-
-    void PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::Start()
-    {
-        dwt.Start();
-        pin.Set(true);
-    }
-
-    uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
-    {
-        pin.Set(false);
-        dwt.Stop();
-        return dwt.Cycles();
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)

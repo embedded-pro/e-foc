@@ -7,7 +7,6 @@ namespace
 {
     constexpr float pi = std::numbers::pi_v<float>;
     constexpr float lutTolerance = 0.015f;
-    constexpr float exactTolerance = 1e-5f;
     constexpr float accurateTolerance = 2e-6f;
 
     class TestFastTrigonometry
@@ -88,31 +87,6 @@ TEST_F(TestFastTrigonometry, accurate_sine_and_cosine_match_std_to_float_precisi
         EXPECT_NEAR(result.sine, std::sin(angle), accurateTolerance) << "at angle " << angle;
         EXPECT_NEAR(result.cosine, std::cos(angle), accurateTolerance) << "at angle " << angle;
     }
-}
-
-TEST_F(TestFastTrigonometry, arctangent_zero)
-{
-    EXPECT_NEAR(foc::FastTrigonometry::Arctangent(0.0f), 0.0f, exactTolerance);
-}
-
-TEST_F(TestFastTrigonometry, arctangent_one)
-{
-    EXPECT_NEAR(foc::FastTrigonometry::Arctangent(1.0f), pi / 4.0f, exactTolerance);
-}
-
-TEST_F(TestFastTrigonometry, phase_positive_real_axis)
-{
-    EXPECT_NEAR(foc::FastTrigonometry::Phase(1.0f, 0.0f), 0.0f, exactTolerance);
-}
-
-TEST_F(TestFastTrigonometry, phase_positive_imaginary_axis)
-{
-    EXPECT_NEAR(foc::FastTrigonometry::Phase(0.0f, 1.0f), pi / 2.0f, exactTolerance);
-}
-
-TEST_F(TestFastTrigonometry, phase_negative_real_axis)
-{
-    EXPECT_NEAR(foc::FastTrigonometry::Phase(-1.0f, 0.0f), pi, exactTolerance);
 }
 
 TEST_F(TestFastTrigonometry, sine_negative_pi_over_2)

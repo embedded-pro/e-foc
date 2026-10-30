@@ -45,16 +45,6 @@ namespace application
         return 0;
     }
 
-    bool PlatformFactoryImpl::PowerStatus() const
-    {
-        return true;
-    }
-
-    hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
-    {
-        return *this;
-    }
-
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(0);
@@ -77,11 +67,6 @@ namespace application
 
     void PlatformFactoryImpl::Start()
     {
-    }
-
-    uint32_t PlatformFactoryImpl::ElapsedCycles()
-    {
-        return 0;
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)

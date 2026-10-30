@@ -45,8 +45,6 @@ namespace tool
         alignButton->setToolTip("Find the rotor's electrical zero. Needed after the controller starts and after a pole-pair change.");
         identifyElectricalButton = new QPushButton("Identify &Electrical");
         identifyElectricalButton->setToolTip("Measure resistance, inductance and pole pairs, then align the rotor");
-        identifyMechanicalButton = new QPushButton("Identify Mecha&nical");
-        identifyMechanicalButton->setToolTip("Measure inertia and viscous friction by spinning the rotor");
         calibrateButton = new QPushButton("Calibra&te");
         calibrateButton->setToolTip(calibrateHint);
         clearCalibrationButton = new QPushButton("Clear Calibration…");
@@ -55,7 +53,6 @@ namespace tool
         auto* buttons = new QHBoxLayout();
         buttons->addWidget(alignButton);
         buttons->addWidget(identifyElectricalButton);
-        buttons->addWidget(identifyMechanicalButton);
         buttons->addWidget(calibrateButton);
         buttons->addStretch();
         buttons->addWidget(clearCalibrationButton);
@@ -63,7 +60,6 @@ namespace tool
 
         connect(alignButton, &QPushButton::clicked, this, &MotorParametersTab::AlignRequested);
         connect(identifyElectricalButton, &QPushButton::clicked, this, &MotorParametersTab::IdentifyElectricalRequested);
-        connect(identifyMechanicalButton, &QPushButton::clicked, this, &MotorParametersTab::IdentifyMechanicalRequested);
         connect(calibrateButton, &QPushButton::clicked, this, &MotorParametersTab::CalibrateRequested);
         connect(clearCalibrationButton, &QPushButton::clicked, this, &MotorParametersTab::ClearCalibrationRequested);
         return group;
@@ -83,12 +79,6 @@ namespace tool
         Refresh();
     }
 
-    void MotorParametersTab::SetMechanicalIdentificationUnavailable(const QString& reason)
-    {
-        mechanicalUnavailable = reason;
-        Refresh();
-    }
-
     void MotorParametersTab::SetMaintenanceUnavailable(const QString& reason)
     {
         maintenanceUnavailable = reason;
@@ -104,10 +94,6 @@ namespace tool
         alignButton->setToolTip(available ? QString("Find the rotor's electrical zero. Needed after a pole-pair change.") : actionsUnavailable);
         identifyElectricalButton->setEnabled(available);
         identifyElectricalButton->setToolTip(available ? QString("Measure resistance, inductance and pole pairs, then align the rotor") : actionsUnavailable);
-
-        const auto& mechanicalReason = available ? mechanicalUnavailable : actionsUnavailable;
-        identifyMechanicalButton->setEnabled(mechanicalReason.isEmpty());
-        identifyMechanicalButton->setToolTip(mechanicalReason.isEmpty() ? QString("Measure inertia and viscous friction by spinning the rotor") : mechanicalReason);
 
         const auto& maintenanceReason = available ? maintenanceUnavailable : actionsUnavailable;
         calibrateButton->setEnabled(maintenanceReason.isEmpty());

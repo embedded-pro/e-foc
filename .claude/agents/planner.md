@@ -17,7 +17,7 @@ Design and plan. Do NOT write or edit code.
 
 1. **Clarify first** — before researching: control mode (torque/speed/position), hardware target, real-time impact, edge cases, acceptance criteria
 2. **Research** — `documentation/theory/`, existing patterns in `core/foc/`, interface contracts, timing budget, numerical-toolbox reuse opportunities
-3. **Plan** — produce the sections below, then validate against AGENTS.md constraints
+3. **Plan** — produce the sections below, then validate them (see Validation before finalizing)
 
 ## Required plan sections
 
@@ -31,4 +31,4 @@ Design and plan. Do NOT write or edit code.
 
 ## Validation before finalizing
 
-Apply the full AGENTS.md §Constraints checklist before presenting the plan.
+Follow AGENTS.md — check the plan against every section §Constraints checklist names before presenting it.

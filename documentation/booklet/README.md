@@ -51,8 +51,6 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Position Loop — LQR/LQI (P1)](../theory/position-loop-lqr-lqi.md)                    | DARE-optimal simultaneous θ, ω regulation                   |
 | [Position Loop — Cascade P (P2)](../theory/position-loop-cascade-p.md)                | Industry-standard Kv architecture; velocity feedforward     |
 | [Position Loop — Two-DOF (P3)](../theory/position-loop-two-dof.md)                    | Decoupled tracking and stiffness; angle-wrapping pre-filter |
-| [Position Loop — ILC (P4)](../theory/position-loop-ilc.md)                            | Near-zero error on repetitive tasks after learning cycles   |
-| [Position Loop — Friction Compensation](../theory/position-loop-friction.md)          | Coulomb + Stribeck feedforward; eliminates hunting at rest  |
 | [Resistance and Inductance Estimation](../theory/resistance-inductance-estimation.md) | RLS-based online electrical parameter identification        |
 | [Friction and Inertia Estimation](../theory/friction-inertia-estimation.md)           | RLS-based online mechanical parameter identification        |
 | [Motor Alignment](../theory/alignment.md)                                             | Rotor flux alignment procedure and angle offset calibration |

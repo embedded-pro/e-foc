@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-SPD-006: the inner-loop budget is REQ-PERF-001
+
 - id: REQ-SPD-001
   title: Speed cascade architecture
   shall: >
@@ -33,14 +36,6 @@
   shall: >
     The speed controller shall expose the configured outer loop frequency so that
     higher-level services can query the effective velocity control rate.
-
-- id: REQ-SPD-006
-  title: FOC loop CPU budget
-  shall: >
-    The complete speed control cycle, including sensing, transforms, the active current
-    law, and PWM output, shall execute at a 20 kHz inner loop rate and shall not exceed
-    4500 cycles at 120 MHz, which is 75 percent of the available CPU time per control
-    period.
 
 - id: REQ-SPD-007
   title: Runtime-selectable speed control law

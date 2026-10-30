@@ -2,7 +2,7 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "disturbances-and-noise"
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.1.0                                  |
+| Version   | 0.1.1                                  |
 | Component | disturbances-and-noise                 |
 | Date      | 2026-10-29                             |
 
@@ -111,8 +111,8 @@ or an explicit disturbance estimate (ADRC, `speed-loop-adrc.md`).
 **Friction.** Viscous friction $B_f\omega_m$ is part of the model and is identified. Coulomb friction, a
 constant torque opposing motion, and the Stribeck rise in breakaway torque near standstill are not linear:
 the rotor sticks until the drive overcomes breakaway, then slips. A position loop with integral action hunts
-around the setpoint; at low speed the velocity ripples. Feed-forward of the friction level removes most of it
-(`documentation/theory/position-loop-friction.md`). *e-foc today:* the mechanical estimator fits a Coulomb term
+around the setpoint; at low speed the velocity ripples. Feed-forward of the friction level removes most of it.
+*e-foc today:* the mechanical estimator fits a Coulomb term
 internally but does not output it (`documentation/design/service-mechanical-ident.md`); the calibration record
 has a field for it that stays zero, and no cascade applies a friction feed-forward.
 

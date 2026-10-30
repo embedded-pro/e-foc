@@ -15,7 +15,6 @@ target_link_libraries(e_foc.services.mechanical_system_ident PUBLIC
 )
 
 target_sources(e_foc.services.mechanical_system_ident PRIVATE
-    FrictionAndInertiaEstimator.hpp
     MechanicalEstimatePolicy.hpp
     MechanicalWindowKinematics.cpp
     MechanicalWindowKinematics.hpp

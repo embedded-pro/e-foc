@@ -25,15 +25,6 @@ namespace drivers
         virtual void SetZero() = 0;
     };
 
-    class HallSensor
-    {
-    protected:
-        ~HallSensor() = default;
-
-    public:
-        virtual std::pair<foc::HallState, foc::Direction> Read() const = 0;
-    };
-
     class ThreePhasePowerStage
     {
     protected:

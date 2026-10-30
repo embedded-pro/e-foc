@@ -31,8 +31,6 @@ namespace application
         hal::GpioPinStm boardId1{ hal::Port::C, 11, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
         hal::GpioPinStm boardId2{ hal::Port::C, 12, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
 
-        hal::GpioPinStm powerStatus{ hal::Port::B, 2, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
-
         hal::GpioPinStm uartRx{ hal::Port::A, 3 };
         hal::GpioPinStm uartTx{ hal::Port::A, 2 };
 
@@ -41,8 +39,6 @@ namespace application
 
         hal::GpioPinStm eepromScl{ hal::Port::C, 8 };
         hal::GpioPinStm eepromSda{ hal::Port::C, 9 };
-
-        hal::GpioPinStm performance{ hal::Port::C, 6 };
     }
 
     namespace Peripheral

@@ -39,8 +39,6 @@ namespace application
         extern hal::GpioPinStm boardId1;
         extern hal::GpioPinStm boardId2;
 
-        extern hal::GpioPinStm powerStatus;
-
         extern hal::GpioPinStm uartRx;
         extern hal::GpioPinStm uartTx;
 
@@ -49,8 +47,6 @@ namespace application
 
         extern hal::GpioPinStm eepromScl;
         extern hal::GpioPinStm eepromSda;
-
-        extern hal::GpioPinStm performance;
     }
 
     namespace Peripheral
@@ -73,7 +69,6 @@ namespace application
         constexpr static uint8_t EepromI2cIndex{ 3 };
 
         constexpr static bool hasBoardIdPins{ true };
-        constexpr static bool hasPowerStatusPin{ true };
 
         constexpr static float adcReferenceVoltage{ 3.3f };
         constexpr static float adcResolution{ 4096.0f };

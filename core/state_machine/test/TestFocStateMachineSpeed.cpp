@@ -157,7 +157,7 @@ namespace
                 EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
                     .Times(mechOk ? 1 : 3)
                     .WillRepeatedly(Invoke([](std::size_t, const auto&,
-                                         const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                                               const infra::Function<void(std::optional<foc::Radians>)>& cb)
                         {
                             cb(foc::Radians{ 0.0f });
                         }));
@@ -191,11 +191,11 @@ namespace
                 EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
                     .Times(3)
                     .WillRepeatedly(Invoke([](const foc::NewtonMeter&,
-                                         std::size_t,
-                                         const services::MechanicalParametersIdentification::Config&,
-                                         const infra::Function<void(
-                                             std::optional<foc::NewtonMeterSecondPerRadian>,
-                                             std::optional<foc::NewtonMeterSecondSquared>)>& cb)
+                                               std::size_t,
+                                               const services::MechanicalParametersIdentification::Config&,
+                                               const infra::Function<void(
+                                                   std::optional<foc::NewtonMeterSecondPerRadian>,
+                                                   std::optional<foc::NewtonMeterSecondSquared>)>& cb)
                         {
                             cb(std::nullopt, std::nullopt);
                         }));
@@ -1249,7 +1249,7 @@ namespace
                 EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
                     .Times(mechOk ? 1 : 3)
                     .WillRepeatedly(Invoke([](std::size_t, const auto&,
-                                         const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                                               const infra::Function<void(std::optional<foc::Radians>)>& cb)
                         {
                             cb(foc::Radians{ 0.0f });
                         }));
@@ -1283,11 +1283,11 @@ namespace
                 EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
                     .Times(3)
                     .WillRepeatedly(Invoke([](const foc::NewtonMeter&,
-                                         std::size_t,
-                                         const services::MechanicalParametersIdentification::Config&,
-                                         const infra::Function<void(
-                                             std::optional<foc::NewtonMeterSecondPerRadian>,
-                                             std::optional<foc::NewtonMeterSecondSquared>)>& cb)
+                                               std::size_t,
+                                               const services::MechanicalParametersIdentification::Config&,
+                                               const infra::Function<void(
+                                                   std::optional<foc::NewtonMeterSecondPerRadian>,
+                                                   std::optional<foc::NewtonMeterSecondSquared>)>& cb)
                         {
                             cb(std::nullopt, std::nullopt);
                         }));

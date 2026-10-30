@@ -18,7 +18,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 2;
+    static constexpr uint8_t focContractVersionMinor = 3;
 
     enum class FieldType : uint8_t
     {
@@ -124,11 +124,6 @@ namespace can
         { "polePairs", FieldType::uint8, 1, "-" },
     } };
 
-    inline constexpr std::array<FieldDescriptor, 2> mechanicalParamsFields{ {
-        { "friction", FieldType::uint32, focFrictionScale, "Nm.s/rad" },
-        { "inertia", FieldType::uint32, focInertiaScale, "kg.m2" },
-    } };
-
     inline constexpr std::array<FieldDescriptor, 4> telemetryElectricalFields{ {
         { "busVoltage", FieldType::fixed16, focVoltageScale, "V" },
         { "maxCurrent", FieldType::fixed16, focCurrentScale, "A" },
@@ -159,15 +154,13 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 26> focMotorMessages{ {
-        MakeDescriptor(focQueryMotorTypeId, "QueryMotorType", Direction::command),
+    inline constexpr std::array<MessageDescriptor, 24> focMotorMessages{ {
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
         MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
         MakeDescriptor(focSetPidSpeedId, "SetPidSpeed", Direction::command, bandwidthFields),
         MakeDescriptor(focSetPidPositionId, "SetPidPosition", Direction::command, bandwidthFields),
         MakeDescriptor(focIdentifyElectricalId, "IdentifyElectrical", Direction::command),
-        MakeDescriptor(focIdentifyMechanicalId, "IdentifyMechanical", Direction::command),
         MakeDescriptor(focRequestTelemetryId, "RequestTelemetry", Direction::command),
         MakeDescriptor(focSetEncoderResolutionId, "SetEncoderResolution", Direction::command, resolutionFields),
         MakeDescriptor(focAlignId, "Align", Direction::command),
@@ -188,10 +181,8 @@ namespace can
         MakeDescriptor(focClearDiagnosticsId, "ClearDiagnostics", Direction::command),
     } };
 
-    inline constexpr std::array<MessageDescriptor, 10> focMotorResponses{ {
-        MakeDescriptor(focMotorTypeResponseId, "MotorTypeResponse", Direction::response, modeFields),
+    inline constexpr std::array<MessageDescriptor, 8> focMotorResponses{ {
         MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
-        MakeDescriptor(focMechanicalParamsResponseId, "MechanicalParamsResponse", Direction::response, mechanicalParamsFields),
         MakeDescriptor(focTelemetryElectricalResponseId, "TelemetryElectricalResponse", Direction::telemetry, telemetryElectricalFields),
         MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
         MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),

@@ -97,7 +97,7 @@ namespace
                 EXPECT_CALL(nvmMock, SaveCalibration(_, _))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([](const services::CalibrationData&,
-                                              const infra::Function<void(services::NvmStatus)>& done)
+                                               const infra::Function<void(services::NvmStatus)>& done)
                         {
                             done(services::NvmStatus::Ok);
                         }));

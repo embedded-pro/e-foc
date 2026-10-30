@@ -42,7 +42,6 @@ TEST_F(TestCommandDescriptions, names_commissioning_and_settings_commands)
 {
     EXPECT_EQ("Align Rotor", CommandDisplayName(can::focMotorCategoryId, can::focAlignId));
     EXPECT_EQ("Identify Electrical", CommandDisplayName(can::focMotorCategoryId, can::focIdentifyElectricalId));
-    EXPECT_EQ("Identify Mechanical", CommandDisplayName(can::focMotorCategoryId, can::focIdentifyMechanicalId));
     EXPECT_EQ("Encoder Resolution", CommandDisplayName(can::focMotorCategoryId, can::focSetEncoderResolutionId));
     EXPECT_EQ("Controller Selection", CommandDisplayName(can::focMotorCategoryId, can::focSelectAlgorithmId));
     EXPECT_EQ("Setting", CommandDisplayName(can::focMotorCategoryId, can::focSetParameterId));

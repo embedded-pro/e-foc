@@ -1,8 +1,6 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/cli/DecimalToken.hpp"
-#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/stream/StringInputStream.hpp"
@@ -13,17 +11,11 @@
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
 #include <chrono>
-#include <numbers>
 #include <optional>
 #include <type_traits>
 
 namespace
 {
-    constexpr float pi_div_180 = std::numbers::pi_v<float> / 180.0f;
-    const std::size_t outerInnerLoopRatio = 10;
-    const hal::Hertz defaultPwmFrequency{ 10000 };
-    const hal::Hertz speedLoopFrequency{ static_cast<unsigned int>(defaultPwmFrequency.Value() / outerInnerLoopRatio) };
-
     application::PlatformFactory::SampleAndHold ToSampleAndHold(const infra::BoundedConstString& value)
     {
         using enum application::PlatformFactory::SampleAndHold;
@@ -85,12 +77,6 @@ namespace application
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , hardware{ hardware }
-        , inverter{ hardware }
-        , identState{ inverter, hardware, hardware.PowerSupplyVoltage() }
-        , performanceTimer{ hardware.PerformanceTimer() }
-        , Vdc{ hardware.PowerSupplyVoltage() }
-        , systemClock{ hardware.SystemClock() }
-        , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
@@ -121,24 +107,6 @@ namespace application
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(ConfigureAdc(param));
-            } });
-
-        terminal.AddCommand({ { "pid", "c", "Configure loop bandwidths in rad/s [speed current]. Ex: pid 188.5 6283.2" },
-            [this](const infra::BoundedConstString& param)
-            {
-                this->terminal.ProcessResult(ConfigurePid(param));
-            } });
-
-        terminal.AddCommand({ { "foc", "f", "Simulate foc [angle ia ib ic]. Ex: foc param" },
-            [this](const infra::BoundedConstString& param)
-            {
-                this->terminal.ProcessResult(SimulateFoc(param));
-            } });
-
-        terminal.AddCommand({ { "motor", "m", "Set motor parameters [poles [2; 16]]. Ex: motor 14" },
-            [this](const infra::BoundedConstString& param)
-            {
-                this->terminal.ProcessResult(SetMotorParameters(param));
             } });
 
         terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [100000;1000000]] [test]. Ex: can_start 500000" },
@@ -213,18 +181,6 @@ namespace application
                 this->terminal.ProcessResult(StallEventLoop());
             } });
 
-        terminal.AddCommand({ { "ident", "i", "Estimate R and L (DC step + HF sinusoidal injection). Ex: ident" },
-            [this](const auto&)
-            {
-                RunIdent();
-            } });
-
-        terminal.AddCommand({ { "align", "al", "Estimate encoder offset. Requires 'motor' set first. Ex: align" },
-            [this](const auto&)
-            {
-                RunAlign();
-            } });
-
         hardware.SetEncoderResolution(4000);
         hardware.ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, PlatformFactory::SampleAndHold::shortest);
         StartAdc(PlatformFactory::SampleAndHold::shortest);
@@ -272,94 +228,12 @@ namespace application
         return { success };
     }
 
-    TerminalInteractor::StatusWithMessage TerminalInteractor::ConfigurePid(const infra::BoundedConstString& param)
-    {
-        infra::Tokenizer tokenizer(param, ' ');
-
-        if (tokenizer.Size() != 2)
-            return { error, "invalid number of arguments" };
-
-        auto speedBandwidth = ParseInput<float>(tokenizer.Token(0), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!speedBandwidth.has_value())
-            return { error, "invalid value for speed loop bandwidth" };
-
-        auto currentBandwidth = ParseInput<float>(tokenizer.Token(1), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!currentBandwidth.has_value())
-            return { error, "invalid value for current loop bandwidth" };
-
-        speedLoopBandwidth = *speedBandwidth;
-        currentLoopBandwidth = *currentBandwidth;
-
-        auto speedTunings = foc::SpeedLoopTunings{};
-        speedTunings.bandwidth = speedLoopBandwidth;
-        foc.SetSpeedTunings(speedTunings);
-
-        auto currentTunings = foc::CurrentLoopTunings{};
-        currentTunings.bandwidth = currentLoopBandwidth;
-        foc.SetCurrentTunings(currentTunings);
-
-        return { success };
-    }
-
     TerminalInteractor::StatusWithMessage TerminalInteractor::ReadEncoder()
     {
         tracer.Trace() << "  Encoder Readings:";
         tracer.Trace() << "    Position:  " << hardware.Read().Value() << " radians";
 
         return { success };
-    }
-
-    TerminalInteractor::StatusWithMessage TerminalInteractor::SimulateFoc(const infra::BoundedConstString& param)
-    {
-        infra::Tokenizer tokenizer(param, ' ');
-
-        if (tokenizer.Size() != 4)
-            return { error, "invalid number of arguments" };
-
-        auto angle = ParseInput<float>(tokenizer.Token(0), -360.0f, 360.0f);
-        if (!angle.has_value())
-            return { error, "invalid value for angle. It should be a float between -360 and 360." };
-
-        auto currentA = ParseInput<float>(tokenizer.Token(1), -1000.0f, 1000.0f);
-        if (!currentA.has_value())
-            return { error, "invalid value for phase A current. It should be a float between -1000 and 1000." };
-
-        auto currentB = ParseInput<float>(tokenizer.Token(2), -1000.0f, 1000.0f);
-        if (!currentB.has_value())
-            return { error, "invalid value for phase B current. It should be a float between -1000 and 1000." };
-
-        auto currentC = ParseInput<float>(tokenizer.Token(3), -1000.0f, 1000.0f);
-        if (!currentC.has_value())
-            return { error, "invalid value for phase C current. It should be a float between -1000 and 1000." };
-
-        RunFocSimulation(foc::PhaseCurrents{ foc::Ampere{ *currentA }, foc::Ampere{ *currentB }, foc::Ampere{ *currentC } }, foc::Radians{ *angle * pi_div_180 });
-
-        return { success };
-    }
-
-    void TerminalInteractor::RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle)
-    {
-        performanceTimer.Start();
-        auto result = foc.Calculate(input, angle);
-        auto duration = performanceTimer.ElapsedCycles();
-
-        tracer.Trace() << "  FOC Simulation Results:";
-        tracer.Trace() << "    Vdc:              " << Vdc.Value() << " V";
-        tracer.Trace() << "    Pole Pairs:       " << polePairs.value_or(0);
-        tracer.Trace() << "    Inputs:";
-        tracer.Trace() << "      Angle:            " << angle.Value() << " degrees";
-        tracer.Trace() << "      Phase A Current:  " << input.a.Value() << " mA";
-        tracer.Trace() << "      Phase B Current:  " << input.b.Value() << " mA";
-        tracer.Trace() << "      Phase C Current:  " << input.c.Value() << " mA";
-        tracer.Trace() << "    PID Tunings:";
-        tracer.Trace() << "    Speed loop bandwidth:   " << speedLoopBandwidth << " rad/s";
-        tracer.Trace() << "    Current loop bandwidth: " << currentLoopBandwidth << " rad/s";
-        tracer.Trace() << "    PWM Outputs:";
-        tracer.Trace() << "      Phase A PWM:      " << result.a.Value() << " %";
-        tracer.Trace() << "      Phase B PWM:      " << result.b.Value() << " %";
-        tracer.Trace() << "      Phase C PWM:      " << result.c.Value() << " %";
-        tracer.Trace() << "    Performance:";
-        tracer.Trace() << "      Execution time:   " << duration << " cycles";
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::Stop()
@@ -423,27 +297,6 @@ namespace application
             return { error, "invalid value for phase C. It should be a float between 1 and 99." };
 
         hardware.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(*dutyA), hal::DutyCycle::FromPercent(*dutyB), hal::DutyCycle::FromPercent(*dutyC) });
-
-        return { success };
-    }
-
-    TerminalInteractor::StatusWithMessage TerminalInteractor::SetMotorParameters(const infra::BoundedConstString& param)
-    {
-        infra::Tokenizer tokenizer(param, ' ');
-
-        if (tokenizer.Size() != 1)
-            return { error, "invalid number of arguments" };
-
-        auto poles = ParseInput<uint8_t>(tokenizer.Token(0), 2, 16);
-        if (!poles.has_value())
-            return { error, "invalid value for poles. It should be an integer between 2 and 16." };
-
-        polePairs = static_cast<std::size_t>(*poles / 2);
-
-        auto parameters = foc::MotorModelParameters{};
-        parameters.busVoltage = Vdc;
-        parameters.polePairs = polePairs.value();
-        foc.Configure(parameters);
 
         return { success };
     }
@@ -703,70 +556,5 @@ namespace application
                 }
             });
         return { success };
-    }
-
-    void TerminalInteractor::RunIdent()
-    {
-        if (identState.identRunning)
-        {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident already running" });
-            return;
-        }
-        identState.identRunning = true;
-        tracer.Trace() << "ident: running R then L estimation...";
-
-        identState.electricalIdent->EstimateResistanceAndInductance({},
-            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
-            {
-                identState.identRunning = false;
-                if (!result.resistance.has_value())
-                {
-                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: R estimation failed (zero current)" });
-                    return;
-                }
-                if (!result.inductance.has_value())
-                {
-                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: L estimation failed" });
-                    return;
-                }
-                tracer.Trace() << "R: " << result.resistance->Value() << " ohm";
-                tracer.Trace() << "L: " << result.inductance->Value() << " mH";
-                tracer.Trace() << "fitQuality: " << result.fitQuality;
-                if (result.fitQuality < 0.5f)
-                {
-                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: low fit quality — noisy signal, calibration rejected" });
-                    return;
-                }
-                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
-            });
-    }
-
-    void TerminalInteractor::RunAlign()
-    {
-        if (!polePairs.has_value() || polePairs.value() == 0)
-        {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: set motor poles first (motor <poles>)" });
-            return;
-        }
-        if (identState.alignRunning)
-        {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align already running" });
-            return;
-        }
-        identState.alignRunning = true;
-        tracer.Trace() << "align: running...";
-
-        identState.alignment->ForceAlignment(polePairs.value(), {},
-            [this](std::optional<foc::Radians> offset)
-            {
-                identState.alignRunning = false;
-                if (!offset.has_value())
-                {
-                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: failed (insufficient rotor response)" });
-                    return;
-                }
-                tracer.Trace() << "encoder offset: " << offset->Value() << " rad";
-                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
-            });
     }
 }

@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: can-service
-date: 2026-10-25
+date: 2026-10-29
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.5.0                    |
+| Version   | 0.6.0                    |
 | Component | can-service              |
-| Date      | 2026-10-25               |
+| Date      | 2026-10-29               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -35,7 +35,7 @@ date: 2026-10-25
 - Bridging the server category to `ControlModeStateMachine`, translating motor control commands into state machine transitions.
 - Providing a user-facing client API that composes the protocol client, transport, and category client into a single object for use by host-side tools and SIL tests.
 - Applying tracing decorators at every layer boundary so all CAN frames and protocol lifecycle events are observable.
-- Delegating identification commands to `ElectricalParametersIdentification` and `MechanicalParametersIdentification` services and broadcasting results via response frames.
+- Delegating the electrical identification command to `ElectricalParametersIdentification` and broadcasting its result via a response frame.
 - Persisting encoder resolution and telemetry rate changes to `NonVolatileMemory`.
 - Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
 - Selecting the control algorithm of each loop and reporting the algorithms in force.
@@ -220,26 +220,29 @@ control periods at 20 kHz) and rounded beyond.
 | `0xA7` | `loopReentries`            | -        | Interrupts that arrived while the previous one ran                                           | no        |
 | `0xB0` | `resetCause`               | -        | Cause of the last reset: `powerUp 0`, `brownOut 1`, `software 2`, `hardware 3`, `watchdog 4` | no        |
 
+**Contract 2.3 — retired messages.** Version 2.3 removes four messages that the firmware never served:
+`QueryMotorType` (`0x00`) and its `MotorTypeResponse` (`0x80`) always answered `notImplemented`, and
+`IdentifyMechanical` (`0x07`) with its `MechanicalParamsResponse` (`0x87`) answered `notImplemented` because the
+application wires no mechanical identification to the CAN bridge; `Calibrate` (`0x17`) runs the mechanical
+identification as part of the calibration sequence. Their IDs stay reserved and are never reused. A 2.2 client
+that still sends either command gets no acknowledgement and times out; every other message is unchanged.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
-saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
-1e-5 and 1e-6 in SI units, which any useful `int16` scale rounds to zero, so they travel as unsigned
-32-bit nano-unit counts:
+saturate (`CanFrameCodec::FloatToFixed16`):
 
-| Quantity   | Wire type | Scale factor | Example                                          |
-|------------|-----------|--------------|--------------------------------------------------|
-| Current    | int16     | 10           | 1.5 A → 15 wire                                  |
-| Speed      | int16     | 1            | 300 rad/s → 300 wire                             |
-| Position   | int16     | 100          | 3.14 rad → 314 wire                              |
-| Voltage    | int16     | 10           | 24.0 V → 240 wire                                |
-| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s                   |
-| Resistance | int16     | 1000         | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire        |
-| Inductance | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire       |
-| Friction   | uint32    | 1000000000   | 1.5e-5 N·m·s/rad (Teknic M-2310P-LN-04K) → 15000 |
-| Inertia    | uint32    | 1000000000   | 7.06e-6 kg·m² (Teknic M-2310P-LN-04K) → 7060     |
+| Quantity   | Wire type | Scale factor | Example                                    |
+|------------|-----------|--------------|--------------------------------------------|
+| Current    | int16     | 10           | 1.5 A → 15 wire                            |
+| Speed      | int16     | 1            | 300 rad/s → 300 wire                       |
+| Position   | int16     | 100          | 3.14 rad → 314 wire                        |
+| Voltage    | int16     | 10           | 24.0 V → 240 wire                          |
+| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s             |
+| Resistance | int16     | 1000         | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire  |
+| Inductance | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire |
 
-The `uint32` fields round to nearest, saturate at `UINT32_MAX` and encode a negative or NaN value as
-`0`: friction and inertia are never negative in a physical plant. The reference-motor values come from
-`documentation/theory/foc-plant-models.md` "Reference motors".
+The reference-motor values come from `documentation/theory/foc-plant-models.md` "Reference motors". Inertia
+and friction, around 1e-6 and 1e-5 in SI units, travel only as `float32` parameters (`SetParameter`,
+`QueryParameter`).
 
 ### Deviations from the can-lite reference example
 
@@ -268,7 +271,6 @@ The observer interface provides callbacks for:
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CAL-015); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
-- `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step, then `CmdReserveExternalCalibration()` for the duration of the run; `invalidState` if not in `Ready`; releases the reservation when the estimation reports and on success broadcasts `focMechanicalParamsResponseId`.
 - `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 - `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
@@ -281,7 +283,7 @@ The observer interface provides callbacks for:
   is called when the sequence or the invalidation ends.
 - `OnClearDiagnostics` — a command without fields, with a completion callback.
 
-The commissioning handlers — `Align`, the two identifications, `Calibrate` and `ClearCalibration` — sit in
+The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
 one handler group of the server, so the server's own surface stays small as the contract grows.
 
 ### Part C — FocMotorCategoryClient
@@ -303,7 +305,7 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnStart` → `CmdEnable()`; success calls the ack callback, rejection sends `invalidState`.
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
-- `OnEmergencyStop` → aborts the bridge's mechanical identification if one runs, then `CmdEmergencyStop()`.
+- `OnEmergencyStop` → `CmdEmergencyStop()`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → the loop's stored settings with this bandwidth, through `Set*Tunings` on the state
@@ -311,7 +313,6 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   acknowledged once stored; a value out of range is acknowledged `invalidPayload`, a loop the active mode does
   not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
-- `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); `CmdReserveExternalCalibration()`; run estimation; `CmdReleaseExternalCalibration()` when it reports; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure. The reservation keeps `Start`, mode selection and setpoints refused while the motor spins.
 - `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
   The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
@@ -607,7 +608,6 @@ graph LR
 | NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`             |
 | Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                             |
 | Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop |
-| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`    |
 | Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder  |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                         |
 

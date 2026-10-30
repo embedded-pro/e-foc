@@ -21,8 +21,8 @@ namespace
         {
             EXPECT_CALL(notifier, Register(_, _))
                 .WillOnce(Invoke([this](
-                    const infra::Function<void(state_machine::FaultCode)>& imm,
-                    const infra::Function<void(state_machine::FaultCode)>& def)
+                                     const infra::Function<void(state_machine::FaultCode)>& imm,
+                                     const infra::Function<void(state_machine::FaultCode)>& def)
                     {
                         storedImmediate = imm;
                         storedDeferred = def;
@@ -233,8 +233,8 @@ TEST_F(FaultControllerTest, registered_callbacks_are_forwarded_to_notifier)
 
     EXPECT_CALL(notifier, Register(_, _))
         .WillOnce(Invoke([](
-            const infra::Function<void(state_machine::FaultCode)>& imm,
-            const infra::Function<void(state_machine::FaultCode)>& def)
+                             const infra::Function<void(state_machine::FaultCode)>& imm,
+                             const infra::Function<void(state_machine::FaultCode)>& def)
             {
                 imm(state_machine::FaultCode::overcurrent);
                 def(state_machine::FaultCode::overcurrent);
@@ -242,8 +242,14 @@ TEST_F(FaultControllerTest, registered_callbacks_are_forwarded_to_notifier)
 
     controller.Register(
         notifier,
-        [&](state_machine::FaultCode) { immediateFired = true; },
-        [&](state_machine::FaultCode) { deferredFired = true; });
+        [&](state_machine::FaultCode)
+        {
+            immediateFired = true;
+        },
+        [&](state_machine::FaultCode)
+        {
+            deferredFired = true;
+        });
 
     EXPECT_TRUE(immediateFired);
     EXPECT_TRUE(deferredFired);

@@ -123,19 +123,6 @@ namespace application
         return static_cast<uint8_t>(bit0 | (bit1 << 1u) | (bit2 << 2u));
     }
 
-    bool PlatformFactoryImpl::PowerStatus() const
-    {
-        if constexpr (!Peripheral::hasPowerStatusPin)
-            return true;
-
-        return !Pins::powerStatus.Get();
-    }
-
-    hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
-    {
-        return peripherals->performanceTrackerImpl;
-    }
-
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(SystemCoreClock);
@@ -183,24 +170,6 @@ namespace application
     void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
     {
         CutPowerStage();
-    }
-
-    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
-        : dwt(dwt)
-        , pin(pin)
-    {}
-
-    void PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::Start()
-    {
-        dwt.Start();
-        pin.Set(true);
-    }
-
-    uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
-    {
-        pin.Set(false);
-        dwt.Stop();
-        return dwt.Cycles();
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)

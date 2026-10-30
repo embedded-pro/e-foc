@@ -40,7 +40,6 @@ namespace services
 
         drivers::ThreePhaseInverter& driver;
         drivers::Encoder& encoder;
-        foc::Volts vdc;
         [[no_unique_address]] foc::ClarkePark transforms;
 
         infra::WithSharedAccess<ResistanceEstimator> resistanceEstimator;

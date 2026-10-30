@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-INT-004: an architecture rule, kept in documentation/architecture/system.md
+
 - id: REQ-INT-001
   title: CAN Start enables motor
   shall: >
@@ -19,13 +22,6 @@
     the state machine shall transition from the Fault state to the Ready state if
     valid calibration data is held, or to the Idle state if no valid calibration
     data is available, consistent with REQ-SM-009.
-
-- id: REQ-INT-004
-  title: CAN command routing through category server
-  shall: >
-    All CAN motor commands shall be dispatched through the FocMotorCategoryServer
-    observer interface. No CAN protocol internals shall be exposed to the state
-    machine layer.
 
 - id: REQ-INT-005
   title: CAN Start is rejected while in Idle
@@ -60,7 +56,7 @@
   title: CAN client sends typed setpoints
   shall: >
     FocMotorCanClient shall provide SendSetTorqueSetpoint(Ampere, callback),
-    SendSetSpeedSetpoint(RevPerMinute, callback), and SendSetPositionSetpoint(Radians,
+    SendSetSpeedSetpoint(RadiansPerSecond, callback), and SendSetPositionSetpoint(Radians,
     callback). Each call shall encode the physical value to the wire format using the
     scale factors defined in FocMotorMessages.hpp and transmit the corresponding
     command frame.
@@ -84,11 +80,6 @@
     broadcast the result via focElectricalParamsResponseId, and acknowledge success,
     or send calibrationFailed on estimation failure; every failure shall release the
     external calibration reservation so the node returns to Ready or Idle.
-    OnIdentifyMechanical shall require the state machine to be in Ready state, hold the
-    external calibration reservation while it runs, delegate to
-    MechanicalParametersIdentification, broadcast via focMechanicalParamsResponseId,
-    and acknowledge success; it shall respond invalidState if not in Ready, and
-    notImplemented if no MechanicalParametersIdentification service is available.
     OnRequestTelemetry shall broadcast the current motor state and fault code via
     focTelemetryStatusResponseId and acknowledge success.
     OnSetEncoderResolution and OnConfigureTelemetryRate shall validate their payloads,

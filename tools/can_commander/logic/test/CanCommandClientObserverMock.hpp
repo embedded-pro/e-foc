@@ -26,7 +26,6 @@ namespace tool
         MOCK_METHOD(void, OnBusVoltageReceived, (uint16_t nodeId, float voltage), (override));
         MOCK_METHOD(void, OnFaultEventReceived, (uint16_t nodeId, FocFaultCode fault), (override));
         MOCK_METHOD(void, OnElectricalParametersReceived, (uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs), (override));
-        MOCK_METHOD(void, OnMechanicalParametersReceived, (uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2), (override));
         MOCK_METHOD(void, OnAlgorithmsReceived, (uint16_t nodeId, const can::FocAlgorithms& algorithms), (override));
         MOCK_METHOD(void, OnParameterReceived, (uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
     };

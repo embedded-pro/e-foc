@@ -1,6 +1,4 @@
 #include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <array>
 #include <cmath>
@@ -19,25 +17,7 @@ namespace
     public:
         services::RealTimeFrictionAndInertiaEstimator estimator{ 0.99f, hal::Hertz{ 1000 } };
 
-        foc::PhaseCurrents currents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
         foc::RadiansPerSecond speed{ 10.0f };
-        foc::Radians angle{ 0.0f };
-
-        float previousSpeed{ 0.0f };
-
-        // Builds the phase currents whose q component, after the estimator's own Clarke/Park at this
-        // electrical angle, carries exactly the requested torque.
-        foc::PhaseCurrents CurrentsProducing(float torque, foc::Radians electricalAngle) const
-        {
-            const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle.Value());
-            const auto sine = foc::FastTrigonometry::Sine(electricalAngle.Value());
-            const foc::ClarkePark transform;
-
-            const auto unitGain = transform.Forward(transform.Inverse(foc::RotatingFrame{ 0.0f, 1.0f }, cosine, sine), cosine, sine).q;
-            const auto phases = transform.Inverse(foc::RotatingFrame{ 0.0f, torque / torqueConstant / unitGain }, cosine, sine);
-
-            return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
-        }
     };
 
     struct ReferenceRotor
@@ -148,44 +128,6 @@ namespace
     }
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, update_produces_finite_results)
-{
-    foc::NewtonMeter torque{ 0.1f };
-
-    auto result = estimator.Update(currents, speed, angle, torque);
-
-    EXPECT_TRUE(std::isfinite(result.inertia.Value()));
-    EXPECT_TRUE(std::isfinite(result.friction.Value()));
-    EXPECT_TRUE(std::isfinite(result.metrics.innovation));
-    EXPECT_TRUE(std::isfinite(result.metrics.residual));
-    EXPECT_TRUE(std::isfinite(result.metrics.uncertainty));
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, acceleration_calculated_from_speed_difference)
-{
-    foc::Radians a{ 0.0f };
-    foc::NewtonMeter torque{ 0.1f };
-
-    estimator.Update(currents, foc::RadiansPerSecond{ 10.0f }, a, torque);
-    auto result = estimator.Update(currents, foc::RadiansPerSecond{ 20.0f }, a, torque);
-
-    EXPECT_TRUE(std::isfinite(result.inertia.Value()));
-    EXPECT_TRUE(std::isfinite(result.friction.Value()));
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, result_units_are_correct_types)
-{
-    foc::NewtonMeter torque{ 0.15f };
-
-    auto result = estimator.Update(currents, foc::RadiansPerSecond{ 50.0f }, foc::Radians{ 0.5f }, torque);
-
-    foc::NewtonMeterSecondSquared inertia = result.inertia;
-    foc::NewtonMeterSecondPerRadian friction = result.friction;
-
-    EXPECT_TRUE(std::isfinite(inertia.Value()));
-    EXPECT_TRUE(std::isfinite(friction.Value()));
-}
-
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_stores_values)
 {
     estimator.SetInitialEstimate(
@@ -194,35 +136,6 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_stores_valu
 
     EXPECT_NEAR(estimator.CurrentInertia().Value(), 0.002f, 1e-9f);
     EXPECT_NEAR(estimator.CurrentFriction().Value(), 0.001f, 1e-9f);
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, standstill_observations_leave_the_coefficients_untouched)
-{
-    foc::NewtonMeter torque{ 0.1f };
-    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    const foc::RadiansPerSecond stopped{ 0.0f };
-
-    auto first = estimator.Update(idle, stopped, angle, torque);
-
-    for (int sample = 0; sample != 500; ++sample)
-        estimator.Update(idle, stopped, angle, torque);
-
-    auto last = estimator.Update(idle, stopped, angle, torque);
-
-    EXPECT_NEAR(last.inertia.Value(), first.inertia.Value(), 1e-9f);
-    EXPECT_NEAR(last.friction.Value(), first.friction.Value(), 1e-9f);
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, an_excited_observation_carrying_torque_updates_the_coefficients)
-{
-    foc::NewtonMeter torque{ 0.1f };
-    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
-
-    auto before = estimator.Update(idle, foc::RadiansPerSecond{ 0.0f }, quadratureAngle, torque);
-    auto after = estimator.Update(currents, foc::RadiansPerSecond{ 50.0f }, quadratureAngle, torque);
-
-    EXPECT_NE(after.inertia.Value(), before.inertia.Value());
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publish_new_online_estimates)

@@ -1,6 +1,5 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
 #include <algorithm>
 #include <cmath>
@@ -24,52 +23,9 @@ namespace services
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)
         : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
         , forgettingFactor(forgettingFactor)
-        , rls(std::in_place, 1000.0f, forgettingFactor)
         , kinematics(1.0f / this->samplingFrequency)
     {
         ReseedOnline();
-    }
-
-    RealTimeFrictionAndInertiaEstimator::Result RealTimeFrictionAndInertiaEstimator::Update(foc::PhaseCurrents currentPhases, foc::RadiansPerSecond speed, foc::Radians electricalAngle, foc::NewtonMeter targetTorque)
-    {
-        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle.Value()), foc::FastTrigonometry::Sine(electricalAngle.Value()));
-        auto acceleration = (speed.Value() - previousSpeed.Value()) * samplingFrequency;
-
-        previousSpeed = speed;
-
-        if (!IsMechanicallyObservable(speed.Value()))
-            return Result{
-                foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
-                foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
-                lastMetrics
-            };
-
-        MotorRLS::MakeRegressor(regressor, acceleration, speed.Value());
-
-        torque.at(0, 0) = rotatingFrame.q * targetTorque.Value();
-
-        lastMetrics = rls->Update(regressor, torque);
-        excitation.Count(acceleration, speed.Value());
-
-        return Result{
-            foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
-            foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
-            lastMetrics
-        };
-    }
-
-    void RealTimeFrictionAndInertiaEstimator::Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction)
-    {
-        if (!rls.has_value())
-            return;
-
-        MotorRLS::CoefficientsMatrix initial{};
-        initial.at(0, 0) = 0.0f;
-        initial.at(1, 0) = inertia.Value();
-        initial.at(2, 0) = friction.Value();
-        rls->SetCoefficients(initial);
-        lastMetrics = MotorRLS::EstimationMetrics{};
-        excitation.Restart();
     }
 
     void RealTimeFrictionAndInertiaEstimator::SetTorqueConstant(foc::NewtonMeter kt)
@@ -83,7 +39,6 @@ namespace services
     {
         currentInertia = inertia;
         currentFriction = friction;
-        Seed(inertia, friction);
         ReseedOnline();
     }
 

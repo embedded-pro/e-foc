@@ -242,7 +242,7 @@ namespace
                 rest = standstillMock;
             }
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, &mechIdentMock, tracer, offsets, rest);
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer, offsets, rest);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -1046,91 +1046,6 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedOffsetMeasurement_Fails
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
 }
 
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_HoldsTheDriveUntilTheIdentificationEnds)
-{
-    ConstructFixtureInReady();
-
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedDone;
-    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([&capturedDone](const foc::NewtonMeter&, std::size_t,
-                             const services::MechanicalParametersIdentification::Config&,
-                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                 std::optional<foc::NewtonMeterSecondSquared>)>
-                                 done)
-            {
-                capturedDone = done;
-            }));
-
-    DispatchCommand(can::focIdentifyMechanicalId);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
-
-    ResetCaptures();
-    DispatchCommand(can::focStartId);
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-
-    capturedDone(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_Failure_ReturnsToReady)
-{
-    ConstructFixtureInReady();
-
-    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                             const services::MechanicalParametersIdentification::Config&,
-                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                 std::optional<foc::NewtonMeterSecondSquared>)>
-                                 done)
-            {
-                done(std::nullopt, std::nullopt);
-            }));
-
-    ResetCaptures();
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    EXPECT_TRUE(categoryErrorSent);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InReady_BroadcastsParamsAndAcksSuccess)
-{
-    ConstructFixtureInReady();
-
-    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                             const services::MechanicalParametersIdentification::Config&,
-                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                 std::optional<foc::NewtonMeterSecondSquared>)>
-                                 done)
-            {
-                done(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
-            }));
-
-    ResetCaptures();
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    EXPECT_FALSE(categoryErrorSent);
-}
-
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InIdle_RejectsInvalidState)
-{
-    ConstructFixture();
-    ResetCaptures();
-
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    EXPECT_FALSE(categoryErrorSent);
-}
-
 TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InIdle_BroadcastsIdleStatus)
 {
     ConstructFixture();
@@ -1332,32 +1247,6 @@ TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_IsRefusedAsModeMisma
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::modeMismatch);
 }
 
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NullMechIdent_ReturnsNotImplemented)
-{
-    GivenNvmAlwaysInvalid();
-    services::ConfigData config{};
-    coordinator.emplace(
-        application::TerminalAndTracer{ terminal, tracer },
-        application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
-        nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
-        faultNotifierMock,
-        config,
-        state_machine::ControlModeStateMachine::OuterLoopArgs{
-            foc::Ampere{ 10.0f },
-            hal::Hertz{ 1000 },
-            lowPriorityInterruptMock });
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, nullptr, tracer);
-    motorServer->SetAcknowledger(ackSpy);
-    ExecuteAllActions();
-    ResetCaptures();
-
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
-}
-
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_SecondStepFails_SendsCalibrationFailed)
 {
     ConstructFixture();
@@ -1427,30 +1316,6 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InFault_RejectsInvalidState)
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
     EXPECT_FALSE(categoryErrorSent);
-}
-
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_WhilePending_ReturnsBusy)
-{
-    ConstructFixtureInReady();
-
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
-    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([&capturedCallback](const foc::NewtonMeter&, std::size_t,
-                             const services::MechanicalParametersIdentification::Config&,
-                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                 std::optional<foc::NewtonMeterSecondSquared>)>
-                                 done)
-            {
-                capturedCallback = done;
-            }));
-
-    motorServer->HandleMessage(can::focIdentifyMechanicalId, SequenceOnlyPayload());
-
-    ResetCaptures();
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    EXPECT_TRUE(categoryErrorSent);
-    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_NvmFails_SendsPersistenceFailed)
@@ -1658,30 +1523,9 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, &mechIdentMock, tracer);
+    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
-}
-
-TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NulloptResults_SendsCalibrationFailed)
-{
-    ConstructFixtureInReady();
-
-    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                             const services::MechanicalParametersIdentification::Config&,
-                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                 std::optional<foc::NewtonMeterSecondSquared>)>
-                                 done)
-            {
-                done(std::nullopt, std::nullopt);
-            }));
-
-    ResetCaptures();
-    DispatchCommand(can::focIdentifyMechanicalId);
-
-    EXPECT_TRUE(categoryErrorSent);
-    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnStart_WithoutCalibration_SendsCalibrationFailedCategoryError)

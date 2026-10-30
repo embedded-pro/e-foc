@@ -67,12 +67,6 @@ WHEN(R"(the rotor is aligned)")
         << "Align command rejected";
 }
 
-WHEN(R"(electrical identification is attempted)")
-{
-    auto& fixture = context.Get<Fixture>();
-    fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, std::chrono::seconds{ 60 });
-}
-
 WHEN(R"(the rotor alignment is attempted)")
 {
     auto& fixture = context.Get<Fixture>();

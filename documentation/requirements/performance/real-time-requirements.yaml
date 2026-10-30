@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-PERF-003: a coding rule, kept in AGENTS.md
+
 - id: REQ-PERF-001
   title: FOC inner-loop execution time
   shall: >
@@ -13,17 +16,6 @@
     mechanical estimator below the current loop, shall complete within 20000 CPU cycles
     at 120 MHz. This budget is enforced by the cortex-cycle-budget CI gate
     (fail-over-max-cycles: 20000).
-
-- id: REQ-PERF-003
-  title: No per-sample validation in the inner loop
-  shall: >
-    The 20 kHz inner loop shall not validate the phase-current sample or the modulator
-    output. It shall perform no plausibility test on the sampled currents and no
-    finiteness test on either the currents or the resulting duty cycles, so that the
-    cycle budget of REQ-PERF-001 is spent on the control law. Detection of a failed
-    shunt, amplifier or ADC channel shall be the responsibility of the hardware
-    protection path, not of the control loop. Conversion of the modulator output to
-    duty cycles shall clamp each phase into the range [0, 1] and do nothing further.
 
 - id: REQ-PERF-004
   title: The control interrupt measures its own execution time

@@ -32,7 +32,6 @@ namespace can
         virtual void OnTelemetryElectrical(uint16_t sourceNodeId, const hal::Can::Message& msg) = 0;
         virtual void OnContractVersionResponse(uint16_t sourceNodeId, uint8_t major, uint8_t minor) = 0;
         virtual void OnElectricalParamsResponse(uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) = 0;
-        virtual void OnMechanicalParamsResponse(uint16_t sourceNodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) = 0;
         virtual void OnAlgorithmsResponse(uint16_t sourceNodeId, const FocAlgorithms& algorithms) = 0;
         virtual void OnParameterResponse(uint16_t sourceNodeId, FocParameter parameter, FocParameterValue value) = 0;
     };
@@ -90,7 +89,6 @@ namespace can
         bool SendQueryContractVersion(uint16_t targetNodeId);
         bool SendAlign(uint16_t targetNodeId);
         bool SendIdentifyElectrical(uint16_t targetNodeId);
-        bool SendIdentifyMechanical(uint16_t targetNodeId);
         bool SendRequestTelemetry(uint16_t targetNodeId);
         bool SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t targetNodeId, FocControlLoop loop, uint8_t algorithm);
@@ -108,7 +106,6 @@ namespace can
         bool HandleTelemetryElectrical(const hal::Can::Message& data);
         bool HandleContractVersionResponse(const hal::Can::Message& data);
         bool HandleElectricalParamsResponse(const hal::Can::Message& data);
-        bool HandleMechanicalParamsResponse(const hal::Can::Message& data);
         bool HandleAlgorithmsResponse(const hal::Can::Message& data);
         bool HandleParameterResponse(const hal::Can::Message& data);
 
@@ -118,7 +115,6 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> telemetryElectrical{ focTelemetryElectricalResponseId, *this, &FocMotorCategoryClient::HandleTelemetryElectrical };
         services::CanMessageHandler<FocMotorCategoryClient> contractVersionResponse{ focContractVersionResponseId, *this, &FocMotorCategoryClient::HandleContractVersionResponse };
         services::CanMessageHandler<FocMotorCategoryClient> electricalParamsResponse{ focElectricalParamsResponseId, *this, &FocMotorCategoryClient::HandleElectricalParamsResponse };
-        services::CanMessageHandler<FocMotorCategoryClient> mechanicalParamsResponse{ focMechanicalParamsResponseId, *this, &FocMotorCategoryClient::HandleMechanicalParamsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> algorithmsResponse{ focAlgorithmsResponseId, *this, &FocMotorCategoryClient::HandleAlgorithmsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> parameterResponse{ focParameterResponseId, *this, &FocMotorCategoryClient::HandleParameterResponse };
 
