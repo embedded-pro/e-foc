@@ -158,7 +158,7 @@ namespace tool
         auto* layout = new QHBoxLayout(group);
 
         controls.knob = new SetpointKnob(axis);
-        const auto range = QString("Accepted by the firmware: ±%1").arg(controls.knob->Format(axis.MaxCounts()));
+        const auto range = QString("%1: ±%2").arg(ui::backend::qt::ToQt(axis.RangeLabel()), controls.knob->Format(axis.MaxCounts()));
         controls.knob->setAccessibleName(QString("%1 knob").arg(title));
         controls.knob->setToolTip(QString("Turn to choose the setpoint, then Apply. Arrow keys step, Page Up and Page Down jump.\n%1").arg(range));
         layout->addWidget(controls.knob);

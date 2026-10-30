@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: service-nvm
-date: 2026-10-25
+date: 2026-10-30
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-25
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.4.0                        |
+| Version   | 0.4.1                        |
 | Component | service-nvm                  |
-| Date      | 2026-10-25                   |
+| Date      | 2026-10-30                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -213,25 +213,25 @@ stateDiagram-v2
 
 **CalibrationData** (108 bytes total, layout version 4):
 
-| Field                | Physical unit | Description                                         |
-|----------------------|---------------|-----------------------------------------------------|
-| rPhase               | Ω             | Measured phase resistance                           |
-| lD                   | H             | Measured d-axis inductance                          |
-| lQ                   | H             | Measured q-axis inductance                          |
-| fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF    |
-| currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor   |
-| inertia              | kg·m²         | Estimated rotor inertia                             |
-| frictionCoulomb      | N·m           | Coulomb (constant) friction                         |
-| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                        |
-| encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service) |
-| currentLoopBandwidth | rad/s         | Current loop closed-loop bandwidth                  |
-| speedLoopBandwidth   | rad/s         | Speed loop closed-loop bandwidth                    |
-| coggingTorqueScale   | N·m per count | Scale of the cogging map entries                    |
-| encoderDirection     | —             | Polarity correction (+1 or −1)                      |
-| polePairs            | —             | Number of motor pole pairs                          |
-| stage                | —             | Whether the calibration completed                   |
-| currentNoise         | mA            | RMS current-sensor noise; 0 when not measured       |
-| coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins  |
+| Field                | Physical unit | Description                                                     |
+|----------------------|---------------|-----------------------------------------------------------------|
+| rPhase               | Ω             | Measured phase resistance                                       |
+| lD                   | H             | Measured d-axis inductance                                      |
+| lQ                   | H             | Measured q-axis inductance                                      |
+| fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF                |
+| currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor               |
+| inertia              | kg·m²         | Estimated rotor inertia                                         |
+| frictionCoulomb      | N·m           | Coulomb (constant) friction                                     |
+| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                                    |
+| encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service)             |
+| currentLoopBandwidth | rad/s         | Not measured: carried from the previous record; 0 = automatic   |
+| speedLoopBandwidth   | rad/s         | Not measured: mechanical identification writes a fixed 50 rad/s |
+| coggingTorqueScale   | N·m per count | Scale of the cogging map entries                                |
+| encoderDirection     | —             | Polarity correction (+1 or −1)                                  |
+| polePairs            | —             | Number of motor pole pairs                                      |
+| stage                | —             | Whether the calibration completed                               |
+| currentNoise         | mA            | RMS current-sensor noise; 0 when not measured                   |
+| coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins              |
 
 `currentNoise` took the reserved byte that completed the last word. Every record written before it holds
 zero there, which reads as not measured and keeps the automatic current-loop bandwidth an earlier

@@ -99,3 +99,19 @@ Feature: Motor controller application on the connected motor
       | lqr      |
       | lqi      |
       | twodof   |
+
+  @hil_motor @REQ-HIL-025 @REQ-POS-013
+  Scenario: Position telemetry reads the setpoint's own turn near the encoder seam
+    Given the position motor system is initialised with no valid calibration data
+    When the position control mode is selected
+    And the full calibration is run
+    And the motor is enabled
+    And a position setpoint of 3.0 rad is applied
+    Then the measured position shall settle at 3.0 rad within 0.3 rad in 4000 ms
+    And the reported position shall read 3.0 rad within 0.3 rad without wrapping
+    When a position setpoint of -3.0 rad is applied
+    Then the measured position shall settle at -3.0 rad within 0.3 rad in 4000 ms
+    And the reported position shall read -3.0 rad within 0.3 rad without wrapping
+    And the motor shall not report a fault
+    When the motor is disabled
+    Then the state machine shall be in the Ready state

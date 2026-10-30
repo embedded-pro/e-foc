@@ -2,9 +2,9 @@
 title: "Current Loop — A1: Decoupled PID + Feedforward"
 type: theory
 status: draft
-version: 1.0.1
+version: 1.0.2
 component: "current-loop-decoupled-pid"
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Current Loop — A1: Decoupled PID + Feedforward |
 | Type      | theory                                         |
 | Status    | draft                                          |
-| Version   | 1.0.1                                          |
+| Version   | 1.0.2                                          |
 | Component | current-loop-decoupled-pid                     |
-| Date      | 2026-10-29                                     |
+| Date      | 2026-10-30                                     |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -151,14 +151,14 @@ minus the feedforward, so the feedforward is never integrated as if the loop had
 
 ## Numerical Properties
 
-| Property                  | Value                                         |
-|---------------------------|-----------------------------------------------|
-| ISR cost                  | ~10 MACs (PI + feedforward additions)         |
-| Settling time             | ~$1/\omega_{bw}$                              |
-| Robustness to Rs/Ls error | Low — feedforward is model-dependent          |
-| Requires $\psi_f$         | Yes (q-axis back-EMF cancellation)            |
-| Requires RLS convergence  | Partial ($L_s$ for feedforward; $R_s$ for PI) |
-| Tuning knobs              | 1 ($\omega_{bw}$)                             |
+| Property                  | Value                                           |
+|---------------------------|-------------------------------------------------|
+| ISR cost                  | ~10 MACs (PI + feedforward additions)           |
+| Time constant             | $1/\omega_{bw}$; 2 % settling $3.9/\omega_{bw}$ |
+| Robustness to Rs/Ls error | Low — feedforward is model-dependent            |
+| Requires $\psi_f$         | Yes (q-axis back-EMF cancellation)              |
+| Requires RLS convergence  | Partial ($L_s$ for feedforward; $R_s$ for PI)   |
+| Tuning knobs              | 1 ($\omega_{bw}$)                               |
 
 ---
 

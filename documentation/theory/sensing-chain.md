@@ -2,9 +2,9 @@
 title: "The Sensing Chain — Shunts, Amplifiers, ADC and Encoder"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "sensing-chain"
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                                                   |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | The Sensing Chain — Shunts, Amplifiers, ADC and Encoder |
 | Type      | theory                                                  |
 | Status    | draft                                                   |
-| Version   | 0.1.0                                                   |
+| Version   | 0.1.1                                                   |
 | Component | sensing-chain                                           |
-| Date      | 2026-10-29                                              |
+| Date      | 2026-10-30                                              |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -201,7 +201,10 @@ A quadrature encoder gives two square waves, A and B, a quarter cycle apart; the
 Counting both edges of both channels (×4 decoding) gives four counts per line: the default 4000 counts per
 revolution of e-foc is a 1000-line encoder read this way. The QEI counter is converted to an angle as
 $2\pi\,n/N_{enc}$ and wrapped to $[-\pi, \pi)$ (`core/platform_abstraction/QuadratureEncoderDecorator.hpp`); the
-platform then subtracts the alignment offset (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`).
+platform then subtracts the alignment offset and wraps the difference to $[-\pi, \pi)$ again
+(`core/platform_abstraction/EncoderZero.hpp`). Every target therefore reads half a turn either side of the
+alignment zero, as the simulated encoder does; without the second wrap the reading would sit in a window
+shifted by the offset, and the same rotor position could read a full turn apart from its setpoint.
 
 | Property         | E-FOC-HARDWARE / e-foc                                                                                                      | Consequence                                                                                            |
 |------------------|-----------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|

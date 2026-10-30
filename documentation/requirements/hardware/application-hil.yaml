@@ -30,3 +30,10 @@
   shall: >
     With the motor enabled in torque mode, a small torque setpoint shall accelerate the
     rotor in the commanded direction, and disabling the motor shall remove the torque.
+
+- id: REQ-HIL-025
+  title: Position telemetry reads the setpoint's own turn on the connected motor
+  shall: >
+    With the motor enabled in position mode and settled on a setpoint near half a turn from
+    the alignment zero, in either direction, the position reported over CAN shall read that
+    setpoint within the stated tolerance, not a turn away from it.

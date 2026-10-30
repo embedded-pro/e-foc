@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.5.1
+version: 0.5.2
 component: state-machine
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.5.1                      |
+| Version   | 0.5.2                      |
 | Component | state-machine              |
-| Date      | 2026-10-29                 |
+| Date      | 2026-10-30                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -271,18 +271,18 @@ sequenceDiagram
 
 **Steps and data produced:**
 
-| Step                                           | Service             | Data stored                                               |
-|------------------------------------------------|---------------------|-----------------------------------------------------------|
-| Rotor at rest (`service-standstill.md`)        | Rotor Standstill    | Nothing; fails the calibration after 10 s                 |
-| 0. Current sensor offsets                      | Current Offsets     | `currentOffsetA`, `currentOffsetB`, `currentOffsetC`      |
-| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                               |
-| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                      |
-| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                       |
-| 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified   |
-| 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
-| 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
-| 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured |
-| 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
+| Step                                           | Service             | Data stored                                                           |
+|------------------------------------------------|---------------------|-----------------------------------------------------------------------|
+| Rotor at rest (`service-standstill.md`)        | Rotor Standstill    | Nothing; fails the calibration after 10 s                             |
+| 0. Current sensor offsets                      | Current Offsets     | `currentOffsetA`, `currentOffsetB`, `currentOffsetC`                  |
+| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                                           |
+| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                                  |
+| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                                   |
+| 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified               |
+| 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor             |
+| 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` (a fixed 50 rad/s) |
+| 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured             |
+| 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                                    |
 
 The sequence starts only once the rotor is at rest: the encoder must stay within 2 mrad of where a
 100 ms window began, which bounds the speed to 0.02 rad/s, and a rotor still turning after 10 s fails
@@ -1046,8 +1046,8 @@ sequenceDiagram
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                                                                        |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                                                                         |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                                                                                |
-| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                                                                                     |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017                                                          |
+| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 50 rad/s, for speed/position modes only                                                      |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017       |
 | `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`                                       |
 
 `watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage

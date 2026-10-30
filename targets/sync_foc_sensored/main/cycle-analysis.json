@@ -33,6 +33,7 @@
       "label": "Encoder Read",
       "patterns": [
         "QuadratureEncoderDecorator.*::Read",
+        "PlatformFactoryImpl::Read\\(\\)",
         "QuadratureEncoder::Position",
         "QuadratureEncoder::Resolution",
         "SynchronousQuadratureEncoderStm::Position",
