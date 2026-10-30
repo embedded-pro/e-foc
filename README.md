@@ -38,7 +38,7 @@ This project provides a production-ready motor control implementation designed f
 - CMake 3.24 or later
 - Ninja, ccache, and Qt 6 (Core, Network, Widgets) for the host preset — the host build always configures `tools/`
 - Compatible toolchain for embedded targets (ARM GCC)
-- Development board: EK-TM4C1294XL (TI) or STM32F407G-DISC1 (ST)
+- Development board: EK-TM4C1294XL (TI) or NUCLEO-G474RE (ST), with the E-FOC-HARDWARE power board
 - Basic understanding of motor control and embedded systems
 
 ### Quick Start

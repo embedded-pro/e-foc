@@ -129,7 +129,7 @@ cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # em
 cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-RelWithDebInfo  # SIL firmware
 ```
 
-Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 

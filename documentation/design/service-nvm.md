@@ -137,7 +137,7 @@ The two NVM regions occupy fixed, non-overlapping address ranges within the MCU 
 | Configuration | 128          | 128 B     | One configuration record |
 | Reserved      | 256+         | remainder | Unused; not accessed     |
 
-Both regions fit comfortably within the 2048-byte EEPROM available on the TM4C1294 target. ST and Host targets use an in-memory stub of identical layout for regression testing.
+Both regions fit comfortably within the 2048-byte EEPROM available on the TM4C1294 target, and within the first 256-byte block of the 512-byte 24LC04 on E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM). The NUCLEO-H563ZI and host targets use an in-memory stub of identical layout for regression testing.
 
 ### Power-Loss Mitigation
 

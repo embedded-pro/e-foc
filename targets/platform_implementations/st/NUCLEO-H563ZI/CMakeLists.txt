@@ -1,3 +1,5 @@
+set(E_FOC_ST_STUBBED_PERIPHERALS On PARENT_SCOPE)
+
 add_library(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTERFACE)
 
 target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTERFACE

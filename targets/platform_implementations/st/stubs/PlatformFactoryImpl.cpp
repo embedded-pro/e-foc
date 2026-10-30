@@ -1,0 +1,222 @@
+#include "targets/platform_implementations/st/stubs/PlatformFactoryImpl.hpp"
+#include "services/tracer/GlobalTracer.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
+#include DEVICE_HEADER
+#include <atomic>
+
+unsigned int hse_value = 8'000'000;
+
+namespace
+{
+    application::ResetCause ReadAndClearResetCause()
+    {
+#if defined(STM32H5)
+        const uint32_t rst = RCC->RSR;
+        RCC->RSR |= RCC_RSR_RMVF;
+        if (rst & RCC_RSR_SFTRSTF)
+            return application::ResetCause::software;
+        if (rst & (RCC_RSR_IWDGRSTF | RCC_RSR_WWDGRSTF))
+            return application::ResetCause::watchdog;
+        if (rst & RCC_RSR_BORRSTF)
+            return application::ResetCause::brownOut;
+        if (rst & RCC_RSR_PINRSTF)
+            return application::ResetCause::hardware;
+#endif
+        return application::ResetCause::powerUp;
+    }
+}
+
+namespace application
+{
+    PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
+        : onInitialized(onInitialized)
+        , resetCause(ReadAndClearResetCause())
+    {
+        if (persistentFaultData.IsValid())
+        {
+            FormatFaultData(persistentFaultData, faultStatusString);
+            persistentFaultData.Invalidate();
+        }
+
+        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it.
+        NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
+
+        services::SetGlobalTracerInstance(terminalAndTracer.tracer);
+        this->onInitialized();
+    }
+
+    PlatformFactoryImpl::HalInitialization::HalInitialization()
+    {
+        HAL_Init();
+    }
+
+    hal::WatchDogStm::Config PlatformFactoryImpl::WatchdogConfig()
+    {
+        // The shortest early-warning period keeps the expiry close to the timeout, which is rounded up to whole periods
+        hal::WatchDogStm::Config config;
+        config.prescaler = WWDG_PRESCALER_1;
+        return config;
+    }
+
+    void PlatformFactoryImpl::OnWatchdogExpired()
+    {
+        CutPowerStage();
+    }
+
+    void PlatformFactoryImpl::Run()
+    {
+        eventDispatcher.Run();
+    }
+
+    services::Tracer& PlatformFactoryImpl::Tracer()
+    {
+        return terminalAndTracer.tracer;
+    }
+
+    services::TerminalWithCommands& PlatformFactoryImpl::Terminal()
+    {
+        return terminalAndTracer.terminal;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::OperationalLed()
+    {
+        return operationalPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::WarningLed()
+    {
+        return warningPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::FailureLed()
+    {
+        return failurePin;
+    }
+
+    uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        return 0;
+    }
+
+    hal::Hertz PlatformFactoryImpl::SystemClock() const
+    {
+        return hal::Hertz(SystemCoreClock);
+    }
+
+    foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
+    {
+        return foc::Volts(48.0f);
+    }
+
+    foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
+    {
+        return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
+    }
+
+    foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
+    {
+        return pendSvLowPriorityInterrupt;
+    }
+
+    void PlatformFactoryImpl::Start()
+    {
+    }
+
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
+    {
+        phaseCurrentAdc.reset();
+        phaseCurrentAdc.emplace(0.0f, 0.0f);
+        pwm.reset();
+        pwm.emplace();
+        pwmBaseFrequency = baseFrequency;
+    }
+
+    void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
+    {
+        encoder.reset();
+        encoder.emplace(resolution);
+    }
+
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t /*bitRate*/, bool /*testMode*/)
+    {
+        canBus.reset();
+        canBus.emplace();
+        diagnostics.AttachCanBus(*canBus);
+    }
+
+    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    {
+        return *canBus;
+    }
+
+    void PlatformFactoryImpl::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    {
+        onPhaseCurrentsReady.Set(onDone);
+        phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
+            {
+                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+            });
+    }
+
+    void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
+    {
+        if (pwm)
+            pwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+    }
+
+    void PlatformFactoryImpl::Stop()
+    {
+        if (pwm)
+            pwm->Stop();
+    }
+
+    hal::Hertz PlatformFactoryImpl::BaseFrequency() const
+    {
+        return pwmBaseFrequency;
+    }
+
+    foc::Radians PlatformFactoryImpl::Read()
+    {
+        if (!encoder)
+            return foc::Radians{ 0.0f };
+        return encoder->Read() - encoderOffset;
+    }
+
+    void PlatformFactoryImpl::Set(foc::Radians value)
+    {
+        if (encoder)
+            encoderOffset = encoder->Read() - value;
+    }
+
+    void PlatformFactoryImpl::SetZero()
+    {
+        if (encoder)
+            encoderOffset = encoder->Read();
+    }
+
+    hal::Eeprom& PlatformFactoryImpl::Eeprom()
+    {
+        return eepromStub;
+    }
+
+    void PlatformFactoryImpl::Reset()
+    {
+        NVIC_SystemReset();
+    }
+
+    ResetCause PlatformFactoryImpl::GetResetCause() const
+    {
+        return resetCause;
+    }
+
+    infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
+    {
+        return faultStatusString;
+    }
+
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
+    {
+        return diagnostics;
+    }
+}

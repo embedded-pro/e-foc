@@ -138,11 +138,11 @@ TEST_F(TerminalWithBannerTest, construction_prints_banner_with_ready_message)
 
 TEST_F(TerminalWithBannerTest, construction_prints_banner_with_different_target_names)
 {
-    auto banner = CreateBanner("STM32F407G-DISC1", 24.0f, 168000000);
+    auto banner = CreateBanner("NUCLEO-G474RE", 24.0f, 170000000);
     services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
     ExecuteAllActions();
 
-    EXPECT_TRUE(OutputContains("STM32F407G-DISC1"));
+    EXPECT_TRUE(OutputContains("NUCLEO-G474RE"));
 }
 
 TEST_F(TerminalWithBannerTest, construction_includes_voltage_in_output)

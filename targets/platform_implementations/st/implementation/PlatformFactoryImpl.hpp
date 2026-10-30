@@ -1,29 +1,51 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
+#include <optional>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "core/services/cli/SerialCommunicationMirror.hpp"
+#include "drivers/eeprom/Eeprom24xx.hpp"
+#include "hal/cortex_m/DataWatchpointAndTrace.hpp"
+#include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
-#include "hal/interfaces/Pwm.hpp"
-#include "hal/interfaces/SerialCommunication.hpp"
-#include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "hal_st/stm32fxxx/AnalogToDigitalPinStm.hpp"
+#include "hal_st/stm32fxxx/DmaStm.hpp"
+#include "hal_st/stm32fxxx/FdCanStm.hpp"
+#include "hal_st/stm32fxxx/GpioStm.hpp"
+#include "hal_st/stm32fxxx/I2cStm.hpp"
+#include "hal_st/stm32fxxx/PwmStm.hpp"
+#include "hal_st/stm32fxxx/UartStmDma.hpp"
 #include "hal_st/stm32fxxx/WatchDogStm.hpp"
+#include "hal_st/synchronous_stm32fxxx/SynchronousAdcStm.hpp"
+#include "hal_st/synchronous_stm32fxxx/SynchronousQuadratureEncoderStm.hpp"
 #include "infra/util/HotSwapFunction.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
+#include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
+#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/peripheral_stubs/PeripheralStubs.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
+#include "targets/platform_implementations/st/implementation/AdcTriggeredByPwmStm.hpp"
+
+extern "C" uint32_t SystemCoreClock;
 
 namespace application
 {
+    struct InterruptPriorities
+    {
+        static constexpr auto phaseCurrentAdc{ hal::cortex::InterruptPriority::highest };
+        static constexpr auto can{ hal::cortex::InterruptPriority::normal };
+        static constexpr auto uart{ hal::cortex::InterruptPriority::low };
+    };
+
     class PlatformFactoryImpl
         : public PlatformFactory
     {
@@ -31,6 +53,8 @@ namespace application
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
 
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
+        drivers::DeadTimeLoss InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const override;
+        uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;
@@ -46,26 +70,16 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
+        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override;
+        PlatformFactory::BoardProtectionState BoardProtectionStatus() override;
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
 
-        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
-        {
-            onBoardProtection = onProtection;
-        }
-
-        PlatformFactory::BoardProtectionState BoardProtectionStatus() override
-        {
-            return PlatformFactory::BoardProtectionState::unknown;
-        }
-
-        // Also satisfies ThreePhaseInverter::Start; no-op on ST
-        void Start() override;
-
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
+        void Start() override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
@@ -75,116 +89,121 @@ namespace application
         void SetZero() override;
 
     private:
-        class EepromStub
-            : public hal::Eeprom
-        {
-        public:
-            static constexpr uint32_t stubSize = 512;
-
-            EepromStub()
-            {
-                storage.fill(0xFF);
-            }
-
-            uint32_t Size() const override
-            {
-                return stubSize;
-            }
-
-            void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
-            {
-                const auto start = static_cast<decltype(storage.size())>(address);
-                const auto length = buffer.size();
-
-                if (start > storage.size() || length > storage.size() - start)
-                {
-                    onDone();
-                    return;
-                }
-
-                std::copy(buffer.begin(), buffer.end(), storage.begin() + start);
-                onDone();
-            }
-
-            void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
-            {
-                const auto start = static_cast<decltype(storage.size())>(address);
-                const auto length = buffer.size();
-
-                if (start > storage.size() || length > storage.size() - start)
-                {
-                    onDone();
-                    return;
-                }
-
-                std::copy(storage.begin() + start, storage.begin() + start + length, buffer.begin());
-                onDone();
-            }
-
-            void Erase(infra::Function<void()> onDone) override
-            {
-                storage.fill(0xFF);
-                onDone();
-            }
-
-        private:
-            std::array<uint8_t, stubSize> storage;
-        };
-
-        struct TerminalAndTracer
-        {
-            explicit TerminalAndTracer(hal::SerialCommunication& com)
-                : streamWriterOnSerialCommunication(com)
-                , tracerStream(streamWriterOnSerialCommunication)
-                , tracer(tracerStream)
-                , terminal(com, tracer)
-            {}
-
-            services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication;
-            infra::TextOutputStream::WithErrorPolicy tracerStream;
-            services::TracerWithDateTime tracer;
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<> terminal;
-        };
-
-    private:
-        static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
-
-        static hal::WatchDogStm::Config WatchdogConfig();
-        static void OnWatchdogExpired();
+        static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
+            "fault status must hold the full register, FSR/FAR and backtrace dump");
 
         struct HalInitialization
         {
             HalInitialization();
         };
 
-        // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
+        struct Cortex
+        {
+            static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
+
+            static hal::WatchDogStm::Config WatchdogConfig();
+
+            explicit Cortex(PlatformFactoryImpl& platform);
+
+            hal::WatchDogStm watchdog{ WatchdogConfig() };
+            services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<Resources::eventDispatcherSize> eventDispatcher;
+            hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
+            hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
+        };
+
+        struct TerminalAndTracer
+        {
+            hal::DmaStm::TransmitStream transmitStream;
+            hal::UartStmDma uart;
+#ifdef E_FOC_CONSOLE_ON_RTT
+            services::SerialCommunicationOnSeggerRtt rtt;
+            services::SerialCommunicationMirror mirror{ uart, rtt };
+            hal::SerialCommunication& console{ mirror };
+#else
+            hal::SerialCommunication& console{ uart };
+#endif
+            services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ console };
+            infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
+            services::TracerWithDateTime tracer{ tracerStream };
+            services::TerminalWithCommandsImplBase<Resources::terminalCommandLength>::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ console, tracer };
+
+            explicit TerminalAndTracer(hal::DmaStm& dma);
+        };
+
+        static constexpr std::size_t phaseCurrentChannels{ 5 };
+        static constexpr std::size_t currentTotalSample{ 3 };
+        static constexpr std::size_t powerSupplySample{ 4 };
+        using PhaseCurrentAdc = AdcTriggeredByPwmStm<phaseCurrentChannels>;
+
+        void ReconfigureAdc(SampleAndHold sampleAndHold);
+        void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
+        void ConfigureSamplingTrigger();
+        void MonitorBoard(hal::AdcMultiChannel::Samples samples);
+        void TripProtection(BoardProtectionReason reason);
+
+        static CanBusAdapter::CanError ToAdapterError(hal::FdCanStm::Error error);
+
+        void OnWatchdogExpired();
+
+        class EepromI2cStm
+            : public hal::I2cStm
+        {
+        public:
+            using hal::I2cStm::I2cStm;
+
+        protected:
+            void DeviceNotFound() override
+            {}
+
+            void BusError() override
+            {}
+
+            void ArbitrationLost() override
+            {}
+        };
+
+        struct Peripherals
+        {
+            explicit Peripherals(PlatformFactoryImpl& platform);
+
+            Cortex cortex;
+            hal::DmaStm dma;
+            TerminalAndTracer terminalAndTracer{ dma };
+            hal::AdcStm phaseCurrentConverter{ Peripheral::PhaseCurrentAdcIndex };
+            hal::DmaStm::ReceiveStream phaseCurrentStream{ dma, hal::DmaChannelId{ Peripheral::DmaIndex, Peripheral::PhaseCurrentDmaChannel, Peripheral::phaseCurrentDmaRequest } };
+            hal::AdcStm powerSupplyConverter{ Peripheral::PowerSupplyAdcIndex };
+            hal::SynchronousAdcStm powerSupplyAdc;
+            EepromI2cStm eepromI2c;
+            drivers::Eeprom24xx eeprom{ eepromI2c, drivers::Eeprom24xx::Config{} };
+
+            std::optional<AdcPhaseCurrentMeasurementImpl<PhaseCurrentAdc>> phaseCurrentAdc;
+            std::optional<hal::PwmStm> pwm;
+            std::optional<QuadratureEncoderDecoratorImpl<hal::SynchronousQuadratureEncoderStm>> encoder;
+            std::optional<CanBusAdapterImpl<hal::FdCanStm::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
+        };
+
+    private:
+        static void ConfigureBoardIdPins();
+        static uint8_t ReadBoardIdPins();
+
         HalInitialization halInitialization;
-        hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
-        hal::WatchDogStm watchdog{ WatchdogConfig() };
-        services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
-            {
-                OnWatchdogExpired();
-            } };
+        hal::cortex::InterruptTable::WithStorage<Resources::interruptTableSize> interruptTable;
+        hal::GpioStm gpio;
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
-        static constexpr uint32_t timerId = 1;
-        GpioPinStub operationalPin;
-        GpioPinStub warningPin;
-        GpioPinStub failurePin;
-        SerialCommunicationStub serial;
-        TerminalAndTracer terminalAndTracer{ serial };
-        std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;
-        std::optional<ThreeChannelsPwmStub> pwm;
-        std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
-        std::optional<CanBusAdapterImpl<CanStub>> canBus;
-        EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
+        uint8_t boardId{ 0 };
+        [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
-        infra::BoundedString::WithStorage<1024> faultStatusString;
+        volatile bool controlLoopEntered{ false };
+        volatile bool protectionTripped{ false };
+        foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };
+        infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
-        infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
+        infra::Function<void(BoardProtectionReason)> onFaultCallback;
+        std::optional<Peripherals> peripherals;
     };
 }

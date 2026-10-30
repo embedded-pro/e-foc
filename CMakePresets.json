@@ -123,17 +123,18 @@
       }
     },
     {
-      "name": "STM32F407G-DISC1",
-      "displayName": "STM32F407G-DISC1",
-      "description": "Build for stm32f407",
+      "name": "NUCLEO-G474RE",
+      "displayName": "NUCLEO-G474RE",
+      "description": "Build for STM32G474RE",
       "inherits": "stm32",
       "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
       "cacheVariables": {
         "TARGET_CORTEX": "m4",
-        "TARGET_MCU_FAMILY": "stm32f4xx",
-        "TARGET_MCU": "stm32f407",
-        "E_FOC_TARGET_BOARD": "STM32F407G-DISC1",
-        "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
+        "TARGET_MCU_FAMILY": "stm32g4xx",
+        "TARGET_MCU": "stm32g474",
+        "TARGET_MCU_VARIANT": "stm32g474rxt",
+        "E_FOC_TARGET_BOARD": "NUCLEO-G474RE",
+        "E_FOC_MOTOR_BOARD": "E-FOC-HARDWARE"
       }
     },
     {
@@ -232,14 +233,14 @@
       "configurePreset": "EK-TM4C123GXL"
     },
     {
-      "name": "STM32F407G-DISC1-RelWithDebInfo",
+      "name": "NUCLEO-G474RE-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
-      "configurePreset": "STM32F407G-DISC1"
+      "configurePreset": "NUCLEO-G474RE"
     },
     {
-      "name": "STM32F407G-DISC1-Debug",
+      "name": "NUCLEO-G474RE-Debug",
       "configuration": "Debug",
-      "configurePreset": "STM32F407G-DISC1"
+      "configurePreset": "NUCLEO-G474RE"
     },
     {
       "name": "NUCLEO-H563ZI-RelWithDebInfo",
