@@ -197,6 +197,8 @@ namespace tool
                 return "Over temperature";
             case FocFaultCode::sensorFault:
                 return "Sensor fault";
+            case FocFaultCode::stall:
+                return "Stall";
             default:
                 return "Unknown";
         }

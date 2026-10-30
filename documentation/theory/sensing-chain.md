@@ -206,19 +206,19 @@ platform then subtracts the alignment offset and wraps the difference to $[-\pi,
 alignment zero, as the simulated encoder does; without the second wrap the reading would sit in a window
 shifted by the offset, and the same rotor position could read a full turn apart from its setpoint.
 
-| Property         | E-FOC-HARDWARE / e-foc                                                                                                      | Consequence                                                                                            |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| Resolution       | 4000 counts, set from the configuration record                                                                              | 0.09° mechanical, 0.36° electrical per count                                                           |
-| Index (Z)        | Wired, not used; the counter resets on its maximum                                                                          | No absolute reference: alignment at every calibration, and the cogging map indexed by electrical angle |
-| Channel polarity | Phase A inverted on the EK-TM4C1294XL wiring                                                                                | A wiring fact the platform must state                                                                  |
-| Speed            | Difference of window angles over 1 ms, unfiltered                                                                           | 1.57 rad/s quantum ([disturbances and noise](disturbances-and-noise.md) §4)                            |
-| Plausibility     | Fault if, for 100 ms, the drive pushes ≥ 5 % of its current limit and asks for motion while the angle stays within 0.01 rad | Detects a disconnected or stuck encoder                                                                |
-| Standstill       | Within 2 mrad for 100 ms                                                                                                    | Gates the offset measurement                                                                           |
+| Property         | E-FOC-HARDWARE / e-foc                                                                                                                                    | Consequence                                                                                            |
+|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| Resolution       | 4000 counts, set from the configuration record                                                                                                            | 0.09° mechanical, 0.36° electrical per count                                                           |
+| Index (Z)        | Wired, not used; the counter resets on its maximum                                                                                                        | No absolute reference: alignment at every calibration, and the cogging map indexed by electrical angle |
+| Channel polarity | Phase A inverted on the EK-TM4C1294XL wiring                                                                                                              | A wiring fact the platform must state                                                                  |
+| Speed            | Difference of window angles over 1 ms, unfiltered                                                                                                         | 1.57 rad/s quantum ([disturbances and noise](disturbances-and-noise.md) §4)                            |
+| Plausibility     | Fault if, for 100 ms, the drive pushes ≥ 5 % of its current limit and asks for motion while the angle stays within 0.01 rad (defaults, settable over CAN) | Detects a disconnected or stuck encoder; a rotor pushed against the drive and held is a stall instead  |
+| Standstill       | Within 2 mrad for 100 ms                                                                                                                                  | Gates the offset measurement                                                                           |
 
 Practical errors that the counter cannot see: a code wheel mounted off-centre or with uneven slots (a periodic
 angle error, once per revolution, whose speed error grows with speed); count dither at rest, flipping between two
 neighbours; electrical noise on long encoder cables, which a digital glitch filter in the counter suppresses; and
-mechanical compliance between the encoder and the rotor. Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`,
+mechanical compliance between the encoder and the rotor. Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `documentation/design/fault-supervision.md`,
 `core/services/standstill/RotorStandstillImpl.hpp`.
 
 ### 8. Bus Voltage and Temperature

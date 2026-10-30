@@ -62,6 +62,7 @@ namespace tool
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
         static constexpr uint8_t settingsContractMinor{ 1 };
         static constexpr uint8_t diagnosticsContractMinor{ 2 };
+        static constexpr uint8_t supervisionContractMinor{ 4 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -72,6 +73,7 @@ namespace tool
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
         bool SupportsSettings(uint16_t nodeId) const;
         bool SupportsDiagnostics(uint16_t nodeId) const;
+        bool SupportsSupervision(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);

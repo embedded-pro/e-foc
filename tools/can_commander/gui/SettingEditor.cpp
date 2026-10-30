@@ -29,7 +29,7 @@ namespace tool
 
         if (presentation.parameter == can::FocParameter::canBitrate)
             BuildChoice(*layout);
-        else if (presentation.parameter == can::FocParameter::currentTwoStepDeadbeat)
+        else if (IsToggle(presentation.parameter))
             BuildToggle(*layout);
         else
             BuildNumber(*layout);

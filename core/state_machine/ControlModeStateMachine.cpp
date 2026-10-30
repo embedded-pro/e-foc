@@ -28,6 +28,7 @@ namespace state_machine
         , algorithmPersistence(configWriter, this->configData, terminalAndTracer.tracer)
     {
         SanitizeTunings(this->configData);
+        SanitizeSupervision(this->configData);
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
     }

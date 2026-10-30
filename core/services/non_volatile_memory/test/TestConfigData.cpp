@@ -39,9 +39,20 @@ TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mod
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_76)
+TEST_F(TestConfigData, config_data_sizeof_is_96)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 76 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 96 });
+}
+
+TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_settings)
+{
+    const auto cfg = services::MakeDefaultConfigData();
+    EXPECT_NEAR(cfg.supervision.window, 0.1f, 1e-6f);
+    EXPECT_NEAR(cfg.supervision.currentFraction, 0.05f, 1e-6f);
+    EXPECT_NEAR(cfg.supervision.demandedSpeed, 2.0f, 1e-6f);
+    EXPECT_NEAR(cfg.supervision.positionError, 0.2f, 1e-6f);
+    EXPECT_NEAR(cfg.supervision.stillExcursion, 0.01f, 1e-6f);
+    EXPECT_EQ(cfg.stallDetection, uint8_t{ 1 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic)

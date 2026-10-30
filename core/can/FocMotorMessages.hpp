@@ -64,7 +64,8 @@ namespace can
         overVoltage = 2,
         underVoltage = 3,
         overTemperature = 4,
-        sensorFault = 5
+        sensorFault = 5,
+        stall = 6
     };
 
     enum class FocMotorCategoryError : uint8_t
@@ -135,6 +136,12 @@ namespace can
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,
+        supervisionWindow = 0x70,
+        supervisionCurrentFraction = 0x71,
+        supervisionDemandedSpeed = 0x72,
+        supervisionPositionError = 0x73,
+        supervisionStillExcursion = 0x74,
+        stallDetection = 0x75,
         currentOffsetA = 0x80,
         currentOffsetB = 0x81,
         currentOffsetC = 0x82,

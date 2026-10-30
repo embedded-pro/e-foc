@@ -1,6 +1,7 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanPayload.hpp"
+#include "core/can/FocMotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
 #include <utility>
@@ -57,6 +58,11 @@ namespace tool
     bool CanCommandClient::SupportsDiagnostics(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, diagnosticsContractMinor);
+    }
+
+    bool CanCommandClient::SupportsSupervision(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, supervisionContractMinor);
     }
 
     bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
@@ -292,8 +298,9 @@ namespace tool
             return;
 
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
+        const bool supervision = SupportsSupervision(nodeId);
         for (const auto& descriptor : can::focParameters)
-            if (!descriptor.readOnly)
+            if (!descriptor.readOnly && (supervision || can::GroupOf(descriptor.id) != can::ParameterGroup::supervision))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 

@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include <cstdint>
+#include <optional>
 
 namespace foc
 {
@@ -15,6 +16,7 @@ namespace foc
         foc::NewtonMeter ExternalTorque() const;
         void SetCoulombFriction(foc::NewtonMeter friction);
         void SetCogging(foc::NewtonMeter amplitude, uint32_t cyclesPerRevolution);
+        void Grip(std::optional<foc::RadiansPerSecond> handSpeed);
 
         void Step(float electricalTorque, float dt);
 
@@ -29,6 +31,7 @@ namespace foc
 
     private:
         float CoggingTorque() const;
+        float FreeSpeed(float electricalTorque, float dt) const;
 
     private:
         float inertia;
@@ -40,6 +43,7 @@ namespace foc
         float coulombFrictionNm{ 0.0f };
         float coggingTorqueNm{ 0.0f };
         uint32_t coggingCyclesPerRevolution{ 0 };
+        std::optional<foc::RadiansPerSecond> grip;
 
         foc::Radians theta{ 0.0f };
         foc::Radians thetaMech{ 0.0f };

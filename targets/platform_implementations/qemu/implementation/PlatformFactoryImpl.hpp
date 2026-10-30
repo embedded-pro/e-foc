@@ -176,6 +176,7 @@ namespace application
         static hal::Hertz BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config);
 
         void ApplyPlantConfig();
+        void ConfigureShaftGrip(uint32_t baseHz);
         void ApplyCurrentSense(SampleAndHold requested);
 
         const std::optional<sil::SilPlantConfig> plantConfig;
@@ -203,6 +204,9 @@ namespace application
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;
+        foc::OneShotDelay shaftGrip;
+        foc::OneShotDelay shaftHold;
+        foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
         std::optional<EmulatedCanBusAdapter> canBusAdapter;

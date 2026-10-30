@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.6.1
+version: 0.7.0
 component: can-service
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.6.1                    |
+| Version   | 0.7.0                    |
 | Component | can-service              |
 | Date      | 2026-10-30               |
 
@@ -40,7 +40,8 @@ date: 2026-10-30
 - Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
 - Selecting the control algorithm of each loop and reporting the algorithms in force.
 - Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
-  parameters of the calibration record and the settings that take effect at the next start.
+  parameters of the calibration record, the settings that take effect at the next start and the drive-wide
+  supervision settings.
 
 **Is NOT responsible for:**
 - The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
@@ -226,6 +227,30 @@ control periods at 20 kHz) and rounded beyond.
 application wires no mechanical identification to the CAN bridge; `Calibrate` (`0x17`) runs the mechanical
 identification as part of the calibration sequence. Their IDs stay reserved and are never reused. A 2.2 client
 that still sends either command gets no acknowledgement and times out; every other message is unchanged.
+
+**Contract 2.4 — fault supervision.** Version 2.4 adds six parameters and one fault code; nothing in 2.3
+changes. The parameters are the drive-wide supervision settings of `fault-supervision.md` (REQ-SM-033),
+kept in the configuration record. Like a start-up setting they can be written in any state and are
+answered once stored, and a write that cannot be stored is taken back; unlike one, they take effect at the
+supervisor's next evaluation, within 10 ms. A position error above π is never reached, because the error is
+wrapped to half a turn, so a threshold that high leaves only the demanded speed as a demand.
+
+| ID     | Parameter                    | Unit  | Range      | Automatic | Takes effect |
+|--------|------------------------------|-------|------------|-----------|--------------|
+| `0x70` | `supervisionWindow`          | s     | 0.05 – 10  | no        | immediately  |
+| `0x71` | `supervisionCurrentFraction` | -     | 0.01 – 1   | no        | immediately  |
+| `0x72` | `supervisionDemandedSpeed`   | rad/s | 0.1 – 500  | no        | immediately  |
+| `0x73` | `supervisionPositionError`   | rad   | 0.01 – 3.2 | no        | immediately  |
+| `0x74` | `supervisionStillExcursion`  | rad   | 0.001 – 1  | no        | immediately  |
+| `0x75` | `stallDetection`             | -     | 0 or 1     | no        | immediately  |
+
+`FocFaultCode` gains `stall` (`6`): an outside force pushed the rotor against the drive and held it
+(`fault-supervision.md` Part C). It is raised only while `stallDetection` is `1`; `sensorFault` (`5`) is
+kept for an encoder that stopped reporting and for a rotor locked before it moved, and cannot be switched
+off. Adding the enumerator leaves the meaning of the existing codes unchanged, which keeps it a minor
+version, as `invalidParameters` was in 2.1. A 2.3 client shows the new code as an unknown fault. A client
+asks a server for the six parameters only when it reports 2.4 or newer, since an older one answers
+`invalidPayload` for each.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

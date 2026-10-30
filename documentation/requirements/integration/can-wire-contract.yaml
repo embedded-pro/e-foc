@@ -87,6 +87,14 @@
     through QueryParameter as read-only parameters. SetParameter on a read-only parameter
     shall be answered with invalidPayload and change nothing.
 
+- id: REQ-CAN-011
+  title: The supervision settings and the stall fault are reachable by number
+  shall: >
+    Contract version 2.4 shall add, without changing any 2.3 message, the supervision settings
+    of REQ-SM-033 as numbered parameters, each with a unit and a range defined once in core/can,
+    writable in any state and answered as REQ-CAN-007 answers a start-up setting, and a stall
+    value of the fault code carried by the status telemetry and the fault event.
+
 - id: REQ-CAN-008
   title: Floating-point fields have one byte order
   shall: >

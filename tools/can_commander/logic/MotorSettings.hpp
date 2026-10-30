@@ -64,12 +64,14 @@ namespace tool
     std::span<const SettingPresentation> LoopSettings(can::FocControlLoop loop);
     std::span<const SettingPresentation> MotorParameterSettings();
     std::span<const SettingPresentation> StartupSettings();
+    std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> Readings();
     std::string_view ResetCauseName(float cause);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm);
     bool IsBandwidth(can::FocParameter parameter);
     bool IsInteger(can::FocParameter parameter);
+    bool IsToggle(can::FocParameter parameter);
     bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy);
     std::optional<uint8_t> LegacyCommandOf(can::FocParameter parameter);
     uint8_t CommandTypeOf(const SettingChange& change, bool legacy);
