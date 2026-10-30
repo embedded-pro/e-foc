@@ -28,9 +28,10 @@ date: 2026-09-26
 - Resetting the target from hardware, so that the next boot reports the reset cause as *watchdog*.
 
 **Is NOT responsible for:**
-- Proving that the control loops are running. A current loop or outer loop that stops while the dispatcher
-  keeps running is not a watchdog failure. It is left to the protections that watch the bridge itself:
-  the hardware overcurrent and overvoltage comparators, board protection and the fault state machine.
+- Proving that the control loops are running. A control interrupt that stops completing while the
+  dispatcher keeps running is not a watchdog failure: the control-loop supervisor stops the power stage
+  within 3 ms ([Control-Loop Supervision Design](control-loop-supervision.md)). The watchdog covers the
+  opposite case, an interrupt that never returns and so starves the dispatcher.
 - Being switched on, off or reconfigured by the application. There is no watchdog port in the platform
   factory. The platform owns the watchdog, and supervision is always on.
 - Detecting the reset cause after a watchdog reset. That is the error-handling component's work, reached

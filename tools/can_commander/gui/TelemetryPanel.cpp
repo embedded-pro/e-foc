@@ -213,6 +213,8 @@ namespace tool
                 return "Sensor fault";
             case FocFaultCode::stall:
                 return "Stall";
+            case FocFaultCode::controlLoopStall:
+                return "Control loop stall";
             default:
                 return "Unknown";
         }

@@ -21,6 +21,11 @@ namespace application
         reentryCount = 0;
     }
 
+    uint32_t ControlLoopMetrics::Completions() const
+    {
+        return completions;
+    }
+
     ControlLoopMetrics::Snapshot ControlLoopMetrics::Read() const
     {
         return Snapshot{

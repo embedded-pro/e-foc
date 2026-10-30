@@ -13,6 +13,7 @@ namespace application
         void AttachCanBus(CanBusAdapter& bus);
 
         ControlLoopMetrics::Snapshot ControlLoopStatistics() const;
+        uint32_t ControlLoopCompletions() const;
         const CanBusAdapter::ErrorCounters& CanStatistics() const;
         void Reset();
 

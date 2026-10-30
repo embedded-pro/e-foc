@@ -1,6 +1,7 @@
 {
   "shards": [
     [
+      "integration_tests/features/control_loop_supervision.feature",
       "integration_tests/features/control_robustness.feature",
       "integration_tests/features/current_stream.feature",
       "integration_tests/features/fault_supervision.feature",

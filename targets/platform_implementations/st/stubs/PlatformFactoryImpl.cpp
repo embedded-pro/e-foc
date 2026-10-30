@@ -156,6 +156,7 @@ namespace application
         phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+                controlLoopMetrics.Record(0);
             });
     }
 

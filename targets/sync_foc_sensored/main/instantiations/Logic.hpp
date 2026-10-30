@@ -25,6 +25,7 @@
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
+#include "core/supervision/ControlLoopStallMonitor.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
@@ -68,6 +69,7 @@ namespace application
         services::RotorStandstillImpl rotorStandstill;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
+        supervision::ControlLoopStallMonitor controlLoopStall;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 

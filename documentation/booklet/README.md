@@ -86,6 +86,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                         |
 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry       |
 | [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings           |
+| [Control-Loop Supervision](../design/control-loop-supervision.md)                      | Stops the power stage when the 20 kHz control interrupt stops completing            |
 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                           |
 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers           |
 

@@ -137,6 +137,7 @@ namespace sil
             .shaftTurnRadians = 0.0f,
             .shaftGripDelayMs = 0u,
             .shaftTurnMs = 0u,
+            .controlInterruptLossDelayMs = 0u,
 
             .polePairs = 0u,
             .faultFlags = 0u,

@@ -26,6 +26,8 @@ namespace
             return can::FocFaultCode::sensorFault;
         if (name == "stall")
             return can::FocFaultCode::stall;
+        if (name == "control-loop-stall")
+            return can::FocFaultCode::controlLoopStall;
         return std::nullopt;
     }
 }

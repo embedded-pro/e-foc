@@ -48,6 +48,9 @@ namespace mil
                 case foc::PlantResponseKind::encoderFreeze:
                     std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu encoder_freeze %ld", tick, Micro(sample.thetaMech));
                     break;
+                case foc::PlantResponseKind::controlInterruptLoss:
+                    std::snprintf(line.data(), line.size(), "PLANT_EVENT %lu control_interrupt_loss 0", tick);
+                    break;
                 case foc::PlantResponseKind::stopped:
                     std::snprintf(line.data(), line.size(), "PLANT_STOP %lu %lu", tick, static_cast<unsigned long>(record.dropped));
                     break;

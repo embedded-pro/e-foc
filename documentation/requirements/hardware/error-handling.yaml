@@ -133,3 +133,13 @@
     from the consumers, and refuse every duty command and start until the power stage is
     stopped, and the platform shall report an over-current board-protection fault from the event
     loop.
+
+- id: REQ-EH-015
+  title: A control interrupt that stops completing stops the power stage
+  shall: >
+    While the power stage is started, a control interrupt that has not completed for more than
+    1 ms shall cause the drive to stop the power stage within 3 ms of the last completed interrupt and to
+    raise FaultCode::controlLoopStall through the platform fault notifier. The supervision shall
+    run on the event loop and add no more than one counter increment to the control interrupt;
+    an interrupt that never returns, and so starves the event loop, is left to the watchdog of
+    REQ-EH-008 and REQ-EH-009.

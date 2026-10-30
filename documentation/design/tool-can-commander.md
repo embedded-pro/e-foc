@@ -250,7 +250,8 @@ sent with the 2.0 bandwidth commands and not read back; the motor parameter fiel
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
 reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added.
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added,
+and a node older than 2.6 never reports *Control loop stall*.
 
 ### Part K — diagnostics
 

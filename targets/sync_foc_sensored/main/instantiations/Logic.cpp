@@ -46,6 +46,10 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , controlLoopStall{ inverter, hardware.Diagnostics(), [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 

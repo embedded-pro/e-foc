@@ -256,6 +256,9 @@ The 20 kHz path should do only the work that changes from one sample to the next
   the rate changes, so closing a window multiplies instead of dividing. A stopped stream costs two loads and two
   compares, and a cascade without a stream one pointer test. Every stream function is inlined into the cascade's `Calculate`, so the
   cycle analysis measures it there.
+- **Prove liveness with one increment.** The control-loop supervisor
+  (`documentation/design/control-loop-supervision.md`) needs only a wrapping completion count, incremented next to the
+  saturating sample count the platform's loop statistics already keep. Everything else it does runs on the event loop.
 
 ---
 

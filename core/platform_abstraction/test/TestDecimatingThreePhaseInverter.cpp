@@ -92,3 +92,23 @@ TEST_F(TestDecimatingThreePhaseInverter, forwards_the_power_stage_controls)
     EXPECT_NEAR(inverter.MaxCurrentSupported().Value(), 2.5f, 1e-6f);
     EXPECT_EQ(inverter.BaseFrequency(), hal::Hertz{ pwmFrequency });
 }
+
+TEST_F(TestDecimatingThreePhaseInverter, reports_whether_the_stage_is_started_and_how_often)
+{
+    EXPECT_CALL(powerStage, Start()).Times(2);
+    EXPECT_CALL(powerStage, Stop());
+
+    EXPECT_FALSE(inverter.Started());
+    EXPECT_EQ(0u, inverter.Starts());
+
+    inverter.Start();
+    EXPECT_TRUE(inverter.Started());
+    EXPECT_EQ(1u, inverter.Starts());
+
+    inverter.Stop();
+    EXPECT_FALSE(inverter.Started());
+
+    inverter.Start();
+    EXPECT_TRUE(inverter.Started());
+    EXPECT_EQ(2u, inverter.Starts());
+}

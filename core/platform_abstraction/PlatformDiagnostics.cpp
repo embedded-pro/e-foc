@@ -21,6 +21,11 @@ namespace application
         return metrics.Read();
     }
 
+    uint32_t PlatformDiagnostics::ControlLoopCompletions() const
+    {
+        return metrics.Completions();
+    }
+
     const CanBusAdapter::ErrorCounters& PlatformDiagnostics::CanStatistics() const
     {
         return canBus == nullptr ? noBus : canBus->ErrorStatistics();

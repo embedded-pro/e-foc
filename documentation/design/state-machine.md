@@ -658,7 +658,9 @@ Hardware protection events reach the state machine through `PlatformFaultNotifie
 | `overTemperature`       | `overtemperature` |
 
 The fault supervisor (`fault-supervision.md`) raises `encoderLoss` and `stall` through the same notifier,
-from the event loop, so the state machine handles them as it handles a board protection trip.
+from the event loop, so the state machine handles them as it handles a board protection trip. The
+control-loop supervisor (`control-loop-supervision.md`) raises `controlLoopStall` the same way, after it
+has stopped the power stage.
 
 A protection event raised before the state machine has registered its handler is discarded by the
 state machine. A platform whose protection reflects a *standing* condition rather than an edge is
@@ -1051,7 +1053,7 @@ sequenceDiagram
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                                                                                |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 50 rad/s, for speed/position modes only                                                      |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017       |
-| `FaultCode`       | —                      | enum (uint8)                   | 9 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`, `stall`                              |
+| `FaultCode`       | —                      | enum (uint8)                   | 10 codes | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`, `stall`, `controlLoopStall`          |
 
 `watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
 from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a

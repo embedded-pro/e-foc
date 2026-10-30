@@ -47,6 +47,8 @@ namespace can
                 return FocFaultCode::sensorFault;
             case state_machine::FaultCode::stall:
                 return FocFaultCode::stall;
+            case state_machine::FaultCode::controlLoopStall:
+                return FocFaultCode::controlLoopStall;
             default:
                 return FocFaultCode::none;
         }

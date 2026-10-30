@@ -183,3 +183,29 @@ TEST_F(TestControlLoopMetrics, counters_keep_counting_well_past_a_16_bit_range)
     EXPECT_EQ(70000u, statistics.samples);
     EXPECT_EQ(70000u, statistics.overruns);
 }
+
+TEST_F(TestControlLoopMetrics, every_recorded_interrupt_is_a_completion)
+{
+    metrics.Record(100);
+    metrics.Record(200);
+
+    EXPECT_EQ(2u, metrics.Completions());
+}
+
+TEST_F(TestControlLoopMetrics, a_reentry_is_not_a_completion)
+{
+    metrics.Record(100);
+    metrics.RecordReentry();
+
+    EXPECT_EQ(1u, metrics.Completions());
+}
+
+TEST_F(TestControlLoopMetrics, clearing_the_statistics_keeps_the_completions)
+{
+    metrics.Record(100);
+    metrics.Reset();
+    metrics.Record(100);
+
+    EXPECT_EQ(1u, metrics.Read().samples);
+    EXPECT_EQ(2u, metrics.Completions());
+}

@@ -25,6 +25,7 @@ namespace foc
         began,
         torqueStep,
         encoderFreeze,
+        controlInterruptLoss,
         stopped
     };
 
