@@ -13,7 +13,6 @@ namespace tool
         constexpr double degreesPerRadian{ 180.0 / std::numbers::pi };
         constexpr const char* firmwareRange{ "Accepted by the firmware" };
 
-        // The position loop is single-turn: ±π names each target once, the firmware's ±2π twice.
         constexpr float halfTurn{ std::numbers::pi_v<float> };
     }
 

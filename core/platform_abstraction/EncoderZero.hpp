@@ -7,8 +7,6 @@
 
 namespace application
 {
-    // Takes readings in [-π, π), as QuadratureEncoderDecorator gives them. The zero is kept in the same
-    // turn, so a reading minus the zero is off by at most one turn and one correction wraps it.
     class EncoderZero
     {
     public:
