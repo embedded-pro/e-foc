@@ -44,6 +44,14 @@ date: 2026-04-13
 
 A naked assembly trampoline runs in HardFault exception context before any C function prologue executes. It determines whether the exception was entered from thread mode (using PSP as the stack pointer) or from handler mode (using MSP), then passes the correct stack frame pointer to the C-level capture routine.
 
+`MemManage_Handler`, `BusFault_Handler` and `UsageFault_Handler` are aliases of the same trampoline, so a
+configurable fault is captured exactly like a HardFault, and CFSR tells them apart. Nothing enables them in
+`SCB->SHCSR`, so today each escalates to HardFault and the aliases never run. They exist for the ST vector table,
+which names all three. Without a strong definition there, the weak ones in EMIL's `FaultTracer` win, and they
+bring about 3 KB of fault-dump code and strings into the image. That code could only reach `abort()`, because
+nothing constructs a `FaultTracer`. The TI startup files point these vectors at `Default_Handler`, so on TI the
+aliases are only extra names for the HardFault trampoline and cost nothing.
+
 The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register
 capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state
 they had when the fault hit.
