@@ -3,7 +3,6 @@
 
 namespace application
 {
-    // Fault-handler safe: no driver state. With OSSI set, clearing MOE drives every gate input to its idle low level.
     void CutPowerStage()
     {
         if ((RCC->APB2ENR & RCC_APB2ENR_TIM1EN) == 0u)

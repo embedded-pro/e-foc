@@ -9,7 +9,6 @@ namespace application
         hal::GpioPinStm currentPhaseA{ hal::Port::A, 0 };
         hal::GpioPinStm currentPhaseB{ hal::Port::A, 1 };
         hal::GpioPinStm currentPhaseC{ hal::Port::C, 0 };
-        // PC1 and PB0 also reach COMP3 and COMP4, should a comparator ever trip the timer's break input
         hal::GpioPinStm currentTotal{ hal::Port::C, 1 };
         hal::GpioPinStm powerSupplyVoltage{ hal::Port::B, 0 };
 
@@ -32,7 +31,6 @@ namespace application
         hal::GpioPinStm boardId1{ hal::Port::C, 11, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
         hal::GpioPinStm boardId2{ hal::Port::C, 12, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
 
-        // LM5164 PGOOD is open drain and the board has no pull-up on it
         hal::GpioPinStm powerStatus{ hal::Port::B, 2, hal::Drive::Default, hal::Speed::Default, hal::WeakPull::Up };
 
         hal::GpioPinStm uartRx{ hal::Port::A, 3 };

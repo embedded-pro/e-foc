@@ -94,7 +94,6 @@ namespace application
         static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
             "fault status must hold the full register, FSR/FAR and backtrace dump");
 
-        // Constructed first: everything after it registers interrupts, configures pins or reads SystemCoreClock
         struct HalInitialization
         {
             HalInitialization();
@@ -133,7 +132,6 @@ namespace application
             explicit TerminalAndTracer(hal::DmaStm& dma);
         };
 
-        // Sequence order: the three phase currents, then CUR_TOTAL and VOLT_TOTAL for the board protection
         static constexpr std::size_t phaseCurrentChannels{ 5 };
         static constexpr std::size_t currentTotalSample{ 3 };
         static constexpr std::size_t powerSupplySample{ 4 };
@@ -149,7 +147,6 @@ namespace application
 
         void OnWatchdogExpired();
 
-        // The EEPROM driver takes an unacknowledged transfer for a missing or busy device; the default hooks abort
         class EepromI2cStm
             : public hal::I2cStm
         {

@@ -8,7 +8,6 @@
 
 namespace application
 {
-    // The monitor sees every sample of each sequence, the consumer only once the monitor is done
     template<std::size_t Channels>
     class AdcTriggeredByPwmStm
         : public hal::AdcDmaMultiChannelStmTriggeredExternally<Channels>

@@ -19,7 +19,6 @@ namespace
             return application::ResetCause::software;
         if (csr & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
             return application::ResetCause::watchdog;
-        // There is no power-on flag: every power-up sets BORRSTF, so a brown-out cannot be told from one
         if (csr & RCC_CSR_BORRSTF)
             return application::ResetCause::powerUp;
         if (csr & RCC_CSR_PINRSTF)
@@ -32,7 +31,6 @@ namespace application
 {
     namespace
     {
-        // At 42.5 MHz, close to the TM4C129's 0.25, 1, 2, 4 and 16 us; five channels at the longest outlast a 20 kHz period
         constexpr std::array<uint32_t, 5> toSamplingTime{ {
             ADC_SAMPLETIME_12CYCLES_5,
             ADC_SAMPLETIME_47CYCLES_5,
@@ -45,7 +43,6 @@ namespace application
         constexpr float adcToAmpereOffset = BoardCharacteristics::AdcToAmpereOffset(Peripheral::adcReferenceVoltage);
         constexpr float adcToVoltsFactor = BoardCharacteristics::AdcToVoltsFactor(Peripheral::adcReferenceVoltage, Peripheral::adcResolution);
 
-        // 100 kHz standard mode from the 170 MHz PCLK1, sized for a 1 us rise time on the board's 10 k pull-ups
         constexpr uint32_t eepromI2cTiming{ 0xf0d42c35 };
 
         bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c)
@@ -118,7 +115,6 @@ namespace application
         peripherals.emplace(*this);
         boardId = ReadBoardIdPins();
 
-        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
 
         services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
@@ -173,7 +169,6 @@ namespace application
             Pins::powerStatus.Config(hal::PinConfigType::input);
     }
 
-    // A closed switch pulls its line to ground and sets the bit
     uint8_t PlatformFactoryImpl::ReadBoardIdPins()
     {
         if constexpr (!Peripheral::hasBoardIdPins)
@@ -185,7 +180,6 @@ namespace application
         return static_cast<uint8_t>(bit0 | (bit1 << 1u) | (bit2 << 2u));
     }
 
-    // PGOOD is high while the LM5164 output is in regulation
     bool PlatformFactoryImpl::PowerStatus() const
     {
         if constexpr (!Peripheral::hasPowerStatusPin)
@@ -232,8 +226,6 @@ namespace application
         return pendSvLowPriorityInterrupt;
     }
 
-    // One counter tick separates the early warning from the reset: prescaler 8 makes it 193 us at 170 MHz,
-    // longer than the control-loop interrupt can hold off the early-warning handler
     hal::WatchDogStm::Config PlatformFactoryImpl::Cortex::WatchdogConfig()
     {
         hal::WatchDogStm::Config config;
@@ -241,7 +233,6 @@ namespace application
         return config;
     }
 
-    // Latched like a protection trip, so the control loop does not re-arm the bridge before the reset follows
     void PlatformFactoryImpl::OnWatchdogExpired()
     {
         protectionTripped = true;
@@ -282,7 +273,6 @@ namespace application
     {
         const auto samplingTime = toSamplingTime.at(static_cast<std::size_t>(sampleAndHold));
 
-        // Stopped before it goes: a converter still triggered with its DMA gone overruns, and an overrun aborts
         if (peripherals->phaseCurrentAdc)
             peripherals->phaseCurrentAdc->Stop();
 
@@ -303,7 +293,6 @@ namespace application
             hal::AdcPinConfig{ Pins::currentTotal, samplingTime },
             hal::AdcPinConfig{ Pins::powerSupplyVoltage, samplingTime });
 
-        // The circular DMA channel registers at normal priority, but its completion runs the control loop
         auto& dmaHandler = *hal::cortex::InterruptTable::Instance().Handler(Peripheral::phaseCurrentDmaIrq);
         dmaHandler.Unregister();
         dmaHandler.Register(Peripheral::phaseCurrentDmaIrq, InterruptPriorities::phaseCurrentAdc);
@@ -325,11 +314,6 @@ namespace application
         ConfigureSamplingTrigger();
     }
 
-    // PWM mode 1 centres the high-side pulse on the counter valley, so the low-side shunts conduct around the peak.
-    // OC4REF rises shortly before the peak and its edge on TRGO starts the ADC sequence there; it stays high for
-    // twice the lead, several ADC clocks, so the converter never misses it. The compare is written before the mode,
-    // which would otherwise raise OC4REF at once. An odd repetition count written before the counter starts moves
-    // every update event to the peak: a new duty never lands mid-pulse.
     void PlatformFactoryImpl::ConfigureSamplingTrigger()
     {
         constexpr uint32_t triggerLeadTicks{ 8 };
@@ -373,7 +357,6 @@ namespace application
         hal::SynchronousQuadratureEncoderStm::Config config;
         config.resolution = resolution;
         config.invertPhaseA = Peripheral::encoderInvertPhaseA;
-        // Jumper wires to the Nucleo pick up switching edges; 8 samples at 170 MHz reject glitches under 50 ns
         config.filter = 3;
 
         peripherals->encoder.reset();
@@ -499,7 +482,6 @@ namespace application
         return pwmBaseFrequency;
     }
 
-    // The encoder exists only once the NVM load has supplied its resolution
     foc::Radians PlatformFactoryImpl::Read()
     {
         if (!peripherals->encoder)
