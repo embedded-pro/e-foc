@@ -241,7 +241,7 @@ sequenceDiagram
     P->>P: compare CUR_TOTAL and VOLT_TOTAL with the thresholds
     alt a threshold is crossed
         P->>TIM: disable the main output
-        P-->>FOC: nothing this period; the fault is reported from the event loop
+        P-->>FOC: nothing this period, the fault is reported from the event loop
     else within limits
         P->>FOC: phase currents
         FOC->>TIM: new duty cycles, loaded at the next peak
