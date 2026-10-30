@@ -1,7 +1,12 @@
 Feature: Disconnected And Faulty Motor Wiring
   A motor whose phases carry no current produces no torque, so the rotor stays
-  where it is however the drive is commanded. The healthy plant is run through
-  the same steps so the comparison is like for like.
+  where it is however the drive is commanded, and a rotor that does not move is
+  exactly what alignment waits for. The alignment therefore checks that the vector
+  it applies drives its current through every phase before it zeroes the encoder,
+  and reports a missing phase when one does not (REQ-EH-016). A cable pulled while
+  the drive runs is found by the phase-loss monitor: the drive demands current it
+  cannot make flow while the rotor is slow. The healthy plant is run through the
+  same steps so the comparison is like for like.
 
   An encoder that has stopped reporting is the opposite failure: the rotor is
   free to turn and the drive cannot see it. Alignment declares the rotor settled
@@ -12,20 +17,27 @@ Feature: Disconnected And Faulty Motor Wiring
   reports that as a sensor fault, whether the encoder was stuck from boot or
   froze while the motor was running.
 
-  @sil @REQ-SM-008
-  Scenario: A disconnected motor does not turn when commanded
+  @sil @REQ-EH-016 @REQ-CAN-014
+  Scenario: A disconnected motor fails its alignment as a missing phase
     Given a disconnected motor plant
     And the motor is already calibrated
     And the motor boots in speed mode
     When the target boots
-    And the rotor is aligned
-    And the motor is enabled
-    And a speed setpoint of 20 rad/s is applied
-    Then the rotor shall not turn
+    And the rotor alignment is attempted
+    Then the state machine shall report a missing-phase fault
 
-  @sil @REQ-SM-008
-  Scenario: A motor with one open phase still turns, degraded and undetected
+  @sil @REQ-EH-016
+  Scenario: A motor with one open phase fails its alignment as a missing phase
     Given an open phase motor plant
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor alignment is attempted
+    Then the state machine shall report a missing-phase fault
+
+  @sil @REQ-EH-016
+  Scenario: A healthy motor aligns and turns through the same steps
+    Given a nominal motor plant
     And the motor is already calibrated
     And the motor boots in speed mode
     When the target boots
@@ -33,6 +45,19 @@ Feature: Disconnected And Faulty Motor Wiring
     And the motor is enabled
     And a speed setpoint of 20 rad/s is applied
     Then the rotor shall turn
+    And the state machine shall be in the running state
+
+  @sil @REQ-EH-016 @REQ-CAN-014
+  Scenario: A cable pulled while the drive runs is reported as a missing phase
+    Given a nominal motor plant
+    And the motor cable is pulled 300 ms after enable
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And a speed setpoint of 5 rad/s is applied
+    Then the state machine shall report a missing-phase fault
 
   @sil @REQ-SM-008 @REQ-SM-028
   Scenario: An encoder that freezes while running is detected as a sensor fault

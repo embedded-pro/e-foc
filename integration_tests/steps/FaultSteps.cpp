@@ -26,6 +26,8 @@ namespace
             return can::FocFaultCode::sensorFault;
         if (name == "stall")
             return can::FocFaultCode::stall;
+        if (name == "missing-phase")
+            return can::FocFaultCode::phaseMissing;
         return std::nullopt;
     }
 }

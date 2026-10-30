@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: can-service
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.8.0                    |
+| Version   | 0.9.0                    |
 | Component | can-service              |
 | Date      | 2026-10-30               |
 
@@ -265,6 +265,17 @@ mean measured d- and q-axis currents and the encoder's mechanical angle at the w
 [−π, π) from the alignment zero. `TelemetryElectrical` (`0x88`, bus voltage, current limit, Iq and Id at
 0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
 start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
+
+**Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.6 changes. Version 2.6
+belongs to the control-loop supervision of #482, which takes `controlLoopStall` (`7`); a server that skips
+2.6 leaves that value unused.
+
+`FocFaultCode` gains `phaseMissing` (`8`): the motor's phases do not carry the current the drive drives into
+them — found by the alignment's phase continuity check (`service-alignment.md`) or, while the drive runs, by
+the phase-loss monitor (`fault-supervision.md` Part E). Before 2.7 the alignment failure went out as `none`
+and a cable pulled while running was not reported at all. Adding the enumerator leaves the meaning of the
+existing codes unchanged, which keeps it a minor version, as `stall` was in 2.4. A client older than 2.7
+shows the new code as an unknown fault.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

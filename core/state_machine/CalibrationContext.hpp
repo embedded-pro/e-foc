@@ -47,6 +47,7 @@ namespace application
             foc::FocBase& controller,
             foc::CurrentLoopTunable& tunable);
 
+        foc::Volts BusVoltage() const;
         foc::Weber EffectiveFluxLinkage() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         foc::Weber ActiveFluxLinkage() const;

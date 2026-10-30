@@ -28,6 +28,8 @@ namespace services
         finishing = false;
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
+        settledSumA = settledSumB = settledSumC = 0.0f;
+        phaseMissing = false;
         previousPosition = encoder.Read();
         onAlignmentDone = onDone;
 
@@ -64,25 +66,71 @@ namespace services
                 if (currentSampleIndex >= alignmentConfig.maxSamples)
                     Finish(std::nullopt);
                 else
-                    ProcessPosition();
+                    ProcessPosition(currents);
             });
     }
 
-    void MotorAlignmentImpl::ProcessPosition()
+    void MotorAlignmentImpl::ProcessPosition(const foc::PhaseCurrents& currents)
     {
         auto currentPosition = encoder.Read();
         auto positionChange = std::abs(foc::detail::PositionWithWrapAround((currentPosition - previousPosition).Value()));
+        previousPosition = currentPosition;
 
         if (positionChange < alignmentConfig.settledThreshold.Value())
         {
             consecutiveSettledSamples++;
+            settledSumA += currents.a.Value();
+            settledSumB += currents.b.Value();
+            settledSumC += currents.c.Value();
+
             if (consecutiveSettledSamples >= alignmentConfig.settledCount)
-                CalculateAlignmentOffset();
+                Settle();
         }
         else
+        {
             consecutiveSettledSamples = 0;
+            settledSumA = settledSumB = settledSumC = 0.0f;
+        }
+    }
 
-        previousPosition = currentPosition;
+    void MotorAlignmentImpl::Settle()
+    {
+        if (!CarriesNoCurrent())
+        {
+            CalculateAlignmentOffset();
+            return;
+        }
+
+        phaseMissing = true;
+        Finish(std::nullopt);
+    }
+
+    bool MotorAlignmentImpl::CarriesNoCurrent() const
+    {
+        const auto samples = static_cast<float>(consecutiveSettledSamples);
+        const auto a = std::abs(settledSumA) / samples;
+        const auto b = std::abs(settledSumB) / samples;
+        const auto c = std::abs(settledSumC) / samples;
+        const auto expected = ExpectedPhaseACurrent();
+
+        if (expected.has_value() && a < missingFraction * *expected)
+            return true;
+
+        // b and c each return half of phase a's current; without a model, a measured a is the only scale
+        const auto floor = missingFraction * 0.5f * expected.value_or(a);
+        return b < floor || c < floor;
+    }
+
+    std::optional<float> MotorAlignmentImpl::ExpectedPhaseACurrent() const
+    {
+        const auto resistance = alignmentConfig.phaseResistance.Value();
+        const auto bus = alignmentConfig.busVoltage.Value();
+
+        if (resistance <= 0.0f || bus <= 0.0f)
+            return std::nullopt;
+
+        // The vector puts d·Vdc/2 across phase a and nothing turns, so only the winding resistance limits the current
+        return 0.5f * foc::DutyFraction(alignmentConfig.testVoltage) * bus / resistance;
     }
 
     void MotorAlignmentImpl::CalculateAlignmentOffset()
@@ -125,6 +173,11 @@ namespace services
 
         if (onAlignmentDone)
             onAlignmentDone(result);
+    }
+
+    bool MotorAlignmentImpl::PhaseMissing() const
+    {
+        return phaseMissing;
     }
 
     void MotorAlignmentImpl::Abort()

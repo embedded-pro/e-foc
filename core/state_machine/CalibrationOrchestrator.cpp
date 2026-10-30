@@ -8,12 +8,14 @@ namespace application
         services::MotorAlignment& motorAlignment,
         services::Tracer& tracer,
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
-        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill,
+        foc::Volts busVoltage)
         : electricalIdent(electricalIdent)
         , motorAlignment(motorAlignment)
         , tracer(tracer)
         , currentOffsets(currentOffsets)
         , standstill(standstill)
+        , busVoltage(busVoltage)
     {}
 
     void CalibrationOrchestrator::Start(
@@ -74,6 +76,11 @@ namespace application
     bool CalibrationOrchestrator::HasRunInFlight() const
     {
         return running;
+    }
+
+    state_machine::FaultCode CalibrationOrchestrator::LastFailure() const
+    {
+        return lastFailure;
     }
 
     // A turning rotor drives current through windings the offset step shorts, and that current would be stored as sensor bias
@@ -181,8 +188,12 @@ namespace application
         tracer.Trace() << "[SM] Aligning motor";
         onStepChanged(state_machine::CalibrationStep::alignment);
 
+        services::MotorAlignment::AlignmentConfig config;
+        config.phaseResistance = foc::Ohm{ pendingData->rPhase };
+        config.busVoltage = busVoltage;
+
         const auto token = runToken;
-        motorAlignment.ForceAlignment(pendingData->polePairs, {},
+        motorAlignment.ForceAlignment(pendingData->polePairs, config,
             [this, token](std::optional<foc::Radians> angle)
             {
                 if (aborted || token != runToken)
@@ -191,15 +202,16 @@ namespace application
                 running = false;
 
                 if (!angle)
-                    Fail();
+                    Fail(motorAlignment.PhaseMissing() ? state_machine::FaultCode::phaseMissing : state_machine::FaultCode::calibrationFailed);
                 else
                     onAlignmentDone(*angle);
             });
     }
 
-    void CalibrationOrchestrator::Fail()
+    void CalibrationOrchestrator::Fail(state_machine::FaultCode code)
     {
         running = false;
+        lastFailure = code;
 
         if (onFailed != nullptr)
             onFailed();

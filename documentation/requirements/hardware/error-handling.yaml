@@ -133,3 +133,17 @@
     from the consumers, and refuse every duty command and start until the power stage is
     stopped, and the platform shall report an over-current board-protection fault from the event
     loop.
+
+- id: REQ-EH-016
+  title: A motor that does not carry the drive's current is reported as a missing phase
+  shall: >
+    When the rotor alignment settles, the drive shall compare the mean phase currents of the
+    settled samples with the currents the alignment vector drives through the calibrated phase
+    resistance at the measured bus voltage, and shall fail the alignment and enter Fault with
+    phaseMissing when phase a carries less than a quarter of its expected current or phase b or
+    c carries less than a quarter of theirs, without zeroing the encoder. While Enabled, the
+    drive shall enter Fault with phaseMissing when, for 50 ms without a break, it demands a
+    torque current of at least 10 % of its current limit, measures less than 20 % of that demand
+    and the rotor turns slower than 10 rad/s. Neither check shall run in the control interrupt.
+    A single open phase while the drive runs is not required to be detected; it is detected at
+    the next alignment.

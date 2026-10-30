@@ -482,6 +482,7 @@ TEST_F(FocStateMachineSpeedCliTest, resistance_inductance_nullopt_enters_fault)
 
 TEST_F(FocStateMachineSpeedCliTest, alignment_nullopt_enters_fault)
 {
+    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectSpeedCalibrationSequence(true, true, false);
@@ -1442,6 +1443,7 @@ TEST_F(FocStateMachineSpeedAutoTest, resistance_inductance_nullopt_enters_fault)
 
 TEST_F(FocStateMachineSpeedAutoTest, alignment_nullopt_enters_fault)
 {
+    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectSpeedCalibrationSequence(true, true, false);

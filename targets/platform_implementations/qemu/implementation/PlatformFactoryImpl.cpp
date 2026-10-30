@@ -126,6 +126,9 @@ namespace application
         const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
         encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
 
+        const auto cableDisconnectDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->cableDisconnectDelayMs) * baseHz / 1000u);
+        cableDisconnect.Configure(plantConfig->cableDisconnectDelayMs != 0 ? std::make_optional(cableDisconnectDelay) : std::nullopt);
+
         ConfigureShaftGrip(baseHz);
 
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
@@ -338,6 +341,13 @@ namespace application
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
+        if (cableDisconnect.Fire(tick))
+        {
+            auto disconnected = bootFaultInjection;
+            disconnected.openPhaseA = disconnected.openPhaseB = disconnected.openPhaseC = true;
+            model.SetFaultInjection(disconnected);
+        }
+
         if (shaftGrip.Fire(tick))
             model.GripShaft(shaftTurnSpeed);
 
@@ -374,6 +384,7 @@ namespace application
         responseRecorder.Begin();
         torqueStep.Begin();
         encoderFreeze.Begin();
+        cableDisconnect.Begin();
         shaftGrip.Begin();
         shaftHold.Begin();
         boardProtection.SetArmed(true);
