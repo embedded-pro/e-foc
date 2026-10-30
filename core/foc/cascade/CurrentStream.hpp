@@ -51,7 +51,7 @@ namespace foc
             return sample;
         }
 
-        ALWAYS_INLINE_HOT void Accumulate(float id, float iq, float position)
+        OPTIMIZE_FOR_SPEED void Accumulate(float id, float iq, float position)
         {
             if (requested != applied)
                 Reopen();
@@ -74,7 +74,7 @@ namespace foc
             requested = requested + 1;
         }
 
-        ALWAYS_INLINE_HOT void Reopen()
+        OPTIMIZE_FOR_SPEED void Reopen()
         {
             applied = requested;
             length = requestedLength;
@@ -84,7 +84,7 @@ namespace foc
             iqSum = 0.0f;
         }
 
-        ALWAYS_INLINE_HOT void Publish(float position)
+        OPTIMIZE_FOR_SPEED void Publish(float position)
         {
             const uint8_t next = head;
             if (static_cast<uint8_t>(next - tail) != capacity)
