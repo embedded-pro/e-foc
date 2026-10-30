@@ -273,9 +273,9 @@ it should change the reason, not just the number:
 `sync_foc_sensored` sizes its CLI command table to the 24 commands it registers. The TI linker script places `.bss`
 first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
 instead of forcing up to 1 KiB of padding after `.data`. The hal-ti `Gpio` driver keeps pin-interrupt handlers in a
-pool of 16 slots and registers a port's interrupt only when a pin on it is enabled. A handler per pin would take
-3.5 KiB more RAM on the TM4C129 (120 pins) and 1.3 KiB more on the TM4C123, and `sync_foc_sensored` enables no pin
-interrupt at all.
+pool sized by the CMake cache variable `HAL_TI_GPIO_MAX_INTERRUPT_PINS` (default 8, 72 bytes each) and registers a
+port's interrupt only when a pin on it is enabled. A handler per pin would take 4.0 KiB more RAM on the TM4C129
+(120 pins) and 1.9 KiB more on the TM4C123, and `sync_foc_sensored` enables no pin interrupt at all.
 
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
 
