@@ -44,7 +44,7 @@ namespace
         return gaps;
     }
 
-    float Mean(const std::vector<StreamedCurrent>& samples, float StreamedCurrent::*field)
+    float Mean(const std::vector<StreamedCurrent>& samples, float StreamedCurrent::* field)
     {
         float sum{ 0.0f };
         for (const auto& sample : samples)
