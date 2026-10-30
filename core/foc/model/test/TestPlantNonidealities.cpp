@@ -137,6 +137,38 @@ TEST_F(TestPlantNonidealities, a_torque_beyond_the_cogging_amplitude_carries_the
     EXPECT_GT(model.MechanicalSpeed().Value(), 0.1f);
 }
 
+TEST_F(TestPlantNonidealities, a_gripped_shaft_turns_at_the_hand_speed_whatever_the_drive_does)
+{
+    model.Start();
+    model.GripShaft(foc::RadiansPerSecond{ -5.0f });
+    DriveHard(2000);
+
+    EXPECT_NEAR(model.MechanicalSpeed().Value(), -5.0f, 1e-6f);
+    EXPECT_NEAR(model.MechanicalAngle().Value(), -0.5f, 1e-3f);
+}
+
+TEST_F(TestPlantNonidealities, a_shaft_held_still_does_not_move_under_the_drive_torque)
+{
+    model.Start();
+    model.GripShaft(foc::RadiansPerSecond{ 0.0f });
+    DriveHard(2000);
+
+    EXPECT_NEAR(model.MechanicalSpeed().Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(model.MechanicalAngle().Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestPlantNonidealities, a_released_shaft_answers_the_drive_again)
+{
+    model.Start();
+    model.GripShaft(foc::RadiansPerSecond{ -5.0f });
+    DriveHard(2000);
+
+    model.GripShaft(std::nullopt);
+    DriveHard(200);
+
+    EXPECT_GT(std::abs(model.MechanicalSpeed().Value() + 5.0f), 1.0f);
+}
+
 TEST_F(TestPlantNonidealities, a_quantised_encoder_reports_whole_counts)
 {
     constexpr uint32_t counts{ 4000 };

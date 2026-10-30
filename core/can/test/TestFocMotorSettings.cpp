@@ -80,6 +80,54 @@ TEST(FocMotorSettings, every_startup_setting_reaches_its_configuration_field)
     EXPECT_EQ(can::StartupSettingOf(config, can::FocParameter::canNodeId), 12u);
 }
 
+TEST(FocMotorSettings, every_supervision_setting_reaches_its_configuration_field)
+{
+    services::ConfigData config{};
+
+    can::WriteSupervisionSetting(config, can::FocParameter::supervisionWindow, 2.0f);
+    can::WriteSupervisionSetting(config, can::FocParameter::supervisionCurrentFraction, 0.2f);
+    can::WriteSupervisionSetting(config, can::FocParameter::supervisionDemandedSpeed, 5.0f);
+    can::WriteSupervisionSetting(config, can::FocParameter::supervisionPositionError, 0.5f);
+    can::WriteSupervisionSetting(config, can::FocParameter::supervisionStillExcursion, 0.02f);
+    can::WriteSupervisionSetting(config, can::FocParameter::stallDetection, 0.0f);
+
+    EXPECT_NEAR(config.supervision.window, 2.0f, 1e-6f);
+    EXPECT_NEAR(config.supervision.currentFraction, 0.2f, 1e-6f);
+    EXPECT_NEAR(config.supervision.demandedSpeed, 5.0f, 1e-6f);
+    EXPECT_NEAR(config.supervision.positionError, 0.5f, 1e-6f);
+    EXPECT_NEAR(config.supervision.stillExcursion, 0.02f, 1e-6f);
+    EXPECT_EQ(config.stallDetection, uint8_t{ 0 });
+}
+
+TEST(FocMotorSettings, every_supervision_setting_reads_back_what_was_written)
+{
+    for (const auto& descriptor : can::focParameters)
+    {
+        if (can::GroupOf(descriptor.id) != can::ParameterGroup::supervision)
+            continue;
+
+        services::ConfigData config{};
+        const auto value = descriptor.integer ? descriptor.minimum : 0.5f * (descriptor.minimum + descriptor.maximum);
+        can::WriteSupervisionSetting(config, descriptor.id, value);
+
+        EXPECT_EQ(can::SupervisionSettingOf(config, descriptor.id), value) << descriptor.name;
+    }
+}
+
+TEST(FocMotorSettings, the_six_supervision_settings_form_their_own_group)
+{
+    std::size_t supervision{ 0 };
+    for (const auto& descriptor : can::focParameters)
+        if (can::GroupOf(descriptor.id) == can::ParameterGroup::supervision)
+        {
+            ++supervision;
+            EXPECT_FALSE(descriptor.automatic) << descriptor.name;
+            EXPECT_FALSE(descriptor.readOnly) << descriptor.name;
+        }
+
+    EXPECT_EQ(supervision, 6u);
+}
+
 TEST(FocMotorSettings, only_the_three_bandwidths_are_bandwidths)
 {
     std::size_t bandwidths{ 0 };

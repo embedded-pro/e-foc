@@ -9,7 +9,7 @@ Feature: Streamed Currents and Rotor Position
   rotor would accelerate into the voltage limit, where the current can no longer follow
   its setpoint, so the stream's mean is checked against a current the loop can hold.
 
-  @sil @REQ-CAN-011
+  @sil @REQ-CAN-012
   Scenario: A torque run streams contiguous one-millisecond windows of the measured currents
     Given a nominal motor plant
     And a motor plant with:
@@ -27,7 +27,7 @@ Feature: Streamed Currents and Rotor Position
     And the mean streamed d-axis current shall be within 0.002 A of 0.0 A
     And every streamed position shall lie within half a turn of the alignment zero
 
-  @sil @REQ-CAN-011
+  @sil @REQ-CAN-012
   Scenario: A zero telemetry rate stops the stream
     Given a nominal motor plant
     And the motor is already calibrated

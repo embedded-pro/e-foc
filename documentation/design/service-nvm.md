@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.4.2
+version: 0.5.1
 component: service-nvm
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.4.2                        |
+| Version   | 0.5.1                        |
 | Component | service-nvm                  |
 | Date      | 2026-10-30                   |
 
@@ -52,14 +52,16 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 76 bytes  |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 96 bytes  |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
-The configuration record's layout is at version 5. The operator's tuning settings (`controller-selection.md`
-Part H) took its data from 20 to 76 bytes, so a record written by an earlier firmware reads as a version
-mismatch once: the start-up settings, the default control mode and the algorithm selections return to their
-defaults and are stored again by the next change. The calibration record is untouched by that bump.
+The configuration record's layout is at version 6. The drive-wide supervision settings
+(`fault-supervision.md` Part D) took its data from 76 to 96 bytes, as version 5 had taken it from 20 to 76
+bytes for the operator's tuning settings (`controller-selection.md` Part H). A record written by an earlier
+firmware reads as a version mismatch once: the start-up settings, the tuning settings, the default control
+mode, the algorithm selections and the supervision settings return to their defaults and are stored again by
+the next change. The calibration record is untouched by either bump.
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 
@@ -237,27 +239,30 @@ stateDiagram-v2
 zero there, which reads as not measured and keeps the automatic current-loop bandwidth an earlier
 firmware derived, so the layout stays at version 4 and no stored calibration is invalidated.
 
-**ConfigData** (76 bytes total):
+**ConfigData** (96 bytes total):
 
-| Field                  | Physical unit | Description                                                                                                    |
-|------------------------|---------------|----------------------------------------------------------------------------------------------------------------|
-| canNodeId              | —             | Base CAN node ID; board ID added at boot                                                                       |
-| canBaudrate            | bit/s         | CAN bus baud rate                                                                                              |
-| telemetryRateHz        | Hz            | Rate of the current stream (`service-can.md` Part J): 0 stops it, 1–1000 Hz; default 100                       |
-| encoderResolution      | —             | Encoder counts per mechanical revolution                                                                       |
-| currentLoop            | rad/s, A, —   | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
-| speedLoop              | rad/s, —, s   | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
-| positionLoop           | rad/s, —, s   | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
-| defaultControlMode     | —             | Control mode selected on power-up                                                                              |
-| currentAlgorithm       | —             | Current-loop algorithm selected on power-up                                                                    |
-| speedAlgorithm         | —             | Speed-loop algorithm selected on power-up                                                                      |
-| positionAlgorithm      | —             | Position-loop algorithm selected on power-up                                                                   |
-| currentTwoStepDeadbeat | —             | Two-step variant of the deadbeat current law                                                                   |
+| Field                  | Physical unit         | Description                                                                                                    |
+|------------------------|-----------------------|----------------------------------------------------------------------------------------------------------------|
+| canNodeId              | —                     | Base CAN node ID; board ID added at boot                                                                       |
+| canBaudrate            | bit/s                 | CAN bus baud rate                                                                                              |
+| telemetryRateHz        | Hz                    | Rate of the current stream (`service-can.md` Part J): 0 stops it, 1–1000 Hz; default 100                       |
+| encoderResolution      | —                     | Encoder counts per mechanical revolution                                                                       |
+| currentLoop            | rad/s, A, —           | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
+| speedLoop              | rad/s, —, s           | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
+| positionLoop           | rad/s, —, s           | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
+| supervision            | s, —, rad/s, rad, rad | Still window, current fraction, demanded speed, position error and still excursion of the fault supervisor     |
+| defaultControlMode     | —                     | Control mode selected on power-up                                                                              |
+| currentAlgorithm       | —                     | Current-loop algorithm selected on power-up                                                                    |
+| speedAlgorithm         | —                     | Speed-loop algorithm selected on power-up                                                                      |
+| positionAlgorithm      | —                     | Position-loop algorithm selected on power-up                                                                   |
+| currentTwoStepDeadbeat | —                     | Two-step variant of the deadbeat current law                                                                   |
+| stallDetection         | —                     | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible
-only if a later firmware narrows a range without bumping the layout — is replaced by its default. The four-byte fields precede the byte-sized ones and three
-reserved bytes complete the last word, so the record has no implicit padding.
+only if a later firmware narrows a range without bumping the layout — is replaced by its default. The four-byte fields precede the byte-sized ones and two
+reserved bytes complete the last word, so the record has no implicit padding. The supervision fields are
+checked the same way, one field at a time, against the command limits the wire contract also uses.
 
 The four selection fields are stored as raw byte identifiers. A record can pass the integrity check
 and still hold a byte outside the valid range for its selection, so each value is range-checked

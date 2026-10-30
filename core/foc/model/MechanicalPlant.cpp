@@ -37,20 +37,15 @@ namespace foc
         coggingCyclesPerRevolution = cyclesPerRevolution;
     }
 
+    void MechanicalPlant::Grip(std::optional<foc::RadiansPerSecond> handSpeed)
+    {
+        grip = handSpeed;
+    }
+
     void MechanicalPlant::Step(float electricalTorque, float dt)
     {
-        const auto loadOpposing = (omegaMech.Value() >= 0.0f) ? load.Value() : -load.Value();
-        const auto acceleration = (electricalTorque - viscousFriction * omegaMech.Value() - loadOpposing - externalTorque.Value() - CoggingTorque()) / inertia;
-
-        float speed = omegaMech.Value() + acceleration * dt;
-
-        if (coulombFrictionNm > 0.0f)
-        {
-            const float frictionStep = coulombFrictionNm * dt / inertia;
-            speed = std::fabs(speed) <= frictionStep ? 0.0f : speed - std::copysign(frictionStep, speed);
-        }
-
-        omegaMech = foc::RadiansPerSecond{ speed };
+        // A gripping hand is stronger than any drive: the shaft goes where the hand takes it
+        omegaMech = grip.has_value() ? *grip : foc::RadiansPerSecond{ FreeSpeed(electricalTorque, dt) };
         omega = foc::RadiansPerSecond{ polePairs * omegaMech.Value() };
 
         thetaMech += foc::Radians{ omegaMech.Value() * dt };
@@ -94,10 +89,27 @@ namespace foc
 
     void MechanicalPlant::Reset()
     {
+        grip = std::nullopt;
         theta = foc::Radians{ 0.0f };
         thetaMech = foc::Radians{ 0.0f };
         omega = foc::RadiansPerSecond{ 0.0f };
         omegaMech = foc::RadiansPerSecond{ 0.0f };
+    }
+
+    float MechanicalPlant::FreeSpeed(float electricalTorque, float dt) const
+    {
+        const auto loadOpposing = (omegaMech.Value() >= 0.0f) ? load.Value() : -load.Value();
+        const auto acceleration = (electricalTorque - viscousFriction * omegaMech.Value() - loadOpposing - externalTorque.Value() - CoggingTorque()) / inertia;
+
+        float speed = omegaMech.Value() + acceleration * dt;
+
+        if (coulombFrictionNm > 0.0f)
+        {
+            const float frictionStep = coulombFrictionNm * dt / inertia;
+            speed = std::fabs(speed) <= frictionStep ? 0.0f : speed - std::copysign(frictionStep, speed);
+        }
+
+        return speed;
     }
 
     float MechanicalPlant::CoggingTorque() const

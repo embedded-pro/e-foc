@@ -101,7 +101,8 @@
     with FocMotorState::fault and the mapped FocFaultCode. The broadcast shall be
     synchronous and shall not depend on any prior CAN command. FaultCode values are
     mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
-    overtemperature→overTemperature, encoderLoss→sensorFault; all other codes→none.
+    undervoltage→underVoltage, overtemperature→overTemperature, encoderLoss→sensorFault,
+    stall→stall; all other codes→none.
 
 - id: REQ-INT-014
   title: Telemetry reports the measured mechanical speed

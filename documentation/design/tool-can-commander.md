@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.7.3
+version: 0.8.1
 component: "tool-can-commander"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.7.3                |
+| Version   | 0.8.1                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-30           |
 
@@ -83,7 +83,7 @@ graph TD
     Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint knob"]
     Commands --> Controllers["Controllers: algorithm and settings per loop"]
     Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align, identify, calibrate"]
-    Commands --> Configuration["Configuration: start-up settings"]
+    Commands --> Configuration["Configuration: start-up settings, fault supervision"]
     Commands --> Diagnostics["Diagnostics: readings the controller reports"]
 ```
 
@@ -226,6 +226,12 @@ flowchart LR
 - **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.
   They are stored at once and take effect when the controller restarts; a new node ID or bitrate means the
   motor appears under another tab, or only after reconnecting at the new bitrate, and the tab says so.
+  Its **Fault Supervision** group holds the drive-wide settings of the fault supervisor
+  (`fault-supervision.md`): the window, current fraction, demanded speed, position error and still excursion
+  that decide when a rotor is not following the drive, and *Report stalls*. They are stored at once and in
+  force within 10 ms, in any state. While *Report stalls* is off — stored, or only edited — the group warns,
+  in the warning colour and in words, that a rotor held against the drive can carry up to the current limit
+  with no fault and only the board's thermal protection watches it; encoder loss is reported either way.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -243,7 +249,8 @@ A node on contract 2.0 has none of the 2.1 messages. Its Controllers tab offers 
 sent with the 2.0 bandwidth commands and not read back; the motor parameter fields are disabled with the
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
-reason.
+reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added.
 
 ### Part K — diagnostics
 

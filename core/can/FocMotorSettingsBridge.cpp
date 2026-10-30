@@ -30,6 +30,21 @@ namespace can
                     return statistics.reentries;
             }
         }
+
+        float StoredSettingOf(const services::ConfigData& config, FocParameter parameter)
+        {
+            if (GroupOf(parameter) == ParameterGroup::supervision)
+                return SupervisionSettingOf(config, parameter);
+            return static_cast<float>(StartupSettingOf(config, parameter));
+        }
+
+        void WriteStoredSetting(services::ConfigData& config, FocParameter parameter, float value)
+        {
+            if (GroupOf(parameter) == ParameterGroup::supervision)
+                WriteSupervisionSetting(config, parameter, value);
+            else
+                WriteStartupSetting(config, parameter, static_cast<uint32_t>(value));
+        }
     }
 
     FocMotorSettingsBridge::FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
@@ -158,8 +173,8 @@ namespace can
 
         if (GroupOf(parameter) == ParameterGroup::motor)
             controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
-        else if (GroupOf(parameter) == ParameterGroup::startup)
-            SetStartupSetting(parameter, static_cast<uint32_t>(value));
+        else if (GroupOf(parameter) == ParameterGroup::startup || GroupOf(parameter) == ParameterGroup::supervision)
+            SetStoredSetting(parameter, value);
         else
             SetLoopSetting(parameter, value, completed);
     }
@@ -181,7 +196,8 @@ namespace can
             case ParameterGroup::motor:
                 return HeldMotorParameter(parameter);
             case ParameterGroup::startup:
-                return FocParameterValue{ static_cast<float>(StartupSettingOf(controlMode.Config(), parameter)), false };
+            case ParameterGroup::supervision:
+                return FocParameterValue{ StoredSettingOf(controlMode.Config(), parameter), false };
             case ParameterGroup::calibrationRecord:
                 return HeldCalibrationReading(parameter);
             case ParameterGroup::onlineEstimate:
@@ -256,15 +272,15 @@ namespace can
             controlMode.SetPositionTunings(WithSetting(controlMode.StoredPositionTunings(), parameter, value), completed);
     }
 
-    void FocMotorSettingsBridge::SetStartupSetting(FocParameter parameter, uint32_t value)
+    void FocMotorSettingsBridge::SetStoredSetting(FocParameter parameter, float value)
     {
-        previousStartupSetting = StartupSettingOf(controlMode.Config(), parameter);
-        WriteStartupSetting(controlMode.Config(), parameter, value);
+        previousStoredSetting = StoredSettingOf(controlMode.Config(), parameter);
+        WriteStoredSetting(controlMode.Config(), parameter, value);
 
         controlMode.PersistConfig([this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
-                    WriteStartupSetting(controlMode.Config(), pendingParameter, previousStartupSetting);
+                    WriteStoredSetting(controlMode.Config(), pendingParameter, previousStoredSetting);
 
                 CompleteParameter(status == services::NvmStatus::Ok ? state_machine::SettingResult::ok : state_machine::SettingResult::nvmFailed);
             });

@@ -24,6 +24,8 @@ namespace
             return can::FocFaultCode::overTemperature;
         if (name == "sensor")
             return can::FocFaultCode::sensorFault;
+        if (name == "stall")
+            return can::FocFaultCode::stall;
         return std::nullopt;
     }
 }

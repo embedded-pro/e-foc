@@ -30,6 +30,11 @@ namespace foc
         mechanical.SetExternalTorque(torque);
     }
 
+    void ThreePhaseMotorModel::GripShaft(std::optional<foc::RadiansPerSecond> handSpeed)
+    {
+        mechanical.Grip(handSpeed);
+    }
+
     foc::NewtonMeter ThreePhaseMotorModel::ExternalTorque() const
     {
         return mechanical.ExternalTorque();

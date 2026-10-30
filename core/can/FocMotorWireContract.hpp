@@ -18,7 +18,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 4;
+    static constexpr uint8_t focContractVersionMinor = 5;
 
     enum class FieldType : uint8_t
     {
@@ -244,7 +244,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 40> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 46> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -268,6 +268,12 @@ namespace can
         { FocParameter::encoderResolution, "encoderResolution", "counts/rev", 1.0f, focMaxEncoderResolution, true, false },
         { FocParameter::canNodeId, "canNodeId", "-", 1.0f, focMaxCanNodeId, true, false },
         { FocParameter::canBitrate, "canBitrate", "bit/s", 125000.0f, 1000000.0f, true, false },
+        { FocParameter::supervisionWindow, "supervisionWindow", "s", foc::CommandLimits::minSupervisionWindow, foc::CommandLimits::maxSupervisionWindow, false, false },
+        { FocParameter::supervisionCurrentFraction, "supervisionCurrentFraction", "-", foc::CommandLimits::minSupervisionCurrentFraction, foc::CommandLimits::maxSupervisionCurrentFraction, false, false },
+        { FocParameter::supervisionDemandedSpeed, "supervisionDemandedSpeed", "rad/s", foc::CommandLimits::minSupervisionDemandedSpeed, foc::CommandLimits::maxSupervisionDemandedSpeed, false, false },
+        { FocParameter::supervisionPositionError, "supervisionPositionError", "rad", foc::CommandLimits::minSupervisionPositionError, foc::CommandLimits::maxSupervisionPositionError, false, false },
+        { FocParameter::supervisionStillExcursion, "supervisionStillExcursion", "rad", foc::CommandLimits::minSupervisionStillExcursion, foc::CommandLimits::maxSupervisionStillExcursion, false, false },
+        { FocParameter::stallDetection, "stallDetection", "-", 0.0f, 1.0f, true, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },

@@ -87,16 +87,24 @@
     through QueryParameter as read-only parameters. SetParameter on a read-only parameter
     shall be answered with invalidPayload and change nothing.
 
+- id: REQ-CAN-011
+  title: The supervision settings and the stall fault are reachable by number
+  shall: >
+    Contract version 2.4 shall add, without changing any 2.3 message, the supervision settings
+    of REQ-SM-033 as numbered parameters, each with a unit and a range defined once in core/can,
+    writable in any state and answered as REQ-CAN-007 answers a start-up setting, and a stall
+    value of the fault code carried by the status telemetry and the fault event.
+
 - id: REQ-CAN-008
   title: Floating-point fields have one byte order
   shall: >
     A float32 field of the category shall be the IEEE 754 single-precision bit pattern sent
     most significant byte first, as every other multi-byte field of the category is.
 
-- id: REQ-CAN-011
+- id: REQ-CAN-012
   title: Measured currents and rotor position are streamed at the configured rate
   shall: >
-    Contract version 2.4 shall add, without changing any 2.3 message other than retiring the
+    Contract version 2.5 shall add, without changing any 2.4 message other than retiring the
     never-sent TelemetryElectrical frame (0x88), a TelemetryCurrents telemetry frame carrying a
     wrapping 8-bit window sequence number, the mean measured d- and q-axis currents over the
     window at 1 mA resolution and the encoder's mechanical angle at the window's last sample at

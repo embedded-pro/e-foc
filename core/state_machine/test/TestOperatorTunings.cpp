@@ -1,6 +1,7 @@
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
 #include <gtest/gtest.h>
+#include <limits>
 
 namespace
 {
@@ -85,4 +86,29 @@ TEST_F(OperatorTuningsTest, sanitising_resets_only_the_loop_holding_an_unaccepta
     EXPECT_NEAR(config.speedLoop.observerBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio, 1e-6f);
     EXPECT_NEAR(config.positionLoop.errorWeight, 2.0f, 1e-6f);
     EXPECT_NEAR(config.currentLoop.switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
+}
+
+TEST_F(OperatorTuningsTest, sanitising_replaces_each_supervision_setting_outside_its_range_by_its_default)
+{
+    constexpr services::SupervisionSettings defaults{};
+    config.supervision = { 0.0f, 2.0f, std::numeric_limits<float>::quiet_NaN(), 0.5f, 5.0f };
+    config.stallDetection = 7;
+
+    state_machine::SanitizeSupervision(config);
+
+    EXPECT_NEAR(config.supervision.window, defaults.window, 1e-6f);
+    EXPECT_NEAR(config.supervision.currentFraction, defaults.currentFraction, 1e-6f);
+    EXPECT_NEAR(config.supervision.demandedSpeed, defaults.demandedSpeed, 1e-6f);
+    EXPECT_NEAR(config.supervision.positionError, 0.5f, 1e-6f);
+    EXPECT_NEAR(config.supervision.stillExcursion, defaults.stillExcursion, 1e-6f);
+    EXPECT_EQ(config.stallDetection, uint8_t{ 1 });
+}
+
+TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)
+{
+    config.stallDetection = 0;
+
+    state_machine::SanitizeSupervision(config);
+
+    EXPECT_EQ(config.stallDetection, uint8_t{ 0 });
 }

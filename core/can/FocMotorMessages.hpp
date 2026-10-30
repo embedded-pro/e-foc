@@ -7,7 +7,7 @@ namespace can
     static constexpr uint8_t focMotorCategoryId = 0x02;
 
     // Retired and never reused: 0x00 QueryMotorType, 0x07 IdentifyMechanical, 0x80 MotorTypeResponse,
-    // 0x87 MechanicalParamsResponse (contract 2.3); 0x88 TelemetryElectrical (contract 2.4)
+    // 0x87 MechanicalParamsResponse (contract 2.3); 0x88 TelemetryElectrical (contract 2.5)
     static constexpr uint8_t focStartId = 0x01;
     static constexpr uint8_t focStopId = 0x02;
     static constexpr uint8_t focSetPidCurrentId = 0x03;
@@ -64,7 +64,8 @@ namespace can
         overVoltage = 2,
         underVoltage = 3,
         overTemperature = 4,
-        sensorFault = 5
+        sensorFault = 5,
+        stall = 6
     };
 
     enum class FocMotorCategoryError : uint8_t
@@ -135,6 +136,12 @@ namespace can
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,
+        supervisionWindow = 0x70,
+        supervisionCurrentFraction = 0x71,
+        supervisionDemandedSpeed = 0x72,
+        supervisionPositionError = 0x73,
+        supervisionStillExcursion = 0x74,
+        stallDetection = 0x75,
         currentOffsetA = 0x80,
         currentOffsetB = 0x81,
         currentOffsetC = 0x82,

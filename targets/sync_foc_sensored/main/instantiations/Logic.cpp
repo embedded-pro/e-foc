@@ -42,9 +42,9 @@ namespace application
         , motorAlignment{ inverterCompensation, hardware }
         , rotorStandstill{ hardware }
         , platformFaultNotifier{ hardware }
-        , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
+        , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this](state_machine::FaultCode code)
             {
-                platformFaultNotifier->Raise(state_machine::FaultCode::encoderLoss);
+                platformFaultNotifier->Raise(code);
             } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
@@ -86,7 +86,10 @@ namespace application
                     {
                         return controlMode->ActiveStateMachine();
                     });
-                encoderPlausibility.Enable({});
+                encoderPlausibility.Enable([this]()
+                    {
+                        return supervision::ConfigFrom(controlMode->Config());
+                    });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()

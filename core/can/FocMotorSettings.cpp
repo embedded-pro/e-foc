@@ -78,6 +78,13 @@ namespace can
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
                 return ParameterGroup::startup;
+            case FocParameter::supervisionWindow:
+            case FocParameter::supervisionCurrentFraction:
+            case FocParameter::supervisionDemandedSpeed:
+            case FocParameter::supervisionPositionError:
+            case FocParameter::supervisionStillExcursion:
+            case FocParameter::stallDetection:
+                return ParameterGroup::supervision;
             default:
                 return ParameterGroup::motor;
         }
@@ -207,6 +214,50 @@ namespace can
             config.canBaudrate = value;
         else
             config.encoderResolution = value;
+    }
+
+    float SupervisionSettingOf(const services::ConfigData& config, FocParameter parameter)
+    {
+        switch (parameter)
+        {
+            case FocParameter::supervisionCurrentFraction:
+                return config.supervision.currentFraction;
+            case FocParameter::supervisionDemandedSpeed:
+                return config.supervision.demandedSpeed;
+            case FocParameter::supervisionPositionError:
+                return config.supervision.positionError;
+            case FocParameter::supervisionStillExcursion:
+                return config.supervision.stillExcursion;
+            case FocParameter::stallDetection:
+                return config.stallDetection != 0 ? 1.0f : 0.0f;
+            default:
+                return config.supervision.window;
+        }
+    }
+
+    void WriteSupervisionSetting(services::ConfigData& config, FocParameter parameter, float value)
+    {
+        switch (parameter)
+        {
+            case FocParameter::supervisionCurrentFraction:
+                config.supervision.currentFraction = value;
+                break;
+            case FocParameter::supervisionDemandedSpeed:
+                config.supervision.demandedSpeed = value;
+                break;
+            case FocParameter::supervisionPositionError:
+                config.supervision.positionError = value;
+                break;
+            case FocParameter::supervisionStillExcursion:
+                config.supervision.stillExcursion = value;
+                break;
+            case FocParameter::stallDetection:
+                config.stallDetection = value != 0.0f ? 1 : 0;
+                break;
+            default:
+                config.supervision.window = value;
+                break;
+        }
     }
 
     foc::CurrentAlgorithm ToCurrentAlgorithm(uint8_t algorithm)

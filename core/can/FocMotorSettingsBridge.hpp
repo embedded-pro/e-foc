@@ -26,7 +26,7 @@ namespace can
     private:
         bool SettingOutstanding() const;
         void SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed);
-        void SetStartupSetting(FocParameter parameter, uint32_t value);
+        void SetStoredSetting(FocParameter parameter, float value);
         void CompleteAlgorithmSelection(state_machine::SettingResult result);
         void CompleteParameter(state_machine::SettingResult result);
         void CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result);
@@ -46,7 +46,7 @@ namespace can
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;
         infra::Function<void(FocParameterValue)> pendingParameterCallback;
         FocParameter pendingParameter{ FocParameter::currentBandwidth };
-        uint32_t previousStartupSetting{ 0 };
+        float previousStoredSetting{ 0.0f };
         uint8_t pendingLegacyCommand{ 0 };
     };
 }

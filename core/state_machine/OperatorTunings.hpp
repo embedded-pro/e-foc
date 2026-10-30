@@ -20,4 +20,5 @@ namespace state_machine
     bool IsDesignable(const foc::CurrentLoopTunings& tunings);
 
     void SanitizeTunings(services::ConfigData& config);
+    void SanitizeSupervision(services::ConfigData& config);
 }
