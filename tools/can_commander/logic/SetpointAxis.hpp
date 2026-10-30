@@ -11,9 +11,10 @@ namespace tool
     class SetpointAxis
     {
     public:
-        SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float firmwareLimit);
+        SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel);
 
         std::string_view Suffix() const;
+        std::string_view RangeLabel() const;
         int32_t MaxCounts() const;
         int Decimals() const;
         double DisplayStep() const;
@@ -28,6 +29,7 @@ namespace tool
         double displayPerSi;
         int32_t wireScale;
         int32_t maxCounts;
+        std::string_view rangeLabel;
     };
 
     const SetpointAxis& TorqueAxis();

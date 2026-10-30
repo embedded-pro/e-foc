@@ -11,18 +11,28 @@ namespace tool
     {
         constexpr double rpmPerRadPerSecond{ 60.0 / (2.0 * std::numbers::pi) };
         constexpr double degreesPerRadian{ 180.0 / std::numbers::pi };
+        constexpr const char* firmwareRange{ "Accepted by the firmware" };
+
+        // The position loop is single-turn: ±π names each target once, the firmware's ±2π twice.
+        constexpr float halfTurn{ std::numbers::pi_v<float> };
     }
 
-    SetpointAxis::SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float firmwareLimit)
+    SetpointAxis::SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel)
         : suffix(suffix)
         , displayPerSi(displayPerSi)
         , wireScale(wireScale)
-        , maxCounts(static_cast<int32_t>(std::min(std::floor(static_cast<double>(firmwareLimit) * wireScale), static_cast<double>(std::numeric_limits<int16_t>::max()))))
+        , maxCounts(static_cast<int32_t>(std::min(std::floor(static_cast<double>(limit) * wireScale), static_cast<double>(std::numeric_limits<int16_t>::max()))))
+        , rangeLabel(rangeLabel)
     {}
 
     std::string_view SetpointAxis::Suffix() const
     {
         return suffix;
+    }
+
+    std::string_view SetpointAxis::RangeLabel() const
+    {
+        return rangeLabel;
     }
 
     int32_t SetpointAxis::MaxCounts() const
@@ -64,19 +74,19 @@ namespace tool
 
     const SetpointAxis& TorqueAxis()
     {
-        static const SetpointAxis axis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint };
+        static const SetpointAxis axis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
         return axis;
     }
 
     const SetpointAxis& SpeedAxis()
     {
-        static const SetpointAxis axis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint };
+        static const SetpointAxis axis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
         return axis;
     }
 
     const SetpointAxis& PositionAxis()
     {
-        static const SetpointAxis axis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, foc::CommandLimits::maxPositionSetpoint };
+        static const SetpointAxis axis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, halfTurn, "One turn from the alignment zero" };
         return axis;
     }
 
