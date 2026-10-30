@@ -16,18 +16,6 @@ rules:
     message: |
       Try to minimize the use of warning suppressions
 
-  - id: amp.no-pragma-once
-    pattern: /#pragma\s*once/
-    glob: "**/*.hpp"
-    severity: error
-    message: |
-      Do not use #pragma once
-    fail: |
-      #pragma once
-    pass: |
-      #ifndef NAMESPACE_COMPONENT_HPP
-      #define NAMESPACE_COMPONENT_HPP
-
   - id: amp.no-global-tracer
     pattern: /services::GlobalTracer().Trace().*/
     glob: "**/*.[c|h]pp"

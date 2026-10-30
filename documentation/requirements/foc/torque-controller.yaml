@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-TRQ-005: the inner-loop budget is REQ-PERF-001
+
 - id: REQ-TRQ-001
   title: Runtime-selectable current control law
   shall: >
@@ -27,14 +30,6 @@
     Every current control law that accumulates an integral state shall bound that
     state whenever the commanded voltage saturates, so that the accumulated term
     cannot grow while the output is limited.
-
-- id: REQ-TRQ-005
-  title: ISR execution budget
-  shall: >
-    The complete torque control cycle (sensing, transforms, active current law,
-    space vector modulation, output) shall execute at a 20 kHz control rate and
-    shall not exceed 4500 cycles at 120 MHz, which is 75 percent of the available
-    CPU time per control period.
 
 - id: REQ-TRQ-006
   title: The torque current reference is bounded by the inverter envelope

@@ -56,8 +56,6 @@ namespace application
         hal::GpioPin& WarningLed() override;
         hal::GpioPin& FailureLed() override;
         uint8_t BoardId() const override;
-        bool PowerStatus() const override;
-        hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
@@ -129,19 +127,6 @@ namespace application
             bool pinState{ false };
         };
 
-        class NoOpPerformanceTracker
-            : public hal::PerformanceTracker
-        {
-        public:
-            void Start() override
-            {}
-
-            uint32_t ElapsedCycles() override
-            {
-                return 0;
-            }
-        };
-
         using EventDispatcherCortexWithWeakPtrAndWatchdog = infra::EventDispatcherWithWeakPtrConnector<services::EventDispatcherWatchdogWorker<EventDispatcherCortexWithWeakPtrWorker>>;
 
         struct Cortex
@@ -211,7 +196,6 @@ namespace application
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;
-        NoOpPerformanceTracker performanceTracker;
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;

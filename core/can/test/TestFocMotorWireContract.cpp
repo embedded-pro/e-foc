@@ -57,7 +57,6 @@ namespace
         MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnAlign, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnIdentifyElectrical, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnIdentifyMechanical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnSetEncoderResolution, (uint32_t, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnConfigureTelemetryRate, (uint32_t, (const infra::Function<void()>&)), (override));
@@ -82,7 +81,6 @@ namespace
         MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t, const hal::Can::Message&), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t, uint8_t, uint8_t), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
-        MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t, foc::NewtonMeterSecondPerRadian, foc::NewtonMeterSecondSquared), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t, const can::FocAlgorithms&), (override));
         MOCK_METHOD(void, OnParameterResponse, (uint16_t, can::FocParameter, can::FocParameterValue), (override));
     };
@@ -474,7 +472,6 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendSetPositionBandwidth(1, 100.0f));
     EXPECT_FALSE(client.SendAlign(1));
     EXPECT_FALSE(client.SendIdentifyElectrical(1));
-    EXPECT_FALSE(client.SendIdentifyMechanical(1));
     EXPECT_FALSE(client.SendRequestTelemetry(1));
     EXPECT_FALSE(client.SendSetEncoderResolution(1, 4000));
     EXPECT_FALSE(client.SendSelectAlgorithm(1, can::FocControlLoop::current, 0));
@@ -552,14 +549,12 @@ namespace
     const std::vector<GoldenVector>& GoldenVectors()
     {
         static const std::vector<GoldenVector> vectors{
-            { can::focQueryMotorTypeId, { 0x00 } },
             { can::focStartId, { 0x00 } },
             { can::focStopId, { 0x00 } },
             { can::focSetPidCurrentId, { 0x00, 0x00, 0xFA } },
             { can::focSetPidSpeedId, { 0x00, 0x00, 0x32 } },
             { can::focSetPidPositionId, { 0x00, 0x00, 0x14 } },
             { can::focIdentifyElectricalId, { 0x00 } },
-            { can::focIdentifyMechanicalId, { 0x00 } },
             { can::focRequestTelemetryId, { 0x00 } },
             { can::focSetEncoderResolutionId, { 0x00, 0x00, 0x00, 0x10, 0x00 } },
             { can::focAlignId, { 0x00 } },
@@ -579,9 +574,7 @@ namespace
             { can::focClearCalibrationId, { 0x00 } },
             { can::focClearDiagnosticsId, { 0x00 } },
 
-            { can::focMotorTypeResponseId, { 0x01 } },
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
-            { can::focMechanicalParamsResponseId, { 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 } },
             { can::focTelemetryElectricalResponseId, { 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
             { can::focSelectControlModeResponseId, { 0x02 } },
@@ -646,7 +639,6 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnSetPidPosition(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnAlign(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnIdentifyElectrical(_)).Times(AnyNumber());
-    EXPECT_CALL(serverObserver, OnIdentifyMechanical(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnRequestTelemetry(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetEncoderResolution(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnConfigureTelemetryRate(_, _)).Times(AnyNumber());

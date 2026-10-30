@@ -1,6 +1,6 @@
 # e-foc — Agent Rules (canonical)
 
-Single source of truth for **Claude, Copilot, and sub-agents**. `CLAUDE.md` and `.github/copilot-instructions.md` point here. Sub-agent definitions: `.claude/agents/` (Claude) and `.github/agents/` (Copilot).
+Single source of truth for **Claude, Copilot, and sub-agents**. `CLAUDE.md` and `.github/copilot-instructions.md` point here. Sub-agent definitions: `.claude/agents/` (Claude) and `.github/agents/` (Copilot). `.github/instructions/*.instructions.md` add only file-type specifics (test patterns, CMake targets, document contents) on top of these rules.
 
 FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints targeting embedded MCUs.
 
@@ -12,7 +12,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `EncoderModel` and `PhaseCurrentSensor`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
-- `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
+- `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
 - `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
@@ -26,26 +26,25 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 **Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR-reachable paths. Host tools, simulators, and tests may use heap.
 
-Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion. No virtual destructors (see Interfaces & errors).
+Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion — stack usage must stay predictable. No virtual destructors (see Interfaces & errors).
 
-Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStorage<N>`, `infra::BoundedDeque<T>::WithMaxSize<N>`, `std::array<T,N>`, `std::optional<T>`.
+Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStorage<N>`, `infra::BoundedDeque<T>::WithMaxSize<N>`, `infra::BoundedList<T>::WithMaxSize<N>`, `std::array<T,N>`, `std::optional<T>`.
 
 ## Real-time — FOC loop
 
-`Calculate()` runs at 20 kHz in interrupt. Budget: **≤4500 cycles at 120 MHz** (inner loop); **≤20000** (1 kHz outer loop).
+`Calculate()` runs at 20 kHz in interrupt. Budget: **≤4500 cycles at 120 MHz** (inner loop, 75% of the 6000-cycle period); **≤20000** (1 kHz outer loop).
 
-Forbidden in hot path: virtual dispatch, heap, blocking calls, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp`.
+Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp` or another lookup table. No blocking calls in any ISR-reachable code. `Calculate()` delegates to focused helper methods.
 
-Also forbidden: per-sample validation. No plausibility check on the phase currents, no finiteness check on
-currents or duty cycles — see REQ-PERF-003. Sensor and power-stage failures are the hardware protection path's
-to catch. `foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
+Also forbidden: per-sample validation — no plausibility check on the phase currents and no finiteness check on
+currents or duty cycles in the 20 kHz path. Sensor and power-stage failures belong to the hardware protection path.
+`foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
 (`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
 
 Never give a function optimisation options of its own: no `#pragma GCC optimize`, no `optimize` attribute. GCC does not
 inline a callee whose options differ from its caller's, so a hot function with its own options calls every small helper
 it uses (unit accessors, matrix element access, toolbox wrappers) out of line. Embedded and QEMU builds compile all of
-e-foc with the same options instead: the configuration's level plus `-ffast-math -fno-finite-math-only`, from
-`cmake/CompilerOptimizations.cmake`. `-fno-finite-math-only` keeps NaN and infinity checks meaningful.
+e-foc with the same options instead — see **Optimisation** under Build.
 
 `OPTIMIZE_FOR_SPEED` (`numerical/math/CompilerOptimizations.hpp`) forces inlining: with
 `NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS` on (embedded and QEMU presets) it makes the function `always_inline` +
@@ -62,16 +61,19 @@ with it enabled the macro's own `inline` would be a duplicate.
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: all PID integrators must clamp or use back-calculation
 - **Decoupling**: −ω·Lq·Iq feedforward on Vd; +ω·(Ld·Id + ψf) on Vq. The Vd term is negative and the Vq term positive — these cancel the coupling the plant adds, so getting the signs backwards doubles it
-- Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` — do not reimplement
-- Unit types: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
+- **SVM**: min-max common-mode injection; duty cycles bounded to [0, 1]
+- Reuse `Clarke`, `Park`, `ClarkePark` (`TransformsClarkePark.hpp`) and `SpaceVectorModulation` from `core/foc/transforms/`, and PID, filters and math from `infra/numerical-toolbox/` — do not reimplement
+- Unit types, never a raw `float` where one exists: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
 ## Style
 
 - Allman braces, 4-space indent, `.clang-format` authoritative
-- `{}` init everywhere. PascalCase types/methods, camelCase members, lowercase namespaces
-- Fixed-width ints (`uint8_t`, `int32_t`). Functions ≤ ~30 lines
+- `{}` init everywhere. PascalCase types/methods, camelCase members, lowercase namespaces. `public:` before `private:`
+- Fixed-width ints (`uint8_t`, `int32_t`). Functions ≤ ~30 lines (hard limit ~50)
 - `const`/`constexpr`-correct. Non-trivial logic in `.cpp` — small `inline`/`constexpr` helpers in headers ok
-- **No comments** except non-obvious *why*, unit/frame types don't carry, concurrency contract. One short line max. No `TODO`/`FIXME`/`HACK`, no commented-out code
+- **No comments** except non-obvious *why* (hardware quirk, datasheet constraint, ordering requirement, deliberate deviation from the obvious implementation), unit/frame/convention types don't carry (electrical vs mechanical, per-unit vs volts, per-sample vs continuous gain), concurrency contract (which context writes a field, which reads it). One short line max
+- No `TODO`/`FIXME`/`HACK`/`XXX` (raise an issue instead), no commented-out code, no comment restating the next line or describing the change for a reviewer, no section banners, no docstrings on self-explanatory methods
+- A stale comment is worse than none: when code changes, fix or delete every comment it invalidates. A comment never claims behaviour the code does not implement, nor, in tests, a verification the assertions do not perform
 
 ## Async callback lifetime safety
 
@@ -92,23 +94,26 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
   Never `virtual ~I()`: nothing is deleted through an interface, and each virtual destructor adds a deleting destructor plus,
   under multiple inheritance, a thunk per base — about 18 KB of flash on the TM4C123 build. Concrete classes declare no
   destructor or a plain public one. Only host code that owns objects through a base pointer (`std::unique_ptr<Base>`) keeps one.
-- No exceptions. `std::optional<T>` or status enums. `assert()`/`really_assert()` for preconditions
-- SOLID + DIP: constructor injection via `PlatformFactory`; depend on abstractions. No global state.
+- No exceptions. `std::optional<T>` or status enums. `assert()`/`really_assert()` for preconditions. Never swallow an error
+- SOLID + DIP: constructor injection via `PlatformFactory` and the hardware ports in `core/platform_abstraction/interfaces/Drivers.hpp`; depend on abstractions. No global state. One class, one control concern; RAII for resources.
+- New FOC modes implement `FocTorque`, `FocSpeed` or `FocPosition` (`core/foc/interfaces/Foc.hpp`) and satisfy every pure virtual, `FocBase`'s included
 
 ## Testing
 
+- **TDD** — Red: a failing test for one behavior, before any production code. Green: the minimum code that passes it. Refactor with every test green. Repeat per behavior
 - GoogleTest. `TEST_F` for fixture tests; `TYPED_TEST` for typed; plain `TEST()` for simple stateless matching existing patterns
 - **`StrictMock` only** (`NiceMock`/`NaggyMock` forbidden). Fixture in anonymous namespace; macros outside
 - `EXPECT_NEAR` with explicit tolerance for float assertions. Heap is allowed in tests (see Memory scope).
-- Test files: `test/Test{ComponentName}.cpp` inside the library under test
+- Test files: `test/Test{ComponentName}.cpp` inside the library under test, added with `add_subdirectory(test)` in the library's `CMakeLists.txt`
 - Host stubs: `targets/platform_implementations/host/`
 
 ## Documentation — always updated
 
-Documentation-first: update `documentation/` **before or alongside** behavioral code changes.
+Documentation-first: update `documentation/` **before or alongside** behavioral code changes — code follows the documentation, not the opposite. A behavioral change with no matching documentation update is a CRITICAL review finding.
 
 - `documentation/theory/` — FOC algorithm or motor model changes
 - `documentation/performance-optimization/README.md` — timing-critical changes
+- `documentation/architecture/`, `documentation/design/` — any component whose observable behavior changes; if it has no document yet, create one from `documentation/templates/architecture.md` or `design.md` before writing production code
 - All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art
 - Markdown image syntax is allowed only for the pre-rendered preview of a TikZ figure (`documentation/tikz/images/*.svg`) placed next to its `{=latex}` block, and, in `documentation/theory/` only, for an animated figure from `documentation/animations/`; no other image references
 - TikZ previews: after editing `documentation/tikz/*.tex`, regenerate them with `python documentation/tools/render-tikz-svgs.py`
@@ -121,13 +126,14 @@ Documentation-first: update `documentation/` **before or alongside** behavioral 
 cmake --preset host && cmake --build --preset host-Debug   # configure + build host
 ctest --preset host                                         # run tests
 cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # embedded
+cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-RelWithDebInfo  # SIL firmware
 ```
 
-Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
-`qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the Software-in-the-Loop Tests job.
+`qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 
-**CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts.
+**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts.
 Its `release_tools_build` job calls `build-tools.yml`, the same workflow the release uses, so every PR
 builds, packages and install-tests the Linux and Windows tools exactly as a release does (MSVC with
 warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubuntu-latest`); signing
@@ -136,7 +142,16 @@ run behavioral tests — never recompile. Do not add cmake build steps to them. 
 every feature with an `@sil` scenario exactly once; a new feature goes into the shard that keeps the three balanced. `software_in_the_loop_tests` gathers the shards' reports into the one
 `Software-in-the-Loop Test Results` check and fails unless every shard passed.
 
-**Release**: `release-please.yml` builds (through `build-tools.yml`, shared with CI) and attaches the Linux/Windows tools (including the CAN Commander `.deb` and NSIS `setup.exe`, each installed, launched and uninstalled on the runner first), the firmware archives, the EK-TM4C1294XL `.hex` images as standalone assets, a full source archive with every submodule (`e_foc-source-<tag>.tar.gz`) and the documentation PDFs bundled in one `e_foc-documentation-<tag>.zip` when release-please creates a release (the booklet `eFocDesign.pdf` is attached on its own by `build-booklet.yml`). Every asset gets a Sigstore build-provenance attestation; the CAN Commander executable and installer are Authenticode-signed through SignPath once `SIGNPATH_ORGANIZATION_ID` is set (see `.github/signpath/README.md`). The CAN Commander's update check finds its installer by those asset-name suffixes (`-linux-x86_64.deb`, `-windows-x86_64-setup.exe`); keep them stable. Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow. `release-please-config.json` lists `feat`, `fix`, `perf`, `revert`, `docs`, `build` and `ci` commits in the changelog, so any of them opens or updates the release PR; `refactor`, `test`, `style` and `chore` stay hidden.
+Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `static-analysis.yml` (SonarCloud), `requirements-validation.yml` and
+`submodule-check.yml` (submodules point to `main`), plus `documentation-validation.yml` and `build-booklet.yml` when `documentation/` changes.
+
+**Release**: `release-please.yml` builds (through `build-tools.yml`, shared with CI) and attaches the Linux/Windows tools (including the CAN Commander `.deb` and NSIS `setup.exe`,
+each installed, launched and uninstalled on the runner first), the firmware archives, the EK-TM4C1294XL `.hex` images as standalone assets, a full source archive with every submodule
+(`e_foc-source-<tag>.tar.gz`) and the documentation PDFs bundled in one `e_foc-documentation-<tag>.zip` when release-please creates a release (the booklet `eFocDesign.pdf` is attached on its own by `build-booklet.yml`).
+Every asset gets a Sigstore build-provenance attestation; the CAN Commander executable and installer are Authenticode-signed through SignPath once `SIGNPATH_ORGANIZATION_ID` is set (see `.github/signpath/README.md`).
+The CAN Commander's update check finds its installer by those asset-name suffixes (`-linux-x86_64.deb`, `-windows-x86_64-setup.exe`); keep them stable.
+Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
+`release-please-config.json` lists `feat`, `fix`, `perf`, `revert`, `docs`, `build` and `ci` commits in the changelog, so any of them opens or updates the release PR; `refactor`, `test`, `style` and `chore` stay hidden.
 
 **Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.
 
@@ -154,9 +169,12 @@ QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebIn
   --mode sil integration_tests/features/ -t "@sil"
 ```
 
+**CMake**: every new file is added to its library's `CMakeLists.txt`; tests come in through `add_subdirectory(test)` (see Testing).
+
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 
-Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer). It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner) or `cycle-analysis-outer.json` (outer) — an unlisted symbol is silently unmeasured, not flagged.
+Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000).
+It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
 
 **Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
 `-Wall -Wextra`; with `CMAKE_COMPILE_WARNING_AS_ERROR` on, any warning in `core/`, `targets/`,
@@ -169,7 +187,8 @@ FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence 
 fix it, or drop the parameter name if it is genuinely unused.
 
 **Optimisation**: `cmake/CompilerOptimizations.cmake` provides `e_foc_enable_embedded_optimizations()`, which adds
-`-ffast-math -fno-finite-math-only` to the embedded and QEMU builds. Its call sits next to the warnings call, after the
+`-ffast-math -fno-finite-math-only` to the configuration's level in the embedded and QEMU builds; `-fno-finite-math-only`
+keeps NaN and infinity checks meaningful. Its call sits next to the warnings call, after the
 submodules and before `add_subdirectory(core)`, so `core/` and `targets/` — and the toolbox code they include — get the
 options while the infrastructure libraries and HALs keep their own.
 
@@ -181,8 +200,7 @@ branch on `CMAKE_CXX_COMPILER_ID`, and both guards are load-bearing — see belo
 naming addresses like `((const infra::Function<...>*)this)[1319]` — an index into a single object, so the
 path it claims does not exist. Definite `-Wuninitialized` stays enabled and is the one that matters; it is
 what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. The GNU guard matters because
-Clang has no `-Wmaybe-uninitialized`: the `windows` preset builds with
-`toolchain-clang-x86_64-pc-windows-msvc.cmake`, where the flag would raise `-Wunknown-warning-option` and
+Clang has no `-Wmaybe-uninitialized`: in a Clang build the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
 **Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
@@ -193,9 +211,11 @@ It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to ho
 
 Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
 
-**Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`. `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
+**Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`.
+`SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
 
-**SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines in the `plant.rec` record file it writes into the scenario directory (control-tick time base, never written from the ISR), a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`).
+**SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines in the `plant.rec` record file it writes into the scenario directory (control-tick time base, never written from the ISR),
+a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`).
 
 Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
 
@@ -212,42 +232,14 @@ Tag motor-controller scenarios on hardware `@hil_motor`, never `@hil`: only `@hi
 
 - **orchestrator** — first stop for any non-trivial task; triages to specialists
 - **planner** — new FOC modes, architectural changes, multi-file changes, tasks needing upfront design
-- **executor** — bug fixes, small changes, tasks with a clear existing plan; follows TDD
+- **executor** — bug fixes, small changes, CI/build/test failure fixes when the cause is known, tasks with a clear existing plan; follows TDD
 - **reviewer** — reviewing code or recent changes against project standards
-- **analyst** — investigation, audit, root-cause analysis, design exploration; read-only, no code changes
+- **analyst** — investigation, audit, root-cause analysis, design exploration, CI/build/test failure diagnosis ("investigate", "analyze", "why", "what is", "understand", "compare"); read-only, no code changes
 - **ux-ui-expert** skill (`.claude/skills/ux-ui-expert/SKILL.md`) — load before designing, reviewing or changing anything a person sees or operates under `tools/`: layouts, safety controls, feedback, installers, update and issue-reporting flows
 
 ## Constraints checklist
 
-Before finalizing any plan or implementation, verify:
-
-**Memory (embedded/runtime scope)**
-- [ ] No `new`/`delete`/`malloc`/`free`/`make_unique`/`make_shared`
-- [ ] No `std::vector`/`string`/`deque`/`list`/`map`/`set` — use bounded alternatives
-- [ ] No recursion; no virtual destructors — interfaces use a protected non-virtual destructor
-
-**Real-time**
-- [ ] No virtual dispatch in `Calculate()` hot path
-- [ ] No blocking calls or heap reachable from `Calculate()`
-- [ ] `FastTrigonometry` used — not raw `sin`/`cos`
-- [ ] No `#pragma GCC optimize` or `optimize` attribute (per-function options block inlining); `OPTIMIZE_FOR_SPEED` on header-defined hot-path methods only, never on a `.cpp` definition
-
-**FOC theory**
-- [ ] Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`; Park: `Id=Iα·cos(θ)+Iβ·sin(θ)`, `Iq=−Iα·sin(θ)+Iβ·cos(θ)`
-- [ ] `θe=θm·pole_pairs`; anti-windup on all PIDs; decoupling feedforward present
-- [ ] No reimplementation of `TransformsClarkePark`/`SpaceVectorModulation`
-- [ ] Unit-typed aliases used — not raw `float`
-
-**Design**
-- [ ] Hardware injected via constructor; no global state
-- [ ] `documentation/` updated before or alongside behavioral changes
-- [ ] New files added to `CMakeLists.txt`; tests added via `add_subdirectory(test)`
-
-**Async callback lifetime safety**
-- [ ] No `EventDispatcherWithWeakPtr::Instance().Schedule([this]…)` raw captures on non-static objects
-- [ ] Services using WeakPtr dispatch inherit `EnableSharedFromThis<T>` and are wrapped in `WithSharedAccess<T>` at every construction site
-- [ ] New identification/async services expose `IsRunning()` and it is included in `HasPendingAsyncWork()`
-- [ ] Test fixtures with `WithSharedAccess` members call `ExecuteAllActions()` in `TearDown()`; `StrictMock` service mocks expect `IsRunning().WillRepeatedly(Return(false))`
+Before finalizing any plan, implementation or review, check it against every rule in §Memory, §Real-time, §FOC theory, §Style, §Async callback lifetime safety, §Interfaces & errors, §Testing, §Documentation and §Build (CMake, cycle-budget configs).
 
 ## Assistant behavior — be terse
 

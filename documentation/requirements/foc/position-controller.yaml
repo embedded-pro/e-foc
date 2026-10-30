@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-POS-005: the inner-loop budget is REQ-PERF-001
+
 - id: REQ-POS-001
   title: Position cascade architecture
   shall: >
@@ -30,14 +33,6 @@
     that accumulates an integral state shall bound that state whenever the commanded
     output saturates, so that the accumulated term cannot grow while the output is
     limited.
-
-- id: REQ-POS-005
-  title: FOC loop CPU budget
-  shall: >
-    The complete position control cycle, including sensing, transforms, the active
-    current law, and PWM output, shall execute at a 20 kHz inner loop rate and shall
-    not exceed 4500 cycles at 120 MHz, which is 75 percent of the available CPU time
-    per control period.
 
 - id: REQ-POS-006
   title: Runtime-selectable position control law

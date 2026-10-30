@@ -16,7 +16,7 @@ Design and plan. Do NOT write or edit code.
 
 1. **Clarify first** — before researching: control mode (torque/speed/position), hardware target, real-time impact, edge cases, acceptance criteria
 2. **Research** — `documentation/theory/`, existing patterns in `core/foc/`, interface contracts, timing budget, numerical-toolbox reuse opportunities
-3. **Plan** — produce the sections below, then validate against AGENTS.md §Constraints checklist
+3. **Plan** — produce the sections below, then check the plan against every section AGENTS.md §Constraints checklist names before finalizing
 
 ## Plan sections
 
@@ -27,5 +27,3 @@ Design and plan. Do NOT write or edit code.
 - **Test strategy** — TDD Red-Green-Refactor; failing tests described before implementation
 - **Documentation update** — which `documentation/` files to update and what changes
 - **Build integration** — `CMakeLists.txt` changes, build + test commands
-
-See AGENTS.md §Constraints checklist for the full validation checklist to apply before finalizing.

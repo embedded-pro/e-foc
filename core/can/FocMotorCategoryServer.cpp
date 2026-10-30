@@ -6,28 +6,13 @@
 
 namespace can
 {
-    namespace
-    {
-        uint32_t ToNanoUnits(float value, int32_t scale)
-        {
-            if (std::isnan(value) || value <= 0.0f)
-                return 0;
-
-            const float scaled = std::roundf(value * static_cast<float>(scale));
-            if (scaled >= static_cast<float>(std::numeric_limits<uint32_t>::max()))
-                return std::numeric_limits<uint32_t>::max();
-
-            return static_cast<uint32_t>(scaled);
-        }
-    }
-
     FocMotorCategoryServer::FocMotorCategoryServer(services::CanFrameTransport& transport)
         : CanCategoryServer(transport)
     {
         AddMessageTypes(start, stop, clearFault, emergencyStop, selectControlMode,
             setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
-            setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion,
+            setEncoderResolution, configureTelemetryRate, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
             clearDiagnostics);
     }
@@ -36,11 +21,10 @@ namespace can
         : server(server)
         , align{ focAlignId, *this, &CommissioningMessages::HandleAlign }
         , identifyElectrical{ focIdentifyElectricalId, *this, &CommissioningMessages::HandleIdentifyElectrical }
-        , identifyMechanical{ focIdentifyMechanicalId, *this, &CommissioningMessages::HandleIdentifyMechanical }
         , calibrate{ focCalibrateId, *this, &CommissioningMessages::HandleCalibrate }
         , clearCalibration{ focClearCalibrationId, *this, &CommissioningMessages::HandleClearCalibration }
     {
-        server.AddMessageTypes(align, identifyElectrical, identifyMechanical, calibrate, clearCalibration);
+        server.AddMessageTypes(align, identifyElectrical, calibrate, clearCalibration);
     }
 
     FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
@@ -340,22 +324,6 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryServer::CommissioningMessages::HandleIdentifyMechanical(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focIdentifyMechanicalId))
-            return false;
-
-        server.NotifyObservers([this](auto& observer)
-            {
-                observer.OnIdentifyMechanical([this]()
-                    {
-                        server.SendCommandAck(focIdentifyMechanicalId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
     bool FocMotorCategoryServer::CommissioningMessages::HandleCalibrate(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focCalibrateId))
@@ -439,16 +407,6 @@ namespace can
                         SendCommandAck(focSetEncoderResolutionId, services::CanAckStatus::success);
                     });
             });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleQueryMotorType(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focQueryMotorTypeId))
-            return false;
-
-        SendCommandAck(focQueryMotorTypeId, services::CanAckStatus::notImplemented);
 
         return true;
     }
@@ -622,13 +580,5 @@ namespace can
         payload.WriteFixed16(inductance.Value(), focInductanceScale);
         payload.WriteUInt8(static_cast<uint8_t>(polePairs));
         SendResponse(focElectricalParamsResponseId, payload);
-    }
-
-    void FocMotorCategoryServer::BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
-    {
-        services::CanPayloadWriter payload;
-        payload.WriteUInt32(ToNanoUnits(friction.Value(), focFrictionScale));
-        payload.WriteUInt32(ToNanoUnits(inertia.Value(), focInertiaScale));
-        SendResponse(focMechanicalParamsResponseId, payload);
     }
 }

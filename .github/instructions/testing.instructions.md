@@ -5,29 +5,7 @@ applyTo: "**/test/**,**/test_doubles/**"
 
 # e-foc Testing Guidelines
 
-## File Structure
-
-- Unit test files: `test/Test{ComponentName}.cpp` inside the library under test
-- Hardware stubs for unit tests: `targets/platform_implementations/Host/`
-- Host simulation models for integration: `tools/simulator/`
-- CMake: tests added via `add_subdirectory(test)` in `CMakeLists.txt`
-
-## Framework
-
-- GoogleTest for assertions (`TEST_F`, `TYPED_TEST`, `TEST`)
-- GoogleMock for mocking hardware interfaces (`testing::StrictMock<>`)
-- Heap allocation (`std::make_unique`, `std::vector`, etc.) is permitted in host-side unit tests; the no-heap rule applies only to embedded target code and ISR-reachable paths
-
-## TDD — Red-Green-Refactor
-
-Follow the TDD cycle for every new behavior:
-
-1. **Red** — Write a failing test that describes one specific behavior (input, expected output, edge case). The test must fail before writing any production code.
-2. **Green** — Write the minimum production code needed to make the test pass. Nothing more.
-3. **Refactor** — Clean up code and test (naming, duplication, structure) while keeping all tests green.
-4. Repeat for the next behavior.
-
-Tests act as executable specifications. Write tests **before** implementation, not after.
+Follow AGENTS.md — see §Testing (TDD, GoogleTest macros, `StrictMock` only, `EXPECT_NEAR`, file names, host stubs, heap in tests) and §Async callback lifetime safety rule 6 (fixtures holding `WithSharedAccess` members). This file adds only the test specifics.
 
 ## Fixture Test Pattern (single type — most FOC tests)
 
@@ -37,14 +15,14 @@ Tests act as executable specifications. Write tests **before** implementation, n
 
 namespace
 {
-    class TestTransformsClarkePark : public ::testing::Test
+    class TestClarkePark : public ::testing::Test
     {
     protected:
-        foc::TransformsClarkePark transforms;
+        foc::ClarkePark clarkePark;
     };
 }
 
-TEST_F(TestTransformsClarkePark, clarke_produces_correct_alpha_from_balanced_currents)
+TEST_F(TestClarkePark, forward_of_balanced_currents_at_zero_angle_gives_expected_d_and_q)
 {
     // Arrange
     // Act
@@ -52,22 +30,22 @@ TEST_F(TestTransformsClarkePark, clarke_produces_correct_alpha_from_balanced_cur
 }
 ```
 
-## Typed Test Pattern (multiple numeric types — for templated algorithms)
+## Typed Test Pattern (templated code instantiated for more than one type)
 
 ```cpp
-#include "numerical/filters/passive/FirFilter.hpp"
+#include "core/foc/<area>/<Component>.hpp"
 #include <gtest/gtest.h>
 
 namespace
 {
     template<typename T>
-    class TestFirFilter : public ::testing::Test {};
+    class TestComponent : public ::testing::Test {};
 
-    using TestTypes = ::testing::Types<float, math::Q15, math::Q31>;
-    TYPED_TEST_SUITE(TestFirFilter, TestTypes);
+    using TestTypes = ::testing::Types<float, double>;
+    TYPED_TEST_SUITE(TestComponent, TestTypes);
 }
 
-TYPED_TEST(TestFirFilter, produces_correct_output)
+TYPED_TEST(TestComponent, produces_correct_output)
 {
     // Arrange, Act, Assert
 }
@@ -75,12 +53,10 @@ TYPED_TEST(TestFirFilter, produces_correct_output)
 
 ## Rules
 
-- Prefer `TEST_F` when tests share fixture state or setup/teardown logic
-- Use plain `TEST()` for simple, stateless tests without shared setup — it is acceptable and used throughout the codebase
-- Fixture class inside anonymous `namespace {}`
-- Test macros (`TEST_F`, `TEST`, `TYPED_TEST`) **outside** the anonymous namespace
 - Include `<gtest/gtest.h>` (not `<gmock/gmock.h>`) unless gmock matchers are needed
-- Use `testing::StrictMock<MockType>` for ALL mock instances — `NiceMock` and `NaggyMock` are **FORBIDDEN**
+- Tests must not require hardware — use the stubs in `targets/platform_implementations/host/`
+- Descriptive test names that state the scenario and expected outcome; one behavior per test
+- Arrange-Act-Assert
 
 ## FOC-Specific Test Requirements
 
@@ -88,14 +64,5 @@ TYPED_TEST(TestFirFilter, produces_correct_output)
 - **SVM**: Test duty cycles for all 6 sectors and sector boundaries
 - **PID anti-windup**: Verify that integrator is clamped and does not accumulate past output limits
 - **Electrical angle conversion**: Verify `θe = θm · pole_pairs` for multiple pole-pair counts
-- **Control loop integration**: Use host simulation models in `tools/simulator/` for end-to-end validation
+- **Control loop integration**: model-in-the-loop (`integration_tests/model_in_the_loop`) for sweeps, `@sil` scenarios in `integration_tests/features/` for the firmware — see AGENTS.md §Build
 - Test edge cases: zero current, maximum current, zero speed, maximum speed, angle wraparound at ±π
-
-## Test Quality
-
-- Use descriptive test names that state the scenario and expected outcome
-- Keep tests focused — one behavior per test
-- Use `EXPECT_NEAR` with explicit tolerance for floating-point assertions (not `EXPECT_EQ`)
-- Tests must not require hardware — use stubs from `targets/platform_implementations/Host/`
-- Follow Arrange-Act-Assert pattern
-- Allman brace style applies to test code too

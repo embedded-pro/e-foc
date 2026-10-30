@@ -33,7 +33,6 @@ namespace application
         hal::tiva::GpioPin boardId0{ hal::tiva::Port::D, 0 };
         hal::tiva::GpioPin boardId1{ hal::tiva::Port::D, 1 };
         hal::tiva::GpioPin boardId2{ hal::tiva::Port::D, 2 };
-        hal::tiva::GpioPin powerStatus{ hal::tiva::Port::D, 4 };
 
         hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 0 };
         hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 1 };
@@ -41,7 +40,6 @@ namespace application
         hal::tiva::GpioPin canRx{ hal::tiva::Port::F, 0 };
         hal::tiva::GpioPin canTx{ hal::tiva::Port::F, 3 };
 
-        hal::tiva::GpioPin performance{ hal::tiva::Port::A, 2 };
     }
 
     namespace Peripheral

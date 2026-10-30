@@ -5,35 +5,27 @@ applyTo: "**/CMakeLists.txt"
 
 # e-foc CMake Rules
 
-## Embedded target bringup
-
-When wiring a new target in `targets/*/main/CMakeLists.txt`:
-- ST targets: `halst_target_bringup(<target>)`
-- TI targets: `hal_ti_target_bringup(<target>)`
-- `*_default_init` variants were removed — do not use them.
+Follow AGENTS.md — see §Build (build commands and presets, CI artifact model, new files, embedded bringup, warnings and optimisation placement) and §Testing (`add_subdirectory(test)`). This file adds only the CMake specifics.
 
 ## Test targets
 
-Add tests via `add_subdirectory(test)` inside the library's `CMakeLists.txt`. The test directory must
-contain its own `CMakeLists.txt` that registers targets with `gtest_discover_tests`.
+A library's `test/CMakeLists.txt` declares its own host-only test executable and registers it with EMIL:
+
+```cmake
+add_executable(e_foc.foc.transforms_test)
+emil_build_for(e_foc.foc.transforms_test HOST All BOOL E_FOC_BUILD_TESTS)
+emil_add_test(e_foc.foc.transforms_test)
+
+target_link_libraries(e_foc.foc.transforms_test PUBLIC
+    gmock_main
+    e_foc.foc.transforms
+)
+```
 
 ## Key library targets
 
-- `infra::BoundedVector` and other bounded containers — via `infra/embedded-infra-lib/`
-- `numerical::PidController`, `numerical::FirFilter`, etc. — via `infra/numerical-toolbox/`
-- Link against these rather than duplicating their logic.
-
-## CI artifacts (do not add build steps to SIL workflow)
-
-`ci.yml` builds and uploads: `e_foc`, `e_foc.qemu_sil_tests`, `e_foc.sync_foc_sensored.qemu.elf`.
-`software-in-the-loop-tests.yml` downloads those artifacts and runs tests — never recompiles.
-Do not add `cmake` or `cmake --build` steps to `software-in-the-loop-tests.yml`.
-
-## Build commands (reference)
-
-```bash
-cmake --preset host && cmake --build --preset host-Debug
-ctest --preset host
-cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug
-cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-Debug
-```
+Link against these rather than duplicating their logic:
+- `infra.util` — bounded containers (`infra::BoundedVector`, `BoundedString`, `BoundedDeque`, `BoundedList`), `WithSharedAccess`
+- `numerical.controllers.interfaces`, `numerical.controllers.implementations` — PID and other controllers
+- `numerical.filters.passive` — filters (`filters::passive::Fir`, …)
+- `numerical.math` — math helpers, `CompilerOptimizations.hpp`

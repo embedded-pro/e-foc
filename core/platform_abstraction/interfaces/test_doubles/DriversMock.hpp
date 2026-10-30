@@ -14,13 +14,6 @@ namespace drivers
         MOCK_METHOD(void, SetZero, (), (override));
     };
 
-    class HallSensorMock
-        : public HallSensor
-    {
-    public:
-        MOCK_METHOD((std::pair<foc::HallState, foc::Direction>), Read, (), (const, override));
-    };
-
     class ThreePhasePowerStageMock
         : public ThreePhasePowerStage
     {

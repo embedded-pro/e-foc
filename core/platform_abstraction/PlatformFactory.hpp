@@ -13,19 +13,6 @@
 #include <chrono>
 #include <cstdint>
 
-namespace hal
-{
-    class PerformanceTracker
-    {
-    protected:
-        ~PerformanceTracker() = default;
-
-    public:
-        virtual void Start() = 0;
-        virtual uint32_t ElapsedCycles() = 0;
-    };
-}
-
 namespace application
 {
     enum class ResetCause : uint8_t
@@ -94,8 +81,6 @@ namespace application
         virtual hal::GpioPin& WarningLed() = 0;
         virtual hal::GpioPin& FailureLed() = 0;
         virtual uint8_t BoardId() const = 0;
-        virtual bool PowerStatus() const = 0;
-        virtual hal::PerformanceTracker& PerformanceTimer() = 0;
         virtual hal::Hertz SystemClock() const = 0;
         virtual foc::Volts PowerSupplyVoltage() = 0;
         virtual foc::LowPriorityInterrupt& LowPriorityInterrupt() = 0;

@@ -78,7 +78,7 @@ namespace application
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
-                    *electricalIdent, nullptr, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
+                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {

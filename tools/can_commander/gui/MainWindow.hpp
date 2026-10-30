@@ -59,7 +59,6 @@ namespace tool
         void OnBusVoltageReceived(uint16_t nodeId, float voltage) override;
         void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) override;
         void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
-        void OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2) override;
         void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
 

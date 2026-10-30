@@ -17,7 +17,7 @@ This project provides a production-ready motor control implementation designed f
 - **Field-Oriented Control (FOC)**: Complete implementation for BLDC and PMSM motors
 - **Space Vector Modulation (SVM)**: Efficient PWM generation
 - **PID Control**: Anti-windup implementations for current and velocity loops
-- **Sensored Control**: Encoder and Hall sensor feedback integration
+- **Sensored Control**: Quadrature encoder feedback
 - **Auto-Tuning**: Resistance and Inductance estimation
 - **Real-Time Performance**: Deterministic execution with no heap allocation
 
@@ -79,7 +79,7 @@ e-foc/
 │   │   ├── cascade/                 # Torque/speed/position cascade orchestration and gain design
 │   │   └── instantiations/          # Execution wiring (Runner, FocController)
 │   ├── platform_abstraction/        # Platform abstraction interfaces and shared adapters
-│   │   ├── interfaces/              # Hardware ports in namespace drivers (ThreePhaseInverter, Encoder, HallSensor)
+│   │   ├── interfaces/              # Hardware ports in namespace drivers (ThreePhaseInverter, Encoder)
 │   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
 │   │   ├── AdcPhaseCurrentMeasurement.hpp
 │   │   ├── CanBusAdapter.hpp
@@ -350,11 +350,11 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Development References
 
-| Document                                                        | Description                                               |
-|-----------------------------------------------------------------|-----------------------------------------------------------|
-| [Copilot / Agent Instructions](.github/copilot-instructions.md) | Development guidelines, patterns, and constraints         |
-| [embedded-infra-lib](infra/embedded-infra-lib/README.md)        | Bounded containers and infrastructure library reference   |
-| [numerical-toolbox](infra/numerical-toolbox/README.md)          | Reusable numerical algorithms (PID, filters, fixed-point) |
+| Document                                                 | Description                                               |
+|----------------------------------------------------------|-----------------------------------------------------------|
+| [Agent Instructions](AGENTS.md)                          | Development guidelines, patterns, and constraints         |
+| [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference   |
+| [numerical-toolbox](infra/numerical-toolbox/README.md)   | Reusable numerical algorithms (PID, filters, fixed-point) |
 
 ## License
 

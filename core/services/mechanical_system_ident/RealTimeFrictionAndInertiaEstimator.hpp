@@ -3,8 +3,6 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
-#include "core/services/mechanical_system_ident/FrictionAndInertiaEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include "core/services/mechanical_system_ident/SteadySpeedFrictionFit.hpp"
@@ -15,17 +13,12 @@
 namespace services
 {
     class RealTimeFrictionAndInertiaEstimator
-        : public FrictionAndInertiaEstimator
-        , public foc::OnlineMechanicalEstimator
+        : public foc::OnlineMechanicalEstimator
     {
     public:
         static constexpr float defaultForgettingFactor = 0.9995f;
 
         RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency);
-
-        Result Update(foc::PhaseCurrents currentPhases, foc::RadiansPerSecond speed, foc::Radians electricalAngle, foc::NewtonMeter targetTorque) override;
-
-        void Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction);
 
         void SetTorqueConstant(foc::NewtonMeter kt) override;
         void SetInitialEstimate(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction) override;
@@ -58,14 +51,6 @@ namespace services
 
         float samplingFrequency;
         float forgettingFactor;
-        std::optional<MotorRLS> rls;
-        [[no_unique_address]] foc::ClarkePark transform;
-        MotorRLS::InputMatrix regressor;
-        math::Matrix<float, 1, 1> torque;
-        foc::RadiansPerSecond previousSpeed{ 0.0f };
-        MotorRLS::EstimationMetrics lastMetrics{};
-        MechanicalExcitation excitation;
-
         std::array<DirectionalFit, 2> onlineFits;
         MotorRLS::InputMatrix onlineRegressor;
         MechanicalWindowKinematics kinematics;

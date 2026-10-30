@@ -10,7 +10,10 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     protected:
-        void TearDown() override { ExecuteAllActions(); }
+        void TearDown() override
+        {
+            ExecuteAllActions();
+        }
 
         infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
     };

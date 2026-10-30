@@ -41,7 +41,6 @@ namespace
         MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
-        MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t sourceNodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t sourceNodeId, const can::FocAlgorithms& algorithms), (override));
         MOCK_METHOD(void, OnParameterResponse, (uint16_t sourceNodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
     };
@@ -243,30 +242,6 @@ TEST_F(FocMotorCategoryClientTest, OnElectricalParamsResponse_ShortPayload_IsRej
     EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focElectricalParamsResponseId, msg));
 }
 
-TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_DecodesFrictionAndInertiaFromNanoUnits)
-{
-    foc::NewtonMeterSecondPerRadian friction{ 0.0f };
-    foc::NewtonMeterSecondSquared inertia{ 0.0f };
-    EXPECT_CALL(observer, OnMechanicalParamsResponse(3, _, _))
-        .WillOnce(Invoke([&](uint16_t, foc::NewtonMeterSecondPerRadian f, foc::NewtonMeterSecondSquared j)
-            {
-                friction = f;
-                inertia = j;
-            }));
-
-    const auto msg = MakeMessage({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 });
-    client.HandleMessage(can::focMechanicalParamsResponseId, msg);
-
-    EXPECT_NEAR(friction.Value(), 15000.0f / can::focFrictionScale, 1e-8f);
-    EXPECT_NEAR(inertia.Value(), 7060.0f / can::focInertiaScale, 1e-9f);
-}
-
-TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_ShortPayload_IsRejected)
-{
-    const auto msg = MakeMessage({ 0x00, 0x00, 0x3A, 0x98 });
-    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focMechanicalParamsResponseId, msg));
-}
-
 TEST_F(FocMotorCategoryClientTest, SendCommissioningCommands_TransmitTheirCommandIds)
 {
     client.SendAlign(1);
@@ -274,9 +249,6 @@ TEST_F(FocMotorCategoryClientTest, SendCommissioningCommands_TransmitTheirComman
 
     client.SendIdentifyElectrical(1);
     EXPECT_EQ(lastSentMsgType, can::focIdentifyElectricalId);
-
-    client.SendIdentifyMechanical(1);
-    EXPECT_EQ(lastSentMsgType, can::focIdentifyMechanicalId);
 
     client.SendRequestTelemetry(1);
     EXPECT_EQ(lastSentMsgType, can::focRequestTelemetryId);

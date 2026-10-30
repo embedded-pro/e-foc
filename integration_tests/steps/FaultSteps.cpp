@@ -55,12 +55,6 @@ WHEN(R"(the motor start command is issued)")
         << "Start command rejected";
 }
 
-WHEN(R"(the fault is cleared)")
-{
-    auto& fixture = context.Get<Fixture>();
-    fixture.SendCanCommand(can::focMotorCategoryId, can::focClearFaultId);
-}
-
 THEN(R"(the rotor shall not turn)")
 {
     auto& fixture = context.Get<Fixture>();

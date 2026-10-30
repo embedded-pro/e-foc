@@ -71,7 +71,6 @@ namespace tool
         {
             case can::focAlignId:
             case can::focIdentifyElectricalId:
-            case can::focIdentifyMechanicalId:
             case can::focCalibrateId:
                 return motionCommandTimeout;
             default:
@@ -231,14 +230,6 @@ namespace tool
         return Tracked(nodeId, can::focIdentifyElectricalId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendIdentifyElectrical(nodeId);
-            });
-    }
-
-    bool CanCommandClient::SendIdentifyMechanical(uint16_t nodeId)
-    {
-        return Tracked(nodeId, can::focIdentifyMechanicalId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendIdentifyMechanical(nodeId);
             });
     }
 
@@ -406,7 +397,6 @@ namespace tool
             case can::focSelectAlgorithmId:
             case can::focAlignId:
             case can::focIdentifyElectricalId:
-            case can::focIdentifyMechanicalId:
                 RequestSettings(nodeId);
                 break;
             case can::focCalibrateId:
@@ -522,14 +512,6 @@ namespace tool
         NotifyObservers([nodeId, resistance, inductance, polePairs](auto& observer)
             {
                 observer.OnElectricalParametersReceived(nodeId, resistance.Value(), inductance.Value(), polePairs);
-            });
-    }
-
-    void CanCommandClient::OnMechanicalParamsResponse(uint16_t nodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
-    {
-        NotifyObservers([nodeId, friction, inertia](auto& observer)
-            {
-                observer.OnMechanicalParametersReceived(nodeId, friction.Value(), inertia.Value());
             });
     }
 

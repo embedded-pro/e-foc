@@ -23,7 +23,6 @@ namespace foc
     using Volts = infra::Quantity<infra::Volt, float>;
     using Radians = infra::Quantity<unit::Radians, float>;
     using RadiansPerSecond = infra::Quantity<unit::Radians::Div<infra::Second>, float>;
-    using HallState = uint8_t;
     using Nm = infra::Quantity<unit::NewtonMeter, float>;
     using NewtonMeter = Nm;
     using NewtonMeterSecondSquared = infra::Quantity<unit::NewtonMeter::Mul<infra::Second>::Mul<infra::Second>, float>;

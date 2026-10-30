@@ -28,8 +28,6 @@ namespace tool
         constexpr FieldId resistance{ 11 };
         constexpr FieldId inductance{ 12 };
         constexpr FieldId polePairs{ 13 };
-        constexpr FieldId friction{ 14 };
-        constexpr FieldId inertia{ 15 };
 
         constexpr FieldSpec ReadOut(FieldId id, std::string_view label, std::string_view suffix, int decimals, ReadOutStyle style = ReadOutStyle::Fixed)
         {
@@ -44,12 +42,10 @@ namespace tool
             ReadOut(busVoltage, "Bus voltage:", " V", DecimalsFor(can::focVoltageScale))
         };
 
-        constexpr std::array<FieldSpec, 5> parameterFields{
+        constexpr std::array<FieldSpec, 3> parameterFields{
             ReadOut(resistance, "Resistance:", " Ω", 4, ReadOutStyle::Significant),
             ReadOut(inductance, "Inductance:", " mH", 4, ReadOutStyle::Significant),
-            ReadOut(polePairs, "Pole pairs:", "", 0),
-            ReadOut(friction, "Friction:", " N·m·s/rad", 4, ReadOutStyle::Significant),
-            ReadOut(inertia, "Inertia:", " kg·m²", 4, ReadOutStyle::Significant)
+            ReadOut(polePairs, "Pole pairs:", "", 0)
         };
 
         constexpr const char* placeholder{ "—" };
@@ -158,12 +154,6 @@ namespace tool
         Show(parameters, resistance, static_cast<double>(resistanceOhm));
         Show(parameters, inductance, static_cast<double>(inductanceMilliHenry));
         Show(parameters, polePairs, static_cast<double>(polePairsValue));
-    }
-
-    void TelemetryPanel::OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2)
-    {
-        Show(parameters, friction, static_cast<double>(frictionNmSPerRad));
-        Show(parameters, inertia, static_cast<double>(inertiaKgM2));
     }
 
     void TelemetryPanel::ShowFault(FocFaultCode fault)

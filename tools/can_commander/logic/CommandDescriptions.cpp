@@ -38,8 +38,6 @@ namespace tool
                 return "Align Rotor";
             case can::focIdentifyElectricalId:
                 return "Identify Electrical";
-            case can::focIdentifyMechanicalId:
-                return "Identify Mechanical";
             case can::focRequestTelemetryId:
                 return "Status Request";
             case can::focSetEncoderResolutionId:

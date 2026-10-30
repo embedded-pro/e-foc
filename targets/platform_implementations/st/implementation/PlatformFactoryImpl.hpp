@@ -26,7 +26,6 @@ namespace application
 {
     class PlatformFactoryImpl
         : public PlatformFactory
-        , public hal::PerformanceTracker
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -43,8 +42,6 @@ namespace application
         hal::GpioPin& WarningLed() override;
         hal::GpioPin& FailureLed() override;
         uint8_t BoardId() const override;
-        bool PowerStatus() const override;
-        hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
@@ -66,7 +63,6 @@ namespace application
 
         // Also satisfies ThreePhaseInverter::Start; no-op on ST
         void Start() override;
-        uint32_t ElapsedCycles() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;

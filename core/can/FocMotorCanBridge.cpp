@@ -12,7 +12,6 @@ namespace can
         state_machine::ControlModeStateMachine& controlMode,
         const Platform& platform,
         services::ElectricalParametersIdentification& electricalIdent,
-        services::MechanicalParametersIdentification* mechIdent,
         services::Tracer& tracer,
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
@@ -21,7 +20,7 @@ namespace can
         , controlMode(controlMode)
         , inverter(platform.inverter)
         , encoder(platform.encoder)
-        , commissioning(server, controlMode, electricalIdent, mechIdent, currentOffsets, standstill)
+        , commissioning(server, controlMode, electricalIdent, currentOffsets, standstill)
         , settings(server, controlMode, platform.diagnostics, platform.resetCause)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
@@ -81,8 +80,6 @@ namespace can
 
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        commissioning.AbortMechanicalIdentification();
-
         ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
 
@@ -173,11 +170,6 @@ namespace can
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>& onDone)
     {
         commissioning.IdentifyElectrical(onDone);
-    }
-
-    void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void()>& onDone)
-    {
-        commissioning.IdentifyMechanical(onDone);
     }
 
     void FocMotorCanBridge::OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone)

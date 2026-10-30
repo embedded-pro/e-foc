@@ -45,7 +45,6 @@ namespace tool
         virtual void OnBusVoltageReceived(uint16_t nodeId, float voltage) = 0;
         virtual void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) = 0;
         virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
-        virtual void OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2) = 0;
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
         virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
     };
@@ -90,7 +89,6 @@ namespace tool
         bool SendClearFault(uint16_t nodeId);
         bool SendAlign(uint16_t nodeId);
         bool SendIdentifyElectrical(uint16_t nodeId);
-        bool SendIdentifyMechanical(uint16_t nodeId);
         bool SendCalibrate(uint16_t nodeId);
         bool SendClearCalibration(uint16_t nodeId);
         bool SendClearDiagnostics(uint16_t nodeId);
@@ -154,7 +152,6 @@ namespace tool
         void OnTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) override;
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
-        void OnMechanicalParamsResponse(uint16_t nodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) override;
         void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
 

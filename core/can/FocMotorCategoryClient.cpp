@@ -11,7 +11,7 @@ namespace can
         , origin(origin)
     {
         AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse,
-            electricalParamsResponse, mechanicalParamsResponse, algorithmsResponse, parameterResponse);
+            electricalParamsResponse, algorithmsResponse, parameterResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -149,14 +149,6 @@ namespace can
             return false;
 
         return SendCommand(targetNodeId, focIdentifyElectricalId);
-    }
-
-    bool FocMotorCategoryClient::SendIdentifyMechanical(uint16_t targetNodeId)
-    {
-        if (contracts.Incompatible(targetNodeId))
-            return false;
-
-        return SendCommand(targetNodeId, focIdentifyMechanicalId);
     }
 
     bool FocMotorCategoryClient::SendRequestTelemetry(uint16_t targetNodeId)
@@ -396,23 +388,6 @@ namespace can
         NotifyObservers([source = origin.SourceNodeId(), parameter = descriptor->id, held](auto& observer)
             {
                 observer.OnParameterResponse(source, parameter, held);
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryClient::HandleMechanicalParamsResponse(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focMechanicalParamsResponseId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        const auto friction = foc::NewtonMeterSecondPerRadian{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focFrictionScale) };
-        const auto inertia = foc::NewtonMeterSecondSquared{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focInertiaScale) };
-
-        NotifyObservers([source = origin.SourceNodeId(), friction, inertia](auto& observer)
-            {
-                observer.OnMechanicalParamsResponse(source, friction, inertia);
             });
 
         return true;

@@ -132,8 +132,6 @@ TEST(WireContractDocumentation, the_scale_table_matches_the_contract)
     EXPECT_EQ(can::focPidScale, documented.at("Bandwidth"));
     EXPECT_EQ(can::focResistanceScale, documented.at("Resistance"));
     EXPECT_EQ(can::focInductanceScale, documented.at("Inductance"));
-    EXPECT_EQ(can::focFrictionScale, documented.at("Friction"));
-    EXPECT_EQ(can::focInertiaScale, documented.at("Inertia"));
 }
 
 TEST(WireContractDocumentation, every_scale_the_contract_uses_is_documented)

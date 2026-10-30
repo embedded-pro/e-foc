@@ -1,3 +1,6 @@
+# Retired, not reused:
+#   REQ-HIL-009: needs a power cycle no test rig provides; never verified
+
 - id: REQ-EH-001
   title: Persistent fault data capture on critical failure
   shall: >
@@ -51,12 +54,6 @@
     When the "reset" command is issued over the CLI, the device shall reboot
     and the CLI banner on the subsequent boot shall report "Software" as the
     reset cause.
-
-- id: REQ-HIL-009
-  title: Power-up reset cause captured correctly
-  shall: >
-    After a power cycle (not a software reset), the CLI banner shall report
-    "PowerUp" as the reset cause.
 
 - id: REQ-HIL-010
   title: HardFault handler captures and reports fault data
