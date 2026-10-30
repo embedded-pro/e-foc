@@ -35,5 +35,16 @@ namespace foc
         static constexpr float minInertia{ 1.0e-9f };
         static constexpr float maxInertia{ 10.0f };
         static constexpr float maxViscousFriction{ 10.0f };
+
+        static constexpr float minSupervisionWindow{ 0.05f };
+        static constexpr float maxSupervisionWindow{ 10.0f };
+        static constexpr float minSupervisionCurrentFraction{ 0.01f };
+        static constexpr float maxSupervisionCurrentFraction{ 1.0f };
+        static constexpr float minSupervisionDemandedSpeed{ 0.1f };
+        static constexpr float maxSupervisionDemandedSpeed{ 500.0f };
+        static constexpr float minSupervisionPositionError{ 0.01f };
+        static constexpr float maxSupervisionPositionError{ 3.2f };
+        static constexpr float minSupervisionStillExcursion{ 1.0e-3f };
+        static constexpr float maxSupervisionStillExcursion{ 1.0f };
     };
 }

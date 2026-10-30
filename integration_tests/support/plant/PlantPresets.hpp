@@ -134,6 +134,10 @@ namespace sil
 
             .eventLoopStallDelayMs = 0u,
 
+            .shaftTurnRadians = 0.0f,
+            .shaftGripDelayMs = 0u,
+            .shaftTurnMs = 0u,
+
             .polePairs = 0u,
             .faultFlags = 0u,
             .encoderFreezeDelayCentiseconds = 0u,

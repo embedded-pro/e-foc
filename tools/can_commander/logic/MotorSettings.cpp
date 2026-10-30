@@ -34,7 +34,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 40> presentations{ {
+        constexpr std::array<SettingPresentation, 46> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -75,6 +75,12 @@ namespace tool
             { FocParameter::encoderResolution, "Encoder resolution", "Encoder resolution:", " counts/rev", "Encoder counts per mechanical revolution.", {} },
             { FocParameter::canNodeId, "CAN node ID base", "CAN node ID base:", {}, "Base of the controller's CAN node ID; the board ID set by its jumpers is added to it.", {} },
             { FocParameter::canBitrate, "CAN bitrate", "CAN bitrate:", " bit/s", "Bitrate of the CAN bus.", {} },
+            { FocParameter::supervisionWindow, "Supervision window", "Window:", " s", "How long the encoder reading has to stay still while the drive pushes for motion before a fault is raised.", {} },
+            { FocParameter::supervisionCurrentFraction, "Supervision current fraction", "Current fraction:", {}, "Torque current, as a fraction of the drive's current limit, from which the drive counts as pushing.", {} },
+            { FocParameter::supervisionDemandedSpeed, "Supervision demanded speed", "Demanded speed:", radPerSecond, "Speed reference from which the drive counts as demanding motion.", {} },
+            { FocParameter::supervisionPositionError, "Supervision position error", "Position error:", " rad", "Position error from which the drive counts as demanding motion. Above 3.14 rad only a speed reference counts.", {} },
+            { FocParameter::supervisionStillExcursion, "Supervision still excursion", "Still excursion:", " rad", "Travel within which the encoder reading counts as still.", {} },
+            { FocParameter::stallDetection, "Stall reporting", "Report stalls:", {}, "Raise a stall fault when an outside force pushes the rotor against the drive and holds it there. Encoder loss is reported either way.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -260,9 +266,14 @@ namespace tool
         return Slice(20, 3);
     }
 
+    std::span<const SettingPresentation> SupervisionSettings()
+    {
+        return Slice(23, 6);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(23, 17);
+        return Slice(29, 17);
     }
 
     std::string_view ResetCauseName(float cause)
@@ -298,6 +309,12 @@ namespace tool
     {
         const auto descriptor = can::FindParameter(parameter);
         return descriptor.has_value() && descriptor->integer;
+    }
+
+    bool IsToggle(can::FocParameter parameter)
+    {
+        const auto descriptor = can::FindParameter(parameter);
+        return descriptor.has_value() && descriptor->integer && descriptor->minimum == 0.0f && descriptor->maximum == 1.0f;
     }
 
     bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy)

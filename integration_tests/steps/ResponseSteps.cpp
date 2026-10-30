@@ -235,6 +235,20 @@ GIVEN(R"(the encoder freezes {int} ms after enable)", (int delayMs))
     setup.plant.encoderFreezeDelayCentiseconds = static_cast<uint8_t>(delayMs / 10);
 }
 
+GIVEN(R"(a hand turns the shaft by {float} rad over {int} ms, {int} ms after enable, and holds it)", (float radians, int turnMs, int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Gripping the shaft needs a simulated target";
+    ASSERT_FALSE(setup.booted) << "The grip must be scheduled before the target boots";
+    ASSERT_NE(radians, 0.0f) << "A zero angle is how a scenario says no hand grips the shaft";
+    ASSERT_GT(turnMs, 0);
+    ASSERT_GE(delayMs, 0);
+
+    setup.plant.shaftTurnRadians = radians;
+    setup.plant.shaftTurnMs = static_cast<uint32_t>(turnMs);
+    setup.plant.shaftGripDelayMs = static_cast<uint32_t>(delayMs);
+}
+
 WHEN(R"(the response is captured for {int} ms after enable)", (int milliseconds))
 {
     auto& setup = context.Get<ScenarioSetup>();

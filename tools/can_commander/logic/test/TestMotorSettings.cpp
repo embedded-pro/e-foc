@@ -64,6 +64,8 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::viscousFriction, MotorParameterSettings().back().parameter);
     EXPECT_EQ(FocParameter::encoderResolution, StartupSettings().front().parameter);
     EXPECT_EQ(FocParameter::canBitrate, StartupSettings().back().parameter);
+    EXPECT_EQ(FocParameter::supervisionWindow, SupervisionSettings().front().parameter);
+    EXPECT_EQ(FocParameter::stallDetection, SupervisionSettings().back().parameter);
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::resetCause, Readings().back().parameter);
 }
@@ -80,8 +82,18 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
         EXPECT_TRUE(std::ranges::none_of(LoopSettings(loop), readOnly));
     EXPECT_TRUE(std::ranges::none_of(MotorParameterSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(StartupSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(SupervisionSettings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + Readings().size());
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + Readings().size());
+}
+
+TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)
+{
+    EXPECT_TRUE(IsToggle(FocParameter::currentTwoStepDeadbeat));
+    EXPECT_TRUE(IsToggle(FocParameter::stallDetection));
+    EXPECT_FALSE(IsToggle(FocParameter::supervisionWindow));
+    EXPECT_FALSE(IsToggle(FocParameter::polePairs));
+    EXPECT_FALSE(IsToggle(FocParameter::resetCause));
 }
 
 TEST_F(TestMotorSettings, each_mode_runs_its_loops)

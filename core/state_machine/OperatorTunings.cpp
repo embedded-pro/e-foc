@@ -22,6 +22,11 @@ namespace state_machine
         {
             return foc::IsWithinInclusive(timeConstant, CommandLimits::minReferenceTimeConstant, CommandLimits::maxReferenceTimeConstant);
         }
+
+        float WithinOrDefault(float value, float minimum, float maximum, float fallback)
+        {
+            return foc::IsWithinInclusive(value, minimum, maximum) ? value : fallback;
+        }
     }
 
     foc::CurrentLoopTunings StoredCurrentTunings(const services::ConfigData& config)
@@ -100,5 +105,20 @@ namespace state_machine
 
         if (!IsAcceptable(StoredPositionTunings(config)))
             StoreTunings(config, StoredPositionTunings(defaults));
+    }
+
+    void SanitizeSupervision(services::ConfigData& config)
+    {
+        constexpr services::SupervisionSettings defaults{};
+        auto& stored = config.supervision;
+
+        stored.window = WithinOrDefault(stored.window, CommandLimits::minSupervisionWindow, CommandLimits::maxSupervisionWindow, defaults.window);
+        stored.currentFraction = WithinOrDefault(stored.currentFraction, CommandLimits::minSupervisionCurrentFraction, CommandLimits::maxSupervisionCurrentFraction, defaults.currentFraction);
+        stored.demandedSpeed = WithinOrDefault(stored.demandedSpeed, CommandLimits::minSupervisionDemandedSpeed, CommandLimits::maxSupervisionDemandedSpeed, defaults.demandedSpeed);
+        stored.positionError = WithinOrDefault(stored.positionError, CommandLimits::minSupervisionPositionError, CommandLimits::maxSupervisionPositionError, defaults.positionError);
+        stored.stillExcursion = WithinOrDefault(stored.stillExcursion, CommandLimits::minSupervisionStillExcursion, CommandLimits::maxSupervisionStillExcursion, defaults.stillExcursion);
+
+        if (config.stallDetection > 1)
+            config.stallDetection = services::ConfigData{}.stallDetection;
     }
 }

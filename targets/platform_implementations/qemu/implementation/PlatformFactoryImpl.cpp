@@ -126,8 +126,24 @@ namespace application
         const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
         encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
 
+        ConfigureShaftGrip(baseHz);
+
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
             watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
+    }
+
+    void PlatformFactoryImpl::ConfigureShaftGrip(uint32_t baseHz)
+    {
+        const auto ticks = [baseHz](uint32_t milliseconds)
+        {
+            return static_cast<uint32_t>(static_cast<uint64_t>(milliseconds) * baseHz / 1000u);
+        };
+
+        const bool gripped = plantConfig->shaftTurnRadians != 0.0f;
+        const auto turnMs = std::max(plantConfig->shaftTurnMs, uint32_t{ 1 });
+        shaftTurnSpeed = foc::RadiansPerSecond{ plantConfig->shaftTurnRadians * 1000.0f / static_cast<float>(turnMs) };
+        shaftGrip.Configure(gripped ? std::make_optional(ticks(plantConfig->shaftGripDelayMs)) : std::nullopt);
+        shaftHold.Configure(gripped ? std::make_optional(ticks(plantConfig->shaftGripDelayMs + turnMs)) : std::nullopt);
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -322,6 +338,12 @@ namespace application
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
+        if (shaftGrip.Fire(tick))
+            model.GripShaft(shaftTurnSpeed);
+
+        if (shaftHold.Fire(tick))
+            model.GripShaft(foc::RadiansPerSecond{ 0.0f });
+
         const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
         model.StepForTest(stepDuty);
         shuntReadout.Applied(stepDuty);
@@ -352,6 +374,8 @@ namespace application
         responseRecorder.Begin();
         torqueStep.Begin();
         encoderFreeze.Begin();
+        shaftGrip.Begin();
+        shaftHold.Begin();
         boardProtection.SetArmed(true);
     }
 
@@ -360,6 +384,7 @@ namespace application
         boardProtection.SetArmed(false);
         model.Stop();
         model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
+        model.GripShaft(std::nullopt);
         model.SetFaultInjection(bootFaultInjection);
         responseRecorder.End();
     }

@@ -31,6 +31,15 @@ namespace services
         float referenceTimeConstant = foc::PositionLoopTunings{}.referenceTimeConstant;
     };
 
+    struct SupervisionSettings
+    {
+        float window = 0.1f;
+        float currentFraction = 0.05f;
+        float demandedSpeed = 2.0f;
+        float positionError = 0.2f;
+        float stillExcursion = 0.01f;
+    };
+
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
     {
@@ -41,15 +50,17 @@ namespace services
         CurrentLoopSettings currentLoop;
         SpeedLoopSettings speedLoop;
         PositionLoopSettings positionLoop;
+        SupervisionSettings supervision;
         uint8_t defaultControlMode = 0;
         uint8_t currentAlgorithm = 0;
         uint8_t speedAlgorithm = 0;
         uint8_t positionAlgorithm = 0;
         uint8_t currentTwoStepDeadbeat = 0;
-        std::array<uint8_t, 3> reserved{};
+        uint8_t stallDetection = 1;
+        std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 76, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 96, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {

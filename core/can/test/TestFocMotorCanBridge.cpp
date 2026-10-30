@@ -1199,6 +1199,18 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_EncoderLoss_MapsToSensorFault)
     EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::sensorFault));
 }
 
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_Stall_MapsToStall)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::stall);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::stall));
+}
+
 TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
 {
     ConstructFixture();
@@ -1830,6 +1842,57 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_AStartupSettingThatCannotBeStored_IsT
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
     EXPECT_EQ(coordinator->Config().canNodeId, 1u);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_ASupervisionSetting_IsStoredAndInForce)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::supervisionWindow, 2.5f);
+
+    ASSERT_TRUE(savedConfig.has_value());
+    EXPECT_NEAR(savedConfig->supervision.window, 2.5f, 1e-6f);
+    EXPECT_NEAR(coordinator->Config().supervision.window, 2.5f, 1e-6f);
+    ExpectAnswered(2.5f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_StallDetectionOff_IsAcceptedWhileTheDriveRuns)
+{
+    ConstructFixtureInReady();
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::stallDetection, 0.0f);
+
+    ASSERT_TRUE(savedConfig.has_value());
+    EXPECT_EQ(savedConfig->stallDetection, uint8_t{ 0 });
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_ASupervisionSettingThatCannotBeStored_IsTakenBack)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    ExpectConfigSaved(services::NvmStatus::WriteFailed);
+    DispatchSetParameter(can::FocParameter::supervisionPositionError, 1.0f);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
+    EXPECT_NEAR(coordinator->Config().supervision.positionError, services::SupervisionSettings{}.positionError, 1e-6f);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_ASupervisionSetting_AnswersTheStoredValue)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::supervisionStillExcursion);
+
+    ExpectAnswered(services::SupervisionSettings{}.stillExcursion, false);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_WhileAnotherWriteIsOutstanding_IsBusy)

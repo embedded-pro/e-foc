@@ -77,6 +77,7 @@ namespace foc
         void SetLoad(foc::NewtonMeter load);
         void SetExternalTorque(foc::NewtonMeter torque);
         foc::NewtonMeter ExternalTorque() const;
+        void GripShaft(std::optional<foc::RadiansPerSecond> handSpeed);
         foc::RadiansPerSecond MechanicalSpeed() const;
         foc::Radians MechanicalAngle() const;
         foc::RotatingFrame LastDqCurrents() const;

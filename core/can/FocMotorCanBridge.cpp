@@ -45,6 +45,8 @@ namespace can
                 return FocFaultCode::overTemperature;
             case state_machine::FaultCode::encoderLoss:
                 return FocFaultCode::sensorFault;
+            case state_machine::FaultCode::stall:
+                return FocFaultCode::stall;
             default:
                 return FocFaultCode::none;
         }

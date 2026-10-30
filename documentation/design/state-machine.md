@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.5.1
+version: 0.5.2
 component: state-machine
-date: 2026-10-29
+date: 2026-10-30
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.5.1                      |
+| Version   | 0.5.2                      |
 | Component | state-machine              |
-| Date      | 2026-10-29                 |
+| Date      | 2026-10-30                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -657,6 +657,9 @@ Hardware protection events reach the state machine through `PlatformFaultNotifie
 | `underVoltage`          | `undervoltage`    |
 | `overTemperature`       | `overtemperature` |
 
+The fault supervisor (`fault-supervision.md`) raises `encoderLoss` and `stall` through the same notifier,
+from the event loop, so the state machine handles them as it handles a board protection trip.
+
 A protection event raised before the state machine has registered its handler is discarded by the
 state machine. A platform whose protection reflects a *standing* condition rather than an edge is
 expected to re-raise it once a handler exists, so a motor does not enable into a condition the
@@ -1048,7 +1051,7 @@ sequenceDiagram
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                                                                                |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                                                                                     |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017                                                          |
-| `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`                                       |
+| `FaultCode`       | —                      | enum (uint8)                   | 9 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`, `stall`                              |
 
 `watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
 from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a

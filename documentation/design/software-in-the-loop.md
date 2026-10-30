@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.10.0
+version: 1.11.0
 component: "software-in-the-loop"
-date: 2026-10-27
+date: 2026-10-30
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.10.0                      |
+| Version   | 1.11.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-10-27                  |
+| Date      | 2026-10-30                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -310,8 +310,11 @@ Two results are worth recording because they are not obvious:
   speed or an unclosed position error, and a reading still inside a small excursion for a
   whole window — and raises the sensor fault the wire already carried but nothing used to
   raise. A disconnected motor carries no current and is not misreported; a position held
-  against a load demands no motion and is not reported either; a mechanically locked rotor is
-  indistinguishable and is reported the same way.
+  against a load demands no motion and is not reported either; a rotor locked before it ever
+  moved is indistinguishable and is reported the same way. A rotor that an outside force pushed
+  against the drive and then held is not: the encoder saw it pushed, which a dead encoder cannot
+  show, so the monitor raises a stall instead (`fault-supervision.md` Part C), and the operator can
+  turn stall reporting off without losing the sensor fault (REQ-SM-033).
 - **A position held against a load was reported after a calibration, under LQR and LQI.** These
   laws command the current, so nothing updated the speed reference, which kept the −10 rad/s the
   cogging mapping last asked for. The monitor read it as a demanded speed, and a held shaft load of
@@ -329,6 +332,14 @@ description written before the freeze existed still reads as one that never free
 record neither grew nor changed version. What freezes is what the firmware reads; the plant goes
 on reporting its own trajectory truthfully, which is what lets a scenario see the rotor moving
 while the drive does not.
+
+The plant can also be gripped by a scheduled hand, so a scenario can push the shaft against the
+drive and hold it there. A set time after enable the hand turns the shaft through a set angle at a
+constant speed and then holds it still until the scenario ends. While gripped, the shaft goes where the
+hand takes it whatever torque the drive produces — the hand is stronger than any drive — and the encoder
+reads that motion, so the firmware sees a rotor overpowered and then stalled. The grip is three fields of
+the plant description, the delay, the duration and the angle, which took the record to layout version 10;
+an angle of zero means no hand.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen
@@ -748,6 +759,7 @@ timing scenarios fail on each when it is put back:
 | Controller algorithms    | Every algorithm of every loop is selected through the stored configuration and reported running, in combinations |
 | Plant characteristics    | Alignment refuses a noisy encoder; heavy current noise does not stop torque control                              |
 | Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault         |
+| Fault supervision        | A shaft pushed against the drive and held is a stall, which can be turned off; encoder loss stays reported       |
 | Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                       |
 | Board protection         | Trips reach the state machine and are reported                                                                   |
 | Control performance      | Each loop's default law stays inside its envelope, from rest and while running                                   |

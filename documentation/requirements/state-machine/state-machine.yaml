@@ -233,21 +233,26 @@
     torque constant.
 
 - id: REQ-SM-028
-  title: An encoder that does not follow the torque it is asked to produce raises a sensor fault
+  title: A rotor that does not follow the torque it is asked to produce raises a sensor or stall fault
   shall: >
     While the drive is Enabled, a supervisor running outside the control interrupts shall
-    compare what the drive asks of the rotor with what the encoder reports. When the measured
-    torque-producing current exceeds a configured fraction of the drive's current limit, and
-    the drive demands motion — a speed reference, or a position error it has not closed, above
-    configured thresholds — while the encoder reading stays within a configured excursion for
-    a whole configured window, the supervisor shall raise FaultCode::encoderLoss through the
-    fault notifier, exactly as a board protection trip is raised. The demanded speed shall be the
-    one the active law asks for: a position law that commands the current demands none, whatever
-    speed the speed loop was last given. A drive that is not Enabled, that carries no current, or
-    that holds its position against a load shall not be reported, also after a full calibration
-    has run the speed loop.
-    A mechanically locked rotor meets the same condition and is reported the same way. The
-    check shall not run in the 20 kHz control interrupt (REQ-PERF-003).
+    compare what the drive asks of the rotor with what the encoder reports. The drive pushes for
+    motion when the measured torque-producing current exceeds a configured fraction of the
+    drive's current limit and the drive demands motion — a position error it has not closed, or
+    else a speed reference, above configured thresholds — in the direction of that error or
+    reference. When the drive pushes for motion while the encoder reading stays within a
+    configured excursion for a whole configured window, the supervisor shall raise a fault
+    through the fault notifier, exactly as a board protection trip is raised: FaultCode::stall
+    when the encoder's last travel of at least that excursion went against the direction the
+    drive was pushing — an outside force overpowered the drive, which an encoder that has stopped
+    reporting cannot show — and FaultCode::encoderLoss otherwise. Travel while the drive does not
+    push, or in the direction it pushes, shall not count as being overpowered, so a frozen
+    encoder and a rotor locked before it ever moved are reported as encoderLoss. The demanded
+    speed shall be the one the active law asks for: a position law that commands the current
+    demands none, whatever speed the speed loop was last given. A drive that is not Enabled, that
+    carries no current, or that holds its position against a load shall not be reported, also
+    after a full calibration has run the speed loop. The check shall not run in the 20 kHz
+    control interrupt (REQ-PERF-003).
 
 - id: REQ-SM-029
   title: A mode selection re-checks its guard before activating
@@ -265,7 +270,7 @@
   shall: >
     Every writer of the drive's single non-volatile memory — calibration, maintenance and boot,
     control-mode selection and its rollback, algorithm selection including its busy retries, and
-    CAN encoder-resolution and telemetry-rate saves — shall count as outstanding asynchronous work
+    CAN encoder-resolution, telemetry-rate, start-up and supervision setting saves — shall count as outstanding asynchronous work
     until its write completes. Calibrate, enable, clear calibration, control-mode selection and
     algorithm selection shall be refused as busy while any such write is outstanding. A calibration
     save answered busy shall be retried, not reported as a failure, and shall not be retried once
@@ -298,3 +303,16 @@
     loaded and is complete for that mode. When the active mode is Idle, or the record is not
     complete for the new mode, the new mode shall start in Idle and require an alignment or a
     calibration before it can be enabled, as after power-on.
+
+- id: REQ-SM-033
+  title: The supervision settings are drive-wide, stored, and in force at once
+  shall: >
+    The drive shall hold one set of supervision settings for every control mode: the window,
+    current fraction, demanded speed, position error and excursion of REQ-SM-028, and whether a
+    stall is reported. A setting shall be writable in any state, shall be stored in non-volatile
+    memory before the write is answered, and shall be used by the supervisor from its next
+    evaluation and after every restart; a write that cannot be stored shall leave the setting as
+    it was. A value outside its range shall be refused when written and, read from storage,
+    replaced by its default. With stall reporting off the supervisor shall not raise
+    FaultCode::stall and shall keep watching, so an encoder that stops reporting is still raised
+    as FaultCode::encoderLoss; encoder-loss detection shall not be switchable off.
