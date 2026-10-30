@@ -1,3 +1,4 @@
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
@@ -670,4 +671,21 @@ TEST_F(TestPositionCascade, a_current_command_bypasses_the_position_and_speed_lo
     EXPECT_NEAR(DutyPercent(duty.a), 50.0f, 1.0f);
     EXPECT_NEAR(DutyPercent(duty.b), 50.0f, 1.0f);
     EXPECT_NEAR(DutyPercent(duty.c), 50.0f, 1.0f);
+}
+
+TEST_F(TestPositionCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+{
+    foc::CurrentStream stream;
+    focPosition->SetCurrentStream(stream);
+    focPosition->Enable();
+    stream.Start(1);
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    const auto sample = stream.Take();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-2f);
+    EXPECT_NEAR(sample->meanIq.Value(), 0.0f, 1e-2f);
+    EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
 }

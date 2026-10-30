@@ -207,7 +207,7 @@ namespace mil
 
                 controlMode.emplace(
                     application::TerminalAndTracer{ terminal, tracer },
-                    application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods() },
+                    application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
                     faultNotifier,
@@ -507,6 +507,11 @@ namespace mil
     state_machine::ControlModeStateMachine& ModelInTheLoop::ControlMode()
     {
         return *controlMode;
+    }
+
+    foc::CurrentStream& ModelInTheLoop::CurrentStream()
+    {
+        return currentStream;
     }
 
     std::optional<state_machine::OnlineEstimates> ModelInTheLoop::OnlineEstimates()

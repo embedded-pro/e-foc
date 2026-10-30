@@ -17,6 +17,7 @@ target_link_libraries(e_foc.foc.cascade PUBLIC
 target_sources(e_foc.foc.cascade PRIVATE
     CascadeWithSpeedLoop.cpp
     CascadeWithSpeedLoop.hpp
+    CurrentStream.hpp
     DirectAxisExcitation.cpp
     DirectAxisExcitation.hpp
     EstimatorChannel.cpp

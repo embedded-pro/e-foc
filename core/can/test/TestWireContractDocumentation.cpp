@@ -128,10 +128,11 @@ TEST(WireContractDocumentation, the_scale_table_matches_the_contract)
     EXPECT_EQ(can::focCurrentScale, documented.at("Current"));
     EXPECT_EQ(can::focSpeedScale, documented.at("Speed"));
     EXPECT_EQ(can::focPositionScale, documented.at("Position"));
-    EXPECT_EQ(can::focVoltageScale, documented.at("Voltage"));
     EXPECT_EQ(can::focPidScale, documented.at("Bandwidth"));
     EXPECT_EQ(can::focResistanceScale, documented.at("Resistance"));
     EXPECT_EQ(can::focInductanceScale, documented.at("Inductance"));
+    EXPECT_EQ(can::focStreamCurrentScale, documented.at("Streamed current"));
+    EXPECT_EQ(can::focStreamPositionScale, documented.at("Streamed position"));
 }
 
 TEST(WireContractDocumentation, every_scale_the_contract_uses_is_documented)
@@ -196,6 +197,6 @@ TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documen
 {
     const auto document = DesignDocument();
 
-    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics" })
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents" })
         EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

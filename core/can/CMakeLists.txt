@@ -37,8 +37,12 @@ target_sources(e_foc.can PRIVATE
     FocMotorSettingsBridge.cpp
     FocMotorCanClient.hpp
     FocMotorCanClient.cpp
+    FocMotorCurrentStreamer.hpp
+    FocMotorCurrentStreamer.cpp
     CanLivenessWatchdog.hpp
     CanLivenessWatchdog.cpp
+    UntracedStreamCan.hpp
+    UntracedStreamCan.cpp
 )
 
 add_subdirectory(test)

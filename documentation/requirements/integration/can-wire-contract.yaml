@@ -92,3 +92,17 @@
   shall: >
     A float32 field of the category shall be the IEEE 754 single-precision bit pattern sent
     most significant byte first, as every other multi-byte field of the category is.
+
+- id: REQ-CAN-011
+  title: Measured currents and rotor position are streamed at the configured rate
+  shall: >
+    Contract version 2.4 shall add, without changing any 2.3 message other than retiring the
+    never-sent TelemetryElectrical frame (0x88), a TelemetryCurrents telemetry frame carrying a
+    wrapping 8-bit window sequence number, the mean measured d- and q-axis currents over the
+    window at 1 mA resolution and the encoder's mechanical angle at the window's last sample at
+    0.1 mrad resolution. While a CAN client is online and a closed-loop control mode runs, the
+    drive shall send one such frame per window, a window being the whole number of control
+    periods nearest to one period of the configured telemetry rate. The rate shall accept 0,
+    which stops the stream, to 1000 Hz; a larger rate shall be answered with invalidPayload and
+    change nothing. Every window the control loop closes shall take the next sequence number,
+    so that a window the drive could not send appears to the client as a gap in the sequence.

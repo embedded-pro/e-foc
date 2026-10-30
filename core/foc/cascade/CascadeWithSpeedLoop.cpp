@@ -74,6 +74,8 @@ namespace foc
         lastMechanicalSpeed = 0.0f;
         lastMeanIq = 0.0f;
         triggerCounter = 0;
+        if (currentStream != nullptr)
+            currentStream->Restart();
         enabled = true;
     }
 
@@ -127,6 +129,8 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
+        if (currentStream != nullptr)
+            currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
         const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -maxCurrent.Value(), maxCurrent.Value());
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
@@ -247,5 +251,10 @@ namespace foc
     void CascadeWithSpeedLoop::ClearCoggingMapImpl()
     {
         coggingFeedForward.Clear();
+    }
+
+    void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)
+    {
+        currentStream = &stream;
     }
 }

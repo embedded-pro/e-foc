@@ -1138,16 +1138,45 @@ TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_PersistsToNvmAndAcksSucce
     EXPECT_FALSE(categoryErrorSent);
 }
 
-TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_ZeroRate_RejectsInvalidPayload)
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_ZeroRate_IsStoredToStopTheStream)
 {
     ConstructFixture();
-    ResetCaptures();
 
+    uint32_t storedRate{ 100 };
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&storedRate](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> done)
+            {
+                storedRate = config.telemetryRateHz;
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
     DispatchUInt32Command(can::focConfigureTelemetryRateId, 0);
 
     ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_EQ(storedRate, 0u);
     EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_OneKilohertz_IsStored)
+{
+    ConstructFixture();
+
+    uint32_t storedRate{ 0 };
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&storedRate](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> done)
+            {
+                storedRate = config.telemetryRateHz;
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 1000);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_EQ(storedRate, 1000u);
 }
 
 TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overcurrent_EmitsTelemetryStatusFrameWithFaultState)
@@ -1437,7 +1466,7 @@ TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_TooHighRate_RejectsInvali
     ConstructFixture();
     ResetCaptures();
 
-    DispatchUInt32Command(can::focConfigureTelemetryRateId, 10001);
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 1001);
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);

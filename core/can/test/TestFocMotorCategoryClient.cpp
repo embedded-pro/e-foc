@@ -38,7 +38,7 @@ namespace
         MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t sourceNodeId, can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnCategoryError, (uint16_t sourceNodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
         MOCK_METHOD(void, OnTelemetryStatus, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
-        MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
+        MOCK_METHOD(void, OnTelemetryCurrents, (uint16_t sourceNodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t sourceNodeId, const can::FocAlgorithms& algorithms), (override));
@@ -309,4 +309,28 @@ TEST_F(FocMotorCategoryClientTest, OnParameterResponse_DecodesValueAndAutomaticF
 TEST_F(FocMotorCategoryClientTest, OnParameterResponse_ShortPayload_IsRejected)
 {
     EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focParameterResponseId, MakeMessage({ 0x00, 0x01, 0x44, 0x7A, 0x00 })));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnTelemetryCurrents_DecodesSequenceCurrentsAndPosition)
+{
+    EXPECT_CALL(observer, OnTelemetryCurrents(3, 0x2A, _, _, _))
+        .WillOnce(Invoke([](uint16_t, uint8_t, foc::Ampere id, foc::Ampere iq, foc::Radians position)
+            {
+                EXPECT_NEAR(id.Value(), 0.512f, 1e-6f);
+                EXPECT_NEAR(iq.Value(), -1.0f, 1e-6f);
+                EXPECT_NEAR(position.Value(), -3.1416f, 1e-6f);
+            }));
+
+    client.HandleMessage(can::focTelemetryCurrentsId, MakeMessage({ 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnTelemetryCurrents_WrongLength_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focTelemetryCurrentsId, MakeMessage({ 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focTelemetryCurrentsId, MakeMessage({ 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48, 0x00 })));
+}
+
+TEST_F(FocMotorCategoryClientTest, the_retired_electrical_telemetry_frame_is_not_handled)
+{
+    EXPECT_EQ(services::CanDispatchResult::unknownMessageType, client.HandleMessage(0x88, MakeMessage({ 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 })));
 }

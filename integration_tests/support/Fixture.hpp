@@ -62,6 +62,8 @@ namespace integration
         // frame they receive. This finds the last one with the given id after the mark.
         std::optional<hal::Can::Message> FindCapturedCanFrame(hal::Can::Id id, CaptureMark from) const;
         std::optional<hal::Can::Message> WaitForCapturedCanFrame(hal::Can::Id id, CaptureMark from, std::chrono::milliseconds timeout);
+        // Keeps the client online while it waits, so a stream the target sends only to an online client keeps flowing.
+        std::vector<hal::Can::Message> CollectCapturedCanFrames(hal::Can::Id id, CaptureMark from, std::size_t count, std::chrono::milliseconds timeout);
         CaptureMark MarkCapture() const;
 
         uint8_t nextSequence{ 0 };

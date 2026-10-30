@@ -147,6 +147,18 @@ namespace hil
         return found;
     }
 
+    std::vector<hal::Can::Message> HardwareInteractor::FindReceivedCanFrames(hal::Can::Id id, std::size_t fromFrame) const
+    {
+        const auto& frames = BridgeSession::Instance().ReceivedFrames();
+        std::vector<hal::Can::Message> found;
+
+        for (std::size_t i = fromFrame; i < frames.size(); ++i)
+            if (frames[i].id == id)
+                found.push_back(frames[i].message);
+
+        return found;
+    }
+
     std::optional<hal::Can::Id> HardwareInteractor::FindReceivedCanFrameId(const std::function<bool(hal::Can::Id)>& matches, std::size_t fromFrame) const
     {
         const auto& frames = BridgeSession::Instance().ReceivedFrames();

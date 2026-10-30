@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
@@ -27,6 +28,7 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
         MotionObservation ObserveMotion() const override;
+        void SetCurrentStream(CurrentStream& stream);
 
         void EnableCurrentCommand() override;
         void DisableCurrentCommand() override;
@@ -56,5 +58,6 @@ namespace foc
         bool previousAngleValid{ false };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastIq{ 0.0f };
+        CurrentStream* currentStream{ nullptr };
     };
 }

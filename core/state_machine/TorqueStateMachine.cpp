@@ -15,6 +15,8 @@ namespace application
         , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
         , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
     {
+        if (hardware.currentStream != nullptr)
+            focController.SetCurrentStream(*hardware.currentStream);
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
         Boot(rotorReference);

@@ -10,7 +10,7 @@ namespace can
         : CanCategoryClient(transport, sequenceSource)
         , origin(origin)
     {
-        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse,
+        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryCurrents, contractVersionResponse,
             electricalParamsResponse, algorithmsResponse, parameterResponse);
     }
 
@@ -313,14 +313,20 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryClient::HandleTelemetryElectrical(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleTelemetryCurrents(const hal::Can::Message& data)
     {
-        if (!PayloadExact(data, focTelemetryElectricalResponseId))
+        if (!PayloadExact(data, focTelemetryCurrentsId))
             return false;
 
-        NotifyObservers([source = origin.SourceNodeId(), &data](auto& observer)
+        services::CanPayloadReader reader{ data };
+        const auto sequence = reader.ReadUInt8();
+        const auto id = foc::Ampere{ reader.ReadFixed16(focStreamCurrentScale) };
+        const auto iq = foc::Ampere{ reader.ReadFixed16(focStreamCurrentScale) };
+        const auto position = foc::Radians{ reader.ReadFixed16(focStreamPositionScale) };
+
+        NotifyObservers([source = origin.SourceNodeId(), sequence, id, iq, position](auto& observer)
             {
-                observer.OnTelemetryElectrical(source, data);
+                observer.OnTelemetryCurrents(source, sequence, id, iq, position);
             });
 
         return true;

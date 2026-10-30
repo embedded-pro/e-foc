@@ -18,7 +18,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 3;
+    static constexpr uint8_t focContractVersionMinor = 4;
 
     enum class FieldType : uint8_t
     {
@@ -124,11 +124,11 @@ namespace can
         { "polePairs", FieldType::uint8, 1, "-" },
     } };
 
-    inline constexpr std::array<FieldDescriptor, 4> telemetryElectricalFields{ {
-        { "busVoltage", FieldType::fixed16, focVoltageScale, "V" },
-        { "maxCurrent", FieldType::fixed16, focCurrentScale, "A" },
-        { "iq", FieldType::fixed16, focCurrentScale, "A" },
-        { "id", FieldType::fixed16, focCurrentScale, "A" },
+    inline constexpr std::array<FieldDescriptor, 4> telemetryCurrentsFields{ {
+        { "sequence", FieldType::uint8, 1, "-" },
+        { "id", FieldType::fixed16, focStreamCurrentScale, "A" },
+        { "iq", FieldType::fixed16, focStreamCurrentScale, "A" },
+        { "position", FieldType::fixed16, focStreamPositionScale, "rad" },
     } };
 
     inline constexpr std::array<FieldDescriptor, 2> categoryErrorFields{ {
@@ -183,8 +183,8 @@ namespace can
 
     inline constexpr std::array<MessageDescriptor, 8> focMotorResponses{ {
         MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
-        MakeDescriptor(focTelemetryElectricalResponseId, "TelemetryElectricalResponse", Direction::telemetry, telemetryElectricalFields),
         MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
+        MakeDescriptor(focTelemetryCurrentsId, "TelemetryCurrents", Direction::telemetry, telemetryCurrentsFields),
         MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
         MakeDescriptor(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
         MakeDescriptor(focAlgorithmsResponseId, "AlgorithmsResponse", Direction::response, algorithmsResponseFields),

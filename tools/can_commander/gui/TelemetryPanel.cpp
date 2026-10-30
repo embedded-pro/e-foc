@@ -7,6 +7,7 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QVBoxLayout>
+#include <chrono>
 
 namespace tool
 {
@@ -23,7 +24,6 @@ namespace tool
         constexpr FieldId iqCurrent{ 2 };
         constexpr FieldId speed{ 3 };
         constexpr FieldId position{ 4 };
-        constexpr FieldId busVoltage{ 5 };
 
         constexpr FieldId resistance{ 11 };
         constexpr FieldId inductance{ 12 };
@@ -34,13 +34,14 @@ namespace tool
             return FieldSpec{ id, ui::model::noGroup, FieldKind::ReadOut, label, suffix, { 0.0, 0.0, 0.0, 0.0, static_cast<std::uint8_t>(decimals), 0.0, style }, {}, {}, {} };
         }
 
-        const std::array<FieldSpec, 5> measurementFields{
-            ReadOut(idCurrent, "Id current:", " A", DecimalsFor(can::focCurrentScale)),
-            ReadOut(iqCurrent, "Iq current:", " A", DecimalsFor(can::focCurrentScale)),
+        const std::array<FieldSpec, 4> measurementFields{
+            ReadOut(idCurrent, "Id current:", " A", DecimalsFor(can::focStreamCurrentScale)),
+            ReadOut(iqCurrent, "Iq current:", " A", DecimalsFor(can::focStreamCurrentScale)),
             ReadOut(speed, "Speed:", SpeedAxis().Suffix(), SpeedAxis().Decimals()),
-            ReadOut(position, "Position:", PositionAxis().Suffix(), PositionAxis().Decimals()),
-            ReadOut(busVoltage, "Bus voltage:", " V", DecimalsFor(can::focVoltageScale))
+            ReadOut(position, "Position:", PositionAxis().Suffix(), PositionAxis().Decimals())
         };
+
+        constexpr std::chrono::milliseconds streamRefreshInterval{ 40 };
 
         constexpr std::array<FieldSpec, 3> parameterFields{
             ReadOut(resistance, "Resistance:", " Ω", 4, ReadOutStyle::Significant),
@@ -70,6 +71,10 @@ namespace tool
         BuildForm(parameters, parameterFields, parameterValues, "Identified Parameters");
         layout->addWidget(parameters.view->parentWidget());
         layout->addStretch();
+
+        streamRefresh.setSingleShot(true);
+        streamRefresh.setInterval(streamRefreshInterval);
+        connect(&streamRefresh, &QTimer::timeout, this, &TelemetryPanel::ShowLatestStreamSample);
 
         Clear();
     }
@@ -109,6 +114,8 @@ namespace tool
 
     void TelemetryPanel::Clear()
     {
+        streamRefresh.stop();
+        latestStreamSample.reset();
         motorStateLabel->setText(placeholder);
         ui::backend::qt::StyleStatusLabel(*motorStateLabel, ui::theme::StatusLevel::Neutral);
         faultLabel->setText(placeholder);
@@ -127,21 +134,28 @@ namespace tool
         ShowFault(fault);
     }
 
-    void TelemetryPanel::OnCurrentMeasurement(float idCurrentValue, float iqCurrentValue)
+    void TelemetryPanel::OnCurrentStream(float idCurrentValue, float iqCurrentValue, float positionValue)
     {
-        Show(measurements, idCurrent, static_cast<double>(idCurrentValue));
-        Show(measurements, iqCurrent, static_cast<double>(iqCurrentValue));
+        latestStreamSample = StreamSample{ idCurrentValue, iqCurrentValue, positionValue };
+        if (!streamRefresh.isActive())
+            streamRefresh.start();
+    }
+
+    void TelemetryPanel::ShowLatestStreamSample()
+    {
+        if (!latestStreamSample)
+            return;
+
+        Show(measurements, idCurrent, static_cast<double>(latestStreamSample->idCurrent));
+        Show(measurements, iqCurrent, static_cast<double>(latestStreamSample->iqCurrent));
+        Show(measurements, position, PositionAxis().DisplayOfSi(latestStreamSample->position));
+        latestStreamSample.reset();
     }
 
     void TelemetryPanel::OnSpeedPosition(float speedValue, float positionValue)
     {
         Show(measurements, speed, SpeedAxis().DisplayOfSi(speedValue));
         Show(measurements, position, PositionAxis().DisplayOfSi(positionValue));
-    }
-
-    void TelemetryPanel::OnBusVoltage(float voltage)
-    {
-        Show(measurements, busVoltage, static_cast<double>(voltage));
     }
 
     void TelemetryPanel::OnFaultEvent(FocFaultCode fault)

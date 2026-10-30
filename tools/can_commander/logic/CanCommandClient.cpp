@@ -487,9 +487,12 @@ namespace tool
         DecodeTelemetryStatus(nodeId, msg);
     }
 
-    void CanCommandClient::OnTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg)
+    void CanCommandClient::OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position)
     {
-        DecodeTelemetryElectrical(nodeId, msg);
+        NotifyObservers([nodeId, sequence, id, iq, position](auto& observer)
+            {
+                observer.OnCurrentStreamReceived(nodeId, sequence, id.Value(), iq.Value(), position.Value());
+            });
     }
 
     void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
@@ -559,27 +562,6 @@ namespace tool
         }
     }
 
-    void CanCommandClient::DecodeTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) const
-    {
-        if (!can::PayloadExact(msg, can::focTelemetryElectricalResponseId))
-            return;
-
-        services::CanPayloadReader reader{ msg };
-        const auto voltage = reader.ReadFixed16(can::focVoltageScale);
-        reader.Skip(2);
-        const auto iq = reader.ReadFixed16(can::focCurrentScale);
-        const auto id = reader.ReadFixed16(can::focCurrentScale);
-
-        NotifyObservers([nodeId, id, iq](auto& observer)
-            {
-                observer.OnCurrentMeasurementReceived(nodeId, id, iq);
-            });
-        NotifyObservers([nodeId, voltage](auto& observer)
-            {
-                observer.OnBusVoltageReceived(nodeId, voltage);
-            });
-    }
-
     bool CanCommandClient::HandleCommandAck(uint32_t id, const services::CanFrame& data)
     {
         if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
@@ -617,7 +599,7 @@ namespace tool
             MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
 
             const uint8_t msgType = ExtractCanMessageType(id);
-            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryElectricalResponseId || HandleCommandAck(id, data);
+            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
         }
 
         if (!consumed)

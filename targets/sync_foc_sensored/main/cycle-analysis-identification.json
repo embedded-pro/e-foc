@@ -49,7 +49,10 @@
         "DeadbeatCurrentController::Compute",
         "SlidingModeCurrentController::Compute",
         "LimitToModulationCircle",
-        "ToDutyCycles"
+        "ToDutyCycles",
+        "CurrentStream::Accumulate",
+        "CurrentStream::Reopen",
+        "CurrentStream::Publish"
       ]
     },
     {

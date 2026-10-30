@@ -21,9 +21,8 @@ namespace tool
         MOCK_METHOD(void, OnContractVersion, (uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible), (override));
         MOCK_METHOD(void, OnControlModeAcknowledged, (uint16_t nodeId, can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnMotorStatusReceived, (uint16_t nodeId, FocMotorState state, FocFaultCode fault), (override));
-        MOCK_METHOD(void, OnCurrentMeasurementReceived, (uint16_t nodeId, float idCurrent, float iqCurrent), (override));
+        MOCK_METHOD(void, OnCurrentStreamReceived, (uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position), (override));
         MOCK_METHOD(void, OnSpeedPositionReceived, (uint16_t nodeId, float speed, float position), (override));
-        MOCK_METHOD(void, OnBusVoltageReceived, (uint16_t nodeId, float voltage), (override));
         MOCK_METHOD(void, OnFaultEventReceived, (uint16_t nodeId, FocFaultCode fault), (override));
         MOCK_METHOD(void, OnElectricalParametersReceived, (uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs), (override));
         MOCK_METHOD(void, OnAlgorithmsReceived, (uint16_t nodeId, const can::FocAlgorithms& algorithms), (override));

@@ -760,22 +760,16 @@ namespace tool
             motor->OnMotorStatus(state, fault);
     }
 
-    void MainWindow::OnCurrentMeasurementReceived(uint16_t nodeId, float idCurrent, float iqCurrent)
+    void MainWindow::OnCurrentStreamReceived(uint16_t nodeId, uint8_t, float idCurrent, float iqCurrent, float position)
     {
         if (auto* motor = Motor(nodeId))
-            motor->OnCurrentMeasurement(idCurrent, iqCurrent);
+            motor->OnCurrentStream(idCurrent, iqCurrent, position);
     }
 
     void MainWindow::OnSpeedPositionReceived(uint16_t nodeId, float speed, float position)
     {
         if (auto* motor = Motor(nodeId))
             motor->OnSpeedPosition(speed, position);
-    }
-
-    void MainWindow::OnBusVoltageReceived(uint16_t nodeId, float voltage)
-    {
-        if (auto* motor = Motor(nodeId))
-            motor->OnBusVoltage(voltage);
     }
 
     void MainWindow::OnFaultEventReceived(uint16_t, FocFaultCode)

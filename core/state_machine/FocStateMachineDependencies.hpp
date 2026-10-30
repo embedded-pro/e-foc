@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
@@ -29,6 +30,7 @@ namespace application
         drivers::Encoder& encoder;
         foc::Volts vdc;
         uint32_t dutyUpdateDelayPeriods{ 0 };
+        foc::CurrentStream* currentStream{ nullptr };
     };
 
     // Kept across a mode switch out of an aligned Ready: the encoder zero is shared hardware.

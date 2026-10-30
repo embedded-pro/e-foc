@@ -60,14 +60,15 @@ namespace application
                 this->hardware.Tracer().Trace() << "[CAN] node " << nodeId << " = base " << this->configData.canNodeId << " + board ID " << boardId;
 
                 tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
-                canServer.emplace(*tracingCan, services::CanProtocolServer::Config{ .nodeId = nodeId });
+                canBus.emplace(*tracingCan, this->hardware.CanBus());
+                canServer.emplace(*canBus, services::CanProtocolServer::Config{ .nodeId = nodeId });
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());
                 canServer->RegisterCategory(*motorCanServer);
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods() },
+                    MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
                     CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
                     *platformFaultNotifier,
@@ -80,6 +81,7 @@ namespace application
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
                     *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
+                currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
                         return controlMode->ActiveStateMachine();

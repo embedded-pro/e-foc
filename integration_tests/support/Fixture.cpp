@@ -355,6 +355,25 @@ namespace integration
         }
     }
 
+    std::vector<hal::Can::Message> Fixture::CollectCapturedCanFrames(hal::Can::Id id, CaptureMark from, std::size_t count, std::chrono::milliseconds timeout)
+    {
+        const auto neverSent = MakeId(services::CanPriority::heartbeat, services::canSystemCategoryId, services::canHeartbeatMessageTypeId, services::canBroadcastNodeId);
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        while (true)
+        {
+            auto frames = interactor.FindReceivedCanFrames(id, from.frame);
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+            if (frames.size() >= count || remaining <= std::chrono::milliseconds{ 0 })
+                return frames;
+
+            SendClientHeartbeat();
+            hal::Can::Message payload;
+            std::chrono::milliseconds elapsed{ 0 };
+            (void)WaitForCanFrame(neverSent, payload, std::min(remaining, kClientHeartbeatInterval), elapsed);
+        }
+    }
+
     Fixture::CaptureMark Fixture::MarkCapture() const
     {
         return { interactor.ReceivedCanFrameCount() };
