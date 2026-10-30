@@ -12,7 +12,16 @@
         "Adc0Sequence.*Handler",
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
+        "Default_Handler_Forwarded",
+        "hal::cortex::ActiveInterrupt",
+        "DmaStm::StreamInterruptHandler::OnInterrupt",
+        "DmaStm::StreamInterruptHandler::StreamInterruptHandler.*lambda",
+        "AdcDmaMultiChannelStmBase::TransferDone",
+        "AdcDmaMultiChannelStmBase::AdcDmaMultiChannelStmBase.*lambda",
+        "AdcTriggeredByPwmStm.*::Measure.*lambda",
         "AdcPhaseCurrentMeasurementImpl.*lambda",
+        "PlatformFactoryImpl::ReconfigureAdc.*lambda",
+        "PlatformFactoryImpl::MonitorBoard",
         "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
         "InverterCompensation::PhaseCurrentsReady.*lambda",
         "Runner.*::OnPhaseCurrents",
@@ -25,7 +34,9 @@
       "patterns": [
         "QuadratureEncoderDecorator.*::Read",
         "QuadratureEncoder::Position",
-        "QuadratureEncoder::Resolution"
+        "QuadratureEncoder::Resolution",
+        "SynchronousQuadratureEncoderStm::Position",
+        "SynchronousQuadratureEncoderStm::Resolution"
       ]
     },
     {
@@ -72,6 +83,9 @@
         "SynchronousPwm::SetComparator",
         "SynchronousPwm::Sync",
         "hal::tiva::Pwm::Start",
+        "hal::PwmStm::Start",
+        "PwmStmBase::StartImpl",
+        "PwmStmBase::SetDutyCycle",
         "Pwm::Start.*Percent.*Percent.*Percent",
         "PlatformFactoryImpl::ThreePhasePwmOutput",
         "InverterCompensation::ThreePhasePwmOutput"

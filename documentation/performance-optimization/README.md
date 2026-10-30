@@ -344,17 +344,26 @@ Three complementary approaches verify cycle budgets. Tier 2 runs the software-in
 
 | Tier                | Tool                                            | Purpose           | Authoritative for                            |
 |---------------------|-------------------------------------------------|-------------------|----------------------------------------------|
-| 1 — Static estimate | `cortex-cycle-budget` CI action                 | Merge gate        | Absolute budget (≤ 4500 / ≤ 6000 / ≤ 20000)  |
+| 1 — Static estimate | `cortex-cycle-budget` CI action                 | Merge gate        | Absolute budget per MCU (table below)        |
 | 2 — QEMU SIL        | `qemu-system-arm -icount` + free-running timer  | Regression signal | ARM ISA correctness, instruction-count delta |
 | 3 — On-silicon DWT  | `PlatformFactory::ElapsedCycles()` via TIVA HIL | Ground truth      | Absolute silicon timing                      |
 
-Tier 1 gates three paths, each with its own configuration under `targets/sync_foc_sensored/main/`:
+Tier 1 gates three paths on two MCUs, each path with one configuration under `targets/sync_foc_sensored/main/`
+that both share. A stage lists the TI and the ST symbols side by side and fails only when none of them is in the
+binary, so a stage that matches on one MCU can still miss the other's half unnoticed. Each budget is the same
+slice of time on both MCUs, in cycles of its clock:
 
-| Path                                                      | Configuration                        | Budget |
-|-----------------------------------------------------------|--------------------------------------|--------|
-| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 4500   |
-| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 20000  |
-| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 6000   |
+| Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
+|-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
+| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
+| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
+| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
+
+On a pull request each MCU gets one cycle banner and one memory banner. The cycle banner
+(`.github/scripts/cycle-analysis-banner.py`) shows one row per path (worst-case cycles and budget, both also as a
+share of the loop period, and whether the path is within budget) and collapses the per-stage breakdowns. All three
+paths are analysed even when one is over budget, so the banner always has every row. The full reports,
+annotated disassembly and JSON metrics are in the `cycle-analysis-<MCU>-<path>` workflow artifacts.
 
 The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
 runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
