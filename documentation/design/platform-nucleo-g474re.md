@@ -127,7 +127,7 @@ around the counter peak. An internal fourth channel rises eight ticks (47 ns) be
 twice that, several converter clocks, so the ADC never misses the edge the timer passes it as its trigger. The repetition counter makes the timer load new duty cycles at the peak
 only, so a duty written in the control loop never lands half-way through a pulse.
 
-```
+```text
              valley            peak            valley            peak
 counter   0 ─── counting up ──▶ ARR ── down ──▶ 0 ─── counting up ──▶ ARR
 high side ███                                  ███████                 

@@ -111,12 +111,7 @@ jobs:
       matrix:
         configuration: ["RelWithDebInfo"]
         target:
-          [
-            "EK-TM4C1294XL",
-            "EK-TM4C123GXL",
-            "NUCLEO-G474RE",
-            "NUCLEO-H563ZI"
-          ]
+          ["EK-TM4C1294XL", "EK-TM4C123GXL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
     steps:
       - name: Configure Git
         run: |
