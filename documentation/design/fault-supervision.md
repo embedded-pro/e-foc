@@ -173,8 +173,8 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface | Purpose                                         | Contract                                                                     |
-|-----------|-------------------------------------------------|------------------------------------------------------------------------------|
+| Interface | Purpose                                                          | Contract                                                                               |
+|-----------|------------------------------------------------------------------|----------------------------------------------------------------------------------------|
 | Fault     | Reports a stall, an encoder loss or a missing phase to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
 
 ### Required
