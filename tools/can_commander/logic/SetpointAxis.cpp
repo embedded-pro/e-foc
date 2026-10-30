@@ -2,7 +2,6 @@
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <numbers>
 
 namespace tool
@@ -14,15 +13,11 @@ namespace tool
         constexpr const char* firmwareRange{ "Accepted by the firmware" };
 
         constexpr float halfTurn{ std::numbers::pi_v<float> };
-    }
 
-    SetpointAxis::SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel)
-        : suffix(suffix)
-        , displayPerSi(displayPerSi)
-        , wireScale(wireScale)
-        , maxCounts(static_cast<int32_t>(std::min(std::floor(static_cast<double>(limit) * wireScale), static_cast<double>(std::numeric_limits<int16_t>::max()))))
-        , rangeLabel(rangeLabel)
-    {}
+        constexpr SetpointAxis torqueAxis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
+        constexpr SetpointAxis speedAxis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
+        constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, halfTurn, "One turn from the alignment zero" };
+    }
 
     std::string_view SetpointAxis::Suffix() const
     {
@@ -73,20 +68,17 @@ namespace tool
 
     const SetpointAxis& TorqueAxis()
     {
-        static const SetpointAxis axis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
-        return axis;
+        return torqueAxis;
     }
 
     const SetpointAxis& SpeedAxis()
     {
-        static const SetpointAxis axis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
-        return axis;
+        return speedAxis;
     }
 
     const SetpointAxis& PositionAxis()
     {
-        static const SetpointAxis axis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, halfTurn, "One turn from the alignment zero" };
-        return axis;
+        return positionAxis;
     }
 
     const SetpointAxis& AxisFor(can::FocMotorMode mode)

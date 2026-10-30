@@ -1,7 +1,9 @@
 #pragma once
 
 #include "core/can/FocMotorMessages.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <string_view>
 
 namespace tool
@@ -11,7 +13,13 @@ namespace tool
     class SetpointAxis
     {
     public:
-        SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel);
+        constexpr SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel)
+            : suffix(suffix)
+            , displayPerSi(displayPerSi)
+            , wireScale(wireScale)
+            , maxCounts(static_cast<int32_t>(std::min(static_cast<double>(limit) * wireScale, static_cast<double>(std::numeric_limits<int16_t>::max()))))
+            , rangeLabel(rangeLabel)
+        {}
 
         std::string_view Suffix() const;
         std::string_view RangeLabel() const;
