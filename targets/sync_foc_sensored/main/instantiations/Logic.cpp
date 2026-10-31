@@ -46,6 +46,10 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , encoderFreeze{ hardware, [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
         , phaseLoss{ hardware.MaxCurrentSupported(), [this](state_machine::FaultCode code)
             {
                 platformFaultNotifier->Raise(code);
@@ -93,6 +97,14 @@ namespace application
                 encoderPlausibility.Enable([this]()
                     {
                         return supervision::ConfigFrom(controlMode->Config());
+                    });
+                encoderFreeze.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                encoderFreeze.Enable([this]()
+                    {
+                        return supervision::LimitsFrom(controlMode->CalibrationRecord(), controlMode->Config().encoderResolution, this->hardware.MaxCurrentSupported());
                     });
                 phaseLoss.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {

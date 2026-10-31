@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "supervision"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.2.0                    |
+| Version   | 0.3.0                    |
 | Component | supervision              |
 | Date      | 2026-10-30               |
 
@@ -31,6 +31,9 @@ date: 2026-10-30
   leaving stall reporting off when the operator turned it off (REQ-SM-033).
 - Watching an enabled drive for a current it demands but cannot make flow, and raising `phaseMissing` when the
   motor is disconnected while it runs (REQ-EH-016, Part E).
+- Watching an enabled drive, in every control mode, for an encoder reading that stops dead faster than the rotor
+  could physically stop, and raising `encoderLoss` (REQ-SM-028, Part F). This is the watch that covers torque
+  mode, where the drive demands no motion for Parts A to C to judge.
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -42,6 +45,10 @@ date: 2026-10-30
 - Detecting a single open phase while the motor runs. Two phases still carry current and turn the rotor, so
   the shortfall Part E watches for does not appear; an open phase is caught at the next alignment
   (`service-alignment.md`, phase continuity check), which runs at every power-up.
+- Catching an encoder that freezes while the rotor turns slowly and the drive demands no motion, as torque mode
+  at low speed. Part F needs a speed the rotor could not have shed, and Parts A to C need a demand; an encoder
+  that stops below that speed in torque mode is found at the next alignment (`service-alignment.md`, encoder
+  follow check).
 - Protecting the motor from heat while a stall is not reported. With stall reporting off, a held rotor can
   carry up to the current limit; only the thermal protection of the board watches that.
 
@@ -167,6 +174,68 @@ stateDiagram-v2
     Reported --> Idle : drive leaves Enabled
 ```
 
+### Part F — An encoder that stops dead
+
+Parts A to C judge effort against motion, so they need the drive to demand motion. In torque mode it demands
+none: a rotor held against its torque is the purpose of a tension or haptic drive, and still while pushing is
+not a fault there. An encoder that freezes in torque mode is still visible, from kinematics alone. A turning
+rotor cannot stop faster than the torques on it allow, while a frozen reading stops at once.
+
+A third watch, the encoder-freeze monitor, reads the encoder every 1 ms on the event loop while the drive is
+`Enabled`, in every mode. Between two readings it records the travel, and the speed that travel implies over
+the longest the interval could have lasted: the timer advances in whole milliseconds, so a measured interval
+of n ms lasted at most n + 1. A reading that moved less than half an encoder count is *still*.
+
+When readings turn still right after an interval measured at a speed ω, the rotor must have shed ω within
+that interval. Decelerating at the largest rate α it can reach, the speed it can have averaged over an
+interval of at most T while ending slow enough to stay still is
+
+  ω_max = α·T/2 + √(α·q)
+
+with q one encoder count. √(α·q) is the speed from which it stops within half a count. An encoder that freezes
+part-way through that interval leaves it only part of its travel, so the interval before it is judged as well:
+measured at ω′ over at most T′, the rotor had T′/2 + T to shed it, and
+
+  ω′_max = α·(T′/2 + T) + √(α·q)
+
+If either speed exceeds its bound and is at least 20 rad/s, and the reading then stays still for 5 ms, the
+monitor raises `encoderLoss` once and stays silent until the drive leaves `Enabled`. Any travel during the
+5 ms starts the watch again.
+
+α is twice the calibrated torque constant (`1.5·p·ψ`) times the current limit over the calibrated inertia.
+The factor two allows for a load torque as large as the motor's own. When the calibration record has no
+inertia or no flux linkage, as after a torque-mode calibration, α falls back to twice 2·10⁴ rad/s² per ampere
+of current limit. That is about three times the torque-to-inertia ratio of either reference motor
+(`documentation/theory/foc-plant-models.md`), so the fallback is looser than the truth for any motor that light or heavier.
+
+| Drive                 | α (rad/s²) | ω_max at T = 2 ms |
+|-----------------------|------------|-------------------|
+| Teknic, 3 A board     | 32 600     | 40 rad/s          |
+| Teknic, 20 A emulated | 217 600    | 236 rad/s         |
+| Fallback, 3 A board   | 120 000    | 134 rad/s         |
+
+Because the timer only bounds each interval to whole milliseconds, a measured speed can be half the real one.
+On the emulated 20 A drive the monitor therefore needs a rotor faster than about 470 rad/s to catch a freeze
+between two evaluations; the SIL scenario runs the bench plant, whose 3 A drive bounds α ten times lower.
+
+The 20 rad/s floor is ten counts per millisecond on a 4000-count encoder, so one count of quantisation cannot
+make a slow rotor look fast. The 5 ms confirmation lets a collision with an elastic stop show its rebound
+before anything is raised. A rigid stop hit fast enough to stop within one interval without rebounding is
+reported as `encoderLoss`. From the encoder that is indistinguishable from a freeze, and a fault is due
+either way.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Moving
+    Moving --> Moving : reading travelled, speed recorded
+    Moving --> Suspect : reading still after a speed above ω_max
+    Moving --> Resting : reading still after a speed the rotor could shed
+    Suspect --> Reported : still for 5 ms, encoderLoss raised
+    Suspect --> Moving : reading travelled
+    Resting --> Moving : reading travelled
+    Reported --> Moving : drive leaves Enabled
+```
+
 ---
 
 ## Interfaces
@@ -179,9 +248,10 @@ stateDiagram-v2
 
 ### Required
 
-| Interface       | Purpose                                           | Contract                                                                    |
-|-----------------|---------------------------------------------------|-----------------------------------------------------------------------------|
-| Active drive    | Lifecycle state and the motion the drive observes | Read every evaluation; the observation is written by the control interrupts |
-| Encoder         | Mechanical angle                                  | Read every evaluation while the drive is enabled                            |
-| Settings        | The configuration record's supervision fields     | Read every evaluation                                                       |
-| Repeating timer | 10 ms evaluation period                           | Runs on the event loop                                                      |
+| Interface        | Purpose                                                                                    | Contract                                                                     |
+|------------------|--------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| Active drive     | Lifecycle state and the motion the drive observes                                          | Read every evaluation; the observation is written by the control interrupts  |
+| Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
+| Settings         | The configuration record's supervision fields                                              | Read every evaluation                                                        |
+| Repeating timer  | 10 ms evaluation period (1 ms for Part F)                                                  | Runs on the event loop                                                       |
+| Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

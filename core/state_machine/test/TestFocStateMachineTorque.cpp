@@ -358,7 +358,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_alignment_failure_enters_fault)
             {
                 cb(std::nullopt);
             }));
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillOnce(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::none));
     sm.CmdReAlign([](state_machine::CommandResult) {});
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -377,7 +377,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_that_finds_a_missing_phase_enters_f
             {
                 cb(std::nullopt);
             }));
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillOnce(Return(true));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::phaseMissing));
     sm.CmdReAlign([](state_machine::CommandResult) {});
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -410,7 +410,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_nvm_failure_enters_fault)
 
 TEST_F(FocStateMachineTorqueCliTest, realign_clears_stale_rotor_reference_before_starting)
 {
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
     GivenNvmValid();
     auto sm = CreateStateMachine();
@@ -1019,7 +1019,7 @@ TEST_F(FocStateMachineTorqueCliTest, resistance_inductance_nullopt_enters_fault)
 
 TEST_F(FocStateMachineTorqueCliTest, alignment_nullopt_enters_fault)
 {
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectCalibrationSequence(true, true, false);
@@ -2110,7 +2110,7 @@ TEST_F(FocStateMachineTorqueAutoTest, resistance_inductance_nullopt_enters_fault
 
 TEST_F(FocStateMachineTorqueAutoTest, alignment_nullopt_enters_fault)
 {
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectCalibrationSequence(true, true, false);

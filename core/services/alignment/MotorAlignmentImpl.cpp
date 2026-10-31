@@ -4,6 +4,7 @@
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace services
@@ -29,7 +30,9 @@ namespace services
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
         settledSumA = settledSumB = settledSumC = 0.0f;
-        phaseMissing = false;
+        failure = Failure::none;
+        firstHold = config.followStep.has_value();
+        samplesInHold = 0;
         previousPosition = encoder.Read();
         onAlignmentDone = onDone;
 
@@ -43,12 +46,8 @@ namespace services
 
     void MotorAlignmentImpl::ApplyAlignmentVoltage()
     {
-        auto voltage = foc::DutyFraction(alignmentConfig.testVoltage);
-        auto electricalAngle = alignmentAngle;
-
         driver.Stop();
-        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+        OutputVector(firstHold ? alignmentAngle + alignmentConfig.followStep->Value() : alignmentAngle);
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
@@ -70,13 +69,22 @@ namespace services
             });
     }
 
+    void MotorAlignmentImpl::OutputVector(float electricalAngle)
+    {
+        auto voltage = foc::DutyFraction(alignmentConfig.testVoltage);
+
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+    }
+
     void MotorAlignmentImpl::ProcessPosition(const foc::PhaseCurrents& currents)
     {
         auto currentPosition = encoder.Read();
         auto positionChange = std::abs(foc::detail::PositionWithWrapAround((currentPosition - previousPosition).Value()));
         previousPosition = currentPosition;
+        ++samplesInHold;
 
-        if (positionChange < alignmentConfig.settledThreshold.Value())
+        if (positionChange < alignmentConfig.settledThreshold.Value() && CountsSettlement())
         {
             consecutiveSettledSamples++;
             settledSumA += currents.a.Value();
@@ -93,16 +101,50 @@ namespace services
         }
     }
 
+    // A rotor that has not yet started to turn after the vector moved reads as settled where it stood.
+    bool MotorAlignmentImpl::CountsSettlement() const
+    {
+        return firstHold || !alignmentConfig.followStep.has_value() || samplesInHold > alignmentConfig.followDwell;
+    }
+
     void MotorAlignmentImpl::Settle()
     {
-        if (!CarriesNoCurrent())
+        if (firstHold)
+            BeginFinalHold();
+        else if (CarriesNoCurrent())
         {
-            CalculateAlignmentOffset();
-            return;
+            failure = Failure::phaseMissing;
+            Finish(std::nullopt);
         }
+        else if (alignmentConfig.followStep.has_value() && !FollowedField())
+        {
+            failure = Failure::encoderNotFollowing;
+            Finish(std::nullopt);
+        }
+        else
+            CalculateAlignmentOffset();
+    }
 
-        phaseMissing = true;
-        Finish(std::nullopt);
+    // Interrupt context: the vector moves without stopping the inverter, so the rotor is held throughout.
+    void MotorAlignmentImpl::BeginFinalHold()
+    {
+        firstHold = false;
+        firstHoldPosition = previousPosition;
+        currentSampleIndex = 0;
+        samplesInHold = 0;
+        consecutiveSettledSamples = 0;
+        settledSumA = settledSumB = settledSumC = 0.0f;
+        OutputVector(alignmentAngle);
+    }
+
+    // Moving the vector back by the follow step turns the rotor by the step over the pole pairs, mechanically.
+    bool MotorAlignmentImpl::FollowedField() const
+    {
+        const auto travel = foc::detail::PositionWithWrapAround((previousPosition - firstHoldPosition).Value());
+        const auto expected = -alignmentConfig.followStep->Value() / static_cast<float>(std::max<std::size_t>(polePairs, 1));
+        const auto ratio = travel / expected;
+
+        return ratio >= minimumFollow && ratio <= maximumFollow;
     }
 
     bool MotorAlignmentImpl::CarriesNoCurrent() const
@@ -175,9 +217,9 @@ namespace services
             onAlignmentDone(result);
     }
 
-    bool MotorAlignmentImpl::PhaseMissing() const
+    MotorAlignment::Failure MotorAlignmentImpl::LastFailure() const
     {
-        return phaseMissing;
+        return failure;
     }
 
     void MotorAlignmentImpl::Abort()

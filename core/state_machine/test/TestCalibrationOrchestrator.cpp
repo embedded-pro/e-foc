@@ -1,6 +1,7 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
+#include <numbers>
 
 namespace
 {
@@ -162,7 +163,7 @@ TEST_F(CalibrationOrchestratorTest, alignment_failure_triggers_onFailed)
     ExpectAlignCall();
     storedRlCb(ValidRlResult());
 
-    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(false));
+    EXPECT_CALL(motorAlignment, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::none));
     storedAlignCb(std::nullopt);
 
     EXPECT_FALSE(alignedCalled);
@@ -175,18 +176,30 @@ TEST_F(CalibrationOrchestratorTest, an_alignment_that_found_a_missing_phase_fail
     ExpectAlignCall();
     StartAlignmentOnly();
 
-    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(true));
+    EXPECT_CALL(motorAlignment, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::phaseMissing));
     storedAlignCb(std::nullopt);
 
     EXPECT_TRUE(failedCalled);
     EXPECT_EQ(state_machine::FaultCode::phaseMissing, orchestrator.LastFailure());
 }
 
+TEST_F(CalibrationOrchestratorTest, an_alignment_whose_encoder_did_not_follow_the_field_fails_as_an_encoder_loss)
+{
+    ExpectAlignCall();
+    StartAlignmentOnly();
+
+    EXPECT_CALL(motorAlignment, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::encoderNotFollowing));
+    storedAlignCb(std::nullopt);
+
+    EXPECT_TRUE(failedCalled);
+    EXPECT_EQ(state_machine::FaultCode::encoderLoss, orchestrator.LastFailure());
+}
+
 TEST_F(CalibrationOrchestratorTest, a_failure_after_a_missing_phase_is_a_calibration_failure_again)
 {
     ExpectAlignCall();
     StartAlignmentOnly();
-    EXPECT_CALL(motorAlignment, PhaseMissing()).WillOnce(Return(true));
+    EXPECT_CALL(motorAlignment, LastFailure()).WillOnce(Return(services::MotorAlignment::Failure::phaseMissing));
     storedAlignCb(std::nullopt);
 
     ExpectPolePairCall();
@@ -208,6 +221,16 @@ TEST_F(CalibrationOrchestratorTest, the_alignment_is_given_the_stored_resistance
 
     EXPECT_NEAR(1.1f, received.phaseResistance.Value(), 1e-6f);
     EXPECT_NEAR(24.0f, received.busVoltage.Value(), 1e-6f);
+}
+
+TEST_F(CalibrationOrchestratorTest, the_alignment_checks_the_encoder_follows_a_quarter_electrical_turn)
+{
+    services::MotorAlignment::AlignmentConfig received;
+    EXPECT_CALL(motorAlignment, ForceAlignment(_, _, _)).WillOnce(SaveArg<1>(&received));
+    StartAlignmentOnly();
+
+    ASSERT_TRUE(received.followStep.has_value());
+    EXPECT_NEAR(0.5f * std::numbers::pi_v<float>, received.followStep->Value(), 1e-6f);
 }
 
 TEST_F(CalibrationOrchestratorTest, abort_before_pole_pairs_callback_suppresses_result)

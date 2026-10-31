@@ -251,8 +251,15 @@
     speed shall be the one the active law asks for: a position law that commands the current
     demands none, whatever speed the speed loop was last given. A drive that is not Enabled, that
     carries no current, or that holds its position against a load shall not be reported, also
-    after a full calibration has run the speed loop. The check shall not run in the 20 kHz
-    control interrupt (REQ-PERF-003).
+    after a full calibration has run the speed loop. Independently of what the drive demands,
+    and so in every control mode including torque mode, the supervisor shall also raise
+    FaultCode::encoderLoss when the encoder reading stops dead: no travel of half an encoder
+    count for 5 ms right after a measured speed of at least 20 rad/s that the rotor could not
+    have shed in the time since it was measured at the largest deceleration it can reach, twice
+    the calibrated torque constant times the current limit over the calibrated inertia, or a
+    fixed bound when either is unknown. A rotor held still, or one that slows within that
+    deceleration, shall not be reported by this criterion. The check shall not run in the
+    20 kHz control interrupt (REQ-PERF-003).
 
 - id: REQ-SM-029
   title: A mode selection re-checks its guard before activating
@@ -316,3 +323,15 @@
     replaced by its default. With stall reporting off the supervisor shall not raise
     FaultCode::stall and shall keep watching, so an encoder that stops reporting is still raised
     as FaultCode::encoderLoss; encoder-loss detection shall not be switchable off.
+
+- id: REQ-SM-034
+  title: Alignment refuses an encoder that does not follow the field
+  shall: >
+    Before it zeroes the encoder, the alignment shall first hold its voltage vector a quarter
+    of an electrical turn ahead of the alignment angle until the rotor settles, then at the
+    alignment angle until it settles again. It shall refuse the alignment with
+    FaultCode::encoderLoss, leaving the encoder unzeroed, unless the settled encoder travel
+    between the two holds is in the direction the field turned and between half and one and a
+    half times a quarter turn divided by the pole pairs. A missing phase found by REQ-EH-016 is
+    reported in preference to it. A rotor mechanically locked at power-up shall be reported
+    the same way, since the drive cannot tell it from an encoder that does not report.
