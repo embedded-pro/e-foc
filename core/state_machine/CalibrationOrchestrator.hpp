@@ -47,6 +47,7 @@ namespace application
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
+        static state_machine::FaultCode FaultFor(services::MotorAlignment::Failure failure);
         void Fail(state_machine::FaultCode code = state_machine::FaultCode::calibrationFailed);
 
         services::ElectricalParametersIdentification& electricalIdent;

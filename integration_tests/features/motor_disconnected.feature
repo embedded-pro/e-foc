@@ -9,13 +9,14 @@ Feature: Disconnected And Faulty Motor Wiring
   same steps so the comparison is like for like.
 
   An encoder that has stopped reporting is the opposite failure: the rotor is
-  free to turn and the drive cannot see it. Alignment declares the rotor settled
-  once its reading stops changing, which a frozen reading satisfies perfectly, so
-  the drive aligns against a reading that means nothing and enables. What gives
-  it away is the first request for motion: the drive pushes torque current and
-  the reading does not move. The encoder plausibility monitor (REQ-SM-028)
-  reports that as a sensor fault, whether the encoder was stuck from boot or
-  froze while the motor was running.
+  free to turn and the drive cannot see it. A frozen reading looks settled at
+  once, so alignment first holds the field a quarter electrical turn ahead and
+  then moves it to the alignment angle: the encoder must follow by the matching
+  mechanical angle, and one stuck from boot is refused there as a sensor fault
+  (REQ-SM-034). An encoder that freezes later is found while the drive runs
+  (REQ-SM-028): in speed and position mode the drive pushes torque current and
+  the reading does not move; in any mode, torque mode included, a reading that
+  stops dead faster than the rotor could physically stop is a sensor fault.
 
   @sil @REQ-EH-016 @REQ-CAN-014
   Scenario: A disconnected motor fails its alignment as a missing phase
@@ -71,15 +72,25 @@ Feature: Disconnected And Faulty Motor Wiring
     And a speed setpoint of 20 rad/s is applied
     Then the state machine shall report a sensor fault
 
-  @sil @REQ-SM-004 @REQ-SM-008 @REQ-SM-028
-  Scenario: A stuck encoder aligns and enables, and is detected as a sensor fault once the drive asks for motion
+  @sil @REQ-SM-034
+  Scenario: A stuck encoder fails its alignment as a sensor fault
     Given a stuck encoder motor plant
     And the motor is already calibrated
     And the motor boots in speed mode
     When the target boots
+    And the rotor alignment is attempted
+    Then the state machine shall report a sensor fault
+
+  @sil @REQ-SM-008 @REQ-SM-028
+  Scenario: An encoder that freezes while a torque-mode drive turns the rotor is detected as a sensor fault
+    Given a bench motor plant
+    And the encoder freezes 2000 ms after enable
+    And the motor is already calibrated
+    And the motor boots in torque mode
+    When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rad/s is applied
+    And a torque setpoint of 0.3 A is applied
     Then the state machine shall report a sensor fault
 
   @sil @REQ-SM-028

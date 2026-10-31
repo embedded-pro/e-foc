@@ -19,10 +19,14 @@ namespace services
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
         void Abort() override;
-        bool PhaseMissing() const override;
+        Failure LastFailure() const override;
 
     private:
         void ApplyAlignmentVoltage();
+        void OutputVector(float electricalAngle);
+        void BeginFinalHold();
+        bool CountsSettlement() const;
+        bool FollowedField() const;
         void CalculateAlignmentOffset();
         void ProcessPosition(const foc::PhaseCurrents& currents);
         void Settle();
@@ -35,6 +39,8 @@ namespace services
         constexpr static uint8_t neutralDuty = 50;
         constexpr static float alignmentAngle = 0.0f;
         constexpr static float missingFraction = 0.25f;
+        constexpr static float minimumFollow = 0.5f;
+        constexpr static float maximumFollow = 1.5f;
 
         drivers::ThreePhaseInverter& driver;
         drivers::Encoder& encoder;
@@ -48,7 +54,10 @@ namespace services
         float settledSumA{ 0.0f };
         float settledSumB{ 0.0f };
         float settledSumC{ 0.0f };
-        bool phaseMissing{ false };
+        Failure failure{ Failure::none };
+        bool firstHold{ false };
+        std::size_t samplesInHold = 0;
+        foc::Radians firstHoldPosition{ 0.0f };
         std::optional<foc::Radians> outcome;
         infra::AutoResetFunction<void(std::optional<foc::Radians>)> onAlignmentDone;
         infra::TimerSingleShot timeoutTimer;

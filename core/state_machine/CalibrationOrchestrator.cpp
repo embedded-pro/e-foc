@@ -1,5 +1,6 @@
 #include "core/state_machine/CalibrationOrchestrator.hpp"
 #include <bit>
+#include <numbers>
 
 namespace application
 {
@@ -191,6 +192,7 @@ namespace application
         services::MotorAlignment::AlignmentConfig config;
         config.phaseResistance = foc::Ohm{ pendingData->rPhase };
         config.busVoltage = busVoltage;
+        config.followStep = foc::Radians{ 0.5f * std::numbers::pi_v<float> };
 
         const auto token = runToken;
         motorAlignment.ForceAlignment(pendingData->polePairs, config,
@@ -202,10 +204,23 @@ namespace application
                 running = false;
 
                 if (!angle)
-                    Fail(motorAlignment.PhaseMissing() ? state_machine::FaultCode::phaseMissing : state_machine::FaultCode::calibrationFailed);
+                    Fail(FaultFor(motorAlignment.LastFailure()));
                 else
                     onAlignmentDone(*angle);
             });
+    }
+
+    state_machine::FaultCode CalibrationOrchestrator::FaultFor(services::MotorAlignment::Failure failure)
+    {
+        switch (failure)
+        {
+            case services::MotorAlignment::Failure::phaseMissing:
+                return state_machine::FaultCode::phaseMissing;
+            case services::MotorAlignment::Failure::encoderNotFollowing:
+                return state_machine::FaultCode::encoderLoss;
+            default:
+                return state_machine::FaultCode::calibrationFailed;
+        }
     }
 
     void CalibrationOrchestrator::Fail(state_machine::FaultCode code)

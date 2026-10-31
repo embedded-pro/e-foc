@@ -791,7 +791,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_BroadcastsParamsAndAcksSucces
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
 {
     ConstructFixture();
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
 
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,

@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.5.4
+version: 0.5.5
 component: state-machine
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.5.4                      |
+| Version   | 0.5.5                      |
 | Component | state-machine              |
 | Date      | 2026-10-30                 |
 
@@ -783,7 +783,7 @@ leaves it in `Idle` as at power-on.
 1. Enters `Calibrating` at the alignment sub-step, copying the stored electrical parameters into `pendingData`.
 2. Calls the Motor Alignment service using the stored pole pairs.
 3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM through the same completion path as a full calibration, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
-4. On failure: enters `Fault` with code `calibrationFailed`, or `phaseMissing` when the alignment found a phase that carries no current (`service-alignment.md`, phase continuity check).
+4. On failure: enters `Fault` with code `calibrationFailed`, `phaseMissing` when the alignment found a phase that carries no current (`service-alignment.md`, phase continuity check), or `encoderLoss` when the encoder did not follow the field (`service-alignment.md`, encoder follow check).
 
 A re-alignment does not wait for the rotor to come to rest. The alignment holds the rotor until its
 position settles, and in simulation a re-alignment issued 30 ms after disabling at 500 rpm aligned and
@@ -1063,6 +1063,10 @@ latched fault code could be read or broadcast; the expiry is reported after rebo
 
 ## Error Handling
 
-All calibration steps produce `std::optional` results. A `nullopt` from any step immediately enters `Fault` with code `calibrationFailed`, except an alignment that found a phase carrying no current, which enters it with `phaseMissing` (`CalibrationStepFailed` carries the code). The entire calibration sequence is safe to retry by issuing `CmdCalibrate` after `CmdClearFault`.
+All calibration steps produce `std::optional` results. A `nullopt` from any step immediately enters `Fault` with
+code `calibrationFailed`, except an alignment that found a phase carrying no current, which enters it with
+`phaseMissing`, or an encoder that did not follow the field, which enters it with `encoderLoss`
+(`CalibrationStepFailed` carries the code). The entire calibration sequence is safe to retry by issuing
+`CmdCalibrate` after `CmdClearFault`.
 
 NVM operations (save, load, invalidate) are also asynchronous and report a `NvmStatus`. On any non-`Ok` status during save or load, the machine enters `Fault` or remains in `Idle`, respectively, without corrupting application state.
