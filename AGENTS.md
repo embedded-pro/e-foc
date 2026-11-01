@@ -6,6 +6,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 ## Architecture
 
+- `core/bootloader/` — Bootloader logic on host-testable abstractions: the status journal (`documentation/design/bootloader.md`)
 - `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
 - `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)
@@ -24,7 +25,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 ## Memory — no heap (embedded/runtime code)
 
-**Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR-reachable paths. Host tools, simulators, and tests may use heap.
+**Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `core/bootloader/`, `targets/`, ISR-reachable paths. Host tools, simulators, and tests may use heap.
 
 Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion — stack usage must stay predictable. No virtual destructors (see Interfaces & errors).
 
