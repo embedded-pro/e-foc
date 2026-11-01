@@ -8,10 +8,14 @@ target_include_directories(e_foc.bootloader PUBLIC
 target_link_libraries(e_foc.bootloader PUBLIC
     infra.util
     hal.synchronous_interfaces
+    services.crypto
     upgrade.pack
 )
 
 target_sources(e_foc.bootloader PRIVATE
+    ApplicationCheck.cpp
+    ApplicationCheck.hpp
+    ImageFormat.hpp
     StatusJournal.cpp
     StatusJournal.hpp
 )

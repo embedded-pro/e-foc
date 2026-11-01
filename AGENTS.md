@@ -6,7 +6,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 ## Architecture
 
-- `core/bootloader/` — Bootloader logic on host-testable abstractions: the status journal (`documentation/design/bootloader.md`)
+- `core/bootloader/` — Bootloader logic on host-testable abstractions: status journal, application header and image descriptor checks (`documentation/design/bootloader.md`)
 - `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
 - `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)

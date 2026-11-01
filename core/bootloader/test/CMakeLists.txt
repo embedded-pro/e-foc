@@ -9,5 +9,7 @@ target_link_libraries(e_foc.bootloader_test PUBLIC
 
 target_sources(e_foc.bootloader_test PRIVATE
     FlashFake.hpp
+    TestApplicationCheck.cpp
+    TestImages.hpp
     TestStatusJournal.cpp
 )
