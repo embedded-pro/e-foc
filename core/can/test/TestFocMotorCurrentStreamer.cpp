@@ -227,7 +227,7 @@ TEST_F(FocMotorCurrentStreamerTest, at_most_two_stream_frames_wait_in_the_send_q
         EXPECT_EQ(frames[i].sequence, i);
 }
 
-TEST_F(FocMotorCurrentStreamerTest, a_heartbeat_from_an_online_client_does_not_restart_the_stream)
+TEST_F(FocMotorCurrentStreamerTest, a_repeated_online_notification_does_not_restart_the_stream)
 {
     config.telemetryRateHz = 1000;
     streamer.Online();
