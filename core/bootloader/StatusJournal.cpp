@@ -50,7 +50,11 @@ namespace bootloader
 
     void StatusJournal::Record(application::UpgradePackStatus status, uint32_t errorCode)
     {
-        auto address = Read().firstErased;
+        const auto scan = Read();
+        if (scan.latest && scan.latest->status == static_cast<uint8_t>(status) && scan.latest->errorCode == errorCode)
+            return;
+
+        auto address = scan.firstErased;
         if (!address)
         {
             Clear();
