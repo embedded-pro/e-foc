@@ -448,7 +448,17 @@ namespace tool
         Report(IssueSeverity::info, QString("Connecting to %1 at %2").arg(connectionPanel->InterfaceName(), connectionPanel->BitrateText()));
 
         if (!adapter.Connect(infra::BoundedConstString(name.data(), name.size()), connectionPanel->Bitrate()))
+        {
             Report(IssueSeverity::error, QString("Could not connect to %1: %2").arg(connectionPanel->InterfaceName(), ConnectFailureHint(connectionPanel->InterfaceName())));
+            return;
+        }
+
+        // slcan reports the connection only after its handshake, whose replies arrive through the read path.
+        if (!busConnected)
+        {
+            SetupSocketNotifier();
+            connectionPanel->OnConnecting();
+        }
     }
 
     void MainWindow::Disconnect()
@@ -671,6 +681,7 @@ namespace tool
 
     void MainWindow::OnConnectionChanged(bool connected)
     {
+        const bool wasConnected{ busConnected };
         busConnected = connected;
         connectionPanel->OnConnectionChanged(connected);
         updateSession.SetBusConnected(connected);
@@ -682,7 +693,8 @@ namespace tool
         }
         else
         {
-            Report(IssueSeverity::info, "Disconnected");
+            if (wasConnected)
+                Report(IssueSeverity::info, "Disconnected");
             TeardownSocketNotifier();
         }
 

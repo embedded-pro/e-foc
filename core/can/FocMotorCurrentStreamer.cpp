@@ -21,7 +21,6 @@ namespace can
 
     void FocMotorCurrentStreamer::Online()
     {
-        // The protocol server reports Online for every client heartbeat, not only when the client returns.
         if (timer.Armed())
             return;
 
