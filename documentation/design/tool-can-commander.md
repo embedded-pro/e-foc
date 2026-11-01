@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.8.1
+version: 0.9.0
 component: "tool-can-commander"
-date: 2026-10-30
+date: 2026-11-01
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.8.1                |
+| Version   | 0.9.0                |
 | Component | tool-can-commander   |
-| Date      | 2026-10-30           |
+| Date      | 2026-11-01           |
 
 ---
 
@@ -31,6 +31,8 @@ date: 2026-10-30
   every setting it holds.
 - Keeping a persistent issue log per user, and turning it into a pre-filled bug report on request.
 - Telling the user when a newer release exists, without ever blocking the tool.
+- Updating a motor controller's firmware over CAN, from the release for its board or from a pack file, in two
+  steps the user starts separately, download and apply, each only while that motor is stopped (Part M).
 - Shipping as a branded, installable product ("e-foc CAN Commander") for Windows and Debian-based Linux.
 
 **Is NOT responsible for:**
@@ -40,7 +42,7 @@ date: 2026-10-30
 - Coordinating motors with each other (synchronised moves, shared setpoints). Each motor is commanded on its own.
 - Sending anything to the network on its own other than the release check. Bug reports open in the
   browser for the user to review and submit.
-- Downloading or installing updates. It links to the installer for the running platform.
+- Checking a firmware pack's signature or decrypting it. The controller's bootloader does (`bootloader.md`).
 
 ---
 
@@ -85,6 +87,7 @@ graph TD
     Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align, identify, calibrate"]
     Commands --> Configuration["Configuration: start-up settings, fault supervision"]
     Commands --> Diagnostics["Diagnostics: readings the controller reports"]
+    Commands --> Firmware["Firmware: version, board, update"]
 ```
 
 - A tab appears automatically for every node whose frames are seen on the bus. The user can also add a tab
@@ -97,18 +100,19 @@ graph TD
 
 ### Part C — state the user can see at all times
 
-| Element                                           | Shows                                                                                 | Source                                  |
-|---------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------------|
-| Connection panel                                  | interface, bitrate, connected or not                                                  | bus adapter                             |
-| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot | each node                               |
-| Tab                                               | status dot and tooltip of that motor                                                  | each node                               |
-| Motor header                                      | node state, firmware contract, the command waiting for an answer                      | that node                               |
-| Control mode                                      | *requested…* until acknowledged, then *active*                                        | that node's mode or algorithms response |
-| Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value | that node's setpoint acknowledgement    |
-| Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted        | that node's parameter responses         |
-| Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's status (read every second)  |
-| Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                 | that node's current stream              |
-| Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                               |
+| Element                                           | Shows                                                                                                     | Source                                  |
+|---------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| Connection panel                                  | interface, bitrate, not connected, connecting or connected                                                | bus adapter                             |
+| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot                     | each node                               |
+| Tab                                               | status dot and tooltip of that motor                                                                      | each node                               |
+| Motor header                                      | node state, firmware contract, the command waiting for an answer                                          | that node                               |
+| Control mode                                      | *requested…* until acknowledged, then *active*                                                            | that node's mode or algorithms response |
+| Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value                     | that node's setpoint acknowledgement    |
+| Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted                            | that node's parameter responses         |
+| Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
+| Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
+| Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
+| Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
 that node goes offline, so stale numbers never read as live. The current stream (`service-can.md` Part J)
@@ -377,10 +381,90 @@ loaded when needed, so the tool installs and starts on a machine without them.
   bitrate, missing vendor library) goes to the log, followed by a next step chosen from the name's prefix.
 - **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
   dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
+- **Connecting** — an adapter that accepts the request but has not yet reported the connection (slcan
+  waits up to 1 s for the device to acknowledge the bitrate and the open command) shows *Connecting…*:
+  the fields and Connect are disabled and Disconnect cancels. A failed handshake logs the adapter's reason,
+  not a disconnect.
 - **Polling** — on Linux the tool waits on the adapter's descriptor; on Windows it polls the adapter every
-  millisecond while connected.
+  millisecond. Reading starts as soon as the adapter accepts the request, so the slcan handshake replies
+  are read before the connection is reported.
 - **Frames** — only 29-bit frames reach the tool and its frame log; standard-identifier frames stop at the
   driver.
+
+### Part M — firmware update
+
+Each motor's **Firmware** tab shows the firmware the controller reports: its release version, its board and a
+pack staged on it, if any (contract 2.6, `service-can.md`). An update has two steps, and the user starts each
+one, separately, while that motor is stopped:
+
+1. **Download to Controller** sends a pack to the controller, which checks it and keeps it staged
+   (`service-firmware-upgrade.md`). The motor can run again afterwards; the staged pack waits.
+2. **Apply Firmware** tells the controller to install the staged pack. It restarts, and its bootloader
+   installs the pack (`bootloader.md`).
+
+The tool never chains the two: a finished download ends with the pack staged and the Apply button offered,
+nothing more.
+
+- **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
+  release, by its asset name (`service-firmware-upgrade.md` Part J). When that release is newer than the
+  version the motor reports, the Firmware tab says so and the motor's tab carries a marker. *Open Pack File…*
+  takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
+  version or board, so the tab explains that and offers nothing.
+- **The right board and microcontroller.** A release pack is downloaded with visible progress into the
+  per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its
+  installer; a file that does not match is deleted. Every pack, downloaded or opened, is read before it is
+  offered: its magic, its header version, a size the staging slot holds (256 KB), and a product name that
+  names the board the node reports and that board's microcontroller. A pack for another board or another
+  microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
+  controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
+- **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
+  motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
+  downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
+  rule and answers `Busy` to a request that arrives while it runs.
+- **Download.** A confirmation names the motor and the version, and says that the motor stays stopped until
+  the download ends, about two minutes for 256 KB, and that nothing is installed yet. Then Begin, which the
+  controller answers once it has erased its whole staging slot, the progress bar reading "Erasing…" until
+  then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
+  pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
+  three times in a row before the download is given up. A progress bar shows the bytes sent out of the total
+  and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
+  with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
+  commandable. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply
+  Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
+- **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
+  controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
+  node to come back, then reads its version. The update succeeded when the node reports the staged version. A
+  node that comes back with the old version had its pack refused by the bootloader, which kept the old
+  application: the tool says so and logs it. A node that does not come back is reported as a failed update that
+  needs a debugger to recover.
+- **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
+  wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
+  microcontroller, and nothing was staged; *Try Again* restarts the download.
+- **Bus.** Disconnecting or closing the tool during a download asks first. Doing it anyway abandons the
+  download, which the controller drops after 30 s without a command. A staged pack is not affected by the bus
+  closing; it is still there, and still offered for apply, at the next connection.
+- Every step, refusal and failure goes to the issue log, with the motor and the versions.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Current
+    Current --> Available : newer release for the board, or a pack opened
+    Available --> Available : pack for another board or microcontroller, not offered
+    Available --> Downloading : Download to Controller… confirmed, motor stopped
+    Downloading --> Downloading : block acknowledged, or resent after Query Progress
+    Downloading --> Available : Cancel (Abort sent)
+    Downloading --> Failed : refused, or no answer after three tries
+    Downloading --> Verifying : last block acknowledged
+    Verifying --> Failed : CrcMismatch or NotReady
+    Verifying --> Staged : verified
+    Staged --> Staged : motor runs, bus closes and reopens
+    Staged --> Available : Discard (Abort sent)
+    Staged --> Restarting : Apply Firmware… confirmed, motor stopped
+    Restarting --> Current : node back with the staged version
+    Restarting --> Failed : old version, or no node within 30 s
+    Failed --> Downloading : Try Again
+    Failed --> Available : Close
+```
 
 ## Interfaces
 
@@ -394,14 +478,16 @@ loaded when needed, so the tool installs and starts on a machine without them.
 
 ### Required
 
-| Interface              | Purpose                                                      | Contract                                                                                             |
-|------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| CAN adapter driver     | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)             |
-| Firmware wire contract | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
-| CAN service client     | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
-| Release feed           | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
-| Elevation              | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                          |
-| Web browser            | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
+| Interface                 | Purpose                                                      | Contract                                                                                             |
+|---------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| CAN adapter driver        | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)             |
+| Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
+| CAN service client        | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
+| Release feed              | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
+| Firmware packs            | Firmware update                                              | Release assets named as in `service-firmware-upgrade.md` Part J, with a published SHA-256            |
+| Firmware-upgrade category | Firmware update                                              | `can-lite` firmware-upgrade specification; the controller answers as `service-firmware-upgrade.md`   |
+| Elevation                 | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                          |
+| Web browser               | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
 
 ---
 
@@ -515,6 +601,42 @@ sequenceDiagram
     end
 ```
 
+### Updating a motor's firmware
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Tool as CAN Commander
+    participant Feed as Release feed
+    participant Node as Motor controller
+    User->>Tool: Download to Controller… (motor stopped)
+    Tool->>Feed: Download the board's pack (progress)
+    Tool->>Tool: Check size and SHA-256, board and microcontroller in the pack header
+    Tool-->>User: Confirm: motor, version, motor stays stopped, nothing installed yet
+    User->>Tool: Download
+    Tool->>Node: Begin (size)
+    Note over Node: Erases its whole staging slot
+    Node-->>Tool: Begin response (page size)
+    loop every block
+        Tool->>Node: Data block
+        Node-->>Tool: Acknowledged
+    end
+    Tool->>Node: Verify (CRC-32)
+    Node-->>Tool: Ok, pack staged
+    Tool-->>User: Downloaded, apply when ready
+    Note over User,Node: The motor may run, the pack stays staged
+    User->>Tool: Apply Firmware… (motor stopped)
+    Tool-->>User: Confirm: running and staged version, restart
+    User->>Tool: Apply
+    Tool->>Node: Activate
+    Node-->>Tool: Ok, then restarts
+    Note over Node: Bootloader checks the target, installs the pack
+    Node->>Tool: Heartbeat
+    Tool->>Node: Query firmware version
+    Node-->>Tool: Staged version now running
+    Tool-->>User: Updated
+```
+
 ### Emergency stop with several motors
 
 ```mermaid
@@ -538,21 +660,24 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint             | Value / Description                                                                                  |
-|------------------------|------------------------------------------------------------------------------------------------------|
-| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                    |
-| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate        |
-| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                      |
-| Status reads           | each compatible node every 1 s and after every accepted command                                      |
-| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                      |
-| On-screen event log    | newest 5000 lines                                                                                    |
-| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                              |
-| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                               |
-| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address) |
-| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                             |
-| Automatic checks       | at startup and every 24 h while running                                                              |
-| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match the release          |
-| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                    |
+| Constraint             | Value / Description                                                                                                                                   |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                     |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase       |
+| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                       |
+| Status reads           | each compatible node every 1 s and after every accepted command                                                                                       |
+| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                       |
+| On-screen event log    | newest 5000 lines                                                                                                                                     |
+| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                               |
+| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                                                                                |
+| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                  |
+| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                              |
+| Automatic checks       | at startup and every 24 h while running                                                                                                               |
+| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match the release                                                           |
+| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; about two minutes for 256 KB |
+| Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                             |
+| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                              |
+| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                     |
 
 ---
 
