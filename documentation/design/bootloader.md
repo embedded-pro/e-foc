@@ -179,8 +179,10 @@ erased. Progress therefore goes to a journal instead, the last erase unit of the
   the error code.
 - The pack reader and the image installer of the library read and write the status through replaceable
   operations; the bootloader supplies ones that use the journal.
-- A full journal is erased and restarted with the current status. That happens only after hundreds of
-  installations, since each one writes at most four entries.
+- An entry that a reset cut short is not valid and is skipped; the next status goes into the following erased
+  unit, so no unit is ever programmed twice.
+- A full journal is erased and restarted with the status being recorded. That happens only after hundreds of
+  installations, since each one writes at most five entries.
 
 ### Part E — image descriptor and the check at every reset
 
@@ -244,15 +246,16 @@ be wrong; the image says itself what it was built for, and the chip says what it
 **Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
 start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
 board kind (`service-can.md`, contract 2.6), the firmware version and the target identity: the device
-identity the image's microcontroller reports, in the form its device-identity register gives it. The header is
-compiled from the same target definitions that compile the rest of the image, so it cannot disagree with the
-code beside it.
+identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
+device-identity register gives. The header is compiled from the same target definitions that compile the rest
+of the image, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
+TM4C123 but not one TM4C129 part from another; the board kind beside it does.
 
-| Microcontroller | Device identity the header carries | Where the chip reports it        |
-|-----------------|------------------------------------|----------------------------------|
-| TM4C1294NCPDT   | device class and part number       | system control `DID0` and `DID1` |
-| STM32H563ZI     | device identifier `0x484`          | `DBGMCU` identity code, `DEV_ID` |
-| STM32G474RE     | device identifier `0x469`          | `DBGMCU` identity code, `DEV_ID` |
+| Microcontroller | Device identity the header carries                    | Where the chip reports it          |
+|-----------------|-------------------------------------------------------|------------------------------------|
+| TM4C1294NCPDT   | device class `0x0A` (TM4C129), with the TI family tag | system control `DID0`, class field |
+| STM32H563ZI     | device identifier `0x484`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`   |
+| STM32G474RE     | device identifier `0x469`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`   |
 
 **Checks, in order.** A wrong pack is stopped at the first layer that can see the mistake; each later layer
 holds even if an earlier one was skipped or its label was wrong:
@@ -357,7 +360,7 @@ sequenceDiagram
 
 | Constraint           | Value / Description                                                                                                           |
 |----------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | 32 KB on every board                                                                                                          |
+| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                   |
 | Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)                           |
 | Largest image        | the application slot less its 64-byte descriptor                                                                              |
 | Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                   |

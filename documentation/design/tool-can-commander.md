@@ -102,7 +102,7 @@ graph TD
 
 | Element                                           | Shows                                                                                                     | Source                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------|
-| Connection panel                                  | interface, bitrate, connected or not                                                                      | bus adapter                             |
+| Connection panel                                  | interface, bitrate, not connected, connecting or connected                                                | bus adapter                             |
 | Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot                     | each node                               |
 | Tab                                               | status dot and tooltip of that motor                                                                      | each node                               |
 | Motor header                                      | node state, firmware contract, the command waiting for an answer                                          | that node                               |
@@ -381,8 +381,13 @@ loaded when needed, so the tool installs and starts on a machine without them.
   bitrate, missing vendor library) goes to the log, followed by a next step chosen from the name's prefix.
 - **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
   dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
+- **Connecting** — an adapter that accepts the request but has not yet reported the connection (slcan
+  waits up to 1 s for the device to acknowledge the bitrate and the open command) shows *Connecting…*:
+  the fields and Connect are disabled and Disconnect cancels. A failed handshake logs the adapter's reason,
+  not a disconnect.
 - **Polling** — on Linux the tool waits on the adapter's descriptor; on Windows it polls the adapter every
-  millisecond while connected.
+  millisecond. Reading starts as soon as the adapter accepts the request, so the slcan handshake replies
+  are read before the connection is reported.
 - **Frames** — only 29-bit frames reach the tool and its frame log; standard-identifier frames stop at the
   driver.
 

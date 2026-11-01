@@ -212,10 +212,10 @@ flash as the EEPROM file stands in for the NVM, so a scenario can read back what
 The release workflow builds, signs and encrypts one pack per board that has a bootloader, and publishes it
 beside the existing firmware archives (`.github/workflows/release-please.yml`):
 
-| Asset                                                         | Content                                                      |
-|---------------------------------------------------------------|--------------------------------------------------------------|
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade`      | the upgrade pack the CAN Commander sends                     |
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>-combined.hex` | bootloader, application and image descriptor, for a debugger |
+| Asset                                                    | Content                                                                                                                    |
+|----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends                                                                                   |
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the bootloader and the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
 
 The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name
 and the target identity from the build of that board (`bootloader.md` Part I), never from an argument typed
