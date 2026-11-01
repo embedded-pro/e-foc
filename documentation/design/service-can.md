@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: can-service
-date: 2026-10-30
+date: 2026-11-01
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.8.0                    |
+| Version   | 0.9.0                    |
 | Component | can-service              |
-| Date      | 2026-10-30               |
+| Date      | 2026-11-01               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -43,9 +43,12 @@ date: 2026-10-30
 - Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
   parameters of the calibration record, the settings that take effect at the next start and the drive-wide
   supervision settings.
+- Registering the `can-lite` firmware-upgrade category beside the FOC motor category, and answering `busy`
+  to configuration writes while a firmware upload is open (Part K).
 
 **Is NOT responsible for:**
 - The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
+- Receiving and checking firmware — that belongs to the firmware upgrade service (`service-firmware-upgrade.md`).
 - The FOC control algorithms, state machine transitions, or calibration — those belong to `core/foc/` and `core/state_machine/`.
 - Motor physics or hardware-specific logic.
 
@@ -265,6 +268,19 @@ mean measured d- and q-axis currents and the encoder's mechanical angle at the w
 [−π, π) from the alignment zero. `TelemetryElectrical` (`0x88`, bus voltage, current limit, Iq and Id at
 0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
 start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
+
+**Contract 2.6 — firmware identity.** Version 2.6 adds four read-only parameters; nothing in 2.5 changes. They
+tell a client which firmware a node runs and on which board, so it can offer the right firmware update
+(`service-firmware-upgrade.md` Part H). Like the diagnostics of 2.2 they answer `QueryParameter`, are refused by
+`SetParameter` with `invalidPayload`, and travel as the float of the number. A client asks for them only when
+the node reports 2.6 or newer.
+
+| ID     | Parameter              | Unit | Value                                                                                                 | Automatic |
+|--------|------------------------|------|-------------------------------------------------------------------------------------------------------|-----------|
+| `0xB1` | `firmwareVersionMajor` | -    | Major number of the running firmware's release version                                                | no        |
+| `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                                | no        |
+| `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                                | no        |
+| `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, `emulated 5`; `0` unknown | no        |
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
@@ -561,6 +577,17 @@ client's heartbeats starve, every drive declares the client gone after `clientTi
 motor (Part F). A node sees only its own traffic and cannot measure the bus load, so it does not throttle
 itself: choosing the rates within the budget is the integrator's job.
 
+### Part K — Firmware Upgrade Category
+
+The drive's protocol server registers a second category beside the FOC motor category: the `can-lite`
+firmware-upgrade category (`0x1`), on the same node ID, with the firmware upgrade service as its observer
+(`service-firmware-upgrade.md`). Its commands carry no sequence byte, as the `can-lite` specification defines,
+so they do not take part in the FOC motor category's sequence bookkeeping, and the server's rate limit of 500
+commands a second covers both categories. While an upload is open the bridge answers `busy` to every command
+that writes the configuration record — start-up settings, `ConfigureTelemetryRate` and the fault supervision
+settings — and the control-mode state machine refuses the commands that start the drive or asynchronous work,
+because the upload counts as pending work. `EmergencyStop` is always accepted.
+
 ---
 
 ## Interfaces
@@ -600,6 +627,7 @@ itself: choosing the rates within the budget is the integrator's job.
 | Parameter value       | value     | float32 wire   | the parameter's range          | IEEE 754, most significant byte first                            |
 | ParameterResponse     | flags     | bitfield uint8 | bit 0: automatic               | Other bits are zero                                              |
 | FocResetCause         | cause     | enum uint8     | 0–4                            | Value of `resetCause`, sent as its float                         |
+| FocBoardKind          | kind      | enum uint8     | 0–5                            | Value of `boardKind`, sent as its float                          |
 | TelemetryCurrents     | sequence  | uint8          | 0–255, wraps                   | One per window the control loop closes                           |
 | TelemetryCurrents     | id, iq    | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 1000 [A], window mean                          |
 | TelemetryCurrents     | position  | int16 wire     | −31416 – 31415                 | Physical = wire / 10000 [rad], at the window's last sample       |
@@ -749,6 +777,7 @@ graph LR
 | Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder angle from the alignment zero, in [−π, π) |
 | Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)                   |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                                  |
+| Firmware upload         | Configuration writes answered `busy`, the drive held stopped, while an upload is open (Part K)                                                     |
 
 ---
 

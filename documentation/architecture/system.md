@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.1.4
+version: 0.2.0
 component: system
-date: 2026-10-30
+date: 2026-11-01
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.1.4                     |
+| Version   | 0.2.0                     |
 | Component | system                    |
-| Date      | 2026-10-30                |
+| Date      | 2026-11-01                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -214,6 +214,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                            |
 | CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                  |
 | Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine. |
+| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC and board, marks it ready and restarts into the bootloader; holds the drive stopped while an upload is open ([design](../design/service-firmware-upgrade.md)).                                     |
 
 ### 3. CAN Service
 
@@ -221,6 +222,7 @@ The CAN service layer (`core/can/`) provides the FOC motor CAN category as a ser
 
 **Server half** (runs on the embedded target):
 - `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire scaling (int16 ↔ physical unit) is contained entirely here.
+- The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while an upload is open the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
 - `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
   It also implements the PID bandwidth, identification, telemetry, and encoder-resolution commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
 
@@ -312,11 +314,11 @@ In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibra
 
 Host-only tools that do not run on the embedded target:
 
-| Tool            | Responsibility                                                                                                                                                                                                                           |
-|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.                                         |
-| CAN Commander   | Desktop application that commands and monitors the motor controllers on a CAN bus, one tab per node; keeps an issue log, checks for new releases and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
-| Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                                                        |
+| Tool            | Responsibility                                                                                                                                                                                                                                                                     |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.                                                                                   |
+| CAN Commander   | Desktop application that commands and monitors the motor controllers on a CAN bus, one tab per node; keeps an issue log, checks for new releases, updates a controller's firmware over CAN and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
+| Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                                                                                                  |
 
 ### 6. Infrastructure (was §5)
 
@@ -352,6 +354,32 @@ Vendor-provided hardware abstraction libraries consumed as Git submodules. They 
 | `infra/hal/st` | STMicroelectronics STM32            |
 
 These are never used directly by the FOC core or services — only by the PAL concrete implementations.
+
+### 8. Bootloader
+
+A single-stage bootloader sits at the start of flash on every board that has room for two images, ahead of
+the application ([design](../design/bootloader.md)). At every reset it checks the application slot against
+its image descriptor and starts it; when the application has staged a firmware pack and marked it ready, it
+first verifies the pack's ECDSA-P256 signature and board, decrypts it with AES-128-CTR and installs it. It has
+no CAN stack and no interrupts: the application receives the pack (Services, Firmware Upgrade) and the CAN
+Commander sends it.
+
+```mermaid
+flowchart LR
+    Commander["CAN Commander"] -- "upgrade pack over CAN" --> App["Application:<br/>firmware upgrade service"]
+    App -- "writes" --> Staging["Staging slot<br/>and status journal"]
+    App -- "restart" --> Boot["Bootloader"]
+    Boot -- "verifies, decrypts, installs" --> Slot["Application slot"]
+    Boot -- "starts" --> App
+```
+
+| Board         | Staging slot               | Firmware update       |
+|---------------|----------------------------|-----------------------|
+| EK-TM4C1294XL | internal flash             | yes                   |
+| NUCLEO-H563ZI | internal flash, bank 2     | yes                   |
+| NUCLEO-G474RE | SPI NOR on the motor board | yes, once fitted      |
+| EK-TM4C123GXL | none (flash full)          | no                    |
+| Emulated      | file in the scenario       | application side only |
 
 ---
 

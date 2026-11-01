@@ -1,0 +1,69 @@
+- id: REQ-UPD-001
+  title: The drive receives firmware over the can-lite firmware-upgrade category
+  shall: >
+    On every board with a staging slot, the motor controller shall answer the can-lite
+    firmware-upgrade category on its CAN node as the can-lite firmware-upgrade
+    specification defines it, and shall write the pack it receives into the staging slot.
+
+- id: REQ-UPD-002
+  title: An upload starts only while the drive is stopped and idle
+  shall: >
+    The motor controller shall refuse Begin Upgrade with Busy while the drive is enabled or
+    calibrating, while a command or a non-volatile memory operation is outstanding, or while
+    another upload is open, and shall erase nothing when it refuses.
+
+- id: REQ-UPD-003
+  title: The drive stays stopped while an upload is open
+  shall: >
+    From an accepted Begin Upgrade until Activate, Abort or the session timeout, the motor
+    controller shall refuse every command that starts the drive or asynchronous work and every
+    write of the configuration record, and shall accept the emergency stop.
+
+- id: REQ-UPD-004
+  title: Verify checks the transfer and the board
+  shall: >
+    On Verify the motor controller shall answer CrcMismatch unless the CRC-32 the can-lite
+    specification fixes, computed over exactly the size given in Begin Upgrade, equals the
+    value received, and NotReady unless the pack header names this board and carries one
+    application image that fits the application slot.
+
+- id: REQ-UPD-005
+  title: Activate restarts into the bootloader
+  shall: >
+    On Activate after a successful Verify the motor controller shall record ready to deploy in
+    the status journal, answer, and restart within one second, so that the bootloader installs
+    the pack. Activate in any other state shall be answered NotReady.
+
+- id: REQ-UPD-006
+  title: Abandoned uploads install nothing
+  shall: >
+    Abort, the session timeout and a failed Verify shall leave the status journal empty, so
+    that the next reset starts the running firmware unchanged.
+
+- id: REQ-UPD-007
+  title: The drive reports its firmware version and board
+  shall: >
+    The motor controller shall answer QueryParameter for the contract 2.6 parameters
+    firmwareVersionMajor, firmwareVersionMinor, firmwareVersionPatch and boardKind with the
+    release version of the running firmware and the kind of its board.
+
+- id: REQ-UPD-008
+  title: Flash work never stalls the event loop past the watchdog
+  shall: >
+    The motor controller shall erase at most one staging sector and program at most one page
+    per event-loop turn while an upload is open.
+
+- id: REQ-UPD-009
+  title: The CAN Commander sends only a checked pack to a stopped motor
+  shall: >
+    The CAN Commander shall send a firmware pack only after checking a downloaded pack's size
+    and SHA-256 against those the release publishes, and every pack's header against the
+    motor's board, and only while that motor's last status reads idle, ready or fault and no
+    other motor on the bus is being updated.
+
+- id: REQ-UPD-010
+  title: The CAN Commander confirms the update from the controller
+  shall: >
+    The CAN Commander shall report a firmware update as successful only when the motor
+    controller comes back online after Activate and reports the version of the pack it sent,
+    and shall keep the emergency stop available to that motor during the whole update.
