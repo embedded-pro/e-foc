@@ -71,17 +71,19 @@ own.
 ### Part A — download and apply
 
 The service follows the state machine of the `can-lite` firmware-upgrade specification (section 7.6), with one
-difference: a verified pack is kept instead of being forgotten when the session ends. The category server runs
-its 30 s session timeout from Begin until Verify; after Verify no timer runs, so Activate may come at any later
-time, also after a restart.
+difference: a verified pack is kept instead of being forgotten when the session ends. The category server stops
+its session timer on Verify and on Activate, also when it refuses them, so the service keeps its own inactivity
+deadline while a pack is received: 30 s after the last command it accepted, after which the download ends as on
+Abort. After a successful Verify no deadline runs, so Activate may come at any later time, also after a restart.
 
-| State     | Meaning                                                                        | Drive and NVM interlock (Part G) |
-|-----------|--------------------------------------------------------------------------------|----------------------------------|
-| Idle      | No pack being received and none staged                                         | released                         |
-| Receiving | Begin accepted; data blocks arrive in order                                    | held                             |
-| Verifying | Last page written; CRC and header being checked, a chunk per turn              | held                             |
-| Staged    | Pack checked and recorded *downloaded*; waits for the user's Activate or Abort | released                         |
-| Error     | Verify or a flash write failed; Abort or a new Begin leaves it                 | released                         |
+| State      | Meaning                                                                        | Drive and NVM interlock (Part G) |
+|------------|--------------------------------------------------------------------------------|----------------------------------|
+| Idle       | No pack being received and none staged                                         | released                         |
+| Receiving  | Begin accepted; data blocks arrive in order                                    | held                             |
+| Verifying  | Last page written; CRC and header being checked, a chunk per turn              | held                             |
+| Staged     | Pack checked and recorded *downloaded*; waits for the user's Activate or Abort | released                         |
+| Error      | Verify or a flash write failed; Abort or a new Begin leaves it                 | released                         |
+| Restarting | Activate accepted; the reset follows within one second                         | held                             |
 
 At start-up the service reads the status journal. A journal that reads *downloaded* puts it in Staged, with
 the pack's version read from its header (Part H); any other status puts it in Idle.
@@ -129,10 +131,12 @@ per event-loop turn, and checks:
 
 1. the CRC-32 of exactly the Begin size, in the variant the `can-lite` specification fixes (section 4.3),
    against the value Verify carries; otherwise `CrcMismatch`;
-2. the pack header: the magic, header version 1, and a product name equal to this firmware's own, which names
-   the board and the microcontroller part (`bootloader.md` Part B); one image whose target is the application,
-   whose destination is the start of the application slot and whose size fits the slot less its descriptor;
-   otherwise `NotReady`, the specification's answer for "no application".
+2. the pack header, as far as it can be read without the key: the magic, header version 1, a product name
+   equal to this firmware's own, which names the board and the microcontroller part (`bootloader.md` Part B),
+   and one image whose target is the application and whose length fits the application slot less its
+   descriptor; otherwise `NotReady`, the specification's answer for "no application". The image's destination
+   and exact size are encrypted; the bootloader checks them before it erases anything (`bootloader.md` Parts C
+   and I).
 
 A pack built for another microcontroller, an STM32 pack sent to a Tiva board for example, names another part
 and fails the second check; the bootloader would refuse it again (`bootloader.md` Part I). The signature is
@@ -151,8 +155,10 @@ Activate is accepted only when all of these hold:
 | The drive is stopped: `Idle` or `Ready` | `Busy`     |
 | No asynchronous work is outstanding     | `Busy`     |
 
-The service then writes *ready to deploy* into the status journal, answers, and restarts the controller once
-the acknowledgement has left the send queue, at most one second later, through the platform's software reset.
+The service then writes *ready to deploy* into the status journal, enters Restarting, answers, and restarts the
+controller once the acknowledgement has left the send queue, at most one second later, through the platform's
+software reset. Restarting holds the same interlocks as receiving a pack (Part G), so nothing starts the drive
+or writes the non-volatile memory in that second, and a new Begin is answered `Busy`.
 The bootloader installs the pack at that reset, and the new application starts. Between the download and the
 apply the motor may run any number of times and the controller may restart; the staged pack waits.
 
@@ -160,21 +166,26 @@ The client sees the node fall silent and come back, then reads the firmware vers
 calibration and configuration records survive the update; a new firmware whose record version differs treats
 them as the NVM design describes (`service-nvm.md`, version check).
 
-### Part F — Abort and the session timeout
+### Part F — Abort and the inactivity deadline
 
-- Abort while a pack is being received, or the session timeout, ends the download: the session returns to
+- Abort while a pack is being received, or the inactivity deadline, ends the download: the session returns to
   Idle, the interlock is released and the journal stays empty, so nothing is staged.
-- Abort in Staged or Error discards the staged pack: the journal is erased and the service returns to Idle.
+- Abort in Staged or Error discards the staged pack and the service returns to Idle. The pack is unavailable at
+  once: Activate is answered `NotReady` and the staged version reads zero. Erasing the journal stalls flash, so
+  it is carried out only while the drive is stopped (`Idle` or `Ready`) with nothing outstanding; an Abort that
+  arrives while the drive runs leaves the erase until it is next stopped and idle. A restart before then leaves
+  the pack staged.
 - A sector being erased or a page being programmed finishes first.
 
 ### Part G — interlocks
 
-- **Drive.** While a pack is received (Receiving and Verifying) the service counts as asynchronous work of the
-  control-mode state machine, so `Enable`, `Calibrate`, `ReAlign`, `ClearCalibration`, `SetMotorParameter` and
+- **Drive.** While a pack is received (Receiving and Verifying), and after an accepted Activate (Restarting),
+  the service counts as asynchronous work of the control-mode state machine, so `Enable`, `Calibrate`, `ReAlign`, `ClearCalibration`, `SetMotorParameter` and
   a control-mode or algorithm selection are refused, as they are while an NVM write is outstanding
   (`state-machine.md`). A staged pack holds nothing: the drive runs normally until the user applies it, and
   Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted.
-- **Non-volatile memory.** While a pack is received the CAN bridge answers `busy` to every command that writes
+- **Non-volatile memory.** While a pack is received, and while Restarting, the CAN bridge answers `busy` to every
+  command that writes
   the configuration record: start-up settings, telemetry rate and fault supervision settings. On the
   EK-TM4C1294XL the EEPROM and the flash share one controller, so a flash program and an EEPROM write must
   never overlap; on the ST boards the rule costs nothing and keeps the behaviour the same.
@@ -243,11 +254,11 @@ the journal in it. The new feature goes into the shard that keeps the three bala
 
 ### Provided
 
-| Interface                        | Purpose                                         | Contract                                                                                         |
-|----------------------------------|-------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| Firmware-upgrade category server | Download and apply a pack over CAN              | `can-lite` firmware-upgrade specification; answers as Parts B to F                               |
-| Running state                    | Interlock with the drive                        | True while a pack is received: from an accepted Begin until Verify, Abort or the session timeout |
-| Firmware identity                | Running and staged version, board, for a client | Contract 2.6 parameters (Part H)                                                                 |
+| Interface                        | Purpose                                         | Contract                                                                                                                                            |
+|----------------------------------|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Firmware-upgrade category server | Download and apply a pack over CAN              | `can-lite` firmware-upgrade specification; answers as Parts B to F                                                                                  |
+| Running state                    | Interlock with the drive                        | True while a pack is received, from an accepted Begin until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
+| Firmware identity                | Running and staged version, board, for a client | Contract 2.6 parameters (Part H)                                                                                                                    |
 
 ### Required
 
@@ -272,12 +283,12 @@ stateDiagram-v2
     Receiving --> Receiving : next block or repeat of the last
     Receiving --> Verifying : Verify
     Receiving --> Error : flash write failed
-    Receiving --> Idle : Abort or session timeout
+    Receiving --> Idle : Abort or 30 s without a command
     Verifying --> Staged : CRC, board and microcontroller match
     Verifying --> Error : CRC or header mismatch
     Staged --> Staged : drive runs, controller restarts
     Staged --> Restarting : Activate, drive stopped and idle
-    Staged --> Idle : Abort
+    Staged --> Idle : Abort, the erase waits until the drive is stopped
     Error --> Idle : Abort
     Restarting --> [*] : software reset, bootloader installs
 ```
@@ -339,19 +350,19 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint        | Value / Description                                                                                       |
-|-------------------|-----------------------------------------------------------------------------------------------------------|
-| Who starts        | the user, for the download and for the apply, each separately; the service never starts either itself     |
-| When              | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                     |
-| Pack size         | at most 393 216 bytes (65 536 blocks of 6 bytes) and the staging slot's capacity                          |
-| Throughput        | one block in flight; about 2–3 KB/s, so a 300 KB pack downloads in about two minutes                      |
-| Session timeout   | 30 s between commands, from Begin to Verify (the category server's default); none for a staged pack       |
-| Flash stall       | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                 |
-| Drive             | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted  |
-| NVM writes        | refused with `busy` while a pack is received                                                              |
-| One pack per node | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it          |
-| Target            | a pack names one board and one microcontroller part; any other is refused at Verify                       |
-| Boards            | EK-TM4C1294XL, NUCLEO-H563ZI, NUCLEO-G474RE (with SPI NOR) and the emulated target; not the EK-TM4C123GXL |
+| Constraint          | Value / Description                                                                                       |
+|---------------------|-----------------------------------------------------------------------------------------------------------|
+| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself     |
+| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                     |
+| Pack size           | at most 393 216 bytes (65 536 blocks of 6 bytes) and the staging slot's capacity                          |
+| Throughput          | one block in flight; about 2–3 KB/s, so a 300 KB pack downloads in about two minutes                      |
+| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack  |
+| Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                 |
+| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted  |
+| NVM writes          | refused with `busy` while a pack is received                                                              |
+| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it          |
+| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                       |
+| Boards              | EK-TM4C1294XL, NUCLEO-H563ZI, NUCLEO-G474RE (with SPI NOR) and the emulated target; not the EK-TM4C123GXL |
 
 ---
 

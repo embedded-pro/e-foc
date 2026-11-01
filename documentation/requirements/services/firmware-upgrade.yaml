@@ -15,9 +15,10 @@
 - id: REQ-UPD-003
   title: The drive stays stopped while a pack is received
   shall: >
-    From an accepted Begin Upgrade until Verify, Abort or the session timeout, the motor
-    controller shall refuse every command that starts the drive or asynchronous work and every
-    write of the configuration record, and shall accept the emergency stop.
+    From an accepted Begin Upgrade until Verify, Abort or 30 s without an accepted command, and
+    from an accepted Activate until the restart, the motor controller shall refuse every command
+    that starts the drive or asynchronous work and every write of the configuration record, and
+    shall accept the emergency stop.
 
 - id: REQ-UPD-004
   title: Verify checks the transfer, the board and the microcontroller
@@ -26,7 +27,7 @@
     specification fixes, computed over exactly the size given in Begin Upgrade, equals the
     value received, and NotReady unless the pack's product name equals the firmware's own,
     naming this board and its microcontroller part, and the pack carries one application image
-    that fits the application slot. A pack that passes shall be recorded as downloaded.
+    whose length fits the application slot. A pack that passes shall be recorded as downloaded.
 
 - id: REQ-UPD-005
   title: The apply restarts into the bootloader only while the drive is stopped
@@ -39,9 +40,10 @@
 - id: REQ-UPD-006
   title: Abandoned or discarded downloads install nothing
   shall: >
-    Abort, the session timeout and a failed Verify shall leave the status journal empty, and
-    Abort while a pack is staged shall erase it, so that the next reset starts the running
-    firmware unchanged.
+    Abort, the inactivity deadline and a failed Verify shall leave the status journal empty.
+    Abort while a pack is staged shall make it unavailable for Activate at once, and shall
+    erase the journal only while the drive is Idle or Ready with nothing outstanding, as soon
+    as it is.
 
 - id: REQ-UPD-007
   title: The drive reports its firmware version, its board and the staged version

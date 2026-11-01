@@ -417,7 +417,7 @@ nothing more.
   board the node reports and that board's microcontroller. A pack for another board or another
   microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
   controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
-- **Stopped means Idle or Ready.** *Download to Controller…* and *Apply Firmware…* are enabled only while the
+- **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
   motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
   rule and answers `Busy` to a request that arrives while it runs.
@@ -440,7 +440,7 @@ nothing more.
   wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
   microcontroller, and nothing was staged; *Try Again* restarts the download.
 - **Bus.** Disconnecting or closing the tool during a download asks first. Doing it anyway abandons the
-  download, which the controller drops after its 30 s session timeout. A staged pack is not affected by the bus
+  download, which the controller drops after 30 s without a command. A staged pack is not affected by the bus
   closing; it is still there, and still offered for apply, at the next connection.
 - Every step, refusal and failure goes to the issue log, with the motor and the versions.
 

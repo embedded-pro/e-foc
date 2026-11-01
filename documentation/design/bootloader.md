@@ -146,7 +146,7 @@ flowchart TD
     Peek --> Target{"Target identity matches<br/>this chip and board?<br/>(Part I)"}
     Target -- no --> Invalid
     Target -- yes --> Started["Record deploy started"]
-    Started --> Copy["Erase the slot sectors the image spans,<br/>decrypt and write the image"]
+    Started --> Copy["Erase the sectors the image spans<br/>and the descriptor's sector,<br/>decrypt and write the image"]
     Copy --> Descriptor["Write the image descriptor"]
     Descriptor --> Deployed["Record deployed"]
     Deployed --> App{"Application intact?<br/>(Part E)"}
@@ -181,8 +181,10 @@ erased. Progress therefore goes to a journal instead, the last erase unit of the
   operations; the bootloader supplies ones that use the journal.
 - An entry that a reset cut short is not valid and is skipped; the next status goes into the following erased
   unit, so no unit is ever programmed twice.
-- A full journal is erased and restarted with the status being recorded. That happens only after hundreds of
-  installations, since each one writes at most five entries.
+- A status equal to the current one is not written again, so an installation interrupted any number of times
+  adds no entries. With the application erasing the journal at every download, one download and installation
+  write at most five entries and the journal never fills. A full journal would be erased and restarted with the
+  status being recorded.
 
 ### Part E — image descriptor and the check at every reset
 
@@ -358,19 +360,19 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint           | Value / Description                                                                                                           |
-|----------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                   |
-| Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)                           |
-| Largest image        | the application slot less its 64-byte descriptor                                                                              |
-| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                   |
-| Installation         | erase of the spanned slot sectors, then decrypt and write; repeated from the start after any interruption                     |
-| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                      |
-| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset |
-| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                  |
-| Recovery             | a broken application slot with no valid pack needs a debugger                                                                 |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board; development keys for development and emulation only              |
-| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL              |
+| Constraint           | Value / Description                                                                                                                              |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                      |
+| Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)                                              |
+| Largest image        | the application slot less its 64-byte descriptor                                                                                                 |
+| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                      |
+| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption |
+| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                         |
+| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                    |
+| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                     |
+| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                    |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board; development keys for development and emulation only                                 |
+| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                 |
 
 ---
 
