@@ -58,7 +58,7 @@
   title: Flash work never stalls the event loop past the watchdog
   shall: >
     The motor controller shall erase at most one staging sector and program at most one page
-    per event-loop turn while a pack is received.
+    per event-loop turn while a pack is erased for or received.
 
 - id: REQ-UPD-009
   title: The CAN Commander offers only a checked pack for the motor's board and microcontroller
@@ -89,3 +89,10 @@
     shall send Begin Upgrade only on the user's download action and Activate only on the user's
     apply action, each after a confirmation, and shall never send Activate as a consequence of
     a finished download.
+
+- id: REQ-UPD-013
+  title: The whole 256 KB staging slot is erased before the download starts
+  shall: >
+    The motor controller shall hold a staging slot of 256 KB, answer Begin Upgrade for a larger
+    pack with InvalidSize, and, after accepting Begin Upgrade, erase the status journal and the
+    entire staging slot before answering it; an erase that fails shall be answered WriteError.

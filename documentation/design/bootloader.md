@@ -69,16 +69,18 @@ through the CAN Commander (`tool-can-commander.md` Part M).
 
 Flash is split into a bootloader region, an application slot and a staging slot. The application runs from
 its slot; the staging slot holds the pack the application received, in internal flash where two copies of the
-image fit and in external SPI NOR flash where they do not. The last sector of the staging slot is the status
-journal (Part D); the last 64 bytes of the application slot are the image descriptor (Part E).
+image fit and in external SPI NOR flash where they do not. The staging slot is 256 KB on every board, and no
+larger: the application erases all of it before a download starts (`service-firmware-upgrade.md` Part B), so
+its size bounds that erase. The status journal (Part D) is the erase unit after the staging slot; the last 64
+bytes of the application slot are the image descriptor (Part E).
 
-| Board         | Flash, erase unit       | Bootloader          | Application slot              | Staging slot                                          | Image today  |
-|---------------|-------------------------|---------------------|-------------------------------|-------------------------------------------------------|--------------|
-| EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 496 KB          | internal, `0x00084000`, 496 KB                        | 234 KB       |
-| NUCLEO-H563ZI | 2 MB in two banks, 8 KB | `0x08000000`, 32 KB | `0x08008000`, 992 KB (bank 1) | internal, `0x08100000`, 1 MB (bank 2)                 | not measured |
-| NUCLEO-G474RE | 512 KB, 2 KB pages      | `0x08000000`, 32 KB | `0x08008000`, 480 KB          | external SPI NOR, from its address 0, at least 512 KB | 292 KB       |
-| Emulated      | 16 MB                   | none (Part H)       | `0x00000000`                  | semihosting file `staging.bin`, 1 MB                  | 229 KB       |
-| EK-TM4C123GXL | 256 KB, 1 KB sectors    | none                | `0x00000000`                  | none                                                  | 255 KB       |
+| Board         | Flash, erase unit       | Bootloader          | Application slot              | Staging slot                                 | Journal                 | Image today  |
+|---------------|-------------------------|---------------------|-------------------------------|----------------------------------------------|-------------------------|--------------|
+| EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 256 KB          | internal, `0x00048000`, 256 KB               | `0x00088000`, 16 KB     | 227 KB       |
+| NUCLEO-H563ZI | 2 MB in two banks, 8 KB | `0x08000000`, 32 KB | `0x08008000`, 992 KB (bank 1) | internal, `0x08100000`, 256 KB (bank 2)      | `0x08140000`, 8 KB      | not measured |
+| NUCLEO-G474RE | 512 KB, 2 KB pages      | `0x08000000`, 32 KB | `0x08008000`, 480 KB          | external SPI NOR, from its address 0, 256 KB | the NOR sector after it | 259 KB       |
+| Emulated      | 16 MB                   | none (Part H)       | `0x00000000`                  | semihosting file `staging.bin`, 256 KB       | in the same file        | 229 KB       |
+| EK-TM4C123GXL | 256 KB, 1 KB sectors    | none                | `0x00000000`                  | none                                         | none                    | 255 KB       |
 
 On the EK-TM4C1294XL:
 
@@ -86,13 +88,15 @@ On the EK-TM4C1294XL:
 0x00000000 +--------------------------+
            | bootloader        32 KB  |
 0x00008000 +--------------------------+
-           | application slot 496 KB  |
+           | application slot 256 KB  |
            |   ...                    |
-0x00083FC0 |   image descriptor 64 B  |
-0x00084000 +--------------------------+
-           | staging slot     480 KB  |  pack received over CAN
-0x000FC000 +--------------------------+
+0x00047FC0 |   image descriptor 64 B  |
+0x00048000 +--------------------------+
+           | staging slot     256 KB  |  pack received over CAN
+0x00088000 +--------------------------+
            | status journal    16 KB  |
+0x0008C000 +--------------------------+
+           | unused           464 KB  |
 0x00100000 +--------------------------+
 ```
 
@@ -103,9 +107,12 @@ On the EK-TM4C1294XL:
   the first bank without stalling. Bank swapping stays off: the bootloader copies the image instead.
 - On the NUCLEO-G474RE the application slot spans both banks, and the staging slot is an SPI NOR device on the
   motor board (Open Question 1).
-- A pack may be as large as the staging slot less its journal sector, and no larger than the 393 216 bytes a
-  `can-lite` firmware-upgrade transfer can address. The image it carries may fill the application slot less its
-  descriptor.
+- A pack may be as large as the staging slot, 262 144 bytes, which is below the 393 216 bytes a `can-lite`
+  firmware-upgrade transfer can address. The image it carries may fill the application slot less its
+  descriptor, and the pack's header, signature and image framing less than that: an update installs only an
+  image whose pack fits the staging slot.
+- The NUCLEO-G474RE image, 259 KB today, is larger than any pack the staging slot holds; that board gets updates
+  only once its image fits (Open Question 5).
 
 ### Part B — upgrade pack
 
@@ -169,7 +176,7 @@ flowchart TD
 The embedded-infrastructure pack reader keeps an installation's progress in the pack's own status byte, which
 it clears bit by bit as the installation advances. The ST internal flash cannot do that: it programs 64-bit
 (G4) or 128-bit (H5) units with ECC, and a programmed unit cannot be programmed again until its page is
-erased. Progress therefore goes to a journal instead, the last erase unit of the staging slot, on every board:
+erased. Progress therefore goes to a journal instead, the erase unit after the staging slot, on every board:
 
 - Each entry is one 16-byte unit: a marker, the status and the error code. A new status is written into the
   next erased unit; the current status is the last entry written, and an erased journal reads *empty*.
@@ -363,7 +370,7 @@ sequenceDiagram
 | Constraint           | Value / Description                                                                                                                              |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
 | Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                      |
-| Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)                                              |
+| Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                |
 | Largest image        | the application slot less its 64-byte descriptor                                                                                                 |
 | Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                      |
 | Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption |
@@ -384,3 +391,4 @@ sequenceDiagram
 | 2 | Should the bootloader refuse a pack older than the installed application?                      | Monotonic version counter in the journal / accept any signed pack (current)                 | open   |
 | 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | open   |
 | 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open   |
+| 5 | How does the NUCLEO-G474RE image get below the 256 KB a pack may hold?                         | Trim the image / leave that board without updates (current)                                 | open   |

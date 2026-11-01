@@ -413,8 +413,8 @@ nothing more.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
   per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its
   installer; a file that does not match is deleted. Every pack, downloaded or opened, is read before it is
-  offered: its magic, its header version, a size the transfer can carry, and a product name that names the
-  board the node reports and that board's microcontroller. A pack for another board or another
+  offered: its magic, its header version, a size the staging slot holds (256 KB), and a product name that
+  names the board the node reports and that board's microcontroller. A pack for another board or another
   microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
   controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
@@ -422,9 +422,10 @@ nothing more.
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
   rule and answers `Busy` to a request that arrives while it runs.
 - **Download.** A confirmation names the motor and the version, and says that the motor stays stopped until
-  the download ends, about two minutes for 300 KB, and that nothing is installed yet. Then Begin, the blocks
-  one at a time, each after the previous one was acknowledged, and Verify with the pack's CRC-32. A block not
-  answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
+  the download ends, about two minutes for 256 KB, and that nothing is installed yet. Then Begin, which the
+  controller answers once it has erased its whole staging slot, the progress bar reading "Erasing…" until
+  then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
+  pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
   three times in a row before the download is given up. A progress bar shows the bytes sent out of the total
   and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
   with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
@@ -614,6 +615,7 @@ sequenceDiagram
     Tool-->>User: Confirm: motor, version, motor stays stopped, nothing installed yet
     User->>Tool: Download
     Tool->>Node: Begin (size)
+    Note over Node: Erases its whole staging slot
     Node-->>Tool: Begin response (page size)
     loop every block
         Tool->>Node: Data block
@@ -661,7 +663,7 @@ sequenceDiagram
 | Constraint             | Value / Description                                                                                                                                   |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                     |
-| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate                                                         |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase       |
 | Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                       |
 | Status reads           | each compatible node every 1 s and after every accepted command                                                                                       |
 | Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                       |
@@ -672,7 +674,7 @@ sequenceDiagram
 | Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                              |
 | Automatic checks       | at startup and every 24 h while running                                                                                                               |
 | Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match the release                                                           |
-| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; about two minutes for 300 KB |
+| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; about two minutes for 256 KB |
 | Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                             |
 | Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                              |
 | Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                     |
