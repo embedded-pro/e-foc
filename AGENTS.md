@@ -18,7 +18,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
-- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
+- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`; development keys and the image tools in `targets/bootloader/`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake
 - `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
@@ -131,6 +131,8 @@ cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-Rel
 ```
 
 Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+
+On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the application slot, the build stamps its image descriptor, and `e_foc.sync_foc_sensored.main.combined.hex` (under `targets/bootloader/main/`) is the image to program with a debugger: bootloader and application together. The stamping and combining need Python 3.
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 
