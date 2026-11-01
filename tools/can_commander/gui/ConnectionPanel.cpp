@@ -126,13 +126,23 @@ namespace tool
         settings.setValue("connection/bitrate", Bitrate());
     }
 
+    void ConnectionPanel::OnConnecting()
+    {
+        connecting = true;
+        disconnectButton->setEnabled(true);
+        SetFieldsEnabled(false);
+        UpdateConnectEnabled();
+
+        statusLabel->setText(QString("Connecting to %1 at %2…").arg(InterfaceName(), BitrateText()));
+        ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Neutral);
+    }
+
     void ConnectionPanel::OnConnectionChanged(bool isConnected)
     {
         connected = isConnected;
+        connecting = false;
         disconnectButton->setEnabled(connected);
-        interfaceCombo->setEnabled(!connected);
-        refreshButton->setEnabled(!connected);
-        bitrateCombo->setEnabled(!connected);
+        SetFieldsEnabled(!connected);
         UpdateConnectEnabled();
 
         statusLabel->setText(connected ? QString("Connected to %1 at %2").arg(InterfaceName(), BitrateText()) : QString("Not connected"));
@@ -141,6 +151,13 @@ namespace tool
 
     void ConnectionPanel::UpdateConnectEnabled()
     {
-        connectButton->setEnabled(!connected && !InterfaceName().isEmpty());
+        connectButton->setEnabled(!connected && !connecting && !InterfaceName().isEmpty());
+    }
+
+    void ConnectionPanel::SetFieldsEnabled(bool enabled)
+    {
+        interfaceCombo->setEnabled(enabled);
+        refreshButton->setEnabled(enabled);
+        bitrateCombo->setEnabled(enabled);
     }
 }

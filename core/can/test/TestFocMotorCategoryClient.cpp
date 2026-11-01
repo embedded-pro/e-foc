@@ -16,14 +16,19 @@ namespace
     struct SequenceSourceStub
         : services::CanSequenceSource
     {
-        uint8_t PeekSequence(uint16_t) override
+        uint8_t ReserveSequence(uint16_t, uint8_t, uint8_t) override
         {
-            return seq;
+            return seq++;
         }
 
-        void CommitSequence(uint16_t, uint8_t, uint8_t) override
+        void CancelReservation(uint16_t, uint8_t) override
         {
-            ++seq;
+            --seq;
+        }
+
+        void ReturnSequence(uint16_t, uint8_t) override
+        {
+            --seq;
         }
 
         uint8_t seq{};
