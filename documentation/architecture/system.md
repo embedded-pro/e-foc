@@ -206,15 +206,15 @@ keep `-fno-finite-math-only`, but the check does not depend on it.
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service                          | Responsibility                                                                                                                                                                                                                                                             |
-|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                       |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                          |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                             |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                            |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                  |
-| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine. |
-| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC and board, marks it ready and restarts into the bootloader; holds the drive stopped while an upload is open ([design](../design/service-firmware-upgrade.md)).                                     |
+| Service                          | Responsibility                                                                                                                                                                                                                                                                                    |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                              |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                 |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                    |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                   |
+| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                         |
+| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                        |
+| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received ([design](../design/service-firmware-upgrade.md)). |
 
 ### 3. CAN Service
 
@@ -222,7 +222,7 @@ The CAN service layer (`core/can/`) provides the FOC motor CAN category as a ser
 
 **Server half** (runs on the embedded target):
 - `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire scaling (int16 ↔ physical unit) is contained entirely here.
-- The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while an upload is open the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
+- The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while a pack is received the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
 - `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
   It also implements the PID bandwidth, identification, telemetry, and encoder-resolution commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
 
@@ -359,10 +359,12 @@ These are never used directly by the FOC core or services — only by the PAL co
 
 A single-stage bootloader sits at the start of flash on every board that has room for two images, ahead of
 the application ([design](../design/bootloader.md)). At every reset it checks the application slot against
-its image descriptor and starts it; when the application has staged a firmware pack and marked it ready, it
-first verifies the pack's ECDSA-P256 signature and board, decrypts it with AES-128-CTR and installs it. It has
-no CAN stack and no interrupts: the application receives the pack (Services, Firmware Upgrade) and the CAN
-Commander sends it.
+its image descriptor and starts it; when the application has staged a firmware pack and the user has applied
+it, it first verifies the pack's ECDSA-P256 signature, board and microcontroller, decrypts it with AES-128-CTR
+and installs it. An image built for another microcontroller is refused before anything is erased: the image
+names its target and the bootloader compares it with the chip's own device identity. It has no CAN stack and no
+interrupts: the application receives the pack (Services, Firmware Upgrade) and the CAN Commander sends it. The
+user starts the download and, separately, the apply, each only while the motor is stopped.
 
 ```mermaid
 flowchart LR

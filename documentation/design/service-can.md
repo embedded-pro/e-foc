@@ -44,7 +44,7 @@ date: 2026-11-01
   parameters of the calibration record, the settings that take effect at the next start and the drive-wide
   supervision settings.
 - Registering the `can-lite` firmware-upgrade category beside the FOC motor category, and answering `busy`
-  to configuration writes while a firmware upload is open (Part K).
+  to configuration writes while a firmware pack is received (Part K).
 
 **Is NOT responsible for:**
 - The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
@@ -269,8 +269,8 @@ mean measured d- and q-axis currents and the encoder's mechanical angle at the w
 0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
 start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
 
-**Contract 2.6 — firmware identity.** Version 2.6 adds four read-only parameters; nothing in 2.5 changes. They
-tell a client which firmware a node runs and on which board, so it can offer the right firmware update
+**Contract 2.6 — firmware identity.** Version 2.6 adds seven read-only parameters; nothing in 2.5 changes. They
+tell a client which firmware a node runs, on which board, and which pack waits to be applied, so it can offer the right firmware update
 (`service-firmware-upgrade.md` Part H). Like the diagnostics of 2.2 they answer `QueryParameter`, are refused by
 `SetParameter` with `invalidPayload`, and travel as the float of the number. A client asks for them only when
 the node reports 2.6 or newer.
@@ -281,6 +281,9 @@ the node reports 2.6 or newer.
 | `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                                | no        |
 | `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                                | no        |
 | `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, `emulated 5`; `0` unknown | no        |
+| `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged         | no        |
+| `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
+| `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
@@ -583,10 +586,11 @@ The drive's protocol server registers a second category beside the FOC motor cat
 firmware-upgrade category (`0x1`), on the same node ID, with the firmware upgrade service as its observer
 (`service-firmware-upgrade.md`). Its commands carry no sequence byte, as the `can-lite` specification defines,
 so they do not take part in the FOC motor category's sequence bookkeeping, and the server's rate limit of 500
-commands a second covers both categories. While an upload is open the bridge answers `busy` to every command
+commands a second covers both categories. While a pack is received the bridge answers `busy` to every command
 that writes the configuration record — start-up settings, `ConfigureTelemetryRate` and the fault supervision
 settings — and the control-mode state machine refuses the commands that start the drive or asynchronous work,
-because the upload counts as pending work. `EmergencyStop` is always accepted.
+because the download counts as pending work. A pack that is staged, waiting for the user to apply it, holds
+nothing. `EmergencyStop` is always accepted.
 
 ---
 
@@ -777,7 +781,7 @@ graph LR
 | Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder angle from the alignment zero, in [−π, π) |
 | Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)                   |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                                  |
-| Firmware upload         | Configuration writes answered `busy`, the drive held stopped, while an upload is open (Part K)                                                     |
+| Firmware download       | Configuration writes answered `busy`, the drive held stopped, while a pack is received (Part K)                                                    |
 
 ---
 

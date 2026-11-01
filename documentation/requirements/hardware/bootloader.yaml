@@ -2,15 +2,17 @@
   title: The application starts only when it is intact
   shall: >
     At every reset the bootloader shall start the application only when the application
-    slot holds a valid image descriptor, the SHA-256 of the image matches it, and the
-    image's initial stack pointer lies in RAM and its reset handler in the application
-    slot. Otherwise the bootloader shall stay in the bootloader and start nothing.
+    slot holds a valid image descriptor, the SHA-256 of the image matches it, the image's
+    initial stack pointer lies in RAM and its reset handler in the application slot, and its
+    application header names this board and the device identity this chip reports. Otherwise
+    the bootloader shall stay in the bootloader and start nothing.
 
 - id: REQ-BOOT-002
   title: Only a signed pack for this board is installed
   shall: >
     The bootloader shall install a staged upgrade pack only when its status journal reads
-    ready to deploy or deploy started, its product name names this board, and its
+    ready to deploy or deploy started, its product name names this board and its
+    microcontroller part, and its
     ECDSA-P256 signature over the SHA-256 of the signed contents verifies with the public
     key built into the bootloader. A pack that fails any of these checks shall be recorded
     as invalid with its error code, and the application slot shall be left untouched.
@@ -45,3 +47,12 @@
     The bootloader shall fit in the first 32 KB of flash, shall enable no interrupt and start
     no watchdog, and shall point the vector table at the application slot before it starts
     the application.
+
+- id: REQ-BOOT-007
+  title: An image for another microcontroller is never written
+  shall: >
+    Before it erases any part of the application slot, the bootloader shall decrypt the start
+    of the staged image and refuse it, recording invalid with its wrong-target error code and
+    leaving the slot untouched, unless the image's initial stack pointer lies in this chip's
+    RAM, its reset handler lies in this board's application slot, and its application header
+    names this board and the device identity this chip's device-identity register reports.

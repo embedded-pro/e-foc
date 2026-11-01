@@ -149,7 +149,7 @@ Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
 `ReserveExternalCalibration`, `ClearCalibration`, `SetMotorParameter`) and `Enable` are guarded by
 `HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
 is in flight, including the boot-time check and load, while an identification service is
-running, while a firmware upload is open (`service-firmware-upgrade.md` Part G), or while a fault latched in
+running, while a firmware pack is being received (`service-firmware-upgrade.md` Part G), or while a fault latched in
 an interrupt still owes its transition. One request therefore owns the machine at a time. A save still outstanding after an
 emergency stop cannot be overlapped by the save of a new run, a clear or a motor-parameter change
 in progress cannot be interrupted by `Enable`, whose transition would discard the completion

@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "bootloader"
 date: 2026-11-01
 ---
@@ -12,7 +12,7 @@ date: 2026-11-01
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.1.0      |
+| Version   | 0.2.0      |
 | Component | bootloader |
 | Date      | 2026-11-01 |
 
@@ -29,18 +29,21 @@ date: 2026-11-01
 ## Responsibilities
 
 The bootloader is a single, small program at the start of flash. It runs at every reset, before the motor
-controller application, and does two things only: it checks that the application is intact before starting
-it, and it installs a new application that the running one staged and marked ready. Receiving the firmware is
-the application's job (`service-firmware-upgrade.md`); choosing and sending it is the CAN Commander's
-(`tool-can-commander.md` Part M).
+controller application, and does two things only: it checks that the application is intact, and built for
+this microcontroller and board, before starting it; and it installs a new application that the running one
+staged and that the user applied. Receiving the firmware is the application's job
+(`service-firmware-upgrade.md`); choosing it, and deciding when to download and when to apply it, is the user's,
+through the CAN Commander (`tool-can-commander.md` Part M).
 
 **Is responsible for:**
 - Checking, at every reset, the application in the application slot against its image descriptor (size and
   SHA-256) and starting it only when they match.
-- Installing an upgrade pack that the application staged and marked ready: checking that the pack was built
-  for this board and product, verifying its ECDSA-P256 signature over SHA-256 with the public key built into the
-  bootloader, decrypting the image with AES-128-CTR, writing it into the application slot and writing its image
-  descriptor.
+- Installing an upgrade pack that the application staged and marked ready on the user's apply: checking that
+  the pack was built for this board and microcontroller, verifying its ECDSA-P256 signature over SHA-256 with
+  the public key built into the bootloader, decrypting the image with AES-128-CTR, writing it into the
+  application slot and writing its image descriptor.
+- Refusing an image built for another microcontroller or board before anything is erased, by comparing the
+  target identity inside the image with the chip's own device identity (Part I).
 - Recording each step of an installation in the status journal, so that a reset or a power loss during an
   installation resumes it at the next reset, and a pack that failed a check is never tried again.
 - Starting the application: its vector table, its stack pointer and its reset handler.
@@ -118,10 +121,12 @@ components, with exactly one image:
 | Image epilogue  | destination address (the start of the application slot) and image size                                   | yes    | yes       |
 | Image           | the application binary, as the debugger would program it into the slot                                   | yes    | yes       |
 
-- The **product name** is `e-foc` followed by the board, for example `e-foc EK-TM4C1294XL`. The bootloader
-  compares it with its own, so a pack for another board is refused before anything is written. The
-  application checks the same name when it verifies the pack, so the refusal comes before the restart
-  (`service-firmware-upgrade.md` Part D).
+- The **product name** is `e-foc`, the board and the microcontroller part: `e-foc EK-TM4C1294XL TM4C1294NCPDT`,
+  `e-foc NUCLEO-H563ZI STM32H563ZI`, `e-foc NUCLEO-G474RE STM32G474RE`. The packer takes it from the build of
+  that board, never from a typed argument. The bootloader compares it with its own, so a pack for another
+  board or microcontroller is refused before anything is written. The application checks the same name when
+  it verifies the pack, so the refusal comes before the user can apply it (`service-firmware-upgrade.md`
+  Part D).
 - The **product version** is the release tag; the component is `sync_foc_sensored`.
 - The prologue's status byte and error code are outside the signature and are not used: progress is kept in
   the status journal (Part D).
@@ -134,10 +139,13 @@ components, with exactly one image:
 flowchart TD
     Reset["Reset"] --> Journal{"Journal status"}
     Journal -- "ready to deploy or deploy started" --> Check{"Product name and<br/>signature valid?"}
-    Journal -- "empty, deployed or invalid" --> App
+    Journal -- "empty, downloaded, deployed or invalid" --> App
     Check -- no --> Invalid["Record invalid and the error code"]
     Invalid --> App
-    Check -- yes --> Started["Record deploy started"]
+    Check -- yes --> Peek["Decrypt the image's first 2 KB into RAM"]
+    Peek --> Target{"Target identity matches<br/>this chip and board?<br/>(Part I)"}
+    Target -- no --> Invalid
+    Target -- yes --> Started["Record deploy started"]
     Started --> Copy["Erase the slot sectors the image spans,<br/>decrypt and write the image"]
     Copy --> Descriptor["Write the image descriptor"]
     Descriptor --> Deployed["Record deployed"]
@@ -146,8 +154,8 @@ flowchart TD
     App -- no --> Halt["Stay in the bootloader"]
 ```
 
-- The signature is verified before anything is erased. A pack that fails it, or names another product, is
-  marked invalid; the application slot is untouched, and the old application starts.
+- The signature and the target are checked before anything is erased. A pack that fails either, or names
+  another product, is marked invalid; the application slot is untouched, and the old application starts.
 - An installation interrupted by a reset or a power loss finds the journal at *deploy started* at the next
   reset. The signature is checked again and the copy starts over; the copy only reads the staging slot, so it
   can be repeated as often as it takes.
@@ -165,8 +173,10 @@ erased. Progress therefore goes to a journal instead, the last erase unit of the
 
 - Each entry is one 16-byte unit: a marker, the status and the error code. A new status is written into the
   next erased unit; the current status is the last entry written, and an erased journal reads *empty*.
-- The application erases the journal when it accepts a new upload, and writes *ready to deploy* when the
-  upload is activated. The bootloader writes *deploy started*, *deployed*, or *invalid* with the error code.
+- The application erases the journal when it accepts a new download, writes *downloaded* when the pack passed
+  its checks, and writes *ready to deploy* when the user applies it. The bootloader ignores *downloaded*, so a
+  staged pack waits through any number of restarts; it writes *deploy started*, *deployed*, or *invalid* with
+  the error code.
 - The pack reader and the image installer of the library read and write the status through replaceable
   operations; the bootloader supplies ones that use the journal.
 - A full journal is erased and restarted with the current status. That happens only after hundreds of
@@ -181,7 +191,8 @@ that:
 1. the descriptor's magic is valid and its size leaves room for the descriptor in the slot,
 2. the SHA-256 of the image matches the descriptor,
 3. the first vector, the initial stack pointer, lies in RAM, and the second, the reset handler, lies in the
-   application slot.
+   application slot;
+4. the application header's target identity matches this chip and this board (Part I).
 
 The bootloader writes the descriptor after an installation, from the digest it computed while writing the
 image. The release build writes it into the combined image that a debugger programs, bootloader and
@@ -224,18 +235,60 @@ software-in-the-loop runner keeps starting one image. Its scenarios cover the ap
 update, up to *ready to deploy* in the journal; the bootloader's install path is tested on the host against a
 flash fake (Open Question 3).
 
+### Part I — target identity: never the wrong microcontroller
+
+An image built for one microcontroller must never be written into another, an STM32 image into a Tiva board for
+example. The bootloader cannot trust the pack's labels alone, because a label is written by the packer and can
+be wrong; the image says itself what it was built for, and the chip says what it is.
+
+**Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
+start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
+board kind (`service-can.md`, contract 2.6), the firmware version and the target identity: the device
+identity the image's microcontroller reports, in the form its device-identity register gives it. The header is
+compiled from the same target definitions that compile the rest of the image, so it cannot disagree with the
+code beside it.
+
+| Microcontroller | Device identity the header carries | Where the chip reports it        |
+|-----------------|------------------------------------|----------------------------------|
+| TM4C1294NCPDT   | device class and part number       | system control `DID0` and `DID1` |
+| STM32H563ZI     | device identifier `0x484`          | `DBGMCU` identity code, `DEV_ID` |
+| STM32G474RE     | device identifier `0x469`          | `DBGMCU` identity code, `DEV_ID` |
+
+**Checks, in order.** A wrong pack is stopped at the first layer that can see the mistake; each later layer
+holds even if an earlier one was skipped or its label was wrong:
+
+| Layer                        | When                 | Checks                                                                                                                                  | A pack for another chip                    |
+|------------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
+| Release workflow             | when packs are built | the packer reads the application header from the built image; the product name and header must name the board the pack is published for | the release is not published               |
+| CAN Commander                | before the download  | the pack's product name names the node's board kind and its microcontroller                                                             | not offered; the reason is shown           |
+| Firmware, Verify             | end of the download  | the product name equals the running firmware's own (`service-firmware-upgrade.md` Part D)                                               | `NotReady`; nothing staged                 |
+| Bootloader, before any erase | at the apply         | product name, signature, then the decrypted vector table and application header against the chip                                        | marked invalid; the old application starts |
+| Bootloader, every reset      | before any start     | the application header against the chip and the board                                                                                   | not started                                |
+
+Before erasing, the bootloader decrypts only the image's first 2 KB into RAM. AES-128-CTR decrypts any part of
+the stream on its own, so this costs nothing in the copy that follows. It then checks that:
+
+1. the initial stack pointer lies in this chip's RAM and the reset handler in this board's application slot,
+   which a Tiva image (flash at `0x00000000`) fails on an STM32 (flash at `0x08000000`) and the other way round;
+2. the application header's magic is valid, its board kind is this bootloader's board, and its target identity
+   equals what this chip's device-identity register reports, read at that moment.
+
+A failure is recorded as *invalid* with the bootloader's own *wrong target* error code, outside the range the
+library reserves for its loaders, and the old application starts untouched.
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface        | Purpose                                                     | Contract                                                                                                  |
-|------------------|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Reset entry      | First code to run after any reset                           | Starts the application only when it is intact (Part E); never returns to a caller                         |
-| Flash layout     | Where the application, the staged pack and the journal live | Part A; the application, the release build and the bootloader use the same addresses                      |
-| Status journal   | Progress of an installation, shared with the application    | Part D; the application writes only *empty* (by erasing) and *ready to deploy*                            |
-| Image descriptor | Integrity of the application slot                           | Part E; written by the bootloader after an installation and by the release build for debugger programming |
+| Interface          | Purpose                                                     | Contract                                                                                                                   |
+|--------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Reset entry        | First code to run after any reset                           | Starts the application only when it is intact and built for this chip and board (Parts E and I); never returns to a caller |
+| Flash layout       | Where the application, the staged pack and the journal live | Part A; the application, the release build and the bootloader use the same addresses                                       |
+| Status journal     | Progress of an installation, shared with the application    | Part D; the application writes *empty* (by erasing), *downloaded* and *ready to deploy*                                    |
+| Application header | What an image was built for                                 | Part I; 64 bytes at offset 1 KB in the slot, compiled with the image                                                       |
+| Image descriptor   | Integrity of the application slot                           | Part E; written by the bootloader after an installation and by the release build for debugger programming                  |
 
 ### Required
 
@@ -247,6 +300,7 @@ flash fake (Open Question 3).
 | ECDSA-P256 verification  | Pack signature                                | micro-ecc, over a SHA-256 computed in software without mbedTLS                       |
 | AES-128-CTR decryption   | Image confidentiality                         | tiny-aes, through the library's AES decryptor                                        |
 | SHA-256                  | Signature digest and the check at every reset | The library's software SHA-256, fed in pieces read from flash                        |
+| Device identity register | What the chip is                              | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)              |
 
 ---
 
@@ -257,9 +311,12 @@ The status journal, as both programs advance it:
 ```mermaid
 stateDiagram-v2
     [*] --> Empty
-    Empty --> ReadyToDeploy : application, Activate
-    ReadyToDeploy --> DeployStarted : bootloader, product and signature valid
-    ReadyToDeploy --> Invalid : bootloader, wrong product or bad signature
+    Empty --> Downloaded : application, Verify passed
+    Downloaded --> Downloaded : any reset, nothing installed
+    Downloaded --> Empty : application, a new Begin or Abort
+    Downloaded --> ReadyToDeploy : application, the user's Activate
+    ReadyToDeploy --> DeployStarted : bootloader, product, signature and target valid
+    ReadyToDeploy --> Invalid : bootloader, wrong product, bad signature or wrong target
     DeployStarted --> DeployStarted : reset during the copy, copy restarts
     DeployStarted --> Deployed : image and descriptor written
     DeployStarted --> Invalid : flash error during the copy
@@ -279,10 +336,13 @@ sequenceDiagram
     participant Journal as Status journal
     participant Boot as Bootloader
     participant Slot as Application slot
+    App->>Journal: Downloaded (on Verify)
+    Note over App,Journal: The pack waits for the user's apply
     App->>Journal: Ready to deploy (on Activate)
     App->>App: Reset
     Boot->>Journal: Read status
     Boot->>Boot: Check product name, verify signature
+    Boot->>Boot: Decrypt the first 2 KB, check the target against the chip
     Boot->>Journal: Deploy started
     Boot->>Slot: Erase, decrypt and write the image
     Boot->>Slot: Write the image descriptor
@@ -295,17 +355,19 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint           | Value / Description                                                                                              |
-|----------------------|------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | 32 KB on every board                                                                                             |
-| Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)              |
-| Largest image        | the application slot less its 64-byte descriptor                                                                 |
-| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build      |
-| Installation         | erase of the spanned slot sectors, then decrypt and write; repeated from the start after any interruption        |
-| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                         |
-| Recovery             | a broken application slot with no valid pack needs a debugger                                                    |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board; development keys for development and emulation only |
-| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL |
+| Constraint           | Value / Description                                                                                                           |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Bootloader size      | 32 KB on every board                                                                                                          |
+| Largest pack         | the staging slot less its journal sector, and at most 393 216 bytes (the `can-lite` transfer limit)                           |
+| Largest image        | the application slot less its 64-byte descriptor                                                                              |
+| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                   |
+| Installation         | erase of the spanned slot sectors, then decrypt and write; repeated from the start after any interruption                     |
+| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                      |
+| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset |
+| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                  |
+| Recovery             | a broken application slot with no valid pack needs a debugger                                                                 |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board; development keys for development and emulation only              |
+| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL              |
 
 ---
 
