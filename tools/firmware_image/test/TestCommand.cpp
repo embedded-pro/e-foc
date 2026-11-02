@@ -143,3 +143,55 @@ TEST_F(TestCommand, bootloader_keys_reports_a_missing_key_set)
 
     EXPECT_THAT(err.str(), HasSubstr("Cannot read"));
 }
+
+#ifndef _WIN32
+TEST_F(TestCommand, a_key_set_is_readable_by_its_owner_only)
+{
+    ASSERT_EQ(0, Run({ "generate-keys", "--output", Path("keys.bin") }));
+
+    using std::filesystem::perms;
+    EXPECT_EQ(perms::owner_read | perms::owner_write, std::filesystem::status(Path("keys.bin")).permissions() & perms::all);
+}
+
+TEST_F(TestCommand, a_key_slot_is_readable_by_its_owner_only_even_when_it_replaces_a_file)
+{
+    ASSERT_EQ(0, Run({ "generate-keys", "--output", Path("keys.bin") }));
+    Write(Path("slot.bin"), { 1, 2, 3 });
+    std::filesystem::permissions(Path("slot.bin"), std::filesystem::perms::all);
+
+    ASSERT_EQ(0, Run({ "bootloader-keys", "--keys", Path("keys.bin"), "--output", Path("slot.bin") }));
+
+    using std::filesystem::perms;
+    EXPECT_EQ(perms::owner_read | perms::owner_write, std::filesystem::status(Path("slot.bin")).permissions() & perms::all);
+    EXPECT_EQ(bootloaderKeySlotSize, Read(Path("slot.bin")).size());
+}
+
+TEST_F(TestCommand, bootloader_keys_refuses_an_output_linked_to_the_key_set)
+{
+    ASSERT_EQ(0, Run({ "generate-keys", "--output", Path("keys.bin") }));
+    std::filesystem::create_hard_link(Path("keys.bin"), Path("link.bin"));
+
+    EXPECT_EQ(1, Run({ "bootloader-keys", "--keys", Path("keys.bin"), "--output", Path("link.bin") }));
+
+    EXPECT_EQ(keySetFileSize, Read(Path("keys.bin")).size());
+}
+#endif
+
+TEST_F(TestCommand, bootloader_keys_refuses_to_write_over_its_key_set)
+{
+    ASSERT_EQ(0, Run({ "generate-keys", "--output", Path("keys.bin") }));
+
+    EXPECT_EQ(1, Run({ "bootloader-keys", "--keys", Path("keys.bin"), "--output", Path("keys.bin") }));
+
+    EXPECT_EQ(keySetFileSize, Read(Path("keys.bin")).size());
+    EXPECT_THAT(err.str(), HasSubstr("the key set itself"));
+}
+
+TEST_F(TestCommand, a_file_that_cannot_be_written_is_reported)
+{
+    ASSERT_EQ(0, Run({ "generate-keys", "--output", Path("keys.bin") }));
+
+    EXPECT_EQ(1, Run({ "bootloader-keys", "--keys", Path("keys.bin"), "--output", Path("missing/slot.bin") }));
+
+    EXPECT_THAT(err.str(), HasSubstr("Cannot write"));
+}

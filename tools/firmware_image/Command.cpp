@@ -3,6 +3,14 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <system_error>
+
+#ifndef _WIN32
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace firmware_image
 {
@@ -39,11 +47,71 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
             return std::vector<uint8_t>{ std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
         }
 
-        bool WriteFile(const std::string& path, std::span<const uint8_t> bytes)
+        enum class Create
         {
+            newOnly,
+            replacing,
+        };
+
+        enum class Written
+        {
+            ok,
+            exists,
+            failed,
+        };
+
+#ifndef _WIN32
+        bool WriteAll(int descriptor, std::span<const uint8_t> bytes)
+        {
+            for (std::size_t done = 0; done < bytes.size();)
+            {
+                const auto count = ::write(descriptor, bytes.data() + done, bytes.size() - done);
+                if (count <= 0)
+                    return false;
+                done += static_cast<std::size_t>(count);
+            }
+            return true;
+        }
+
+        // Key material is owner-only from the moment the file exists, whatever the umask; newOnly is atomic
+        Written WriteSecret(const std::string& path, std::span<const uint8_t> bytes, Create create)
+        {
+            const auto flags = O_WRONLY | O_CREAT | (create == Create::newOnly ? O_EXCL : O_TRUNC);
+            const auto descriptor = ::open(path.c_str(), flags, S_IRUSR | S_IWUSR);
+            if (descriptor < 0)
+                return errno == EEXIST ? Written::exists : Written::failed;
+
+            const auto written = ::fchmod(descriptor, S_IRUSR | S_IWUSR) == 0 && WriteAll(descriptor, bytes);
+            return ::close(descriptor) == 0 && written ? Written::ok : Written::failed;
+        }
+#else
+        Written WriteSecret(const std::string& path, std::span<const uint8_t> bytes, Create create)
+        {
+            if (create == Create::newOnly && std::filesystem::exists(path))
+                return Written::exists;
+
             std::ofstream file{ path, std::ios::binary | std::ios::trunc };
             file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-            return static_cast<bool>(file);
+            file.close();
+            if (file.fail())
+                return Written::failed;
+
+            std::error_code error;
+            std::filesystem::permissions(path, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write, error);
+            return error ? Written::failed : Written::ok;
+        }
+#endif
+
+        bool SameFile(const std::string& first, const std::string& second)
+        {
+            std::error_code error;
+            return std::filesystem::equivalent(first, second, error);
+        }
+
+        int AlreadyExists(std::ostream& err, const std::string& path)
+        {
+            err << path << " already exists. A key set is never overwritten: choose another file name, or delete the old one if nothing still needs it.\n";
+            return failure;
         }
 
         int Missing(std::ostream& err, const std::string& command, const char* option)
@@ -60,10 +128,7 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
                 return Missing(err, arguments[0], "--output <file>");
 
             if (std::filesystem::exists(*output))
-            {
-                err << *output << " already exists. A key set is never overwritten: choose another file name, or delete the old one if nothing still needs it.\n";
-                return failure;
-            }
+                return AlreadyExists(err, *output);
 
             const auto keys = GenerateKeySet(random);
             if (!keys)
@@ -72,7 +137,10 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
                 return failure;
             }
 
-            if (!WriteFile(*output, Serialize(*keys)))
+            const auto written = WriteSecret(*output, Serialize(*keys), Create::newOnly);
+            if (written == Written::exists)
+                return AlreadyExists(err, *output);
+            if (written == Written::failed)
             {
                 err << "Cannot write " << *output << ".\n";
                 return failure;
@@ -101,6 +169,12 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
             if (!output)
                 return Missing(err, arguments[0], "--output <file>");
 
+            if (SameFile(*keysPath, *output))
+            {
+                err << "--output is the key set itself: writing the slot there would destroy the key set. Choose another output file.\n";
+                return failure;
+            }
+
             const auto file = ReadFile(*keysPath);
             if (!file)
             {
@@ -112,7 +186,7 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
             if (const auto* error = std::get_if<KeySetError>(&parsed))
                 return ReportKeySetError(err, *keysPath, file->size(), *error);
 
-            if (!WriteFile(*output, BootloaderKeySlot(std::get<KeySet>(parsed))))
+            if (WriteSecret(*output, BootloaderKeySlot(std::get<KeySet>(parsed)), Create::replacing) != Written::ok)
             {
                 err << "Cannot write " << *output << ".\n";
                 return failure;
