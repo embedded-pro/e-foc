@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.1
+version: 0.4.2
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.1      |
+| Version   | 0.4.2      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -230,11 +230,11 @@ only when software starts them, and the application does (`watchdog.md`).
   left erased. An erased slot holds no valid public key, and the library's verifier refuses a key that is not
   on the curve, so every pack fails its signature check and only the installed application ever starts: a
   build without keys is safe, but cannot update a board.
-- A build given a key set fills the slot after the link: the image tool takes the public key and the AES key
-  from the set, and the toolchain's object copy writes them into the slot before the hex and binary images
-  are made.
-  Nothing else changes, so two builds with different sets differ only in those 80 bytes. A build that reads
-  no secret, such as a pull request from a fork, produces a bootloader without keys.
+- Keys are not a build input: the build always produces a bootloader with an erased slot, and the image tool's
+  key injection writes the public key and the AES key from a set into the finished bootloader, its ELF file
+  and its hex files, afterwards. One build can therefore take the development set or the release set, and the
+  two differ only in those 80 bytes. Continuous integration injects the development set when it can read it;
+  without it, as on a pull request from a fork, the bootloader keeps its erased slot.
 - The public key only verifies, so reading it from a board gains nothing. The AES key protects the
   confidentiality of the images and is only as safe as the board's flash: production boards are locked
   against debug read-out (TM4C debug lock, ST read-out protection level 1). Every board shares one AES key,
@@ -302,13 +302,16 @@ library reserves for its loaders, and the old application starts untouched.
 
 The embedded-infrastructure library's `application.bootloader_image`, a host program built with its
 bootloader package, so the firmware build needs no interpreter and e-foc keeps no tool of its own. The
-library's tests cover it. The library's CMake steps run it after the link: the host build has it as a target,
-and an embedded build builds it first with the host compiler.
+library's tests cover it. The host build has it as a target, and an embedded build builds it first with the
+host compiler, in the build directory's `_native_bootloader_image/bin`, where the workflows run it.
 
-| Command           | Takes     | Gives                                        |
-|-------------------|-----------|----------------------------------------------|
-| `generate-keys`   | nothing   | a new key set, from the host's random source |
-| `bootloader-keys` | a key set | the bootloader's 80-byte key slot (Part G)   |
+| Command           | Takes                                             | Gives                                                                    |
+|-------------------|---------------------------------------------------|--------------------------------------------------------------------------|
+| `generate-keys`   | nothing                                           | a new key set, from the host's random source                             |
+| `bootloader-keys` | a key set                                         | the bootloader's 80-byte key slot (Part G)                               |
+| `inject-keys`     | a key set, the bootloader's ELF and its hex files | the key slot written into each, at the key slot section's place (Part G) |
+
+`inject-keys` checks every file first and changes none unless all of them take the slot.
 
 A key set file is 112 bytes: the AES key (16), the public key (64, the curve point's x and then y, most
 significant byte first) and the private key (32). The tool refuses a file of another size, or one whose
@@ -342,7 +345,7 @@ bootloader that refuses every pack.
 | SHA-256                  | Signature digest and the check at every reset       | The library's software SHA-256, fed in pieces read from flash                                                                                                                                                           |
 | Device identity register | What the chip is                                    | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)                                                                                                                                                 |
 | Cortex-M jump            | Start the application (Part F)                      | Embedded-infrastructure library; points the vector table at the slot, then loads the stack pointer and branches                                                                                                         |
-| Object copy              | Write the key slot after the link (Part G)          | The GNU Arm toolchain's object copy, updating one section of the linked bootloader                                                                                                                                      |
+| Image tool               | Write the key slot into the bootloader (Part G)     | The embedded-infrastructure library's `application.bootloader_image inject-keys` (Part J)                                                                                                                               |
 
 ---
 
