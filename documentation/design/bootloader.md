@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.0      |
+| Version   | 0.4.1      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -226,11 +226,13 @@ only when software starts them, and the application does (`watchdog.md`).
   the development set, which continuous integration and the release workflow's dry runs read. A pack signed
   with the development key never installs on a board whose bootloader carries the release key. A developer
   generates a set of their own for local builds.
-- The bootloader links with a key slot of its own, 80 bytes holding the public key and then the AES key,
-  left erased. An erased slot holds no valid public key, so every pack fails its signature check and only
-  the installed application ever starts: a build without keys is safe, but cannot update a board.
-- A build given a key set fills the slot after the link: the image tool takes the 80 public bytes from the
-  set, and the toolchain's object copy writes them into the slot before the hex and binary images are made.
+- The bootloader links with the library's key slot, 80 bytes holding the public key and then the AES key,
+  left erased. An erased slot holds no valid public key, and the library's verifier refuses a key that is not
+  on the curve, so every pack fails its signature check and only the installed application ever starts: a
+  build without keys is safe, but cannot update a board.
+- A build given a key set fills the slot after the link: the image tool takes the public key and the AES key
+  from the set, and the toolchain's object copy writes them into the slot before the hex and binary images
+  are made.
   Nothing else changes, so two builds with different sets differ only in those 80 bytes. A build that reads
   no secret, such as a pull request from a fork, produces a bootloader without keys.
 - The public key only verifies, so reading it from a board gains nothing. The AES key protects the
@@ -298,9 +300,10 @@ library reserves for its loaders, and the old application starts untouched.
 
 ### Part J — firmware image tool
 
-A host program built from the e-foc sources, so the firmware build needs no interpreter. The host build
-builds and tests it; an embedded build that needs it builds it first with the host compiler. It uses the
-embedded-infrastructure library's SHA-256 and micro-ecc.
+The embedded-infrastructure library's `application.bootloader_image`, a host program built with its
+bootloader package, so the firmware build needs no interpreter and e-foc keeps no tool of its own. The
+library's tests cover it. The library's CMake steps run it after the link: the host build has it as a target,
+and an embedded build builds it first with the host compiler.
 
 | Command           | Takes     | Gives                                        |
 |-------------------|-----------|----------------------------------------------|

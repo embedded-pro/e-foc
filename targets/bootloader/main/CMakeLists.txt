@@ -36,15 +36,7 @@ endif()
 
 set(E_FOC_BOOTLOADER_KEYS "" CACHE FILEPATH "Key set written into the bootloader's key slot after the link; empty leaves the slot erased")
 if(E_FOC_BOOTLOADER_KEYS)
-    e_foc_firmware_image_tool()
-    set(keySlot "${CMAKE_CURRENT_BINARY_DIR}/bootloader_keys.bin")
-    add_dependencies(e_foc.bootloader.main e_foc.tool.firmware_image)
-    set_property(TARGET e_foc.bootloader.main APPEND PROPERTY LINK_DEPENDS "${E_FOC_BOOTLOADER_KEYS}")
-    add_custom_command(TARGET e_foc.bootloader.main POST_BUILD
-        COMMAND e_foc.tool.firmware_image bootloader-keys --keys "${E_FOC_BOOTLOADER_KEYS}" --output "${keySlot}"
-        COMMAND "${EMIL_OBJ_COPY_TOOL}" --update-section ".bootloader_keys=${keySlot}" "$<TARGET_FILE:e_foc.bootloader.main>"
-        VERBATIM
-    )
+    emil_bootloader_key_slot(e_foc.bootloader.main KEYS "${E_FOC_BOOTLOADER_KEYS}")
 endif()
 
 emil_generate_artifacts(TARGET e_foc.bootloader.main MAP BIN HEX)
