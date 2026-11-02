@@ -39,16 +39,9 @@ emil_fetch_bootloader_image()
 emil_generate_artifacts(TARGET e_foc.bootloader.main MAP BIN HEX)
 
 if(TARGET e_foc.sync_foc_sensored.main)
-    find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-    set(bootloaderHex "$<TARGET_FILE_DIR:e_foc.bootloader.main>/$<TARGET_FILE_BASE_NAME:e_foc.bootloader.main>.hex")
-    set(applicationHex "$<TARGET_FILE_DIR:e_foc.sync_foc_sensored.main>/$<TARGET_FILE_BASE_NAME:e_foc.sync_foc_sensored.main>.hex")
-    set(combinedHex "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/e_foc.sync_foc_sensored.main.combined.hex")
-
-    add_custom_command(OUTPUT "${combinedHex}"
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/../tools/firmware_image.py" combine --output "${combinedHex}" "${bootloaderHex}" "${applicationHex}"
-        DEPENDS e_foc.bootloader.main e_foc.sync_foc_sensored.main
-        VERBATIM
+    emil_bootloader_combined_hex(e_foc.sync_foc_sensored.combined
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/e_foc.sync_foc_sensored.main.combined.hex"
+        BOOTLOADER e_foc.bootloader.main
+        APPLICATION e_foc.sync_foc_sensored.main
     )
-    add_custom_target(e_foc.sync_foc_sensored.combined ALL DEPENDS "${combinedHex}")
 endif()

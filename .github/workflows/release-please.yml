@@ -88,10 +88,37 @@ jobs:
           name: host-install-package
       - run: tar -zxvf e_foc-*.tar.gz
       - run: mkdir -p install && mv e_foc-*/* install/ || true
+      # Every bootloader gets the secret release key set, a dry run's the public development set (bootloader.md Part G)
+      - name: Choose the bootloader key set
+        env:
+          DRY_RUN: ${{ inputs.dry_run == true }}
+          BOOTLOADER_KEYS_RELEASE: ${{ secrets.BOOTLOADER_KEYS_RELEASE }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "BOOTLOADER_KEYS=targets/bootloader/keys/development.keys" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -z "$BOOTLOADER_KEYS_RELEASE" ]; then
+            echo "::error::BOOTLOADER_KEYS_RELEASE is not set: a release bootloader without keys could never update a board"
+            exit 1
+          fi
+          printf '%s' "$BOOTLOADER_KEYS_RELEASE" | base64 -d > "$RUNNER_TEMP/bootloader.keys"
+          echo "BOOTLOADER_KEYS=$RUNNER_TEMP/bootloader.keys" >> "$GITHUB_ENV"
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
+      - name: Inject the key set into the bootloader
+        run: |
+          images="build/${{ matrix.target }}/targets/bootloader/main/${{ matrix.configuration }}"
+          if [ ! -f "$images/e_foc.bootloader.main.elf" ]; then
+            echo "::notice::${{ matrix.target }} builds no bootloader: no key slot to fill"
+            exit 0
+          fi
+          hex=()
+          for file in "$images"/*.hex; do hex+=(--hex "$file"); done
+          "build/${{ matrix.target }}/_native_bootloader_image/bin/application.bootloader_image" inject-keys \
+            --keys "$BOOTLOADER_KEYS" --elf "$images/e_foc.bootloader.main.elf" "${hex[@]}"
       - name: Generate hex firmware
         run: |
           find "build/${{ matrix.target }}" -name "*.elf" -path "*/${{ matrix.configuration }}/*" -type f | while read -r elf; do
