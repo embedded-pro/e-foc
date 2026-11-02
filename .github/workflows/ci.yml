@@ -140,6 +140,7 @@ jobs:
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
       # Every embedded build with a bootloader gets the public development key set in its key slot (bootloader.md Part G)
       - name: Inject the development keys into the bootloader
+        shell: bash
         run: |
           images="build/${{ matrix.target }}/targets/bootloader/main/${{ matrix.configuration }}"
           if [ ! -f "$images/e_foc.bootloader.main.elf" ]; then
