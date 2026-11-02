@@ -196,17 +196,19 @@ TEST_F(CalibrationOrchestratorTest, a_failure_after_a_missing_phase_is_a_calibra
     EXPECT_EQ(state_machine::FaultCode::calibrationFailed, orchestrator.LastFailure());
 }
 
-TEST_F(CalibrationOrchestratorTest, the_alignment_is_given_the_stored_resistance_and_the_bus_voltage)
+TEST_F(CalibrationOrchestratorTest, the_alignment_is_given_the_stored_resistance_inductance_and_the_bus_voltage)
 {
     application::CalibrationOrchestrator withBus{ electricalIdent, motorAlignment, tracer, std::nullopt, std::nullopt, foc::Volts{ 24.0f } };
     pendingData.polePairs = 4;
     pendingData.rPhase = 1.1f;
+    pendingData.lD = 2.5f;
 
     services::MotorAlignment::AlignmentConfig received;
     EXPECT_CALL(motorAlignment, ForceAlignment(4, _, _)).WillOnce(SaveArg<1>(&received));
     withBus.StartAlignmentOnly(pendingData, [](state_machine::CalibrationStep) {}, [](foc::Radians) {}, [] {});
 
     EXPECT_NEAR(1.1f, received.phaseResistance.Value(), 1e-6f);
+    EXPECT_NEAR(0.0025f, received.phaseInductance.Value(), 1e-9f);
     EXPECT_NEAR(24.0f, received.busVoltage.Value(), 1e-6f);
 }
 

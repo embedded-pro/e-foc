@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "supervision"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.2.0                    |
+| Version   | 0.2.1                    |
 | Component | supervision              |
 | Date      | 2026-10-30               |
 
@@ -140,8 +140,14 @@ same notifier. It looks for a current the drive demands but cannot make flow: an
 - the torque current it measures is below 20 % of that demand; and
 - the rotor turns slower than 10 rad/s.
 
-When counted evaluations span 50 ms without a break, the monitor raises the fault once and stays silent
-until the drive leaves `Enabled`. An evaluation that does not count starts the span again.
+The span starts at the first evaluation that counts. When the evaluations have counted without a break for
+the span, the monitor raises the fault once and stays silent until the drive leaves `Enabled`. An evaluation
+that does not count ends the span; the next one that counts starts a new one.
+
+The span is 50 ms, or one current-loop time constant when the operator's current bandwidth makes that longer
+(1/ω_c: 1 s at the 1 rad/s minimum). A healthy first-order loop passes a fifth of a step after 0.22 time
+constants, so a slow loop is never mistaken for an open circuit while its current rises. The automatic
+bandwidth is far above 20 rad/s and leaves the span at 50 ms.
 
 The speed condition is what keeps a connected motor from tripping. At standstill there is no back-EMF and the
 whole supply drives current through the winding resistance, many times the current limit for any motor the
@@ -157,6 +163,7 @@ never appears. Both limits are recorded in REQ-EH-015.
 The demanded current is what the active drive commands its current loop: the torque setpoint after the
 current envelope in torque mode, the speed loop's output (or the current a position law commands directly)
 in speed and position modes. The thresholds are fixed; the supervision settings of Part D do not apply.
+The current bandwidth is read from the configuration record at every evaluation.
 
 ```mermaid
 stateDiagram-v2

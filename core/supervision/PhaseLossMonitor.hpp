@@ -6,6 +6,7 @@
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
+#include <optional>
 
 namespace supervision
 {
@@ -20,18 +21,20 @@ namespace supervision
 
         PhaseLossMonitor(foc::Ampere maxCurrent, const infra::Function<void(state_machine::FaultCode)>& onFault);
 
-        void Enable();
+        void Enable(const infra::Function<foc::RadiansPerSecond()>& currentLoopBandwidth);
         void Attach(const infra::Function<const state_machine::FocStateMachineBase&()>& activeDrive);
 
     private:
         void Evaluate();
         bool CurrentMissing(const foc::MotionObservation& observation) const;
+        infra::Duration Span() const;
 
         foc::Ampere maxCurrent;
         infra::Function<void(state_machine::FaultCode)> onFault;
         infra::Function<const state_machine::FocStateMachineBase&()> activeDrive;
+        infra::Function<foc::RadiansPerSecond()> currentLoopBandwidth;
         infra::TimerRepeating evaluationTimer;
-        infra::Duration missingFor{};
+        std::optional<infra::TimePoint> missingSince;
         bool reported{ false };
     };
 }

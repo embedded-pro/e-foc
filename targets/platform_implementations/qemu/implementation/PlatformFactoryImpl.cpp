@@ -95,6 +95,7 @@ namespace application
 
         sil::ConfigureModel(model, *plantConfig);
         bootFaultInjection = sil::BootFaultInjection(*plantConfig);
+        activeFaultInjection = bootFaultInjection;
         ApplyCurrentSense(SampleAndHold::shortest);
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
@@ -335,17 +336,15 @@ namespace application
 
         if (encoderFreeze.Fire(tick))
         {
-            auto frozen = bootFaultInjection;
-            frozen.encoderStuck = true;
-            model.SetFaultInjection(frozen);
+            activeFaultInjection.encoderStuck = true;
+            model.SetFaultInjection(activeFaultInjection);
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
         if (cableDisconnect.Fire(tick))
         {
-            auto disconnected = bootFaultInjection;
-            disconnected.openPhaseA = disconnected.openPhaseB = disconnected.openPhaseC = true;
-            model.SetFaultInjection(disconnected);
+            activeFaultInjection.openPhaseA = activeFaultInjection.openPhaseB = activeFaultInjection.openPhaseC = true;
+            model.SetFaultInjection(activeFaultInjection);
         }
 
         if (shaftGrip.Fire(tick))
@@ -396,7 +395,8 @@ namespace application
         model.Stop();
         model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
         model.GripShaft(std::nullopt);
-        model.SetFaultInjection(bootFaultInjection);
+        activeFaultInjection = bootFaultInjection;
+        model.SetFaultInjection(activeFaultInjection);
         responseRecorder.End();
     }
 

@@ -190,6 +190,7 @@ namespace application
 
         services::MotorAlignment::AlignmentConfig config;
         config.phaseResistance = foc::Ohm{ pendingData->rPhase };
+        config.phaseInductance = foc::Henry{ pendingData->lD * 1.0e-3f };
         config.busVoltage = busVoltage;
 
         const auto token = runToken;

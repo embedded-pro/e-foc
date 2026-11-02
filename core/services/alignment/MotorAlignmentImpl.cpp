@@ -93,7 +93,22 @@ namespace services
         }
     }
 
+    // Interrupt context: the vector keeps holding the rotor while the event loop judges the snapshot.
     void MotorAlignmentImpl::Settle()
+    {
+        finishing = true;
+        settledEndSample = currentSampleIndex;
+
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [settledRun = run](const infra::SharedPtr<MotorAlignmentImpl>& self)
+            {
+                if (self->run == settledRun && self->onAlignmentDone)
+                    self->Decide();
+            },
+            WeakFromThis());
+    }
+
+    void MotorAlignmentImpl::Decide()
     {
         if (!CarriesNoCurrent())
         {
@@ -102,7 +117,8 @@ namespace services
         }
 
         phaseMissing = true;
-        Finish(std::nullopt);
+        driver.Stop();
+        Complete(std::nullopt);
     }
 
     bool MotorAlignmentImpl::CarriesNoCurrent() const
@@ -111,7 +127,8 @@ namespace services
         const auto a = std::abs(settledSumA) / samples;
         const auto b = std::abs(settledSumB) / samples;
         const auto c = std::abs(settledSumC) / samples;
-        const auto expected = ExpectedPhaseACurrent();
+        const auto final = ExpectedPhaseACurrent();
+        const auto expected = final.has_value() ? std::make_optional(*final * SettledShareOfFinalCurrent()) : std::nullopt;
 
         if (expected.has_value() && a < missingFraction * *expected)
             return true;
@@ -133,11 +150,33 @@ namespace services
         return 0.5f * foc::DutyFraction(alignmentConfig.testVoltage) * bus / resistance;
     }
 
+    // The winding current rises with L/R from the moment the vector is applied, so a rotor that settles at once is
+    // judged on the mean the settled samples could reach, not on the final current.
+    float MotorAlignmentImpl::SettledShareOfFinalCurrent() const
+    {
+        const auto resistance = alignmentConfig.phaseResistance.Value();
+        const auto inductance = alignmentConfig.phaseInductance.Value();
+        const auto sampleRate = static_cast<float>(alignmentConfig.samplingFrequency.Value());
+
+        if (resistance <= 0.0f || inductance <= 0.0f || sampleRate <= 0.0f || consecutiveSettledSamples == 0)
+            return 1.0f;
+
+        const auto samplesPerTimeConstant = sampleRate * inductance / resistance;
+        const auto firstSample = settledEndSample + 1 - consecutiveSettledSamples;
+        float share = 0.0f;
+
+        for (auto sample = firstSample; sample <= settledEndSample; ++sample)
+            share += 1.0f - std::exp(-static_cast<float>(sample) / samplesPerTimeConstant);
+
+        return share / static_cast<float>(consecutiveSettledSamples);
+    }
+
     void MotorAlignmentImpl::CalculateAlignmentOffset()
     {
         alignedPosition = encoder.Read();
         encoder.SetZero();
-        Finish(std::make_optional<foc::Radians>(alignedPosition));
+        driver.Stop();
+        Complete(std::make_optional<foc::Radians>(alignedPosition));
     }
 
     void MotorAlignmentImpl::FailToConverge()

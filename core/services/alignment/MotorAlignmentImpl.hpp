@@ -26,8 +26,10 @@ namespace services
         void CalculateAlignmentOffset();
         void ProcessPosition(const foc::PhaseCurrents& currents);
         void Settle();
+        void Decide();
         bool CarriesNoCurrent() const;
         std::optional<float> ExpectedPhaseACurrent() const;
+        float SettledShareOfFinalCurrent() const;
         void FailToConverge();
         void Finish(std::optional<foc::Radians> result);
         void Complete(std::optional<foc::Radians> result);
@@ -42,6 +44,7 @@ namespace services
         AlignmentConfig alignmentConfig;
         std::size_t polePairs = 1;
         std::size_t currentSampleIndex = 0;
+        std::size_t settledEndSample = 0;
         std::size_t consecutiveSettledSamples = 0;
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
