@@ -1,4 +1,3 @@
-#include DEVICE_HEADER
 #include "bootloader/ImageFormat.hpp"
 #include "generated/Version.h"
 #include "targets/bootloader/ImageTarget.hpp"
@@ -9,6 +8,8 @@ extern "C" uint32_t _text;
 
 namespace
 {
+    constexpr uintptr_t vtorAddress = 0xE000ED08u;
+
     constexpr bootloader::ImageTarget target{ E_FOC_BOARD_KIND, static_cast<bootloader::DeviceFamily>(E_FOC_DEVICE_FAMILY), E_FOC_DEVICE_IDENTITY };
 
     constexpr std::array<uint8_t, bootloader::imageDescriptorSize> ErasedDescriptor()
@@ -26,6 +27,6 @@ namespace
 
     [[gnu::constructor(101)]] void PointVectorTableAtImage()
     {
-        SCB->VTOR = reinterpret_cast<uintptr_t>(&_text);
+        *reinterpret_cast<volatile uint32_t*>(vtorAddress) = reinterpret_cast<uintptr_t>(&_text);
     }
 }

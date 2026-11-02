@@ -1,21 +1,29 @@
 add_executable(e_foc.bootloader.main)
 
+if(E_FOC_TARGET_PLATFORM STREQUAL "qemu")
+    set(platformDir qemu)
+    set(boardLibrary e_foc.platform_abstraction_qemu_board)
+else()
+    set(platformDir ${TARGET_MCU_VENDOR})
+    set(boardLibrary e_foc.platform_abstraction_${E_FOC_TARGET_BOARD})
+endif()
+
 target_include_directories(e_foc.bootloader.main PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/${TARGET_MCU_VENDOR}"
+    "${CMAKE_CURRENT_LIST_DIR}/${platformDir}"
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../..>"
 )
 
 target_link_libraries(e_foc.bootloader.main PRIVATE
     bootloader
-    e_foc.platform_abstraction_${E_FOC_TARGET_BOARD}
+    ${boardLibrary}
 )
 
 target_sources(e_foc.bootloader.main PRIVATE
     KeySlot.cpp
     KeySlot.hpp
     Main.cpp
-    ${TARGET_MCU_VENDOR}/BootloaderPlatform.cpp
-    ${TARGET_MCU_VENDOR}/BootloaderPlatform.hpp
+    ${platformDir}/BootloaderPlatform.cpp
+    ${platformDir}/BootloaderPlatform.hpp
     ../ImageTarget.hpp
 )
 
@@ -32,6 +40,10 @@ if(TARGET_MCU_VENDOR STREQUAL "ti")
         ti.hal_driver
     )
     e_foc_ti_target_linker_scripts(e_foc.bootloader.main BOOTLOADER)
+elseif(E_FOC_TARGET_PLATFORM STREQUAL "qemu")
+    target_link_libraries(e_foc.bootloader.main PRIVATE e_foc.qemu.semihosting)
+    e_foc_link_qemu_runtime(e_foc.bootloader.main)
+    e_foc_qemu_target_linker_scripts(e_foc.bootloader.main BOOTLOADER)
 endif()
 
 emil_fetch_bootloader_image()

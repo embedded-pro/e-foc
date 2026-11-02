@@ -10,7 +10,7 @@ function(e_foc_ti_target_linker_scripts target)
     set(imageSectionsDir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cortex_m_common/ldscripts/standalone")
     if(bootloaderLdScripts AND E_FOC_LAYOUT_BOOTLOADER)
         set(scripts "${bootloaderLdScripts}/mem_bootloader.ld" "${bootloaderLdScripts}/flash_layout.ld" "${sectionsLd}"
-            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ldscripts/bootloader_keys.ld")
+            "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cortex_m_common/ldscripts/bootloader_keys.ld")
     elseif(bootloaderLdScripts AND E_FOC_LAYOUT_APPLICATION)
         set(scripts "${bootloaderLdScripts}/mem_application.ld" "${bootloaderLdScripts}/flash_layout.ld" "${sectionsLd}")
         set(imageSectionsDir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cortex_m_common/ldscripts/application")
