@@ -158,15 +158,20 @@ Nothing supervises the 20 kHz control interrupt itself. What catches each way it
 | The interrupt faults                                                                                  | The HardFault handler, which cuts the power stage                          |
 | The interrupt stops being raised while the event loop runs: lost PWM-to-ADC trigger, masked interrupt | Nothing. The PWM keeps its last duty until a disable, a fault or a reset   |
 
-The last case needs a peripheral fault. The PWM-to-ADC trigger and the conversion sequence are configured
-once at boot (`ConfigureAdcAndPwm`); enable and disable only start and stop the PWM that raises the trigger.
-On TI the overcurrent, overvoltage and undervoltage comparators are steps of that same PWM-triggered
-sequence, so they stop with it and do not cover this case.
+The last case needs a peripheral fault. In the motor-controller application (`sync_foc_sensored`) the
+PWM-to-ADC trigger and the conversion sequence are configured once at boot (`ConfigureAdcAndPwm`); enable and
+disable only start and stop the PWM that raises the trigger. The bring-up application (`hardware_test`)
+reconfigures them from its terminal, but it runs no control loop.
+
+The two causes differ on TI. The overcurrent, overvoltage and undervoltage comparators are steps of the same
+PWM-triggered sequence and trip the PWM fault input in hardware. A masked interrupt leaves that path running,
+so the bridge stays protected. A lost trigger stops the comparators with the conversions, so nothing covers it.
 
 It is accepted as a residual risk. A supervisor was built and dropped as out of proportion to the
 probability (issue #482, closed as not planned): the control interrupt counted its completions, and an
 event-loop check every millisecond stopped the stage within 3 ms when the count stalled. Revisit it if the
-trigger path is ever reconfigured at run time, or if a stalled control interrupt is seen on a board.
+motor-controller application ever reconfigures the trigger path at run time, or if a stalled control
+interrupt is seen on a board.
 
 ---
 
@@ -302,7 +307,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 | Constraint                      | Value / Description                                                                                             |
 |---------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | Scope                           | Proves the software is running; does not prove the control loops are running                                    |
-| Control interrupt               | Not supervised: a lost trigger leaves the last duty applied (Part F)                                            |
+| Control interrupt               | Not supervised: a lost trigger leaves the last duty applied, unprotected on TI (Part F)                         |
 | Always on                       | Starts with the dispatcher; there is no enable, disable or query                                                |
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
 | Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
