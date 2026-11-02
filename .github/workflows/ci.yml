@@ -133,10 +133,24 @@ jobs:
           name: e_foc
       - run: tar -zxvf e_foc-*.tar.gz
       - run: mkdir install && mv e_foc-*/* install/
+      # The development key set goes into the bootloader's key slot (bootloader.md Part G); without the secret, as on
+      # a pull request from a fork, the bootloader is built without keys and refuses every pack
+      - name: Write the development key set
+        if: ${{ matrix.target == 'EK-TM4C1294XL' }}
+        env:
+          BOOTLOADER_KEYS_DEVELOPMENT: ${{ secrets.BOOTLOADER_KEYS_DEVELOPMENT }}
+        run: |
+          if [ -n "$BOOTLOADER_KEYS_DEVELOPMENT" ]; then
+            printf '%s' "$BOOTLOADER_KEYS_DEVELOPMENT" | base64 -d > "$RUNNER_TEMP/bootloader.keys"
+            echo "BOOTLOADER_KEYS=$RUNNER_TEMP/bootloader.keys" >> "$GITHUB_ENV"
+          else
+            echo "::notice::BOOTLOADER_KEYS_DEVELOPMENT is not readable here: the bootloader is built without keys"
+          fi
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         id: build
         with:
           configurePreset: ${{ matrix.target }}
+          configurePresetAdditionalArgs: "['-DE_FOC_BOOTLOADER_KEYS=${{ env.BOOTLOADER_KEYS }}']"
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis

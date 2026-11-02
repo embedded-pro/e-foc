@@ -1,6 +1,6 @@
 #include "BootloaderPlatform.hpp"
 #include DEVICE_HEADER
-#include "targets/bootloader/main/JumpToApplication.hpp"
+#include "hal/cortex_m/JumpToApplication.hpp"
 
 extern "C"
 {
@@ -51,7 +51,7 @@ namespace bootloader
 
     void BootloaderPlatform::Start(uint32_t slotBegin)
     {
-        JumpToApplication(slotBegin);
+        hal::cortex::JumpToApplication(slotBegin);
     }
 
     void BootloaderPlatform::Halt()

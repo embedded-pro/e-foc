@@ -42,6 +42,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptimizations.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FirmwareImageTool.cmake")
 
 set(EMIL_INCLUDE_ECHO Off CACHE BOOL "" FORCE)
 set(EMIL_FETCH_ECHO_COMPILERS Off CACHE BOOL "" FORCE)

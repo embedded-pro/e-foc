@@ -11,12 +11,12 @@ target_link_libraries(e_foc.bootloader.main PRIVATE
 )
 
 target_sources(e_foc.bootloader.main PRIVATE
-    JumpToApplication.hpp
+    KeySlot.cpp
+    KeySlot.hpp
     Main.cpp
     ${TARGET_MCU_VENDOR}/BootloaderPlatform.cpp
     ${TARGET_MCU_VENDOR}/BootloaderPlatform.hpp
     ../ImageTarget.hpp
-    ../keys/DevelopmentKeys.hpp
 )
 
 if(TARGET_MCU_VENDOR STREQUAL "ti")
@@ -32,6 +32,19 @@ if(TARGET_MCU_VENDOR STREQUAL "ti")
         ti.hal_driver
     )
     e_foc_ti_target_linker_scripts(e_foc.bootloader.main BOOTLOADER)
+endif()
+
+set(E_FOC_BOOTLOADER_KEYS "" CACHE FILEPATH "Key set written into the bootloader's key slot after the link; empty leaves the slot erased")
+if(E_FOC_BOOTLOADER_KEYS)
+    e_foc_firmware_image_tool()
+    set(keySlot "${CMAKE_CURRENT_BINARY_DIR}/bootloader_keys.bin")
+    add_dependencies(e_foc.bootloader.main e_foc.tool.firmware_image)
+    set_property(TARGET e_foc.bootloader.main APPEND PROPERTY LINK_DEPENDS "${E_FOC_BOOTLOADER_KEYS}")
+    add_custom_command(TARGET e_foc.bootloader.main POST_BUILD
+        COMMAND e_foc.tool.firmware_image bootloader-keys --keys "${E_FOC_BOOTLOADER_KEYS}" --output "${keySlot}"
+        COMMAND "${EMIL_OBJ_COPY_TOOL}" --update-section ".bootloader_keys=${keySlot}" "$<TARGET_FILE:e_foc.bootloader.main>"
+        VERBATIM
+    )
 endif()
 
 emil_generate_artifacts(TARGET e_foc.bootloader.main MAP BIN HEX)

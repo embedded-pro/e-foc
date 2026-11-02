@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.3.0      |
+| Version   | 0.4.0      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -214,17 +214,25 @@ application together, so a board programmed for the first time starts in the sam
 The bootloader uses no interrupt, no timer and no peripheral but the flash controller, so the processor is in
 its reset state apart from the flash controller, which it locks again. It points the vector table at the
 application slot, loads the stack pointer from the slot's first vector and branches to the reset handler in
-the second. The watchdog is not running at that point: the TI watchdog and the ST window watchdog both start
+the second, through the embedded-infrastructure library's Cortex-M jump. The watchdog is not running at that point: the TI watchdog and the ST window watchdog both start
 only when software starts them, and the application does (`watchdog.md`).
 
 ### Part G — keys
 
-- The bootloader is built with the project's ECDSA-P256 public key and its AES-128 key. The release workflow
-  signs and encrypts every pack with the private key and the AES key, held as repository secrets that only the
-  release workflow reads.
-- A development key pair and AES key live in the repository, marked as such. Development builds, the
-  emulated target and the release workflow's dry runs use them, so a pack signed with them never installs on a
-  board whose bootloader carries the release key.
+- No key material lives in the repository. A key set is one file holding the AES-128 image key, the
+  ECDSA-P256 public key and its private key; the firmware image tool (Part J) generates one from the host's
+  random source.
+- Two key sets exist, each a repository secret: the release set, which only the release workflow reads, and
+  the development set, which continuous integration and the release workflow's dry runs read. A pack signed
+  with the development key never installs on a board whose bootloader carries the release key. A developer
+  generates a set of their own for local builds.
+- The bootloader links with a key slot of its own, 80 bytes holding the public key and then the AES key,
+  left erased. An erased slot holds no valid public key, so every pack fails its signature check and only
+  the installed application ever starts: a build without keys is safe, but cannot update a board.
+- A build given a key set fills the slot after the link: the image tool takes the 80 public bytes from the
+  set, and the toolchain's object copy writes them into the slot before the hex and binary images are made.
+  Nothing else changes, so two builds with different sets differ only in those 80 bytes. A build that reads
+  no secret, such as a pull request from a fork, produces a bootloader without keys.
 - The public key only verifies, so reading it from a board gains nothing. The AES key protects the
   confidentiality of the images and is only as safe as the board's flash: production boards are locked
   against debug read-out (TM4C debug lock, ST read-out protection level 1). Every board shares one AES key,
@@ -288,6 +296,22 @@ the stream on its own, so this costs nothing in the copy that follows. It then c
 A failure is recorded as *invalid* with the bootloader's own *wrong target* error code, outside the range the
 library reserves for its loaders, and the old application starts untouched.
 
+### Part J — firmware image tool
+
+A host program built from the e-foc sources, so the firmware build needs no interpreter. The host build
+builds and tests it; an embedded build that needs it builds it first with the host compiler. It uses the
+embedded-infrastructure library's SHA-256 and micro-ecc.
+
+| Command           | Takes     | Gives                                        |
+|-------------------|-----------|----------------------------------------------|
+| `generate-keys`   | nothing   | a new key set, from the host's random source |
+| `bootloader-keys` | a key set | the bootloader's 80-byte key slot (Part G)   |
+
+A key set file is 112 bytes: the AES key (16), the public key (64, the curve point's x and then y, most
+significant byte first) and the private key (32). The tool refuses a file of another size, or one whose
+public key is not the one its private key gives, so a damaged secret stops the build instead of producing a
+bootloader that refuses every pack.
+
 ---
 
 ## Interfaces
@@ -314,6 +338,8 @@ library reserves for its loaders, and the old application starts untouched.
 | AES-128-CTR decryption   | Image confidentiality                               | tiny-aes, through the library's AES decryptor                                                                                                                                                                           |
 | SHA-256                  | Signature digest and the check at every reset       | The library's software SHA-256, fed in pieces read from flash                                                                                                                                                           |
 | Device identity register | What the chip is                                    | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)                                                                                                                                                 |
+| Cortex-M jump            | Start the application (Part F)                      | Embedded-infrastructure library; points the vector table at the slot, then loads the stack pointer and branches                                                                                                         |
+| Object copy              | Write the key slot after the link (Part G)          | The GNU Arm toolchain's object copy, updating one section of the linked bootloader                                                                                                                                      |
 
 ---
 
@@ -368,19 +394,19 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint           | Value / Description                                                                                                                              |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                      |
-| Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                |
-| Largest image        | the application slot less its 64-byte descriptor                                                                                                 |
-| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                      |
-| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption |
-| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                         |
-| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                    |
-| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                     |
-| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                    |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board; development keys for development and emulation only                                 |
-| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                 |
+| Constraint           | Value / Description                                                                                                                                               |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                                       |
+| Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                                 |
+| Largest image        | the application slot less its 64-byte descriptor                                                                                                                  |
+| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                                       |
+| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption                  |
+| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                          |
+| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                                     |
+| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                                      |
+| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                                     |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a release and a development set, both repository secrets |
+| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                                  |
 
 ---
 

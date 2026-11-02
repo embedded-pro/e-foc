@@ -1,8 +1,8 @@
 #include "BootloaderPlatform.hpp"
+#include "KeySlot.hpp"
 #include "bootloader/ApplicationInstaller.hpp"
 #include "bootloader/BootSequence.hpp"
 #include "bootloader/StatusJournal.hpp"
-#include "targets/bootloader/keys/DevelopmentKeys.hpp"
 #include "upgrade/boot_loader/DecryptorAesTiny.hpp"
 #include "upgrade/boot_loader/VerifierEcDsa.hpp"
 #include <array>
@@ -41,9 +41,9 @@ int main()
     bootloader::BootloaderPlatform platform{ Region(__staging_slot_start, __staging_slot_end), Region(__status_journal_start, __status_journal_end), slot };
     const bootloader::ExactTargetCheck<bootloader::ImageTarget> target{ platform.Target() };
 
-    application::DecryptorAesTiny decryptor{ infra::MakeRange(bootloader::keys::imageEncryptionKey) };
-    application::DecryptorAesTiny checkDecryptor{ infra::MakeRange(bootloader::keys::imageEncryptionKey) };
-    const application::VerifierEcDsa256 verifier{ infra::MakeRange(bootloader::keys::signaturePublicKey) };
+    application::DecryptorAesTiny decryptor{ infra::MakeRange(bootloader::keySlot.imageEncryptionKey) };
+    application::DecryptorAesTiny checkDecryptor{ infra::MakeRange(bootloader::keySlot.imageEncryptionKey) };
+    const application::VerifierEcDsa256 verifier{ infra::MakeRange(bootloader::keySlot.signaturePublicKey) };
     std::array<uint8_t, bootloader::imageStartCheckSize> buffer{};
 
     bootloader::StatusJournal journal{ platform.JournalFlash() };
