@@ -25,6 +25,7 @@ namespace services
             std::size_t settledCount{ 10 };
             infra::Duration timeout{ std::chrono::seconds{ 2 } };
             foc::Ohm phaseResistance{ 0.0f };
+            foc::Henry phaseInductance{ 0.0f };
             foc::Volts busVoltage{ 0.0f };
             std::optional<foc::Radians> followStep;
             std::size_t followDwell{ 100 };

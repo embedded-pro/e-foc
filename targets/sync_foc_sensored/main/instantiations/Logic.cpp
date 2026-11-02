@@ -110,7 +110,10 @@ namespace application
                     {
                         return controlMode->ActiveStateMachine();
                     });
-                phaseLoss.Enable();
+                phaseLoss.Enable([this]()
+                    {
+                        return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
+                    });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()

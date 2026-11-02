@@ -45,7 +45,10 @@ namespace
                 {
                     return drive;
                 });
-            monitor.Enable();
+            monitor.Enable([this]()
+                {
+                    return currentLoopBandwidth;
+                });
         }
 
         void Observe(float speed, float measured, float demanded)
@@ -66,6 +69,7 @@ namespace
         StrictMock<FocStateMachineBaseMock> drive;
         state_machine::State state{ state_machine::Enabled{} };
         foc::MotionObservation observation{};
+        foc::RadiansPerSecond currentLoopBandwidth{ 0.0f };
         std::vector<state_machine::FaultCode> faults;
         supervision::PhaseLossMonitor monitor{ foc::Ampere{ maxCurrent }, [this](state_machine::FaultCode code)
             {
@@ -74,14 +78,58 @@ namespace
     };
 }
 
-TEST_F(PhaseLossMonitorTest, a_demand_that_draws_no_current_at_standstill_is_a_missing_phase_after_50_ms)
+TEST_F(PhaseLossMonitorTest, a_demand_that_draws_no_current_at_standstill_is_a_missing_phase_50_ms_after_it_is_first_seen)
 {
     Observe(0.0f, 0.01f, 5.0f);
 
-    Run(std::chrono::milliseconds(40));
+    Run(std::chrono::milliseconds(50));
     EXPECT_EQ(0u, Reports());
 
     Run(std::chrono::milliseconds(10));
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(PhaseLossMonitorTest, a_shortfall_that_lasts_less_than_50_ms_is_not_reported_even_when_it_starts_just_before_an_evaluation)
+{
+    Run(std::chrono::milliseconds(9));
+    Observe(0.0f, 0.0f, 5.0f);
+    Run(std::chrono::milliseconds(45));
+    Observe(0.0f, 5.0f, 5.0f);
+    Run(std::chrono::milliseconds(100));
+
+    EXPECT_EQ(0u, Reports());
+}
+
+TEST_F(PhaseLossMonitorTest, a_healthy_drive_at_the_minimum_current_bandwidth_is_not_reported_while_its_current_rises)
+{
+    // A first-order loop at 1 rad/s needs 0.22 s to pass a fifth of its demand.
+    currentLoopBandwidth = foc::RadiansPerSecond{ 1.0f };
+    Observe(0.0f, 0.0f, 5.0f);
+    Run(std::chrono::milliseconds(220));
+    Observe(0.0f, 1.1f, 5.0f);
+    Run(std::chrono::milliseconds(500));
+
+    EXPECT_EQ(0u, Reports());
+}
+
+TEST_F(PhaseLossMonitorTest, an_open_circuit_at_the_minimum_current_bandwidth_is_reported_one_loop_time_constant_after_it_is_seen)
+{
+    currentLoopBandwidth = foc::RadiansPerSecond{ 1.0f };
+    Observe(0.0f, 0.0f, 5.0f);
+
+    Run(std::chrono::milliseconds(1000));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(10));
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(PhaseLossMonitorTest, a_fast_current_loop_keeps_the_50_ms_span)
+{
+    currentLoopBandwidth = foc::RadiansPerSecond{ 2000.0f };
+    Observe(0.0f, 0.0f, 5.0f);
+
+    Run(std::chrono::milliseconds(60));
     EXPECT_EQ(1u, Reports());
 }
 
@@ -94,7 +142,7 @@ TEST_F(PhaseLossMonitorTest, a_missing_phase_is_reported_once_per_enable)
     state = state_machine::Ready{};
     Run(std::chrono::milliseconds(10));
     state = state_machine::Enabled{};
-    Run(std::chrono::milliseconds(50));
+    Run(std::chrono::milliseconds(60));
     EXPECT_EQ(2u, Reports());
 }
 
@@ -137,7 +185,7 @@ TEST_F(PhaseLossMonitorTest, a_cable_pulled_while_running_is_reported_once_the_r
     EXPECT_EQ(0u, Reports());
 
     Observe(-9.0f, 0.0f, 10.0f);
-    Run(std::chrono::milliseconds(50));
+    Run(std::chrono::milliseconds(60));
     EXPECT_EQ(1u, Reports());
 }
 

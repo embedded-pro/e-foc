@@ -209,6 +209,8 @@ namespace application
         foc::OneShotDelay shaftHold;
         foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
+        // Faults injected during a run accumulate here; Stop() returns it to the boot faults.
+        foc::ThreePhaseMotorModel::FaultInjectionConfig activeFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
         std::optional<EmulatedCanBusAdapter> canBusAdapter;
         infra::TimerRepeating portPollTimer;

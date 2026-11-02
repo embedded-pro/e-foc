@@ -30,8 +30,11 @@ namespace services
         void CalculateAlignmentOffset();
         void ProcessPosition(const foc::PhaseCurrents& currents);
         void Settle();
+        void Decide();
         bool CarriesNoCurrent() const;
+        bool Missing(float measured, float final, float starting, float risen) const;
         std::optional<float> ExpectedPhaseACurrent() const;
+        float SettledShareOfFinalCurrent() const;
         void FailToConverge();
         void Finish(std::optional<foc::Radians> result);
         void Complete(std::optional<foc::Radians> result);
@@ -48,12 +51,22 @@ namespace services
         AlignmentConfig alignmentConfig;
         std::size_t polePairs = 1;
         std::size_t currentSampleIndex = 0;
+        std::size_t settledEndSample = 0;
         std::size_t consecutiveSettledSamples = 0;
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
         float settledSumA{ 0.0f };
         float settledSumB{ 0.0f };
         float settledSumC{ 0.0f };
+
+        struct PhaseMeans
+        {
+            float a{ 0.0f };
+            float b{ 0.0f };
+            float c{ 0.0f };
+        };
+
+        PhaseMeans startingCurrents;
         Failure failure{ Failure::none };
         bool firstHold{ false };
         std::size_t samplesInHold = 0;

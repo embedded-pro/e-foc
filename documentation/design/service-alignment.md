@@ -2,7 +2,7 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: service-alignment
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.0                    |
+| Version   | 0.3.1                    |
 | Component | service-alignment        |
 | Date      | 2026-10-30               |
 
@@ -65,6 +65,8 @@ Before invoking alignment, the caller must have:
    - **phase resistance** and **bus voltage** — the calibrated winding resistance and the measured supply, from
      which the phase-continuity check derives the current the vector should drive; either left at zero skips the
      part of the check that needs them
+   - **phase inductance** — the calibrated winding inductance; with the resistance it sets how far the current
+     can have risen by the settled samples. Left at zero, the current is taken as settled
    - **follow step** — the electrical angle ahead of the alignment angle at which the vector is held first, so
      the encoder can be seen to follow the field; zero skips the first hold and the follow check. The calibration
      flow passes a quarter turn
@@ -114,8 +116,10 @@ reaches anything.
 completion **without invoking it**, so a fault raised by the state machine cannot be overwritten by an
 alignment result that arrives after it.
 
-Every decision above is taken in the sampling interrupt, and so is everything that must happen at that
-instant: the inverter is stopped there and, on success, the encoder zeroed there. The completion is not. The
+A maximum-sample run-out and an over-current are decided in the sampling interrupt, and the inverter is
+stopped there. A settled rotor is not: the interrupt only hands the settled samples to the event loop, which
+judges the phase currents and, while the vector still holds the rotor, zeroes the encoder and then stops the
+inverter (Phase Continuity Check). The completion is never delivered from the interrupt either. The
 caller stores calibration data and changes state from it, which is event-loop work and far longer than a
 control period, so the outcome is queued and delivered from the event loop. Until then the run is still in
 progress: samples are discarded, a second `ForceAlignment` is rejected, and `Abort()` drops the queued outcome.
@@ -127,8 +131,8 @@ The encoder position at the moment of settlement declaration becomes the calibra
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
 
-The service applies the offset itself, by calling `Encoder::SetZero()` at the settled instant while the rotor
-is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
+The service applies the offset itself, by calling `Encoder::SetZero()` once the settled run is judged, while
+the rotor is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
 rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
 read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
 loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
@@ -153,6 +157,25 @@ already takes at the sampling frequency, never the 20 kHz ones — and declares 
 A quarter leaves room for what the model ignores: dead time and switch drop take a few percent of the
 alignment voltage, and the calibrated resistance can be off by more than that. A missing phase reads a few
 noise samples' worth of current, far below it.
+
+The current does not reach `ia` at once: it rises as `1 − e^(−t/τ)` with `τ = L/R` from the moment the vector is
+applied. A rotor that already rests at electrical zero settles after the first few samples, before a slow winding
+has carried much current. So the expected currents are scaled by the mean of `1 − e^(−t/τ)` over the settled
+samples' own times. On the reference motors τ is under 1.2 ms and the scale is close to 1. The accepted ranges
+allow τ up to about 10⁴ s (L up to 1 H, R down to 0.1 mΩ), far beyond any hold the alignment can afford, so
+waiting for the current to settle instead would turn a slow winding into a failed alignment. A slow winding with
+no current flowing still reads below a quarter of its scaled expectation.
+
+With the follow step (Encoder Follow Check) the second hold does not start from zero: each phase moves from the
+current the first hold left to the alignment angle's, and the expectation follows that path. Phase b reverses on
+the way. While its expected mean is under a quarter of its final share, a transition cannot be told from an open
+phase, so b is not judged; a and c, which keep their sign, still are.
+
+The settled samples are taken in the control interrupt, but nothing is decided there. The interrupt stops
+taking samples, records which samples were settled and hands the run to the event loop. The vector keeps
+holding the rotor until the event loop has judged the currents and, on success, read and zeroed the encoder;
+only then is the inverter stopped. An `Abort()` between the hand-over and the decision stops the inverter and
+discards the run without zeroing the encoder.
 
 Without a resistance or a bus voltage the expected current is unknown. The check then falls back to the
 ratio between the phases: b and c must each carry at least a quarter of half of the measured `|ia|`. That
@@ -179,8 +202,9 @@ nothing (REQ-SM-034). With a non-zero follow step the service therefore aligns i
    the pole pairs mechanically. Settlement is not counted during the follow dwell, so a heavy rotor that has not
    yet started to move cannot be declared settled where it stood. Each hold has its own `maxSamples`.
 
-When the second hold settles, the phase-continuity check runs on its currents, which are the alignment angle's,
-and a missing phase is reported first: a disconnected motor or an open phase also leaves the rotor where it is.
+When the second hold settles, the sampling interrupt hands the run to the event loop as without the follow step.
+There the phase-continuity check runs on the second hold's currents, which are the alignment angle's, and a
+missing phase is reported first: a disconnected motor or an open phase also leaves the rotor where it is.
 Then the travel between the two settled readings is compared with the expected one. The encoder followed when
 the travel is in the direction the field turned and between half and one and a half times the expected angle.
 Otherwise the run ends like a missing phase, with *encoder not following* recorded, which the caller reports as
@@ -203,14 +227,17 @@ hold's own `maxSamples` for a slow one.
 
 ### State Machine
 
-The service follows a four-state machine:
+The service follows a five-state machine:
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
     Idle --> Aligning : ForceAlignment called
     Aligning --> Aligning : first hold settled\n(vector moves to the alignment angle)
-    Aligning --> Delivering : settled, maxSamples exceeded or over-current\n(sampling interrupt stops the inverter)
+    Aligning --> Judging : final hold settled\n(sampling interrupt hands the settled samples over; the vector keeps holding)
+    Judging --> Idle : event loop judges the currents and the follow\n(zeroes the encoder if both pass, stops the inverter, onDone fired)
+    Judging --> Idle : Abort\n(inverter stopped, encoder untouched, onDone dropped)
+    Aligning --> Delivering : maxSamples exceeded or over-current\n(sampling interrupt stops the inverter)
     Aligning --> Idle : step timeout\n(inverter stopped, onDone(nullopt) fired)
     Delivering --> Idle : event loop fires\nonDone(offset) or onDone(nullopt)
     Aligning --> Idle : Abort\n(inverter stopped, onDone dropped)
