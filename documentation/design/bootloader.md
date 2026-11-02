@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.5
+version: 0.5.0
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.5      |
+| Version   | 0.5.0      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -79,7 +79,7 @@ bytes of the application slot are the image descriptor (Part E).
 | EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 256 KB          | internal, `0x00048000`, 256 KB               | `0x00088000`, 16 KB     | 227 KB       |
 | NUCLEO-H563ZI | 2 MB in two banks, 8 KB | `0x08000000`, 32 KB | `0x08008000`, 992 KB (bank 1) | internal, `0x08100000`, 256 KB (bank 2)      | `0x08140000`, 8 KB      | not measured |
 | NUCLEO-G474RE | 512 KB, 2 KB pages      | `0x08000000`, 32 KB | `0x08008000`, 480 KB          | external SPI NOR, from its address 0, 256 KB | the NOR sector after it | 259 KB       |
-| Emulated      | 16 MB                   | none (Part H)       | `0x00000000`                  | semihosting file `staging.bin`, 256 KB       | in the same file        | 229 KB       |
+| Emulated      | 4 MB of code RAM        | `0x00000000`, 32 KB | `0x00008000`, 256 KB          | semihosting file `staging.bin`, 256 KB       | file `journal.bin`      | 229 KB       |
 | EK-TM4C123GXL | 256 KB, 1 KB sectors    | none                | `0x00000000`                  | none                                         | none                    | 255 KB       |
 
 On the EK-TM4C1294XL:
@@ -252,13 +252,15 @@ only when software starts them, and the application does (`watchdog.md`).
 | EK-TM4C1294XL | TI internal flash, blocking | TI internal flash, blocking          | yes                                |
 | NUCLEO-H563ZI | ST internal flash, bank 1   | ST internal flash, bank 2            | yes                                |
 | NUCLEO-G474RE | ST internal flash           | SPI NOR on the motor board, blocking | yes, once the board has the device |
-| Emulated      | —                           | file in the scenario directory       | no: the application starts at 0    |
+| Emulated      | code RAM, refilled at reset | file in the scenario directory       | yes                                |
 | EK-TM4C123GXL | —                           | —                                    | no                                 |
 
-The emulated target runs the application at the start of flash, without a bootloader, so the
-software-in-the-loop runner keeps starting one image. Its scenarios cover the application's side of an
-update, up to *ready to deploy* in the journal; the bootloader's install path is tested on the host, in the
-embedded-infrastructure library, against a flash fake (Open Question 3).
+The emulated target boots through the bootloader like a board with one: every software-in-the-loop scenario
+starts with the bootloader's check of the application slot, and the bootloader's own scenarios stage packs
+and read the journal (`software-in-the-loop.md` Part P). Its code memory is RAM that the emulator fills again
+at every reset, so an image the bootloader installs lasts until the next reset; staging and journal are files
+in the scenario directory and last across resets and restarts. The emulator has no device-identity register
+(Part I).
 
 ### Part I — target identity: never the wrong microcontroller
 
@@ -275,11 +277,12 @@ device-identity register gives. The header is compiled from the same target defi
 of the image, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
 TM4C123 but not one TM4C129 part from another; the board kind beside it does.
 
-| Microcontroller | Device identity the header carries                    | Where the chip reports it          |
-|-----------------|-------------------------------------------------------|------------------------------------|
-| TM4C1294NCPDT   | device class `0x0A` (TM4C129), with the TI family tag | system control `DID0`, class field |
-| STM32H563ZI     | device identifier `0x484`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`   |
-| STM32G474RE     | device identifier `0x469`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`   |
+| Microcontroller | Device identity the header carries                    | Where the chip reports it                   |
+|-----------------|-------------------------------------------------------|---------------------------------------------|
+| TM4C1294NCPDT   | device class `0x0A` (TM4C129), with the TI family tag | system control `DID0`, class field          |
+| STM32H563ZI     | device identifier `0x484`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
+| STM32G474RE     | device identifier `0x469`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
+| Emulated        | the constant `0x00000386`, with the emulated tag      | none: the bootloader uses the same constant |
 
 **Checks, in order.** A wrong pack is stopped at the first layer that can see the mistake; each later layer
 holds even if an earlier one was skipped or its label was wrong:
@@ -429,10 +432,10 @@ sequenceDiagram
 
 ## Open Questions
 
-| # | Question                                                                                       | Options                                                                                     | Status |
-|---|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|--------|
-| 1 | Which SPI NOR device holds the NUCLEO-G474RE's staging slot, and on which SPI and chip-select? | A JEDEC serial NOR of 1 MB or more on the motor board / a flash board on the NUCLEO headers | open   |
-| 2 | Should the bootloader refuse a pack older than the installed application?                      | Monotonic version counter in the journal / accept any signed pack (current)                 | open   |
-| 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | open   |
-| 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open   |
-| 5 | How does the NUCLEO-G474RE image get below the 256 KB a pack may hold?                         | Trim the image / leave that board without updates (current)                                 | open   |
+| # | Question                                                                                       | Options                                                                                     | Status                                                                                          |
+|---|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| 1 | Which SPI NOR device holds the NUCLEO-G474RE's staging slot, and on which SPI and chip-select? | A JEDEC serial NOR of 1 MB or more on the motor board / a flash board on the NUCLEO headers | open                                                                                            |
+| 2 | Should the bootloader refuse a pack older than the installed application?                      | Monotonic version counter in the journal / accept any signed pack (current)                 | open                                                                                            |
+| 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | closed: every emulated scenario boots through the bootloader (`software-in-the-loop.md` Part P) |
+| 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open                                                                                            |
+| 5 | How does the NUCLEO-G474RE image get below the 256 KB a pack may hold?                         | Trim the image / leave that board without updates (current)                                 | open                                                                                            |
