@@ -3,7 +3,7 @@ Feature: Disconnected And Faulty Motor Wiring
   where it is however the drive is commanded, and a rotor that does not move is
   exactly what alignment waits for. The alignment therefore checks that the vector
   it applies drives its current through every phase before it zeroes the encoder,
-  and reports a missing phase when one does not (REQ-EH-016). A cable pulled while
+  and reports a missing phase when one does not (REQ-EH-015). A cable pulled while
   the drive runs is found by the phase-loss monitor: the drive demands current it
   cannot make flow while the rotor is slow. The healthy plant is run through the
   same steps so the comparison is like for like.
@@ -18,7 +18,7 @@ Feature: Disconnected And Faulty Motor Wiring
   the reading does not move; in any mode, torque mode included, a reading that
   stops dead faster than the rotor could physically stop is a sensor fault.
 
-  @sil @REQ-EH-016 @REQ-CAN-014
+  @sil @REQ-EH-015 @REQ-CAN-013
   Scenario: A disconnected motor fails its alignment as a missing phase
     Given a disconnected motor plant
     And the motor is already calibrated
@@ -27,7 +27,7 @@ Feature: Disconnected And Faulty Motor Wiring
     And the rotor alignment is attempted
     Then the state machine shall report a missing-phase fault
 
-  @sil @REQ-EH-016
+  @sil @REQ-EH-015
   Scenario: A motor with one open phase fails its alignment as a missing phase
     Given an open phase motor plant
     And the motor is already calibrated
@@ -36,7 +36,7 @@ Feature: Disconnected And Faulty Motor Wiring
     And the rotor alignment is attempted
     Then the state machine shall report a missing-phase fault
 
-  @sil @REQ-EH-016
+  @sil @REQ-EH-015
   Scenario: A healthy motor aligns and turns through the same steps
     Given a nominal motor plant
     And the motor is already calibrated
@@ -48,7 +48,7 @@ Feature: Disconnected And Faulty Motor Wiring
     Then the rotor shall turn
     And the state machine shall be in the running state
 
-  @sil @REQ-EH-016 @REQ-CAN-014
+  @sil @REQ-EH-015 @REQ-CAN-013
   Scenario: A cable pulled while the drive runs is reported as a missing phase
     Given a nominal motor plant
     And the motor cable is pulled 300 ms after enable

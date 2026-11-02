@@ -63,31 +63,33 @@ files. The builder numbers the chapters in the order the tables below list them.
 
 ## Design
 
-| Chapter                                                                                | What it covers                                                                      |
-|----------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| [FOC Mathematical Transforms](../design/foc-transforms.md)                             | Clarke, Park, inverse Park, SVM — component responsibilities                        |
-| [FOC Torque Control](../design/foc-torque.md)                                          | Current-loop component design, PI anti-windup, ISR flow                             |
-| [FOC Speed Control](../design/foc-speed.md)                                            | Speed-loop component design, 1 kHz handler flow                                     |
-| [FOC Position Control](../design/foc-position.md)                                      | Position-loop component design, handler flow                                        |
-| [Runtime Controller Selection](../design/controller-selection.md)                      | Heap-free variant storage, std::visit dispatch, state gating                        |
-| [Service: FOC State Machine](../design/state-machine.md)                               | States, transitions, guards, and the enable/disable lifecycle                       |
-| [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                           |
-| [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                           |
-| [Service: Rotor Standstill](../design/service-standstill.md)                           | Waits for the rotor to come to rest before the offsets are measured                 |
-| [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample         |
-| [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures       |
-| [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for |
-| [Service: Cogging Compensation](../design/service-cogging-compensation.md)             | Cogging torque map at calibration, current feed-forward in the cascades             |
-| [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step   |
-| [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                               |
-| [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                       |
-| [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                       |
-| [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                     |
-| [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                         |
-| [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry       |
-| [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings           |
-| [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                           |
-| [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers           |
+| Chapter                                                                                | What it covers                                                                         |
+|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| [FOC Mathematical Transforms](../design/foc-transforms.md)                             | Clarke, Park, inverse Park, SVM — component responsibilities                           |
+| [FOC Torque Control](../design/foc-torque.md)                                          | Current-loop component design, PI anti-windup, ISR flow                                |
+| [FOC Speed Control](../design/foc-speed.md)                                            | Speed-loop component design, 1 kHz handler flow                                        |
+| [FOC Position Control](../design/foc-position.md)                                      | Position-loop component design, handler flow                                           |
+| [Runtime Controller Selection](../design/controller-selection.md)                      | Heap-free variant storage, std::visit dispatch, state gating                           |
+| [Service: FOC State Machine](../design/state-machine.md)                               | States, transitions, guards, and the enable/disable lifecycle                          |
+| [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                              |
+| [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                              |
+| [Service: Rotor Standstill](../design/service-standstill.md)                           | Waits for the rotor to come to rest before the offsets are measured                    |
+| [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample            |
+| [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures          |
+| [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for    |
+| [Service: Cogging Compensation](../design/service-cogging-compensation.md)             | Cogging torque map at calibration, current feed-forward in the cascades                |
+| [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step      |
+| [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                                  |
+| [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                          |
+| [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                          |
+| [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                        |
+| [Service: Firmware Upgrade](../design/service-firmware-upgrade.md)                     | Receiving a firmware pack over CAN, checking it and restarting into the bootloader     |
+| [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                            |
+| [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry          |
+| [Bootloader](../design/bootloader.md)                                                  | Flash layout, pack verification and decryption, installation, the check at every reset |
+| [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings              |
+| [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                              |
+| [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers              |
 
 ## Building the booklet
 

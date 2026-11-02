@@ -332,6 +332,6 @@
     alignment angle until it settles again. It shall refuse the alignment with
     FaultCode::encoderLoss, leaving the encoder unzeroed, unless the settled encoder travel
     between the two holds is in the direction the field turned and between half and one and a
-    half times a quarter turn divided by the pole pairs. A missing phase found by REQ-EH-016 is
+    half times a quarter turn divided by the pole pairs. A missing phase found by REQ-EH-015 is
     reported in preference to it. A rotor mechanically locked at power-up shall be reported
     the same way, since the drive cannot tell it from an encoder that does not report.

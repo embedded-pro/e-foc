@@ -30,6 +30,7 @@ namespace tool
         void DisconnectRequested();
 
     public slots:
+        void OnConnecting();
         void OnConnectionChanged(bool connected);
 
     private slots:
@@ -41,6 +42,7 @@ namespace tool
         void CreateButtons(QHBoxLayout& layout);
         void ConnectSignals();
         void UpdateConnectEnabled();
+        void SetFieldsEnabled(bool enabled);
 
         services::CanBusAdapter& adapter;
         QComboBox* interfaceCombo;
@@ -50,5 +52,6 @@ namespace tool
         QPushButton* disconnectButton;
         QLabel* statusLabel;
         bool connected{ false };
+        bool connecting{ false };
     };
 }

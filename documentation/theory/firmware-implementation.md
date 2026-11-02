@@ -316,7 +316,8 @@ becomes 40. The window, not the CPU, is the binding constraint.
 - **Not verifiable here**: the TI driver code (dead-time cycle calculation, QEI filter, ADC clock setup) lives in a
   submodule not checked out with the firmware; its behaviour is taken from the platform code and the design
   documents.
-- **Does not cover**: the build system, the bootloader and firmware update, and the desktop tools.
+- **Does not cover**: the build system, the bootloader and firmware update (`design/bootloader.md`,
+  `design/service-firmware-upgrade.md`), and the desktop tools.
 
 ## References
 

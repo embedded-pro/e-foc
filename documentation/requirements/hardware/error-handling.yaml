@@ -134,7 +134,7 @@
     stopped, and the platform shall report an over-current board-protection fault from the event
     loop.
 
-- id: REQ-EH-016
+- id: REQ-EH-015
   title: A motor that does not carry the drive's current is reported as a missing phase
   shall: >
     When the rotor alignment settles, the drive shall compare the mean phase currents of the
