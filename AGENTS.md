@@ -138,6 +138,8 @@ built bootloader. An embedded build builds the tool natively at `build/<preset>/
 The development key set is public, `targets/bootloader/keys/development.keys`: CI, dry runs and local builds inject it, and anyone can sign
 packs for a board that carries it. The release set is the only secret, `BOOTLOADER_KEYS_RELEASE` (base64), injected by the release alone (`bootloader.md` Part G).
 
+On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the application slot, the build stamps its image descriptor, and `e_foc.sync_foc_sensored.main.combined.hex` (under `targets/bootloader/main/`) is the image to program with a debugger: bootloader and application together. The descriptor and the combined image come from `e_foc.tool.firmware_image` (`bootloader.md` Part J), which the embedded build builds natively.
+
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 
 **CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts.
