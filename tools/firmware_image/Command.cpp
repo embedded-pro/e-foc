@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <string_view>
 #include <system_error>
 
 #ifndef _WIN32
@@ -31,7 +32,7 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
         constexpr int success = 0;
         constexpr int failure = 1;
 
-        std::optional<std::string> Option(const std::vector<std::string>& arguments, const std::string& name)
+        std::optional<std::string> Option(const std::vector<std::string>& arguments, std::string_view name)
         {
             for (std::size_t index = 1; index + 1 < arguments.size(); ++index)
                 if (arguments[index] == name)
@@ -39,9 +40,9 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
             return std::nullopt;
         }
 
-        std::optional<std::vector<uint8_t>> ReadFile(const std::string& path)
+        std::optional<std::vector<uint8_t>> ReadFile(std::string_view path)
         {
-            std::ifstream file{ path, std::ios::binary };
+            std::ifstream file{ std::filesystem::path{ path }, std::ios::binary };
             if (!file)
                 return std::nullopt;
             return std::vector<uint8_t>{ std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
@@ -102,19 +103,19 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
         }
 #endif
 
-        bool SameFile(const std::string& first, const std::string& second)
+        bool SameFile(std::string_view first, std::string_view second)
         {
             std::error_code error;
-            return std::filesystem::equivalent(first, second, error);
+            return std::filesystem::equivalent(std::filesystem::path{ first }, std::filesystem::path{ second }, error);
         }
 
-        int AlreadyExists(std::ostream& err, const std::string& path)
+        int AlreadyExists(std::ostream& err, std::string_view path)
         {
             err << path << " already exists. A key set is never overwritten: choose another file name, or delete the old one if nothing still needs it.\n";
             return failure;
         }
 
-        int Missing(std::ostream& err, const std::string& command, const char* option)
+        int Missing(std::ostream& err, std::string_view command, std::string_view option)
         {
             err << command << " needs " << option << ".\n\n"
                 << usage;
@@ -151,7 +152,7 @@ Key sets and the bootloader key slot: documentation/design/bootloader.md, Parts 
             return success;
         }
 
-        int ReportKeySetError(std::ostream& err, const std::string& path, std::size_t size, KeySetError error)
+        int ReportKeySetError(std::ostream& err, std::string_view path, std::size_t size, KeySetError error)
         {
             if (error == KeySetError::wrongSize)
                 err << path << " is not a key set: it holds " << size << " bytes, a key set holds " << keySetFileSize << ".\n";

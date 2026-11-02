@@ -123,3 +123,34 @@ TEST_F(TestKeySet, the_bootloader_key_slot_carries_no_private_key_byte)
 
     EXPECT_EQ(slot.end(), std::search(slot.begin(), slot.end(), keys.privateKey.begin(), keys.privateKey.begin() + 8));
 }
+
+TEST_F(TestKeySet, a_private_key_out_of_the_curves_range_is_drawn_again)
+{
+    std::size_t draws{ 0 };
+    const RandomSource zeroFirst{ [&](std::span<uint8_t> bytes)
+        {
+            ++draws;
+            for (auto& byte : bytes)
+                byte = draws == 2 ? 0 : static_cast<uint8_t>(draws * 41 + 7);
+            return true;
+        } };
+
+    const auto keys = GenerateKeySet(zeroFirst);
+
+    ASSERT_TRUE(keys.has_value());
+    EXPECT_NE((std::array<uint8_t, 32>{}), keys->privateKey);
+    std::array<uint8_t, 64> computed{};
+    ASSERT_EQ(1, uECC_compute_public_key(keys->privateKey.data(), computed.data(), uECC_secp256r1()));
+    EXPECT_EQ(computed, keys->publicKey);
+}
+
+TEST_F(TestKeySet, a_random_source_that_never_gives_a_usable_private_key_gives_no_key_set)
+{
+    const RandomSource zeros{ [](std::span<uint8_t> bytes)
+        {
+            std::ranges::fill(bytes, 0);
+            return true;
+        } };
+
+    EXPECT_FALSE(GenerateKeySet(zeros).has_value());
+}

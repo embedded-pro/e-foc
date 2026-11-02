@@ -6,13 +6,7 @@ namespace firmware_image
 {
     namespace
     {
-        // micro-ecc takes its random source as a plain function, so the source in use is parked here
-        const RandomSource* activeRandom = nullptr;
-
-        int UeccRandom(uint8_t* destination, unsigned size)
-        {
-            return (*activeRandom)(std::span<uint8_t>{ destination, size }) ? 1 : 0;
-        }
+        constexpr std::size_t privateKeyDraws = 64;
 
         template<std::size_t N>
         void CopyOut(std::span<const uint8_t> from, std::size_t offset, std::array<uint8_t, N>& to)
@@ -27,15 +21,16 @@ namespace firmware_image
         if (!random(keys.aesKey))
             return std::nullopt;
 
-        activeRandom = &random;
-        uECC_set_rng(&UeccRandom);
-        const auto made = uECC_make_key(keys.publicKey.data(), keys.privateKey.data(), uECC_secp256r1());
-        uECC_set_rng(nullptr);
-        activeRandom = nullptr;
+        // A draw outside [1, n - 1] is refused by uECC_compute_public_key and drawn again, as uECC_make_key does
+        for (std::size_t draw = 0; draw < privateKeyDraws; ++draw)
+        {
+            if (!random(keys.privateKey))
+                return std::nullopt;
+            if (uECC_compute_public_key(keys.privateKey.data(), keys.publicKey.data(), uECC_secp256r1()) == 1)
+                return keys;
+        }
 
-        if (made != 1)
-            return std::nullopt;
-        return keys;
+        return std::nullopt;
     }
 
     std::vector<uint8_t> Serialize(const KeySet& keys)
