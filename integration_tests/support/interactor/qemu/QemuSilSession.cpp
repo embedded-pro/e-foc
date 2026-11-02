@@ -31,6 +31,18 @@ namespace
     constexpr auto kPumpSlice = std::chrono::milliseconds{ 10 };
     constexpr auto kGdbAttachTimeout = std::chrono::milliseconds{ 300000 };
     constexpr auto kStopTimeout = std::chrono::milliseconds{ 2000 };
+    constexpr const char* kSlotAddress = "0x00008000";
+
+    std::optional<std::string> AbsolutePath(const std::string& path)
+    {
+        char resolved[PATH_MAX]{};
+        if (realpath(path.c_str(), resolved) == nullptr)
+        {
+            std::fprintf(stderr, "[QEMU] cannot resolve %s\n", path.c_str());
+            return std::nullopt;
+        }
+        return std::string{ resolved };
+    }
 
     bool SilVerbose()
     {
@@ -161,26 +173,24 @@ namespace sil
         return written;
     }
 
-    bool QemuSilSession::Restart(const std::string& elfPath)
+    bool QemuSilSession::Restart(const Images& images)
     {
         Stop();
-        return Start(elfPath);
+        return Start(images);
     }
 
-    bool QemuSilSession::Start(const std::string& elfPath)
+    bool QemuSilSession::Start(const Images& images)
     {
         signal(SIGPIPE, SIG_IGN);
 
         if (scenarioDirectory.empty() && !CreateScenarioDirectory())
             return false;
 
-        char resolvedElf[PATH_MAX]{};
-        if (realpath(elfPath.c_str(), resolvedElf) == nullptr)
-        {
-            std::fprintf(stderr, "[QEMU] cannot resolve ELF path %s\n", elfPath.c_str());
+        const auto absoluteElf = AbsolutePath(images.bootloaderElf);
+        const auto absoluteSlot = images.slotImage ? AbsolutePath(*images.slotImage) : std::optional<std::string>{ "" };
+        if (!absoluteElf || !absoluteSlot)
             return false;
-        }
-        const std::string absoluteElf{ resolvedElf };
+        const std::string slotLoader = "loader,file=" + *absoluteSlot + ",addr=" + kSlotAddress + ",force-raw=on";
 
         std::error_code error;
         std::filesystem::remove(scenarioDirectory + "/" + kPlantRecordName, error);
@@ -247,8 +257,13 @@ namespace sil
                 "-serial",
                 "chardev:can",
                 "-kernel",
-                absoluteElf.c_str(),
+                absoluteElf->c_str(),
             };
+            if (images.slotImage)
+            {
+                argv.push_back("-device");
+                argv.push_back(slotLoader.c_str());
+            }
             const char* icountOverride = std::getenv("SIL_ICOUNT");
             argv.push_back("-icount");
             argv.push_back(icountOverride != nullptr ? icountOverride : kIcountShift);
@@ -271,6 +286,10 @@ namespace sil
 
         if (!connected)
         {
+            PumpUntil(std::chrono::steady_clock::now() + kStopTimeout, []()
+                {
+                    return false;
+                });
             Stop();
             return false;
         }
@@ -367,9 +386,14 @@ namespace sil
         return tail;
     }
 
-    bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data)
+    bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data, std::chrono::milliseconds timeout)
     {
         if (canSockFd < 0)
+            return false;
+
+        // A target that stops reading its CAN port, such as a halted bootloader, fills the socket; a frame nobody takes is dropped
+        pollfd writable{ canSockFd, POLLOUT, 0 };
+        if (poll(&writable, 1, static_cast<int>(timeout.count())) <= 0 || (writable.revents & POLLOUT) == 0)
             return false;
 
         const auto line = EncodeCanFrame(id, data);

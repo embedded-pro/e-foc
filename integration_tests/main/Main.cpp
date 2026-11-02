@@ -2,6 +2,7 @@
 #include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
 #include "integration_tests/support/interactor/hardware/HardwareInteractor.hpp"
 #include "integration_tests/support/interactor/hardware/SerialLogger.hpp"
+#include "integration_tests/support/interactor/interfaces/BootloaderTarget.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include "integration_tests/support/interactor/interfaces/TerminalInteractor.hpp"
 #include <cstdlib>
@@ -21,10 +22,20 @@ namespace
     bool g_logDisabled{ false };
 
     std::string g_qemuElf;
+    std::string g_qemuBootloaderElf;
+    std::string g_developmentKeys;
 
     hil::BridgeConfig g_bridgeConfig;
 
     std::unique_ptr<integration::TargetInteractor> g_interactor;
+
+    std::string OptionOrEnvironment(const std::string& option, const char* variable, const char* fallback)
+    {
+        if (!option.empty())
+            return option;
+        const char* value = std::getenv(variable);
+        return value != nullptr ? value : fallback;
+    }
 }
 
 int main(int argc, char** argv)
@@ -38,6 +49,8 @@ int main(int argc, char** argv)
     cli.add_flag("--log-disabled", g_logDisabled, "Disable serial transcript logging");
 
     cli.add_option("--qemu-elf", g_qemuElf, "Path to the QEMU SIL firmware ELF (mode=sil)");
+    cli.add_option("--qemu-bootloader-elf", g_qemuBootloaderElf, "Path to the QEMU SIL bootloader ELF (mode=sil)");
+    cli.add_option("--development-keys", g_developmentKeys, "Key set the emulated bootloader and the staged packs use (mode=sil)");
 
     cli.add_option("--bridge-host", g_bridgeConfig.host, "hardware_bridge TCP host (mode=hil)");
     cli.add_option("--serial-port", g_bridgeConfig.serialPort, "hardware_bridge serial TCP port (mode=hil)");
@@ -54,12 +67,12 @@ int main(int argc, char** argv)
             if (g_mode == "sil")
             {
 #ifdef __unix__
-                if (g_qemuElf.empty())
-                {
-                    const char* env = std::getenv("QEMU_SIL_ELF");
-                    g_qemuElf = (env != nullptr) ? env : QEMU_SIL_ELF_DEFAULT_PATH;
-                }
-                g_interactor = std::make_unique<sil::QemuInteractor>(g_qemuElf);
+                g_qemuElf = OptionOrEnvironment(g_qemuElf, "QEMU_SIL_ELF", QEMU_SIL_ELF_DEFAULT_PATH);
+                g_qemuBootloaderElf = OptionOrEnvironment(g_qemuBootloaderElf, "QEMU_SIL_BOOTLOADER_ELF", QEMU_SIL_BOOTLOADER_ELF_DEFAULT_PATH);
+                g_developmentKeys = OptionOrEnvironment(g_developmentKeys, "E_FOC_DEVELOPMENT_KEYS", E_FOC_DEVELOPMENT_KEYS_DEFAULT_PATH);
+                auto qemu = std::make_unique<sil::QemuInteractor>(sil::QemuImages{ g_qemuElf, g_qemuBootloaderElf, g_developmentKeys });
+                integration::BootloaderTarget::SetInstance(*qemu);
+                g_interactor = std::move(qemu);
 #else
                 throw std::runtime_error{ "SIL mode requires a UNIX host" };
 #endif

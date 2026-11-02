@@ -20,8 +20,11 @@ target_link_libraries(e_foc.integration_tests PRIVATE
 )
 
 set(QEMU_SIL_ELF_DEFAULT "${CMAKE_SOURCE_DIR}/build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf")
+set(QEMU_SIL_BOOTLOADER_ELF_DEFAULT "${CMAKE_SOURCE_DIR}/build/qemu-foc-sensored/targets/bootloader/main/RelWithDebInfo/e_foc.bootloader.main.elf")
 target_compile_definitions(e_foc.integration_tests PRIVATE
     "QEMU_SIL_ELF_DEFAULT_PATH=\"${QEMU_SIL_ELF_DEFAULT}\""
+    "QEMU_SIL_BOOTLOADER_ELF_DEFAULT_PATH=\"${QEMU_SIL_BOOTLOADER_ELF_DEFAULT}\""
+    "E_FOC_DEVELOPMENT_KEYS_DEFAULT_PATH=\"${CMAKE_SOURCE_DIR}/targets/bootloader/keys/development.keys\""
 )
 
 add_test(NAME e_foc.integration_tests.sil
