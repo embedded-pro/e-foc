@@ -133,30 +133,18 @@ jobs:
           name: e_foc
       - run: tar -zxvf e_foc-*.tar.gz
       - run: mkdir install && mv e_foc-*/* install/
-      # The development key set goes into the built bootloader's key slot (bootloader.md Part G); without the secret,
-      # as on a pull request from a fork, the bootloader keeps its erased slot and refuses every pack
-      - name: Write the development key set
-        if: ${{ matrix.target == 'EK-TM4C1294XL' }}
-        env:
-          BOOTLOADER_KEYS_DEVELOPMENT: ${{ secrets.BOOTLOADER_KEYS_DEVELOPMENT }}
-        run: |
-          if [ -n "$BOOTLOADER_KEYS_DEVELOPMENT" ]; then
-            printf '%s' "$BOOTLOADER_KEYS_DEVELOPMENT" | base64 -d > "$RUNNER_TEMP/bootloader.keys"
-            echo "BOOTLOADER_KEYS=$RUNNER_TEMP/bootloader.keys" >> "$GITHUB_ENV"
-          else
-            echo "::notice::BOOTLOADER_KEYS_DEVELOPMENT is not readable here: the bootloader keeps its erased key slot"
-          fi
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         id: build
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
+      # The public development key set goes into the built bootloader's key slot (bootloader.md Part G)
       - name: Inject the development keys into the bootloader
-        if: ${{ matrix.target == 'EK-TM4C1294XL' && env.BOOTLOADER_KEYS != '' }}
+        if: ${{ matrix.target == 'EK-TM4C1294XL' }}
         run: |
           images="build/${{ matrix.target }}/targets/bootloader/main/${{ matrix.configuration }}"
           "build/${{ matrix.target }}/_native_bootloader_image/bin/application.bootloader_image" inject-keys \
-            --keys "$BOOTLOADER_KEYS" --elf "$images/e_foc.bootloader.main.elf" --hex "$images/e_foc.bootloader.main.hex"
+            --keys targets/bootloader/keys/development.keys --elf "$images/e_foc.bootloader.main.elf" --hex "$images/e_foc.bootloader.main.hex"
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}

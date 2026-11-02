@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.2
+version: 0.4.3
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.2      |
+| Version   | 0.4.3      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -219,13 +219,14 @@ only when software starts them, and the application does (`watchdog.md`).
 
 ### Part G — keys
 
-- No key material lives in the repository. A key set is one file holding the AES-128 image key, the
-  ECDSA-P256 public key and its private key; the firmware image tool (Part J) generates one from the host's
-  random source.
-- Two key sets exist, each a repository secret: the release set, which only the release workflow reads, and
-  the development set, which continuous integration and the release workflow's dry runs read. A pack signed
-  with the development key never installs on a board whose bootloader carries the release key. A developer
-  generates a set of their own for local builds.
+- A key set is one file holding the AES-128 image key, the ECDSA-P256 public key and its private key; the
+  firmware image tool (Part J) generates one from the host's random source.
+- Two key sets exist. The development set is public: e-foc is open source, so it lives in the repository
+  (`targets/bootloader/keys/development.keys`), and continuous integration, pull requests from forks, the
+  release workflow's dry runs and local builds all use it. Anyone can sign a pack that a board with the
+  development key accepts, so that key is for development boards only. The release set is the only secret, a
+  repository secret that only the release workflow reads. A pack signed with the development key never
+  installs on a board whose bootloader carries the release key.
 - The bootloader links with the library's key slot, 80 bytes holding the public key and then the AES key,
   left erased. An erased slot holds no valid public key, and the library's verifier refuses a key that is not
   on the curve, so every pack fails its signature check and only the installed application ever starts: a
@@ -233,13 +234,13 @@ only when software starts them, and the application does (`watchdog.md`).
 - Keys are not a build input: the build always produces a bootloader with an erased slot, and the image tool's
   key injection writes the public key and the AES key from a set into the finished bootloader, its ELF file
   and its hex files, afterwards. One build can therefore take the development set or the release set, and the
-  two differ only in those 80 bytes. Continuous integration injects the development set when it can read it;
-  without it, as on a pull request from a fork, the bootloader keeps its erased slot.
-- The public key only verifies, so reading it from a board gains nothing. The AES key protects the
-  confidentiality of the images and is only as safe as the board's flash: production boards are locked
-  against debug read-out (TM4C debug lock, ST read-out protection level 1). Every board shares one AES key,
-  so reading it from one board decrypts the images for all of them; the signature still keeps anyone without
-  the private key from installing an image.
+  two differ only in those 80 bytes. Continuous integration injects the development set into every build.
+- The public key only verifies, so reading it from a board gains nothing. The AES key hides nothing in an
+  open-source product: anyone can build the plaintext image from the sources, and the release ships the
+  bootloader with its key slot. The packs stay encrypted because the library's pack format carries the
+  encryption. The signature is what keeps anyone without the release private key from installing an image on
+  a release board; production boards are also locked against debug access (TM4C debug lock, ST read-out
+  protection level 1).
 
 ### Part H — per board
 
@@ -411,7 +412,7 @@ sequenceDiagram
 | Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                                     |
 | Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                                      |
 | Recovery             | a broken application slot with no valid pack needs a debugger                                                                                                     |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a release and a development set, both repository secrets |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set        |
 | Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                                  |
 
 ---

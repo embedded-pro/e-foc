@@ -132,11 +132,11 @@ cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-Rel
 
 Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
-**Bootloader keys**: no key lives in the repository and none is a build input. The bootloader always builds with an erased
-key slot that refuses every pack; afterwards EmIL's `application.bootloader_image inject-keys --keys <set> --elf <bootloader elf> --hex <file>...`
-writes the slot into the built bootloader. An embedded build builds the tool natively at `build/<preset>/_native_bootloader_image/bin` (`bootloader.md` Part J).
-Make a key set with `application.bootloader_image generate-keys --output <file>`. CI injects the development set from the `BOOTLOADER_KEYS_DEVELOPMENT`
-secret (base64); the release injects `BOOTLOADER_KEYS_RELEASE` (`bootloader.md` Part G).
+**Bootloader keys**: no key is a build input. The bootloader always builds with an erased key slot that refuses every pack;
+afterwards EmIL's `application.bootloader_image inject-keys --keys <set> --elf <bootloader elf> --hex <file>...` writes the slot into the
+built bootloader. An embedded build builds the tool natively at `build/<preset>/_native_bootloader_image/bin` (`bootloader.md` Part J).
+The development key set is public, `targets/bootloader/keys/development.keys`: CI, dry runs and local builds inject it, and anyone can sign
+packs for a board that carries it. The release set is the only secret, `BOOTLOADER_KEYS_RELEASE` (base64), injected by the release alone (`bootloader.md` Part G).
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 
