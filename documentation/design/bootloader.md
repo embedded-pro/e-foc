@@ -401,19 +401,19 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint           | Value / Description                                                                                                                                               |
-|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                                       |
-| Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                                 |
-| Largest image        | the application slot less its 64-byte descriptor                                                                                                                  |
-| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                                       |
-| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption                  |
-| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                          |
-| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                                     |
-| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                                      |
-| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                                     |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set        |
-| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                                  |
+| Constraint           | Value / Description                                                                                                                                        |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                                |
+| Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                          |
+| Largest image        | the application slot less its 64-byte descriptor                                                                                                           |
+| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                                |
+| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption           |
+| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                   |
+| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                              |
+| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                               |
+| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                              |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set |
+| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                           |
 
 ---
 
