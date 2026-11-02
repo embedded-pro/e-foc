@@ -17,7 +17,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
-- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
+- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`; its development keys in `targets/bootloader/`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence) the bootloader is built from (`documentation/design/bootloader.md`)
 - `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner

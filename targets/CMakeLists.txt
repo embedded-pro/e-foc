@@ -22,4 +22,5 @@ target_link_libraries(e_foc.platform_abstraction_impl INTERFACE
 )
 
 add_subdirectory(sync_foc_sensored)
+add_subdirectory(bootloader)
 add_subdirectory(hardware_test)
