@@ -30,7 +30,7 @@ date: 2026-10-30
 - Using the drive-wide supervision settings of the configuration record from its next evaluation, and
   leaving stall reporting off when the operator turned it off (REQ-SM-033).
 - Watching an enabled drive for a current it demands but cannot make flow, and raising `phaseMissing` when the
-  motor is disconnected while it runs (REQ-EH-016, Part E).
+  motor is disconnected while it runs (REQ-EH-015, Part E).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -152,7 +152,7 @@ The 10 rad/s bound leaves the back-EMF under 0.3 V on both reference motors.
 
 A cable pulled while the rotor turns faster than that is reported once friction has slowed the rotor below
 it. A single open phase is not reported: two phases still carry current and turn the rotor, so the shortfall
-never appears. Both limits are recorded in REQ-EH-016.
+never appears. Both limits are recorded in REQ-EH-015.
 
 The demanded current is what the active drive commands its current loop: the torque setpoint after the
 current envelope in torque mode, the speed loop's output (or the current a position law commands directly)

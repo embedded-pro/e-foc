@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.5.4
+version: 0.6.1
 component: state-machine
-date: 2026-10-30
+date: 2026-11-01
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.5.4                      |
+| Version   | 0.6.1                      |
 | Component | state-machine              |
-| Date      | 2026-10-30                 |
+| Date      | 2026-11-01                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -149,7 +149,8 @@ Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
 `ReserveExternalCalibration`, `ClearCalibration`, `SetMotorParameter`) and `Enable` are guarded by
 `HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
 is in flight, including the boot-time check and load, while an identification service is
-running, or while a fault latched in an interrupt still owes its transition. One request therefore owns the machine at a time. A save still outstanding after an
+running, while a firmware pack is being received (`service-firmware-upgrade.md` Part G), or while a fault latched in
+an interrupt still owes its transition. One request therefore owns the machine at a time. A save still outstanding after an
 emergency stop cannot be overlapped by the save of a new run, a clear or a motor-parameter change
 in progress cannot be interrupted by `Enable`, whose transition would discard the completion
 and leave the command pending forever, and the boot-time load cannot overwrite the record of a

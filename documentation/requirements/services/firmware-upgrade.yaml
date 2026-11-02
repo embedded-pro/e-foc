@@ -1,0 +1,98 @@
+- id: REQ-UPD-001
+  title: The drive receives firmware over the can-lite firmware-upgrade category
+  shall: >
+    On every board with a staging slot, the motor controller shall answer the can-lite
+    firmware-upgrade category on its CAN node as the can-lite firmware-upgrade
+    specification defines it, and shall write the pack it receives into the staging slot.
+
+- id: REQ-UPD-002
+  title: A download starts only while the drive is stopped
+  shall: >
+    The motor controller shall refuse Begin Upgrade with Busy unless the drive is Idle or
+    Ready with no command and no non-volatile memory operation outstanding, and while
+    another pack is being received, and shall erase nothing when it refuses.
+
+- id: REQ-UPD-003
+  title: The drive stays stopped while a pack is received
+  shall: >
+    From an accepted Begin Upgrade until Verify, Abort or 30 s without an accepted command, and
+    from an accepted Activate until the restart, the motor controller shall refuse every command
+    that starts the drive or asynchronous work and every write of the configuration record, and
+    shall accept the emergency stop.
+
+- id: REQ-UPD-004
+  title: Verify checks the transfer, the board and the microcontroller
+  shall: >
+    On Verify the motor controller shall answer CrcMismatch unless the CRC-32 the can-lite
+    specification fixes, computed over exactly the size given in Begin Upgrade, equals the
+    value received, and NotReady unless the pack's product name equals the firmware's own,
+    naming this board and its microcontroller part, and the pack carries one application image
+    whose length fits the application slot. A pack that passes shall be recorded as downloaded.
+
+- id: REQ-UPD-005
+  title: The apply restarts into the bootloader only while the drive is stopped
+  shall: >
+    The motor controller shall answer Activate with NotReady unless a verified pack is staged,
+    and with Busy unless the drive is Idle or Ready with nothing outstanding. An accepted
+    Activate shall record ready to deploy in the status journal, answer, and restart the
+    controller within one second, so that the bootloader installs the pack.
+
+- id: REQ-UPD-006
+  title: Abandoned or discarded downloads install nothing
+  shall: >
+    Abort, the inactivity deadline and a failed Verify shall leave the status journal empty.
+    Abort while a pack is staged shall make it unavailable for Activate at once, and shall
+    erase the journal only while the drive is Idle or Ready with nothing outstanding, as soon
+    as it is.
+
+- id: REQ-UPD-007
+  title: The drive reports its firmware version, its board and the staged version
+  shall: >
+    The motor controller shall answer QueryParameter for the contract 2.6 parameters
+    firmwareVersionMajor, firmwareVersionMinor, firmwareVersionPatch, boardKind,
+    stagedVersionMajor, stagedVersionMinor and stagedVersionPatch with the release version of
+    the running firmware, the kind of its board and the release version of the staged pack, or
+    zero when none is staged.
+
+- id: REQ-UPD-008
+  title: Flash work never stalls the event loop past the watchdog
+  shall: >
+    The motor controller shall erase at most one staging sector and program at most one page
+    per event-loop turn while a pack is erased for or received.
+
+- id: REQ-UPD-009
+  title: The CAN Commander offers only a checked pack for the motor's board and microcontroller
+  shall: >
+    The CAN Commander shall offer a firmware pack for a motor only after checking a downloaded
+    pack's size and SHA-256 against those the release publishes, and every pack's product name
+    against the board the motor reports and that board's microcontroller, and shall enable the
+    download and the apply only while that motor's last status reads idle or ready, it has no
+    command pending and no other motor on the bus is downloading.
+
+- id: REQ-UPD-010
+  title: The CAN Commander confirms the update from the controller
+  shall: >
+    The CAN Commander shall report a firmware update as successful only when the motor
+    controller comes back online after Activate and reports the version of the pack it staged,
+    and shall keep the emergency stop available to that motor during the download and the apply.
+
+- id: REQ-UPD-011
+  title: A staged pack waits for the user's apply
+  shall: >
+    A pack that passed Verify shall stay staged across motor runs and controller restarts until
+    Activate, Abort or the next Begin Upgrade, and no reset shall install it before Activate.
+
+- id: REQ-UPD-012
+  title: The user starts the download and the apply separately
+  shall: >
+    The motor controller shall never begin a download or an apply on its own. The CAN Commander
+    shall send Begin Upgrade only on the user's download action and Activate only on the user's
+    apply action, each after a confirmation, and shall never send Activate as a consequence of
+    a finished download.
+
+- id: REQ-UPD-013
+  title: The whole 256 KB staging slot is erased before the download starts
+  shall: >
+    The motor controller shall hold a staging slot of 256 KB, answer Begin Upgrade for a larger
+    pack with InvalidSize, and, after accepting Begin Upgrade, erase the status journal and the
+    entire staging slot before answering it; an erase that fails shall be answered WriteError.
