@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "bootloader"
-date: 2026-11-01
+date: 2026-11-02
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.2.0      |
+| Version   | 0.3.0      |
 | Component | bootloader |
-| Date      | 2026-11-01 |
+| Date      | 2026-11-02 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -243,8 +243,8 @@ only when software starts them, and the application does (`watchdog.md`).
 
 The emulated target runs the application at the start of flash, without a bootloader, so the
 software-in-the-loop runner keeps starting one image. Its scenarios cover the application's side of an
-update, up to *ready to deploy* in the journal; the bootloader's install path is tested on the host against a
-flash fake (Open Question 3).
+update, up to *ready to deploy* in the journal; the bootloader's install path is tested on the host, in the
+embedded-infrastructure library, against a flash fake (Open Question 3).
 
 ### Part I — target identity: never the wrong microcontroller
 
@@ -304,15 +304,16 @@ library reserves for its loaders, and the old application starts untouched.
 
 ### Required
 
-| Interface                | Purpose                                       | Contract                                                                             |
-|--------------------------|-----------------------------------------------|--------------------------------------------------------------------------------------|
-| Blocking flash, internal | Read, erase and write the application slot    | TI and ST internal-flash drivers; erase per sector, write any byte range             |
-| Blocking flash, staging  | Read the pack, write the journal              | Internal flash, or the SPI NOR driver on the NUCLEO-G474RE                           |
-| Upgrade pack components  | Pack reader, image installer                  | Embedded-infrastructure library; status kept through replaceable operations (Part D) |
-| ECDSA-P256 verification  | Pack signature                                | micro-ecc, over a SHA-256 computed in software without mbedTLS                       |
-| AES-128-CTR decryption   | Image confidentiality                         | tiny-aes, through the library's AES decryptor                                        |
-| SHA-256                  | Signature digest and the check at every reset | The library's software SHA-256, fed in pieces read from flash                        |
-| Device identity register | What the chip is                              | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)              |
+| Interface                | Purpose                                             | Contract                                                                                                                                                                                                                |
+|--------------------------|-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Blocking flash, internal | Read, erase and write the application slot          | TI and ST internal-flash drivers; erase per sector, write any byte range                                                                                                                                                |
+| Blocking flash, staging  | Read the pack, write the journal                    | Internal flash, or the SPI NOR driver on the NUCLEO-G474RE                                                                                                                                                              |
+| Upgrade pack components  | Pack reader, image installer                        | Embedded-infrastructure library; status kept through replaceable operations (Part D)                                                                                                                                    |
+| Bootloader components    | Journal, image checks, checked installer, boot flow | Embedded-infrastructure library's bootloader package (Parts C, D, E and I); this product supplies the flash, keys, layout, the target its application header names and the check of it (Part I), and the start (Part F) |
+| ECDSA-P256 verification  | Pack signature                                      | micro-ecc, over a SHA-256 computed in software without mbedTLS                                                                                                                                                          |
+| AES-128-CTR decryption   | Image confidentiality                               | tiny-aes, through the library's AES decryptor                                                                                                                                                                           |
+| SHA-256                  | Signature digest and the check at every reset       | The library's software SHA-256, fed in pieces read from flash                                                                                                                                                           |
+| Device identity register | What the chip is                                    | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)                                                                                                                                                 |
 
 ---
 
