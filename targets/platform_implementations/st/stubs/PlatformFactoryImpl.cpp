@@ -99,6 +99,11 @@ namespace application
         return 0;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return BoardKind::nucleoH563zi;
+    }
+
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(SystemCoreClock);

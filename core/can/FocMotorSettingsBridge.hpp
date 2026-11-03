@@ -12,7 +12,7 @@ namespace can
     {
     public:
         FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
-            application::PlatformDiagnostics& diagnostics, FocResetCause resetCause);
+            application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware);
 
         void SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone);
         void SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone);
@@ -36,11 +36,13 @@ namespace can
         FocParameterValue HeldCalibrationReading(FocParameter parameter) const;
         FocParameterValue HeldOnlineEstimate(FocParameter parameter) const;
         FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
+        FocParameterValue HeldPlatformReading(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
         application::PlatformDiagnostics& diagnostics;
         FocResetCause resetCause;
+        FocFirmwareIdentity firmware;
 
         infra::Function<void()> pendingNvmDoneCallback;
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;

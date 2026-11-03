@@ -1,0 +1,12 @@
+#pragma once
+
+#include <cstdint>
+
+namespace build_info
+{
+    inline constexpr uint8_t versionMajor{ @PROJECT_VERSION_MAJOR@ };
+    inline constexpr uint8_t versionMinor{ @PROJECT_VERSION_MINOR@ };
+    inline constexpr uint8_t versionPatch{ @PROJECT_VERSION_PATCH@ };
+    inline constexpr const char* version{ "@PROJECT_VERSION@" };
+    inline constexpr const char* revision{ "@E_FOC_SOURCE_REVISION@" };
+}

@@ -21,7 +21,7 @@ namespace can
         , inverter(platform.inverter)
         , encoder(platform.encoder)
         , commissioning(server, controlMode, electricalIdent, currentOffsets, standstill)
-        , settings(server, controlMode, platform.diagnostics, platform.resetCause)
+        , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }

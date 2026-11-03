@@ -156,6 +156,11 @@ namespace application
         return boardId;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return static_cast<BoardKind>(Peripheral::boardKind);
+    }
+
     void PlatformFactoryImpl::ConfigureBoardIdPins()
     {
         if constexpr (Peripheral::hasBoardIdPins)

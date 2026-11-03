@@ -67,7 +67,7 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::supervisionWindow, SupervisionSettings().front().parameter);
     EXPECT_EQ(FocParameter::stallDetection, SupervisionSettings().back().parameter);
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
-    EXPECT_EQ(FocParameter::resetCause, Readings().back().parameter);
+    EXPECT_EQ(FocParameter::boardKind, Readings().back().parameter);
 }
 
 TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_and_reads_out_the_rest)

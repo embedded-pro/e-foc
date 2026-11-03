@@ -219,6 +219,11 @@ namespace application
         return 0;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return BoardKind::emulated;
+    }
+
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz{ kQemuSystemClockHz };

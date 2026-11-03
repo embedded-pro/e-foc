@@ -27,6 +27,8 @@ namespace services
             hal::Hertz systemClock;
             application::ResetCause resetCause{};
             infra::BoundedConstString faultStatus;
+            infra::BoundedConstString version;
+            infra::BoundedConstString revision;
         };
 
         TerminalWithBanner(infra::BoundedVector<Command>& storage, services::TerminalWithCommands& terminal, services::Tracer& tracer, const Banner& banner);

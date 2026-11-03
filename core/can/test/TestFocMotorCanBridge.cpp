@@ -242,7 +242,7 @@ namespace
                 rest = standstillMock;
             }
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer, offsets, rest);
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer, offsets, rest);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -1578,7 +1578,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer);
+    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }
@@ -2121,6 +2121,21 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_ResetCause_ReportsTheCauseOfTheLast
     DispatchQueryParameter(can::FocParameter::resetCause);
 
     ExpectAnswered(static_cast<float>(can::FocResetCause::watchdog), false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_FirmwareIdentity_ReportsTheVersionAndTheBoardKind)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMajor);
+    ExpectAnswered(1.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMinor);
+    ExpectAnswered(6.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionPatch);
+    ExpectAnswered(2.0f, false);
+    DispatchQueryParameter(can::FocParameter::boardKind);
+    ExpectAnswered(5.0f, false);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_CalibrationReadings_ReportTheStoredRecord)

@@ -7,6 +7,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     CurrentStreamSteps.cpp
     EepromSteps.cpp
     FaultSteps.cpp
+    FirmwareIdentitySteps.cpp
     HardfaultRecoverySteps.cpp
     HilMotorSteps.cpp
     IdentificationSteps.cpp
@@ -22,6 +23,7 @@ add_library(e_foc.integration_tests.steps OBJECT
 
 target_link_libraries(e_foc.integration_tests.steps PUBLIC
     e_foc.integration_tests.support
+    e_foc.build_info
     e_foc.integration_tests.interactor.hardware
     cucumber_cpp.runner
     GTest::gtest

@@ -34,7 +34,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 46> presentations{ {
+        constexpr std::array<SettingPresentation, 50> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -98,6 +98,10 @@ namespace tool
             { FocParameter::loopDeadlineMisses, "Control loop deadline misses", "Deadline misses:", {}, "Periods whose interrupt started late.", {} },
             { FocParameter::loopReentries, "Control loop re-entries", "Re-entries:", {}, "Interrupts that arrived while the previous one still ran.", {} },
             { FocParameter::resetCause, "Reset cause", "Reset cause:", {}, "Cause of the last reset of the controller.", {} },
+            { FocParameter::firmwareVersionMajor, "Firmware major version", "Firmware major:", {}, "Major number of the release version of the running firmware.", {} },
+            { FocParameter::firmwareVersionMinor, "Firmware minor version", "Firmware minor:", {}, "Minor number of the release version of the running firmware.", {} },
+            { FocParameter::firmwareVersionPatch, "Firmware patch version", "Firmware patch:", {}, "Patch number of the release version of the running firmware.", {} },
+            { FocParameter::boardKind, "Board kind", "Board kind:", {}, "Kind of the board: 1 EK-TM4C1294XL, 2 NUCLEO-G474RE, 3 NUCLEO-H563ZI, 4 EK-TM4C123GXL, 5 emulated, 0 unknown.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -273,7 +277,7 @@ namespace tool
 
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(29, 17);
+        return Slice(29, 21);
     }
 
     std::string_view ResetCauseName(float cause)

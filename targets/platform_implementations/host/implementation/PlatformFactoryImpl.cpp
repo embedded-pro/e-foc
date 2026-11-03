@@ -45,6 +45,11 @@ namespace application
         return 0;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return BoardKind::unknown;
+    }
+
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(0);

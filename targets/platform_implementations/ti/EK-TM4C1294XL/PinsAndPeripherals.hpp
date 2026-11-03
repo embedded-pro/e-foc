@@ -64,6 +64,7 @@ namespace application
         constexpr static uint8_t CanIndex = 0;
 
         constexpr static bool hasFaultComparators = true;
+        constexpr static uint8_t boardKind{ 1 };
         constexpr static bool hasBoardIdPins{ true };
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
         constexpr static uint8_t OvervoltageComparatorIndex = 1;
