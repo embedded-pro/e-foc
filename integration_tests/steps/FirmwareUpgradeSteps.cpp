@@ -27,6 +27,8 @@ namespace
 {
     constexpr std::size_t smallImageSize = 600;
     constexpr auto installTimeout = std::chrono::seconds{ 60 };
+    constexpr auto silenceTimeout = std::chrono::seconds{ 10 };
+    constexpr auto silence = std::chrono::milliseconds{ 1500 };
     constexpr auto journalPollInterval = std::chrono::milliseconds{ 100 };
 
     const std::map<std::string, services::FwuError> answers{
@@ -155,6 +157,13 @@ GIVEN(R"(the application is staged as a downloaded pack of the version it runs)"
     EmulatedBootloader().ConfigureJournal(JournalReading(application::UpgradePackStatus::downloaded));
 }
 
+WHEN(R"(the application is downloaded as a pack of the version it runs)")
+{
+    auto& download = context.Get<ScenarioSetup>().download;
+    Prepare(download, ApplicationPack());
+    Download(context.Get<Fixture>(), download);
+}
+
 WHEN(R"(Begin Upgrade is sent for a pack of version {string})", (std::string version))
 {
     auto& download = context.Get<ScenarioSetup>().download;
@@ -276,4 +285,16 @@ THEN(R"(the bootloader installs the pack and the application starts again)")
 
     ASSERT_EQ(application::UpgradePackStatus::deployed, RecordedJournal().first) << "The bootloader did not record the pack deployed";
     EXPECT_TRUE(context.Get<Fixture>().WaitForCanHeartbeat()) << "No application answered after the installation";
+}
+
+THEN(R"(the drive falls silent and its heartbeat comes back)")
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto deadline = std::chrono::steady_clock::now() + silenceTimeout;
+    bool fellSilent = false;
+    while (!fellSilent && std::chrono::steady_clock::now() < deadline)
+        fellSilent = !fixture.WaitForCanHeartbeat(silence);
+
+    ASSERT_TRUE(fellSilent) << "The drive kept sending its heartbeat after Activate";
+    EXPECT_TRUE(fixture.WaitForCanHeartbeat(installTimeout)) << "No application answered after the installation";
 }

@@ -40,6 +40,8 @@ target_compile_definitions(e_foc.integration_tests.steps PRIVATE
     "E_FOC_EMULATED_PRODUCT_NAME=\"${E_FOC_EMULATED_PRODUCT_NAME}\""
     "E_FOC_EMULATED_BOARD_KIND=${E_FOC_EMULATED_BOARD_KIND}"
     "E_FOC_HIL_PRODUCT_NAME=\"${E_FOC_EK_TM4C1294XL_PRODUCT_NAME}\""
+    "E_FOC_HIL_BOARD_KIND=${E_FOC_EK_TM4C1294XL_BOARD_KIND}"
+    "E_FOC_DEVELOPMENT_KEYS_DEFAULT_PATH=\"${CMAKE_SOURCE_DIR}/targets/bootloader/keys/development.keys\""
 )
 
 add_version_header_dependency(e_foc.integration_tests.steps e_foc.version_header)

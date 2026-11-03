@@ -115,3 +115,21 @@ Feature: Motor controller application on the connected motor
     And the motor shall not report a fault
     When the motor is disabled
     Then the state machine shall be in the Ready state
+
+  @hil_motor @REQ-UPD-005 @REQ-UPD-007
+  Scenario: A downloaded pack waits while the motor runs and is applied once it stops
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the application is downloaded as a pack of the version it runs
+    Then the download is answered "ok"
+    And the drive reports the staged version of its build
+    When the motor is enabled
+    And Activate is sent
+    Then Activate is answered "busy"
+    When the motor is disabled
+    And Activate is sent
+    Then Activate is answered "ok"
+    And the drive falls silent and its heartbeat comes back
+    And the drive reports the staged version "0.0.0"
+    And the drive reports the version of its build and its board kind
