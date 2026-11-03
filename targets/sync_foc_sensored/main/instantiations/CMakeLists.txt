@@ -16,6 +16,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.services.current_offsets
     e_foc.services.inverter_compensation
     e_foc.services.electrical_system_ident
+    e_foc.services.firmware_upgrade
     e_foc.services.alignment
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
@@ -27,3 +28,5 @@ target_sources(e_foc.sync_foc_sensored.main.inst PRIVATE
     Logic.cpp
     Logic.hpp
 )
+
+add_version_header_dependency(e_foc.sync_foc_sensored.main.inst e_foc.version)

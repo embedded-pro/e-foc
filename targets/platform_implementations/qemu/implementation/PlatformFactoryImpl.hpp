@@ -25,7 +25,9 @@
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuCycleCounter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingAsyncFlash.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingFileFlash.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingRecordFile.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
@@ -66,6 +68,8 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
+        uint8_t BoardKind() const override;
+        std::optional<FirmwareStaging> Staging() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -194,6 +198,8 @@ namespace application
         TerminalAndTracerBlock terminalAndTracer{ serial };
         SilWatchdogStall watchdogStall{ terminalAndTracer.tracer };
         SemihostingEeprom eeprom{ "eeprom.bin" };
+        SemihostingAsyncFlash stagingFlash;
+        SemihostingFileFlash journalFlash;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;

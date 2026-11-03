@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
+#include "bootloader/ImageFormat.hpp"
 #include "core/platform_abstraction/BoardProtection.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "infra/event/EventDispatcher.hpp"
@@ -47,6 +48,23 @@ namespace application
     }
 
     extern "C" uint32_t SystemCoreClock;
+
+#ifdef E_FOC_PRODUCT_NAME
+    extern "C"
+    {
+        extern const uint8_t __application_slot_start[];
+        extern const uint8_t __application_slot_end[];
+        extern const uint8_t __staging_slot_start[];
+        extern const uint8_t __staging_slot_end[];
+        extern const uint8_t __status_journal_start[];
+        extern const uint8_t __status_journal_end[];
+    }
+
+    namespace
+    {
+        constexpr uint16_t stagingPageSize{ 128 };
+    }
+#endif
 
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
         : onInitialized(onInitialized)
@@ -416,4 +434,32 @@ namespace application
     {
         return diagnostics;
     }
+
+    uint8_t PlatformFactoryImpl::BoardKind() const
+    {
+        return E_FOC_BOARD_KIND;
+    }
+
+#ifdef E_FOC_PRODUCT_NAME
+    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    {
+        const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
+        return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, E_FOC_PRODUCT_NAME, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+    }
+
+    infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
+    {
+        return infra::ConstByteRange{ __staging_slot_start, __staging_slot_end };
+    }
+
+    infra::ConstByteRange PlatformFactoryImpl::JournalRegion()
+    {
+        return infra::ConstByteRange{ __status_journal_start, __status_journal_end };
+    }
+#else
+    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    {
+        return std::nullopt;
+    }
+#endif
 }

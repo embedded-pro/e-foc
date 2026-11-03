@@ -1,3 +1,5 @@
+add_version_header_target(e_foc.version)
+
 if(NOT E_FOC_TARGET_PLATFORM STREQUAL "host" AND NOT E_FOC_TARGET_PLATFORM STREQUAL "qemu")
     add_subdirectory(platform_implementations/motor_boards)
 endif()

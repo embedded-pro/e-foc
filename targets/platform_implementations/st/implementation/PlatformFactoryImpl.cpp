@@ -503,4 +503,9 @@ namespace application
     {
         return diagnostics;
     }
+
+    uint8_t PlatformFactoryImpl::BoardKind() const
+    {
+        return E_FOC_BOARD_KIND;
+    }
 }

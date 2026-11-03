@@ -1,5 +1,6 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include "core/can/CanNodeAddress.hpp"
+#include "generated/Version.h"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace application
@@ -21,6 +22,11 @@ namespace application
                 default:
                     return can::FocResetCause::powerUp;
             }
+        }
+
+        can::FocFirmwareIdentity FirmwareIdentity(const PlatformFactory& hardware)
+        {
+            return can::FocFirmwareIdentity{ e_foc::generated::VERSION_MAJOR, e_foc::generated::VERSION_MINOR, e_foc::generated::VERSION_PATCH, hardware.BoardKind() };
         }
     }
 
@@ -73,6 +79,8 @@ namespace application
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());
                 canServer->RegisterCategory(*motorCanServer);
+                firmwareUpgradeServer.emplace(canServer->Transport());
+                canServer->RegisterCategory(*firmwareUpgradeServer);
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
@@ -85,9 +93,14 @@ namespace application
                         .maxCurrent = this->hardware.MaxCurrentSupported(),
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
+                firmwareUpgradeInterlock.emplace(*controlMode);
+                firmwareUpgrade.emplace(*firmwareUpgradeServer, this->hardware.Staging(), *firmwareUpgradeInterlock, [this]()
+                    {
+                        this->hardware.Reset();
+                    });
                 canBridge.emplace(*motorCanServer, *controlMode,
-                    can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()) },
-                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
+                    can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()), FirmwareIdentity(this->hardware) },
+                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
