@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/FirmwareStaging.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
@@ -12,6 +13,7 @@
 #include "services/util/Terminal.hpp"
 #include <chrono>
 #include <cstdint>
+#include <optional>
 
 namespace application
 {
@@ -105,5 +107,10 @@ namespace application
         virtual void Reset() = 0;
         virtual ResetCause GetResetCause() const = 0;
         virtual infra::BoundedConstString FaultStatus() const = 0;
+
+        virtual std::optional<FirmwareStaging> Staging()
+        {
+            return std::nullopt;
+        }
     };
 }
