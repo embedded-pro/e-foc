@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.3
+version: 0.4.4
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.3      |
+| Version   | 0.4.4      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -268,7 +268,8 @@ be wrong; the image says itself what it was built for, and the chip says what it
 
 **Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
 start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
-board kind (`service-can.md`, contract 2.6), the firmware version and the target identity: the device
+board kind (`service-can.md`, contract 2.6), the firmware version (the project version, from the version header
+embedded-infra-lib generates at build time) and the target identity: the device
 identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
 device-identity register gives. The header is compiled from the same target definitions that compile the rest
 of the image, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from

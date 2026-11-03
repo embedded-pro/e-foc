@@ -1,5 +1,6 @@
 #include DEVICE_HEADER
 #include "bootloader/ImageFormat.hpp"
+#include "generated/Version.h"
 #include "targets/bootloader/ImageTarget.hpp"
 #include <array>
 #include <cstdint>
@@ -18,7 +19,7 @@ namespace
     }
 
     [[gnu::section(".application_header"), gnu::used]] const bootloader::ApplicationHeader applicationHeader{
-        bootloader::MakeApplicationHeader(target, E_FOC_VERSION_MAJOR, E_FOC_VERSION_MINOR, E_FOC_VERSION_PATCH)
+        bootloader::MakeApplicationHeader(target, e_foc::generated::VERSION_MAJOR, e_foc::generated::VERSION_MINOR, e_foc::generated::VERSION_PATCH)
     };
 
     [[gnu::section(".image_descriptor"), gnu::used]] const std::array<uint8_t, bootloader::imageDescriptorSize> imageDescriptor{ ErasedDescriptor() };
