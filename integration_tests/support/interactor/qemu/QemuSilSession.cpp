@@ -391,7 +391,6 @@ namespace sil
         if (canSockFd < 0)
             return false;
 
-        // A target that stops reading its CAN port, such as a halted bootloader, fills the socket; a frame nobody takes is dropped
         pollfd writable{ canSockFd, POLLOUT, 0 };
         if (poll(&writable, 1, static_cast<int>(timeout.count())) <= 0 || (writable.revents & POLLOUT) == 0)
             return false;

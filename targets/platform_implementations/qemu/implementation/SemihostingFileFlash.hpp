@@ -6,7 +6,6 @@
 
 namespace application
 {
-    // A flash region held in RAM and written through to a file in the scenario folder, which outlives the emulator
     class SemihostingFileFlash
         : public services::SynchronousFlashMemory
     {

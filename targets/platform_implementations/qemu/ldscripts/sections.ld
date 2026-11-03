@@ -1,5 +1,3 @@
-/* The sections of embedded-infra-lib's qemu_virt.ld, with the vector table at the start of the region and the image
-   sections (application header and descriptor, or none) after it */
 ENTRY(Reset_Handler)
 
 REGION_ALIAS("REGION_TEXT", FLASH);

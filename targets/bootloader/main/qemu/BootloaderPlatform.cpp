@@ -13,7 +13,6 @@ namespace bootloader
         std::array<uint8_t, 256 * 1024> packStorage;
         std::array<uint8_t, 16 * 1024> journalStorage;
 
-        // The emulator's code memory is RAM, so the slot the linker names read-only is written in place
         infra::ByteRange Writable(infra::ConstByteRange region)
         {
             return infra::ByteRange{ const_cast<uint8_t*>(region.begin()), const_cast<uint8_t*>(region.end()) };

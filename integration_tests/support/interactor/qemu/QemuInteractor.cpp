@@ -227,7 +227,6 @@ namespace sil
 
     bool QemuInteractor::WriteWhileStopped(const std::string& name, const std::vector<uint8_t>& contents)
     {
-        // The running bootloader reads and writes these files; it must not see one half written
         session.Stop();
         return session.WriteScenarioFile(name, contents);
     }

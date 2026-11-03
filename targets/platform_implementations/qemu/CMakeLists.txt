@@ -9,7 +9,6 @@ target_compile_definitions(e_foc.platform_abstraction_qemu_board INTERFACE
 
 set_property(GLOBAL PROPERTY E_FOC_BOOTLOADER_LDSCRIPTS "${CMAKE_CURRENT_LIST_DIR}/ldscripts")
 
-# The emulated board is laid out like a board with a bootloader (documentation/design/software-in-the-loop.md, Part P)
 function(e_foc_qemu_target_linker_scripts target)
     cmake_parse_arguments(PARSE_ARGV 1 E_FOC_LAYOUT "APPLICATION;BOOTLOADER" "" "")
 

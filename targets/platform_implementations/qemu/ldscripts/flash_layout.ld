@@ -1,5 +1,3 @@
-/* Emulated layout of documentation/design/bootloader.md, Part A: the code RAM holds the bootloader and the application
-   slot; staging and journal are semihosting files, so their symbols give only their sizes */
 __bootloader_start = 0x00000000;
 __bootloader_end = 0x00008000;
 __application_slot_start = 0x00008000;
