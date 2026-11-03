@@ -14,7 +14,7 @@ namespace services
         template<std::size_t N>
         infra::BoundedConstString TextOf(const std::array<char, N>& field)
         {
-            const auto end = std::find(field.begin(), field.end(), '\0');
+            const auto end = std::ranges::find(field, '\0');
             return infra::BoundedConstString{ field.data(), static_cast<std::size_t>(end - field.begin()) };
         }
 
@@ -68,7 +68,7 @@ namespace services
                 return std::nullopt;
 
             const auto number = ParseNumber(remaining.substr(0, separator));
-            if (!number)
+            if (!number.has_value())
                 return std::nullopt;
 
             numbers[index] = *number;
