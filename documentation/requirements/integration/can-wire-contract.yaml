@@ -2,15 +2,17 @@
   title: One authoritative wire contract for the FOC motor category
   shall: >
     The message identifiers, enumerations, scale factors and per-message field layouts of CAN
-    category 0x02 shall be defined once, in core/can. No producer or consumer of those frames —
-    the category server, the category client, the commander tool or the integration test
-    fixtures — shall restate an identifier, a scale or an enumerator; each shall reference the
-    single definition. Every decode shall derive its accepted payload length from that
-    definition rather than from a restated constant, and every message layout shall be pinned
-    by the byte-level vectors of REQ-CAN-004, which are what detect a field order or width that
-    has drifted from the definition. Encoding and decoding are written against the definition
-    rather than generated from it: a descriptor edit changes the accepted length and fails the
-    vectors, and the accompanying encode or decode change is made by hand.
+    category 0x02 shall be defined once, in core/can. No producer or consumer of those frames — the
+    category server, the category client, the commander tool or the integration test fixtures —
+    shall restate an identifier, a scale or an enumerator; each shall reference the single
+    definition. Every decode shall derive its accepted payload length from that definition rather
+    than from a restated constant, and every message layout shall be pinned by the byte-level
+    vectors of REQ-CAN-004.
+  rationale: >
+    The byte-level vectors are what detect a field order or width that has drifted from the
+    definition. Encoding and decoding are written against the definition rather than generated from
+    it: a descriptor edit changes the accepted length and fails the vectors, and the accompanying
+    encode or decode change is made by hand.
 
 - id: REQ-CAN-002
   title: Payload length is exact
@@ -28,8 +30,9 @@
     contract it implements, in every lifecycle state. A client whose major version differs from
     the server's shall report the mismatch to its operator and shall send that server no further
     category 0x02 command; servers on the same bus whose major matches stay commandable. Adding
-    a message shall increment the minor version; changing any field layout, or the meaning of
-    any enumerator, shall increment the major version.
+    a message, a parameter or an enumerator to an existing field shall increment the minor
+    version, as contract versions 2.1, 2.4 and 2.7 did; changing any field layout, or the meaning
+    of any existing enumerator, shall increment the major version.
 
 - id: REQ-CAN-004
   title: The contract is verified byte for byte and end to end
@@ -57,7 +60,9 @@
     12-bit node field shall be replaced by the default base of 1.
 
 - id: REQ-CAN-007
-  title: Every setting the firmware holds is reachable by number
+  title: Loop tuning, motor and start-up settings are reachable by number
+  status: verified
+  verification: sil
   shall: >
     Contract version 2.1 shall add, without changing any 2.0 message, a numbered parameter
     space covering every loop tuning setting, the six motor parameters of the calibration
@@ -67,7 +72,8 @@
     and stored, preceded by a response carrying the value now held; a query shall answer the
     value in force, flagged when the firmware chose it automatically. A value that is not
     finite, outside its range or not whole for an integer parameter shall be answered with
-    invalidPayload and change nothing.
+    invalidPayload and change nothing. The telemetry rate is not a numbered parameter; it is set
+    by the ConfigureTelemetryRate command (0x0D).
 
 - id: REQ-CAN-009
   title: Commissioning needs no terminal
@@ -89,6 +95,8 @@
 
 - id: REQ-CAN-011
   title: The supervision settings and the stall fault are reachable by number
+  status: verified
+  verification: sil
   shall: >
     Contract version 2.4 shall add, without changing any 2.3 message, the supervision settings
     of REQ-SM-033 as numbered parameters, each with a unit and a range defined once in core/can,
@@ -97,12 +105,16 @@
 
 - id: REQ-CAN-008
   title: Floating-point fields have one byte order
+  status: verified
+  verification: sil
   shall: >
     A float32 field of the category shall be the IEEE 754 single-precision bit pattern sent
     most significant byte first, as every other multi-byte field of the category is.
 
 - id: REQ-CAN-012
   title: Measured currents and rotor position are streamed at the configured rate
+  status: verified
+  verification: sil
   shall: >
     Contract version 2.5 shall add, without changing any 2.4 message other than retiring the
     never-sent TelemetryElectrical frame (0x88), a TelemetryCurrents telemetry frame carrying a
@@ -117,6 +129,8 @@
 
 - id: REQ-CAN-013
   title: A missing phase is reported with its own fault code
+  status: verified
+  verification: sil
   shall: >
     Contract version 2.7 shall add, without changing any 2.6 message, a phaseMissing value (7)
     of the fault code carried by the status telemetry and the fault event, sent whenever the

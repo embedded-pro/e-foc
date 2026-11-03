@@ -101,6 +101,8 @@
 
 - id: REQ-CAL-012
   title: Electrical identification reports the plant it measured
+  status: verified
+  verification: sil
   shall: >
     Run against a plant whose parameters are known, the electrical identification command
     shall report a phase resistance within 5 % and a phase inductance within 20 % of the
@@ -114,6 +116,8 @@
 
 - id: REQ-CAL-013
   title: The full calibration identifies the mechanical parameters of the plant
+  status: verified
+  verification: sil
   shall: >
     Run from a stored calibration whose resistance, inductance, inertia and friction are
     deliberately wrong by a factor of 1.3, 0.7, 2.0 and 0.5, the full calibration sequence
@@ -130,6 +134,8 @@
 
 - id: REQ-CAL-014
   title: Online estimates converge on the plant from a wrong seed
+  status: verified
+  verification: sil
   shall: >
     Seeded from a stored calibration whose values are wrong by the factors of REQ-CAL-013 and
     excited for six seconds by a speed reference alternating between 26 and 52 rad/s every
@@ -141,6 +147,8 @@
 
 - id: REQ-CAL-015
   title: Calibration measures and removes the current sensors' offsets
+  status: verified
+  verification: sil
   shall: >
     The full calibration sequence shall begin by holding all three legs at 50 % duty and
     averaging each phase current, once the bridge has settled, into a per-phase offset, and
@@ -161,6 +169,8 @@
 
 - id: REQ-CAL-016
   title: The online friction estimate tells dry friction and shaft loads from viscous friction in both directions
+  status: verified
+  verification: sil
   shall: >
     The online mechanical estimator shall fit each direction of rotation separately, so that a dry
     friction and a shaft load each appear only in that direction's torque intercept, take no
@@ -179,6 +189,8 @@
 
 - id: REQ-CAL-017
   title: Online electrical estimates hold on a board that applies each duty a period late
+  status: verified
+  verification: sil
   shall: >
     The platform shall state how many PWM periods after its current sample a duty takes effect,
     and the online electrical estimators shall pair each current change with the voltage that
@@ -189,6 +201,8 @@
 
 - id: REQ-CAL-018
   title: The full calibration maps the cogging torque over one electrical period
+  status: verified
+  verification: sil
   shall: >
     In speed and position mode, the full calibration shall, once the mechanical parameters are
     agreed, turn the rotor slowly through at least two revolutions in each direction and store with
@@ -204,6 +218,8 @@
 
 - id: REQ-CAL-019
   title: The online electrical estimator's d-axis test current runs in bursts
+  status: verified
+  verification: sil
   shall: >
     While an online electrical estimator is attached, the speed and position cascades shall add
     their d-axis square wave for the first 4 s after each enable and for the first 4 s of every
@@ -216,6 +232,8 @@
 
 - id: REQ-CAL-020
   title: The full calibration measures the current sensors' offsets on a rotor at rest
+  status: verified
+  verification: sil
   shall: >
     The full calibration sequence shall begin only once the encoder has stayed within 2 mrad of where
     a 100 ms window began, and shall fail if the rotor has not come to rest within 10 s. Started 25 ms
@@ -224,6 +242,8 @@
 
 - id: REQ-CAL-021
   title: Calibration identifies the flux linkage from the back-EMF
+  status: verified
+  verification: sil
   shall: >
     After alignment, in every control mode, the full calibration shall spin the rotor with a q-axis
     current of at most 0.6 A and a quarter of the drive's current, keep it below 50 rad/s, set the

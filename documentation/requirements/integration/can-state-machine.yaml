@@ -95,6 +95,8 @@
 
 - id: REQ-INT-013
   title: Hardware faults are broadcast over CAN as telemetry status frames
+  status: verified
+  verification: sil
   shall: >
     When a hardware fault is detected by PlatformFaultNotifier, FocMotorCanBridge
     shall immediately broadcast a telemetry status frame (focTelemetryStatusResponseId)
@@ -106,6 +108,8 @@
 
 - id: REQ-INT-014
   title: Telemetry reports the measured mechanical speed
+  status: verified
+  verification: sil
   shall: >
     The speed field of the telemetry status frame shall carry the mechanical speed the active
     control mode measures: the outer loop's window speed in speed and position mode, and the

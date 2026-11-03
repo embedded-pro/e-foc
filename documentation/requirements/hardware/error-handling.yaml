@@ -1,5 +1,8 @@
 # Retired, not reused:
 #   REQ-HIL-009: needs a power cycle no test rig provides; never verified
+#   REQ-HIL-011: number skipped, never assigned to a requirement
+#   REQ-EH-010: number skipped, never assigned to a requirement
+#   REQ-EH-011: number skipped, never assigned to a requirement
 
 - id: REQ-EH-001
   title: Persistent fault data capture on critical failure
@@ -35,6 +38,8 @@
 
 - id: REQ-EH-005
   title: Software reset command via PlatformFactory
+  status: verified
+  verification: hil
   shall: >
     The platform shall expose a Reset() method on PlatformFactory that triggers
     an immediate system reset. The reset cause on the subsequent boot shall be
@@ -50,6 +55,8 @@
 
 - id: REQ-HIL-008
   title: Software reset cause captured correctly
+  status: verified
+  verification: hil
   shall: >
     When the "reset" command is issued over the CLI, the device shall reboot
     and the CLI banner on the subsequent boot shall report "Software" as the
@@ -57,6 +64,8 @@
 
 - id: REQ-HIL-010
   title: HardFault handler captures and reports fault data
+  status: verified
+  verification: hil
   shall: >
     When a HardFault is deliberately induced via the "force_hardfault" CLI
     command, the device shall reboot and the fault_status command on the
@@ -65,6 +74,8 @@
 
 - id: REQ-EH-008
   title: The event dispatcher is supervised by the MCU watchdog on every MCU platform
+  status: verified
+  verification: [sil, hil]
   shall: >
     Every MCU platform shall run its event dispatcher under supervision of the
     MCU watchdog peripheral, starting when the dispatcher is constructed. The
@@ -79,6 +90,8 @@
 
 - id: REQ-EH-009
   title: Watchdog expiry brings the power stage to a safe state
+  status: verified
+  verification: hil
   shall: >
     When an event dispatcher action has not returned within the expiration
     timeout, the watchdog early-warning interrupt shall cut the power stage
@@ -88,6 +101,8 @@
 
 - id: REQ-EH-012
   title: A watchdog reset is reported after reboot
+  status: verified
+  verification: [sil, hil]
   shall: >
     A reset caused by the watchdog shall be reported as reset cause Watchdog on
     the subsequent boot, read from the MCU's own reset-cause register, so that
@@ -97,6 +112,8 @@
 
 - id: REQ-HIL-012
   title: A deliberately stalled event loop resets the target
+  status: verified
+  verification: hil
   shall: >
     When the "watchdog_stall" CLI command schedules an event dispatcher action
     that never returns, the device shall cut the power stage, reset, and report
@@ -136,6 +153,8 @@
 
 - id: REQ-EH-015
   title: A motor that does not carry the drive's current is reported as a missing phase
+  status: verified
+  verification: sil
   shall: >
     When the rotor alignment settles, the drive shall compare the mean phase currents of the
     settled samples with the currents the alignment vector drives through the calibrated phase

@@ -15,6 +15,8 @@
 
 - id: REQ-SM-003
   title: Calibration step sequencing
+  status: verified
+  verification: sil
   shall: >
     During calibration, the state machine shall execute steps in the following
     fixed order: (1) pole-pairs estimation, (2) resistance and inductance estimation,
@@ -24,6 +26,8 @@
 
 - id: REQ-SM-004
   title: Calibration success transitions to Ready
+  status: verified
+  verification: sil
   shall: >
     When all calibration steps complete successfully and calibration data is
     saved to non-volatile memory, the state machine shall transition to the
@@ -31,24 +35,32 @@
 
 - id: REQ-SM-005
   title: Calibration failure transitions to Fault
+  status: verified
+  verification: sil
   shall: >
     If any calibration step fails (e.g., pole-pairs estimation returns no result),
     the state machine shall transition to the Fault state with code calibrationFailed.
 
 - id: REQ-SM-006
   title: Ready-to-Enabled transition
+  status: verified
+  verification: sil
   shall: >
     From the Ready state, when an enable command is issued, the state machine
     shall transition to the Enabled state and activate the FOC control loop.
 
 - id: REQ-SM-007
   title: Enabled-to-Ready transition
+  status: verified
+  verification: sil
   shall: >
     From the Enabled state, when a disable command is issued, the state machine
     shall transition back to the Ready state and deactivate the FOC control loop.
 
 - id: REQ-SM-008
   title: Fault transition on hardware fault
+  status: verified
+  verification: sil
   shall: >
     From any non-Fault state, when a hardware fault event is raised via the
     FaultNotifier, the state machine shall stop the FOC controller immediately
@@ -69,15 +81,26 @@
 
 - id: REQ-SM-010
   title: Valid NVM on boot restores electrical parameters without enabling
+  status: verified
+  verification: sil
   shall: >
     On power-on, if valid calibration data exists in non-volatile storage, the
     state machine shall load and apply the electrical parameters (resistance,
     inductance, pole pairs) but shall remain in the Idle state. The motor shall
     not be enabled until a live alignment re-establishes the rotor reference,
-    because the encoder zero-offset is volatile and is lost on every reset.
+    because the encoder zero-offset is volatile and is lost on every reset. Over CAN, which
+    reports Idle and Ready alike as idle (issue #490), the software-in-the-loop scenarios verify
+    only that the drive is neither Enabled, Calibrating nor Faulted and refuses to enable, not
+    that it is in Idle rather than Ready.
+  rationale: >
+    The step "the state machine shall be in the Ready state" asserts the CAN motor state idle
+    (integration_tests/steps/StateMachineSteps.cpp). Distinguishing Ready from Idle over CAN is
+    issue #490 and is not fixed by this requirement.
 
 - id: REQ-SM-011
   title: Calibration data persistence
+  status: verified
+  verification: sil
   shall: >
     Calibration data produced during a successful calibration run shall be saved
     to non-volatile memory so that it survives power cycles.
@@ -177,50 +200,54 @@
 - id: REQ-SM-023
   title: A fault is latched in the faulting context
   shall: >
-    A fault raised in an interrupt shall latch before the interrupt returns, using only
-    single-word writes so that the constraints of REQ-SM-021 are preserved. The latch shall
-    record both that a fault is in force and that its transition is still owed. Every command
-    that arms the power stage, and every command that would clear the fault or destroy the
-    state machine holding the latch, shall consult that latch rather than the lifecycle state,
-    which the deferred transition has not yet written, so that such a command issued between
-    the interrupt and the dispatcher turn is refused. The transition shall be taken exactly
-    once, by whichever of the dispatcher turn or the enable sequence observes the latched
-    fault first; taking a transition shall not discharge a fault latched after it began, which
-    is owed a transition of its own.
+    A fault raised in an interrupt shall latch before the interrupt returns, using only single-word
+    writes, as REQ-SM-021 requires. The latch shall record both that a fault is in force and that
+    its transition is still owed. Every command that arms the power stage, and every command that
+    would clear the fault or destroy the state machine holding the latch, shall consult that latch
+    rather than the lifecycle state, and shall be refused when issued between the interrupt and the
+    dispatcher turn. The transition shall be taken exactly once, by whichever of the dispatcher turn
+    or the enable sequence observes the latched fault first; taking a transition shall not discharge
+    a fault latched after it began, which is owed a transition of its own.
+  rationale: >
+    The deferred transition has not yet written the lifecycle state, so a command that consulted it
+    between the interrupt and the dispatcher turn would see a healthy drive.
 
 - id: REQ-SM-024
   title: An interrupted enable sequence never re-arms the power stage
   shall: >
-    The steps that arm the power stage — taking the phase-current callback slot, enabling
-    the control law, starting the inverter and committing the enabled flag — shall detect a
-    stop issued from the faulting context at any point between them, and shall bring the
-    drive back to the stopped state rather than completing. No step shall undo a stop that
-    preceded it, so that a fault cannot be followed by an armed bridge that no control loop
-    is updating.
+    The steps that arm the power stage — taking the phase-current callback slot, enabling the
+    control law, starting the inverter and committing the enabled flag — shall detect a stop issued
+    from the faulting context at any point between them, and shall bring the drive back to the
+    stopped state rather than completing. No step shall undo a stop that preceded it.
+  rationale: >
+    A fault cannot then be followed by an armed bridge that no control loop is updating.
 
 - id: REQ-SM-025
   title: A fault clear verifies the hardware protection condition
   shall: >
     The state machine shall refuse a clear-fault command while the platform reports its
-    board-protection condition as asserted, and shall report that refusal distinctly from
-    a refusal on the retry budget, so that an operator can tell a still-faulted board from
-    an exhausted allowance. The retry budget of REQ-SM-018 shall apply in addition to this
-    verification and shall not be consumed by a clear the condition refused. A platform that
-    cannot interrogate its protection hardware shall report the condition as unavailable
-    rather than clear; for such a platform the retry budget remains the only bound, because
-    a fault it raised came from software rather than from a physical condition it could hold.
+    board-protection condition as asserted, and shall report that refusal distinctly from a refusal
+    on the retry budget. The retry budget of REQ-SM-018 shall apply in addition to this verification
+    and shall not be consumed by a clear the condition refused. A platform that cannot interrogate
+    its protection hardware shall report the condition as unavailable rather than clear.
+  rationale: >
+    The distinct refusal lets an operator tell a still-faulted board from an exhausted allowance.
+    For a platform that reports the condition unavailable the retry budget remains the only bound,
+    because a fault it raised came from software rather than from a physical condition it could
+    hold.
 
 - id: REQ-SM-026
   title: A deasserted protection condition shall settle before a clear is accepted
   shall: >
-    The state machine shall sample the board-protection condition while it holds a fault,
-    on its own schedule rather than only when a command arrives, and shall accept a
-    clear-fault command only once the condition has been observed to leave the asserted
-    state and to have remained clear for the settling interval. Any asserted sample within
-    that interval shall restart it, so that a condition chattering around its threshold
-    cannot be cleared on a single favourable reading. An enable command shall be refused
-    while the condition reads asserted, independently of the fault latch, so that a clear
-    granted during a momentary deassertion cannot arm the bridge on faulted hardware.
+    The state machine shall sample the board-protection condition while it holds a fault, on its own
+    schedule rather than only when a command arrives, and shall accept a clear-fault command only
+    once the condition has been observed to leave the asserted state and to have remained clear for
+    the settling interval. Any asserted sample within that interval shall restart it. An enable
+    command shall be refused while the condition reads asserted, independently of the fault latch.
+  rationale: >
+    Restarting the interval keeps a condition chattering around its threshold from being cleared on
+    a single favourable reading, and refusing enable on the live condition keeps a clear granted
+    during a momentary deassertion from arming the bridge on faulted hardware.
 
 - id: REQ-SM-027
   title: The torque constant is derived from the calibrated flux linkage
@@ -234,14 +261,18 @@
 
 - id: REQ-SM-028
   title: A rotor that does not follow the torque it is asked to produce raises a sensor or stall fault
+  status: verified
+  verification: sil
   shall: >
     While the drive is Enabled, a supervisor running outside the control interrupts shall
     compare what the drive asks of the rotor with what the encoder reports. The drive pushes for
-    motion when the measured torque-producing current exceeds a configured fraction of the
-    drive's current limit and the drive demands motion — a position error it has not closed, or
-    else a speed reference, above configured thresholds — in the direction of that error or
-    reference. When the drive pushes for motion while the encoder reading stays within a
-    configured excursion for a whole configured window, the supervisor shall raise a fault
+    motion when the measured torque-producing current exceeds the supervision current fraction
+    of the drive's current limit and the drive demands motion — a position error it has not
+    closed, or else a speed reference, above the supervision position-error and demanded-speed
+    thresholds — in the direction of that error or reference. The fraction, thresholds,
+    excursion and window are the supervision settings of REQ-SM-033, configurable over CAN as
+    parameters 0x70 to 0x75. When the drive pushes for motion while the encoder reading stays
+    within the supervision excursion for the whole supervision window, the supervisor shall raise a fault
     through the fault notifier, exactly as a board protection trip is raised: FaultCode::stall
     when the encoder's last travel of at least that excursion went against the direction the
     drive was pushing — an outside force overpowered the drive, which an encoder that has stopped
@@ -285,6 +316,8 @@
 
 - id: REQ-SM-031
   title: Motor parameters can be entered while the drive is stopped
+  status: verified
+  verification: sil
   shall: >
     The state machine shall accept a new phase resistance, inductance, pole-pair count, flux
     linkage, inertia or viscous friction in Idle and Ready while no asynchronous work is
@@ -303,6 +336,8 @@
 
 - id: REQ-SM-032
   title: A control-mode switch keeps an established rotor reference
+  status: verified
+  verification: sil
   shall: >
     When a control-mode selection is activated while the active mode is Ready with an
     established rotor reference, the newly activated mode shall reach Ready with the rotor
@@ -313,6 +348,8 @@
 
 - id: REQ-SM-033
   title: The supervision settings are drive-wide, stored, and in force at once
+  status: verified
+  verification: sil
   shall: >
     The drive shall hold one set of supervision settings for every control mode: the window,
     current fraction, demanded speed, position error and excursion of REQ-SM-028, and whether a
@@ -326,6 +363,8 @@
 
 - id: REQ-SM-034
   title: Alignment refuses an encoder that does not follow the field
+  status: verified
+  verification: sil
   shall: >
     Before it zeroes the encoder, the alignment shall first hold its voltage vector a quarter
     of an electrical turn ahead of the alignment angle until the rotor settles, then at the

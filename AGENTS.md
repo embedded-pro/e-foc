@@ -215,7 +215,10 @@ warnings-as-errors would fail the build.
 **Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
-model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits; every requirement keeps at least one `@sil` scenario.
+model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.
+Requirements carry an optional `status` (`draft`, `implemented`, `verified`, `retired`) and `verification` (`sil`, `hil`, `mil`, `unit`, `inspection`) in `documentation/requirements/`.
+A requirement is not required to have a scenario, but one marked `verified` must be cited by an `@REQ-...` tag. `documentation/tools/check-requirements-traceability.py` (run by `requirements-validation.yml`)
+fails on a `verified` requirement with no tag, a tag naming an unknown or retired ID, a duplicate ID, or a scenario kind the `verification` field omits.
 It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to how `Logic` wires a service is made in `ModelInTheLoop` too. See `documentation/design/software-in-the-loop.md` Part N.
 
 Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.

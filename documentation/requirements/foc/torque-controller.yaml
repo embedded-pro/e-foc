@@ -41,24 +41,37 @@
 
 - id: REQ-TRQ-007
   title: Current step-response envelope
+  status: verified
+  verification: [sil, mil]
   shall: >
-    With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default
-    current-loop bandwidth, every current control law shall bring the q-axis current from zero to
-    a 0.5 A setpoint and enter and then stay inside a 10 percent band of the step within 3 ms
-    (1 ms for deadbeat) with an overshoot below 30 percent and a steady-state error below
-    0.05 A, measured on the plant's own q-axis current at the control rate. The PI law is held to
-    a 25 percent band and 0.12 A instead: without back-EMF feedforward it follows the ramping
-    back-EMF of a free rotor with a standing error of the ramp rate over its integral gain, which
-    no duty resolution removes. Each law's rise time from a tenth to nine tenths of the
-    step, and the band its tail still ripples in over the last quarter of the window, measured as
-    a percentage of that step rather than of the setpoint it ends at, shall also
-    be bounded by the row it carries. Each of those bounds is set at twice the worst
-    value repeated runs of its row measured, rounded up to the figure the row carries, and the row
-    fails when a measurement exceeds that figure; the margin is there so that the spread between
-    one run and the next cannot reach it.
+    With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default current-loop
+    bandwidth, every current control law shall bring the q-axis current from zero to a 0.5 A
+    setpoint, measured on the plant's own q-axis current at the control rate, and shall meet its row
+    below. Each row gives the band, as a percentage of the step, the response enters and then stays
+    inside within the settling time; the overshoot limit; the rise time from a tenth to nine tenths
+    of the step; the band the tail still ripples in over the last quarter of the window, as a
+    percentage of that step rather than of the setpoint it ends at; and the steady-state error
+    limit. PI: 25 percent band within 3 ms, overshoot below 30 percent, rise within 15 ms, tail
+    within 35 percent, error below 0.12 A. Decoupled PID: 10 percent within 3 ms, below 30 percent,
+    rise within 4 ms, tail within 1 percent, error below 0.05 A. Deadbeat: 10 percent within 1 ms,
+    below 30 percent, rise within 1 ms, tail within 7 percent, error below 0.05 A. Sliding mode: 10
+    percent within 3 ms, below 30 percent, rise within 1 ms, tail within 13 percent, error below
+    0.05 A. A PI setpoint change from 0.5 A to -0.5 A while running shall settle into a 40 percent
+    band within 12 ms with overshoot below 30 percent, rise within 6 ms, tail within 65 percent and
+    error below 0.2 A.
+  rationale: >
+    The PI law is held to a wider band and error because, without back-EMF feedforward, it follows
+    the ramping back-EMF of a free rotor with a standing error of the ramp rate over its integral
+    gain, which no duty resolution removes. Each rise and tail bound is twice the worst value
+    repeated runs of its row measured, rounded up to the figure the row carries; the row fails when
+    a measurement exceeds that figure, and the margin keeps the spread between one run and the next
+    from reaching it. The rows are pinned in integration_tests/features/control_performance.feature
+    and integration_tests/model_in_the_loop/test/TestControlPerformance.cpp.
 
 - id: REQ-TRQ-008
   title: The bridge's dead-time loss is compensated
+  status: verified
+  verification: sil
   shall: >
     On a board whose bridge has a dead-time loss measured at the dead band the drive runs, every
     duty the drive commands shall be raised on a leg whose current flows out of it and lowered on
@@ -72,6 +85,8 @@
 
 - id: REQ-TRQ-009
   title: Two readable phases give the third phase's current
+  status: verified
+  verification: sil
   shall: >
     On a board that reads its phases through low-side shunts, the platform shall keep the middle
     of the three duties within the board's readable limit, moving all three together where that
@@ -86,6 +101,8 @@
 
 - id: REQ-TRQ-010
   title: The deadbeat law accounts for a duty that acts a period late
+  status: verified
+  verification: sil
   shall: >
     On a board that applies each duty a PWM period after it is computed, the deadbeat current law
     shall act on the current it predicts for the period its duty lands in, from the measured
@@ -97,6 +114,8 @@
 
 - id: REQ-TRQ-011
   title: The deadbeat law removes a voltage error its model does not account for
+  status: verified
+  verification: sil
   shall: >
     The deadbeat current law shall estimate the voltage its model does not account for from the
     difference between each measured current and the current it predicted for that sample, at the
