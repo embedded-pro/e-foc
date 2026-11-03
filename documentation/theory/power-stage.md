@@ -205,10 +205,23 @@ $\pm t_{eff}/T$ when the current is near zero and its sign uncertain
 (`core/services/inverter_compensation/InverterCompensation.hpp`).
 
 **Minimum pulse.** A commanded conduction shorter than the dead band and the switching transitions does not
-happen as commanded. The firmware has no minimum-pulse handling. The top is guarded by the 95 % bootstrap cap; the
-bottom is not: shifting the duties down for the shunts ([low-side shunt current sensing](low-side-current-sensing.md)
+happen as commanded. The firmware has no minimum-pulse handling, by decision. The top is guarded by the 95 % bootstrap
+cap; the bottom is not: shifting the duties down for the shunts ([low-side shunt current sensing](low-side-current-sensing.md)
 §5) drives the lowest duty continuously to exactly 0 %, so it passes through high-side pulses shorter than the
-500 ns band (15 PWM counts) on the way.
+500 ns band (15 PWM counts, 1 % duty at 20 kHz) on the way.
+
+With the 0.7 readable limit and min-max centring the shifted lowest duty is $1.7 - 2\,d_{max}$, so it lands between
+0 and 1 % only while the highest duty $d_{max}$ is between 84.5 % and 85 %: a brief crossing at high modulation, about
+2 % of the periods of the bench motor held at 400 rad/s in the model-in-the-loop plant. In such a period that leg's high
+side does not turn on, so the voltage applied differs from the command by at most 1 % duty for that period. It cannot
+cause shoot-through, since the dead band is inserted by the PWM hardware whatever the duty.
+
+Handling it (extending the shift until the lowest duty is exactly 0, and rounding a second short leg to 0 or the minimum
+pulse) was implemented and rejected (issue #463, closed as not planned). It cost about 55 cycles in the control
+interrupt on both Cortex-M4 boards, 4043 to 4098 of the 4500 on EK-TM4C1294XL, about an eighth of the inner loop's
+remaining headroom, and its tests showed only that the short pulses were gone, not a control metric it improved.
+Revisit it if a power stage with a longer dead band, or a gate driver that misbehaves on runt pulses, makes the error
+or the pulses matter.
 
 ### 5. Losses
 
