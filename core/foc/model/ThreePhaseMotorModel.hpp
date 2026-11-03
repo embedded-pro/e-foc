@@ -110,6 +110,7 @@ namespace foc
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
+        void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;

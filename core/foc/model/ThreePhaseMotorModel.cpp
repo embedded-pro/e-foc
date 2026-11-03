@@ -273,6 +273,9 @@ namespace foc
         return parameters.maxSupportedCurrent;
     }
 
+    void ThreePhaseMotorModel::CurrentOffsets(const foc::PhaseCurrents&)
+    {}
+
     foc::Radians ThreePhaseMotorModel::Read()
     {
         return encoder.Read(mechanical.Angle());

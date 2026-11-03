@@ -13,6 +13,21 @@ namespace services
     void InverterCompensation::ApplyOffsets(const foc::PhaseCurrents& newOffsets)
     {
         offsets = newOffsets;
+        PassOffsetsDown();
+    }
+
+    void InverterCompensation::CurrentOffsets(const foc::PhaseCurrents& offsetsRemovedAbove)
+    {
+        offsetsAbove = offsetsRemovedAbove;
+        PassOffsetsDown();
+    }
+
+    void InverterCompensation::PassOffsetsDown()
+    {
+        inverter.CurrentOffsets(foc::PhaseCurrents{
+            foc::Ampere{ offsets.a.Value() + offsetsAbove.a.Value() },
+            foc::Ampere{ offsets.b.Value() + offsetsAbove.b.Value() },
+            foc::Ampere{ offsets.c.Value() + offsetsAbove.c.Value() } });
     }
 
     void InverterCompensation::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)

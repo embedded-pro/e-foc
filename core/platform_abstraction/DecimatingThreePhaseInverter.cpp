@@ -52,6 +52,11 @@ namespace application
         return powerStage.MaxCurrentSupported();
     }
 
+    void DecimatingThreePhaseInverter::CurrentOffsets(const foc::PhaseCurrents& offsets)
+    {
+        powerStage.CurrentOffsets(offsets);
+    }
+
     void DecimatingThreePhaseInverter::Decimate(foc::PhaseCurrents currents)
     {
         if (++samplesSinceCallback < samplesPerCallback)

@@ -37,6 +37,8 @@ namespace drivers
         virtual void Stop() = 0;
         virtual hal::Hertz BaseFrequency() const = 0;
         virtual foc::Ampere MaxCurrentSupported() const = 0;
+        // The offsets the stage above removes from every sample; a phase rebuilt from the other two must carry them.
+        virtual void CurrentOffsets(const foc::PhaseCurrents& offsets) = 0;
     };
 
     class ThreePhaseInverter
@@ -51,5 +53,6 @@ namespace drivers
         virtual void Stop() = 0;
         virtual hal::Hertz BaseFrequency() const = 0;
         virtual foc::Ampere MaxCurrentSupported() const = 0;
+        virtual void CurrentOffsets(const foc::PhaseCurrents& offsets) = 0;
     };
 }

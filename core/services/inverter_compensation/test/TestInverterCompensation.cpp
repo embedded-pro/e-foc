@@ -92,9 +92,31 @@ TEST_F(TestInverterCompensation, without_offsets_the_currents_pass_through_uncha
     EXPECT_THAT(*forwarded, CurrentsNear(Currents(1.0f, -0.4f, -0.6f)));
 }
 
+TEST_F(TestInverterCompensation, the_offsets_it_applies_reach_the_stage_below)
+{
+    foc::PhaseCurrents told{};
+    EXPECT_CALL(inverterMock, CurrentOffsets(_)).WillOnce(SaveArg<0>(&told));
+
+    compensation.ApplyOffsets(Currents(0.027f, -0.018f, 0.054f));
+
+    EXPECT_THAT(told, CurrentsNear(Currents(0.027f, -0.018f, 0.054f)));
+}
+
+TEST_F(TestInverterCompensation, offsets_removed_above_it_add_to_its_own_for_the_stage_below)
+{
+    foc::PhaseCurrents told{};
+    EXPECT_CALL(inverterMock, CurrentOffsets(_)).WillOnce(Return()).WillOnce(SaveArg<0>(&told));
+
+    compensation.ApplyOffsets(Currents(0.027f, -0.018f, 0.054f));
+    compensation.CurrentOffsets(Currents(0.010f, 0.020f, -0.030f));
+
+    EXPECT_THAT(told, CurrentsNear(Currents(0.037f, 0.002f, 0.024f)));
+}
+
 TEST_F(TestInverterCompensation, the_currents_it_forwards_have_the_applied_offsets_removed)
 {
     Register();
+    EXPECT_CALL(inverterMock, CurrentOffsets(_));
     compensation.ApplyOffsets(Currents(0.027f, -0.018f, 0.054f));
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.027f, -0.518f, -0.446f));
 
@@ -105,6 +127,7 @@ TEST_F(TestInverterCompensation, the_currents_it_forwards_have_the_applied_offse
 TEST_F(TestInverterCompensation, the_dead_time_correction_follows_the_currents_with_the_offsets_removed)
 {
     Register();
+    EXPECT_CALL(inverterMock, CurrentOffsets(_));
     compensation.ApplyOffsets(Currents(1.0f, 0.0f, 0.0f));
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -0.5f, 0.0f));
 

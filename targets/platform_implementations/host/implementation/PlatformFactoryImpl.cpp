@@ -65,6 +65,9 @@ namespace application
         return foc::Ampere(5.0f);
     }
 
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents&)
+    {}
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return simpleLowPriorityInterrupt;
