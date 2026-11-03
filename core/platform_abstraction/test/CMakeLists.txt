@@ -11,7 +11,6 @@ target_link_libraries(e_foc.platform_abstraction_test PUBLIC
 )
 
 target_sources(e_foc.platform_abstraction_test PRIVATE
-    TestActiveInterrupt.cpp
     TestAdcPhaseCurrentMeasurement.cpp
     TestBoardProtection.cpp
     TestCanErrorCounters.cpp

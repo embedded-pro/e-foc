@@ -183,7 +183,8 @@ the reset cause unconditionally and surrounds fault data with visible delimiters
 Alongside the post-mortem fault record, the platform keeps two live sets of counters, both readable
 from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
 
-**Control-interrupt execution.** The Cortex-M cycle counter is left free-running and read on entry
+**Control-interrupt execution.** The Cortex-M cycle counter (EmIL's
+`hal::cortex::DataWatchpointAndTrace`, started once when the platform is built) is left free-running and read on entry
 to and exit from the application callback that executes inside the control interrupt; the difference
 is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
 own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
@@ -202,9 +203,10 @@ inferred afterwards).
 A Cortex-M exception cannot preempt itself, so a flag set on entry and tested on the next entry
 never sees a re-entry: the late conversion waits as pending and runs after the return. The TI and ST
 platforms instead check, as the callback ends, whether the interrupt now running is pending again
-(`ActiveInterruptPendsAgain`: the active exception number from `SCB->ICSR`, its bit in
-`NVIC->ISPR`). Both drivers clear their interrupt flag and pending bit before calling back, so the
-bit is set only by a conversion or transfer that completed during the callback.
+(EmIL's `hal::cortex::InterruptPending(hal::cortex::ActiveInterrupt())`: the active exception
+number from `SCB->ICSR`, its bit in `NVIC->ISPR`). Both drivers clear their interrupt flag and
+pending bit before calling back, so the bit is set only by a conversion or transfer that completed
+during the callback.
 
 **CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
 that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can

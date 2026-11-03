@@ -52,6 +52,8 @@ namespace application
         : onInitialized(onInitialized)
         , resetCause(ReadAndClearResetCause())
     {
+        cycleCounter.Start();
+
         if (persistentFaultData.IsValid())
         {
             FormatFaultData(persistentFaultData, faultStatusString);
@@ -284,7 +286,7 @@ namespace application
         onPhaseCurrentsReady.Set(onDone);
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
-                const auto entryCycles = CycleCounter::Now();
+                const auto entryCycles = cycleCounter.Cycles();
 
                 const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
 
@@ -293,8 +295,8 @@ namespace application
                 else
                     onPhaseCurrentsReady(currents);
 
-                controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
-                if (ControlInterrupt::PendsAgain())
+                controlLoopMetrics.Record(cycleCounter.Cycles() - entryCycles);
+                if (hal::cortex::InterruptPending(hal::cortex::ActiveInterrupt()))
                     controlLoopMetrics.RecordReentry();
             });
     }
