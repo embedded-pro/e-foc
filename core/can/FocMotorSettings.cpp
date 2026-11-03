@@ -43,6 +43,10 @@ namespace can
                 case FocParameter::loopReentries:
                     return ParameterGroup::loopStatistics;
                 case FocParameter::resetCause:
+                case FocParameter::firmwareVersionMajor:
+                case FocParameter::firmwareVersionMinor:
+                case FocParameter::firmwareVersionPatch:
+                case FocParameter::boardKind:
                     return ParameterGroup::platform;
                 default:
                     return std::nullopt;

@@ -99,6 +99,11 @@ namespace application
         return 0;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return static_cast<BoardKind>(Peripheral::boardKind);
+    }
+
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(SystemCoreClock);

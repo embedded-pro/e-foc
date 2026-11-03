@@ -23,6 +23,8 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     services.peripheral
 )
 
+add_version_header_dependency(e_foc.sync_foc_sensored.main.inst e_foc.version_header)
+
 target_sources(e_foc.sync_foc_sensored.main.inst PRIVATE
     Logic.cpp
     Logic.hpp

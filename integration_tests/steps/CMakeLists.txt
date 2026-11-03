@@ -7,6 +7,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     CurrentStreamSteps.cpp
     EepromSteps.cpp
     FaultSteps.cpp
+    FirmwareIdentitySteps.cpp
     HardfaultRecoverySteps.cpp
     HilMotorSteps.cpp
     IdentificationSteps.cpp
@@ -27,3 +28,5 @@ target_link_libraries(e_foc.integration_tests.steps PUBLIC
     GTest::gtest
     GTest::gmock
 )
+
+add_version_header_dependency(e_foc.integration_tests.steps e_foc.version_header)

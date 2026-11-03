@@ -68,6 +68,7 @@ namespace application
         constexpr static uint8_t CanIndex{ 1 };
         constexpr static uint8_t EepromI2cIndex{ 3 };
 
+        constexpr static uint8_t boardKind{ 2 };
         constexpr static bool hasBoardIdPins{ true };
 
         constexpr static float adcReferenceVoltage{ 3.3f };

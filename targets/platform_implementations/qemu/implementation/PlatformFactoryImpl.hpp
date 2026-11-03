@@ -56,6 +56,7 @@ namespace application
         hal::GpioPin& WarningLed() override;
         hal::GpioPin& FailureLed() override;
         uint8_t BoardId() const override;
+        BoardKind GetBoardKind() const override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;

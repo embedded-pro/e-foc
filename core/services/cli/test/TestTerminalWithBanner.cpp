@@ -40,7 +40,9 @@ namespace
                 .vdc = foc::Volts{ vdc },
                 .systemClock = hal::Hertz{ systemClock },
                 .resetCause = application::ResetCause{},
-                .faultStatus = infra::BoundedConstString{}
+                .faultStatus = infra::BoundedConstString{},
+                .version = "1.2.3",
+                .revision = "abc12345"
             };
             return banner;
         }
@@ -54,7 +56,9 @@ namespace
                 .vdc = foc::Volts{ vdc },
                 .systemClock = hal::Hertz{ systemClock },
                 .resetCause = resetCause,
-                .faultStatus = faultStatus
+                .faultStatus = faultStatus,
+                .version = "1.2.3",
+                .revision = "abc12345"
             };
             return banner;
         }
@@ -115,7 +119,16 @@ TEST_F(TerminalWithBannerTest, construction_prints_banner_with_version)
     services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
     ExecuteAllActions();
 
-    EXPECT_TRUE(OutputContains("Version: 0.0.1"));
+    EXPECT_NE(GetFullOutput().find("Version: 1.2.3"), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_prints_banner_with_revision)
+{
+    auto banner = CreateBanner("Board", 12.0f, 80000000);
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    EXPECT_NE(GetFullOutput().find("Revision: abc12345"), std::string::npos);
 }
 
 TEST_F(TerminalWithBannerTest, construction_prints_banner_with_e_foc_prefix)
