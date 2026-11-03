@@ -27,6 +27,22 @@ namespace tool
 
             return std::nullopt;
         }
+
+        std::vector<InstallerAsset> FindFirmwarePacks(const QJsonArray& assets)
+        {
+            std::vector<InstallerAsset> packs;
+            for (const auto& asset : assets)
+            {
+                const auto object = asset.toObject();
+                const auto name = object.value("name").toString();
+                const QUrl url{ object.value("browser_download_url").toString() };
+
+                if (name.startsWith("e_foc-firmware-") && name.endsWith(".upgrade") && url.isValid() && url.scheme() == "https")
+                    packs.push_back(InstallerAsset{ name, url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) });
+            }
+
+            return packs;
+        }
     }
 
     InstallerPlatform CurrentInstallerPlatform()
@@ -84,7 +100,17 @@ namespace tool
         if (!version || !pageUrl.isValid() || pageUrl.scheme() != "https")
             return std::nullopt;
 
-        return ReleaseInfo{ *version, tag, pageUrl, FindInstaller(root.value("assets").toArray(), platform) };
+        const auto assets = root.value("assets").toArray();
+        return ReleaseInfo{ *version, tag, pageUrl, FindInstaller(assets, platform), FindFirmwarePacks(assets) };
+    }
+
+    std::optional<InstallerAsset> FirmwarePackFor(const ReleaseInfo& release, const QString& boardName)
+    {
+        const auto name = QString("e_foc-firmware-%1-sync_foc_sensored-%2.upgrade").arg(boardName, release.tag);
+        for (const auto& pack : release.firmwarePacks)
+            if (pack.fileName == name)
+                return pack;
+        return std::nullopt;
     }
 
     UpdateEvaluation EvaluateLatestRelease(const QByteArray& json, const ReleaseVersion& current, InstallerPlatform platform)
