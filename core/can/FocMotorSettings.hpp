@@ -19,7 +19,8 @@ namespace can
         calibrationRecord,
         onlineEstimate,
         loopStatistics,
-        platform
+        platform,
+        firmware
     };
 
     ParameterGroup GroupOf(FocParameter parameter);

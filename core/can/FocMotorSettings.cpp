@@ -44,6 +44,14 @@ namespace can
                     return ParameterGroup::loopStatistics;
                 case FocParameter::resetCause:
                     return ParameterGroup::platform;
+                case FocParameter::firmwareVersionMajor:
+                case FocParameter::firmwareVersionMinor:
+                case FocParameter::firmwareVersionPatch:
+                case FocParameter::boardKind:
+                case FocParameter::stagedVersionMajor:
+                case FocParameter::stagedVersionMinor:
+                case FocParameter::stagedVersionPatch:
+                    return ParameterGroup::firmware;
                 default:
                     return std::nullopt;
             }

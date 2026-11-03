@@ -27,6 +27,7 @@ namespace can
             drivers::Encoder& encoder;
             application::PlatformDiagnostics& diagnostics;
             FocResetCause resetCause;
+            FocFirmwareIdentity firmware{};
         };
 
         FocMotorCanBridge(
@@ -36,7 +37,8 @@ namespace can
             services::ElectricalParametersIdentification& electricalIdent,
             services::Tracer& tracer,
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
-            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt);
+            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt,
+            FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade = std::nullopt);
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };
@@ -82,6 +84,7 @@ namespace can
         drivers::Encoder& encoder;
         FocMotorCommissioningBridge commissioning;
         FocMotorSettingsBridge settings;
+        FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
     };

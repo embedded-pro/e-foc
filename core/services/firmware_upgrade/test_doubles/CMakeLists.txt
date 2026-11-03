@@ -3,7 +3,7 @@ emil_build_for(e_foc.services.firmware_upgrade_mock HOST All BOOL E_FOC_BUILD_TE
 
 target_link_libraries(e_foc.services.firmware_upgrade_mock INTERFACE
     gmock_main
-    e_foc.services.firmware_upgrade
+    e_foc.services.firmware_upgrade.interfaces
 )
 
 target_sources(e_foc.services.firmware_upgrade_mock INTERFACE

@@ -159,7 +159,22 @@ namespace can
         loopOverruns = 0xA5,
         loopDeadlineMisses = 0xA6,
         loopReentries = 0xA7,
-        resetCause = 0xB0
+        resetCause = 0xB0,
+        firmwareVersionMajor = 0xB1,
+        firmwareVersionMinor = 0xB2,
+        firmwareVersionPatch = 0xB3,
+        boardKind = 0xB4,
+        stagedVersionMajor = 0xB5,
+        stagedVersionMinor = 0xB6,
+        stagedVersionPatch = 0xB7
+    };
+
+    struct FocFirmwareIdentity
+    {
+        uint16_t versionMajor{};
+        uint16_t versionMinor{};
+        uint16_t versionPatch{};
+        uint8_t boardKind{};
     };
 
     enum class FocResetCause : uint8_t

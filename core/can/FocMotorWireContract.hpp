@@ -18,7 +18,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 7;
+    static constexpr uint8_t focContractVersionMinor = 8;
 
     enum class FieldType : uint8_t
     {
@@ -243,8 +243,9 @@ namespace can
     inline constexpr float focMaxCanNodeId{ 4095.0f };
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
+    inline constexpr float focMaxVersionNumber{ static_cast<float>(std::numeric_limits<uint16_t>::max()) };
 
-    inline constexpr std::array<ParameterDescriptor, 46> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 53> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -291,6 +292,13 @@ namespace can
         { FocParameter::loopDeadlineMisses, "loopDeadlineMisses", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::loopReentries, "loopReentries", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::resetCause, "resetCause", "-", 0.0f, 4.0f, true, false, true },
+        { FocParameter::firmwareVersionMajor, "firmwareVersionMajor", "-", 0.0f, focMaxVersionNumber, true, false, true },
+        { FocParameter::firmwareVersionMinor, "firmwareVersionMinor", "-", 0.0f, focMaxVersionNumber, true, false, true },
+        { FocParameter::firmwareVersionPatch, "firmwareVersionPatch", "-", 0.0f, focMaxVersionNumber, true, false, true },
+        { FocParameter::boardKind, "boardKind", "-", 0.0f, 5.0f, true, false, true },
+        { FocParameter::stagedVersionMajor, "stagedVersionMajor", "-", 0.0f, focMaxVersionNumber, true, false, true },
+        { FocParameter::stagedVersionMinor, "stagedVersionMinor", "-", 0.0f, focMaxVersionNumber, true, false, true },
+        { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, focMaxVersionNumber, true, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

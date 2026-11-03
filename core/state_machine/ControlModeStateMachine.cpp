@@ -780,4 +780,19 @@ namespace state_machine
         return pendingSelectCallback != nullptr || configWriter.HasPendingPersist();
     }
 
+    bool ControlModeStateMachine::IsStoppedAndIdle() const
+    {
+        return SettingGate() == SettingResult::ok;
+    }
+
+    void ControlModeStateMachine::HoldAsyncWork()
+    {
+        nvmActivity.Begin();
+    }
+
+    void ControlModeStateMachine::ReleaseAsyncWork()
+    {
+        nvmActivity.End();
+    }
+
 }

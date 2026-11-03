@@ -310,7 +310,7 @@ namespace tool
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly)
+            if (descriptor.readOnly && can::GroupOf(descriptor.id) != can::ParameterGroup::firmware)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 

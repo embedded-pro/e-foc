@@ -14,14 +14,16 @@ namespace can
         services::ElectricalParametersIdentification& electricalIdent,
         services::Tracer& tracer,
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
-        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill,
+        FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade)
         : FocMotorCategoryServerObserver(server)
         , server(server)
         , controlMode(controlMode)
         , inverter(platform.inverter)
         , encoder(platform.encoder)
         , commissioning(server, controlMode, electricalIdent, currentOffsets, standstill)
-        , settings(server, controlMode, platform.diagnostics, platform.resetCause)
+        , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware, firmwareUpgrade)
+        , firmwareUpgrade(firmwareUpgrade)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -84,6 +86,9 @@ namespace can
 
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
+        if (firmwareUpgrade)
+            firmwareUpgrade->get().EmergencyStop();
+
         ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
 

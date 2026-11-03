@@ -34,7 +34,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 46> presentations{ {
+        constexpr std::array<SettingPresentation, 53> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -98,6 +98,13 @@ namespace tool
             { FocParameter::loopDeadlineMisses, "Control loop deadline misses", "Deadline misses:", {}, "Periods whose interrupt started late.", {} },
             { FocParameter::loopReentries, "Control loop re-entries", "Re-entries:", {}, "Interrupts that arrived while the previous one still ran.", {} },
             { FocParameter::resetCause, "Reset cause", "Reset cause:", {}, "Cause of the last reset of the controller.", {} },
+            { FocParameter::firmwareVersionMajor, "Firmware major version", "Major:", {}, "Major number of the running firmware's release version.", {} },
+            { FocParameter::firmwareVersionMinor, "Firmware minor version", "Minor:", {}, "Minor number of the running firmware's release version.", {} },
+            { FocParameter::firmwareVersionPatch, "Firmware patch version", "Patch:", {}, "Patch number of the running firmware's release version.", {} },
+            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on.", {} },
+            { FocParameter::stagedVersionMajor, "Staged major version", "Staged major:", {}, "Major number of the pack staged for an update; 0 when none is staged.", {} },
+            { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the pack staged for an update; 0 when none is staged.", {} },
+            { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the pack staged for an update; 0 when none is staged.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -274,6 +281,11 @@ namespace tool
     std::span<const SettingPresentation> Readings()
     {
         return Slice(29, 17);
+    }
+
+    std::span<const SettingPresentation> FirmwareIdentity()
+    {
+        return Slice(46, 7);
     }
 
     std::string_view ResetCauseName(float cause)

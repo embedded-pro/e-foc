@@ -143,6 +143,14 @@ namespace
                 }));
         }
 
+        static std::size_t FirmwareParameterCount()
+        {
+            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
+                {
+                    return can::GroupOf(descriptor.id) == can::ParameterGroup::firmware;
+                }));
+        }
+
         static std::size_t SupervisionParameterCount()
         {
             return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
@@ -950,7 +958,7 @@ TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - FirmwareParameterCount(), Count(can::focQueryParameterId));
     EXPECT_TRUE(QueriedAReadOnlyParameter());
 }
 
@@ -973,7 +981,7 @@ TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_setting
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - FirmwareParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_1_node_is_not_asked_for_diagnostics)
@@ -1019,7 +1027,7 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - FirmwareParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
@@ -1034,7 +1042,7 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - FirmwareParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
@@ -1049,5 +1057,5 @@ TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
     DeliverAck(can::focClearDiagnosticsId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - WritableParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - WritableParameterCount() - FirmwareParameterCount(), Count(can::focQueryParameterId));
 }

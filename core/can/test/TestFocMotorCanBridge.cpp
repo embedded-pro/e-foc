@@ -2,6 +2,7 @@
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/test/CanMock.hpp"
+#include "core/can/FirmwareUpgradeInterlock.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorMessages.hpp"
@@ -11,6 +12,7 @@
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
+#include "core/services/firmware_upgrade/test_doubles/FirmwareUpgradeControlMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
@@ -242,7 +244,11 @@ namespace
                 rest = standstillMock;
             }
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer, offsets, rest);
+            can::FocMotorSettingsBridge::FirmwareUpgrade upgrade;
+            if (bridgeHasFirmwareUpgrade)
+                upgrade = firmwareUpgradeMock;
+
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, firmwareIdentity }, electricalIdentMock, tracer, offsets, rest, upgrade);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -387,6 +393,9 @@ namespace
         StrictMock<services::PhaseCurrentOffsetsMock> currentOffsetsMock;
         StrictMock<services::RotorStandstillMock> standstillMock;
         bool bridgeMeasuresOffsets{ false };
+        StrictMock<services::FirmwareUpgradeControlMock> firmwareUpgradeMock;
+        bool bridgeHasFirmwareUpgrade{ false };
+        can::FocFirmwareIdentity firmwareIdentity{};
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
         infra::Execute setupTeardownExpectations{ [this]()
             {
@@ -2211,4 +2220,117 @@ TEST_F(FocMotorCanBridgeTest, ClearCalibration_WhileASettingIsBeingStored_IsBusy
 
     pendingSave(services::NvmStatus::Ok);
     ExecuteAllActions();
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_FirmwareIdentity_ReportsTheRunningVersionAndTheBoard)
+{
+    firmwareIdentity = can::FocFirmwareIdentity{ 1, 6, 3, 5 };
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMajor);
+    ExpectAnswered(1.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMinor);
+    ExpectAnswered(6.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionPatch);
+    ExpectAnswered(3.0f, false);
+    DispatchQueryParameter(can::FocParameter::boardKind);
+    ExpectAnswered(5.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_ReportsThePackStagedForAnUpdate)
+{
+    bridgeHasFirmwareUpgrade = true;
+    EXPECT_CALL(firmwareUpgradeMock, StagedVersion()).WillRepeatedly(Return(services::FirmwareVersion{ 2, 3, 4 }));
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::stagedVersionMajor);
+    ExpectAnswered(2.0f, false);
+    DispatchQueryParameter(can::FocParameter::stagedVersionMinor);
+    ExpectAnswered(3.0f, false);
+    DispatchQueryParameter(can::FocParameter::stagedVersionPatch);
+    ExpectAnswered(4.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_IsZeroOnABoardWithoutAnUpgradeService)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::stagedVersionMajor);
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_WhileAPackIsReceived_ReturnsBusy)
+{
+    bridgeHasFirmwareUpgrade = true;
+    EXPECT_CALL(firmwareUpgradeMock, IsRunning()).WillRepeatedly(Return(true));
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_WhileAPackIsReceived_ReturnsBusy)
+{
+    bridgeHasFirmwareUpgrade = true;
+    EXPECT_CALL(firmwareUpgradeMock, IsRunning()).WillRepeatedly(Return(true));
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_WithNoPackBeingReceived_IsPersisted)
+{
+    bridgeHasFirmwareUpgrade = true;
+    EXPECT_CALL(firmwareUpgradeMock, IsRunning()).WillRepeatedly(Return(false));
+    ConstructFixture();
+    ExpectConfigSaved();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
+
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_EndsAFirmwareDownload)
+{
+    bridgeHasFirmwareUpgrade = true;
+    ConstructFixture();
+    ResetCaptures();
+
+    EXPECT_CALL(firmwareUpgradeMock, EmergencyStop());
+    DispatchCommand(can::focEmergencyStopId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, FirmwareUpgradeInterlock_HoldsTheDriveUntilReleased)
+{
+    ConstructFixtureInReady();
+    can::FirmwareUpgradeInterlock interlock{ *coordinator };
+    EXPECT_TRUE(interlock.IsStoppedAndIdle());
+
+    interlock.Hold();
+    EXPECT_FALSE(interlock.IsStoppedAndIdle());
+    ResetCaptures();
+    DispatchCommand(can::focStartId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_NE(ackSpy.last->status, services::CanAckStatus::success);
+
+    interlock.Release();
+    EXPECT_TRUE(interlock.IsStoppedAndIdle());
+    ResetCaptures();
+    DispatchCommand(can::focStartId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }

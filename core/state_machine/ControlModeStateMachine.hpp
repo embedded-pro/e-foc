@@ -95,6 +95,10 @@ namespace state_machine
         void PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone);
         bool HasPendingConfigWrite() const;
 
+        bool IsStoppedAndIdle() const;
+        void HoldAsyncWork();
+        void ReleaseAsyncWork();
+
         foc::Weber ActiveFluxLinkage() const;
         CommandResult CmdReserveExternalCalibration();
         CommandResult CmdReleaseExternalCalibration();
