@@ -10,9 +10,12 @@
 #include "integration_tests/support/plant/PlantConfigWriter.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include "upgrade/pack/UpgradePackHeader.hpp"
+#include <algorithm>
 #include <chrono>
 #include <gtest/gtest.h>
 #include <map>
+#include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -24,7 +27,6 @@ namespace
 {
     constexpr std::size_t headerTargetOffset = 0x400 + 16;
     constexpr uint8_t anotherBoardKind = 1;
-    constexpr application::InitialCounter counter{ 0x5a, 0x3c, 0x96, 0x0f, 0xa5, 0xc3, 0x69, 0xf0, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf1 };
 
     const std::map<std::string, application::UpgradePackStatus> statuses{
         { "empty", application::UpgradePackStatus::empty },
@@ -34,6 +36,16 @@ namespace
         { "deployed", application::UpgradePackStatus::deployed },
         { "invalid", application::UpgradePackStatus::invalid },
     };
+
+    bool Random(std::span<uint8_t> bytes)
+    {
+        static std::random_device device;
+        std::ranges::generate(bytes, []()
+            {
+                return static_cast<uint8_t>(device());
+            });
+        return true;
+    }
 
     BootloaderTarget& Target()
     {
@@ -72,7 +84,7 @@ namespace
         if (!std::holds_alternative<application::KeySet>(keys))
             throw std::runtime_error{ "The development key set is not a key set" };
 
-        auto built = application::BuildPack(Description(defect), std::get<application::KeySet>(keys), counter);
+        auto built = application::BuildPack(Description(defect), std::get<application::KeySet>(keys), Random);
         if (!std::holds_alternative<std::vector<uint8_t>>(built))
             throw std::runtime_error{ "The pack could not be built" };
 
