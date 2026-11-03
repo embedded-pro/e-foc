@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.12.0
+version: 1.13.0
 component: "software-in-the-loop"
-date: 2026-11-02
+date: 2026-11-03
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-02
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.12.0                      |
+| Version   | 1.13.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-02                  |
+| Date      | 2026-11-03                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1224,7 +1224,7 @@ error code the bootloader recorded.
 
 A refused pack leaves the application in the slot, which the heartbeat after the refusal shows. The
 firmware-upgrade service's scenarios add the other half: the application downloading the pack into
-`staging.bin` and recording *ready to deploy* itself (`service-firmware-upgrade.md` Part K).
+`staging.bin` and recording *ready to deploy* itself (Part Q).
 
 A scenario reads the journal only after the heartbeat, or after the time it waits for one, so the bootloader
 has finished writing it.
@@ -1236,6 +1236,24 @@ descriptor files go to the software-in-the-loop shards, which name the bootloade
 `QEMU_SIL_BOOTLOADER_ELF`, find the image and descriptor next to the application, and read the key set from
 `targets/bootloader/keys/development.keys` (`E_FOC_DEVELOPMENT_KEYS` overrides it). `bootloader.feature`
 goes into the lightest shard.
+
+### Part Q — Downloading and applying through the application
+
+The firmware-upgrade service's scenarios drive the other half of an update: the application receives a pack
+over CAN, stages it and, on Activate, restarts into the bootloader, which installs it
+(`service-firmware-upgrade.md`).
+
+**Staging on the emulated board.** The application stages into the same two files the bootloader reads,
+`staging.bin` and `journal.bin` (Part P), and writes each change through to its file, so what the application
+staged is what the bootloader finds after the reset, and what a scenario reads back after the run. The page
+is 256 bytes and the staging slot 256 KB, as Part I of the service's design gives for the emulated board.
+
+**What the harness sends.** The firmware-upgrade category carries no sequence byte, so the steps send its
+commands as raw frames and wait for each answer, one block in flight, as a client does, and keep the client's
+heartbeat going meanwhile. The downloads send a small pack, a few hundred bytes of image built for the
+scenario with the library's pack builder and the emulated board's product name: the service checks the
+header but not the image, which only the bootloader decrypts. A refused pack differs in one thing: another
+board's product name, or a CRC that does not match.
 
 ## Interfaces
 

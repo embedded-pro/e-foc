@@ -55,6 +55,7 @@ namespace sil
         void ConfigureStaging(const std::vector<uint8_t>& pack) override;
         void ConfigureJournal(const std::vector<uint8_t>& journal) override;
         std::vector<uint8_t> Journal() const override;
+        std::vector<uint8_t> Staging() const override;
 
     private:
         QemuSilSession::Images LaunchImages();
