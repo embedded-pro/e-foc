@@ -97,7 +97,7 @@ namespace integration
             return false;
 
         const auto acks = fixture.CollectCapturedCanFrames(ackId, mark, 4, answerTimeout);
-        return std::any_of(acks.begin(), acks.end(), [](const hal::Can::Message& ack)
+        return std::ranges::any_of(acks, [](const hal::Can::Message& ack)
             {
                 return ack.size() >= 3 && ack[0] == services::firmwareUpgradeCategoryId && ack[1] == services::fwuAbortId && ack[2] == static_cast<uint8_t>(services::CanAckStatus::success);
             });
