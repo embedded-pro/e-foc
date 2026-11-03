@@ -17,9 +17,10 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, `injection_current_limit/`
 - `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
-- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
+- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
-- `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence) the bootloader is built from (`documentation/design/bootloader.md`)
+- `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
+  with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
 - `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
@@ -130,6 +131,12 @@ cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-Rel
 ```
 
 Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+
+**Bootloader keys**: no key is a build input. The bootloader always builds with an erased key slot that refuses every pack;
+afterwards EmIL's `application.bootloader_image inject-keys --keys <set> --elf <bootloader elf> --hex <file>...` writes the slot into the
+built bootloader. An embedded build builds the tool natively at `build/<preset>/_native_bootloader_image/bin` (`bootloader.md` Part J).
+The development key set is public, `targets/bootloader/keys/development.keys`: CI, dry runs and local builds inject it, and anyone can sign
+packs for a board that carries it. The release set is the only secret, `BOOTLOADER_KEYS_RELEASE` (base64), injected by the release alone (`bootloader.md` Part G).
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 

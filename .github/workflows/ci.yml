@@ -138,6 +138,19 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
+      # Every embedded build with a bootloader gets the public development key set in its key slot (bootloader.md Part G)
+      - name: Inject the development keys into the bootloader
+        shell: bash
+        run: |
+          images="build/${{ matrix.target }}/targets/bootloader/main/${{ matrix.configuration }}"
+          if [ ! -f "$images/e_foc.bootloader.main.elf" ]; then
+            echo "::notice::${{ matrix.target }} builds no bootloader: no key slot to fill"
+            exit 0
+          fi
+          hex=()
+          for file in "$images"/*.hex; do hex+=(--hex "$file"); done
+          "build/${{ matrix.target }}/_native_bootloader_image/bin/application.bootloader_image" inject-keys \
+            --keys targets/bootloader/keys/development.keys --elf "$images/e_foc.bootloader.main.elf" "${hex[@]}"
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
