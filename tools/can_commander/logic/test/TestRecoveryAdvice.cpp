@@ -30,6 +30,21 @@ TEST_F(TestRecoveryAdvice, start_refused_while_idle_asks_to_align_the_rotor)
     EXPECT_THAT(advice->text, HasSubstr("Align the rotor"));
 }
 
+TEST_F(TestRecoveryAdvice, start_refused_while_ready_gives_the_advice_of_an_idle_motor)
+{
+    const auto advice = Refuse(can::focStartId, FocMotorState::ready);
+
+    ASSERT_TRUE(advice.has_value());
+    EXPECT_EQ(RecoveryAction::alignRotor, advice->action);
+    EXPECT_THAT(advice->text, HasSubstr("check the supply"));
+}
+
+TEST_F(TestRecoveryAdvice, stop_or_clear_fault_refused_while_ready_needs_no_advice)
+{
+    EXPECT_FALSE(Refuse(can::focStopId, FocMotorState::ready).has_value());
+    EXPECT_FALSE(Refuse(can::focClearFaultId, FocMotorState::ready).has_value());
+}
+
 TEST_F(TestRecoveryAdvice, setpoint_refused_before_any_status_asks_to_align_the_rotor)
 {
     const auto advice = Refuse(can::focSetTorqueSetpointId, std::nullopt);

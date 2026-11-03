@@ -37,8 +37,15 @@ WHEN(R"(the calibrate command is issued)")
 THEN(R"(the state machine shall be in the Ready state)")
 {
     auto& fixture = context.Get<Fixture>();
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::ready))
+        << "Motor state is not ready over CAN telemetry";
+}
+
+THEN(R"(the state machine shall be in the Idle state)")
+{
+    auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::idle))
-        << "Motor state is not idle/ready over CAN telemetry";
+        << "Motor state is not idle over CAN telemetry";
 }
 
 THEN(R"(the state machine shall report incomplete calibration)")

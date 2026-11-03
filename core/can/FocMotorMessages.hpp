@@ -54,7 +54,8 @@ namespace can
         running = 1,
         fault = 2,
         calibrating = 3,
-        partialCalibration = 4
+        partialCalibration = 4,
+        ready = 5
     };
 
     enum class FocFaultCode : uint8_t
@@ -66,7 +67,9 @@ namespace can
         overTemperature = 4,
         sensorFault = 5,
         stall = 6,
-        phaseMissing = 7
+        phaseMissing = 7,
+        hardwareFault = 8,
+        calibrationFailed = 9
     };
 
     enum class FocMotorCategoryError : uint8_t

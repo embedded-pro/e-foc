@@ -155,6 +155,11 @@ namespace integration
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
     {
+        return WaitForMotorState(std::initializer_list<can::FocMotorState>{ expectedState }, timeout);
+    }
+
+    bool Fixture::WaitForMotorState(std::initializer_list<can::FocMotorState> expectedStates, std::chrono::milliseconds timeout)
+    {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
             can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
@@ -181,9 +186,9 @@ namespace integration
                 if (std::getenv("SIL_VERBOSE") != nullptr)
                     std::fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",
                         static_cast<int>(payload[0]),
-                        static_cast<int>(expectedState),
+                        static_cast<int>(*expectedStates.begin()),
                         static_cast<long>(elapsed.count()));
-                if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
+                if (std::ranges::find(expectedStates, static_cast<can::FocMotorState>(payload[0])) != expectedStates.end())
                     return true;
             }
 
@@ -299,7 +304,7 @@ namespace integration
         payload.push_back(static_cast<uint8_t>(mode));
         if (!SendCanCommand(can::focMotorCategoryId, can::focSelectControlModeId, payload, timeout))
             return false;
-        return WaitForMotorState(can::FocMotorState::idle, timeout);
+        return WaitForMotorState({ can::FocMotorState::idle, can::FocMotorState::ready }, timeout);
     }
 
     bool Fixture::EnableMotor(std::chrono::milliseconds timeout)
@@ -313,7 +318,7 @@ namespace integration
     {
         if (!SendCanCommand(can::focMotorCategoryId, can::focStopId, {}, timeout))
             return false;
-        return WaitForMotorState(can::FocMotorState::idle, timeout);
+        return WaitForMotorState(can::FocMotorState::ready, timeout);
     }
 
     bool Fixture::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,

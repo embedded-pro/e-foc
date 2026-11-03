@@ -190,6 +190,8 @@ namespace tool
                 return "Calibrating";
             case FocMotorState::partialCalibration:
                 return "Partially calibrated";
+            case FocMotorState::ready:
+                return "Ready";
             default:
                 return "Unknown";
         }
@@ -215,6 +217,10 @@ namespace tool
                 return "Stall";
             case FocFaultCode::phaseMissing:
                 return "Phase missing";
+            case FocFaultCode::hardwareFault:
+                return "Hardware fault";
+            case FocFaultCode::calibrationFailed:
+                return "Calibration failed";
             default:
                 return "Unknown";
         }

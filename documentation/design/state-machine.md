@@ -1020,7 +1020,7 @@ sequenceDiagram
 | `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
 | `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
 | `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. Used by `ControlModeStateMachine` to refuse destroying the machine.                   |
-| `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
+| `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`. `Ready` is broadcast as `FocMotorState::ready` (contract 2.8).                                    |
 | `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 
 ### Required
@@ -1054,12 +1054,13 @@ sequenceDiagram
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 50 rad/s, for speed/position modes only                                                      |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017       |
-| `FaultCode`       | —                      | enum (uint8)                   | 10 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`              |
+| `FaultCode`       | —                      | enum (uint8)                   | 10 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`                          |
 
-`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
-from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a
-latched fault code could be read or broadcast; the expiry is reported after reboot through
-`ResetCause::watchdog` instead. The watchdog does not reach the state machine at all. See
+A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware
+resets the target, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the
+expiry is reported after reboot through `ResetCause::watchdog` instead. The watchdog does not reach the state
+machine at all. Every code is reported over CAN under its own wire code (contract 2.8, `service-can.md`); the
+bridge's mapping has no default, so a new code does not build until it is mapped. See
 [Watchdog Design](watchdog.md).
 
 ---

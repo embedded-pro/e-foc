@@ -558,6 +558,27 @@ TEST_F(TestCanCommandClient, telemetry_is_attributed_to_the_node_that_sent_it)
         Message({ static_cast<uint8_t>(FocMotorState::idle), 0, 0, 0, 0, 0 }));
 }
 
+TEST_F(TestCanCommandClient, telemetry_status_ready_is_passed_on_as_ready)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::ready, FocFaultCode::none));
+    EXPECT_CALL(observer, OnSpeedPositionReceived(1, _, _));
+
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
+        Message({ 5, 0, 0, 0, 0, 0 }));
+}
+
+TEST_F(TestCanCommandClient, telemetry_status_with_a_contract_2_8_fault_notifies_fault_event)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::fault, FocFaultCode::hardwareFault));
+    EXPECT_CALL(observer, OnSpeedPositionReceived(1, _, _));
+    EXPECT_CALL(observer, OnFaultEventReceived(1, FocFaultCode::hardwareFault));
+
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
+        Message({ 2, 8, 0, 0, 0, 0 }));
+}
+
 TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
