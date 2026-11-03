@@ -4,10 +4,12 @@
 - id: REQ-PERF-001
   title: FOC inner-loop execution time
   shall: >
-    The Calculate() method of the FOC inner loop shall complete within 4500 CPU
-    cycles at 120 MHz (37.5 microseconds), leaving 25% headroom in the 50 microsecond
-    control period for ISR entry/exit, encoder reads, and PWM writes. This budget
-    is enforced by the cortex-cycle-budget CI gate (fail-over-max-cycles: 4500).
+    The application callback that runs inside the control interrupt — encoder read, Calculate()
+    of the FOC inner loop and PWM write — shall complete within 4500 CPU cycles at 120 MHz (37.5
+    microseconds), leaving 25% of the 50 microsecond control period as headroom for hardware ISR
+    entry/exit. This is the window REQ-PERF-004 measures on target. The static
+    cortex-cycle-budget CI gate enforces the same 4500 cycles on the symbols its configuration
+    lists (fail-over-max-cycles: 4500).
 
 - id: REQ-PERF-002
   title: FOC outer-loop execution time
@@ -19,6 +21,8 @@
 
 - id: REQ-PERF-004
   title: The control interrupt measures its own execution time
+  status: verified
+  verification: sil
   shall: >
     The platform shall measure the duration of every control-interrupt execution with the Cortex-M
     cycle counter, or on the emulated target, which has none, with a free-running timer of its
@@ -27,9 +31,8 @@
     measurement shall span the application callback — encoder read, control law and PWM write — that
     executes inside the interrupt context. Hardware ISR entry/exit overhead and any platform-
     specific pre-processing that is not part of the real-time control law (such as simulation model
-    steps in QEMU) are excluded from the measured window. REQ-PERF-001 accounts for this: the
-    4500-cycle budget covers Calculate() with 25% headroom reserved for ISR entry/exit overhead
-    outside the measured window.
+    steps in QEMU) are excluded from the measured window. That window is the scope of the
+    REQ-PERF-001 budget of 4500 cycles at 120 MHz.
 
 - id: REQ-PERF-005
   title: Overruns and deadline misses are counted separately
@@ -55,6 +58,8 @@
 
 - id: REQ-PERF-008
   title: Calibration, commanded alignment and closed-loop running hold the control-interrupt budget
+  status: verified
+  verification: sil
   shall: >
     Through a full calibration, while the rotor is aligned on command and while the motor then
     runs closed loop in any control mode, no control-interrupt execution shall exceed the budget

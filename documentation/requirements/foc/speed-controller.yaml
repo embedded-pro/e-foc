@@ -47,24 +47,34 @@
 
 - id: REQ-SPD-008
   title: Speed step-response envelope
+  status: verified
+  verification: [sil, mil]
   shall: >
     With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default loop
     bandwidths, every speed control law shall bring the mechanical speed from rest to a 20 rad/s
-    setpoint with the mean of the last quarter of a 500 ms window within 0.5 rad/s of the
-    setpoint, and shall enter and then stay inside a 10 percent band of the step within a
-    settling time and with an overshoot no worse than its row: PI 60 ms, 15 percent overshoot;
-    ADRC 80 ms, 15 percent; two-DOF 60 ms, 15 percent; LQI 60 ms, 15 percent. A setpoint changed
-    while running, to 40 rad/s and to -20 rad/s, shall meet the same rows. Each law's
-    rise time from a tenth to nine tenths of the step, and the band its tail still ripples in
-    over the last quarter of the window, measured as a percentage of that step rather than of
-    the setpoint it ends at, shall also be bounded by the row it carries. Each of those bounds is
-    set at twice the worst value repeated runs of its row measured, rounded up to the figure the
-    row carries, and the row fails when a measurement exceeds that figure; the margin is there so
-    that the spread between one run and the next cannot reach it.
-    The response is measured on the plant's own trajectory on the control-tick time base.
+    setpoint with the mean of the last quarter of a 500 ms window within 0.5 rad/s of the setpoint,
+    and shall enter and then stay inside a 10 percent band of the step within a settling time and
+    with an overshoot no worse than its row, with a rise time from a tenth to nine tenths of the
+    step and a tail band over the last quarter of the window, as a percentage of that step rather
+    than of the setpoint it ends at, no worse than its row. From rest, as settling time, overshoot,
+    rise time and tail band: PI 60 ms, 15 percent, 20 ms, 6 percent; ADRC 80 ms, 15 percent, 50 ms,
+    6 percent; two-DOF 60 ms, 15 percent, 30 ms, 6 percent; LQI 60 ms, 15 percent, 25 ms, 6 percent.
+    A setpoint changed while running shall meet the same settling time, overshoot and 0.5 rad/s
+    error, with rise time and tail band, for a change to 40 rad/s: PI 25 ms, 5 percent; ADRC 50 ms,
+    6 percent; two-DOF 40 ms, 6 percent; LQI 35 ms, 6 percent; and for a change to -20 rad/s: PI 20
+    ms, 4 percent; ADRC 40 ms, 4 percent; two-DOF 30 ms, 4 percent; LQI 30 ms, 4 percent. The
+    response is measured on the plant's own trajectory on the control-tick time base.
+  rationale: >
+    Each rise and tail bound is twice the worst value repeated runs of its row measured, rounded up
+    to the figure the row carries; the row fails when a measurement exceeds that figure, and the
+    margin keeps the spread between one run and the next from reaching it. The rows are pinned in
+    integration_tests/features/control_performance.feature (PI) and
+    integration_tests/model_in_the_loop/test/TestControlPerformance.cpp (every law).
 
 - id: REQ-SPD-009
   title: Speed-loop rejection of a shaft torque step
+  status: verified
+  verification: [sil, mil]
   shall: >
     While regulating 20 rad/s against the nominal plant, every speed control law shall keep the
     speed within 4 rad/s of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
@@ -77,3 +87,8 @@
     latching the integrator: against a 0.5 N·m step, which asks for about thirteen of the twenty
     amperes allowed, the speed shall stay within 300 rad/s of the setpoint and return to within
     3 rad/s of it within 350 ms.
+  rationale: >
+    The 0.002 N·m step is 0.73 percent of the 0.274 N·m rated torque of the Teknic M-2310P-LN-04K
+    (documentation/theory/foc-plant-models.md, Reference motors); it is small on purpose, so that the loop
+    stays out of current saturation and the numbers measure the control law rather than the current limit.
+    The 0.5 N·m step is 182 percent of that rated torque.

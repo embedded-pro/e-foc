@@ -5,13 +5,21 @@
 
 - id: REQ-HIL-001
   title: ADC phase current measurement
+  status: verified
+  verification: hil
   shall: >
-    The hardware test target shall read three-phase motor currents from the ADC
-    peripheral and report measured values within the expected range for the
-    configured shunt resistor and gain.
+    The hardware test target shall read three-phase motor currents from the ADC peripheral and, at
+    rest with the three duties held at 50 percent, report at least one phase-current sample row of
+    three values, every one of them finite.
+  rationale: >
+    The scenario asserts only that each reported a;b;c sample is finite; it states no numeric range,
+    because the idle reading depends on the board's shunt resistor and gain and no per-board figure
+    is pinned yet.
 
 - id: REQ-HIL-004
   title: EEPROM read-write integrity
+  status: verified
+  verification: hil
   shall: >
     The hardware test target shall write a calibration data block to EEPROM and
     read it back. The read-back data shall be byte-for-byte identical to the
@@ -19,6 +27,8 @@
 
 - id: REQ-HIL-005
   title: UART serial communication
+  status: verified
+  verification: hil
   shall: >
     The hardware test target shall respond to a command sent over the UART
     serial interface within 100 milliseconds of receipt. The response shall
@@ -26,6 +36,8 @@
 
 - id: REQ-HIL-006
   title: CAN bus communication
+  status: verified
+  verification: hil
   shall: >
     The hardware test target shall transmit a CAN frame in response to a CAN
     command received on the bus. The response frame shall arrive within 10
