@@ -101,7 +101,7 @@ namespace application
 
     BoardKind PlatformFactoryImpl::GetBoardKind() const
     {
-        return BoardKind::nucleoH563zi;
+        return static_cast<BoardKind>(Peripheral::boardKind);
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const

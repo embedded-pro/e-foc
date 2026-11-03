@@ -212,7 +212,7 @@ board and microcontroller its packs name (`bootloader.md` Part B), so a client p
 talks to and shows what waits to be applied.
 
 The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the build information the
-configure step generates (`BuildInfo.hpp`) and from `PlatformFactory::BoardKind()`; the staged-version
+configure step generates (`BuildInfo.hpp`) and from `PlatformFactory::GetBoardKind()`, which each board's `Peripheral::boardKind` sets; the staged-version
 parameters (`0xB5`–`0xB7`) wait for the bootloader work. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
 `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, emulated `5`, unknown `0`.
 

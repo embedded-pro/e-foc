@@ -67,6 +67,7 @@ namespace tool
     std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> Readings();
     std::string_view ResetCauseName(float cause);
+    std::string_view BoardKindName(float kind);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm);
     bool IsBandwidth(can::FocParameter parameter);

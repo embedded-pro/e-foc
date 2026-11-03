@@ -101,7 +101,7 @@ namespace tool
             { FocParameter::firmwareVersionMajor, "Firmware major version", "Firmware major:", {}, "Major number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionMinor, "Firmware minor version", "Firmware minor:", {}, "Minor number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionPatch, "Firmware patch version", "Firmware patch:", {}, "Patch number of the release version of the running firmware.", {} },
-            { FocParameter::boardKind, "Board kind", "Board kind:", {}, "Kind of the board: 1 EK-TM4C1294XL, 2 NUCLEO-G474RE, 3 NUCLEO-H563ZI, 4 EK-TM4C123GXL, 5 emulated, 0 unknown.", {} },
+            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on; Emulated is the QEMU software-in-the-loop target.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -280,14 +280,27 @@ namespace tool
         return Slice(29, 21);
     }
 
+    namespace
+    {
+        std::string_view NameAt(std::span<const std::string_view> names, float value)
+        {
+            const auto index = std::lround(value);
+            if (index < 0 || static_cast<std::size_t>(index) >= names.size() || static_cast<float>(index) != value)
+                return "Unknown";
+            return names[static_cast<std::size_t>(index)];
+        }
+    }
+
     std::string_view ResetCauseName(float cause)
     {
         static constexpr std::array<std::string_view, 5> names{ "Power-up", "Brown-out", "Software", "Hardware", "Watchdog" };
+        return NameAt(names, cause);
+    }
 
-        const auto index = std::lround(cause);
-        if (index < 0 || static_cast<std::size_t>(index) >= names.size() || static_cast<float>(index) != cause)
-            return "Unknown";
-        return names[static_cast<std::size_t>(index)];
+    std::string_view BoardKindName(float kind)
+    {
+        static constexpr std::array<std::string_view, 6> names{ "Unknown", "EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI", "EK-TM4C123GXL", "Emulated" };
+        return NameAt(names, kind);
     }
 
     const SettingPresentation& PresentationOf(can::FocParameter parameter)

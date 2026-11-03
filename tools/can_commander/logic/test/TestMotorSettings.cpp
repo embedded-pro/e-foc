@@ -352,3 +352,16 @@ TEST_F(TestMotorSettings, names_the_reset_cause_the_controller_reports)
     EXPECT_EQ("Unknown", ResetCauseName(-1.0f));
     EXPECT_EQ("Unknown", ResetCauseName(2.5f));
 }
+
+TEST_F(TestMotorSettings, names_the_board_kind_the_controller_reports)
+{
+    EXPECT_EQ("Unknown", BoardKindName(0.0f));
+    EXPECT_EQ("EK-TM4C1294XL", BoardKindName(1.0f));
+    EXPECT_EQ("NUCLEO-G474RE", BoardKindName(2.0f));
+    EXPECT_EQ("NUCLEO-H563ZI", BoardKindName(3.0f));
+    EXPECT_EQ("EK-TM4C123GXL", BoardKindName(4.0f));
+    EXPECT_EQ("Emulated", BoardKindName(5.0f));
+    EXPECT_EQ("Unknown", BoardKindName(6.0f));
+    EXPECT_EQ("Unknown", BoardKindName(-1.0f));
+    EXPECT_EQ("Unknown", BoardKindName(1.5f));
+}

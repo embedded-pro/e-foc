@@ -105,6 +105,8 @@ namespace tool
         const auto& presentation = PresentationOf(parameter);
         if (parameter == can::FocParameter::resetCause)
             return ToQt(ResetCauseName(value));
+        if (parameter == can::FocParameter::boardKind)
+            return ToQt(BoardKindName(value));
         if (IsInteger(parameter))
             return numberLocale.toString(static_cast<qlonglong>(std::llround(value))) + ToQt(presentation.suffix);
         return numberLocale.toString(static_cast<double>(value), 'g', 6) + ToQt(presentation.suffix);
