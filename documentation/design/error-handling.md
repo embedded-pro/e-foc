@@ -89,7 +89,6 @@ The platforms answer as follows. The decision itself is one header, `core/platfo
 outside the board's overvoltage and undervoltage thresholds (a reading that is not a number counts as outside),
 `clear` otherwise. A latched trip answers without reading the bus.
 
-
 - **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
   whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO; steps 3 to 5
   are redirected to comparators 0, 1 and 2 through the SSOP register and never reach the FIFO, so the phase-current

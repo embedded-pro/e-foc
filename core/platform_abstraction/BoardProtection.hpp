@@ -9,13 +9,14 @@ namespace application
 {
     struct BoardProtectionLimits
     {
-        float overVoltageVolts;
-        float underVoltageVolts;
+        foc::Volts overVoltage;
+        foc::Volts underVoltage;
     };
 
-    ALWAYS_INLINE_HOT bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c, float limit)
+    ALWAYS_INLINE_HOT bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c, foc::Ampere limit)
     {
-        return std::abs(a.Value()) > limit || std::abs(b.Value()) > limit || std::abs(c.Value()) > limit;
+        const auto bound = limit.Value();
+        return std::abs(a.Value()) > bound || std::abs(b.Value()) > bound || std::abs(c.Value()) > bound;
     }
 
     // Event-loop context only: readBusVoltage may block, and it is skipped while a latch already decides the answer.
@@ -26,7 +27,7 @@ namespace application
             return PlatformFactory::BoardProtectionState::asserted;
 
         const auto bus = readBusVoltage().Value();
-        const auto inRange = bus >= limits.underVoltageVolts && bus <= limits.overVoltageVolts;
+        const auto inRange = bus >= limits.underVoltage.Value() && bus <= limits.overVoltage.Value();
 
         return inRange ? PlatformFactory::BoardProtectionState::clear : PlatformFactory::BoardProtectionState::asserted;
     }

@@ -19,7 +19,7 @@ namespace
                 });
         }
 
-        const application::BoardProtectionLimits limits{ 58.0f, 18.0f };
+        const application::BoardProtectionLimits limits{ foc::Volts{ 58.0f }, foc::Volts{ 18.0f } };
         uint32_t busReads{ 0 };
     };
 }
@@ -65,7 +65,7 @@ TEST_F(TestBoardProtection, the_pwm_fault_latch_asserts_without_reading_the_bus)
 
 TEST(TestExceedsOverCurrent, any_phase_beyond_the_limit_in_either_direction_exceeds_it)
 {
-    constexpr float limit{ 6.6f };
+    const foc::Ampere limit{ 6.6f };
 
     EXPECT_FALSE(application::ExceedsOverCurrent(foc::Ampere{ 6.6f }, foc::Ampere{ -6.6f }, foc::Ampere{ 0.0f }, limit));
     EXPECT_TRUE(application::ExceedsOverCurrent(foc::Ampere{ 6.7f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, limit));

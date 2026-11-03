@@ -40,7 +40,10 @@ namespace application
 {
     namespace
     {
-        constexpr BoardProtectionLimits protectionLimits{ Peripheral::overvoltageThresholdVolts, Peripheral::undervoltageThresholdVolts };
+        BoardProtectionLimits ProtectionLimits()
+        {
+            return { foc::Volts{ Peripheral::overvoltageThresholdVolts }, foc::Volts{ Peripheral::undervoltageThresholdVolts } };
+        }
     }
 
     extern "C" uint32_t SystemCoreClock;
@@ -282,7 +285,7 @@ namespace application
 
                 const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
 
-                if (overCurrentTripped || ExceedsOverCurrent(currents.a, currents.b, currents.c, BoardCharacteristics::overcurrentThresholdAmps))
+                if (overCurrentTripped || ExceedsOverCurrent(currents.a, currents.b, currents.c, foc::Ampere{ BoardCharacteristics::overcurrentThresholdAmps }))
                     TripOverCurrent();
                 else
                     onPhaseCurrentsReady(currents);
@@ -388,7 +391,7 @@ namespace application
         if constexpr (!Peripheral::hasFaultComparators)
             return PlatformFactory::BoardProtectionState::unknown;
         else
-            return EvaluateBoardProtection(overCurrentTripped, pwmFaultAsserted, protectionLimits, [this]()
+            return EvaluateBoardProtection(overCurrentTripped, pwmFaultAsserted, ProtectionLimits(), [this]()
                 {
                     return PowerSupplyVoltage();
                 });

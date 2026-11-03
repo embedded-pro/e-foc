@@ -46,7 +46,10 @@ namespace application
 
         constexpr uint32_t eepromI2cTiming{ 0xf0d42c35 };
 
-        constexpr BoardProtectionLimits protectionLimits{ Peripheral::overvoltageThresholdVolts, Peripheral::undervoltageThresholdVolts };
+        BoardProtectionLimits ProtectionLimits()
+        {
+            return { foc::Volts{ Peripheral::overvoltageThresholdVolts }, foc::Volts{ Peripheral::undervoltageThresholdVolts } };
+        }
 
         hal::SynchronousAdcStm::Config PowerSupplyAdcConfig()
         {
@@ -398,7 +401,7 @@ namespace application
 
                 if (protectionTripped)
                     CutPowerStage();
-                else if (ExceedsOverCurrent(currents.a, currents.b, currents.c, BoardCharacteristics::overcurrentThresholdAmps))
+                else if (ExceedsOverCurrent(currents.a, currents.b, currents.c, foc::Ampere{ BoardCharacteristics::overcurrentThresholdAmps }))
                     TripProtection(BoardProtectionReason::overCurrent);
                 else
                     onPhaseCurrentsReady(currents);
@@ -475,7 +478,7 @@ namespace application
 
     PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
     {
-        return EvaluateBoardProtection(protectionTripped, false, protectionLimits, [this]()
+        return EvaluateBoardProtection(protectionTripped, false, ProtectionLimits(), [this]()
             {
                 return PowerSupplyVoltage();
             });
