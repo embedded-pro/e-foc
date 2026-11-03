@@ -166,7 +166,10 @@ namespace can
         firmwareVersionMajor = 0xB1,
         firmwareVersionMinor = 0xB2,
         firmwareVersionPatch = 0xB3,
-        boardKind = 0xB4
+        boardKind = 0xB4,
+        stagedVersionMajor = 0xB5,
+        stagedVersionMinor = 0xB6,
+        stagedVersionPatch = 0xB7
     };
 
     struct FocFirmwareIdentity

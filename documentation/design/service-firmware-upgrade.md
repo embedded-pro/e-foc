@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.3
+version: 0.3.4
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.3                     |
+| Version   | 0.3.4                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -222,15 +222,17 @@ them as the NVM design describes (`service-nvm.md`, version check).
 
 Contract 2.6 adds read-only parameters to the FOC motor contract (`service-can.md` Part A, "Contract 2.6"):
 the major, minor and patch numbers of the running firmware's release version, the board kind, and the version
-of the staged pack, zero when none is staged. The running version is the one the release workflow stamps into
-the build; the staged version is the product version in the staged pack's header, which Verify requires to
-read as three numbers from 0 to 255, the range the parameters carry (Part D). A board kind maps to the
+of the staged pack, zero when none is staged. The running version is the one the build stamps into the
+application header (`bootloader.md` Part B), the project's release version; the staged version is the product
+version in the staged pack's header, which Verify requires to read as three numbers from 0 to 255, the range
+the parameters carry (Part D). Every board reports its version and its kind, also one that cannot be updated.
+A board kind maps to the
 board and microcontroller its packs name (`bootloader.md` Part B), so a client picks the pack for the board it
 talks to and shows what waits to be applied.
 
 The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the version header EmIL
 generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which each board's `Peripheral::boardKind` sets; the staged-version
-parameters (`0xB5`–`0xB7`) wait for the bootloader work. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
+parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
 `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, emulated `5`, unknown `0`.
 
 ### Part I — per board
@@ -298,13 +300,13 @@ the journal in it. The new feature goes into the shard that keeps the three bala
 
 ### Required
 
-| Interface                  | Purpose                     | Contract                                                                               |
-|----------------------------|-----------------------------|----------------------------------------------------------------------------------------|
-| Staging flash              | Hold the received pack      | Asynchronous flash of the platform; erase per sector, write any byte range             |
-| Status journal flash       | Record the pack's status    | Synchronous flash of the platform, read and written as the bootloader does             |
-| Control-mode state machine | Drive state, pending work   | Begin and Activate admitted only in `Idle` or `Ready` with nothing outstanding         |
-| Platform software reset    | Restart into the bootloader | Does not return                                                                        |
-| CAN protocol server        | Category registration       | Registered beside the FOC motor category on the drive's node (`service-can.md` Part K) |
+| Interface                  | Purpose                     | Contract                                                                                                                                               |
+|----------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Staging flash              | Hold the received pack      | Asynchronous flash of the platform; erase per sector, write any byte range                                                                             |
+| Status journal flash       | Record the pack's status    | Synchronous flash of the platform, read and written as the bootloader does                                                                             |
+| Control-mode state machine | Drive state, pending work   | Begin and Activate admitted only in `Idle` or `Ready` with nothing outstanding; holds the drive's asynchronous-work interlock for the service (Part G) |
+| Platform software reset    | Restart into the bootloader | Does not return                                                                                                                                        |
+| CAN protocol server        | Category registration       | Registered beside the FOC motor category on the drive's node (`service-can.md` Part K)                                                                 |
 
 ---
 

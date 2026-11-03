@@ -47,6 +47,9 @@ namespace can
                 case FocParameter::firmwareVersionMinor:
                 case FocParameter::firmwareVersionPatch:
                 case FocParameter::boardKind:
+                case FocParameter::stagedVersionMajor:
+                case FocParameter::stagedVersionMinor:
+                case FocParameter::stagedVersionPatch:
                     return ParameterGroup::platform;
                 default:
                     return std::nullopt;

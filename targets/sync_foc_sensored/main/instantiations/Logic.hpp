@@ -1,9 +1,11 @@
 #pragma once
 
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeCategoryServer.hpp"
 #include "can-lite/server/CanProtocolServer.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
 #include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
 #include "core/can/CanLivenessWatchdog.hpp"
+#include "core/can/FirmwareUpgradeInterlock.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCurrentStreamer.hpp"
@@ -19,6 +21,7 @@
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
@@ -80,7 +83,10 @@ namespace application
         std::optional<services::CanProtocolServer> canServer;
         std::optional<services::TracingCanProtocolServerObserver> tracingServerObserver;
         std::optional<can::FocMotorCategoryServer> motorCanServer;
+        std::optional<services::FirmwareUpgradeCategoryServer> firmwareUpgradeServer;
         std::optional<ControlMode> controlMode;
+        std::optional<can::FirmwareUpgradeInterlock> firmwareUpgradeInterlock;
+        std::optional<services::FirmwareUpgrade> firmwareUpgrade;
         std::optional<can::FocMotorCanBridge> canBridge;
         std::optional<can::CanLivenessWatchdog> canLivenessWatchdog;
         std::optional<can::FocMotorCurrentStreamer> currentStreamer;

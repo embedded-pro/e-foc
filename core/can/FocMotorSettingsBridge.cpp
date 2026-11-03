@@ -48,12 +48,14 @@ namespace can
     }
 
     FocMotorSettingsBridge::FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
-        application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware)
+        application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware,
+        FirmwareUpgrade firmwareUpgrade)
         : server(server)
         , controlMode(controlMode)
         , diagnostics(diagnostics)
         , resetCause(resetCause)
         , firmware(firmware)
+        , firmwareUpgrade(firmwareUpgrade)
     {}
 
     void FocMotorSettingsBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
@@ -260,6 +262,8 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldPlatformReading(FocParameter parameter) const
     {
+        const auto staged = firmwareUpgrade ? firmwareUpgrade->get().StagedVersion() : services::FirmwareVersion{};
+
         switch (parameter)
         {
             case FocParameter::firmwareVersionMajor:
@@ -270,6 +274,12 @@ namespace can
                 return FocParameterValue{ static_cast<float>(firmware.versionPatch), false };
             case FocParameter::boardKind:
                 return FocParameterValue{ static_cast<float>(firmware.boardKind), false };
+            case FocParameter::stagedVersionMajor:
+                return FocParameterValue{ static_cast<float>(staged.major), false };
+            case FocParameter::stagedVersionMinor:
+                return FocParameterValue{ static_cast<float>(staged.minor), false };
+            case FocParameter::stagedVersionPatch:
+                return FocParameterValue{ static_cast<float>(staged.patch), false };
             default:
                 return FocParameterValue{ static_cast<float>(resetCause), false };
         }
@@ -277,7 +287,8 @@ namespace can
 
     bool FocMotorSettingsBridge::SettingOutstanding() const
     {
-        return pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
+        const bool downloading = firmwareUpgrade && firmwareUpgrade->get().IsRunning();
+        return downloading || pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
     }
 
     void FocMotorSettingsBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
