@@ -179,3 +179,14 @@ TEST_F(TestReleaseFeed, a_pack_named_for_another_release_is_not_this_release_s_p
     ASSERT_TRUE(release.has_value());
     EXPECT_FALSE(FirmwarePackFor(*release, "EK-TM4C1294XL").has_value());
 }
+
+TEST_F(TestReleaseFeed, a_firmware_pack_not_downloadable_over_https_is_ignored)
+{
+    const auto insecure = QString(R"({ "name": "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.upgrade", "browser_download_url": "http://example.com/e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.upgrade" })");
+    const auto unlinked = QString(R"({ "name": "e_foc-firmware-NUCLEO-G474RE-sync_foc_sensored-v1.7.0.upgrade" })");
+    const auto release = ParseLatestRelease(Release("v1.7.0", insecure + "," + unlinked), InstallerPlatform::linuxX64);
+
+    ASSERT_TRUE(release.has_value());
+    EXPECT_TRUE(release->firmwarePacks.empty());
+    EXPECT_FALSE(FirmwarePackFor(*release, "EK-TM4C1294XL").has_value());
+}
