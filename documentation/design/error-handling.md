@@ -84,7 +84,10 @@ condition, and the state machine then falls back to the retry budget alone — w
 platforms had before the query existed. Reporting `clear` instead would claim a verification the hardware never
 performed, and on a board with no protection comparators the fault being cleared came from software anyway.
 
-Every platform reports `unknown` today:
+The platforms answer as follows. The decision itself is one header, `core/platform_abstraction/BoardProtection.hpp`
+(`EvaluateBoardProtection`, host-tested): `asserted` while a latched trip is set or a fresh bus-voltage reading is
+outside the board's overvoltage and undervoltage thresholds (a reading that is not a number counts as outside),
+`clear` otherwise. A latched trip answers without reading the bus.
 
 - **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
   whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO; steps 3 to 5
@@ -112,14 +115,24 @@ Every platform reports `unknown` today:
   one control period, 50 µs, in which the bench winding's current can rise by at most about 1.1 A from the
   24 V bus. That ADC is triggered by the PWM generator, so once the bridge is
   stopped it stops converting, the comparators stop evaluating, and no status register distinguishes a cleared
-  condition from an unevaluated one. Answering this honestly needs either a sampling path that survives the
-  bridge stopping — `PowerSupplyVoltage()` already runs on a separately triggered ADC and could verify
-  overvoltage against `BoardCharacteristics::OvervoltageThresholdCounts` — or a software/continuous ADC trigger
-  in `hal-ti` so the comparators keep evaluating. Overcurrent is arguably not observable at all while stopped:
-  no current flows through a disabled bridge.
-- **NUCLEO-G474RE** — `unknown`, for the TM4C129's reason: its checks run on the PWM-triggered samples, which
-  stop with the bridge.
-- **NUCLEO-H563ZI, QEMU** — neither wires board protection, so there is no condition to observe.
+  condition from an unevaluated one. `BoardProtectionStatus()` therefore does not read the comparators. It reports
+  `asserted` while the over-current latch (`overCurrentTripped`, set by `TripOverCurrent`) or the PWM-fault latch
+  (`pwmFaultAsserted`, set by `OnPwmFault` when the OV/UV comparators drive the fault input) is set, and otherwise
+  takes a fresh `PowerSupplyVoltage()` reading, on the separately triggered ADC1, and reports `asserted` when it is
+  above 58 V or below 18 V and `clear` when it is between. The reading is blocking and takes about 134 µs, which is
+  acceptable because the query runs on the event dispatcher at fault-clear time and never from an interrupt. Both
+  latches hold until the bridge is stopped (`Stop()`), which the fault response does at once; after that the live
+  bus reading is the evidence for an over- or undervoltage, and over-current is not observable while stopped
+  because no current flows through a disabled bridge. Monitoring the bus while the stage is stopped, so a
+  condition that appears with no fault pending is seen, is out of scope here and belongs to #466. EK-TM4C123GXL
+  has no protection comparators and still reports `unknown`.
+- **NUCLEO-G474RE** — the same decision. Its checks run on the PWM-triggered samples, which stop with the bridge,
+  so the latch (`protectionTripped`, set by `TripProtection` and by the watchdog) covers the trip until `Stop()`
+  and a fresh `PowerSupplyVoltage()` reading against the same thresholds covers the rest. The reading is on
+  ADC1 in the event loop, never in the interrupt.
+- **QEMU** — reports the simulated board protection's real status (`boardProtection.Status()`), driven by the
+  plant's over-current, over- and undervoltage trip levels.
+- **NUCLEO-H563ZI** — does not wire board protection, so there is no condition to observe.
 - **host** — settable, so tests can hold the condition asserted across a re-arm attempt.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus

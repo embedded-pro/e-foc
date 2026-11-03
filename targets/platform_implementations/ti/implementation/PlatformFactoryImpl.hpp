@@ -306,6 +306,7 @@ namespace application
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
         volatile bool overCurrentTripped{ false };
+        volatile bool pwmFaultAsserted{ false };
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };

@@ -12,6 +12,7 @@ target_link_libraries(e_foc.platform_abstraction_test PUBLIC
 
 target_sources(e_foc.platform_abstraction_test PRIVATE
     TestAdcPhaseCurrentMeasurement.cpp
+    TestBoardProtection.cpp
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
     TestDecimatingThreePhaseInverter.cpp

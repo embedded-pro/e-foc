@@ -23,6 +23,7 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
 
 target_sources(e_foc.platform_abstraction PRIVATE
     AdcPhaseCurrentMeasurement.hpp
+    BoardProtection.hpp
     CanBusAdapter.hpp
     CanBusAdapter.cpp
     ControlLoopMetrics.hpp

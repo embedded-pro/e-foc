@@ -73,6 +73,8 @@ namespace application
         constexpr static uint16_t overvoltageThresholdCounts{ 0 };
         constexpr static uint16_t overcurrentThresholdCounts{ 0 };
         constexpr static uint16_t undervoltageThresholdCounts{ 0 };
+        constexpr static float overvoltageThresholdVolts{ 0.0f };
+        constexpr static float undervoltageThresholdVolts{ 0.0f };
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator0;
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
