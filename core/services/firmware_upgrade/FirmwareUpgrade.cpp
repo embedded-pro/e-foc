@@ -15,10 +15,11 @@ namespace services
     }
 
     FirmwareUpgrade::FirmwareUpgrade(FirmwareUpgradeCategoryServer& server, const std::optional<application::FirmwareStaging>& staging,
-        FirmwareUpgradeDrive& drive)
+        FirmwareUpgradeDrive& drive, const infra::Function<void()>& reset)
         : FirmwareUpgradeCategoryServerObserver(server)
         , staging(staging)
         , drive(drive)
+        , reset(reset)
     {
         if (!this->staging)
             return;
@@ -33,6 +34,12 @@ namespace services
             {
                 return !TakeAbort();
             });
+
+        if (journal->Status() == application::UpgradePackStatus::downloaded)
+        {
+            state = State::staged;
+            ReadStagedVersion();
+        }
     }
 
     void FirmwareUpgrade::OnBeginUpgrade(uint32_t firmwareSize, const infra::Function<void(FwuError, uint16_t)>& onResult)
@@ -102,7 +109,25 @@ namespace services
 
     void FirmwareUpgrade::OnActivate(const infra::Function<void(FwuError)>& onResult)
     {
-        onResult(FwuError::notReady);
+        if (state != State::staged)
+        {
+            onResult(FwuError::notReady);
+            return;
+        }
+
+        if (FlashBusy() || !drive.IsStoppedAndIdle())
+        {
+            onResult(FwuError::busy);
+            return;
+        }
+
+        journal->Record(application::UpgradePackStatus::readyToDeploy, 0);
+        Enter(State::restarting);
+        onResult(FwuError::ok);
+        restartTimer.Start(restartDelay, [this]()
+            {
+                reset();
+            });
     }
 
     void FirmwareUpgrade::OnAbort(const infra::Function<void()>& onDone)
@@ -139,9 +164,20 @@ namespace services
         return stagedVersion;
     }
 
+    void FirmwareUpgrade::EmergencyStop()
+    {
+        if (!Downloading())
+            return;
+
+        if (FlashBusy())
+            abortRequested = true;
+        else
+            EndDownload();
+    }
+
     bool FirmwareUpgrade::Holds(State state)
     {
-        return state == State::erasing || state == State::receiving || state == State::verifying;
+        return state == State::erasing || state == State::receiving || state == State::verifying || state == State::restarting;
     }
 
     void FirmwareUpgrade::Enter(State next)
@@ -165,7 +201,7 @@ namespace services
         if (!staging)
             return FwuError::invalidSize;
 
-        if (Downloading() || FlashBusy() || !drive.IsStoppedAndIdle())
+        if (Downloading() || state == State::restarting || FlashBusy() || !drive.IsStoppedAndIdle())
             return FwuError::busy;
 
         if (firmwareSize < minimumPackSize || firmwareSize > staging->pack.TotalSize())
@@ -176,6 +212,7 @@ namespace services
 
     void FirmwareUpgrade::StartDownload(uint32_t firmwareSize)
     {
+        discardTimer.Cancel();
         packSize = firmwareSize;
         nextBlock = 0;
         stagedVersion = {};
@@ -240,6 +277,14 @@ namespace services
         Take(verifyDone)(FwuError::ok);
     }
 
+    void FirmwareUpgrade::ReadStagedVersion()
+    {
+        reader->ReadHeader(staging->pack.TotalSize(), [this](const PackHeader& header)
+            {
+                stagedVersion = ParseVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
+            });
+    }
+
     bool FirmwareUpgrade::FlashBusy() const
     {
         return (writer && writer->Busy()) || (reader && reader->Busy());
@@ -262,6 +307,8 @@ namespace services
     {
         if (Downloading())
             EndDownload();
+        else if (state == State::staged)
+            Discard();
         else if (state == State::error)
             Enter(State::idle);
     }
@@ -288,6 +335,29 @@ namespace services
             Take(blockDone)(result);
         if (verifyDone != nullptr)
             Take(verifyDone)(result);
+    }
+
+    void FirmwareUpgrade::Discard()
+    {
+        Enter(State::idle);
+        stagedVersion = {};
+        TryDiscard();
+    }
+
+    void FirmwareUpgrade::TryDiscard()
+    {
+        if (!drive.IsStoppedAndIdle())
+        {
+            if (!discardTimer.Armed())
+                discardTimer.Start(discardRetry, [this]()
+                    {
+                        TryDiscard();
+                    });
+            return;
+        }
+
+        discardTimer.Cancel();
+        journal->Clear();
     }
 
     void FirmwareUpgrade::RestartDeadline()
@@ -319,6 +389,7 @@ namespace services
             case State::verifying:
                 return FwuState::verifying;
             case State::staged:
+            case State::restarting:
                 return FwuState::complete;
             case State::error:
                 return FwuState::error;

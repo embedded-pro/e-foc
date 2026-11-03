@@ -141,7 +141,10 @@ namespace
 
         void Construct()
         {
-            service.emplace(server, application::FirmwareStaging{ packFlash, journalFlash, productName, applicationCapacity, pageSize }, drive);
+            service.emplace(server, application::FirmwareStaging{ packFlash, journalFlash, productName, applicationCapacity, pageSize }, drive, [this]()
+                {
+                    reset.Call();
+                });
             ExecuteAllActions();
         }
 
@@ -295,6 +298,7 @@ namespace
         FailingEraseFlash packFlash{ numberOfSectors, sectorSize };
         hal::SynchronousFlashStub journalFlash{ 1, 512 };
         DriveFake drive;
+        testing::StrictMock<testing::MockFunction<void()>> reset;
         std::optional<services::FirmwareUpgrade> service;
 
         std::vector<std::string> events;
@@ -366,7 +370,10 @@ TEST_F(FirmwareUpgradeTest, begin_accepts_a_pack_of_exactly_the_slot_size)
 
 TEST_F(FirmwareUpgradeTest, a_board_without_staging_answers_begin_invalid_size_verify_invalid_state_and_activate_not_ready)
 {
-    service.emplace(server, std::nullopt, drive);
+    service.emplace(server, std::nullopt, drive, [this]()
+        {
+            reset.Call();
+        });
 
     EXPECT_EQ(FwuError::invalidSize, Begin(400)->first);
     EXPECT_EQ(FwuError::invalidState, Verify(0));
@@ -565,6 +572,72 @@ TEST_F(FirmwareUpgradeTest, a_pack_whose_header_fails_the_check_answers_verify_n
     EXPECT_EQ(0, drive.held);
 }
 
+TEST_F(FirmwareUpgradeTest, a_staged_pack_stays_staged_across_a_restart)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+
+    service.reset();
+    Construct();
+
+    EXPECT_EQ((services::FirmwareVersion{ 2, 3, 4 }), service->StagedVersion());
+    EXPECT_EQ(FwuState::complete, std::get<0>(Progress()));
+    EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
+}
+
+TEST_F(FirmwareUpgradeTest, a_journal_that_reads_anything_but_downloaded_stages_nothing_at_start_up)
+{
+    RecordJournal(UpgradePackStatus::readyToDeploy);
+    Construct();
+
+    EXPECT_EQ(services::FirmwareVersion{}, service->StagedVersion());
+    EXPECT_EQ(FwuError::notReady, Activate());
+}
+
+TEST_F(FirmwareUpgradeTest, activate_without_a_staged_pack_is_answered_not_ready)
+{
+    Construct();
+
+    EXPECT_EQ(FwuError::notReady, Activate());
+}
+
+TEST_F(FirmwareUpgradeTest, activate_while_the_drive_runs_is_answered_busy_and_keeps_the_pack_staged)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    drive.stoppedAndIdle = false;
+
+    EXPECT_EQ(FwuError::busy, Activate());
+    EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
+    ForwardTime(std::chrono::seconds(1));
+}
+
+TEST_F(FirmwareUpgradeTest, activate_records_ready_to_deploy_answers_and_resets_after_the_restart_delay)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+
+    EXPECT_EQ(FwuError::ok, Activate());
+    EXPECT_EQ(UpgradePackStatus::readyToDeploy, JournalStatus());
+    EXPECT_TRUE(service->IsRunning());
+    EXPECT_EQ(1, drive.held);
+
+    ForwardTime(services::FirmwareUpgrade::restartDelay - std::chrono::milliseconds(1));
+    EXPECT_CALL(reset, Call());
+    ForwardTime(std::chrono::milliseconds(1));
+}
+
+TEST_F(FirmwareUpgradeTest, begin_while_restarting_is_answered_busy)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Activate());
+
+    EXPECT_EQ(FwuError::busy, Begin(400)->first);
+    EXPECT_CALL(reset, Call());
+    ForwardTime(services::FirmwareUpgrade::restartDelay);
+}
+
 TEST_F(FirmwareUpgradeTest, abort_during_a_download_returns_to_idle_with_the_journal_empty)
 {
     Construct();
@@ -610,6 +683,34 @@ TEST_F(FirmwareUpgradeTest, abort_during_verify_answers_verify_invalid_state_fir
     EXPECT_EQ(FwuError::invalidState, verifyResult);
     EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
     EXPECT_EQ(0, drive.held);
+}
+
+TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_discards_it_at_once_and_erases_the_journal_once_the_drive_is_stopped)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    drive.stoppedAndIdle = false;
+
+    EXPECT_TRUE(Abort());
+    EXPECT_EQ(services::FirmwareVersion{}, service->StagedVersion());
+    EXPECT_EQ(FwuError::notReady, Activate());
+    EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
+
+    ForwardTime(std::chrono::seconds(1));
+    EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
+
+    drive.stoppedAndIdle = true;
+    ForwardTime(services::FirmwareUpgrade::discardRetry);
+    EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
+}
+
+TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_while_the_drive_is_stopped_erases_the_journal_at_once)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+
+    EXPECT_TRUE(Abort());
+    EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
 }
 
 TEST_F(FirmwareUpgradeTest, abort_after_a_failed_verify_returns_to_idle)
@@ -660,6 +761,50 @@ TEST_F(FirmwareUpgradeTest, the_session_timeout_of_the_category_ends_a_download)
     service->OnSessionTimeout();
     EXPECT_FALSE(service->IsRunning());
     EXPECT_EQ(0, drive.held);
+}
+
+TEST_F(FirmwareUpgradeTest, the_emergency_stop_ends_a_download_without_an_abort_answer)
+{
+    Construct();
+    const auto pack = MakePack();
+    Begin(static_cast<uint32_t>(pack.size()));
+    EXPECT_EQ(FwuError::ok, Block(0, pack));
+
+    service->EmergencyStop();
+    ExecuteAllActions();
+
+    EXPECT_FALSE(service->IsRunning());
+    EXPECT_EQ(0, drive.held);
+    EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
+    EXPECT_EQ(FwuError::invalidState, Block(1, pack));
+    EXPECT_EQ((std::vector<std::string>{ "begin" }), events);
+}
+
+TEST_F(FirmwareUpgradeTest, the_emergency_stop_during_the_erase_answers_begin_invalid_state)
+{
+    Construct();
+
+    SendBegin(400);
+    service->EmergencyStop();
+    ExecuteAllActions();
+
+    EXPECT_EQ(FwuError::invalidState, beginResult->first);
+    EXPECT_FALSE(service->IsRunning());
+    EXPECT_EQ(0, drive.held);
+}
+
+TEST_F(FirmwareUpgradeTest, the_emergency_stop_keeps_a_staged_pack_and_an_accepted_activate)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+
+    service->EmergencyStop();
+    EXPECT_EQ((services::FirmwareVersion{ 2, 3, 4 }), service->StagedVersion());
+
+    EXPECT_EQ(FwuError::ok, Activate());
+    service->EmergencyStop();
+    EXPECT_CALL(reset, Call());
+    ForwardTime(services::FirmwareUpgrade::restartDelay);
 }
 
 TEST_F(FirmwareUpgradeTest, query_progress_reports_the_blocks_received_and_the_blocks_of_the_pack)

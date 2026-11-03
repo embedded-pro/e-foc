@@ -15,5 +15,6 @@ namespace services
     public:
         virtual bool IsRunning() const = 0;
         virtual FirmwareVersion StagedVersion() const = 0;
+        virtual void EmergencyStop() = 0;
     };
 }

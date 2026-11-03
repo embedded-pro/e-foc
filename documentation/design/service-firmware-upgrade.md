@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.1
+version: 0.3.2
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.1                     |
+| Version   | 0.3.2                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -53,6 +53,7 @@ own.
   journal so a restart keeps it.
 - On Activate, recording *ready to deploy* in the status journal and restarting the controller.
 - Keeping the drive stopped, and every writer of the non-volatile memory waiting, while a pack is received.
+- Ending a download in progress on the emergency stop.
 - Reporting the running firmware version, the board and the version of a staged pack over the FOC motor
   contract (2.6, Part H).
 
@@ -74,8 +75,8 @@ The service follows the state machine of the `can-lite` firmware-upgrade specifi
 difference: a verified pack is kept instead of being forgotten when the session ends. The category server stops
 its session timer on Verify and on Activate, also when it refuses them, so the service keeps its own inactivity
 deadline while a pack is received: 30 s after Begin was answered or the last command it accepted, after which
-the download ends as on Abort. After a successful Verify no deadline runs, so Activate may come at any later
-time, also after a restart.
+the download ends as on Abort. The emergency stop ends a download the same way (Part F). After a successful
+Verify no deadline runs, so Activate may come at any later time, also after a restart.
 
 | State      | Meaning                                                                        | Drive and NVM interlock (Part G) |
 |------------|--------------------------------------------------------------------------------|----------------------------------|
@@ -115,8 +116,8 @@ erased slot: 16 sectors on the EK-TM4C1294XL, whatever the pack's size. The answ
 number of bytes the service collects before it programs them: 128 on the TI board and 256 on the ST boards.
 
 - An erase that fails is answered `WriteError`, and the session goes to Error.
-- An Abort during the erase stops it after the sector in progress. The pending Begin is answered
-  `InvalidState`, then the Abort, and the session returns to Idle with the journal empty.
+- An Abort or the emergency stop during the erase stops it after the sector in progress. The pending Begin is
+  answered `InvalidState`, then the Abort, and the session returns to Idle with the journal empty.
 - A second Begin during the erase is answered `Busy`.
 - The inactivity deadline (Part A) starts when Begin is answered, so the erase never counts against it.
 
@@ -169,8 +170,8 @@ Activate is accepted only when all of these hold:
 | No asynchronous work is outstanding     | `Busy`     |
 
 The service then writes *ready to deploy* into the status journal, enters Restarting, answers, and restarts the
-controller once the acknowledgement has left the send queue, at most one second later, through the platform's
-software reset. Restarting holds the same interlocks as receiving a pack (Part G), so nothing starts the drive
+controller 250 ms later, which leaves the acknowledgement time to leave the send queue, through the
+platform's software reset. Restarting holds the same interlocks as receiving a pack (Part G), so nothing starts the drive
 or writes the non-volatile memory in that second, and a new Begin is answered `Busy`.
 The bootloader installs the pack at that reset, and the new application starts. Between the download and the
 apply the motor may run any number of times and the controller may restart; the staged pack waits.
@@ -184,6 +185,9 @@ them as the NVM design describes (`service-nvm.md`, version check).
 - Abort while a pack is being received, or the inactivity deadline, ends the download: the session returns to
   Idle, the interlock is released and the journal stays empty, so nothing is staged. A Begin or Verify still
   unanswered is answered `InvalidState` first.
+- The emergency stop ends a download in progress, from an accepted Begin until Verify is answered, as Abort
+  does, without an Abort answer: the client sees its pending Begin or Verify answered `InvalidState`, or its
+  next block answered `InvalidState`. A staged pack stays staged, and an accepted Activate still restarts.
 - Abort in Staged or Error discards the staged pack and the service returns to Idle. The pack is unavailable at
   once: Activate is answered `NotReady` and the staged version reads zero. Erasing the journal stalls flash, so
   it is carried out only while the drive is stopped (`Idle` or `Ready`) with nothing outstanding; an Abort that
@@ -197,7 +201,8 @@ them as the NVM design describes (`service-nvm.md`, version check).
   (Restarting), the service counts as asynchronous work of the control-mode state machine, so `Enable`, `Calibrate`, `ReAlign`, `ClearCalibration`, `SetMotorParameter` and
   a control-mode or algorithm selection are refused, as they are while an NVM write is outstanding
   (`state-machine.md`). A staged pack holds nothing: the drive runs normally until the user applies it, and
-  Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted.
+  Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted, and ends
+  a download in progress (Part F).
 - **Non-volatile memory.** While a pack is received, and while Restarting, the CAN bridge answers `busy` to every
   command that writes
   the configuration record: start-up settings, telemetry rate and fault supervision settings. On the
@@ -262,13 +267,13 @@ the board it is published for. A dry run builds and signs with the development k
 
 ### Part K — verification
 
-| Level                 | What it shows                                                                                                                                                                                                     | Requirements                     |
-|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|
-| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort and timeout, against a flash fake | REQ-UPD-001 to 008, 011 to 013   |
-| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                    | REQ-BOOT-001 to 007              |
-| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; NVM writes refused meanwhile                                   | REQ-UPD-001 to 007, 011, 012     |
-| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                             | REQ-UPD-005, REQ-BOOT-001 to 004 |
-| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                   | REQ-UPD-009, REQ-UPD-010         |
+| Level                 | What it shows                                                                                                                                                                                                                         | Requirements                     |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|
+| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake | REQ-UPD-001 to 008, 011 to 014   |
+| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                                        | REQ-BOOT-001 to 007              |
+| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; NVM writes refused meanwhile                                                       | REQ-UPD-001 to 007, 011, 012     |
+| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                                                 | REQ-UPD-005, REQ-BOOT-001 to 004 |
+| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                       | REQ-UPD-009, REQ-UPD-010         |
 
 The software-in-the-loop scenarios read the staging file the emulated firmware wrote and check the pack and
 the journal in it. The new feature goes into the shard that keeps the three balanced
@@ -285,6 +290,7 @@ the journal in it. The new feature goes into the shard that keeps the three bala
 | Firmware-upgrade category server | Download and apply a pack over CAN | `can-lite` firmware-upgrade specification; answers as Parts B to F                                                                                                      |
 | Running state                    | Interlock with the drive           | True while a pack is received, from an accepted Begin, through the erase, until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
 | Staged version                   | The version waiting to be applied  | The staged pack's product version, zero when none is staged (Part H)                                                                                                    |
+| Emergency stop                   | End a download in progress         | As Abort, without its answer (Part F)                                                                                                                                   |
 
 ### Required
 
@@ -310,12 +316,12 @@ stateDiagram-v2
     Erasing --> Erasing : next sector, one per turn
     Erasing --> Receiving : whole slot erased, Begin answered
     Erasing --> Error : erase failed
-    Erasing --> Idle : Abort
+    Erasing --> Idle : Abort or emergency stop
     Receiving --> Receiving : next block or repeat of the last
     Receiving --> Verifying : Verify, every byte received
     Receiving --> Error : flash write failed
-    Receiving --> Idle : Abort or 30 s without a command
-    Verifying --> Idle : Abort
+    Receiving --> Idle : Abort, emergency stop or 30 s without a command
+    Verifying --> Idle : Abort or emergency stop
     Verifying --> Staged : CRC, board and microcontroller match
     Verifying --> Error : CRC or header mismatch
     Staged --> Staged : drive runs, controller restarts
@@ -385,27 +391,27 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint          | Value / Description                                                                                       |
-|---------------------|-----------------------------------------------------------------------------------------------------------|
-| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself     |
-| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                     |
-| Pack size           | at most the staging slot, 256 KB (262 144 bytes), below the 393 216 bytes the transfer can address        |
-| Throughput          | one block in flight; about 2–3 KB/s, so a 256 KB pack downloads in about two minutes                      |
-| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                     |
-| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack  |
-| Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                 |
-| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted  |
-| NVM writes          | refused with `busy` while a pack is received                                                              |
-| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it          |
-| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                       |
-| Boards              | EK-TM4C1294XL, NUCLEO-H563ZI, NUCLEO-G474RE (with SPI NOR) and the emulated target; not the EK-TM4C123GXL |
+| Constraint          | Value / Description                                                                                                              |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                            |
+| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                            |
+| Pack size           | at most the staging slot, 256 KB (262 144 bytes), below the 393 216 bytes the transfer can address                               |
+| Throughput          | one block in flight; about 2–3 KB/s, so a 256 KB pack downloads in about two minutes                                             |
+| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                            |
+| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                         |
+| Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                                        |
+| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download |
+| NVM writes          | refused with `busy` while a pack is received                                                                                     |
+| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                 |
+| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                              |
+| Boards              | EK-TM4C1294XL, NUCLEO-H563ZI, NUCLEO-G474RE (with SPI NOR) and the emulated target; not the EK-TM4C123GXL                        |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                                                       | Options                                                                    | Status |
-|---|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|--------|
-| 1 | Should the transfer acknowledge a window of blocks at a time, as the specification suggests?   | `can-lite` extension (section 7.2) / one block in flight (current)         | open   |
-| 2 | Which tool builds the packs in the release workflow? The library's pack builder needs mbedTLS. | The library's pack builder in a host build with mbedTLS / a script of ours | open   |
-| 3 | Should the emergency stop also abort a download in progress?                                   | Abort on emergency stop / leave the download open (current)                | open   |
+| # | Question                                                                                       | Options                                                                    | Status                                                            |
+|---|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------------------------|
+| 1 | Should the transfer acknowledge a window of blocks at a time, as the specification suggests?   | `can-lite` extension (section 7.2) / one block in flight (current)         | open                                                              |
+| 2 | Which tool builds the packs in the release workflow? The library's pack builder needs mbedTLS. | The library's pack builder in a host build with mbedTLS / a script of ours | open                                                              |
+| 3 | Should the emergency stop also abort a download in progress?                                   | Abort on emergency stop / leave the download open                          | resolved: the emergency stop ends a download in progress (Part F) |
