@@ -392,21 +392,21 @@ namespace tool
 
     void MotorFirmware::ShowOutcome(const QString& message, StatusLevel level)
     {
-        outcome = message;
+        outcomeText = message;
         outcomeLevel = level;
         RefreshStatus();
     }
 
     void MotorFirmware::ClearOutcome()
     {
-        outcome.clear();
+        outcomeText.clear();
         RefreshStatus();
     }
 
     void MotorFirmware::RefreshStatus()
     {
-        if (!outcome.isEmpty())
-            tab.ShowStatus(outcome, outcomeLevel);
+        if (!outcomeText.isEmpty())
+            tab.ShowStatus(outcomeText, outcomeLevel);
         else if (const auto reason = DownloadReason(); !reason.isEmpty() && !IsDownloading())
             tab.ShowStatus(reason, StatusLevel::Neutral);
         else

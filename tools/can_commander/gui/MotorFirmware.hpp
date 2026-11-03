@@ -95,7 +95,7 @@ namespace tool
         QString chosenSource;
         bool fetching{ false };
         bool failed{ false };
-        QString outcome;
+        QString outcomeText;
         ui::theme::StatusLevel outcomeLevel{ ui::theme::StatusLevel::Neutral };
         QElapsedTimer transferClock;
     };
