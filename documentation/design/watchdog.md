@@ -2,9 +2,9 @@
 title: "Watchdog Design"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: "watchdog"
-date: 2026-09-26
+date: 2026-11-02
 ---
 
 | Field     | Value           |
@@ -12,9 +12,9 @@ date: 2026-09-26
 | Title     | Watchdog Design |
 | Type      | design          |
 | Status    | draft           |
-| Version   | 0.4.0           |
+| Version   | 0.4.1           |
 | Component | watchdog        |
-| Date      | 2026-09-26      |
+| Date      | 2026-11-02      |
 
 ---
 
@@ -28,9 +28,9 @@ date: 2026-09-26
 - Resetting the target from hardware, so that the next boot reports the reset cause as *watchdog*.
 
 **Is NOT responsible for:**
-- Proving that the control loops are running. A current loop or outer loop that stops while the dispatcher
-  keeps running is not a watchdog failure. It is left to the protections that watch the bridge itself:
-  the hardware overcurrent and overvoltage comparators, board protection and the fault state machine.
+- Proving that the control loops are running. A control interrupt that stops being raised while the
+  dispatcher keeps running is not a watchdog failure, and nothing else supervises it either: Part F records
+  why that is accepted.
 - Being switched on, off or reconfigured by the application. There is no watchdog port in the platform
   factory. The platform owns the watchdog, and supervision is always on.
 - Detecting the reset cause after a watchdog reset. That is the error-handling component's work, reached
@@ -147,6 +147,31 @@ semihosting marker, the machine reset and the reset-cause report. The production
 stall command either way.
 
 There is no command to enable or query the watchdog, because it has no state the application can change.
+
+### Part F — a control interrupt that stops
+
+Nothing supervises the 20 kHz control interrupt itself. What catches each way it can stop:
+
+| Case                                                                                                  | Caught by                                                                  |
+|-------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| The interrupt never returns                                                                           | This watchdog: it starves the early warning (Part C) and the target resets |
+| The interrupt faults                                                                                  | The HardFault handler, which cuts the power stage                          |
+| The interrupt stops being raised while the event loop runs: lost PWM-to-ADC trigger, masked interrupt | Nothing. The PWM keeps its last duty until a disable, a fault or a reset   |
+
+The last case needs a peripheral fault. In the motor-controller application (`sync_foc_sensored`) the
+PWM-to-ADC trigger and the conversion sequence are configured once at boot (`ConfigureAdcAndPwm`); enable and
+disable only start and stop the PWM that raises the trigger. The bring-up application (`hardware_test`)
+reconfigures them from its terminal, but it runs no control loop.
+
+The two causes differ on TI. The overcurrent, overvoltage and undervoltage comparators are steps of the same
+PWM-triggered sequence and trip the PWM fault input in hardware. A masked interrupt leaves that path running,
+so the bridge stays protected. A lost trigger stops the comparators with the conversions, so nothing covers it.
+
+It is accepted as a residual risk. A supervisor was built and dropped as out of proportion to the
+probability (issue #482, closed as not planned): the control interrupt counted its completions, and an
+event-loop check every millisecond stopped the stage within 3 ms when the count stalled. Revisit it if the
+motor-controller application ever reconfigures the trigger path at run time, or if a stalled control
+interrupt is seen on a board.
 
 ---
 
@@ -282,6 +307,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 | Constraint                      | Value / Description                                                                                             |
 |---------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | Scope                           | Proves the software is running; does not prove the control loops are running                                    |
+| Control interrupt               | Not supervised: a lost trigger leaves the last duty applied, unprotected on TI (Part F)                         |
 | Always on                       | Starts with the dispatcher; there is no enable, disable or query                                                |
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
 | Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
@@ -297,7 +323,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 
 | # | Question                                                                        | Answer or options                                                                                                      | Status   |
 |---|---------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|----------|
-| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; bridge protection covers the power stage                                        | answered |
+| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; a stopped control interrupt is an accepted residual risk (Part F)               | answered |
 | 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset                             | answered |
 | 3 | Should the ST window-watchdog driver take the early-warning priority as config? | Yes, as the Tiva driver does; today the platform overrides the driver after start, which depends on construction order | open     |
 | 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the SIL watchdog scenario stalls the event loop and asserts the *watchdog* reset cause after the reboot           | answered |
