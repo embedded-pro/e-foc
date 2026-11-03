@@ -101,6 +101,7 @@ namespace application
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
         if (plantConfig->maxDutyPercent != 0)
             maxDuty = hal::DutyCycle::FromPercent(plantConfig->maxDutyPercent);
+        minPulseDuty = foc::MinimumPulseDuty(plantConfig->minimumPulseNanoseconds, baseFrequency.Value());
         shuntReadout = foc::LowSideShuntReadout{ maxReadableDuty };
         dutyDelayed = plantConfig->dutyDelayPeriods != 0;
 
@@ -320,7 +321,7 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty);
+        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty, minPulseDuty);
     }
 
     void PlatformFactoryImpl::FocTimerIsr()

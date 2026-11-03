@@ -417,7 +417,7 @@ namespace application
         if (protectionTripped)
             return;
 
-        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty);
+        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty, Peripheral::minPulseDuty);
         shuntReadout.Applied(readable);
 
         peripherals->pwm->Start(readable.a, readable.b, readable.c);

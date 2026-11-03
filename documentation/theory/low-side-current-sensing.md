@@ -187,6 +187,11 @@ e-foc applies this only when needed (`core/platform_abstraction/LowSideShuntWind
 3. If the middle duty is still above 70 %, or the highest above 95 % (the bootstrap limit,
    [power stage](power-stage.md) §3), scale the three about the lowest so the binding one meets its limit. This keeps
    the vector's direction and shortens it.
+4. A pulse shorter than the board's minimum (the dead band times the PWM frequency) is not produced as commanded. If
+   step 2 would leave the lowest duty between 0 and that minimum, the shift is extended until the lowest is exactly 0:
+   a common-mode change again, so the line-to-line voltages are unchanged and every low-side window only grows. A
+   second duty still between 0 and the minimum rounds to whichever of 0 and the minimum is nearer. A board with no
+   minimum pulse skips this step.
 
 How far each strategy reads, computed over a full electrical turn:
 

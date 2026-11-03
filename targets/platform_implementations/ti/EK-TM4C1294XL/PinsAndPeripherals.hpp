@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "hal/interfaces/DutyCycle.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
@@ -82,6 +83,8 @@ namespace application
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
         constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxDutyPercent) };
+        constexpr static uint32_t pwmFrequencyHz{ 20000 };
+        constexpr static hal::DutyCycle minPulseDuty{ foc::MinimumPulseDuty(static_cast<float>(application::BoardCharacteristics::measuredDeadBandNanoseconds), pwmFrequencyHz) };
 
         extern std::array<hal_pwm::PinChannel, 3> pwmPhases;
     }

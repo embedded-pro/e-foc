@@ -280,3 +280,20 @@ Feature: FOC Control Performance
     And the motor is enabled
     And the response is captured for 1500 ms after enable
     Then the steady-state speed error shall be below 0.5 rad/s
+
+  @sil @REQ-TRQ-012
+  Scenario: The bench motor reaches 400 rad/s when its power stage drops pulses shorter than the dead band
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the plant drives its windings through the bench's power stage
+    And a motor plant with:
+      | minimum_pulse_ns | 500 |
+    And the plant response is recorded at 1000 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    When a speed setpoint of 400 rad/s is applied
+    And the motor is enabled
+    And the response is captured for 1500 ms after enable
+    Then the steady-state speed error shall be below 0.5 rad/s

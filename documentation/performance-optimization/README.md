@@ -247,6 +247,11 @@ The 20 kHz path should do only the work that changes from one sample to the next
   board without a dead-time loss the compensation stage hands its duties on untouched.
 - **Do not stack pass-through stages.** The sensor offsets and the dead-time correction are one stage between the
   platform and the loop, so a sample and a duty each cross one call instead of two.
+- **Settle the minimum pulse once.** `foc::KeepLowSideShuntsReadable` takes the board's minimum pulse as a constant
+  duty (`Peripheral::minPulseDuty`). Its handling adds two integer compares and one select to the shift and a
+  compare per leg, all in a header function marked `ALWAYS_INLINE_HOT` and inlined into
+  `PlatformFactoryImpl::ThreePhasePwmOutput`, which the cycle analysis already measures; a zero minimum pulse
+  passes every compare.
 - **Divide out one ratio.** Choosing the tighter of two bounds by cross-multiplying leaves one division instead of two.
 - **Run the law that is configured.** A general controller whose limits never clamp and whose derivative gain is zero
   is replaced by the two-state law it reduces to.

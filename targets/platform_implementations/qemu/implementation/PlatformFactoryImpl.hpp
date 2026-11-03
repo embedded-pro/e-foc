@@ -222,6 +222,7 @@ namespace application
         bool dutyDelayed{ false };
         hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
         hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(100) };
+        hal::DutyCycle minPulseDuty{};
         foc::LowSideShuntReadout shuntReadout{ maxReadableDuty };
         foc::PhaseCurrents lastCurrents{};
     };

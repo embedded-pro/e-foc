@@ -19,6 +19,7 @@ namespace
     public:
         const hal::DutyCycle limit{ Duty(0.7f) };
         const hal::DutyCycle maxDuty{ Duty(1.0f) };
+        const hal::DutyCycle minPulse{ Duty(0.01f) };
         static constexpr float tolerance{ 1e-4f };
     };
 }
@@ -102,6 +103,73 @@ TEST_F(TestLowSideShuntWindow, equal_duties_above_the_limit_move_to_the_limit)
     EXPECT_NEAR(Fraction(kept.a), 0.7f, tolerance);
     EXPECT_NEAR(Fraction(kept.b), 0.7f, tolerance);
     EXPECT_NEAR(Fraction(kept.c), 0.7f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, a_lowest_duty_left_inside_the_minimum_pulse_extends_the_shift_to_zero_and_keeps_the_line_voltages)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.85f), Duty(0.5f), Duty(0.155f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.a), 0.695f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.345f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, a_lowest_duty_left_at_the_minimum_pulse_is_not_extended)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.85f), Duty(0.5f), Duty(0.16f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.a), 0.7f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.35f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.01f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, a_second_duty_inside_the_minimum_pulse_rounds_down_to_zero_when_it_is_nearer_zero)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.95f), Duty(0.004f), Duty(0.0f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.a), 0.95f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.0f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, a_second_duty_inside_the_minimum_pulse_rounds_up_to_it_when_it_is_nearer_the_minimum)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.95f), Duty(0.007f), Duty(0.0f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.a), 0.95f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.01f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, two_duties_inside_the_minimum_pulse_extend_the_shift_then_round_the_second)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.9f), Duty(0.209f), Duty(0.205f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.a), 0.695f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.0f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.0f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, a_zero_minimum_pulse_leaves_the_shifted_duties_as_they_are)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.85f), Duty(0.5f), Duty(0.155f) }, limit, maxDuty, hal::DutyCycle{});
+
+    EXPECT_NEAR(Fraction(kept.a), 0.7f, tolerance);
+    EXPECT_NEAR(Fraction(kept.b), 0.35f, tolerance);
+    EXPECT_NEAR(Fraction(kept.c), 0.005f, tolerance);
+}
+
+TEST_F(TestLowSideShuntWindow, duties_within_the_limit_pass_unchanged_whatever_the_minimum_pulse)
+{
+    const auto kept = foc::KeepLowSideShuntsReadable({ Duty(0.7f), Duty(0.5f), Duty(0.004f) }, limit, maxDuty, minPulse);
+
+    EXPECT_NEAR(Fraction(kept.c), 0.004f, tolerance);
+}
+
+TEST(TestMinimumPulseDuty, the_pulse_is_the_dead_band_times_the_pwm_frequency)
+{
+    EXPECT_NEAR(Fraction(foc::MinimumPulseDuty(500.0f, 20000u)), 0.01f, 1e-4f);
+    EXPECT_EQ(foc::MinimumPulseDuty(0.0f, 20000u).Value(), 0u);
 }
 
 namespace

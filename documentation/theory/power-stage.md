@@ -205,10 +205,15 @@ $\pm t_{eff}/T$ when the current is near zero and its sign uncertain
 (`core/services/inverter_compensation/InverterCompensation.hpp`).
 
 **Minimum pulse.** A commanded conduction shorter than the dead band and the switching transitions does not
-happen as commanded. The firmware has no minimum-pulse handling. The top is guarded by the 95 % bootstrap cap; the
-bottom is not: shifting the duties down for the shunts ([low-side shunt current sensing](low-side-current-sensing.md)
-§5) drives the lowest duty continuously to exactly 0 %, so it passes through high-side pulses shorter than the
-500 ns band (15 PWM counts) on the way.
+happen as commanded. The top is guarded by the 95 % bootstrap cap. The bottom is guarded by the shift that keeps the
+shunts readable ([low-side shunt current sensing](low-side-current-sensing.md) §5): it drives the lowest duty down to
+0 %, and without care it would pass through high-side pulses shorter than the 500 ns band (15 PWM counts) on the way.
+With the 0.7 readable limit and min-max centring this happens only while the highest duty is between 84.5 % and 85 %,
+a brief crossing at high modulation. The firmware therefore extends the shift until the lowest duty is exactly 0 when
+it would be left between 0 and the minimum pulse (the dead band times the PWM frequency, 1 % at 500 ns and 20 kHz), and
+rounds a second leg left in that range to whichever of 0 and the minimum pulse is nearer. The line-to-line voltages stay
+unchanged by the extension and the low-side windows only get longer. The 1 % on all legs that the TI platform writes at
+`Start()`, which charges the bootstrap capacitors, is exactly the dead band and is left as it is.
 
 ### 5. Losses
 

@@ -28,6 +28,7 @@ namespace mil
         foc::Volts PowerSupplyVoltage() const;
         drivers::DeadTimeLoss InverterDeadTimeLoss() const;
         uint32_t DutyUpdateDelayPeriods() const;
+        const foc::PhasePwmDutyCycles& CommandedDuty() const;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -57,6 +58,7 @@ namespace mil
         bool dutyDelayed;
         hal::DutyCycle maxReadableDuty;
         hal::DutyCycle maxDuty;
+        hal::DutyCycle minPulseDuty;
         foc::LowSideShuntReadout shuntReadout;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhasePwmDutyCycles appliedDutyPhases{};

@@ -171,6 +171,10 @@ down together, which keeps the line-to-line voltages and so the vector the curre
 limit, a current loop that saturated drove a leg to the rail, read that phase near zero and held it there: on
 the bench the real current reached 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
 
+A leg the shift would leave with a pulse shorter than the board's minimum (its dead band times the PWM frequency) is
+not left there: the shift is extended until the lowest duty is 0, and a second leg still in that range rounds to 0 or
+the minimum pulse (REQ-TRQ-012). Both are integer compares inside the same inlined function.
+
 Only two phases need to be read, since the winding's three currents sum to zero. A vector wider than the limit
 takes the lowest duty to zero and keeps the middle one within the limit, and the highest may go up to the
 board's maximum duty, 95 % on E-FOC-HARDWARE, where the FAN7888's bootstrap capacitors still charge in every

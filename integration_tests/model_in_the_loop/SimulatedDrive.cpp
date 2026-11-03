@@ -65,6 +65,7 @@ namespace mil
         , dutyDelayed{ plant.dutyDelayPeriods != 0 }
         , maxReadableDuty{ DutyOrFull(plant.maxReadableDutyPercent) }
         , maxDuty{ DutyOrFull(plant.maxDutyPercent) }
+        , minPulseDuty{ foc::MinimumPulseDuty(plant.minimumPulseNanoseconds, baseFrequency.Value()) }
         , shuntReadout{ maxReadableDuty }
     {
         sil::ConfigureModel(model, plant);
@@ -154,6 +155,11 @@ namespace mil
         return dutyDelayed ? 1 : 0;
     }
 
+    const foc::PhasePwmDutyCycles& SimulatedDrive::CommandedDuty() const
+    {
+        return lastDutyPhases;
+    }
+
     void SimulatedDrive::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
     {
         onPhaseCurrentsReady.Set(onDone);
@@ -161,7 +167,7 @@ namespace mil
 
     void SimulatedDrive::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty);
+        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty, minPulseDuty);
     }
 
     void SimulatedDrive::Start()

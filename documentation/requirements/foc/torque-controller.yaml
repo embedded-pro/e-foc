@@ -107,3 +107,17 @@
     with an overshoot below 30 percent, its tail within 7 percent of the step and a steady-state
     error below 0.02 A, where without the estimate the current stays near 0.39 A and keeps the
     rotor accelerating.
+
+- id: REQ-TRQ-012
+  title: No leg is left with a pulse shorter than the dead band
+  shall: >
+    On a board that reads its phases through low-side shunts, after moving the three duties
+    down to keep the shunts readable the platform shall extend that common-mode shift until the
+    lowest duty is exactly zero whenever the lowest would otherwise be left between zero and the
+    board's minimum pulse, which is its dead band times the PWM frequency, and shall round a
+    second duty still between zero and the minimum pulse to whichever of zero and the minimum
+    pulse is nearer. A board with no minimum pulse shall have its duties pass unchanged. With
+    the bench's power stage dropping every pulse shorter than 500 ns and the 70 % readable limit,
+    a bench motor driven at 400 rad/s shall have no leg commanded a pulse between zero and 500 ns
+    in 200 ms, where without the extension it has some in 1 of every 50 periods, and shall hold
+    a speed setpoint of 400 rad/s within 0.5 rad/s.

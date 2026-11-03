@@ -7,8 +7,22 @@
 
 namespace foc
 {
+    constexpr hal::DutyCycle MinimumPulseDuty(float nanoseconds, uint32_t pwmFrequencyHz)
+    {
+        return hal::DutyCycle{ static_cast<uint32_t>(nanoseconds * 1e-9f * static_cast<float>(pwmFrequencyHz) * static_cast<float>(hal::DutyCycle::fullScale) + 0.5f) };
+    }
+
+    ALWAYS_INLINE_HOT uint32_t RoundShortPulse(uint32_t duty, uint32_t minPulse)
+    {
+        if (duty == 0 || duty >= minPulse)
+            return duty;
+
+        return duty * 2 < minPulse ? 0 : minPulse;
+    }
+
     // Keeps the line-to-line voltages while lowering the duties so two low-side shunts stay readable.
-    ALWAYS_INLINE_HOT PhasePwmDutyCycles KeepLowSideShuntsReadable(const PhasePwmDutyCycles& duties, hal::DutyCycle maxReadable, hal::DutyCycle maxDuty)
+    // A shifted leg left shorter than minPulse is moved to 0 by a larger shift; a second one rounds to 0 or minPulse.
+    ALWAYS_INLINE_HOT PhasePwmDutyCycles KeepLowSideShuntsReadable(const PhasePwmDutyCycles& duties, hal::DutyCycle maxReadable, hal::DutyCycle maxDuty, hal::DutyCycle minPulse = hal::DutyCycle{})
     {
         const auto limit = maxReadable.Value();
         const auto highest = std::max({ duties.a.Value(), duties.b.Value(), duties.c.Value() });
@@ -18,7 +32,9 @@ namespace foc
 
         const auto lowest = std::min({ duties.a.Value(), duties.b.Value(), duties.c.Value() });
         const auto middle = duties.a.Value() + duties.b.Value() + duties.c.Value() - highest - lowest;
-        const auto shift = std::min(highest - limit, lowest);
+        const auto readableShift = std::min(highest - limit, lowest);
+        const auto remaining = lowest - readableShift;
+        const auto shift = remaining != 0 && remaining < minPulse.Value() ? lowest : readableShift;
         const auto shiftedMiddle = middle - shift;
         const auto shiftedHighest = highest - shift;
 
@@ -36,9 +52,11 @@ namespace foc
         }
         const auto scale = value != bound ? static_cast<float>(bound) / static_cast<float>(value) : 1.0f;
 
-        const auto keep = [shift, scale](hal::DutyCycle duty)
+        const auto minimumPulse = minPulse.Value();
+        const auto keep = [shift, scale, minimumPulse](hal::DutyCycle duty)
         {
-            return hal::DutyCycle{ static_cast<uint32_t>(static_cast<float>(duty.Value() - shift) * scale + 0.5f) };
+            const auto scaled = static_cast<uint32_t>(static_cast<float>(duty.Value() - shift) * scale + 0.5f);
+            return hal::DutyCycle{ RoundShortPulse(scaled, minimumPulse) };
         };
 
         return PhasePwmDutyCycles{ keep(duties.a), keep(duties.b), keep(duties.c) };
