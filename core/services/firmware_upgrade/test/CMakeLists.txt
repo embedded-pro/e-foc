@@ -4,9 +4,15 @@ emil_add_test(e_foc.services.firmware_upgrade_test)
 
 target_link_libraries(e_foc.services.firmware_upgrade_test PUBLIC
     gmock_main
-    e_foc.services.firmware_upgrade.pack_header
+    can_lite.test_util
+    e_foc.services.firmware_upgrade
+    hal.interfaces_test_doubles
+    hal.synchronous_interfaces_test_doubles
+    infra.timer_test_helper
+    infra.event_test_helper
 )
 
 target_sources(e_foc.services.firmware_upgrade_test PRIVATE
+    TestFirmwareUpgrade.cpp
     TestPackHeaderCheck.cpp
 )
