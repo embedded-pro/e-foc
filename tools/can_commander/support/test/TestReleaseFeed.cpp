@@ -151,3 +151,31 @@ TEST_F(TestReleaseFeed, unreadable_feed_is_invalid)
     EXPECT_EQ(UpdateStatus::invalidResponse, evaluation.status);
     EXPECT_FALSE(evaluation.latest.has_value());
 }
+
+TEST_F(TestReleaseFeed, finds_the_firmware_pack_of_a_board_by_its_asset_name)
+{
+    const auto release = ParseLatestRelease(Release("v1.7.0", assets + "," + Asset("e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.upgrade") + "," + Asset("e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.hex")), InstallerPlatform::linuxX64);
+
+    ASSERT_TRUE(release.has_value());
+    const auto pack = FirmwarePackFor(*release, "EK-TM4C1294XL");
+    ASSERT_TRUE(pack.has_value());
+    EXPECT_EQ("e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.upgrade", pack->fileName);
+    EXPECT_EQ(4096, pack->size);
+    EXPECT_TRUE(pack->sha256.has_value());
+}
+
+TEST_F(TestReleaseFeed, a_board_without_a_pack_in_the_release_finds_none)
+{
+    const auto release = ParseLatestRelease(Release("v1.7.0", assets + "," + Asset("e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.7.0.upgrade")), InstallerPlatform::linuxX64);
+
+    ASSERT_TRUE(release.has_value());
+    EXPECT_FALSE(FirmwarePackFor(*release, "NUCLEO-H563ZI").has_value());
+}
+
+TEST_F(TestReleaseFeed, a_pack_named_for_another_release_is_not_this_release_s_pack)
+{
+    const auto release = ParseLatestRelease(Release("v1.7.0", Asset("e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-v1.6.0.upgrade")), InstallerPlatform::linuxX64);
+
+    ASSERT_TRUE(release.has_value());
+    EXPECT_FALSE(FirmwarePackFor(*release, "EK-TM4C1294XL").has_value());
+}
