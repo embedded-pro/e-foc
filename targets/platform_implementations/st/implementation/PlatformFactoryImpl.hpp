@@ -31,6 +31,7 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
+#include "targets/platform_implementations/cortex_m_common/ControlInterrupt.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
@@ -199,7 +200,6 @@ namespace application
         [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
-        volatile bool controlLoopEntered{ false };
         volatile bool protectionTripped{ false };
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;

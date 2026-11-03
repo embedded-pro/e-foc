@@ -26,6 +26,7 @@ target_sources(e_foc.platform_abstraction PRIVATE
     BoardProtection.hpp
     CanBusAdapter.hpp
     CanBusAdapter.cpp
+    ActiveInterrupt.hpp
     ControlLoopMetrics.hpp
     ControlLoopMetrics.cpp
     DecimatingThreePhaseInverter.hpp

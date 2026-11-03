@@ -199,6 +199,13 @@ still met), **deadline misses** (over the period itself), and **re-entries** (a 
 while the previous interrupt had not returned — the same failure observed as it happens rather than
 inferred afterwards).
 
+A Cortex-M exception cannot preempt itself, so a flag set on entry and tested on the next entry
+never sees a re-entry: the late conversion waits as pending and runs after the return. The TI and ST
+platforms instead check, as the callback ends, whether the interrupt now running is pending again
+(`ActiveInterruptPendsAgain`: the active exception number from `SCB->ICSR`, its bit in
+`NVIC->ISPR`). Both drivers clear their interrupt flag and pending bit before calling back, so the
+bit is set only by a conversion or transfer that completed during the callback.
+
 **CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
 that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
 omit it. This is what separates a bus with marginal termination from one that is unplugged.

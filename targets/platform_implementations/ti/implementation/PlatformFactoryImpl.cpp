@@ -284,13 +284,6 @@ namespace application
         onPhaseCurrentsReady.Set(onDone);
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
-                if (controlLoopEntered)
-                {
-                    controlLoopMetrics.RecordReentry();
-                    return;
-                }
-
-                controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
 
                 const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
@@ -301,7 +294,8 @@ namespace application
                     onPhaseCurrentsReady(currents);
 
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
-                controlLoopEntered = false;
+                if (ControlInterrupt::PendsAgain())
+                    controlLoopMetrics.RecordReentry();
             });
     }
 
