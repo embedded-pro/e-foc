@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -227,7 +228,7 @@ THEN(R"(the staging slot holds the pack and is erased past it)")
     const auto& pack = context.Get<ScenarioSetup>().download.pack;
     const auto staging = EmulatedBootloader().Staging();
 
-    EXPECT_TRUE(std::equal(pack.begin(), pack.end(), staging.begin())) << "The staging slot does not hold the pack";
+    EXPECT_TRUE(std::ranges::equal(pack, staging | std::views::take(pack.size()))) << "The staging slot does not hold the pack";
     EXPECT_TRUE(std::all_of(staging.begin() + static_cast<std::ptrdiff_t>(pack.size()), staging.end(), [](uint8_t byte)
         {
             return byte == 0xff;
