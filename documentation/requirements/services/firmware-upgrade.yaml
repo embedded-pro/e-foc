@@ -40,6 +40,8 @@
 
 - id: REQ-UPD-005
   title: The apply restarts into the bootloader only while the drive is stopped
+  status: verified
+  verification: [unit, sil]
   shall: >
     The motor controller shall answer Activate with NotReady unless a verified pack is staged,
     and with Busy unless the drive is Idle or Ready with nothing outstanding. An accepted
@@ -93,6 +95,8 @@
 
 - id: REQ-UPD-011
   title: A staged pack waits for the user's apply
+  status: verified
+  verification: [unit, sil]
   shall: >
     A pack that passed Verify shall stay staged across motor runs and controller restarts until
     Activate, Abort or the next Begin Upgrade, and no reset shall install it before Activate.

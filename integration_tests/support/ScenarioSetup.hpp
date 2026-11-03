@@ -47,6 +47,7 @@ namespace integration
         std::optional<uint8_t> beginAnswer;
         std::optional<uint16_t> pageSize;
         std::optional<uint8_t> verifyAnswer;
+        std::optional<uint8_t> activateAnswer;
         uint16_t blocksSent{ 0 };
     };
 

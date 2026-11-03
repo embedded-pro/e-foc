@@ -21,6 +21,7 @@ namespace integration
 
     BootloaderTarget& EmulatedBootloader();
     PackSource TargetPackSource();
+    std::string BuildVersion();
     std::vector<uint8_t> DevelopmentSignedPack(const application::PackDescription& description);
     application::UpgradePackStatus JournalStatusNamed(const std::string& name);
     std::vector<uint8_t> JournalReading(application::UpgradePackStatus status);
