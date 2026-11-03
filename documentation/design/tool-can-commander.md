@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.9.1
+version: 0.10.0
 component: "tool-can-commander"
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.9.1                |
+| Version   | 0.10.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-01           |
+| Date      | 2026-11-03           |
 
 ---
 
@@ -409,12 +409,18 @@ nothing more.
   release, by its asset name (`service-firmware-upgrade.md` Part J). When that release is newer than the
   version the motor reports, the Firmware tab says so and the motor's tab carries a marker. *Open Pack File…*
   takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
-  version or board, so the tab explains that and offers nothing.
+  version or board, so the tab explains that and offers nothing. A node that reports its version but refuses
+  the staged version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade
+  service: the tab says that this firmware cannot be updated over CAN and offers no download. Only a board with
+  a bootloader can be updated, today the EK-TM4C1294XL and the emulated board; for any other the tab says that
+  the board has no bootloader to install a pack.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
   per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its
   installer; a file that does not match is deleted. Every pack, downloaded or opened, is read before it is
-  offered: its magic, its header version, a size the staging slot holds (256 KB), and a product name that
-  names the board the node reports and that board's microcontroller. A pack for another board or another
+  offered: its magic, its header version, a size the staging slot holds (256 KB), a product name that names
+  the board the node reports and that board's microcontroller, a product version of three numbers from 0 to
+  255, and the one application image that ends the pack, as the controller checks them
+  (`service-firmware-upgrade.md` Part D). A pack for another board or another
   microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
   controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
