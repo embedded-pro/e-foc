@@ -15,6 +15,7 @@ namespace can
         services::CanProtocolClient& ProtocolClient();
         FocMotorCategoryClient& CategoryClient();
         const FocMotorCategoryClient& CategoryClient() const;
+        const CanFrameOrigin& Origin() const;
 
     private:
         CanFrameOriginTracker originTracker;
