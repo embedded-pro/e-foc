@@ -29,7 +29,9 @@ namespace services
         finishing = false;
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
-        settledSumA = settledSumB = settledSumC = 0.0f;
+        settledSumA = 0.0f;
+        settledSumB = 0.0f;
+        settledSumC = 0.0f;
         failure = Failure::none;
         startingCurrents = {};
         firstHold = config.followStep.has_value();
@@ -98,17 +100,17 @@ namespace services
         else
         {
             consecutiveSettledSamples = 0;
-            settledSumA = settledSumB = settledSumC = 0.0f;
+            settledSumA = 0.0f;
+            settledSumB = 0.0f;
+            settledSumC = 0.0f;
         }
     }
 
-    // A rotor that has not yet started to turn after the vector moved reads as settled where it stood.
     bool MotorAlignmentImpl::CountsSettlement() const
     {
         return firstHold || !alignmentConfig.followStep.has_value() || samplesInHold > alignmentConfig.followDwell;
     }
 
-    // Interrupt context: the vector keeps holding the rotor while the event loop judges the final hold.
     void MotorAlignmentImpl::Settle()
     {
         if (firstHold)
@@ -145,7 +147,6 @@ namespace services
         Complete(std::nullopt);
     }
 
-    // Interrupt context: the vector moves without stopping the inverter, so the rotor is held throughout.
     void MotorAlignmentImpl::BeginFinalHold()
     {
         firstHold = false;
@@ -155,11 +156,12 @@ namespace services
         currentSampleIndex = 0;
         samplesInHold = 0;
         consecutiveSettledSamples = 0;
-        settledSumA = settledSumB = settledSumC = 0.0f;
+        settledSumA = 0.0f;
+        settledSumB = 0.0f;
+        settledSumC = 0.0f;
         OutputVector(alignmentAngle);
     }
 
-    // Moving the vector back by the follow step turns the rotor by the step over the pole pairs, mechanically.
     bool MotorAlignmentImpl::FollowedField() const
     {
         const auto travel = foc::detail::PositionWithWrapAround((previousPosition - firstHoldPosition).Value());
@@ -175,30 +177,27 @@ namespace services
         const auto a = settledSumA / samples;
         const auto b = settledSumB / samples;
         const auto c = settledSumC / samples;
-        const auto final = ExpectedPhaseACurrent();
+        const auto finalCurrent = ExpectedPhaseACurrent();
 
-        if (!final.has_value())
+        if (!finalCurrent.has_value())
         {
-            // b and c each return half of phase a's current; without a model, a measured a is the only scale
             const auto floor = missingFraction * 0.5f * std::abs(a);
             return std::abs(b) < floor || std::abs(c) < floor;
         }
 
         const auto risen = SettledShareOfFinalCurrent();
 
-        return Missing(a, *final, startingCurrents.a, risen) ||
-               Missing(b, -0.5f * *final, startingCurrents.b, risen) ||
-               Missing(c, -0.5f * *final, startingCurrents.c, risen);
+        return Missing(a, *finalCurrent, startingCurrents.a, risen) ||
+               Missing(b, -0.5f * *finalCurrent, startingCurrents.b, risen) ||
+               Missing(c, -0.5f * *finalCurrent, startingCurrents.c, risen);
     }
 
-    // The settled mean moves from the current the previous hold left to the final one with L/R. A phase whose
-    // expected mean passes near zero on the way cannot tell a transition from an open phase, so it is not judged.
-    bool MotorAlignmentImpl::Missing(float measured, float final, float starting, float risen) const
+    bool MotorAlignmentImpl::Missing(float measured, float finalCurrent, float starting, float risen) const
     {
-        const auto expected = final * risen + starting * (1.0f - risen);
-        const auto crossing = starting * final < 0.0f;
+        const auto expected = finalCurrent * risen + starting * (1.0f - risen);
+        const auto crossing = starting * finalCurrent < 0.0f;
 
-        if (crossing && std::abs(expected) < missingFraction * std::abs(final))
+        if (crossing && std::abs(expected) < missingFraction * std::abs(finalCurrent))
             return false;
 
         return std::abs(measured) < missingFraction * std::abs(expected);
@@ -212,12 +211,9 @@ namespace services
         if (resistance <= 0.0f || bus <= 0.0f)
             return std::nullopt;
 
-        // The vector puts d·Vdc/2 across phase a and nothing turns, so only the winding resistance limits the current
         return 0.5f * foc::DutyFraction(alignmentConfig.testVoltage) * bus / resistance;
     }
 
-    // The winding current moves with L/R from the moment the vector was last applied or moved, so a rotor that
-    // settles at once is judged on the mean the settled samples could reach, not on the final current.
     float MotorAlignmentImpl::SettledShareOfFinalCurrent() const
     {
         const auto resistance = alignmentConfig.phaseResistance.Value();
@@ -254,7 +250,6 @@ namespace services
         Complete(std::nullopt);
     }
 
-    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void MotorAlignmentImpl::Finish(std::optional<foc::Radians> result)
     {
         driver.Stop();

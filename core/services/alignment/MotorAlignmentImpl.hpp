@@ -32,7 +32,7 @@ namespace services
         void Settle();
         void Decide();
         bool CarriesNoCurrent() const;
-        bool Missing(float measured, float final, float starting, float risen) const;
+        bool Missing(float measured, float finalCurrent, float starting, float risen) const;
         std::optional<float> ExpectedPhaseACurrent() const;
         float SettledShareOfFinalCurrent() const;
         void FailToConverge();

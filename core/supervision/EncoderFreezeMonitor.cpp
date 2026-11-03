@@ -85,8 +85,6 @@ namespace supervision
         anchorTime = now;
     }
 
-    // The timer advances in whole periods, so a measured span of n periods lasted up to n + 1: the speed is a
-    // lower bound and the span an upper one, which only ever makes a stop look more plausible.
     void EncoderFreezeMonitor::NoteTravel(float reading, float travel, infra::TimePoint now)
     {
         previousSpeed = lastSpeed;
@@ -115,9 +113,6 @@ namespace supervision
         onFault(state_machine::FaultCode::encoderLoss);
     }
 
-    // Decelerating at most alpha and ending below the speed it stops from within half a count, sqrt(alpha·step),
-    // a rotor averages at most alpha·span/2 more than that over the last span, and alpha·(span/2 + last span) over
-    // the one before. A freeze part-way through the last span leaves it only part of the travel, so both are judged.
     bool EncoderFreezeMonitor::CouldNotHaveStopped() const
     {
         const auto alpha = armedLimits.maximumDeceleration.Value();
@@ -135,9 +130,7 @@ namespace supervision
 
     EncoderFreezeMonitor::Limits LimitsFrom(const services::CalibrationData& calibration, uint32_t encoderResolution, foc::Ampere maxCurrent)
     {
-        // Allows a load torque as large as the motor's own
         constexpr float margin = 2.0f;
-        // Torque constant over inertia, in rad/s² per ampere, for a record without one: about three times either reference motor's
         constexpr float fallbackPerAmpere = 2.0e4f;
 
         const auto torqueConstant = 1.5f * static_cast<float>(calibration.polePairs) * calibration.fluxLinkage;

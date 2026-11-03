@@ -818,7 +818,6 @@ namespace
         : public MotorAlignmentTest
     {
     public:
-        // 20 % of a 24 V bus across 1 Ω drives 2.4 A into phase a and 1.2 A back out of b and c.
         static constexpr float expectedPhaseA{ 2.4f };
 
         MotorAlignmentPhaseContinuityTest()
@@ -964,7 +963,6 @@ TEST_F(MotorAlignmentPhaseContinuityTest, OnlyTheSettledSamplesAreJudged)
 
 TEST_F(MotorAlignmentPhaseContinuityTest, ASlowlyRisingCurrentInAWindingThatIsAlreadyAlignedAligns)
 {
-    // L/R = 50 ms: the five settled samples end 5 ms after the vector is applied, at about 6 % of the final current.
     config.phaseInductance = foc::Henry{ 0.05f };
     EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.3f }));
     EXPECT_CALL(driverMock, Stop()).Times(2);
@@ -1075,7 +1073,6 @@ namespace
             return result;
         }
 
-        // 20 % at a quarter turn ahead puts nothing across phase a and ±17.3 % across b and c.
         const foc::PhasePwmDutyCycles firstHoldDuties{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromRatio(5866, 10000), hal::DutyCycle::FromRatio(4134, 10000) };
         const foc::PhasePwmDutyCycles alignmentDuties{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(45), hal::DutyCycle::FromPercent(45) };
         services::MotorAlignment::AlignmentConfig config;
@@ -1086,7 +1083,6 @@ namespace
 
 TEST_F(MotorAlignmentFollowTest, AWindingStillSwingingFromTheFirstHoldIsNotAMissingPhase)
 {
-    // L/R = 7 ms: phase b passes zero on its way from the first hold's +2.08 A to -1.2 A while the final hold settles.
     config.phaseInductance = foc::Henry{ 0.007f };
     Start(true);
     Samples(config.settledCount, start, { foc::Ampere{ 0.0f }, foc::Ampere{ 2.08f }, foc::Ampere{ -2.08f } });

@@ -102,7 +102,6 @@ TEST_F(PhaseLossMonitorTest, a_shortfall_that_lasts_less_than_50_ms_is_not_repor
 
 TEST_F(PhaseLossMonitorTest, a_healthy_drive_at_the_minimum_current_bandwidth_is_not_reported_while_its_current_rises)
 {
-    // A first-order loop at 1 rad/s needs 0.22 s to pass a fifth of its demand.
     currentLoopBandwidth = foc::RadiansPerSecond{ 1.0f };
     Observe(0.0f, 0.0f, 5.0f);
     Run(std::chrono::milliseconds(220));

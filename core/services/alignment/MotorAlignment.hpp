@@ -42,7 +42,6 @@ namespace services
 
         virtual void Abort() = 0;
 
-        // Why the last run failed, when a phase did not carry the vector's current or the encoder did not follow its field.
         virtual Failure LastFailure() const = 0;
     };
 }
