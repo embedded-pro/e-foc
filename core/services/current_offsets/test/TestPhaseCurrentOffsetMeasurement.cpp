@@ -81,6 +81,7 @@ TEST_F(TestPhaseCurrentOffsetMeasurement, applied_offsets_are_removed_by_the_com
             forwarded = currents;
         });
 
+    EXPECT_CALL(inverterMock, CurrentOffsets(_));
     measurement->Apply(Currents(0.027f, -0.018f, 0.054f));
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.027f, -0.518f, -0.446f));
 
@@ -90,6 +91,7 @@ TEST_F(TestPhaseCurrentOffsetMeasurement, applied_offsets_are_removed_by_the_com
 
 TEST_F(TestPhaseCurrentOffsetMeasurement, a_measurement_averages_the_raw_currents_at_neutral_duty_after_they_settle)
 {
+    EXPECT_CALL(inverterMock, CurrentOffsets(_));
     measurement->Apply(Currents(0.1f, 0.1f, 0.1f));
     StartMeasurement();
 

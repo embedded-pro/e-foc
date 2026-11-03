@@ -154,11 +154,19 @@ hidden changes every 60° of the reference, so the error signature shifts with i
 
 **Offsets and the rebuild.** The order of the two corrections matters. If the hidden phase is rebuilt from samples
 whose offsets are already removed, its offset is the negated sum of the other two's residuals, below a milliampere
-after calibration. *e-foc today* rebuilds first, from the raw samples, and subtracts the calibrated offsets
-afterwards (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`, then
-`core/services/inverter_compensation/InverterCompensation.hpp`). The rebuilt phase then comes out biased by the sum
-of all three calibrated offsets, $-(o_a + o_b + o_c)$: with the bench's +27, −18 and +54 mA, −63 mA, on whichever
-phase is hidden. Subtracting the offsets before the rebuild would remove it.
+after calibration. In *e-foc* the platform rebuilds from the raw samples (`LowSideShuntReadout`) and
+`InverterCompensation` subtracts the calibrated offsets afterwards, one per phase. Rebuilt as plain
+$-(m_{other,1} + m_{other,2})$, the hidden phase would come out biased by the sum of all three offsets,
+$-(o_a + o_b + o_c)$: with the bench's +27, −18 and +54 mA, −63 mA on whichever phase is hidden. So
+`InverterCompensation` hands the offsets it applies down to the platform (`CurrentOffsets`), and the readout adds
+their sum back when it rebuilds:
+
+$$
+m_{hidden} = -\left(m_{other,1} + m_{other,2}\right) + o_a + o_b + o_c
+$$
+
+Subtracting $o_{hidden}$ from that leaves $-(i_{other,1} + i_{other,2})$, the same as rebuilding from samples whose
+offsets are already removed. It costs one addition, and only on a period that rebuilds.
 
 **Two phases hidden.** In the directions where two phases share the highest duty ($\theta = 60^\circ, 180^\circ,
 300^\circ$ for common-mode injection), both windows shrink together and only one phase remains: nothing can be

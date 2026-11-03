@@ -58,6 +58,11 @@ namespace foc
             latest = duties;
         }
 
+        void Offsets(const PhaseCurrents& offsets)
+        {
+            offsetSum = offsets.a.Value() + offsets.b.Value() + offsets.c.Value();
+        }
+
         ALWAYS_INLINE_HOT PhaseCurrents Read(const PhaseCurrents& measured) const
         {
             const auto a = std::max(previous.a.Value(), latest.a.Value());
@@ -68,14 +73,16 @@ namespace foc
                 return measured;
 
             if (a >= b && a >= c)
-                return PhaseCurrents{ Ampere{ -(measured.b.Value() + measured.c.Value()) }, measured.b, measured.c };
+                return PhaseCurrents{ Ampere{ offsetSum - (measured.b.Value() + measured.c.Value()) }, measured.b, measured.c };
             if (b >= c)
-                return PhaseCurrents{ measured.a, Ampere{ -(measured.a.Value() + measured.c.Value()) }, measured.c };
-            return PhaseCurrents{ measured.a, measured.b, Ampere{ -(measured.a.Value() + measured.b.Value()) } };
+                return PhaseCurrents{ measured.a, Ampere{ offsetSum - (measured.a.Value() + measured.c.Value()) }, measured.c };
+            return PhaseCurrents{ measured.a, measured.b, Ampere{ offsetSum - (measured.a.Value() + measured.b.Value()) } };
         }
 
     private:
         uint32_t maxReadable;
+        // Written from the event loop, read in the control interrupt.
+        float offsetSum{ 0.0f };
         PhasePwmDutyCycles previous{};
         PhasePwmDutyCycles latest{};
     };

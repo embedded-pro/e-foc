@@ -144,6 +144,11 @@ namespace application
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents& offsets)
+    {
+        shuntReadout.Offsets(offsets);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
     {
         if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })

@@ -496,6 +496,11 @@ namespace application
         return model.MaxCurrentSupported();
     }
 
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents& offsets)
+    {
+        shuntReadout.Offsets(offsets);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
     {
         if (!plantConfig)

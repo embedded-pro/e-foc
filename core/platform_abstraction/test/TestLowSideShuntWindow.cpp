@@ -149,6 +149,27 @@ TEST_F(TestLowSideShuntReadout, each_phase_can_be_the_one_rebuilt)
     ExpectCurrents(readout.Read(measured), 0.9f, -0.4f, -0.5f);
 }
 
+TEST_F(TestLowSideShuntReadout, a_rebuilt_phase_carries_the_offsets_so_removing_each_phase_offset_leaves_its_current)
+{
+    const foc::PhaseCurrents offsets{ foc::Ampere{ 0.027f }, foc::Ampere{ -0.018f }, foc::Ampere{ 0.054f } };
+    readout.Offsets(offsets);
+    readout.Applied({ Duty(0.5f), Duty(0.9f), Duty(0.0f) });
+    readout.Applied({ Duty(0.5f), Duty(0.9f), Duty(0.0f) });
+
+    const auto rebuilt = readout.Read({ foc::Ampere{ 0.9f + 0.027f }, foc::Ampere{ 5.0f }, foc::Ampere{ -0.3f + 0.054f } });
+
+    ExpectCurrents({ rebuilt.a - offsets.a, rebuilt.b - offsets.b, rebuilt.c - offsets.c }, 0.9f, -0.6f, -0.3f);
+}
+
+TEST_F(TestLowSideShuntReadout, readable_phases_pass_unchanged_whatever_the_offsets)
+{
+    readout.Offsets({ foc::Ampere{ 0.027f }, foc::Ampere{ -0.018f }, foc::Ampere{ 0.054f } });
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+
+    ExpectCurrents(readout.Read(measured), 0.9f, -0.4f, -0.3f);
+}
+
 TEST_F(TestLowSideShuntReadout, a_duty_above_the_limit_in_the_period_before_still_hides_the_phase)
 {
     readout.Applied({ Duty(0.9f), Duty(0.5f), Duty(0.0f) });

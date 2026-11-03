@@ -119,6 +119,9 @@ namespace application
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents&)
+    {}
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
