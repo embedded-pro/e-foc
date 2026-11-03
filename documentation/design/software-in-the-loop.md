@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.12.0
+version: 1.13.0
 component: "software-in-the-loop"
-date: 2026-11-02
+date: 2026-11-03
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-02
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.12.0                      |
+| Version   | 1.13.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-02                  |
+| Date      | 2026-11-03                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1215,7 +1215,7 @@ error code the bootloader recorded.
 
 A refused pack leaves the application in the slot, which the heartbeat after the refusal shows. The
 firmware-upgrade service's scenarios add the other half: the application downloading the pack into
-`staging.bin` and recording *ready to deploy* itself (`service-firmware-upgrade.md` Part K).
+`staging.bin` and recording *ready to deploy* itself (Part Q).
 
 A scenario reads the journal only after the heartbeat, or after the time it waits for one, so the bootloader
 has finished writing it.
@@ -1227,6 +1227,47 @@ descriptor files go to the software-in-the-loop shards, which name the bootloade
 `QEMU_SIL_BOOTLOADER_ELF`, find the image and descriptor next to the application, and read the key set from
 `targets/bootloader/keys/development.keys` (`E_FOC_DEVELOPMENT_KEYS` overrides it). `bootloader.feature`
 goes into the lightest shard.
+
+### Part Q — Downloading and applying through the application
+
+The firmware-upgrade service's scenarios drive the other half of an update: the application receives a pack
+over CAN, stages it and, on Activate, restarts into the bootloader, which installs it
+(`service-firmware-upgrade.md`).
+
+**Staging on the emulated board.** The application stages into the same two files the bootloader reads,
+`staging.bin` and `journal.bin` (Part P), and writes each change through to its file, so what the application
+staged is what the bootloader finds after the reset, and what a scenario reads back after the run. The page
+is 256 bytes and the staging slot 256 KB, as Part I of the service's design gives for the emulated board.
+
+**The reset.** The application's software reset requests a system reset. The emulator restarts the machine in
+the same process: it loads the bootloader and the slot as at start (Part P), the bootloader finds *ready to
+deploy* in `journal.bin` and installs the pack from `staging.bin`. The terminal and the CAN channel stay
+connected across it, so a scenario sees the node fall silent and its heartbeat come back.
+
+**What the harness sends.** The firmware-upgrade category carries no sequence byte, so the steps send its
+commands as raw frames and wait for each answer, one block in flight, as a client does. Most scenarios send
+a small pack, a few hundred bytes of image built for the scenario with the library's pack builder and the
+emulated board's product name: the service checks the header but not the image, which only the bootloader
+decrypts. The scenario that applies its pack sends the application itself, since the bootloader checks the
+image it installs. A refused pack differs in one thing: another board's product name, or a CRC that does not
+match.
+
+**Scenarios** (`firmware_upgrade.feature`, `@sil`):
+
+| Scenario                                         | The scenario sees                                                                                                               | Requirements               |
+|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------|
+| A pack is downloaded and staged                  | Begin answered with the page size; Verify ok; the journal reads *downloaded*; the slot erased past the pack; the staged version | REQ-UPD-001, 004, 007, 013 |
+| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                | REQ-UPD-011                |
+| A download is refused while the motor runs       | Begin answered Busy; nothing staged                                                                                             | REQ-UPD-002                |
+| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                    | REQ-UPD-005                |
+| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                 | REQ-UPD-003, 006           |
+| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                     | REQ-UPD-004, 006           |
+| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                  | REQ-UPD-004, 006           |
+| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                         | REQ-UPD-014                |
+| The apply installs the pack                      | Activate ok; the node falls silent and comes back; the journal reads *deployed*; the staged version zero                        | REQ-UPD-005, 007           |
+
+**Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
+(`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.
 
 ## Interfaces
 

@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.9.1
+version: 0.9.2
 component: "tool-can-commander"
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.9.1                |
+| Version   | 0.9.2                |
 | Component | tool-can-commander   |
-| Date      | 2026-11-01           |
+| Date      | 2026-11-03           |
 
 ---
 
@@ -112,7 +112,7 @@ graph TD
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
 | Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
-| Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
+| Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.8 parameters, the release |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
 that node goes offline, so stale numbers never read as live. The current stream (`service-can.md` Part J)
@@ -394,7 +394,7 @@ loaded when needed, so the tool installs and starts on a machine without them.
 ### Part M — firmware update
 
 Each motor's **Firmware** tab shows the firmware the controller reports: its release version, its board and a
-pack staged on it, if any (contract 2.6, `service-can.md`). An update has two steps, and the user starts each
+pack staged on it, if any (contract 2.8, `service-can.md`). An update has two steps, and the user starts each
 one, separately, while that motor is stopped:
 
 1. **Download to Controller** sends a pack to the controller, which checks it and keeps it staged
@@ -408,7 +408,7 @@ nothing more.
 - **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
   release, by its asset name (`service-firmware-upgrade.md` Part J). When that release is newer than the
   version the motor reports, the Firmware tab says so and the motor's tab carries a marker. *Open Pack File…*
-  takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
+  takes a local pack instead, for a development build. A node older than contract 2.8 cannot report its
   version or board, so the tab explains that and offers nothing.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
   per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its

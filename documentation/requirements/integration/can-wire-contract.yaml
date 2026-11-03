@@ -132,6 +132,6 @@
   status: verified
   verification: sil
   shall: >
-    Contract version 2.7 shall add, without changing any 2.6 message, a phaseMissing value (7)
+    Contract version 2.7 shall add, without changing any 2.5 message, a phaseMissing value (7)
     of the fault code carried by the status telemetry and the fault event, sent whenever the
     drive is in Fault with phaseMissing (REQ-EH-015).

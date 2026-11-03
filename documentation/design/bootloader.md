@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: "bootloader"
-date: 2026-11-02
+date: 2026-11-03
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.5.0      |
+| Version   | 0.5.1      |
 | Component | bootloader |
-| Date      | 2026-11-02 |
+| Date      | 2026-11-03 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -270,7 +270,7 @@ be wrong; the image says itself what it was built for, and the chip says what it
 
 **Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
 start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
-board kind (`service-can.md`, contract 2.6), the firmware version (the project version, from the version header
+board kind (`service-can.md`, contract 2.8), the firmware version (the project version, from the version header
 embedded-infra-lib generates at build time) and the target identity: the device
 identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
 device-identity register gives. The header is compiled from the same target definitions that compile the rest

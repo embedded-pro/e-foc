@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.9.1
+version: 0.10.0
 component: can-service
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.9.1                    |
+| Version   | 0.10.0                   |
 | Component | can-service              |
-| Date      | 2026-11-01               |
+| Date      | 2026-11-03               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -269,11 +269,22 @@ mean measured d- and q-axis currents and the encoder's mechanical angle at the w
 0.1 A) is retired: the firmware never sent it, and the bus voltage it carried is measured only once, at
 start-up. Its ID stays reserved and is never reused. A 2.4 client simply never receives either frame.
 
-**Contract 2.6 — firmware identity.** Version 2.6 adds seven read-only parameters; nothing in 2.5 changes. They
+**Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.5 changes. Version 2.6 was
+never released: its number was set aside for the firmware identity, which ships as 2.8.
+
+`FocFaultCode` gains `phaseMissing` (`7`): the motor's phases do not carry the current the drive drives into
+them — found by the alignment's phase continuity check (`service-alignment.md`) or, while the drive runs, by
+the phase-loss monitor (`fault-supervision.md` Part E). Before 2.7 the alignment failure went out as `none`
+and a cable pulled while running was not reported at all. Adding the enumerator leaves the meaning of the
+existing codes unchanged, which keeps it a minor version, as `stall` was in 2.4. A client older than 2.7
+shows the new code as an unknown fault.
+
+**Contract 2.8 — firmware identity.** Version 2.8 adds seven read-only parameters; nothing in 2.7 changes. They
 tell a client which firmware a node runs, on which board, and which pack waits to be applied, so it can offer the right firmware update
 (`service-firmware-upgrade.md` Part H). Like the diagnostics of 2.2 they answer `QueryParameter`, are refused by
 `SetParameter` with `invalidPayload`, and travel as the float of the number. A client asks for them only when
-the node reports 2.6 or newer.
+the node reports 2.8 or newer. Every board answers them, also one that cannot be updated, whose staged version
+reads zero.
 
 | ID     | Parameter              | Unit | Value                                                                                                 | Automatic |
 |--------|------------------------|------|-------------------------------------------------------------------------------------------------------|-----------|
@@ -284,15 +295,6 @@ the node reports 2.6 or newer.
 | `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged         | no        |
 | `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
 | `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
-
-**Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.6 changes.
-
-`FocFaultCode` gains `phaseMissing` (`7`): the motor's phases do not carry the current the drive drives into
-them — found by the alignment's phase continuity check (`service-alignment.md`) or, while the drive runs, by
-the phase-loss monitor (`fault-supervision.md` Part E). Before 2.7 the alignment failure went out as `none`
-and a cable pulled while running was not reported at all. Adding the enumerator leaves the meaning of the
-existing codes unchanged, which keeps it a minor version, as `stall` was in 2.4. A client older than 2.7
-shows the new code as an unknown fault.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
@@ -327,7 +329,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xB0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x17`–`0x19`, `0x80`–`0xB7`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 
