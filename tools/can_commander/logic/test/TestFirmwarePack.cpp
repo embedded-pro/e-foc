@@ -53,6 +53,7 @@ namespace
         image.encryptionAndMacMethod = 1;
 
         std::vector<uint8_t> pack;
+        pack.reserve(epilogue.headerLength + image.lengthOfHeaderAndImage);
         Append(pack, prologue);
         pack.insert(pack.end(), signatureLength, 0x5a);
         Append(pack, epilogue);
