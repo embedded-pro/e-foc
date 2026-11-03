@@ -16,16 +16,22 @@ namespace services
     }
 
     FirmwareUpgrade::FirmwareUpgrade(FirmwareUpgradeCategoryServer& server, const std::optional<application::FirmwareStaging>& staging,
-        FirmwareUpgradeDrive& drive)
+        FirmwareUpgradeDrive& drive, const infra::Function<void()>& reset)
         : FirmwareUpgradeCategoryServerObserver(server)
         , staging(staging)
         , drive(drive)
+        , reset(reset)
     {
         if (!this->staging)
             return;
 
         really_assert(this->staging->pageSize >= blockSize && this->staging->pageSize <= maxPageSize);
         journal.emplace(this->staging->journal);
+        if (journal->Status() == application::UpgradePackStatus::downloaded)
+        {
+            state = State::staged;
+            ReadStagedVersion();
+        }
     }
 
     void FirmwareUpgrade::OnBeginUpgrade(uint32_t firmwareSize, const infra::Function<void(FwuError, uint16_t)>& onResult)
@@ -87,7 +93,25 @@ namespace services
 
     void FirmwareUpgrade::OnActivate(const infra::Function<void(FwuError)>& onResult)
     {
-        onResult(FwuError::notReady);
+        if (state != State::staged)
+        {
+            onResult(FwuError::notReady);
+            return;
+        }
+
+        if (flashBusy || !drive.IsStoppedAndIdle())
+        {
+            onResult(FwuError::busy);
+            return;
+        }
+
+        journal->Record(application::UpgradePackStatus::readyToDeploy, 0);
+        Enter(State::restarting);
+        onResult(FwuError::ok);
+        restartTimer.Start(restartDelay, [this]()
+            {
+                reset();
+            });
     }
 
     void FirmwareUpgrade::OnAbort(const infra::Function<void()>& onDone)
@@ -124,9 +148,20 @@ namespace services
         return stagedVersion;
     }
 
+    void FirmwareUpgrade::EmergencyStop()
+    {
+        if (!Downloading())
+            return;
+
+        if (flashBusy)
+            abortRequested = true;
+        else
+            EndDownload();
+    }
+
     bool FirmwareUpgrade::Holds(State state)
     {
-        return state == State::erasing || state == State::receiving || state == State::verifying;
+        return state == State::erasing || state == State::receiving || state == State::verifying || state == State::restarting;
     }
 
     void FirmwareUpgrade::Enter(State next)
@@ -150,7 +185,7 @@ namespace services
         if (!staging)
             return FwuError::invalidSize;
 
-        if (Downloading() || flashBusy || !drive.IsStoppedAndIdle())
+        if (Downloading() || state == State::restarting || flashBusy || !drive.IsStoppedAndIdle())
             return FwuError::busy;
 
         if (firmwareSize < minimumPackSize || firmwareSize > staging->pack.TotalSize())
@@ -161,6 +196,7 @@ namespace services
 
     void FirmwareUpgrade::StartDownload(uint32_t firmwareSize)
     {
+        discardTimer.Cancel();
         packSize = firmwareSize;
         received = 0;
         nextBlock = 0;
@@ -367,7 +403,7 @@ namespace services
             return;
 
         const auto offset = EpilogueOffset(header.prologue);
-        if (offset + sizeof(header.epilogue) > packSize)
+        if (offset + sizeof(header.epilogue) > HeaderReadLimit())
         {
             FinishHeader();
             return;
@@ -386,7 +422,7 @@ namespace services
             return;
 
         const uint32_t offset = header.epilogue.headerLength;
-        if (offset + sizeof(header.image) > packSize)
+        if (offset + sizeof(header.image) > HeaderReadLimit())
         {
             FinishHeader();
             return;
@@ -405,6 +441,11 @@ namespace services
         Take(onHeaderRead)();
     }
 
+    uint32_t FirmwareUpgrade::HeaderReadLimit() const
+    {
+        return state == State::verifying ? packSize : staging->pack.TotalSize();
+    }
+
     void FirmwareUpgrade::OnVerifiedHeader()
     {
         const auto version = CheckPackHeader(header, PackLimits{ staging->productName, staging->applicationCapacity, packSize });
@@ -418,6 +459,14 @@ namespace services
         stagedVersion = *version;
         Enter(State::staged);
         Take(verifyDone)(FwuError::ok);
+    }
+
+    void FirmwareUpgrade::ReadStagedVersion()
+    {
+        ReadHeader([this]()
+            {
+                stagedVersion = ParseVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
+            });
     }
 
     bool FirmwareUpgrade::FlashDone()
@@ -443,6 +492,8 @@ namespace services
     {
         if (Downloading())
             EndDownload();
+        else if (state == State::staged)
+            Discard();
         else if (state == State::error)
             Enter(State::idle);
     }
@@ -469,6 +520,29 @@ namespace services
             Take(blockDone)(result);
         if (verifyDone != nullptr)
             Take(verifyDone)(result);
+    }
+
+    void FirmwareUpgrade::Discard()
+    {
+        Enter(State::idle);
+        stagedVersion = {};
+        TryDiscard();
+    }
+
+    void FirmwareUpgrade::TryDiscard()
+    {
+        if (!drive.IsStoppedAndIdle())
+        {
+            if (!discardTimer.Armed())
+                discardTimer.Start(discardRetry, [this]()
+                    {
+                        TryDiscard();
+                    });
+            return;
+        }
+
+        discardTimer.Cancel();
+        journal->Clear();
     }
 
     void FirmwareUpgrade::RestartDeadline()
@@ -500,6 +574,7 @@ namespace services
             case State::verifying:
                 return FwuState::verifying;
             case State::staged:
+            case State::restarting:
                 return FwuState::complete;
             case State::error:
                 return FwuState::error;

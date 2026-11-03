@@ -97,3 +97,11 @@
     The motor controller shall hold a staging slot of 256 KB, answer Begin Upgrade for a larger
     pack with InvalidSize, and, after accepting Begin Upgrade, erase the status journal and the
     entire staging slot before answering it; an erase that fails shall be answered WriteError.
+
+- id: REQ-UPD-014
+  title: The emergency stop ends a download
+  shall: >
+    The emergency stop shall end a download in progress, from an accepted Begin Upgrade until
+    Verify is answered, as Abort does: the status journal shall stay empty, the interlock of
+    REQ-UPD-003 shall be released, and a Begin Upgrade or Verify still unanswered shall be
+    answered InvalidState. A staged pack shall stay staged.
