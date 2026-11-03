@@ -34,7 +34,6 @@ if(TARGET_MCU_VENDOR STREQUAL "ti")
     e_foc_ti_target_linker_scripts(e_foc.bootloader.main BOOTLOADER)
 endif()
 
-# Keys are not a build input: application.bootloader_image inject-keys writes them into the built bootloader (bootloader.md Part G)
 emil_fetch_bootloader_image()
 
 emil_generate_artifacts(TARGET e_foc.bootloader.main MAP BIN HEX)

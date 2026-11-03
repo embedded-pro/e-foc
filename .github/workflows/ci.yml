@@ -138,7 +138,6 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
-      # Every embedded build with a bootloader gets the public development key set in its key slot (bootloader.md Part G)
       - name: Inject the development keys into the bootloader
         shell: bash
         run: |

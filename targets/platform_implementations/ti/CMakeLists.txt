@@ -1,8 +1,7 @@
 add_subdirectory(${E_FOC_TARGET_BOARD})
 add_subdirectory(implementation)
 
-# Uses the infra mem file but the e-foc custom sections.ld (adds .error_handling). On a board with a bootloader,
-# the bootloader links at the start of flash, with its key slot at the end of its region
+# Uses the infra mem file but the e-foc custom sections.ld (adds .error_handling)
 function(e_foc_ti_target_linker_scripts target)
     cmake_parse_arguments(PARSE_ARGV 1 E_FOC_LAYOUT "BOOTLOADER" "" "")
     get_property(bootloaderLdScripts GLOBAL PROPERTY E_FOC_BOOTLOADER_LDSCRIPTS)
