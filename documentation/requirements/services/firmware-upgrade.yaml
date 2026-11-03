@@ -1,5 +1,7 @@
 - id: REQ-UPD-001
   title: The drive receives firmware over the can-lite firmware-upgrade category
+  status: verified
+  verification: [unit, sil]
   shall: >
     On every board with a staging slot, the motor controller shall answer the can-lite
     firmware-upgrade category on its CAN node as the can-lite firmware-upgrade
@@ -7,6 +9,8 @@
 
 - id: REQ-UPD-002
   title: A download starts only while the drive is stopped
+  status: verified
+  verification: [unit, sil]
   shall: >
     The motor controller shall refuse Begin Upgrade with Busy unless the drive is Idle or
     Ready with no command and no non-volatile memory operation outstanding, and while
@@ -14,6 +18,8 @@
 
 - id: REQ-UPD-003
   title: The drive stays stopped while a pack is received
+  status: verified
+  verification: [unit, sil]
   shall: >
     From an accepted Begin Upgrade until Verify, Abort or 30 s without an accepted command, and
     from an accepted Activate until the restart, the motor controller shall refuse every command
@@ -22,13 +28,15 @@
 
 - id: REQ-UPD-004
   title: Verify checks the transfer, the board and the microcontroller
+  status: verified
+  verification: [unit, sil]
   shall: >
     On Verify the motor controller shall answer CrcMismatch unless the CRC-32 the can-lite
     specification fixes, computed over exactly the size given in Begin Upgrade, equals the
     value received, and NotReady unless the pack's product name equals the firmware's own,
     naming this board and its microcontroller part, the pack's product version reads as major,
-    minor and patch numbers from 0 to 255, and the pack carries one application image, which ends
-    it, whose length fits the application slot. A pack that passes shall be recorded as downloaded.
+    minor and patch numbers from 0 to 255, and the pack carries one application image, which ends it, whose
+    length fits the application slot. A pack that passes shall be recorded as downloaded.
 
 - id: REQ-UPD-005
   title: The apply restarts into the bootloader only while the drive is stopped
@@ -40,6 +48,8 @@
 
 - id: REQ-UPD-006
   title: Abandoned or discarded downloads install nothing
+  status: verified
+  verification: [unit, sil]
   shall: >
     Abort, the inactivity deadline and a failed Verify shall leave the status journal empty.
     Abort while a pack is staged shall make it unavailable for Activate at once, and shall
@@ -48,6 +58,8 @@
 
 - id: REQ-UPD-007
   title: The drive reports its firmware version, its board and the staged version
+  status: verified
+  verification: [unit, sil]
   shall: >
     The motor controller shall answer QueryParameter for the contract 2.6 parameters
     firmwareVersionMajor, firmwareVersionMinor, firmwareVersionPatch, boardKind,
@@ -57,6 +69,8 @@
 
 - id: REQ-UPD-008
   title: Flash work never stalls the event loop past the watchdog
+  status: implemented
+  verification: unit
   shall: >
     The motor controller shall erase at most one staging sector and program at most one page
     per event-loop turn while a pack is erased for or received.
@@ -93,6 +107,8 @@
 
 - id: REQ-UPD-013
   title: The whole 256 KB staging slot is erased before the download starts
+  status: verified
+  verification: [unit, sil]
   shall: >
     The motor controller shall hold a staging slot of 256 KB, answer Begin Upgrade for a larger
     pack with InvalidSize, and, after accepting Begin Upgrade, erase the status journal and the
@@ -100,6 +116,8 @@
 
 - id: REQ-UPD-014
   title: The emergency stop ends a download
+  status: verified
+  verification: [unit, sil]
   shall: >
     The emergency stop shall end a download in progress, from an accepted Begin Upgrade until
     Verify is answered, as Abort does: the status journal shall stay empty, the interlock of

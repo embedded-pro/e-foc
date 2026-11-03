@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.4
+version: 0.3.5
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.4                     |
+| Version   | 0.3.5                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -273,17 +273,17 @@ the board it is published for. A dry run builds and signs with the development k
 
 ### Part K — verification
 
-| Level                 | What it shows                                                                                                                                                                                                                         | Requirements                     |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|
-| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake | REQ-UPD-001 to 008, 011 to 014   |
-| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                                        | REQ-BOOT-001 to 007              |
-| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; NVM writes refused meanwhile                                                       | REQ-UPD-001 to 007, 011, 012     |
-| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                                                 | REQ-UPD-005, REQ-BOOT-001 to 004 |
-| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                       | REQ-UPD-009, REQ-UPD-010         |
+| Level                 | What it shows                                                                                                                                                                                                                         | Requirements                           |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake | REQ-UPD-001 to 008, 011 to 014         |
+| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                                        | REQ-BOOT-001 to 007                    |
+| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile                                                | REQ-UPD-001 to 004, 006, 007, 013, 014 |
+| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                                                 | REQ-UPD-005, REQ-BOOT-001 to 004       |
+| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                       | REQ-UPD-009, REQ-UPD-010               |
 
-The software-in-the-loop scenarios read the staging file the emulated firmware wrote and check the pack and
-the journal in it. The new feature goes into the shard that keeps the three balanced
-(`integration_tests/sil-shards.json`).
+The software-in-the-loop scenarios read the staging and journal files the emulated firmware wrote and check
+the pack and the journal in them. They send a small pack, built for the scenario with the real product name.
+The new feature goes into the shard that keeps the three balanced (`integration_tests/sil-shards.json`).
 
 ---
 
@@ -416,8 +416,8 @@ sequenceDiagram
 
 ## Open Questions
 
-| # | Question                                                                                       | Options                                                                    | Status                                                            |
-|---|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------------------------|
-| 1 | Should the transfer acknowledge a window of blocks at a time, as the specification suggests?   | `can-lite` extension (section 7.2) / one block in flight (current)         | open                                                              |
-| 2 | Which tool builds the packs in the release workflow? The library's pack builder needs mbedTLS. | The library's pack builder in a host build with mbedTLS / a script of ours | open                                                              |
-| 3 | Should the emergency stop also abort a download in progress?                                   | Abort on emergency stop / leave the download open                          | resolved: the emergency stop ends a download in progress (Part F) |
+| # | Question                                                                                       | Options                                                                    | Status                                                                                                                                                           |
+|---|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Should the transfer acknowledge a window of blocks at a time, as the specification suggests?   | `can-lite` extension (section 7.2) / one block in flight (current)         | open                                                                                                                                                             |
+| 2 | Which tool builds the packs in the release workflow? The library's pack builder needs mbedTLS. | The library's pack builder in a host build with mbedTLS / a script of ours | resolved: the library's pack builder, which now runs on tiny-AES and micro-ecc without mbedTLS (embedded-infra-lib#192), through the image tool's `pack` command |
+| 3 | Should the emergency stop also abort a download in progress?                                   | Abort on emergency stop / leave the download open                          | resolved: the emergency stop ends a download in progress (Part F)                                                                                                |

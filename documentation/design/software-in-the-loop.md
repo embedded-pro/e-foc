@@ -1255,6 +1255,20 @@ scenario with the library's pack builder and the emulated board's product name: 
 header but not the image, which only the bootloader decrypts. A refused pack differs in one thing: another
 board's product name, or a CRC that does not match.
 
+**Scenarios** (`firmware_upgrade.feature`, `@sil`):
+
+| Scenario                                         | The scenario sees                                                                                                               | Requirements               |
+|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------|
+| A pack is downloaded and staged                  | Begin answered with the page size; Verify ok; the journal reads *downloaded*; the slot erased past the pack; the staged version | REQ-UPD-001, 004, 007, 013 |
+| A download is refused while the motor runs       | Begin answered Busy; nothing staged                                                                                             | REQ-UPD-002                |
+| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                 | REQ-UPD-003, 006           |
+| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                     | REQ-UPD-004, 006           |
+| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                  | REQ-UPD-004, 006           |
+| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                         | REQ-UPD-014                |
+
+**Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
+(`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.
+
 ## Interfaces
 
 **Provided to scenarios:** a named plant (one of the reference motors, or a variation on the
