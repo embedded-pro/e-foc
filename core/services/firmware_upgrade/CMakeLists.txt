@@ -54,3 +54,4 @@ target_sources(e_foc.services.firmware_upgrade PRIVATE
 )
 
 add_subdirectory(test)
+add_subdirectory(test_doubles)

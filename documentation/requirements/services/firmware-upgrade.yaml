@@ -53,7 +53,7 @@
     firmwareVersionMajor, firmwareVersionMinor, firmwareVersionPatch, boardKind,
     stagedVersionMajor, stagedVersionMinor and stagedVersionPatch with the release version of
     the running firmware, the kind of its board and the release version of the staged pack, or
-    zero when none is staged.
+    zero when none is staged, on every board, also one without a staging slot.
 
 - id: REQ-UPD-008
   title: Flash work never stalls the event loop past the watchdog

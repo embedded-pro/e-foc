@@ -82,6 +82,8 @@ namespace application
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());
                 canServer->RegisterCategory(*motorCanServer);
+                firmwareUpgradeServer.emplace(canServer->Transport());
+                canServer->RegisterCategory(*firmwareUpgradeServer);
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
@@ -94,9 +96,14 @@ namespace application
                         .maxCurrent = this->hardware.MaxCurrentSupported(),
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
+                firmwareUpgradeInterlock.emplace(*controlMode);
+                firmwareUpgrade.emplace(*firmwareUpgradeServer, this->hardware.Staging(), *firmwareUpgradeInterlock, [this]()
+                    {
+                        this->hardware.Reset();
+                    });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()), FirmwareIdentityOf(this->hardware.GetBoardKind()) },
-                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill);
+                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade);
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
