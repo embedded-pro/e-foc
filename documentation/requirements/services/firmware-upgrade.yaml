@@ -26,8 +26,9 @@
     On Verify the motor controller shall answer CrcMismatch unless the CRC-32 the can-lite
     specification fixes, computed over exactly the size given in Begin Upgrade, equals the
     value received, and NotReady unless the pack's product name equals the firmware's own,
-    naming this board and its microcontroller part, and the pack carries one application image
-    whose length fits the application slot. A pack that passes shall be recorded as downloaded.
+    naming this board and its microcontroller part, the pack's product version reads as major,
+    minor and patch numbers from 0 to 255, and the pack carries one application image, which ends
+    it, whose length fits the application slot. A pack that passes shall be recorded as downloaded.
 
 - id: REQ-UPD-005
   title: The apply restarts into the bootloader only while the drive is stopped
