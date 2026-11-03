@@ -335,7 +335,7 @@ and the loop around it and the load bound it from below:
 | Loop     | Automatic value                                                                       | Time constant |
 |----------|---------------------------------------------------------------------------------------|---------------|
 | Current  | $\min\!\big(2\pi f_{PWM}/15,\ \max(0.08\,\text{V}/(L_s\,\sigma_i),\ 1885)\big)$ rad/s | 0.12–0.53 ms  |
-| Speed    | 50 rad/s                                                                              | 20 ms         |
+| Speed    | 100 rad/s                                                                             | 10 ms         |
 | Position | $2\pi \cdot 3 \approx 18.8$ rad/s                                                     | 53 ms         |
 
 $\sigma_i$ is the RMS current-sensor noise the calibration measured: the second term keeps the noise
@@ -344,7 +344,7 @@ $L_s\,\omega_{bw}$ puts on the voltage command under 0.08 V RMS. At 20 kHz the f
 None of these is identified from the motor; the identified inductance and the measured noise only cap the
 current loop. The calibration record has a current-loop and a speed-loop bandwidth field, and a value in
 range there replaces the automatic one, but calibration measures neither: it carries the current-loop
-field over from the record it replaces, zero on a first calibration, and writes a fixed 50 rad/s into the
+field over from the record it replaces, zero on a first calibration, and writes a fixed 100 rad/s into the
 speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN or the CLI, inside the
 bounds above; 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
 are the subject of the [controller chapter](advanced-controllers.md).

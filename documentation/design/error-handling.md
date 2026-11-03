@@ -135,6 +135,14 @@ outside the board's overvoltage and undervoltage thresholds (a reading that is n
 - **NUCLEO-H563ZI** — does not wire board protection, so there is no condition to observe.
 - **host** — settable, so tests can hold the condition asserted across a re-arm attempt.
 
+**Verification.** The per-sample decision, `ExceedsOverCurrent` in `core/platform_abstraction/BoardProtection.hpp`,
+is shared by both platforms and unit-tested on the host, and `protection_faults.feature` covers the state machine's
+response to a board-protection fault through the QEMU board protection. The trip paths on the boards are verified
+by review only, and no automated test is planned for them (#487): the TI comparators driving the PWM fault inputs,
+the TI per-sample over-current cut and the NUCLEO-G474RE software checks. Exercising them takes a dedicated rig that
+is out of scope here: a programmable supply driven above 58 V and below 18 V, a way to force a phase current above
+6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (REQ-INT-016) has.
+
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
 above the exception frame and records any word whose value falls within the `.text` section as a probable
@@ -183,7 +191,8 @@ the reset cause unconditionally and surrounds fault data with visible delimiters
 Alongside the post-mortem fault record, the platform keeps two live sets of counters, both readable
 from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
 
-**Control-interrupt execution.** The Cortex-M cycle counter is left free-running and read on entry
+**Control-interrupt execution.** The Cortex-M cycle counter (EmIL's
+`hal::cortex::DataWatchpointAndTrace`, started once when the platform is built) is left free-running and read on entry
 to and exit from the application callback that executes inside the control interrupt; the difference
 is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
 own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
@@ -198,6 +207,14 @@ execution count, and three failure counts: **overruns** (over the budget, margin
 still met), **deadline misses** (over the period itself), and **re-entries** (a conversion arriving
 while the previous interrupt had not returned — the same failure observed as it happens rather than
 inferred afterwards).
+
+A Cortex-M exception cannot preempt itself, so a flag set on entry and tested on the next entry
+never sees a re-entry: the late conversion waits as pending and runs after the return. The TI and ST
+platforms instead check, as the callback ends, whether the interrupt now running is pending again
+(EmIL's `hal::cortex::InterruptPending(hal::cortex::ActiveInterrupt())`: the active exception
+number from `SCB->ICSR`, its bit in `NVIC->ISPR`). Both drivers clear their interrupt flag and
+pending bit before calling back, so the bit is set only by a conversion or transfer that completed
+during the callback.
 
 **CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
 that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
