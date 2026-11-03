@@ -151,7 +151,7 @@ namespace
         static void Fill(hal::FlashStub& flash, uint8_t value)
         {
             for (auto& sector : flash.sectors)
-                std::fill(sector.begin(), sector.end(), value);
+                std::ranges::fill(sector, value);
         }
 
         std::vector<uint8_t> PackFlashContents(uint32_t size) const
