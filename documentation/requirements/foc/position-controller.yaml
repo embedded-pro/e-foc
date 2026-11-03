@@ -55,32 +55,43 @@
   title: A position law with no actuator authority commands nothing and accumulates nothing
   shall: >
     When a state-feedback position law holds a design its solver could not produce, so that its
-    command is zero for every state, the controller shall command zero current and shall not
-    advance its integral state. The saturation guard that unwinds the integral compares the limited
-    command against the unlimited one, and with such a design the two are equal for every input, so
-    the guard cannot fire.
+    command is zero for every state, the controller shall command zero current and shall not advance
+    its integral state.
+  rationale: >
+    The saturation guard that unwinds the integral compares the limited command against the
+    unlimited one, and with such a design the two are equal for every input, so the guard cannot
+    fire.
 
 - id: REQ-POS-009
   title: Position step-response envelope
+  status: verified
+  verification: [sil, mil]
   shall: >
     With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default loop
-    bandwidths, every position control law shall move the rotor from rest to a 1.5 rad setpoint,
-    and from there to -1.5 rad while holding, and enter and then stay inside a 10 percent band of
-    the step within a settling time and with an overshoot no worse than its row: PID 200 ms, 15
-    percent overshoot, steady-state error below 0.1 rad from rest and 0.15 rad on the change;
-    cascade P 200 ms, 10 percent, 0.02 rad; LQR 60 ms, 15 percent, 0.01 rad; LQI 60 ms, 50 percent
-    from rest and 40 percent on the change, 0.01 rad; two-DOF 300 ms, 15 percent, 0.1 rad from
-    rest and 0.15 rad on the change. Each law's rise time from a tenth to nine tenths of the
-    step, and the band its tail still ripples in over the last quarter of the window, measured as
-    a percentage of that step rather than of the setpoint it ends at, shall also
-    be bounded by the row it carries. Each of those bounds is set at twice the worst
-    value repeated runs of its row measured, rounded up to the figure the row carries, and the row
-    fails when a measurement exceeds that figure; the margin is there so that the spread between
-    one run and the next cannot reach it. The response is measured on
+    bandwidths, every position control law shall move the rotor from rest to a 1.5 rad setpoint, and
+    from there to -1.5 rad while holding, and enter and then stay inside a 10 percent band of the
+    step within a settling time and with an overshoot, a steady-state error, a rise time from a
+    tenth to nine tenths of the step and a tail band over the last quarter of the window, as a
+    percentage of that step rather than of the setpoint it ends at, no worse than its row. From
+    rest, as settling time, overshoot, error, rise time and tail band: PID 200 ms, 15 percent, 0.1
+    rad, 185 ms, 8 percent; cascade P 200 ms, 10 percent, 0.02 rad, 210 ms, 1 percent; LQR 60 ms, 15
+    percent, 0.01 rad, 30 ms, 1 percent; LQI 60 ms, 50 percent, 0.01 rad, 10 ms, 1 percent; two-DOF
+    300 ms, 15 percent, 0.1 rad, 310 ms, 8 percent. On the change to -1.5 rad: PID 200 ms, 15
+    percent, 0.15 rad, 195 ms, 6 percent; cascade P 200 ms, 10 percent, 0.02 rad, 210 ms, 1 percent;
+    LQR 60 ms, 15 percent, 0.01 rad, 30 ms, 1 percent; LQI 60 ms, 40 percent, 0.01 rad, 15 ms, 1
+    percent; two-DOF 300 ms, 15 percent, 0.15 rad, 320 ms, 6 percent. The response is measured on
     the plant's own trajectory on the control-tick time base.
+  rationale: >
+    Each rise and tail bound is twice the worst value repeated runs of its row measured, rounded up
+    to the figure the row carries; the row fails when a measurement exceeds that figure, and the
+    margin keeps the spread between one run and the next from reaching it. The rows are pinned in
+    integration_tests/features/control_performance.feature (PID) and
+    integration_tests/model_in_the_loop/test/TestControlPerformance.cpp (every law).
 
 - id: REQ-POS-010
   title: Position hold against a shaft torque step
+  status: verified
+  verification: [sil, mil]
   shall: >
     While holding 1.5 rad against the nominal plant, every position control law shall keep the
     rotor within 0.1 rad of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
@@ -90,6 +101,8 @@
 
 - id: REQ-POS-011
   title: Position hold against cogging and dry friction
+  status: verified
+  verification: sil
   shall: >
     Against the bench plant with the bench's cogging (24 detents a revolution, 4 mN·m deep) and
     dry friction (3.7 mN·m), after the full calibration, every position control law shall settle
@@ -99,6 +112,8 @@
 
 - id: REQ-POS-012
   title: Position hold on a cogging hill top with the cogging map applied
+  status: verified
+  verification: sil
   shall: >
     With a cogging map in the calibration record, the speed and position cascades shall add the
     map's torque at the rotor's electrical angle, over the torque constant, to the quadrature
@@ -110,6 +125,8 @@
 
 - id: REQ-POS-013
   title: Measured position within half a turn of the alignment zero on every target
+  status: verified
+  verification: hil
   shall: >
     The measured rotor position, which the position loop compares with its setpoint and the CAN
     telemetry reports, shall be the mechanical angle from the zero the alignment set, wrapped to

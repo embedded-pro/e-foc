@@ -4,6 +4,8 @@
 
 - id: REQ-CTRL-001
   title: Runtime algorithm selection
+  status: verified
+  verification: sil
   shall: >
     The system shall allow selection of the active control algorithm for each FOC
     loop (current, speed, and position) at runtime via the CLI and via the CAN
@@ -93,6 +95,8 @@
 
 - id: REQ-CTRL-013
   title: Active algorithm query
+  status: verified
+  verification: sil
   shall: >
     The system shall provide a query interface to read the currently active
     algorithm identifier for each control loop. This query shall be available
@@ -102,26 +106,42 @@
 
 - id: REQ-CTRL-014
   title: Control laws stay bounded on plants other than the nominal one
+  status: verified
+  verification: [sil, mil]
   shall: >
-    The baseline speed and position laws shall reach their setpoint and stay near it on a plant
-    that is not the one their limits were characterised against: a noisy encoder and current
-    measurement, a winding held near its thermal limit, a mechanically loaded shaft, and the
-    second reference motor (the Anaheim BLY172S-24V-4000 on its 24 V bus). On that second motor
-    every other law of both loops shall meet the same envelope, and shall additionally be the law
-    the firmware reports as running, so that a design which did not converge for that winding is
-    caught rather than silently leaving the previous law in place and measuring it instead. The
-    cross product of every law against every plant is not required: the plants vary what the
-    baseline law must survive, the second motor varies what every law must be designed against,
-    and running both dimensions together would multiply the scenarios without separating those
-    two questions. Each law's rise time and the band its tail ripples in shall be
-    bounded as well as its settling, its overshoot and its standing error, and no law shall be
-    measured on the second motor without its rise time being one of them. The rise and tail
-    bounds are twice the worst value repeated runs measured; the remaining bounds stay wide
-    enough to cover a whole group of rows rather than to describe any one of them, and catch a
-    law that fails to reach its setpoint, rings without settling, or holds far from it.
+    The baseline speed and position laws shall reach their setpoint and stay near it on plants other
+    than the nominal one: a noisy encoder and current measurement, a winding held near its thermal
+    limit, a mechanically loaded shaft, and the second reference motor (the Anaheim BLY172S-24V-4000
+    on its 24 V bus). The speed loop is stepped from rest to 20 rad/s and shall settle into a 10
+    percent band within 300 ms with overshoot below 60 percent and a steady-state error below 2.0
+    rad/s; the position loop is stepped from rest to 1.5 rad and shall settle into a 10 percent band
+    within 400 ms with overshoot below 60 percent and an error below 0.3 rad. Speed rise time and
+    tail band: noisy 20 ms, 10 percent; hot 20 ms, 6 percent; loaded 400 ms, 10 percent; second
+    motor 20 ms, 5 percent. Position rise time and tail band: noisy 190 ms, 8 percent; hot 185 ms, 8
+    percent; loaded 340 ms, 13 percent; second motor 185 ms, 8 percent. On the second motor every
+    other law of both loops shall meet the same settling, overshoot and error limits, with rise time
+    and tail band for speed of LQI 30 ms, 5 percent, ADRC 40 ms, 5 percent, two-DOF 30 ms, 4
+    percent, and for position of cascade P 210 ms, 1 percent, LQR 30 ms, 1 percent, LQI 12 ms, 1
+    percent, two-DOF 310 ms, 8 percent, and shall additionally be the law the firmware reports as
+    running. No law shall be measured on the second motor without its rise time being one of the
+    bounds.
+  rationale: >
+    The shared settling, overshoot and error limits stay wide enough to cover a whole group of rows
+    rather than to describe any one of them, and catch a law that fails to reach its setpoint, rings
+    without settling, or holds far from it. The rise and tail bounds are twice the worst value
+    repeated runs measured. The firmware is asked which law runs so that a design which did not
+    converge for that winding is caught rather than silently leaving the previous law in place and
+    measuring it instead. The cross product of every law against every plant is not required: the
+    plants vary what the baseline law must survive, the second motor varies what every law must be
+    designed against, and running both dimensions together would multiply the scenarios without
+    separating those two questions. The rows are pinned in
+    integration_tests/features/control_robustness.feature and
+    integration_tests/model_in_the_loop/test/TestControlRobustness.cpp.
 
 - id: REQ-CTRL-015
   title: Tuning settings are the operator's, persisted and restored
+  status: verified
+  verification: sil
   shall: >
     Each loop's tuning settings — its bandwidth and the law-specific settings of its
     algorithms — shall be settable by the operator, stored in non-volatile memory and
@@ -133,6 +153,8 @@
 
 - id: REQ-CTRL-016
   title: A tuning setting that cannot be designed is refused without effect
+  status: verified
+  verification: sil
   shall: >
     A tuning setting shall be refused, leaving both the running law and the stored settings
     unchanged, when its value lies outside its range, when the drive is enabled or

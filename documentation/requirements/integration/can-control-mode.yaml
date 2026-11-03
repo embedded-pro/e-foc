@@ -36,8 +36,10 @@
 - id: REQ-CM-006
   title: Loss of the CAN client stops an enabled drive
   shall: >
-    When the CAN protocol server reports that its client has gone offline while the
-    active state machine is in the Enabled state, the drive shall be stopped by way of
+    When the CAN protocol server reports that its client has gone offline, which it does
+    once no frame from the client has arrived within 3 s (the can-lite CanProtocolServer
+    default client timeout, which e-foc does not override; a client heartbeats every 1 s),
+    while the active state machine is in the Enabled state, the drive shall be stopped by way of
     an emergency-stop command. When the client goes offline while the drive is not
     enabled, the state machine shall be left unchanged.
 
