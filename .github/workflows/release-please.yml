@@ -142,7 +142,7 @@ jobs:
         if: matrix.target == 'EK-TM4C1294XL'
         run: |
           version="${{ needs.release_please.outputs.version }}"
-          for image in sync_foc_sensored:e_foc.sync_foc_sensored.main.combined.hex hardware_test:e_foc.hardware_test.main.hex; do
+          for image in sync_foc_sensored:e_foc.sync_foc_sensored.main.hex bootloader:e_foc.bootloader.main.hex hardware_test:e_foc.hardware_test.main.hex; do
             app="${image%%:*}"
             hex="$(find "build/${{ matrix.target }}" -name "${image#*:}" -path "*/${{ matrix.configuration }}/*" -type f | head -n 1)"
             test -s "$hex" || { echo "::error::no ${app} hex image for ${{ matrix.target }}"; exit 1; }

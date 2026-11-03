@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.4
+version: 0.4.5
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.4      |
+| Version   | 0.4.5      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -206,8 +206,8 @@ that:
 4. the application header's target identity matches this chip and this board (Part I).
 
 The bootloader writes the descriptor after an installation, from the digest it computed while writing the
-image. The release build writes it into the combined image that a debugger programs, bootloader and
-application together, so a board programmed for the first time starts in the same way.
+image. The build writes it into the application's own image, so a board programmed for the first time with a
+debugger, the bootloader and the application each from its own hex file, starts in the same way.
 
 ### Part F — starting the application
 
@@ -233,7 +233,7 @@ only when software starts them, and the application does (`watchdog.md`).
   build without keys is safe, but cannot update a board.
 - Keys are not a build input: the build always produces a bootloader with an erased slot, and the image tool's
   key injection writes the public key and the AES key from a set into the finished bootloader, its ELF file
-  and its hex files, the combined image's included, afterwards. One build can therefore take the development
+  and its hex file, afterwards. One build can therefore take the development
   set or the release set, and the two differ only in those 80 bytes. Continuous integration injects the
   development set into every build.
 - A release fails when the release set cannot be read, rather than publish a bootloader that could never
@@ -316,7 +316,6 @@ host compiler, in the build directory's `_native_bootloader_image/bin`, where th
 | `bootloader-keys` | a key set                                            | the bootloader's 80-byte key slot (Part G)                               |
 | `inject-keys`     | a key set, the bootloader's ELF and its hex files    | the key slot written into each, at the key slot section's place (Part G) |
 | `descriptor`      | the application image, gaps filled with erased bytes | its 64-byte image descriptor (Part E)                                    |
-| `combine`         | the bootloader's and the application's hex files     | one hex file, bootloader first, that a debugger programs in one go       |
 
 `inject-keys` checks every file first and changes none unless all of them take the slot.
 

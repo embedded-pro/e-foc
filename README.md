@@ -211,7 +211,7 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 | Asset                                                  | Content                                                                                                   |
 |--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
 | `e_foc-firmware-<board>-<tag>.tar.gz`                  | `.elf` and `.hex` of every application built for the board                                                |
-| `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL: `sync_foc_sensored` with its bootloader, and `hardware_test` |
+| `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL: `bootloader`, `sync_foc_sensored` and `hardware_test`        |
 | `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)                         |
 | `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                                           |
 | `eFocDesign.pdf`                                       | the complete design booklet                                                                               |

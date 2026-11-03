@@ -37,11 +37,3 @@ endif()
 emil_fetch_bootloader_image()
 
 emil_generate_artifacts(TARGET e_foc.bootloader.main MAP BIN HEX)
-
-if(TARGET e_foc.sync_foc_sensored.main)
-    emil_bootloader_combined_hex(e_foc.sync_foc_sensored.combined
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/e_foc.sync_foc_sensored.main.combined.hex"
-        BOOTLOADER e_foc.bootloader.main
-        APPLICATION e_foc.sync_foc_sensored.main
-    )
-endif()
