@@ -13,7 +13,6 @@
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
         "Default_Handler_Forwarded",
-        "hal::cortex::ActiveInterrupt",
         "DmaStm::StreamInterruptHandler::OnInterrupt",
         "DmaStm::StreamInterruptHandler::StreamInterruptHandler.*lambda",
         "AdcDmaMultiChannelStmBase::TransferDone",

@@ -89,7 +89,7 @@ namespace application
         services::CoggingMapping::Config CoggingConfig() const;
         void ApplyCoggingMap(const services::CalibrationData& data);
 
-        static constexpr float velocityBandwidthRadPerSec = 50.0f;
+        static constexpr float velocityBandwidthRadPerSec = 100.0f;
 
         // Small placeholders that let the loops move the rotor during identification; never persisted.
         static constexpr float provisionalInertia = 1.0e-4f;
