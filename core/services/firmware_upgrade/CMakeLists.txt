@@ -51,6 +51,10 @@ target_link_libraries(e_foc.services.firmware_upgrade PUBLIC
 target_sources(e_foc.services.firmware_upgrade PRIVATE
     FirmwareUpgrade.cpp
     FirmwareUpgrade.hpp
+    StagedPackReader.cpp
+    StagedPackReader.hpp
+    StagingWriter.cpp
+    StagingWriter.hpp
 )
 
 add_subdirectory(test)
