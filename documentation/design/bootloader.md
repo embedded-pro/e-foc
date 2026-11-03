@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.4.3
+version: 0.4.5
 component: "bootloader"
 date: 2026-11-02
 ---
@@ -12,7 +12,7 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.4.3      |
+| Version   | 0.4.5      |
 | Component | bootloader |
 | Date      | 2026-11-02 |
 
@@ -206,8 +206,8 @@ that:
 4. the application header's target identity matches this chip and this board (Part I).
 
 The bootloader writes the descriptor after an installation, from the digest it computed while writing the
-image. The release build writes it into the combined image that a debugger programs, bootloader and
-application together, so a board programmed for the first time starts in the same way.
+image. The build writes it into the application's own image, so a board programmed for the first time with a
+debugger, the bootloader and the application each from its own hex file, starts in the same way.
 
 ### Part F — starting the application
 
@@ -233,8 +233,11 @@ only when software starts them, and the application does (`watchdog.md`).
   build without keys is safe, but cannot update a board.
 - Keys are not a build input: the build always produces a bootloader with an erased slot, and the image tool's
   key injection writes the public key and the AES key from a set into the finished bootloader, its ELF file
-  and its hex files, afterwards. One build can therefore take the development set or the release set, and the
-  two differ only in those 80 bytes. Continuous integration injects the development set into every build.
+  and its hex file, afterwards. One build can therefore take the development
+  set or the release set, and the two differ only in those 80 bytes. Continuous integration injects the
+  development set into every build.
+- A release fails when the release set cannot be read, rather than publish a bootloader that could never
+  update a board; a dry run injects the development set.
 - The public key only verifies, so reading it from a board gains nothing. The AES key hides nothing in an
   open-source product: anyone can build the plaintext image from the sources, and the release ships the
   bootloader with its key slot. The packs stay encrypted because the library's pack format carries the
@@ -265,7 +268,8 @@ be wrong; the image says itself what it was built for, and the chip says what it
 
 **Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
 start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
-board kind (`service-can.md`, contract 2.6), the firmware version and the target identity: the device
+board kind (`service-can.md`, contract 2.6), the firmware version (the project version, from the version header
+embedded-infra-lib generates at build time) and the target identity: the device
 identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
 device-identity register gives. The header is compiled from the same target definitions that compile the rest
 of the image, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
@@ -306,13 +310,19 @@ bootloader package, so the firmware build needs no interpreter and e-foc keeps n
 library's tests cover it. The host build has it as a target, and an embedded build builds it first with the
 host compiler, in the build directory's `_native_bootloader_image/bin`, where the workflows run it.
 
-| Command           | Takes                                             | Gives                                                                    |
-|-------------------|---------------------------------------------------|--------------------------------------------------------------------------|
-| `generate-keys`   | nothing                                           | a new key set, from the host's random source                             |
-| `bootloader-keys` | a key set                                         | the bootloader's 80-byte key slot (Part G)                               |
-| `inject-keys`     | a key set, the bootloader's ELF and its hex files | the key slot written into each, at the key slot section's place (Part G) |
+| Command           | Takes                                                | Gives                                                                    |
+|-------------------|------------------------------------------------------|--------------------------------------------------------------------------|
+| `generate-keys`   | nothing                                              | a new key set, from the host's random source                             |
+| `bootloader-keys` | a key set                                            | the bootloader's 80-byte key slot (Part G)                               |
+| `inject-keys`     | a key set, the bootloader's ELF and its hex files    | the key slot written into each, at the key slot section's place (Part G) |
+| `descriptor`      | the application image, gaps filled with erased bytes | its 64-byte image descriptor (Part E)                                    |
 
 `inject-keys` checks every file first and changes none unless all of them take the slot.
+
+After the application links, the build copies it out as the bytes a debugger programs, every section but the
+descriptor, gaps erased; the tool computes the descriptor of those bytes with the library's own descriptor
+code, and the object copy writes it into the application's descriptor section. The bootloader's check at every
+reset therefore passes on an image programmed with a debugger, exactly as on one the bootloader installed.
 
 A key set file is 112 bytes: the AES key (16), the public key (64, the curve point's x and then y, most
 significant byte first) and the private key (32). The tool refuses a file of another size, or one whose

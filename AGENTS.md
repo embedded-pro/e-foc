@@ -138,6 +138,10 @@ built bootloader. An embedded build builds the tool natively at `build/<preset>/
 The development key set is public, `targets/bootloader/keys/development.keys`: CI, dry runs and local builds inject it, and anyone can sign
 packs for a board that carries it. The release set is the only secret, `BOOTLOADER_KEYS_RELEASE` (base64), injected by the release alone (`bootloader.md` Part G).
 
+On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the application slot and the build stamps its image
+descriptor with EmIL's `emil_bootloader_image_descriptor` and `application.bootloader_image` (`bootloader.md` Part J). A debugger
+programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`.
+
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
 
 **CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts.
@@ -157,7 +161,7 @@ each installed, launched and uninstalled on the runner first), the firmware arch
 (`e_foc-source-<tag>.tar.gz`) and the documentation PDFs bundled in one `e_foc-documentation-<tag>.zip` when release-please creates a release (the booklet `eFocDesign.pdf` is attached on its own by `build-booklet.yml`).
 Every asset gets a Sigstore build-provenance attestation; the CAN Commander executable and installer are Authenticode-signed through SignPath once `SIGNPATH_ORGANIZATION_ID` is set (see `.github/signpath/README.md`).
 The CAN Commander's update check finds its installer by those asset-name suffixes (`-linux-x86_64.deb`, `-windows-x86_64-setup.exe`); keep them stable.
-Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
+Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow. A release fails without the `BOOTLOADER_KEYS_RELEASE` secret; a dry run uses the public development key set.
 `release-please-config.json` lists `feat`, `fix`, `perf`, `revert`, `docs`, `build` and `ci` commits in the changelog, so any of them opens or updates the release PR; `refactor`, `test`, `style` and `chore` stay hidden.
 
 **Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.

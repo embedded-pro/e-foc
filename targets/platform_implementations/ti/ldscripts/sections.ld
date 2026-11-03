@@ -11,11 +11,17 @@ REGION_ALIAS("REGION_RAM", RAM);
 
 SECTIONS
 {
-    .text :
+    .isr_vector :
     {
         . = ALIGN(4);
         _text = .;
         KEEP(*(.isr_vector))
+    } > REGION_TEXT
+
+    INCLUDE image_sections.ld
+
+    .text :
+    {
         *(.text .text* .gnu.linkonce.t.*)
         *(.glue_7t) *(.glue_7)
         *(.rodata .rodata* .gnu.linkonce.r.*)

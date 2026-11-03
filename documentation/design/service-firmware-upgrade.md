@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "service-firmware-upgrade"
 date: 2026-11-01
 ---
@@ -12,7 +12,7 @@ date: 2026-11-01
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.2.0                     |
+| Version   | 0.2.1                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-01                |
 
@@ -230,10 +230,11 @@ flash as the EEPROM file stands in for the NVM, so a scenario can read back what
 The release workflow builds, signs and encrypts one pack per board that has a bootloader, and publishes it
 beside the existing firmware archives (`.github/workflows/release-please.yml`):
 
-| Asset                                                    | Content                                                                                                                    |
-|----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends                                                                                   |
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the bootloader and the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
+| Asset                                                    | Content                                                                                                 |
+|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends                                                                |
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
+| `e_foc-firmware-<board>-bootloader-<tag>.hex`            | the bootloader with the release key set, for a debugger, which programs it beside the application       |
 
 The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name
 and the target identity from the build of that board (`bootloader.md` Part I), never from an argument typed

@@ -1,22 +1,27 @@
 add_subdirectory(${E_FOC_TARGET_BOARD})
 add_subdirectory(implementation)
 
-# Uses the infra mem file but the e-foc custom sections.ld (adds .error_handling). On a board with a bootloader,
-# the bootloader links at the start of flash, with its key slot at the end of its region
+# Uses the infra mem file but the e-foc custom sections.ld (adds .error_handling)
 function(e_foc_ti_target_linker_scripts target)
-    cmake_parse_arguments(PARSE_ARGV 1 E_FOC_LAYOUT "BOOTLOADER" "" "")
+    cmake_parse_arguments(PARSE_ARGV 1 E_FOC_LAYOUT "APPLICATION;BOOTLOADER" "" "")
     get_property(bootloaderLdScripts GLOBAL PROPERTY E_FOC_BOOTLOADER_LDSCRIPTS)
 
     set(sectionsLd "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ldscripts/sections.ld")
+    set(imageSectionsDir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cortex_m_common/ldscripts/standalone")
     if(bootloaderLdScripts AND E_FOC_LAYOUT_BOOTLOADER)
         set(scripts "${bootloaderLdScripts}/mem_bootloader.ld" "${bootloaderLdScripts}/flash_layout.ld" "${sectionsLd}"
             "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ldscripts/bootloader_keys.ld")
+    elseif(bootloaderLdScripts AND E_FOC_LAYOUT_APPLICATION)
+        set(scripts "${bootloaderLdScripts}/mem_application.ld" "${bootloaderLdScripts}/flash_layout.ld" "${sectionsLd}")
+        set(imageSectionsDir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cortex_m_common/ldscripts/application")
+        e_foc_add_application_image(${target})
     else()
         set(scripts "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../../infra/hal/ti/tiva/ldscripts/mem_${TARGET_MCU}.ld" "${sectionsLd}")
     endif()
 
+    target_link_options(${target} PUBLIC "LINKER:-L${imageSectionsDir}")
     foreach(script IN LISTS scripts)
         target_link_options(${target} PUBLIC "LINKER:-T${script}")
     endforeach()
-    set_property(TARGET ${target} APPEND PROPERTY INTERFACE_LINK_DEPENDS ${scripts})
+    set_property(TARGET ${target} APPEND PROPERTY INTERFACE_LINK_DEPENDS ${scripts} "${imageSectionsDir}/image_sections.ld")
 endfunction()
