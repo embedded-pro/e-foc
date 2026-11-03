@@ -88,6 +88,7 @@ namespace tool
         , updateSession(UpdateDownloadDirectory(), UpdateCommandFor)
     {
         CanCommandClientObserver::Attach(client);
+        FirmwareTransferObserver::Attach(transfer);
         setWindowTitle(QString("%1 %2").arg(ToQt(application::displayName), ToQt(application::version)));
         setMinimumSize(900, 600);
         resize(1280, 860);
@@ -131,6 +132,12 @@ namespace tool
 
     void MainWindow::closeEvent(QCloseEvent* event)
     {
+        if (!ConfirmAbandonTransfer("Close"))
+        {
+            event->ignore();
+            return;
+        }
+
         SaveSettings();
         Report(IssueSeverity::info, "Session ended");
         event->accept();
@@ -300,6 +307,7 @@ namespace tool
         connect(&updateChecker, &UpdateChecker::UpdateAvailable, this, [this](const ReleaseInfo& release)
             {
                 const auto requested = std::exchange(userRequestedUpdateCheck, false);
+                SetLatestRelease(release);
                 if (!requested && QSettings{}.value("updates/skippedVersion").toString() == release.tag)
                 {
                     Report(IssueSeverity::info, QString("Update available: %1 (skipped)").arg(release.tag));
@@ -312,6 +320,7 @@ namespace tool
         connect(&updateChecker, &UpdateChecker::UpToDate, this, [this](const ReleaseInfo& latest)
             {
                 Report(IssueSeverity::info, QString("Up to date (latest release %1)").arg(latest.tag));
+                SetLatestRelease(latest);
                 if (std::exchange(userRequestedUpdateCheck, false))
                     QMessageBox::information(this, "Check for Updates", QString("You are running the latest version (%1).").arg(ToQt(application::version)));
             });
@@ -463,6 +472,9 @@ namespace tool
 
     void MainWindow::Disconnect()
     {
+        if (!ConfirmAbandonTransfer("Disconnect"))
+            return;
+
         TeardownSocketNotifier();
         adapter.Disconnect();
     }
@@ -490,11 +502,13 @@ namespace tool
         if (auto* existing = Motor(nodeId))
             return existing;
 
-        auto* motor = new MotorPanel(client, nodeId, [this](IssueSeverity severity, const QString& message)
+        auto* motor = new MotorPanel(client, transfer, nodeId, [this](IssueSeverity severity, const QString& message)
             {
                 Report(severity, message);
             });
         motors.emplace(nodeId, motor);
+        if (latestRelease)
+            motor->SetLatestRelease(*latestRelease);
         motor->SetBusConnected(busConnected);
         if (busConnected && client.IsOnline(nodeId))
             motor->OnNodeOnlineChanged(true);
@@ -508,7 +522,7 @@ namespace tool
                 motorTabs->setCurrentWidget(motor);
             });
 
-        motorTabs->addTab(motor, StatusIcon(motor->Level()), motor->Title());
+        motorTabs->addTab(motor, StatusIcon(motor->Level()), motor->TabText());
         motorArea->setCurrentWidget(motorTabs);
         RefreshMotor(*motor);
         return motor;
@@ -550,8 +564,10 @@ namespace tool
         const auto index = motorTabs->indexOf(&motor);
         if (index >= 0)
         {
+            const auto firmware = motor.FirmwareSummary();
             motorTabs->setTabIcon(index, StatusIcon(motor.Level()));
-            motorTabs->setTabToolTip(index, QString("%1: %2").arg(motor.Title(), motor.Summary()));
+            motorTabs->setTabText(index, motor.TabText());
+            motorTabs->setTabToolTip(index, QString("%1: %2%3").arg(motor.Title(), motor.Summary(), firmware.isEmpty() ? QString() : "; " + firmware));
         }
 
         overview->SetMotor(motor.NodeId(), motor.Title(), motor.Summary(), motor.Level());
@@ -693,6 +709,7 @@ namespace tool
         }
         else
         {
+            transfer.Abandon();
             if (wasConnected)
                 Report(IssueSeverity::info, "Disconnected");
             TeardownSocketNotifier();
@@ -743,6 +760,7 @@ namespace tool
 
     void MainWindow::OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
+        transfer.OnCommandAck(nodeId, categoryId, commandType, status);
         if (auto* motor = Motor(nodeId))
             motor->OnCommandAck(categoryId, commandType, status);
     }
@@ -805,8 +823,70 @@ namespace tool
             motor->OnParameter(parameter, value);
     }
 
-    void MainWindow::OnFirmwareIdentityReceived(uint16_t, const FirmwareIdentity&)
-    {}
+    void MainWindow::OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnFirmwareIdentity(identity);
+        transfer.OnFirmwareIdentity(nodeId, identity);
+    }
+
+    void MainWindow::OnTransferProgress(uint16_t nodeId, const TransferProgress& progress)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->Firmware().OnTransferProgress(progress);
+    }
+
+    void MainWindow::OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->Firmware().OnDownloadFinished(outcome, error);
+        for (const auto& [id, motor] : motors)
+            motor->Firmware().Refresh();
+    }
+
+    void MainWindow::OnDiscardFinished(uint16_t nodeId, bool acknowledged)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->Firmware().OnDiscardFinished(acknowledged);
+        for (const auto& [id, motor] : motors)
+            motor->Firmware().Refresh();
+    }
+
+    void MainWindow::OnApplyFinished(uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->Firmware().OnApplyFinished(outcome, error, running);
+        for (const auto& [id, motor] : motors)
+            motor->Firmware().Refresh();
+    }
+
+    void MainWindow::OnTransferAbandoned(uint16_t nodeId)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->Firmware().OnTransferAbandoned();
+    }
+
+    bool MainWindow::ConfirmAbandonTransfer(const QString& action)
+    {
+        const auto node = transfer.ActiveNode();
+        if (!node.has_value())
+            return true;
+
+        const auto text = QString("Motor %1 is in the middle of a firmware transfer. %2 anyway?\n\nThe download is abandoned; the controller drops it after 30 s without a command, and nothing is installed. A pack already staged stays staged.").arg(*node).arg(action);
+        if (QMessageBox::warning(this, action, text, QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes)
+            return false;
+
+        Report(IssueSeverity::warning, QString("Firmware transfer to motor %1 abandoned: %2").arg(*node).arg(action.toLower()));
+        transfer.Abandon();
+        return true;
+    }
+
+    void MainWindow::SetLatestRelease(const ReleaseInfo& release)
+    {
+        latestRelease = release;
+        for (const auto& [nodeId, motor] : motors)
+            motor->SetLatestRelease(release);
+    }
 
     void MainWindow::OnAdapterError(infra::BoundedConstString message)
     {
