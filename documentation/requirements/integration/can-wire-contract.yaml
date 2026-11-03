@@ -135,3 +135,14 @@
     Contract version 2.7 shall add, without changing any 2.6 message, a phaseMissing value (7)
     of the fault code carried by the status telemetry and the fault event, sent whenever the
     drive is in Fault with phaseMissing (REQ-EH-015).
+
+- id: REQ-CAN-014
+  title: Every fault and the Ready state are reported with their own codes
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.8 shall add, without changing any 2.7 message, a ready value (5) of the
+    motor state and hardwareFault (8) and calibrationFailed (9) values of the fault code carried
+    by the status telemetry and the fault event. Every fault the drive raises shall be reported
+    with a code of its own, none going out as none, and a drive in Ready shall be reported as
+    ready, distinctly from a drive in Idle, which is reported as idle or partialCalibration.

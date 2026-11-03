@@ -88,14 +88,11 @@
     state machine shall load and apply the electrical parameters (resistance,
     inductance, pole pairs) but shall remain in the Idle state. The motor shall
     not be enabled until a live alignment re-establishes the rotor reference,
-    because the encoder zero-offset is volatile and is lost on every reset. Over CAN, which
-    reports Idle and Ready alike as idle (issue #490), the software-in-the-loop scenarios verify
-    only that the drive is neither Enabled, Calibrating nor Faulted and refuses to enable, not
-    that it is in Idle rather than Ready.
+    because the encoder zero-offset is volatile and is lost on every reset. Over CAN the drive
+    reports Idle as idle (or partialCalibration) and never as ready (REQ-CAN-014).
   rationale: >
-    The step "the state machine shall be in the Ready state" asserts the CAN motor state idle
-    (integration_tests/steps/StateMachineSteps.cpp). Distinguishing Ready from Idle over CAN is
-    issue #490 and is not fixed by this requirement.
+    The corrupt-calibration scenario asserts the CAN motor state idle and a refused enable
+    (integration_tests/steps/StateMachineSteps.cpp), which tells Idle from Ready.
 
 - id: REQ-SM-011
   title: Calibration data persistence

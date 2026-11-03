@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <vector>
@@ -29,6 +30,8 @@ namespace integration
             const hal::Can::Message& payload = {},
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForMotorState(can::FocMotorState expectedState,
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        bool WaitForMotorState(std::initializer_list<can::FocMotorState> expectedStates,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForFaultCode(can::FocFaultCode expectedFault,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });

@@ -1054,12 +1054,13 @@ sequenceDiagram
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 50 rad/s, for speed/position modes only                                                      |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017       |
-| `FaultCode`       | —                      | enum (uint8)                   | 10 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`              |
+| `FaultCode`       | —                      | enum (uint8)                   | 10 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`                         |
 
-`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
-from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a
-latched fault code could be read or broadcast; the expiry is reported after reboot through
-`ResetCause::watchdog` instead. The watchdog does not reach the state machine at all. See
+A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware
+resets the target, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the
+expiry is reported after reboot through `ResetCause::watchdog` instead. The watchdog does not reach the state
+machine at all. Every code is reported over CAN under its own wire code (contract 2.8, `service-can.md`); the
+bridge's mapping has no default, so a new code does not build until it is mapped. See
 [Watchdog Design](watchdog.md).
 
 ---

@@ -103,7 +103,7 @@ graph TD
 | Element                                           | Shows                                                                                                     | Source                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------|
 | Connection panel                                  | interface, bitrate, not connected, connecting or connected                                                | bus adapter                             |
-| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot                     | each node                               |
+| Overview row                                      | every motor's summary (running, ready, idle, fault, offline, incompatible) with a status dot              | each node                               |
 | Tab                                               | status dot and tooltip of that motor                                                                      | each node                               |
 | Motor header                                      | node state, firmware contract, the command waiting for an answer                                          | that node                               |
 | Control mode                                      | *requested…* until acknowledged, then *active*                                                            | that node's mode or algorithms response |
@@ -170,16 +170,16 @@ without a calibration for the active mode, a setpoint for another mode), the pan
 that names the motor and the refused command and says what makes the motor operational again, judged from
 the last status the controller reported:
 
-| Last reported state    | Refused                                            | Advice                                                                                     | Button                |
-|------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------|
-| Idle, or no status yet | Start Motor, a setpoint                            | Align the rotor, then start; the reference is lost at start-up and on a pole-pair change   | Align Rotor           |
-| Idle                   | Align Rotor (no complete calibration for the mode) | Calibrate, or enter the motor parameters (inertia and friction in speed and position mode) | Open Motor Parameters |
-| Partially calibrated   | any operating command                              | Calibrate, or enter inertia and friction, then align and start                             | Open Motor Parameters |
-| Fault                  | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
-| Fault                  | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
-| Calibrating            | any operating command                              | Wait until it finishes                                                                     | —                     |
-| Running                | Align Rotor                                        | Stop the motor first                                                                       | Stop Motor            |
-| any                    | a setpoint for another control mode                | Select that mode while the motor is stopped                                                | —                     |
+| Last reported state           | Refused                                            | Advice                                                                                     | Button                |
+|-------------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------|
+| Idle, Ready, or no status yet | Start Motor, a setpoint                            | Align the rotor, then start; the reference is lost at start-up and on a pole-pair change   | Align Rotor           |
+| Idle                          | Align Rotor (no complete calibration for the mode) | Calibrate, or enter the motor parameters (inertia and friction in speed and position mode) | Open Motor Parameters |
+| Partially calibrated          | any operating command                              | Calibrate, or enter inertia and friction, then align and start                             | Open Motor Parameters |
+| Fault                         | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
+| Fault                         | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
+| Calibrating                   | any operating command                              | Wait until it finishes                                                                     | —                     |
+| Running                       | Align Rotor                                        | Stop the motor first                                                                       | Stop Motor            |
+| any                           | a setpoint for another control mode                | Select that mode while the motor is stopped                                                | —                     |
 
 Stop Motor refused while stopped, Clear Fault refused without a fault and Start Motor refused while running
 get no dialog; the log line says enough. The button sends the same command as its counterpart in the panel,
@@ -187,9 +187,9 @@ only while that motor accepts commands, and brings its tab to the front. A motor
 same advice raises the open one, other advice replaces it, and a change of the reported state closes it,
 since what it says no longer applies. The refusal is logged as before.
 
-The controller reports Ready and Idle both as idle, so the advice for an idle motor covers both: aligning is
-what makes an idle motor Ready, and the text names the other reason Start Motor is refused in Ready (the
-board protection). A control-mode switch out of an aligned Ready keeps the rotor reference (state-machine
+A 2.8 controller reports Ready as *Ready* and an uncalibrated or unaligned Idle as *Idle*; an older one reports
+both as idle. The advice for a motor that is not running covers both: aligning is what makes an idle motor Ready,
+and the text names the other reason Start Motor is refused in Ready (the board protection). A control-mode switch out of an aligned Ready keeps the rotor reference (state-machine
 design, C4), so switching modes no longer needs Align Rotor; a switch into speed or position mode without
 inertia and friction does, after they are set.
 
@@ -254,7 +254,7 @@ sent with the 2.0 bandwidth commands and not read back; the motor parameter fiel
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
 reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*.
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware fault* or *Calibration failed*.
 
 ### Part K — diagnostics
 
