@@ -18,6 +18,8 @@ target_link_libraries(e_foc.supervision PUBLIC
 target_sources(e_foc.supervision PRIVATE
     EncoderPlausibilityMonitor.hpp
     EncoderPlausibilityMonitor.cpp
+    PhaseLossMonitor.hpp
+    PhaseLossMonitor.cpp
 )
 
 add_subdirectory(test)

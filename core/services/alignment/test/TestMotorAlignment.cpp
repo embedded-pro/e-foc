@@ -727,15 +727,41 @@ TEST_F(MotorAlignmentTest, SamplesArrivingBeforeTheOutcomeIsDeliveredAreIgnored)
     EXPECT_EQ(1u, fired);
 }
 
-TEST_F(MotorAlignmentTest, AnAbortBeforeTheOutcomeIsDeliveredDropsIt)
+TEST_F(MotorAlignmentTest, TheSettledDecisionAndTheEncoderZeroWaitForTheEventLoop)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
     config.settledCount = 1;
     config.settledThreshold = foc::Radians{ 1.0f };
 
     EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    alignment->ForceAlignment(7, config, [](auto) {});
+    TriggerSettledSamples(1);
+    Mock::VerifyAndClearExpectations(&encoderMock);
+    Mock::VerifyAndClearExpectations(&driverMock);
+
+    InSequence sequence;
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.25f }));
     EXPECT_CALL(encoderMock, SetZero());
-    EXPECT_CALL(driverMock, Stop()).Times(3);
+    EXPECT_CALL(driverMock, Stop());
+    ExecuteAllActions();
+}
+
+TEST_F(MotorAlignmentTest, AnAbortBetweenTheSettledSnapshotAndTheDecisionNeitherZeroesNorCompletes)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& cb)
@@ -763,8 +789,7 @@ TEST_F(MotorAlignmentTest, AnOutcomeQueuedByAnAbortedRunDoesNotCompleteTheNextRu
     config.settledThreshold = foc::Radians{ 1.0f };
 
     EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
-    EXPECT_CALL(encoderMock, SetZero());
-    EXPECT_CALL(driverMock, Stop()).Times(4);
+    EXPECT_CALL(driverMock, Stop()).Times(3);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
@@ -785,4 +810,202 @@ TEST_F(MotorAlignmentTest, AnOutcomeQueuedByAnAbortedRunDoesNotCompleteTheNextRu
     ExecuteAllActions();
 
     EXPECT_FALSE(fired);
+}
+
+namespace
+{
+    class MotorAlignmentPhaseContinuityTest
+        : public MotorAlignmentTest
+    {
+    public:
+        // 20 % of a 24 V bus across 1 Ω drives 2.4 A into phase a and 1.2 A back out of b and c.
+        static constexpr float expectedPhaseA{ 2.4f };
+
+        MotorAlignmentPhaseContinuityTest()
+        {
+            config.testVoltage = hal::DutyCycle::FromPercent(20);
+            config.settledThreshold = foc::Radians{ 0.001f };
+            config.settledCount = 5;
+            config.phaseResistance = foc::Ohm{ 1.0f };
+            config.busVoltage = foc::Volts{ 24.0f };
+        }
+
+        std::optional<foc::Radians> Align(foc::PhaseCurrents settled, bool aligns)
+        {
+            EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.3f }));
+            EXPECT_CALL(driverMock, Stop()).Times(2);
+            EXPECT_CALL(encoderMock, SetZero()).Times(aligns ? 1 : 0);
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+            EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+                .WillOnce([this](auto, const auto& onDone)
+                    {
+                        driverMock.StorePhaseCurrentsCallback(onDone);
+                    });
+
+            std::optional<foc::Radians> result{ foc::Radians{ -1.0f } };
+            alignment->ForceAlignment(4, config, [&result](std::optional<foc::Radians> offset)
+                {
+                    result = offset;
+                });
+
+            for (std::size_t sample = 0; sample != config.settledCount; ++sample)
+                driverMock.TriggerPhaseCurrentsCallback(settled);
+            ExecuteAllActions();
+
+            return result;
+        }
+
+        static foc::PhaseCurrents Currents(float a, float b, float c)
+        {
+            return { foc::Ampere{ a }, foc::Ampere{ b }, foc::Ampere{ c } };
+        }
+
+        services::MotorAlignment::AlignmentConfig config;
+    };
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, PhasesCarryingTheirCurrentAlign)
+{
+    EXPECT_TRUE(Align(Currents(2.2f, -1.1f, -1.1f), true).has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, ADisconnectedMotorFailsAsAMissingPhaseWithoutZeroingTheEncoder)
+{
+    EXPECT_FALSE(Align(Currents(0.01f, -0.004f, -0.006f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseAIsAMissingPhase)
+{
+    EXPECT_FALSE(Align(Currents(0.0f, 0.01f, -0.01f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseBIsAMissingPhase)
+{
+    EXPECT_FALSE(Align(Currents(1.8f, 0.0f, -1.8f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseCIsAMissingPhase)
+{
+    EXPECT_FALSE(Align(Currents(1.8f, -1.8f, 0.0f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, PhaseAJustAboveAQuarterOfItsExpectedCurrentAligns)
+{
+    const auto a = 0.27f * expectedPhaseA;
+    EXPECT_TRUE(Align(Currents(a, -a / 2.0f, -a / 2.0f), true).has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, PhaseAJustBelowAQuarterOfItsExpectedCurrentIsAMissingPhase)
+{
+    const auto a = 0.23f * expectedPhaseA;
+    EXPECT_FALSE(Align(Currents(a, -a / 2.0f, -a / 2.0f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, PhaseBJustBelowAQuarterOfItsShareIsAMissingPhase)
+{
+    EXPECT_FALSE(Align(Currents(2.4f, -0.23f * 1.2f, -2.1f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceTheRatioStillFindsAnOpenPhase)
+{
+    config.phaseResistance = foc::Ohm{ 0.0f };
+
+    EXPECT_FALSE(Align(Currents(2.0f, 0.0f, -2.0f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceNoCurrentAtAllCannotBeJudged)
+{
+    config.phaseResistance = foc::Ohm{ 0.0f };
+
+    EXPECT_TRUE(Align(Currents(0.0f, 0.0f, 0.0f), true).has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, OnlyTheSettledSamplesAreJudged)
+{
+    EXPECT_CALL(encoderMock, Read())
+        .WillOnce(Return(foc::Radians{ 0.0f }))
+        .WillOnce(Return(foc::Radians{ 0.2f }))
+        .WillOnce(Return(foc::Radians{ 0.4f }))
+        .WillRepeatedly(Return(foc::Radians{ 0.5f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& onDone)
+            {
+                driverMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    std::optional<foc::Radians> result;
+    alignment->ForceAlignment(4, config, [&result](std::optional<foc::Radians> offset)
+        {
+            result = offset;
+        });
+
+    for (std::size_t sample = 0; sample != 3; ++sample)
+        driverMock.TriggerPhaseCurrentsCallback(Currents(0.0f, 0.0f, 0.0f));
+    for (std::size_t sample = 0; sample != config.settledCount; ++sample)
+        driverMock.TriggerPhaseCurrentsCallback(Currents(2.4f, -1.2f, -1.2f));
+    ExecuteAllActions();
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, ASlowlyRisingCurrentInAWindingThatIsAlreadyAlignedAligns)
+{
+    // L/R = 50 ms: the five settled samples end 5 ms after the vector is applied, at about 6 % of the final current.
+    config.phaseInductance = foc::Henry{ 0.05f };
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.3f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& onDone)
+            {
+                driverMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    std::optional<foc::Radians> result;
+    alignment->ForceAlignment(4, config, [&result](std::optional<foc::Radians> offset)
+        {
+            result = offset;
+        });
+
+    for (std::size_t sample = 1; sample <= config.settledCount; ++sample)
+    {
+        const auto a = expectedPhaseA * (1.0f - std::exp(-static_cast<float>(sample) * 0.001f / 0.05f));
+        driverMock.TriggerPhaseCurrentsCallback(Currents(a, -a / 2.0f, -a / 2.0f));
+    }
+    ExecuteAllActions();
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, AHighInductanceWindingThatCarriesNoCurrentIsStillAMissingPhase)
+{
+    config.phaseInductance = foc::Henry{ 0.05f };
+
+    EXPECT_FALSE(Align(Currents(0.0f, 0.0f, 0.0f), false).has_value());
+    EXPECT_TRUE(alignment->PhaseMissing());
+}
+
+TEST_F(MotorAlignmentPhaseContinuityTest, ANewRunForgetsAMissingPhaseFoundBefore)
+{
+    EXPECT_FALSE(Align(Currents(0.0f, 0.0f, 0.0f), false).has_value());
+    ASSERT_TRUE(alignment->PhaseMissing());
+
+    EXPECT_TRUE(Align(Currents(2.4f, -1.2f, -1.2f), true).has_value());
+    EXPECT_FALSE(alignment->PhaseMissing());
 }

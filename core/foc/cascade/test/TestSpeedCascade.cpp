@@ -681,3 +681,21 @@ TEST_F(TestSpeedCascade, enabling_restarts_the_stream_window)
     ASSERT_TRUE(sample.has_value());
     EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-2f);
 }
+
+TEST_F(TestSpeedCascade, the_observed_demand_is_the_current_the_speed_loop_commands)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+
+    focSpeed->EnableCurrentCommand();
+    focSpeed->CommandCurrent(foc::Ampere{ 1.5f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 0.0f };
+        focSpeed->Calculate(ZeroCurrents(), held);
+    }
+    lowPriorityInterruptMock.TriggerHandler();
+
+    EXPECT_NEAR(focSpeed->ObserveMotion().demandedTorqueCurrent.Value(), 1.5f, 1e-6f);
+}

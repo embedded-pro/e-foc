@@ -486,3 +486,10 @@ TEST_F(TestTorqueCascade, enabling_restarts_the_stream_window)
     ASSERT_TRUE(sample.has_value());
     EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-4f);
 }
+
+TEST_F(TestTorqueCascade, the_observed_demand_is_the_q_axis_setpoint)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f } });
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 1.5f, 1e-6f);
+}

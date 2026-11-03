@@ -211,7 +211,7 @@ namespace foc
 
     MotionObservation CascadeWithSpeedLoop::ObserveSpeedLoopMotion() const
     {
-        return { RadiansPerSecond{ lastMechanicalSpeed }, Ampere{ lastMeanIq }, RadiansPerSecond{ speedReference }, Radians{ 0.0f } };
+        return { RadiansPerSecond{ lastMechanicalSpeed }, Ampere{ lastMeanIq }, RadiansPerSecond{ speedReference }, Radians{ 0.0f }, Ampere{ lastSpeedLoopOutput } };
     }
 
     LowPriorityInterrupt& CascadeWithSpeedLoop::GetLowPriorityInterrupt()

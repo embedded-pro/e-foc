@@ -14,5 +14,6 @@ namespace services
                 const infra::Function<void(std::optional<foc::Radians>)>& onDone),
             (override));
         MOCK_METHOD(void, Abort, (), (override));
+        MOCK_METHOD(bool, PhaseMissing, (), (const, override));
     };
 }

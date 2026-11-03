@@ -204,10 +204,13 @@ namespace application
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;
+        foc::OneShotDelay cableDisconnect;
         foc::OneShotDelay shaftGrip;
         foc::OneShotDelay shaftHold;
         foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
+        // Faults injected during a run accumulate here; Stop() returns it to the boot faults.
+        foc::ThreePhaseMotorModel::FaultInjectionConfig activeFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
         std::optional<EmulatedCanBusAdapter> canBusAdapter;
         infra::TimerRepeating portPollTimer;

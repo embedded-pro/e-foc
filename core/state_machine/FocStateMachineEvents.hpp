@@ -94,6 +94,7 @@ namespace state_machine
     struct CalibrationStepFailed
     {
         static constexpr const char* name{ "CalibrationStepFailed" };
+        state_machine::FaultCode code{ state_machine::FaultCode::calibrationFailed };
     };
 
     struct MechanicalParametersIdentified

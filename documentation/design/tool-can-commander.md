@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.9.0
+version: 0.9.1
 component: "tool-can-commander"
 date: 2026-11-01
 ---
@@ -12,7 +12,7 @@ date: 2026-11-01
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.9.0                |
+| Version   | 0.9.1                |
 | Component | tool-can-commander   |
 | Date      | 2026-11-01           |
 
@@ -254,7 +254,7 @@ sent with the 2.0 bandwidth commands and not read back; the motor parameter fiel
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
 reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added.
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*.
 
 ### Part K — diagnostics
 

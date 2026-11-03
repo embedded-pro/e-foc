@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.11.0
+version: 1.12.0
 component: "software-in-the-loop"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.11.0                      |
+| Version   | 1.12.0                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-10-30                  |
 
@@ -297,9 +297,15 @@ supply sags. These are configuration, not a separate model, and they compose wit
 Two results are worth recording because they are not obvious:
 
 - A **fully disconnected** motor produces no torque and does not turn, however it is commanded.
-  Its torque follows the currents that actually flow, so masking the phases is enough.
+  Its torque follows the currents that actually flow, so masking the phases is enough. The
+  alignment's phase continuity check finds it before the drive enables, and a cable pulled
+  while the drive runs is found by the phase-loss monitor (`fault-supervision.md` Part E); both
+  report `phaseMissing`. The plant can open all three phases a scheduled time after a start to
+  pull the cable mid-run.
 - A motor with **one open phase** still turns. Two phases can produce torque, so this is a
-  degraded running condition rather than a dead motor, and nothing in the firmware detects it.
+  degraded running condition rather than a dead motor. The alignment check finds it, because
+  the open phase carries none of the current the alignment vector drives; once the drive runs,
+  nothing does.
 - A **stuck encoder** passes alignment rather than failing it. Alignment declares the rotor
   settled once its reading stops changing for a run of samples, and a reading frozen at one
   value satisfies that on the first run it sees, more convincingly than a real rotor ever

@@ -22,6 +22,7 @@ target_link_libraries(e_foc.supervision_test PUBLIC
 
 target_sources(e_foc.supervision_test PRIVATE
     TestEncoderPlausibilityMonitor.cpp
+    TestPhaseLossMonitor.cpp
 )
 
 if (EMIL_ENABLE_COVERAGE)

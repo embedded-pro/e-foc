@@ -95,6 +95,7 @@ namespace application
 
         sil::ConfigureModel(model, *plantConfig);
         bootFaultInjection = sil::BootFaultInjection(*plantConfig);
+        activeFaultInjection = bootFaultInjection;
         ApplyCurrentSense(SampleAndHold::shortest);
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
@@ -125,6 +126,9 @@ namespace application
         // The delay is carried in centiseconds because it reuses a byte the record already had.
         const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
         encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
+
+        const auto cableDisconnectDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->cableDisconnectDelayMs) * baseHz / 1000u);
+        cableDisconnect.Configure(plantConfig->cableDisconnectDelayMs != 0 ? std::make_optional(cableDisconnectDelay) : std::nullopt);
 
         ConfigureShaftGrip(baseHz);
 
@@ -332,10 +336,15 @@ namespace application
 
         if (encoderFreeze.Fire(tick))
         {
-            auto frozen = bootFaultInjection;
-            frozen.encoderStuck = true;
-            model.SetFaultInjection(frozen);
+            activeFaultInjection.encoderStuck = true;
+            model.SetFaultInjection(activeFaultInjection);
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
+        }
+
+        if (cableDisconnect.Fire(tick))
+        {
+            activeFaultInjection.openPhaseA = activeFaultInjection.openPhaseB = activeFaultInjection.openPhaseC = true;
+            model.SetFaultInjection(activeFaultInjection);
         }
 
         if (shaftGrip.Fire(tick))
@@ -374,6 +383,7 @@ namespace application
         responseRecorder.Begin();
         torqueStep.Begin();
         encoderFreeze.Begin();
+        cableDisconnect.Begin();
         shaftGrip.Begin();
         shaftHold.Begin();
         boardProtection.SetArmed(true);
@@ -385,7 +395,8 @@ namespace application
         model.Stop();
         model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
         model.GripShaft(std::nullopt);
-        model.SetFaultInjection(bootFaultInjection);
+        activeFaultInjection = bootFaultInjection;
+        model.SetFaultInjection(activeFaultInjection);
         responseRecorder.End();
     }
 

@@ -19,7 +19,7 @@ namespace application
     CalibrationFlow::CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services)
         : env(environment)
         , agreeingRuns(services.agreeingMechanicalRuns)
-        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets, services.standstill)
+        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets, services.standstill, environment.context.BusVoltage())
     {}
 
     state_machine::Calibrating CalibrationFlow::Begin(const state_machine::Calibrate& command)
@@ -97,7 +97,7 @@ namespace application
             },
             [this]
             {
-                env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+                env.machine.Dispatch(state_machine::CalibrationStepFailed{ orchestrator.LastFailure() });
             });
     }
 
@@ -115,7 +115,7 @@ namespace application
             },
             [this]
             {
-                env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+                env.machine.Dispatch(state_machine::CalibrationStepFailed{ orchestrator.LastFailure() });
             });
     }
 

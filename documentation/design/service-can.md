@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.9.0
+version: 0.9.1
 component: can-service
 date: 2026-11-01
 ---
@@ -12,7 +12,7 @@ date: 2026-11-01
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.9.0                    |
+| Version   | 0.9.1                    |
 | Component | can-service              |
 | Date      | 2026-11-01               |
 
@@ -284,6 +284,15 @@ the node reports 2.6 or newer.
 | `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged         | no        |
 | `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
 | `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
+
+**Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.6 changes.
+
+`FocFaultCode` gains `phaseMissing` (`7`): the motor's phases do not carry the current the drive drives into
+them — found by the alignment's phase continuity check (`service-alignment.md`) or, while the drive runs, by
+the phase-loss monitor (`fault-supervision.md` Part E). Before 2.7 the alignment failure went out as `none`
+and a cable pulled while running was not reported at all. Adding the enumerator leaves the meaning of the
+existing codes unchanged, which keeps it a minor version, as `stall` was in 2.4. A client older than 2.7
+shows the new code as an unknown fault.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

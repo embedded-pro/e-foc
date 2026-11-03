@@ -46,6 +46,10 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , phaseLoss{ hardware.MaxCurrentSupported(), [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
@@ -89,6 +93,14 @@ namespace application
                 encoderPlausibility.Enable([this]()
                     {
                         return supervision::ConfigFrom(controlMode->Config());
+                    });
+                phaseLoss.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                phaseLoss.Enable([this]()
+                    {
+                        return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
                     });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {

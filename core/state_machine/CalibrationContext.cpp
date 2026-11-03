@@ -121,6 +121,11 @@ namespace application
         return configured;
     }
 
+    foc::Volts CalibrationContext::BusVoltage() const
+    {
+        return vdc;
+    }
+
     foc::Weber CalibrationContext::EffectiveFluxLinkage() const
     {
         return EffectiveFluxLinkage(calibrationData);

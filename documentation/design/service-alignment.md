@@ -2,7 +2,7 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.1.1
+version: 0.2.1
 component: service-alignment
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.1                    |
+| Version   | 0.2.1                    |
 | Component | service-alignment        |
 | Date      | 2026-10-30               |
 
@@ -33,6 +33,7 @@ date: 2026-10-30
 - Applying an open-loop DC voltage vector at electrical angle 0° via the three-phase inverter to force the rotor to a known magnetic position
 - Detecting rotor settlement by monitoring encoder position change over consecutive samples
 - Reporting the calibrated encoder offset (in radians) via a single completion callback on success, or reporting failure if the rotor does not settle within the allowed time
+- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-EH-015): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
@@ -60,6 +61,11 @@ Before invoking alignment, the caller must have:
    - **max samples** — the total number of sampling ticks before the procedure times out
    - **settled threshold** — the maximum absolute encoder position change (radians) that qualifies as "not moving"
    - **settled count** — the number of consecutive below-threshold samples required to declare settlement
+   - **phase resistance** and **bus voltage** — the calibrated winding resistance and the measured supply, from
+     which the phase-continuity check derives the current the vector should drive; either left at zero skips the
+     part of the check that needs them
+   - **phase inductance** — the calibrated winding inductance; with the resistance it sets how far the current
+     can have risen by the settled samples. Left at zero, the current is taken as settled
 
 These parameters are tuned by the application engineer for the specific motor and mechanical load. A typical configuration applies 10–20 % of bus voltage and requires 20 consecutive samples within 0.001 rad of one another before declaring settlement.
 
@@ -104,8 +110,10 @@ reaches anything.
 completion **without invoking it**, so a fault raised by the state machine cannot be overwritten by an
 alignment result that arrives after it.
 
-Every decision above is taken in the sampling interrupt, and so is everything that must happen at that
-instant: the inverter is stopped there and, on success, the encoder zeroed there. The completion is not. The
+A maximum-sample run-out and an over-current are decided in the sampling interrupt, and the inverter is
+stopped there. A settled rotor is not: the interrupt only hands the settled samples to the event loop, which
+judges the phase currents and, while the vector still holds the rotor, zeroes the encoder and then stops the
+inverter (Phase Continuity Check). The completion is never delivered from the interrupt either. The
 caller stores calibration data and changes state from it, which is event-loop work and far longer than a
 control period, so the outcome is queued and delivered from the event loop. Until then the run is still in
 progress: samples are discarded, a second `ForceAlignment` is rejected, and `Abort()` drops the queued outcome.
@@ -117,22 +125,71 @@ The encoder position at the moment of settlement declaration becomes the calibra
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
 
-The service applies the offset itself, by calling `Encoder::SetZero()` at the settled instant while the rotor
-is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
+The service applies the offset itself, by calling `Encoder::SetZero()` once the settled run is judged, while
+the rotor is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
 rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
 read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
 loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
 calibration must be re-run to orient the field.
 
+### Phase Continuity Check
+
+A rotor held at electrical zero by a vector the windings do not carry looks exactly like an aligned rotor:
+its reading stops changing at once. So when the rotor is declared settled, before the encoder is zeroed, the
+service compares the phase currents of the settled run with the ones the vector must drive (REQ-EH-015).
+
+The vector puts `d·Vdc/2` across phase a and `−d·Vdc/4` across phases b and c, with `d` the test voltage as a
+fraction of the bus. With the rotor at rest there is no back-EMF, so the currents settle at
+`ia = d·Vdc/(2R)` and `ib = ic = −ia/2`. The service averages each phase over the settled run — the samples it
+already takes at the sampling frequency, never the 20 kHz ones — and declares a phase missing when:
+
+- **phase a** carries less than a quarter of the expected `|ia|`. Phase a is the only one driven against the
+  other two together, so this also catches a fully disconnected motor, where nothing flows;
+- **phase b or c** carries less than a quarter of half of the expected `|ia|`. An open b or c leaves a and the
+  other one in series, so the open phase reads zero while a still carries most of its current.
+
+A quarter leaves room for what the model ignores: dead time and switch drop take a few percent of the
+alignment voltage, and the calibrated resistance can be off by more than that. A missing phase reads a few
+noise samples' worth of current, far below it.
+
+The current does not reach `ia` at once: it rises as `1 − e^(−t/τ)` with `τ = L/R` from the moment the vector is
+applied. A rotor that already rests at electrical zero settles after the first few samples, before a slow winding
+has carried much current. So the expected currents are scaled by the mean of `1 − e^(−t/τ)` over the settled
+samples' own times. On the reference motors τ is under 1.2 ms and the scale is close to 1. The accepted ranges
+allow τ up to about 10⁴ s (L up to 1 H, R down to 0.1 mΩ), far beyond any hold the alignment can afford, so
+waiting for the current to settle instead would turn a slow winding into a failed alignment. A slow winding with
+no current flowing still reads below a quarter of its scaled expectation.
+
+The settled samples are taken in the control interrupt, but nothing is decided there. The interrupt stops
+taking samples, records which samples were settled and hands the run to the event loop. The vector keeps
+holding the rotor until the event loop has judged the currents and, on success, read and zeroed the encoder;
+only then is the inverter stopped. An `Abort()` between the hand-over and the decision stops the inverter and
+discards the run without zeroing the encoder.
+
+Without a resistance or a bus voltage the expected current is unknown. The check then falls back to the
+ratio between the phases: b and c must each carry at least a quarter of half of the measured `|ia|`. That
+still catches an open b or c, but not a disconnected motor or an open a, which leave nothing to compare
+against. Every caller in this firmware passes both.
+
+The check needs all three phases measured. The alignment duties (60 % and 45 % at the default 20 % vector)
+stay below every board's readable duty, so no phase is rebuilt from the other two.
+
+A missing phase ends the run like a timeout — inverter stopped, encoder untouched, completion empty — and the
+service records why. `PhaseMissing()` answers `true` after such a run until the next `ForceAlignment`, so the
+caller can enter `phaseMissing` instead of a generic calibration failure.
+
 ### State Machine
 
-The service follows a four-state machine:
+The service follows a five-state machine:
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
     Idle --> Aligning : ForceAlignment called
-    Aligning --> Delivering : settled, maxSamples exceeded or over-current\n(sampling interrupt stops the inverter)
+    Aligning --> Judging : settled\n(sampling interrupt hands the settled samples over; the vector keeps holding)
+    Judging --> Idle : event loop judges the currents\n(zeroes the encoder if they flow, stops the inverter, onDone fired)
+    Judging --> Idle : Abort\n(inverter stopped, encoder untouched, onDone dropped)
+    Aligning --> Delivering : maxSamples exceeded or over-current\n(sampling interrupt stops the inverter)
     Aligning --> Idle : step timeout\n(inverter stopped, onDone(nullopt) fired)
     Delivering --> Idle : event loop fires\nonDone(offset) or onDone(nullopt)
     Aligning --> Idle : Abort\n(inverter stopped, onDone dropped)
@@ -146,7 +203,7 @@ While in the **Aligning** state, any further call to `ForceAlignment` is silentl
 The `onDone` callback accepts a single `std::optional<Radians>` argument:
 
 - `std::optional` with a value: alignment succeeded; the contained value is the encoder offset in mechanical radians, already applied to the encoder by the service.
-- Empty `std::optional`: alignment failed (timeout); the caller should not use any offset and may retry.
+- Empty `std::optional`: alignment failed — a timeout, an over-current, or a missing phase. The caller should not use any offset; `PhaseMissing()` tells the last apart, and only a timeout is worth retrying.
 
 The callback fires exactly once per `ForceAlignment` invocation, from the event loop and never from the sampling interrupt. The callback is reset (using `infra::AutoResetFunction` semantics) after firing so that stale references cannot cause a second invocation.
 
