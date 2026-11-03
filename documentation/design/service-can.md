@@ -304,14 +304,14 @@ Before 2.8 the fault codes `hardwareFault` (a CAN bus-off, a failed NVM write) a
 `none`, and `Ready` went out as `idle`, so a client could neither tell why the drive faulted nor tell a calibrated
 drive from one that still needs a calibration.
 
-| `FocMotorState`      | Value | Lifecycle state (`state-machine.md`)                                        |
-|----------------------|-------|-----------------------------------------------------------------------------|
-| `idle`               | 0     | `Idle`: not calibrated for the active mode                                  |
-| `running`            | 1     | `Enabled`                                                                   |
-| `fault`              | 2     | `Fault`                                                                     |
-| `calibrating`        | 3     | `Calibrating`                                                               |
-| `partialCalibration` | 4     | `Idle` holding a non-empty but incomplete record                            |
-| `ready`              | 5     | `Ready`: calibrated and stopped; Start and the setpoints are accepted       |
+| `FocMotorState`      | Value | Lifecycle state (`state-machine.md`)                                  |
+|----------------------|-------|-----------------------------------------------------------------------|
+| `idle`               | 0     | `Idle`: not calibrated for the active mode                            |
+| `running`            | 1     | `Enabled`                                                             |
+| `fault`              | 2     | `Fault`                                                               |
+| `calibrating`        | 3     | `Calibrating`                                                         |
+| `partialCalibration` | 4     | `Idle` holding a non-empty but incomplete record                      |
+| `ready`              | 5     | `Ready`: calibrated and stopped; Start and the setpoints are accepted |
 
 | `FocFaultCode`      | Value | `state_machine::FaultCode` |
 |---------------------|-------|----------------------------|
@@ -422,7 +422,8 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   acknowledged once stored; a value out of range is acknowledged `invalidPayload`, a loop the active mode does
   not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
-- `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
+- `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds.
+  `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
   The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
   record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection that

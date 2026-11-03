@@ -103,7 +103,7 @@ graph TD
 | Element                                           | Shows                                                                                                     | Source                                  |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------|
 | Connection panel                                  | interface, bitrate, not connected, connecting or connected                                                | bus adapter                             |
-| Overview row                                      | every motor's summary (running, ready, idle, fault, offline, incompatible) with a status dot                     | each node                               |
+| Overview row                                      | every motor's summary (running, ready, idle, fault, offline, incompatible) with a status dot              | each node                               |
 | Tab                                               | status dot and tooltip of that motor                                                                      | each node                               |
 | Motor header                                      | node state, firmware contract, the command waiting for an answer                                          | that node                               |
 | Control mode                                      | *requested…* until acknowledged, then *active*                                                            | that node's mode or algorithms response |
