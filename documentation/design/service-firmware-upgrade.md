@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.5
+version: 0.3.6
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.5                     |
+| Version   | 0.3.6                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -265,11 +265,12 @@ beside the existing firmware archives (`.github/workflows/release-please.yml`):
 | `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
 | `e_foc-firmware-<board>-bootloader-<tag>.hex`            | the bootloader with the release key set, for a debugger, which programs it beside the application       |
 
-The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name
-and the target identity from the build of that board (`bootloader.md` Part I), never from an argument typed
-for it. Every asset carries the build-provenance attestation the other assets carry, and the release check
-fails when a pack or image exceeds its limit, or when a pack's product name or image identity does not match
-the board it is published for. A dry run builds and signs with the development keys.
+The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name,
+the version and the target identity from the build of that board (`bootloader.md` Parts I and J), never from
+an argument typed for it. Every asset carries the build-provenance attestation the other assets carry, and the
+release fails when a pack or image exceeds its limit, or when a pack's product name or image identity does not
+match the board it is published for. A dry run builds and signs with the development keys, and so does
+continuous integration on every pull request, so the step a release takes is the one every build has taken.
 
 ### Part K — verification
 
