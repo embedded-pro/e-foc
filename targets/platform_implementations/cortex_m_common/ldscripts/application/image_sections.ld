@@ -1,5 +1,3 @@
-/* An application behind the bootloader: its header at 1 KiB, its image descriptor at the end of its slot
-   (documentation/design/bootloader.md, Parts E and I) */
 .application_header ORIGIN(REGION_TEXT) + 0x400 :
 {
     KEEP(*(.application_header))

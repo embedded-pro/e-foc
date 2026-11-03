@@ -23,7 +23,6 @@ namespace
 
     [[gnu::section(".image_descriptor"), gnu::used]] const std::array<uint8_t, bootloader::imageDescriptorSize> imageDescriptor{ ErasedDescriptor() };
 
-    // A debugger may start the application without the bootloader; its interrupts must still find this vector table
     [[gnu::constructor(101)]] void PointVectorTableAtImage()
     {
         SCB->VTOR = reinterpret_cast<uintptr_t>(&_text);

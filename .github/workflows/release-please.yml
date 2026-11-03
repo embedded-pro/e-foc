@@ -88,7 +88,6 @@ jobs:
           name: host-install-package
       - run: tar -zxvf e_foc-*.tar.gz
       - run: mkdir -p install && mv e_foc-*/* install/ || true
-      # Every bootloader gets the secret release key set, a dry run's the public development set (bootloader.md Part G)
       - name: Choose the bootloader key set
         env:
           DRY_RUN: ${{ inputs.dry_run == true }}
