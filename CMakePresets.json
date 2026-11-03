@@ -256,10 +256,7 @@
       "name": "qemu-foc-sensored-RelWithDebInfo",
       "configuration": "RelWithDebInfo",
       "configurePreset": "qemu-foc-sensored",
-      "targets": [
-        "e_foc.bootloader.main",
-        "e_foc.sync_foc_sensored.main"
-      ]
+      "targets": ["e_foc.bootloader.main", "e_foc.sync_foc_sensored.main"]
     }
   ],
   "testPresets": [
