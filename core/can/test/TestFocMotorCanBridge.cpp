@@ -248,7 +248,7 @@ namespace
             if (bridgeHasFirmwareUpgrade)
                 upgrade = firmwareUpgradeMock;
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer, offsets, rest, upgrade);
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, offsets, rest, upgrade }, tracer);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -1626,7 +1626,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer);
+    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, std::nullopt, std::nullopt, std::nullopt }, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }
