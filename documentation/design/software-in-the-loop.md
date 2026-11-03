@@ -1245,12 +1245,20 @@ deploy* in `journal.bin` and installs the pack from `staging.bin`. The terminal 
 connected across it, so a scenario sees the node fall silent and its heartbeat come back.
 
 **What the harness sends.** The firmware-upgrade category carries no sequence byte, so the steps send its
-commands as raw frames and wait for each answer, one block in flight, as a client does. Most scenarios send
-a small pack, a few hundred bytes of image built for the scenario with the library's pack builder and the
-emulated board's product name: the service checks the header but not the image, which only the bootloader
-decrypts. The scenario that applies its pack sends the application itself, since the bootloader checks the
-image it installs. A refused pack differs in one thing: another board's product name, or a CRC that does not
-match.
+commands as raw frames and wait for each answer, one block in flight, as a client does, and keep the client's
+heartbeat going meanwhile. The downloads send a small pack, a few hundred bytes of image built for the
+scenario with the library's pack builder and the emulated board's product name: the service checks the
+header but not the image, which only the bootloader decrypts. A refused pack differs in one thing: another
+board's product name, or a CRC that does not match.
+
+**Why the apply starts from a staged pack.** The emulated serial port that carries the CAN lines hands the
+firmware about one character per poll, every millisecond, so a block and its answer take about 32 ms and the
+whole application, some 39 000 blocks, about 20 minutes, beyond what a shard can spend on one scenario. The
+scenario that applies a pack therefore starts where a finished download leaves the board: the application's
+pack in `staging.bin`, built as above, and the journal reading *downloaded*. The firmware reads both at
+start-up and reports the staged version, Activate goes over CAN, and the bootloader installs the pack at the
+reset. That the download writes exactly what it received into `staging.bin` is the first scenario's check, and
+the hardware-in-the-loop scenario downloads the whole application over the board's CAN bus.
 
 **Scenarios** (`firmware_upgrade.feature`, `@sil`):
 
@@ -1264,7 +1272,7 @@ match.
 | A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                     | REQ-UPD-004, 006           |
 | A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                  | REQ-UPD-004, 006           |
 | The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                         | REQ-UPD-014                |
-| The apply installs the pack                      | Activate ok; the node falls silent and comes back; the journal reads *deployed*; the staged version zero                        | REQ-UPD-005, 007           |
+| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* and the heartbeat comes back; the staged version zero | REQ-UPD-005, 007, 011      |
 
 **Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
 (`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.

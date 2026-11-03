@@ -1,7 +1,6 @@
-#include "application/bootloader_image/KeySet.hpp"
-#include "application/bootloader_image/Pack.hpp"
 #include "bootloader/StatusJournal.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/steps/UpgradePacks.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/interactor/interfaces/BootloaderTarget.hpp"
@@ -10,15 +9,10 @@
 #include "integration_tests/support/plant/PlantConfigWriter.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include "upgrade/pack/UpgradePackHeader.hpp"
-#include <algorithm>
 #include <chrono>
 #include <gtest/gtest.h>
-#include <map>
-#include <random>
-#include <span>
 #include <stdexcept>
 #include <string>
-#include <variant>
 #include <vector>
 
 using namespace integration;
@@ -28,44 +22,9 @@ namespace
     constexpr std::size_t headerTargetOffset = 0x400 + 16;
     constexpr uint8_t anotherBoardKind = 1;
 
-    const std::map<std::string, application::UpgradePackStatus> statuses{
-        { "empty", application::UpgradePackStatus::empty },
-        { "downloaded", application::UpgradePackStatus::downloaded },
-        { "ready to deploy", application::UpgradePackStatus::readyToDeploy },
-        { "deploy started", application::UpgradePackStatus::deployStarted },
-        { "deployed", application::UpgradePackStatus::deployed },
-        { "invalid", application::UpgradePackStatus::invalid },
-    };
-
-    bool Random(std::span<uint8_t> bytes)
-    {
-        static std::random_device device;
-        std::ranges::generate(bytes, []()
-            {
-                return static_cast<uint8_t>(device());
-            });
-        return true;
-    }
-
-    BootloaderTarget& Target()
-    {
-        auto* target = BootloaderTarget::Instance();
-        if (target == nullptr)
-            throw std::runtime_error{ "Only the emulated target boots a bootloader the harness can stage packs for" };
-        return *target;
-    }
-
-    application::UpgradePackStatus Status(const std::string& name)
-    {
-        const auto status = statuses.find(name);
-        if (status == statuses.end())
-            throw std::runtime_error{ "Unknown journal status: " + name };
-        return status->second;
-    }
-
     application::PackDescription Description(const std::string& defect)
     {
-        application::PackDescription description{ E_FOC_EMULATED_PRODUCT_NAME, "", "sync_foc_sensored", emulatedSlotStart, Target().ApplicationImage() };
+        application::PackDescription description{ E_FOC_EMULATED_PRODUCT_NAME, "", "sync_foc_sensored", emulatedSlotStart, EmulatedBootloader().ApplicationImage() };
 
         if (defect == "for another product")
             description.productName = "e-foc another product";
@@ -80,51 +39,27 @@ namespace
 
     std::vector<uint8_t> Pack(const std::string& defect)
     {
-        const auto keys = application::ParseKeySet(Target().DevelopmentKeySet());
-        if (!std::holds_alternative<application::KeySet>(keys))
-            throw std::runtime_error{ "The development key set is not a key set" };
-
-        auto built = application::BuildPack(Description(defect), std::get<application::KeySet>(keys), Random);
-        if (!std::holds_alternative<std::vector<uint8_t>>(built))
-            throw std::runtime_error{ "The pack could not be built" };
-
-        auto pack = std::get<std::vector<uint8_t>>(built);
+        auto pack = DevelopmentSignedPack(Description(defect));
         if (defect == "with a bad signature")
             pack.at(sizeof(application::UpgradePackHeaderPrologue)) ^= 0x01;
         return pack;
     }
 
-    std::vector<uint8_t> JournalReading(application::UpgradePackStatus status)
-    {
-        std::vector<uint8_t> memory(emulatedJournalSize, 0xff);
-        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedJournalSize };
-        bootloader::StatusJournal{ flash }.Record(status, 0);
-        return memory;
-    }
-
-    std::pair<application::UpgradePackStatus, uint32_t> ReadJournal()
-    {
-        auto memory = Target().Journal();
-        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedJournalSize };
-        const bootloader::StatusJournal journal{ flash };
-        return { journal.Status(), journal.ErrorCode() };
-    }
-
     void Stage(const std::string& defect, const std::string& status)
     {
-        Target().ConfigureStaging(Pack(defect));
-        Target().ConfigureJournal(JournalReading(Status(status)));
+        EmulatedBootloader().ConfigureStaging(Pack(defect));
+        EmulatedBootloader().ConfigureJournal(JournalReading(JournalStatusNamed(status)));
     }
 }
 
 GIVEN(R"(the application slot holds {string})", (std::string contents))
 {
     if (contents == "the application")
-        Target().ConfigureSlot(BootloaderTarget::Slot::application);
+        EmulatedBootloader().ConfigureSlot(BootloaderTarget::Slot::application);
     else if (contents == "a damaged application")
-        Target().ConfigureSlot(BootloaderTarget::Slot::damagedApplication);
+        EmulatedBootloader().ConfigureSlot(BootloaderTarget::Slot::damagedApplication);
     else if (contents == "nothing")
-        Target().ConfigureSlot(BootloaderTarget::Slot::empty);
+        EmulatedBootloader().ConfigureSlot(BootloaderTarget::Slot::empty);
     else
         FAIL() << "Unknown slot contents: " << contents;
 }
@@ -167,13 +102,13 @@ THEN(R"(the debug log says {string})", (std::string text))
 
 THEN(R"(the journal reads {string})", (std::string status))
 {
-    const auto [recorded, errorCode] = ReadJournal();
-    EXPECT_EQ(Status(status), recorded) << "The journal reads " << static_cast<int>(recorded) << " with error code " << errorCode;
+    const auto [recorded, errorCode] = RecordedJournal();
+    EXPECT_EQ(JournalStatusNamed(status), recorded) << "The journal reads " << static_cast<int>(recorded) << " with error code " << errorCode;
 }
 
 THEN(R"(the journal reads {string} with error code {int})", (std::string status, int expectedErrorCode))
 {
-    const auto [recorded, errorCode] = ReadJournal();
-    EXPECT_EQ(Status(status), recorded) << "The journal reads " << static_cast<int>(recorded);
+    const auto [recorded, errorCode] = RecordedJournal();
+    EXPECT_EQ(JournalStatusNamed(status), recorded) << "The journal reads " << static_cast<int>(recorded);
     EXPECT_EQ(static_cast<uint32_t>(expectedErrorCode), errorCode);
 }

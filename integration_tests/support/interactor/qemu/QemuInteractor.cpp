@@ -237,4 +237,11 @@ namespace sil
         journal.resize(integration::emulatedJournalSize, 0xff);
         return journal;
     }
+
+    std::vector<uint8_t> QemuInteractor::Staging() const
+    {
+        auto staging = ReadFile(session.ScenarioDirectory() + "/staging.bin");
+        staging.resize(integration::emulatedStagingSize, 0xff);
+        return staging;
+    }
 }

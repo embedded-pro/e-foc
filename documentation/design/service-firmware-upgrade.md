@@ -275,8 +275,10 @@ the board it is published for. A dry run builds and signs with the development k
 | Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the version read back (`@hil_motor`)                                                                                                                                                                                          | REQ-UPD-005, REQ-BOOT-001 to 004  |
 | CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                                                                            | REQ-UPD-009, REQ-UPD-010          |
 
-The software-in-the-loop scenarios read the staging and journal files the emulated firmware wrote and check
-the pack and the journal in them. Most send a small pack, built for the scenario with the real product name;
+The hardware scenario downloads the application it runs, as a pack signed with the development key set,
+so the board needs the bootloader with that key set, as every build programmed by a debugger has
+(`bootloader.md` Part G). The software-in-the-loop scenarios read the staging and journal files the emulated
+firmware wrote and check the pack and the journal in them. Most send a small pack, built for the scenario with the real product name;
 only the scenario that applies the pack sends the application itself, since the bootloader checks the image
 it installs. The new feature goes into the shard that keeps the three balanced
 (`integration_tests/sil-shards.json`).
