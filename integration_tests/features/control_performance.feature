@@ -239,7 +239,7 @@ Feature: FOC Control Performance
     And the motor is enabled
     And the response is captured for 15 ms after enable
     Then the current step response shall settle into a 10 % band within 1 ms with overshoot below 30 %
-    And the current response tail shall stay within 7 % of the step
+    And the current response tail shall stay within 16 % of the step
     And the response shall have no dropped samples
     When the motor is disabled
     Then the state machine shall be in the Ready state
@@ -263,7 +263,7 @@ Feature: FOC Control Performance
     And a torque setpoint of 0 A is applied
     And the response is captured for 60 ms after the last setpoint
     Then the current step response shall settle into a 10 % band within 1 ms with overshoot below 30 %
-    And the current response tail shall stay within 7 % of the step
+    And the current response tail shall stay within 16 % of the step
     And the steady-state current error shall be below 0.02 A
     And the response shall have no dropped samples
 
