@@ -68,12 +68,12 @@ namespace integration
         // Keeps the client online while it waits, so a stream the target sends only to an online client keeps flowing.
         std::vector<hal::Can::Message> CollectCapturedCanFrames(hal::Can::Id id, CaptureMark from, std::size_t count, std::chrono::milliseconds timeout);
         CaptureMark MarkCapture() const;
+        void SendClientHeartbeat();
 
         uint8_t nextSequence{ 0 };
 
     private:
         void RequestStatus();
-        void SendClientHeartbeat();
         std::optional<uint16_t> FindHeartbeatNode(CaptureMark from) const;
 
         TargetInteractor& interactor;
