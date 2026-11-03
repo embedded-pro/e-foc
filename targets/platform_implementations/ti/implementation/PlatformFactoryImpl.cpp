@@ -52,12 +52,12 @@ namespace application
 #ifdef E_FOC_PRODUCT_NAME
     extern "C"
     {
-        extern const uint8_t __application_slot_start[];
-        extern const uint8_t __application_slot_end[];
-        extern const uint8_t __staging_slot_start[];
-        extern const uint8_t __staging_slot_end[];
-        extern const uint8_t __status_journal_start[];
-        extern const uint8_t __status_journal_end[];
+        [[gnu::weak]] extern const uint8_t __application_slot_start[];
+        [[gnu::weak]] extern const uint8_t __application_slot_end[];
+        [[gnu::weak]] extern const uint8_t __staging_slot_start[];
+        [[gnu::weak]] extern const uint8_t __staging_slot_end[];
+        [[gnu::weak]] extern const uint8_t __status_journal_start[];
+        [[gnu::weak]] extern const uint8_t __status_journal_end[];
     }
 
     namespace
@@ -443,6 +443,9 @@ namespace application
 #ifdef E_FOC_PRODUCT_NAME
     std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
     {
+        if (StagingRegion().empty())
+            return std::nullopt;
+
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
         return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, E_FOC_PRODUCT_NAME, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
