@@ -71,7 +71,7 @@ revolutions measured, in one direction and then in the other. Each control inter
 quadrature current and the encoder's rotation since the last interrupt to the bin of the electrical
 period the rotor is in, 48 bins, kept per direction.
 
-At 10 rad/s the cogging repeats at 240 rad/s, well above the speed loop's 50 rad/s, so most of it
+At 10 rad/s the cogging repeats at 240 rad/s, well above the speed loop's 100 rad/s, so most of it
 goes into speeding and slowing the rotor rather than into current. The torque a bin holds is
 therefore the winding's less the rotor's:
 

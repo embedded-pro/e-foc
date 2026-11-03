@@ -117,7 +117,8 @@ loop, the communication interrupts and the event loop, which run only in the tim
 
 The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
 counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a
-re-entry, an interrupt that started before the previous one finished; a GPIO pin can also be toggled for a scope.
+re-entry, an interrupt requested again before the previous one finished, seen as its own pending bit set when the
+callback ends; a GPIO pin can also be toggled for a scope.
 The measurement covers the application callback inside the interrupt (encoder read, control law, PWM write) and
 leaves out the hardware's interrupt entry and exit, for which the requirement reserves the remaining quarter of the
 period (`documentation/design/error-handling.md`). Measured on silicon, the callback takes **1074–1353 cycles**

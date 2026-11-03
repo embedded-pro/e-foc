@@ -200,8 +200,8 @@ $$
   addresses it without the integral's phase cost.
 - A setpoint between two cogging detents sits where the cogging torque pushes the rotor away from it.
   The loop holds there only while its stiffness, $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, exceeds the
-  cogging's, the detent count times its depth. On the bench at the default bandwidths (50 rad/s
-  speed, 18.8 rad/s position) the loop's 0.023 N·m/rad is a quarter of the cogging's 0.096, and the
+  cogging's, the detent count times its depth. On the bench at the default bandwidths (100 rad/s
+  speed, 18.8 rad/s position) the loop's 0.046 N·m/rad is half the cogging's 0.096, and the
   rotor steps between the neighbouring detents instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
   map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
   with it every position law holds 3.0 rad (REQ-POS-012).
