@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.2
+version: 0.3.3
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.2                     |
+| Version   | 0.3.3                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -63,7 +63,8 @@ own.
 - Choosing a firmware version, where it comes from, or when to download or apply it. The user does, through a
   client.
 - Keeping the previous firmware. The bootloader overwrites it when it installs the new one.
-- Updating the EK-TM4C123GXL, which has no bootloader and no staging slot (`bootloader.md` Part A).
+- Updating a board without a bootloader: the EK-TM4C123GXL, and the ST boards until they have one
+  (`bootloader.md` Part A, Part I below).
 
 ---
 
@@ -113,7 +114,8 @@ stopped in this sense: the fault is cleared first, so a download never starts wh
 An accepted Begin erases the status journal, which discards a pack that was staged before, then the entire
 staging slot, one sector per event-loop turn, and only then answers. The download therefore starts on a fully
 erased slot: 16 sectors on the EK-TM4C1294XL, whatever the pack's size. The answer carries the page size, the
-number of bytes the service collects before it programs them: 128 on the TI board and 256 on the ST boards.
+number of bytes the service collects before it programs them: 128 on the TI board and 256 on the emulated
+board (Part I).
 
 - An erase that fails is answered `WriteError`, and the session goes to Error.
 - An Abort or the emergency stop during the erase stops it after the sector in progress. The pending Begin is
@@ -171,7 +173,8 @@ Activate is accepted only when all of these hold:
 
 The service then writes *ready to deploy* into the status journal, enters Restarting, answers, and restarts the
 controller 250 ms later, which leaves the acknowledgement time to leave the send queue, through the
-platform's software reset. Restarting holds the same interlocks as receiving a pack (Part G), so nothing starts the drive
+platform's software reset. On the emulated board the software reset requests a system reset, and the
+emulator restarts into the bootloader, as the board does. Restarting holds the same interlocks as receiving a pack (Part G), so nothing starts the drive
 or writes the non-volatile memory in that second, and a new Begin is answered `Busy`.
 The bootloader installs the pack at that reset, and the new application starts. Between the download and the
 apply the motor may run any number of times and the controller may restart; the staged pack waits.
@@ -232,21 +235,22 @@ parameters (`0xB5`–`0xB7`) wait for the bootloader work. Board kinds: `EK-TM4C
 
 ### Part I — per board
 
-| Board         | Staging flash                                     | Page  | Pack capacity |
-|---------------|---------------------------------------------------|-------|---------------|
-| EK-TM4C1294XL | internal flash, staging region of `bootloader.md` | 128 B | 262 144 B     |
-| NUCLEO-H563ZI | internal flash, bank 2                            | 256 B | 262 144 B     |
-| NUCLEO-G474RE | SPI NOR on the motor board (`bootloader.md` Q1)   | 256 B | 262 144 B     |
-| Emulated      | file `staging.bin` in the scenario directory      | 256 B | 262 144 B     |
-| EK-TM4C123GXL | none: Begin is answered `InvalidSize`             | —     | 0             |
+| Board         | Staging flash                                                     | Page  | Pack capacity |
+|---------------|-------------------------------------------------------------------|-------|---------------|
+| EK-TM4C1294XL | internal flash, staging region of `bootloader.md`                 | 128 B | 262 144 B     |
+| Emulated      | file `staging.bin` in the scenario directory                      | 256 B | 262 144 B     |
+| NUCLEO-H563ZI | none until it has a bootloader; then internal flash, bank 2       | —     | 0             |
+| NUCLEO-G474RE | none until it has a bootloader; then SPI NOR (`bootloader.md` Q1) | —     | 0             |
+| EK-TM4C123GXL | none: Begin is answered `InvalidSize`                             | —     | 0             |
 
 A board without a staging slot still answers the category: Begin with `InvalidSize`, Verify with
 `InvalidState`, Activate with `NotReady`.
 
 The platform provides the staging flash and the status journal, the product name, the application slot's
-capacity and the page size; the service depends on these abstractions only. On the emulated target the file
-stands in for the staging flash as the EEPROM file stands in for the NVM, so a scenario can read back what
-the firmware staged.
+capacity and the page size; the service depends on these abstractions only. On the emulated target the files
+`staging.bin` and `journal.bin` stand in for the staging flash and the journal as the EEPROM file stands in for
+the NVM, so a scenario can read back what the firmware staged; they are the files the emulated bootloader
+reads (`software-in-the-loop.md` Part P).
 
 ### Part J — release assets
 
@@ -404,7 +408,7 @@ sequenceDiagram
 | NVM writes          | refused with `busy` while a pack is received                                                                                     |
 | One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                 |
 | Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                              |
-| Boards              | EK-TM4C1294XL, NUCLEO-H563ZI, NUCLEO-G474RE (with SPI NOR) and the emulated target; not the EK-TM4C123GXL                        |
+| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader; not the EK-TM4C123GXL                          |
 
 ---
 

@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
+#include "bootloader/ImageFormat.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -11,9 +12,26 @@
 #include <cstdio>
 #include <string_view>
 
+extern "C"
+{
+    extern const uint8_t __application_slot_start[];
+    extern const uint8_t __application_slot_end[];
+    extern const uint8_t __staging_slot_start[];
+    extern const uint8_t __staging_slot_end[];
+    extern const uint8_t __status_journal_start[];
+    extern const uint8_t __status_journal_end[];
+}
+
 namespace
 {
     constexpr int kResponseLinesPerDrain = 16;
+    constexpr uint32_t stagingEraseUnit{ 16 * 1024 };
+    constexpr uint16_t stagingPageSize{ 256 };
+    constexpr uintptr_t aircrAddress{ 0xE000ED0Cu };
+    constexpr uint32_t systemResetRequest{ 0x05FA0004u };
+
+    std::array<uint8_t, 256 * 1024> stagingStorage;
+    std::array<uint8_t, 16 * 1024> journalStorage;
 
     // No reset-cause register and reset reloads RAM, so the watchdog leaves its record in a host file.
     constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
@@ -159,9 +177,12 @@ namespace application
               {
                   FocTimerIsr();
               })
+        , stagingFlash("staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
+        , journalFlash("journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
         , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig), std::nullopt, false)
         , baseFrequency(BaseFrequencyFrom(plantConfig))
     {
+        really_assert(stagingStorage.size() == static_cast<std::size_t>(__staging_slot_end - __staging_slot_start) && journalStorage.size() == static_cast<std::size_t>(__status_journal_end - __status_journal_start));
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
         ApplyPlantConfig();
         onInitialized();
@@ -255,7 +276,21 @@ namespace application
     }
 
     void PlatformFactoryImpl::Reset()
-    {}
+    {
+        __asm volatile("dsb" ::: "memory");
+        *reinterpret_cast<volatile uint32_t*>(aircrAddress) = systemResetRequest;
+        __asm volatile("dsb" ::: "memory");
+
+        for (;;)
+        {
+        }
+    }
+
+    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    {
+        const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
+        return FirmwareStaging{ stagingFlash, journalFlash, E_FOC_PRODUCT_NAME, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+    }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const
     {
