@@ -68,8 +68,8 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::stallDetection, SupervisionSettings().back().parameter);
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::resetCause, Readings().back().parameter);
-    EXPECT_EQ(FocParameter::firmwareVersionMajor, FirmwareIdentity().front().parameter);
-    EXPECT_EQ(FocParameter::stagedVersionPatch, FirmwareIdentity().back().parameter);
+    EXPECT_EQ(FocParameter::firmwareVersionMajor, FirmwareIdentityReadings().front().parameter);
+    EXPECT_EQ(FocParameter::stagedVersionPatch, FirmwareIdentityReadings().back().parameter);
 }
 
 TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_and_reads_out_the_rest)
@@ -86,8 +86,8 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(StartupSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(SupervisionSettings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
-    EXPECT_TRUE(std::ranges::all_of(FirmwareIdentity(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + Readings().size() + FirmwareIdentity().size());
+    EXPECT_TRUE(std::ranges::all_of(FirmwareIdentityReadings(), readOnly));
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + Readings().size() + FirmwareIdentityReadings().size());
 }
 
 TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)

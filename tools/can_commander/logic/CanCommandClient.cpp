@@ -377,7 +377,10 @@ namespace tool
 
         auto& partial = identities[nodeId];
         partial[static_cast<std::size_t>(slot - identityParameters.begin())] = value;
-        if (!std::ranges::all_of(partial, &std::optional<float>::has_value))
+        if (!std::ranges::all_of(partial, [](const std::optional<float>& value)
+                {
+                    return value.has_value();
+                }))
             return true;
 
         const FirmwareIdentity identity{ { VersionNumber(partial[0]), VersionNumber(partial[1]), VersionNumber(partial[2]) },

@@ -66,7 +66,7 @@ namespace tool
     std::span<const SettingPresentation> StartupSettings();
     std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> Readings();
-    std::span<const SettingPresentation> FirmwareIdentity();
+    std::span<const SettingPresentation> FirmwareIdentityReadings();
     std::string_view ResetCauseName(float cause);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm);

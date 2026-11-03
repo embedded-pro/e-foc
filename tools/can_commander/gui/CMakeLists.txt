@@ -31,8 +31,12 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     DisplayFormat.hpp
     EventLogView.hpp
     EventLogView.cpp
+    FirmwareTab.hpp
+    FirmwareTab.cpp
     MainWindow.hpp
     MainWindow.cpp
+    MotorFirmware.hpp
+    MotorFirmware.cpp
     MotorOverview.hpp
     MotorOverview.cpp
     MotorPanel.hpp

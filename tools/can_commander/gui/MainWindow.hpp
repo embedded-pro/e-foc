@@ -7,6 +7,7 @@
 #include "tools/can_commander/gui/MotorPanel.hpp"
 #include "tools/can_commander/gui/UpdateBanner.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
+#include "tools/can_commander/logic/FirmwareTransfer.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
 #include "tools/can_commander/support/UpdateChecker.hpp"
 #include "tools/can_commander/support/UpdateSession.hpp"
@@ -20,12 +21,14 @@
 #include <QTabWidget>
 #include <QTimer>
 #include <map>
+#include <optional>
 
 namespace tool
 {
     class MainWindow
         : public QMainWindow
         , private CanCommandClientObserver
+        , private FirmwareTransferObserver
     {
         Q_OBJECT
 
@@ -62,6 +65,13 @@ namespace tool
         void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
         void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) override;
 
+        void OnTransferProgress(uint16_t nodeId, const TransferProgress& progress) override;
+        void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) override;
+        void OnDiscardFinished(uint16_t nodeId, bool acknowledged) override;
+        void OnApplyFinished(uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running) override;
+        void OnTransferAbandoned(uint16_t nodeId) override;
+        bool ConfirmAbandonTransfer(const QString& action);
+        void SetLatestRelease(const ReleaseInfo& release);
         void BuildMenus();
         void BuildFileMenu();
         void BuildMotorMenu();
@@ -104,6 +114,7 @@ namespace tool
         services::CanBusAdapter& adapter;
         IssueLog& issueLog;
         CanCommandClient client;
+        FirmwareTransfer transfer{ client };
         UpdateChecker updateChecker;
         UpdateSession updateSession;
 
@@ -128,6 +139,7 @@ namespace tool
         QSocketNotifier* socketNotifier{ nullptr };
 
         std::map<uint16_t, MotorPanel*> motors;
+        std::optional<ReleaseInfo> latestRelease;
         bool busConnected{ false };
         bool userRequestedUpdateCheck{ false };
         UpdatePhase updatePhase{ UpdatePhase::idle };

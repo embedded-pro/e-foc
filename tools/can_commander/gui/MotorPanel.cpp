@@ -35,9 +35,10 @@ namespace tool
         }
     }
 
-    MotorPanel::MotorPanel(CanCommandClient& client, uint16_t nodeId, Reporter reporter, QWidget* parent)
+    MotorPanel::MotorPanel(CanCommandClient& client, FirmwareTransfer& transfer, uint16_t nodeId, Reporter reporter, QWidget* parent)
         : QWidget(parent)
         , client(client)
+        , transfer(transfer)
         , nodeId(nodeId)
         , reporter(std::move(reporter))
     {
@@ -52,6 +53,21 @@ namespace tool
         splitter->setStretchFactor(0, 3);
         splitter->setStretchFactor(1, 2);
         layout->addWidget(splitter, 1);
+
+        firmware = new MotorFirmware(client, transfer, nodeId, commandPanel->Firmware(), [this](IssueSeverity severity, const QString& message)
+            {
+                Report(severity, message);
+            },
+            [this]()
+            {
+                return CommandsUnavailableReason();
+            },
+            this);
+        connect(firmware, &MotorFirmware::StatusChanged, this, &MotorPanel::StatusChanged);
+        connect(firmware, &MotorFirmware::TransferChanged, this, [this]()
+            {
+                Refresh();
+            });
 
         ConnectCommands();
         ConnectSetpoints();
@@ -84,6 +100,31 @@ namespace tool
     QString MotorPanel::Title() const
     {
         return QString("Motor %1").arg(nodeId);
+    }
+
+    QString MotorPanel::TabText() const
+    {
+        return firmware->UpdateAvailable() ? Title() + " ↑" : Title();
+    }
+
+    QString MotorPanel::FirmwareSummary() const
+    {
+        return firmware->UpdateSummary();
+    }
+
+    MotorFirmware& MotorPanel::Firmware()
+    {
+        return *firmware;
+    }
+
+    void MotorPanel::OnFirmwareIdentity(const FirmwareIdentity& identity)
+    {
+        firmware->OnFirmwareIdentity(identity);
+    }
+
+    void MotorPanel::SetLatestRelease(const ReleaseInfo& release)
+    {
+        firmware->SetLatestRelease(release);
     }
 
     QString MotorPanel::Summary() const
@@ -418,6 +459,7 @@ namespace tool
         for (auto* page : commandPanel->SettingsPages())
             page->ForgetValues();
         commandPanel->Diagnostics().ForgetValues();
+        firmware->ForgetNodeState();
     }
 
     QString MotorPanel::CommandsUnavailableReason() const
@@ -439,6 +481,8 @@ namespace tool
                 break;
         }
 
+        if (transfer.ActiveNode() == nodeId)
+            return "Firmware transfer in progress: the other commands wait until it ends. The emergency stop stays available.";
         if (client.IsBusy(nodeId))
             return QString("Waiting for the response to %1…").arg(pendingCommand);
         return {};
@@ -478,6 +522,7 @@ namespace tool
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
+        firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();
     }
@@ -550,6 +595,9 @@ namespace tool
 
     void MotorPanel::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
+        if (categoryId == services::firmwareUpgradeCategoryId)
+            return;
+
         const bool ownCategory = categoryId == can::focMotorCategoryId;
         auto name = ownCategory && commandType == pendingCommandType && !pendingCommand.isEmpty() ? pendingCommand : ToQt(CommandDisplayName(categoryId, commandType));
         if (name.isEmpty())
@@ -651,7 +699,10 @@ namespace tool
         lastState = state;
         lastFault = fault;
         if (changed)
+        {
+            firmware->SetMotorState(fault == FocFaultCode::none ? std::optional{ state } : std::optional{ FocMotorState::fault });
             Refresh();
+        }
     }
 
     void MotorPanel::OnCurrentStream(float idCurrent, float iqCurrent, float position)

@@ -40,6 +40,7 @@ namespace tool
         motorParameters = new MotorParametersTab();
         configuration = new ConfigurationTab();
         diagnostics = new DiagnosticsTab();
+        firmware = new FirmwareTab();
 
         tabs = new QTabWidget();
         tabs->addTab(CreateMotorControlTab(), "&Motor Control");
@@ -47,7 +48,13 @@ namespace tool
         tabs->addTab(motorParameters, "Motor &Parameters");
         tabs->addTab(configuration, "Confi&guration");
         tabs->addTab(diagnostics, "Diagnostics");
+        tabs->addTab(firmware, "Firm&ware");
         layout->addWidget(tabs, 1);
+    }
+
+    FirmwareTab& CommandPanel::Firmware() const
+    {
+        return *firmware;
     }
 
     ControllersTab& CommandPanel::Controllers() const

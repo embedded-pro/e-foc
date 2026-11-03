@@ -283,7 +283,7 @@ namespace tool
         return Slice(29, 17);
     }
 
-    std::span<const SettingPresentation> FirmwareIdentity()
+    std::span<const SettingPresentation> FirmwareIdentityReadings()
     {
         return Slice(46, 7);
     }
