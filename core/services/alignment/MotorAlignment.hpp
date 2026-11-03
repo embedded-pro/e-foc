@@ -5,6 +5,7 @@
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
+#include <cstdint>
 #include <optional>
 
 namespace services
@@ -26,13 +27,21 @@ namespace services
             foc::Ohm phaseResistance{ 0.0f };
             foc::Henry phaseInductance{ 0.0f };
             foc::Volts busVoltage{ 0.0f };
+            std::optional<foc::Radians> followStep;
+            std::size_t followDwell{ 100 };
+        };
+
+        enum class Failure : uint8_t
+        {
+            none,
+            phaseMissing,
+            encoderNotFollowing
         };
 
         virtual void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) = 0;
 
         virtual void Abort() = 0;
 
-        // Whether the last run failed because a phase did not carry the current the alignment vector drives.
-        virtual bool PhaseMissing() const = 0;
+        virtual Failure LastFailure() const = 0;
     };
 }

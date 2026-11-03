@@ -391,7 +391,7 @@ TEST_F(FocStateMachinePositionCliTest, resistance_inductance_nullopt_enters_faul
 
 TEST_F(FocStateMachinePositionCliTest, alignment_nullopt_enters_fault)
 {
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectPositionCalibrationSequence(true, true, false);
@@ -982,7 +982,7 @@ TEST_F(FocStateMachinePositionAutoTest, resistance_inductance_nullopt_enters_fau
 
 TEST_F(FocStateMachinePositionAutoTest, alignment_nullopt_enters_fault)
 {
-    EXPECT_CALL(alignmentMock, PhaseMissing()).WillRepeatedly(Return(false));
+    EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     ExpectPositionCalibrationSequence(true, true, false);

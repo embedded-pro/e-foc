@@ -58,8 +58,6 @@ namespace supervision
         onFault(state_machine::FaultCode::phaseMissing);
     }
 
-    // A healthy first-order loop passes a fifth of a step in 0.22 time constants, so a slow loop is given one whole
-    // time constant before its shortfall counts as a missing phase.
     infra::Duration PhaseLossMonitor::Span() const
     {
         const auto bandwidth = currentLoopBandwidth != nullptr ? currentLoopBandwidth().Value() : 0.0f;
@@ -71,7 +69,6 @@ namespace supervision
         return std::max(window, timeConstant);
     }
 
-    // Only judged on a slow rotor: at speed the back-EMF can legitimately leave a large demand unmet.
     bool PhaseLossMonitor::CurrentMissing(const foc::MotionObservation& observation) const
     {
         const auto demanded = std::abs(observation.demandedTorqueCurrent.Value());

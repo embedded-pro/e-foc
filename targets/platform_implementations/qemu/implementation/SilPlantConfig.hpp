@@ -85,7 +85,6 @@ namespace sil
         float shaftTurnRadians;
         uint32_t shaftGripDelayMs;
         uint32_t shaftTurnMs;
-        // Zero means the motor cable is never pulled while running.
         uint32_t cableDisconnectDelayMs;
 
         uint8_t polePairs;

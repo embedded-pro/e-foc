@@ -818,7 +818,6 @@ namespace
         : public MotorAlignmentTest
     {
     public:
-        // 20 % of a 24 V bus across 1 Ω drives 2.4 A into phase a and 1.2 A back out of b and c.
         static constexpr float expectedPhaseA{ 2.4f };
 
         MotorAlignmentPhaseContinuityTest()
@@ -867,51 +866,51 @@ namespace
 TEST_F(MotorAlignmentPhaseContinuityTest, PhasesCarryingTheirCurrentAlign)
 {
     EXPECT_TRUE(Align(Currents(2.2f, -1.1f, -1.1f), true).has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, ADisconnectedMotorFailsAsAMissingPhaseWithoutZeroingTheEncoder)
 {
     EXPECT_FALSE(Align(Currents(0.01f, -0.004f, -0.006f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseAIsAMissingPhase)
 {
     EXPECT_FALSE(Align(Currents(0.0f, 0.01f, -0.01f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseBIsAMissingPhase)
 {
     EXPECT_FALSE(Align(Currents(1.8f, 0.0f, -1.8f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, AnOpenPhaseCIsAMissingPhase)
 {
     EXPECT_FALSE(Align(Currents(1.8f, -1.8f, 0.0f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, PhaseAJustAboveAQuarterOfItsExpectedCurrentAligns)
 {
     const auto a = 0.27f * expectedPhaseA;
     EXPECT_TRUE(Align(Currents(a, -a / 2.0f, -a / 2.0f), true).has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, PhaseAJustBelowAQuarterOfItsExpectedCurrentIsAMissingPhase)
 {
     const auto a = 0.23f * expectedPhaseA;
     EXPECT_FALSE(Align(Currents(a, -a / 2.0f, -a / 2.0f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, PhaseBJustBelowAQuarterOfItsShareIsAMissingPhase)
 {
     EXPECT_FALSE(Align(Currents(2.4f, -0.23f * 1.2f, -2.1f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceTheRatioStillFindsAnOpenPhase)
@@ -919,7 +918,7 @@ TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceTheRatioStillFindsAn
     config.phaseResistance = foc::Ohm{ 0.0f };
 
     EXPECT_FALSE(Align(Currents(2.0f, 0.0f, -2.0f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceNoCurrentAtAllCannotBeJudged)
@@ -927,7 +926,7 @@ TEST_F(MotorAlignmentPhaseContinuityTest, WithoutAResistanceNoCurrentAtAllCannot
     config.phaseResistance = foc::Ohm{ 0.0f };
 
     EXPECT_TRUE(Align(Currents(0.0f, 0.0f, 0.0f), true).has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, OnlyTheSettledSamplesAreJudged)
@@ -959,12 +958,11 @@ TEST_F(MotorAlignmentPhaseContinuityTest, OnlyTheSettledSamplesAreJudged)
     ExecuteAllActions();
 
     EXPECT_TRUE(result.has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, ASlowlyRisingCurrentInAWindingThatIsAlreadyAlignedAligns)
 {
-    // L/R = 50 ms: the five settled samples end 5 ms after the vector is applied, at about 6 % of the final current.
     config.phaseInductance = foc::Henry{ 0.05f };
     EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.3f }));
     EXPECT_CALL(driverMock, Stop()).Times(2);
@@ -990,7 +988,7 @@ TEST_F(MotorAlignmentPhaseContinuityTest, ASlowlyRisingCurrentInAWindingThatIsAl
     ExecuteAllActions();
 
     EXPECT_TRUE(result.has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, AHighInductanceWindingThatCarriesNoCurrentIsStillAMissingPhase)
@@ -998,14 +996,173 @@ TEST_F(MotorAlignmentPhaseContinuityTest, AHighInductanceWindingThatCarriesNoCur
     config.phaseInductance = foc::Henry{ 0.05f };
 
     EXPECT_FALSE(Align(Currents(0.0f, 0.0f, 0.0f), false).has_value());
-    EXPECT_TRUE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 }
 
 TEST_F(MotorAlignmentPhaseContinuityTest, ANewRunForgetsAMissingPhaseFoundBefore)
 {
     EXPECT_FALSE(Align(Currents(0.0f, 0.0f, 0.0f), false).has_value());
-    ASSERT_TRUE(alignment->PhaseMissing());
+    ASSERT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
 
     EXPECT_TRUE(Align(Currents(2.4f, -1.2f, -1.2f), true).has_value());
-    EXPECT_FALSE(alignment->PhaseMissing());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
+}
+
+namespace
+{
+    class MotorAlignmentFollowTest
+        : public MotorAlignmentTest
+    {
+    public:
+        static constexpr std::size_t polePairs{ 4 };
+        static constexpr float start{ 1.0f };
+        static constexpr float quarterTurn{ std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs) };
+
+        MotorAlignmentFollowTest()
+        {
+            config.testVoltage = hal::DutyCycle::FromPercent(20);
+            config.settledThreshold = foc::Radians{ 0.001f };
+            config.settledCount = 3;
+            config.followStep = foc::Radians{ std::numbers::pi_v<float> / 2.0f };
+            config.followDwell = 5;
+            config.phaseResistance = foc::Ohm{ 1.0f };
+            config.busVoltage = foc::Volts{ 24.0f };
+
+            EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Invoke([this]()
+                {
+                    return foc::Radians{ position };
+                }));
+            EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+                .WillOnce([this](auto, const auto& onDone)
+                    {
+                        driverMock.StorePhaseCurrentsCallback(onDone);
+                    });
+        }
+
+        void Start(bool aligns)
+        {
+            InSequence sequence;
+            EXPECT_CALL(driverMock, Stop());
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(firstHoldDuties)));
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(alignmentDuties)));
+            if (aligns)
+                EXPECT_CALL(encoderMock, SetZero());
+            EXPECT_CALL(driverMock, Stop());
+
+            alignment->ForceAlignment(polePairs, config, [this](std::optional<foc::Radians> offset)
+                {
+                    result = offset;
+                });
+        }
+
+        void Samples(std::size_t count, float at, foc::PhaseCurrents currents = { foc::Ampere{ 2.0f }, foc::Ampere{ -1.0f }, foc::Ampere{ -1.0f } })
+        {
+            position = at;
+            for (std::size_t sample = 0; sample != count; ++sample)
+                driverMock.TriggerPhaseCurrentsCallback(currents);
+        }
+
+        void SettleFirstHold()
+        {
+            Samples(config.settledCount + 1, start);
+        }
+
+        std::optional<foc::Radians> Finish()
+        {
+            ExecuteAllActions();
+            return result;
+        }
+
+        const foc::PhasePwmDutyCycles firstHoldDuties{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromRatio(5866, 10000), hal::DutyCycle::FromRatio(4134, 10000) };
+        const foc::PhasePwmDutyCycles alignmentDuties{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(45), hal::DutyCycle::FromPercent(45) };
+        services::MotorAlignment::AlignmentConfig config;
+        float position{ start };
+        std::optional<foc::Radians> result{ foc::Radians{ -1.0f } };
+    };
+}
+
+TEST_F(MotorAlignmentFollowTest, AWindingStillSwingingFromTheFirstHoldIsNotAMissingPhase)
+{
+    config.phaseInductance = foc::Henry{ 0.007f };
+    Start(true);
+    Samples(config.settledCount, start, { foc::Ampere{ 0.0f }, foc::Ampere{ 2.08f }, foc::Ampere{ -2.08f } });
+
+    position = start - quarterTurn;
+    for (std::size_t sample = 1; sample <= config.followDwell + config.settledCount; ++sample)
+    {
+        const auto decay = std::exp(-static_cast<float>(sample) * 0.001f / 0.007f);
+        driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 2.4f * (1.0f - decay) }, foc::Ampere{ -1.2f + 3.28f * decay }, foc::Ampere{ -1.2f - 0.88f * decay } });
+    }
+
+    EXPECT_TRUE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, AnEncoderThatFollowsTheFieldAligns)
+{
+    Start(true);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start - quarterTurn);
+
+    EXPECT_TRUE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::none, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, AStuckEncoderOrALockedRotorFailsWithoutZeroing)
+{
+    Start(false);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start);
+
+    EXPECT_FALSE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::encoderNotFollowing, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, AnEncoderCountingTheWrongWayFails)
+{
+    Start(false);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start + quarterTurn);
+
+    EXPECT_FALSE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::encoderNotFollowing, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, ATravelOfTheWrongScaleFails)
+{
+    Start(false);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start - 0.3f * quarterTurn);
+
+    EXPECT_FALSE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::encoderNotFollowing, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, ATravelHeldShortByFrictionStillAligns)
+{
+    Start(true);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start - 0.8f * quarterTurn);
+
+    EXPECT_TRUE(Finish().has_value());
+}
+
+TEST_F(MotorAlignmentFollowTest, AMissingPhaseIsReportedBeforeTheEncoder)
+{
+    Start(false);
+    SettleFirstHold();
+    Samples(config.followDwell + config.settledCount + 1, start, { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_FALSE(Finish().has_value());
+    EXPECT_EQ(services::MotorAlignment::Failure::phaseMissing, alignment->LastFailure());
+}
+
+TEST_F(MotorAlignmentFollowTest, ARotorThatStartsToTurnWithinTheDwellIsNotTakenForSettled)
+{
+    Start(true);
+    SettleFirstHold();
+    Samples(config.followDwell - 1, start);
+    Samples(config.settledCount + 2, start - quarterTurn);
+
+    EXPECT_TRUE(Finish().has_value());
 }
