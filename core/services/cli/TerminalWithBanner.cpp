@@ -9,7 +9,8 @@ namespace services
         tracer.Trace() << "\033[2J\033[H";
         tracer.Trace() << "================================================";
         tracer.Trace() << "e-foc:" << banner.targetName;
-        tracer.Trace() << "Version: 0.0.1";
+        tracer.Trace() << "Version: " << banner.version;
+        tracer.Trace() << "Revision: " << banner.revision;
         tracer.Trace() << "Build: " << __DATE__ << " " << __TIME__;
 #ifdef __VERSION__
         tracer.Trace() << "Compiler: " << __VERSION__;

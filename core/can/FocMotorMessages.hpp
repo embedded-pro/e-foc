@@ -54,7 +54,8 @@ namespace can
         running = 1,
         fault = 2,
         calibrating = 3,
-        partialCalibration = 4
+        partialCalibration = 4,
+        ready = 5
     };
 
     enum class FocFaultCode : uint8_t
@@ -66,7 +67,9 @@ namespace can
         overTemperature = 4,
         sensorFault = 5,
         stall = 6,
-        phaseMissing = 7
+        phaseMissing = 7,
+        hardwareFault = 8,
+        calibrationFailed = 9
     };
 
     enum class FocMotorCategoryError : uint8_t
@@ -159,7 +162,19 @@ namespace can
         loopOverruns = 0xA5,
         loopDeadlineMisses = 0xA6,
         loopReentries = 0xA7,
-        resetCause = 0xB0
+        resetCause = 0xB0,
+        firmwareVersionMajor = 0xB1,
+        firmwareVersionMinor = 0xB2,
+        firmwareVersionPatch = 0xB3,
+        boardKind = 0xB4
+    };
+
+    struct FocFirmwareIdentity
+    {
+        uint8_t versionMajor;
+        uint8_t versionMinor;
+        uint8_t versionPatch;
+        uint8_t boardKind;
     };
 
     enum class FocResetCause : uint8_t

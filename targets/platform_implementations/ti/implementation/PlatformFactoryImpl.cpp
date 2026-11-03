@@ -101,6 +101,11 @@ namespace application
         return boardId;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return static_cast<BoardKind>(Peripheral::boardKind);
+    }
+
     void PlatformFactoryImpl::ConfigureBoardIdPins()
     {
         if constexpr (Peripheral::hasBoardIdPins)
@@ -137,6 +142,11 @@ namespace application
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
+    }
+
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents& offsets)
+    {
+        shuntReadout.Offsets(offsets);
     }
 
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const

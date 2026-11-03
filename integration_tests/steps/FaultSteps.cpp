@@ -28,6 +28,10 @@ namespace
             return can::FocFaultCode::stall;
         if (name == "missing-phase")
             return can::FocFaultCode::phaseMissing;
+        if (name == "hardware")
+            return can::FocFaultCode::hardwareFault;
+        if (name == "calibration")
+            return can::FocFaultCode::calibrationFailed;
         return std::nullopt;
     }
 }

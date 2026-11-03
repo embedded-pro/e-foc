@@ -161,7 +161,7 @@ Counters saturate rather than wrap, so a long run cannot present itself as a hea
 
 `TerminalWithBanner` wraps any `TerminalWithStorage` instance and intercepts the first connection event. On first connect, it prints a formatted welcome message containing:
 
-- Firmware version string
+- Firmware version and source revision, injected by the application from the build information (`generated/Version.h`, which EmIL's `add_version_header_target` regenerates on every build from the CMake project version and the abbreviated source revision, empty when the revision cannot be read); the library holds no version literal
 - Board/hardware identifier
 - A list of available commands (the commands registered on the terminal)
 

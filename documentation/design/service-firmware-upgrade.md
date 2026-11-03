@@ -211,6 +211,11 @@ the build; the staged version is the product version in the staged pack's header
 board and microcontroller its packs name (`bootloader.md` Part B), so a client picks the pack for the board it
 talks to and shows what waits to be applied.
 
+The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the version header EmIL
+generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which each board's `Peripheral::boardKind` sets; the staged-version
+parameters (`0xB5`–`0xB7`) wait for the bootloader work. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
+`NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, emulated `5`, unknown `0`.
+
 ### Part I — per board
 
 | Board         | Staging flash                                     | Page  | Pack capacity |

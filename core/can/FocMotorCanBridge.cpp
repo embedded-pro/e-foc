@@ -21,7 +21,7 @@ namespace can
         , inverter(platform.inverter)
         , encoder(platform.encoder)
         , commissioning(server, controlMode, electricalIdent, currentOffsets, standstill)
-        , settings(server, controlMode, platform.diagnostics, platform.resetCause)
+        , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -35,6 +35,8 @@ namespace can
     {
         switch (code)
         {
+            case state_machine::FaultCode::none:
+                return FocFaultCode::none;
             case state_machine::FaultCode::overcurrent:
                 return FocFaultCode::overCurrent;
             case state_machine::FaultCode::overvoltage:
@@ -49,9 +51,13 @@ namespace can
                 return FocFaultCode::stall;
             case state_machine::FaultCode::phaseMissing:
                 return FocFaultCode::phaseMissing;
-            default:
-                return FocFaultCode::none;
+            case state_machine::FaultCode::hardwareFault:
+                return FocFaultCode::hardwareFault;
+            case state_machine::FaultCode::calibrationFailed:
+                return FocFaultCode::calibrationFailed;
         }
+
+        return FocFaultCode::none;
     }
 
     FocMotorState FocMotorCanBridge::ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration)
@@ -62,6 +68,8 @@ namespace can
             return FocMotorState::calibrating;
         if (std::holds_alternative<state_machine::Enabled>(state))
             return FocMotorState::running;
+        if (std::holds_alternative<state_machine::Ready>(state))
+            return FocMotorState::ready;
         if (hasPartialCalibration)
             return FocMotorState::partialCalibration;
         return FocMotorState::idle;

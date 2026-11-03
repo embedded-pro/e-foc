@@ -92,3 +92,15 @@ TEST_F(TestDecimatingThreePhaseInverter, forwards_the_power_stage_controls)
     EXPECT_NEAR(inverter.MaxCurrentSupported().Value(), 2.5f, 1e-6f);
     EXPECT_EQ(inverter.BaseFrequency(), hal::Hertz{ pwmFrequency });
 }
+
+TEST_F(TestDecimatingThreePhaseInverter, the_current_offsets_pass_to_the_power_stage)
+{
+    foc::PhaseCurrents told{};
+    EXPECT_CALL(powerStage, CurrentOffsets(_)).WillOnce(SaveArg<0>(&told));
+
+    inverter.CurrentOffsets(foc::PhaseCurrents{ foc::Ampere{ 0.027f }, foc::Ampere{ -0.018f }, foc::Ampere{ 0.054f } });
+
+    EXPECT_NEAR(told.a.Value(), 0.027f, 1e-6f);
+    EXPECT_NEAR(told.b.Value(), -0.018f, 1e-6f);
+    EXPECT_NEAR(told.c.Value(), 0.054f, 1e-6f);
+}

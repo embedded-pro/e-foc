@@ -6,7 +6,7 @@ Feature: FOC Motor Control Modes
   mechanical parameters, which this command does not identify, so they stay out
   of Ready, report an incomplete calibration and refuse to enable.
 
-  @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-005 @REQ-SM-011
+  @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-005 @REQ-SM-011 @REQ-CAN-014
   Scenario: Torque mode runs motor with current setpoint
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected

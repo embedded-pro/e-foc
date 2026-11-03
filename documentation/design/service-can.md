@@ -285,6 +285,11 @@ the node reports 2.6 or newer.
 | `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
 | `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
 
+This firmware answers `0xB1`–`0xB4` and does not yet answer `0xB5`–`0xB7`: a query for a staged-version
+parameter is answered `invalidPayload` until the bootloader work serves them. The version numbers are those of
+the CMake project version the build was configured with, and the board kind is the one the platform reports
+(`application::BoardKind`); a client reads `0xB1`–`0xB4` and nothing else of 2.6 from this firmware.
+
 **Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.6 changes.
 
 `FocFaultCode` gains `phaseMissing` (`7`): the motor's phases do not carry the current the drive drives into
@@ -293,6 +298,39 @@ the phase-loss monitor (`fault-supervision.md` Part E). Before 2.7 the alignment
 and a cable pulled while running was not reported at all. Adding the enumerator leaves the meaning of the
 existing codes unchanged, which keeps it a minor version, as `stall` was in 2.4. A client older than 2.7
 shows the new code as an unknown fault.
+
+**Contract 2.8 — every fault, and Ready.** Version 2.8 adds one state and two fault codes; nothing in 2.7 changes.
+Before 2.8 the fault codes `hardwareFault` (a CAN bus-off, a failed NVM write) and `calibrationFailed` went out as
+`none`, and `Ready` went out as `idle`, so a client could neither tell why the drive faulted nor tell a calibrated
+drive from one that still needs a calibration.
+
+| `FocMotorState`      | Value | Lifecycle state (`state-machine.md`)                                  |
+|----------------------|-------|-----------------------------------------------------------------------|
+| `idle`               | 0     | `Idle`: not calibrated for the active mode                            |
+| `running`            | 1     | `Enabled`                                                             |
+| `fault`              | 2     | `Fault`                                                               |
+| `calibrating`        | 3     | `Calibrating`                                                         |
+| `partialCalibration` | 4     | `Idle` holding a non-empty but incomplete record                      |
+| `ready`              | 5     | `Ready`: calibrated and stopped; Start and the setpoints are accepted |
+
+| `FocFaultCode`      | Value | `state_machine::FaultCode` |
+|---------------------|-------|----------------------------|
+| `none`              | 0     | `none`                     |
+| `overCurrent`       | 1     | `overcurrent`              |
+| `overVoltage`       | 2     | `overvoltage`              |
+| `underVoltage`      | 3     | `undervoltage`             |
+| `overTemperature`   | 4     | `overtemperature`          |
+| `sensorFault`       | 5     | `encoderLoss`              |
+| `stall`             | 6     | `stall`                    |
+| `phaseMissing`      | 7     | `phaseMissing`             |
+| `hardwareFault`     | 8     | `hardwareFault`            |
+| `calibrationFailed` | 9     | `calibrationFailed`        |
+
+The mapping has no default: a new `state_machine::FaultCode` fails the build until it is given a wire code.
+Adding enumerators leaves the meaning of the existing ones unchanged, which keeps it a minor version, as `stall`
+was in 2.4. A client older than 2.8 shows the new state and codes as unknown, and a script that waited for `idle`
+after a calibration waits for `ready` from a 2.8 server. `FaultCode::watchdogTimeout` was never raised and its
+value was never persisted or sent, so it was removed instead of given a wire code.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
@@ -323,11 +361,11 @@ documentation. Because every decode is length-exact, a frame built from the exam
 |-------------------------------|---------------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
 | `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
 | `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                      |
-| `FocMotorState`               | adds `partialCalibration = 4`               | stops at `calibrating` | speed and position modes can hold a partial record                                           |
+| `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                           |
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xB0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x17`–`0x19`, `0x80`–`0xB4`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 
@@ -384,7 +422,8 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   acknowledged once stored; a value out of range is acknowledged `invalidPayload`, a loop the active mode does
   not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
-- `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
+- `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds.
+  `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
   The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
   record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection that

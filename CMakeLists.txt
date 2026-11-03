@@ -110,6 +110,8 @@ endif()
 e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
 e_foc_enable_project_warnings()
 e_foc_enable_embedded_optimizations()
+# Created here, not inside EmIL's project(), so the header carries this repository's revision.
+add_version_header_target(e_foc.version_header)
 
 add_subdirectory(core)
 

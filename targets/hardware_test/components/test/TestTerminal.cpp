@@ -24,6 +24,7 @@ namespace
         MOCK_METHOD(hal::GpioPin&, WarningLed, (), (override));
         MOCK_METHOD(hal::GpioPin&, FailureLed, (), (override));
         MOCK_METHOD(uint8_t, BoardId, (), (const, override));
+        MOCK_METHOD(application::BoardKind, GetBoardKind, (), (const, override));
         MOCK_METHOD(hal::Hertz, SystemClock, (), (const, override));
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
@@ -46,6 +47,7 @@ namespace
         MOCK_METHOD(void, Stop, (), (override));
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
+        MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
 
         MOCK_METHOD(foc::Radians, Read, (), (override));
         MOCK_METHOD(void, Set, (foc::Radians), (override));

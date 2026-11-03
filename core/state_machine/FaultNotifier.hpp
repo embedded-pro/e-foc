@@ -13,7 +13,6 @@ namespace state_machine
         undervoltage,
         overtemperature,
         encoderLoss,
-        watchdogTimeout,
         hardwareFault,
         calibrationFailed,
         stall,
@@ -36,8 +35,6 @@ namespace state_machine
                 return "overtemperature";
             case FaultCode::encoderLoss:
                 return "encoderLoss";
-            case FaultCode::watchdogTimeout:
-                return "watchdogTimeout";
             case FaultCode::hardwareFault:
                 return "hardwareFault";
             case FaultCode::calibrationFailed:

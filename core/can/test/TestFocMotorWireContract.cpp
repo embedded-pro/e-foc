@@ -399,6 +399,21 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_8)
+{
+    EXPECT_EQ(2, can::focContractVersionMajor);
+    EXPECT_EQ(8, can::focContractVersionMinor);
+}
+
+TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
+{
+    server.BroadcastTelemetryStatus(can::FocMotorState::ready, can::FocFaultCode::calibrationFailed,
+        foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f });
+
+    EXPECT_EQ(can::focTelemetryStatusResponseId, respondedMessageType);
+    EXPECT_EQ(Bytes({ 0x05, 0x09, 0x00, 0x00, 0x00, 0x00 }), respondedMessage);
+}
+
 TEST_F(FocMotorWireContractTest, the_contract_version_round_trips_and_both_ends_agree)
 {
     client.SendQueryContractVersion(1);

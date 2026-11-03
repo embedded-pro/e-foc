@@ -26,6 +26,16 @@ namespace application
 
     infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, ResetCause cause);
 
+    enum class BoardKind : uint8_t
+    {
+        unknown = 0,
+        ekTm4c1294xl = 1,
+        nucleoG474re = 2,
+        nucleoH563zi = 3,
+        ekTm4c123gxl = 4,
+        emulated = 5,
+    };
+
     class PlatformFactory
         : public drivers::ThreePhasePowerStage
         , public drivers::Encoder
@@ -81,6 +91,7 @@ namespace application
         virtual hal::GpioPin& WarningLed() = 0;
         virtual hal::GpioPin& FailureLed() = 0;
         virtual uint8_t BoardId() const = 0;
+        virtual BoardKind GetBoardKind() const = 0;
         virtual hal::Hertz SystemClock() const = 0;
         virtual foc::Volts PowerSupplyVoltage() = 0;
         virtual foc::LowPriorityInterrupt& LowPriorityInterrupt() = 0;

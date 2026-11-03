@@ -190,6 +190,11 @@ namespace mil
         return model.MaxCurrentSupported();
     }
 
+    void SimulatedDrive::CurrentOffsets(const foc::PhaseCurrents& offsets)
+    {
+        shuntReadout.Offsets(offsets);
+    }
+
     foc::Radians SimulatedDrive::Read()
     {
         return model.Read();

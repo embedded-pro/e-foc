@@ -99,6 +99,11 @@ namespace application
         return 0;
     }
 
+    BoardKind PlatformFactoryImpl::GetBoardKind() const
+    {
+        return static_cast<BoardKind>(Peripheral::boardKind);
+    }
+
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
         return hal::Hertz(SystemCoreClock);
@@ -113,6 +118,9 @@ namespace application
     {
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
+
+    void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents&)
+    {}
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {

@@ -15,6 +15,8 @@ target_link_libraries(e_foc.hardware_test.instantiations PUBLIC
     services.peripheral
 )
 
+add_version_header_dependency(e_foc.hardware_test.instantiations e_foc.version_header)
+
 target_sources(e_foc.hardware_test.instantiations PRIVATE
     Logic.cpp
     Logic.hpp

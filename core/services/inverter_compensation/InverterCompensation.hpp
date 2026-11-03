@@ -23,8 +23,11 @@ namespace services
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
+        void CurrentOffsets(const foc::PhaseCurrents& offsetsRemovedAbove) override;
 
     private:
+        void PassOffsetsDown();
+
         OPTIMIZE_FOR_SPEED void Forward(const foc::PhaseCurrents& raw)
         {
             lastCurrents = foc::PhaseCurrents{
@@ -61,6 +64,7 @@ namespace services
         float inverseKneeCurrent{ 0.0f };
         float lossCounts{ 0.0f };
         foc::PhaseCurrents offsets{};
+        foc::PhaseCurrents offsetsAbove{};
         foc::PhaseCurrents lastCurrents{};
     };
 }

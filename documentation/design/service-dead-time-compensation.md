@@ -56,7 +56,10 @@ identification and alignment procedures. To them it is the inverter. On the way 
 sensors' offsets from each sample (`service-current-offsets.md`) and remembers the result; on the
 way out it corrects the next duty with those currents. In the closed loop the duty follows the
 sample it was computed from in the same interrupt, so the correction always uses the current of
-that period.
+that period. It also hands the offsets it removes down to the platform (`CurrentOffsets`): a
+low-side shunt board rebuilds a hidden phase from the other two raw samples, and that phase must
+carry the sum of the three offsets for the subtraction here to leave it unbiased
+(`documentation/theory/low-side-current-sensing.md` §4).
 
 Both corrections share the stage so that a sample and a duty each cross one call, not two. They
 used to be two stages, one wrapping the other, and each passed the other's traffic through.
@@ -151,7 +154,7 @@ sequenceDiagram
 | Interface | Purpose                                                        | Contract                                                                                       |
 |-----------|----------------------------------------------------------------|------------------------------------------------------------------------------------------------|
 | Inverter  | The bridge, for every duty-commanding and current-reading user | Same as the platform's; samples with the offsets removed, duties corrected by their leg's loss |
-| Offsets   | Set the sensor offsets in force                                | Takes effect on the next sample                                                                |
+| Offsets   | Set the sensor offsets in force                                | Takes effect on the next sample; passed on to the platform for a rebuilt phase                 |
 
 ### Required
 

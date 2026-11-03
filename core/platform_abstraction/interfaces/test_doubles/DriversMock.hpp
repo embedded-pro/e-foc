@@ -24,6 +24,7 @@ namespace drivers
         MOCK_METHOD(void, Stop, (), (override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
+        MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
     };
 
     class ThreePhaseInverterMock
@@ -44,6 +45,7 @@ namespace drivers
         MOCK_METHOD(void, Stop, (), (override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
+        MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
 
         void StorePhaseCurrentsCallback(const infra::Function<void(foc::PhaseCurrents phaseCurrents)>& onDone)
         {

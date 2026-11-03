@@ -27,6 +27,7 @@ namespace can
             drivers::Encoder& encoder;
             application::PlatformDiagnostics& diagnostics;
             FocResetCause resetCause;
+            FocFirmwareIdentity firmware;
         };
 
         FocMotorCanBridge(

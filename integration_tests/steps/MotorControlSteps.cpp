@@ -24,9 +24,9 @@ WHEN(R"(the motor is enabled)")
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId))
         << "Enable (focStartId) command rejected";
-    // Check if the motor immediately goes back to idle (fault/emergency stop)
-    const bool isIdle = fixture.WaitForMotorState(can::FocMotorState::idle, std::chrono::milliseconds{ 500 });
-    EXPECT_FALSE(isIdle) << "Motor immediately returned to idle after enable (fault or emergency stop?)";
+    // Check if the motor immediately goes back to ready (fault/emergency stop)
+    const bool isReady = fixture.WaitForMotorState(can::FocMotorState::ready, std::chrono::milliseconds{ 500 });
+    EXPECT_FALSE(isReady) << "Motor immediately returned to ready after enable (fault or emergency stop?)";
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))
         << "Motor did not reach running state after enable";
 }
@@ -34,7 +34,7 @@ WHEN(R"(the motor is enabled)")
 WHEN(R"(the motor is disabled)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.DisableMotor()) << "Motor did not return to idle after disable";
+    ASSERT_TRUE(fixture.DisableMotor()) << "Motor did not return to ready after disable";
 }
 
 WHEN(R"(a torque setpoint of {float} A is applied)", (float iq))

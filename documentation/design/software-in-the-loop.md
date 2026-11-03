@@ -576,6 +576,15 @@ a fifth higher than anything those six had shown. Every bound still had more tha
 itself to spare, and a bound pinned to the measurement itself would have been red on all three,
 on the very run that was meant to confirm it.
 
+The two deadbeat scenarios on the bench plant with the duty acting a period late (REQ-TRQ-010 and
+REQ-TRQ-011) show what happens without it. Their tail bound was 7 percent, close to a single
+measurement, and CI measured 7.38 and 7.86 percent on runs where the current loop had not changed
+(issue #528). Twenty local runs of each measured tail bands from 3.5 to 6.7 percent, and eleven
+CI measurements of the two from 4.0 to 7.86, so the bound sat inside the spread. The tail band
+there is mostly a late excursion rather than a ripple: the response peaks anywhere from the first
+tick to the end of the window, and when the peak lands in the last quarter the tail band equals
+the overshoot. Both scenarios now carry 16 percent, twice the worst measured, rounded up.
+
 ### Part J — The estimators against a known plant
 
 A simulated plant is the one place where an estimator can be marked against the truth: the

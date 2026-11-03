@@ -242,7 +242,7 @@ namespace
                 rest = standstillMock;
             }
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer, offsets, rest);
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer, offsets, rest);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -1062,6 +1062,20 @@ TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InIdle_BroadcastsIdleStatus)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InReady_BroadcastsReadyStatus)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchCommand(can::focRequestTelemetryId);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::ready));
+    EXPECT_EQ(5u, static_cast<uint8_t>(can::FocMotorState::ready));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+}
+
 TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InPartialCalibration_BroadcastsPartialCalibrationStatus)
 {
     ConstructFixtureInPartialCalibration();
@@ -1254,12 +1268,38 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_PhaseMissing_MapsToPhaseMissing)
     EXPECT_EQ(7u, static_cast<uint8_t>(can::FocFaultCode::phaseMissing));
 }
 
-TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToHardwareFault)
 {
     ConstructFixture();
     ResetCaptures();
 
     bridge->BroadcastFault(state_machine::FaultCode::hardwareFault);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::hardwareFault));
+    EXPECT_EQ(8u, static_cast<uint8_t>(can::FocFaultCode::hardwareFault));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_CalibrationFailed_MapsToCalibrationFailed)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::calibrationFailed);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::calibrationFailed));
+    EXPECT_EQ(9u, static_cast<uint8_t>(can::FocFaultCode::calibrationFailed));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_None_MapsToNone)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::none);
 
     EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
     ASSERT_GE(lastSentData.size(), 2u);
@@ -1578,7 +1618,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog }, electricalIdentMock, tracer);
+    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, electricalIdentMock, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }
@@ -2121,6 +2161,21 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_ResetCause_ReportsTheCauseOfTheLast
     DispatchQueryParameter(can::FocParameter::resetCause);
 
     ExpectAnswered(static_cast<float>(can::FocResetCause::watchdog), false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_FirmwareIdentity_ReportsTheVersionAndTheBoardKind)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMajor);
+    ExpectAnswered(1.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionMinor);
+    ExpectAnswered(6.0f, false);
+    DispatchQueryParameter(can::FocParameter::firmwareVersionPatch);
+    ExpectAnswered(2.0f, false);
+    DispatchQueryParameter(can::FocParameter::boardKind);
+    ExpectAnswered(5.0f, false);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_CalibrationReadings_ReportTheStoredRecord)
