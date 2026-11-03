@@ -4,19 +4,40 @@
 #include "core/can/FocMotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace tool
 {
     using namespace services;
 
+    namespace
+    {
+        constexpr std::array<can::FocParameter, 7> identityParameters{
+            can::FocParameter::firmwareVersionMajor,
+            can::FocParameter::firmwareVersionMinor,
+            can::FocParameter::firmwareVersionPatch,
+            can::FocParameter::boardKind,
+            can::FocParameter::stagedVersionMajor,
+            can::FocParameter::stagedVersionMinor,
+            can::FocParameter::stagedVersionPatch,
+        };
+
+        uint16_t VersionNumber(const std::optional<float>& value)
+        {
+            return static_cast<uint16_t>(std::lround(value.value_or(0.0f)));
+        }
+    }
+
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter }
+        , firmwareUpgrade{ focClient.ProtocolClient().Transport(), focClient.ProtocolClient() }
         , statusRefresh{ statusRefreshInterval, [this]()
             {
                 RefreshStatus();
             } }
     {
+        focClient.ProtocolClient().RegisterCategory(firmwareUpgrade);
         CanProtocolClientObserver::Attach(focClient.ProtocolClient());
         can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
         services::CanBusAdapterObserver::Attach(adapter);
@@ -63,6 +84,21 @@ namespace tool
     bool CanCommandClient::SupportsSupervision(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, supervisionContractMinor);
+    }
+
+    bool CanCommandClient::SupportsFirmwareIdentity(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, firmwareContractMinor);
+    }
+
+    services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
+    {
+        return firmwareUpgrade;
+    }
+
+    const can::CanFrameOrigin& CanCommandClient::FrameOrigin() const
+    {
+        return focClient.Origin();
     }
 
     bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
@@ -314,6 +350,46 @@ namespace tool
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
+    void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
+    {
+        if (!SupportsFirmwareIdentity(nodeId) || IsIdentityQueued(nodeId))
+            return;
+
+        identities.erase(nodeId);
+        for (const auto parameter : identityParameters)
+            QueueRead(nodeId, Read{ can::focQueryParameterId, parameter });
+    }
+
+    bool CanCommandClient::IsIdentityQueued(uint16_t nodeId) const
+    {
+        const auto node = reads.find(nodeId);
+        return node != reads.end() && std::ranges::any_of(node->second.queued, [](const Read& read)
+                                          {
+                                              return read.commandType == can::focQueryParameterId && can::GroupOf(read.parameter) == can::ParameterGroup::firmware;
+                                          });
+    }
+
+    bool CanCommandClient::CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value)
+    {
+        const auto slot = std::ranges::find(identityParameters, parameter);
+        if (slot == identityParameters.end())
+            return false;
+
+        auto& partial = identities[nodeId];
+        partial[static_cast<std::size_t>(slot - identityParameters.begin())] = value;
+        if (!std::ranges::all_of(partial, &std::optional<float>::has_value))
+            return true;
+
+        const FirmwareIdentity identity{ { VersionNumber(partial[0]), VersionNumber(partial[1]), VersionNumber(partial[2]) },
+            static_cast<uint8_t>(VersionNumber(partial[3])), { VersionNumber(partial[4]), VersionNumber(partial[5]), VersionNumber(partial[6]) } };
+        identities.erase(nodeId);
+        NotifyObservers([nodeId, &identity](auto& observer)
+            {
+                observer.OnFirmwareIdentityReceived(nodeId, identity);
+            });
+        return true;
+    }
+
     void CanCommandClient::RequestStatus(uint16_t nodeId)
     {
         if (Compatibility(nodeId) == can::ContractCompatibility::compatible)
@@ -386,6 +462,7 @@ namespace tool
         if (node == reads.end())
             return;
 
+        identities.erase(nodeId);
         node->second.queued.clear();
         node->second.inFlight.reset();
         node->second.timeout.Cancel();
@@ -514,6 +591,7 @@ namespace tool
 
         RequestSettings(nodeId);
         RequestReadings(nodeId);
+        RequestFirmwareIdentity(nodeId);
         RequestStatus(nodeId);
     }
 
@@ -535,6 +613,9 @@ namespace tool
 
     void CanCommandClient::OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value)
     {
+        if (CollectIdentity(nodeId, parameter, value.value))
+            return;
+
         NotifyObservers([nodeId, parameter, value](auto& observer)
             {
                 observer.OnParameterReceived(nodeId, parameter, value);
