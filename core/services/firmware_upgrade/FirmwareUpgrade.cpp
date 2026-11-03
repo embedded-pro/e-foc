@@ -288,7 +288,7 @@ namespace services
         std::copy(data.begin(), data.begin() + now, page.begin() + pageFill);
         pageFill += static_cast<uint16_t>(now);
 
-        const auto rest = infra::DiscardHead(data, now);
+        const auto rest = infra::Head(infra::DiscardHead(data, now), carry.size());
         std::ranges::copy(rest, carry.begin());
         carryFill = static_cast<uint8_t>(rest.size());
 
