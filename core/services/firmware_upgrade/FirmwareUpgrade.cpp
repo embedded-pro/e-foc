@@ -1,6 +1,5 @@
 #include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "infra/util/ReallyAssert.hpp"
-#include <algorithm>
 
 namespace services
 {
@@ -27,6 +26,15 @@ namespace services
 
         really_assert(this->staging->pageSize >= blockSize && this->staging->pageSize <= maxPageSize);
         journal.emplace(this->staging->journal);
+        writer.emplace(this->staging->pack, this->staging->pageSize, infra::MakeRange(scratch), [this]()
+            {
+                return !TakeAbort();
+            });
+        reader.emplace(this->staging->pack, infra::MakeRange(scratch), [this]()
+            {
+                return !TakeAbort();
+            });
+
         if (journal->Status() == application::UpgradePackStatus::downloaded)
         {
             state = State::staged;
@@ -50,7 +58,7 @@ namespace services
     {
         if (state != State::receiving)
             onResult(FwuError::invalidState);
-        else if (flashBusy)
+        else if (FlashBusy())
             onResult(FwuError::busy);
         else if (nextBlock != 0 && blockIndex == nextBlock - 1)
         {
@@ -59,14 +67,17 @@ namespace services
         }
         else if (blockIndex != nextBlock)
             onResult(FwuError::sequenceError);
-        else if (data.size() > packSize - received)
+        else if (data.size() > packSize - writer->Written())
             onResult(FwuError::invalidSize);
         else
         {
             RestartDeadline();
             blockDone = onResult;
             ++nextBlock;
-            AcceptBlock(data);
+            writer->Append(data, [this](bool stored)
+                {
+                    OnBlockStored(stored);
+                });
         }
     }
 
@@ -74,20 +85,25 @@ namespace services
     {
         if (state != State::receiving)
             onResult(FwuError::invalidState);
-        else if (flashBusy)
+        else if (FlashBusy())
             onResult(FwuError::busy);
-        else if (received != packSize)
+        else if (writer->Written() != packSize)
             onResult(FwuError::invalidSize);
         else
         {
             deadline.Cancel();
-            expectedCrc = expectedCrc32;
             verifyDone = onResult;
             Enter(State::verifying);
-            if (pageFill != 0)
-                ProgramPage();
+            if (writer->HoldsPartialPage())
+                writer->Flush([this, expectedCrc32](bool flushed)
+                    {
+                        if (flushed)
+                            CheckCrc(expectedCrc32);
+                        else
+                            Fail(FwuError::writeError);
+                    });
             else
-                StartCrc();
+                CheckCrc(expectedCrc32);
         }
     }
 
@@ -99,7 +115,7 @@ namespace services
             return;
         }
 
-        if (flashBusy || !drive.IsStoppedAndIdle())
+        if (FlashBusy() || !drive.IsStoppedAndIdle())
         {
             onResult(FwuError::busy);
             return;
@@ -116,7 +132,7 @@ namespace services
 
     void FirmwareUpgrade::OnAbort(const infra::Function<void()>& onDone)
     {
-        if (flashBusy)
+        if (FlashBusy())
         {
             abortRequested = true;
             abortDone = onDone;
@@ -153,7 +169,7 @@ namespace services
         if (!Downloading())
             return;
 
-        if (flashBusy)
+        if (FlashBusy())
             abortRequested = true;
         else
             EndDownload();
@@ -185,7 +201,7 @@ namespace services
         if (!staging)
             return FwuError::invalidSize;
 
-        if (Downloading() || state == State::restarting || flashBusy || !drive.IsStoppedAndIdle())
+        if (Downloading() || state == State::restarting || FlashBusy() || !drive.IsStoppedAndIdle())
             return FwuError::busy;
 
         if (firmwareSize < minimumPackSize || firmwareSize > staging->pack.TotalSize())
@@ -198,255 +214,55 @@ namespace services
     {
         discardTimer.Cancel();
         packSize = firmwareSize;
-        received = 0;
         nextBlock = 0;
-        pageAddress = 0;
-        pageFill = 0;
-        carryFill = 0;
-        eraseSector = 0;
         stagedVersion = {};
         Enter(State::erasing);
 
         if (journal->Status() != application::UpgradePackStatus::empty)
             journal->Clear();
 
-        EraseNextSector();
-    }
-
-    void FirmwareUpgrade::EraseNextSector()
-    {
-        if (eraseSector == staging->pack.NumberOfSectors())
-        {
-            OnSlotErased();
-            return;
-        }
-
-        flashBusy = true;
-        staging->pack.EraseSectors(eraseSector, eraseSector + 1, [this]()
+        writer->Erase([this](bool erased)
             {
-                OnSectorErased();
+                OnSlotErased(erased);
             });
     }
 
-    void FirmwareUpgrade::OnSectorErased()
+    void FirmwareUpgrade::OnSlotErased(bool erased)
     {
-        if (!FlashDone())
-            return;
-
-        readAddress = staging->pack.AddressOfSector(eraseSector);
-        readEnd = staging->pack.AddressOfSector(eraseSector + 1);
-        CheckErasedChunk();
-    }
-
-    void FirmwareUpgrade::CheckErasedChunk()
-    {
-        if (readAddress == readEnd)
-        {
-            ++eraseSector;
-            EraseNextSector();
-            return;
-        }
-
-        const auto length = std::min<uint32_t>(maxPageSize, readEnd - readAddress);
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::Head(infra::MakeRange(readBack), length), readAddress, [this, length]()
-            {
-                OnErasedChunk(length);
-            });
-    }
-
-    void FirmwareUpgrade::OnErasedChunk(uint32_t length)
-    {
-        if (!FlashDone())
-            return;
-
-        const auto chunk = infra::Head(infra::MakeRange(readBack), length);
-        if (!std::ranges::all_of(chunk, [](uint8_t byte)
-                {
-                    return byte == 0xff;
-                }))
+        if (!erased)
         {
             Fail(FwuError::writeError);
             return;
         }
 
-        readAddress += length;
-        CheckErasedChunk();
-    }
-
-    void FirmwareUpgrade::OnSlotErased()
-    {
         Enter(State::receiving);
         RestartDeadline();
         Take(beginDone)(FwuError::ok, staging->pageSize);
     }
 
-    void FirmwareUpgrade::AcceptBlock(infra::ConstByteRange data)
+    void FirmwareUpgrade::OnBlockStored(bool stored)
     {
-        received += static_cast<uint32_t>(data.size());
-        const auto now = std::min<std::size_t>(staging->pageSize - pageFill, data.size());
-        std::copy(data.begin(), data.begin() + now, page.begin() + pageFill);
-        pageFill += static_cast<uint16_t>(now);
-
-        const auto rest = infra::Head(infra::DiscardHead(data, now), carry.size());
-        std::ranges::copy(rest, carry.begin());
-        carryFill = static_cast<uint8_t>(rest.size());
-
-        if (pageFill == staging->pageSize)
-            ProgramPage();
+        if (stored)
+            Take(blockDone)(FwuError::ok);
         else
-            CompleteBlock();
-    }
-
-    void FirmwareUpgrade::ProgramPage()
-    {
-        flashBusy = true;
-        staging->pack.WriteBuffer(infra::Head(infra::MakeRange(page), pageFill), pageAddress, [this]()
-            {
-                OnPageWritten();
-            });
-    }
-
-    void FirmwareUpgrade::OnPageWritten()
-    {
-        if (!FlashDone())
-            return;
-
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::Head(infra::MakeRange(readBack), pageFill), pageAddress, [this]()
-            {
-                OnPageProgrammed();
-            });
-    }
-
-    void FirmwareUpgrade::OnPageProgrammed()
-    {
-        if (!FlashDone())
-            return;
-
-        if (!std::equal(page.begin(), page.begin() + pageFill, readBack.begin()))
-        {
             Fail(FwuError::writeError);
-            return;
-        }
-
-        pageAddress += pageFill;
-        std::copy(carry.begin(), carry.begin() + carryFill, page.begin());
-        pageFill = carryFill;
-        carryFill = 0;
-
-        if (state == State::verifying)
-            StartCrc();
-        else
-            CompleteBlock();
     }
 
-    void FirmwareUpgrade::CompleteBlock()
+    void FirmwareUpgrade::CheckCrc(uint32_t expectedCrc)
     {
-        Take(blockDone)(FwuError::ok);
-    }
-
-    void FirmwareUpgrade::StartCrc()
-    {
-        crc.Reset();
-        readAddress = 0;
-        readEnd = packSize;
-        ReadNextCrcChunk();
-    }
-
-    void FirmwareUpgrade::ReadNextCrcChunk()
-    {
-        if (readAddress == readEnd)
-        {
-            if (crc.Result() != expectedCrc)
-                Fail(FwuError::crcMismatch);
-            else
-                ReadHeader([this]()
-                    {
-                        OnVerifiedHeader();
-                    });
-            return;
-        }
-
-        const auto length = std::min<uint32_t>(maxPageSize, readEnd - readAddress);
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::Head(infra::MakeRange(readBack), length), readAddress, [this, length]()
+        reader->CheckCrc(packSize, expectedCrc, [this](bool matches)
             {
-                OnCrcChunk(length);
+                if (!matches)
+                    Fail(FwuError::crcMismatch);
+                else
+                    reader->ReadHeader(packSize, [this](const PackHeader& header)
+                        {
+                            OnVerifiedHeader(header);
+                        });
             });
     }
 
-    void FirmwareUpgrade::OnCrcChunk(uint32_t length)
-    {
-        if (!FlashDone())
-            return;
-
-        crc.Update(infra::Head(infra::MakeRange(readBack), length));
-        readAddress += length;
-        ReadNextCrcChunk();
-    }
-
-    void FirmwareUpgrade::ReadHeader(const infra::Function<void()>& onRead)
-    {
-        onHeaderRead = onRead;
-        header = {};
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::MakeByteRange(header.prologue), 0, [this]()
-            {
-                ReadEpilogue();
-            });
-    }
-
-    void FirmwareUpgrade::ReadEpilogue()
-    {
-        if (!FlashDone())
-            return;
-
-        const auto offset = EpilogueOffset(header.prologue);
-        if (offset + sizeof(header.epilogue) > HeaderReadLimit())
-        {
-            FinishHeader();
-            return;
-        }
-
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::MakeByteRange(header.epilogue), offset, [this]()
-            {
-                ReadImagePrologue();
-            });
-    }
-
-    void FirmwareUpgrade::ReadImagePrologue()
-    {
-        if (!FlashDone())
-            return;
-
-        const uint32_t offset = header.epilogue.headerLength;
-        if (offset + sizeof(header.image) > HeaderReadLimit())
-        {
-            FinishHeader();
-            return;
-        }
-
-        flashBusy = true;
-        staging->pack.ReadBuffer(infra::MakeByteRange(header.image), offset, [this]()
-            {
-                if (FlashDone())
-                    FinishHeader();
-            });
-    }
-
-    void FirmwareUpgrade::FinishHeader()
-    {
-        Take(onHeaderRead)();
-    }
-
-    uint32_t FirmwareUpgrade::HeaderReadLimit() const
-    {
-        return state == State::verifying ? packSize : staging->pack.TotalSize();
-    }
-
-    void FirmwareUpgrade::OnVerifiedHeader()
+    void FirmwareUpgrade::OnVerifiedHeader(const PackHeader& header)
     {
         const auto version = CheckPackHeader(header, PackLimits{ staging->productName, staging->applicationCapacity, packSize });
         if (!version)
@@ -463,16 +279,15 @@ namespace services
 
     void FirmwareUpgrade::ReadStagedVersion()
     {
-        ReadHeader([this]()
+        reader->ReadHeader(staging->pack.TotalSize(), [this](const PackHeader& header)
             {
                 stagedVersion = ParseVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
             });
     }
 
-    bool FirmwareUpgrade::FlashDone()
+    bool FirmwareUpgrade::FlashBusy() const
     {
-        flashBusy = false;
-        return !TakeAbort();
+        return (writer && writer->Busy()) || (reader && reader->Busy());
     }
 
     bool FirmwareUpgrade::TakeAbort()
@@ -558,7 +373,7 @@ namespace services
         if (state != State::receiving)
             return;
 
-        if (flashBusy)
+        if (FlashBusy())
             abortRequested = true;
         else
             EndDownload();
