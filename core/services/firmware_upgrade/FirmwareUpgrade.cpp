@@ -225,7 +225,7 @@ namespace services
             return;
 
         const auto chunk = infra::Head(infra::MakeRange(readBack), length);
-        if (!std::all_of(chunk.begin(), chunk.end(), [](uint8_t byte)
+        if (!std::ranges::all_of(chunk, [](uint8_t byte)
                 {
                     return byte == 0xff;
                 }))
@@ -253,7 +253,7 @@ namespace services
         pageFill += static_cast<uint16_t>(now);
 
         const auto rest = infra::DiscardHead(data, now);
-        std::copy(rest.begin(), rest.end(), carry.begin());
+        std::ranges::copy(rest, carry.begin());
         carryFill = static_cast<uint8_t>(rest.size());
 
         if (pageFill == staging->pageSize)
