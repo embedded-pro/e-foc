@@ -2,8 +2,13 @@
 #include "application/bootloader_image/KeySet.hpp"
 #include "bootloader/StatusJournal.hpp"
 #include "generated/Version.h"
+#include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include <algorithm>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <random>
 #include <span>
@@ -14,6 +19,8 @@ namespace integration
 {
     namespace
     {
+        constexpr uint32_t hilSlotStart = 0x00008000;
+
         const std::map<std::string, application::UpgradePackStatus> statuses{
             { "empty", application::UpgradePackStatus::empty },
             { "downloaded", application::UpgradePackStatus::downloaded },
@@ -22,6 +29,26 @@ namespace integration
             { "deployed", application::UpgradePackStatus::deployed },
             { "invalid", application::UpgradePackStatus::invalid },
         };
+
+        std::vector<uint8_t> ReadFile(const std::string& path)
+        {
+            std::ifstream file{ path, std::ios::binary };
+            if (!file)
+                throw std::runtime_error{ "Cannot read " + path };
+            return { std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
+        }
+
+        std::string DevelopmentKeysPath()
+        {
+            const char* path = std::getenv("E_FOC_DEVELOPMENT_KEYS");
+            return path != nullptr ? path : E_FOC_DEVELOPMENT_KEYS_DEFAULT_PATH;
+        }
+
+        PackSource HardwarePackSource()
+        {
+            auto image = std::filesystem::path{ hil::GetBridgeConfig().firmwareElf }.replace_extension(".image.bin");
+            return PackSource{ ReadFile(image.string()), ReadFile(DevelopmentKeysPath()), E_FOC_HIL_PRODUCT_NAME, hilSlotStart, E_FOC_HIL_BOARD_KIND };
+        }
 
         bool Random(std::span<uint8_t> bytes)
         {
@@ -44,8 +71,9 @@ namespace integration
 
     PackSource TargetPackSource()
     {
-        auto& emulated = EmulatedBootloader();
-        return PackSource{ emulated.ApplicationImage(), emulated.DevelopmentKeySet(), E_FOC_EMULATED_PRODUCT_NAME, emulatedSlotStart, E_FOC_EMULATED_BOARD_KIND };
+        if (auto* emulated = BootloaderTarget::Instance())
+            return PackSource{ emulated->ApplicationImage(), emulated->DevelopmentKeySet(), E_FOC_EMULATED_PRODUCT_NAME, emulatedSlotStart, E_FOC_EMULATED_BOARD_KIND };
+        return HardwarePackSource();
     }
 
     std::string BuildVersion()

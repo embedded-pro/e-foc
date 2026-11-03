@@ -1266,7 +1266,8 @@ whole application, some 39 000 blocks, about 20 minutes, beyond what a shard can
 scenario that applies a pack therefore starts where a finished download leaves the board: the application's
 pack in `staging.bin`, built as above, and the journal reading *downloaded*. The firmware reads both at
 start-up and reports the staged version, Activate goes over CAN, and the bootloader installs the pack at the
-reset. That the download writes exactly what it received into `staging.bin` is the first scenario's check.
+reset. That the download writes exactly what it received into `staging.bin` is the first scenario's check, and
+the hardware-in-the-loop scenario downloads the whole application over the board's CAN bus.
 
 **Scenarios** (`firmware_upgrade.feature`, `@sil`):
 

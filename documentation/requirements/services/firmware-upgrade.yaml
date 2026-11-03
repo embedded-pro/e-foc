@@ -41,7 +41,7 @@
 - id: REQ-UPD-005
   title: The apply restarts into the bootloader only while the drive is stopped
   status: verified
-  verification: [unit, sil]
+  verification: [unit, sil, hil]
   shall: >
     The motor controller shall answer Activate with NotReady unless a verified pack is staged,
     and with Busy unless the drive is Idle or Ready with nothing outstanding. An accepted
@@ -61,7 +61,7 @@
 - id: REQ-UPD-007
   title: The drive reports its firmware version, its board and the staged version
   status: verified
-  verification: [unit, sil]
+  verification: [unit, sil, hil]
   shall: >
     The motor controller shall answer QueryParameter for the contract 2.6 parameters
     firmwareVersionMajor, firmwareVersionMinor, firmwareVersionPatch, boardKind,
