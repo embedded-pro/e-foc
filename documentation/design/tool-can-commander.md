@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.9.2
+version: 0.10.0
 component: "tool-can-commander"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.9.2                |
+| Version   | 0.10.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-03           |
 
@@ -407,14 +407,18 @@ nothing more.
 
 - **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
   release, by its asset name (`service-firmware-upgrade.md` Part J). When that release is newer than the
-  version the motor reports, the Firmware tab says so and the motor's tab carries a marker. *Open Pack File…*
-  takes a local pack instead, for a development build. A node older than contract 2.8 cannot report its
-  version or board, so the tab explains that and offers nothing.
+  version the motor reports, the Firmware tab says so and the motor's tab carries a marker, an arrow after the
+  motor's name, with the release in the tab's tooltip. *Open Pack File…* takes a local pack instead, for a
+  development build. A node older than contract 2.8 cannot report its version or board, so the tab explains
+  that and offers nothing. Only a board with a bootloader can be updated, today the EK-TM4C1294XL and the
+  emulated board; for any other the tab says that the board has no bootloader to install a pack.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
-  per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its
-  installer; a file that does not match is deleted. Every pack, downloaded or opened, is read before it is
-  offered: its magic, its header version, a size the staging slot holds (256 KB), and a product name that
-  names the board the node reports and that board's microcontroller. A pack for another board or another
+  per-user cache, in its `firmware` folder, and checked against the size and SHA-256 the release publishes, as
+  the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
+  opened, is read before it is offered: its magic, its header version, a size the staging slot holds (256 KB),
+  a product name that names the board the node reports and that board's microcontroller, a product version of
+  three numbers, and the one application image that ends the pack, as the controller checks them
+  (`service-firmware-upgrade.md` Part D). A pack for another board or another
   microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
   controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
@@ -433,7 +437,10 @@ nothing more.
   Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
-  node to come back, then reads its version. The update succeeded when the node reports the staged version. A
+  node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
+  its firmware identity again when it comes back online, and every 5 s while it has not dropped off the bus,
+  which a restart faster than the 3 s offline timeout does not. The update succeeded when the node reports the
+  staged version. A
   node that comes back with the old version had its pack refused by the bootloader, which kept the old
   application: the tool says so and logs it. A node that does not come back is reported as a failed update that
   needs a debugger to recover.
