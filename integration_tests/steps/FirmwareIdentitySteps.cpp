@@ -1,6 +1,6 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
-#include "e_foc/BuildInfo.hpp"
+#include "generated/Version.h"
 #include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include <gtest/gtest.h>
@@ -21,9 +21,9 @@ THEN(R"(the target shall report the firmware version of this build)")
 {
     auto& fixture = context.Get<Fixture>();
 
-    ExpectReported(fixture, can::FocParameter::firmwareVersionMajor, build_info::versionMajor);
-    ExpectReported(fixture, can::FocParameter::firmwareVersionMinor, build_info::versionMinor);
-    ExpectReported(fixture, can::FocParameter::firmwareVersionPatch, build_info::versionPatch);
+    ExpectReported(fixture, can::FocParameter::firmwareVersionMajor, e_foc::generated::VERSION_MAJOR);
+    ExpectReported(fixture, can::FocParameter::firmwareVersionMinor, e_foc::generated::VERSION_MINOR);
+    ExpectReported(fixture, can::FocParameter::firmwareVersionPatch, e_foc::generated::VERSION_PATCH);
 }
 
 THEN(R"(the target shall report board kind {int})", (int kind))

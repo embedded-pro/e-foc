@@ -13,7 +13,6 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.supervision
     e_foc.foc.cascade
     e_foc.services.cli
-    e_foc.build_info
     e_foc.services.current_offsets
     e_foc.services.inverter_compensation
     e_foc.services.electrical_system_ident
@@ -23,6 +22,8 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     numerical.controllers.implementations
     services.peripheral
 )
+
+add_version_header_dependency(e_foc.sync_foc_sensored.main.inst e_foc.version_header)
 
 target_sources(e_foc.sync_foc_sensored.main.inst PRIVATE
     Logic.cpp

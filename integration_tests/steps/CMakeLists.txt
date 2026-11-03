@@ -23,9 +23,10 @@ add_library(e_foc.integration_tests.steps OBJECT
 
 target_link_libraries(e_foc.integration_tests.steps PUBLIC
     e_foc.integration_tests.support
-    e_foc.build_info
     e_foc.integration_tests.interactor.hardware
     cucumber_cpp.runner
     GTest::gtest
     GTest::gmock
 )
+
+add_version_header_dependency(e_foc.integration_tests.steps e_foc.version_header)

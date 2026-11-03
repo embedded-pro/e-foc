@@ -1,6 +1,6 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include "core/can/CanNodeAddress.hpp"
-#include "e_foc/BuildInfo.hpp"
+#include "generated/Version.h"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace application
@@ -29,7 +29,7 @@ namespace application
     {
         can::FocFirmwareIdentity FirmwareIdentityOf(BoardKind boardKind)
         {
-            return can::FocFirmwareIdentity{ build_info::versionMajor, build_info::versionMinor, build_info::versionPatch, static_cast<uint8_t>(boardKind) };
+            return can::FocFirmwareIdentity{ e_foc::generated::VERSION_MAJOR, e_foc::generated::VERSION_MINOR, e_foc::generated::VERSION_PATCH, static_cast<uint8_t>(boardKind) };
         }
     }
 
@@ -38,7 +38,7 @@ namespace application
         , boardId{ hardware.BoardId() }
         , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
-        , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus(), build_info::version, build_info::revision } }
+        , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus(), e_foc::generated::VERSION, e_foc::generated::VERSION_GIT_SHA } }
         , terminalDiagnostics{ terminalWithStorage, hardware.Diagnostics(), hardware.Tracer() }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }

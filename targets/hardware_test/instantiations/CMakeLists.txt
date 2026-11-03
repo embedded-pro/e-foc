@@ -11,10 +11,11 @@ target_link_libraries(e_foc.hardware_test.instantiations PUBLIC
     e_foc.hardware_test.components
     e_foc.foc.cascade
     e_foc.services.cli
-    e_foc.build_info
     numerical.controllers.implementations
     services.peripheral
 )
+
+add_version_header_dependency(e_foc.hardware_test.instantiations e_foc.version_header)
 
 target_sources(e_foc.hardware_test.instantiations PRIVATE
     Logic.cpp

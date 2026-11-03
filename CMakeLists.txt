@@ -42,7 +42,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptimizations.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildInfo.cmake")
 
 set(EMIL_INCLUDE_ECHO Off CACHE BOOL "" FORCE)
 set(EMIL_FETCH_ECHO_COMPILERS Off CACHE BOOL "" FORCE)
@@ -110,7 +109,8 @@ endif()
 e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
 e_foc_enable_project_warnings()
 e_foc_enable_embedded_optimizations()
-e_foc_generate_build_info()
+# Created here, not inside EmIL's project(), so the header carries this repository's revision.
+add_version_header_target(e_foc.version_header)
 
 add_subdirectory(core)
 
