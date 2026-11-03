@@ -26,6 +26,8 @@ add_library(e_foc.integration_tests.support OBJECT
     CanParameters.cpp
     ControllerSelection.hpp
     ControllerSelection.cpp
+    FirmwareUpgradeClient.hpp
+    FirmwareUpgradeClient.cpp
     Fixture.hpp
     Fixture.cpp
     TerminalFixture.hpp
@@ -44,6 +46,7 @@ target_link_libraries(e_foc.integration_tests.support PUBLIC
     e_foc.services.non_volatile_memory
     e_foc.can
     hal.interfaces
+    can_lite.categories.firmware_upgrade
     can_lite.test_util
     GTest::gtest
     GTest::gmock

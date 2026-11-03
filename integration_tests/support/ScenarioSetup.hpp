@@ -40,6 +40,17 @@ namespace integration
         std::optional<float> fluxLinkageWeber;
     };
 
+    struct FirmwareDownload
+    {
+        std::vector<uint8_t> pack;
+        uint32_t crc{ 0 };
+        std::optional<uint8_t> beginAnswer;
+        std::optional<uint16_t> pageSize;
+        std::optional<uint8_t> verifyAnswer;
+        std::optional<uint8_t> activateAnswer;
+        uint16_t blocksSent{ 0 };
+    };
+
     struct ScenarioSetup
     {
         sil::SilPlantConfig plant{ sil::NominalPlant() };
@@ -51,5 +62,6 @@ namespace integration
         IdentifiedParameters identified;
         IdentifiedParameters online;
         std::vector<StreamedCurrent> streamedCurrents;
+        FirmwareDownload download;
     };
 }
