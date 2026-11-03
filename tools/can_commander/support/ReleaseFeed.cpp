@@ -9,6 +9,16 @@ namespace tool
     {
         constexpr qsizetype sha256Bytes{ 32 };
 
+        std::optional<InstallerAsset> DownloadableAsset(const QJsonValue& asset)
+        {
+            const auto object = asset.toObject();
+            const QUrl url{ object.value("browser_download_url").toString() };
+            if (!url.isValid() || url.scheme() != "https")
+                return std::nullopt;
+
+            return InstallerAsset{ object.value("name").toString(), url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) };
+        }
+
         std::optional<InstallerAsset> FindInstaller(const QJsonArray& assets, InstallerPlatform platform)
         {
             const auto suffix = InstallerAssetSuffix(platform);
@@ -16,14 +26,8 @@ namespace tool
                 return std::nullopt;
 
             for (const auto& asset : assets)
-            {
-                const auto object = asset.toObject();
-                const auto name = object.value("name").toString();
-                const QUrl url{ object.value("browser_download_url").toString() };
-
-                if (name.endsWith(suffix) && url.isValid() && url.scheme() == "https")
-                    return InstallerAsset{ name, url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) };
-            }
+                if (auto installer = DownloadableAsset(asset); installer && installer->fileName.endsWith(suffix))
+                    return installer;
 
             return std::nullopt;
         }
@@ -32,14 +36,8 @@ namespace tool
         {
             std::vector<InstallerAsset> packs;
             for (const auto& asset : assets)
-            {
-                const auto object = asset.toObject();
-                const auto name = object.value("name").toString();
-                const QUrl url{ object.value("browser_download_url").toString() };
-
-                if (name.startsWith("e_foc-firmware-") && name.endsWith(".upgrade") && url.isValid() && url.scheme() == "https")
-                    packs.push_back(InstallerAsset{ name, url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) });
-            }
+                if (auto pack = DownloadableAsset(asset); pack && pack->fileName.startsWith(QLatin1String("e_foc-firmware-")) && pack->fileName.endsWith(QLatin1String(".upgrade")))
+                    packs.push_back(*pack);
 
             return packs;
         }
