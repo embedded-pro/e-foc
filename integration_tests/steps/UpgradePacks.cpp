@@ -1,6 +1,7 @@
 #include "integration_tests/steps/UpgradePacks.hpp"
 #include "application/bootloader_image/KeySet.hpp"
 #include "bootloader/StatusJournal.hpp"
+#include "generated/Version.h"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include <algorithm>
 #include <map>
@@ -45,6 +46,11 @@ namespace integration
     {
         auto& emulated = EmulatedBootloader();
         return PackSource{ emulated.ApplicationImage(), emulated.DevelopmentKeySet(), E_FOC_EMULATED_PRODUCT_NAME, emulatedSlotStart, E_FOC_EMULATED_BOARD_KIND };
+    }
+
+    std::string BuildVersion()
+    {
+        return std::to_string(e_foc::generated::VERSION_MAJOR) + "." + std::to_string(e_foc::generated::VERSION_MINOR) + "." + std::to_string(e_foc::generated::VERSION_PATCH);
     }
 
     std::vector<uint8_t> DevelopmentSignedPack(const application::PackDescription& description)

@@ -1,9 +1,10 @@
 Feature: Firmware upgrade
   The application receives an upgrade pack over the can-lite firmware-upgrade
-  category into the staging slot, checks it and keeps it staged. A download
-  starts only while the drive is stopped. Every pack is built with the release's
-  pack builder and signed with the public development key set the emulated
-  bootloader carries.
+  category into the staging slot, checks it and keeps it staged; on Activate it
+  marks the pack ready and restarts into the bootloader, which installs it. A
+  download starts, and an apply restarts, only while the drive is stopped. Every
+  pack is built with the release's pack builder and signed with the public
+  development key set the emulated bootloader carries.
 
   Background:
     Given a nominal motor plant
@@ -21,6 +22,17 @@ Feature: Firmware upgrade
     And the drive reports the staged version "2.3.4"
     And the drive reports the version of its build and its board kind
 
+  @REQ-UPD-011 @sil
+  Scenario: A staged pack waits across runs and restarts
+    When the target boots
+    And a pack of version "2.3.4" is downloaded
+    And the rotor is aligned
+    And the motor is enabled
+    And the motor is disabled
+    And the target restarts
+    Then the drive reports the staged version "2.3.4"
+    And the journal reads "downloaded"
+
   @REQ-UPD-002 @sil
   Scenario: A download is refused while the motor runs
     When the target boots
@@ -29,6 +41,16 @@ Feature: Firmware upgrade
     And Begin Upgrade is sent for a pack of version "2.3.4"
     Then Begin Upgrade is answered "busy"
     And the journal reads "empty"
+
+  @REQ-UPD-005 @sil
+  Scenario: The apply is refused while the motor runs
+    When the target boots
+    And a pack of version "2.3.4" is downloaded
+    And the rotor is aligned
+    And the motor is enabled
+    And Activate is sent
+    Then Activate is answered "busy"
+    And the journal reads "downloaded"
 
   @REQ-UPD-003 @REQ-UPD-006 @sil
   Scenario: The drive stays stopped while a pack is received
@@ -66,3 +88,14 @@ Feature: Firmware upgrade
     And the emergency stop is sent
     Then the next block is answered "invalid state"
     And the journal reads "empty"
+
+  @REQ-UPD-005 @REQ-UPD-007 @REQ-UPD-011 @sil
+  Scenario: The apply installs the staged pack
+    Given the application is staged as a downloaded pack of the version it runs
+    When the target boots
+    Then the drive reports the staged version of its build
+    When Activate is sent
+    Then Activate is answered "ok"
+    And the bootloader installs the pack and the application starts again
+    And the drive reports the staged version "0.0.0"
+    And the drive reports the version of its build and its board kind

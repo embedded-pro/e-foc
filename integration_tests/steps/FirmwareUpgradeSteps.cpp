@@ -18,6 +18,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace integration;
@@ -25,6 +26,8 @@ using namespace integration;
 namespace
 {
     constexpr std::size_t smallImageSize = 600;
+    constexpr auto installTimeout = std::chrono::seconds{ 60 };
+    constexpr auto journalPollInterval = std::chrono::milliseconds{ 100 };
 
     const std::map<std::string, services::FwuError> answers{
         { "ok", services::FwuError::ok },
@@ -57,6 +60,11 @@ namespace
     {
         const auto source = TargetPackSource();
         return application::PackDescription{ source.productName, version, "sync_foc_sensored", source.slotStart, std::move(image) };
+    }
+
+    application::PackDescription ApplicationPack()
+    {
+        return PackOf(BuildVersion(), TargetPackSource().applicationImage);
     }
 
     void Prepare(FirmwareDownload& download, const application::PackDescription& description)
@@ -139,6 +147,14 @@ WHEN(R"(a pack of version {string} is downloaded with a CRC that does not match)
     Download(context.Get<Fixture>(), download);
 }
 
+GIVEN(R"(the application is staged as a downloaded pack of the version it runs)")
+{
+    auto& download = context.Get<ScenarioSetup>().download;
+    Prepare(download, ApplicationPack());
+    EmulatedBootloader().ConfigureStaging(download.pack);
+    EmulatedBootloader().ConfigureJournal(JournalReading(application::UpgradePackStatus::downloaded));
+}
+
 WHEN(R"(Begin Upgrade is sent for a pack of version {string})", (std::string version))
 {
     auto& download = context.Get<ScenarioSetup>().download;
@@ -151,6 +167,13 @@ WHEN(R"(the first {int} blocks are sent)", (int count))
     auto& download = context.Get<ScenarioSetup>().download;
     ASSERT_EQ(AnswerNamed("ok"), download.beginAnswer) << "Begin Upgrade was refused";
     SendBlocks(context.Get<Fixture>(), download, static_cast<uint16_t>(count));
+}
+
+WHEN(R"(Activate is sent)")
+{
+    const auto answer = FirmwareUpgradeClient{ context.Get<Fixture>() }.Activate();
+    ASSERT_TRUE(answer.has_value()) << "Activate was not answered";
+    context.Get<ScenarioSetup>().download.activateAnswer = static_cast<uint8_t>(*answer);
 }
 
 WHEN(R"(Abort is sent)")
@@ -176,6 +199,11 @@ THEN(R"(Begin Upgrade was answered with a page size of {int})", (int pageSize))
 THEN(R"(the download is answered {string})", (std::string answer))
 {
     EXPECT_EQ(AnswerNamed(answer), context.Get<ScenarioSetup>().download.verifyAnswer);
+}
+
+THEN(R"(Activate is answered {string})", (std::string answer))
+{
+    EXPECT_EQ(AnswerNamed(answer), context.Get<ScenarioSetup>().download.activateAnswer);
 }
 
 THEN(R"(the next block is answered {string})", (std::string answer))
@@ -208,6 +236,14 @@ THEN(R"(the drive reports the staged version {string})", (std::string version))
     ExpectParameter(fixture, can::FocParameter::stagedVersionPatch, numbers[2]);
 }
 
+THEN(R"(the drive reports the staged version of its build)")
+{
+    auto& fixture = context.Get<Fixture>();
+    ExpectParameter(fixture, can::FocParameter::stagedVersionMajor, e_foc::generated::VERSION_MAJOR);
+    ExpectParameter(fixture, can::FocParameter::stagedVersionMinor, e_foc::generated::VERSION_MINOR);
+    ExpectParameter(fixture, can::FocParameter::stagedVersionPatch, e_foc::generated::VERSION_PATCH);
+}
+
 THEN(R"(the drive reports the version of its build and its board kind)")
 {
     auto& fixture = context.Get<Fixture>();
@@ -230,4 +266,14 @@ THEN(R"(setting the telemetry rate to {int} Hz is refused as busy)", (int rateHz
     ASSERT_TRUE(error.has_value() && error->size() == 2) << "The drive sent no category error";
     EXPECT_EQ((*error)[0], can::focConfigureTelemetryRateId);
     EXPECT_EQ((*error)[1], static_cast<uint8_t>(can::FocMotorCategoryError::busy));
+}
+
+THEN(R"(the bootloader installs the pack and the application starts again)")
+{
+    const auto deadline = std::chrono::steady_clock::now() + installTimeout;
+    while (RecordedJournal().first != application::UpgradePackStatus::deployed && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(journalPollInterval);
+
+    ASSERT_EQ(application::UpgradePackStatus::deployed, RecordedJournal().first) << "The bootloader did not record the pack deployed";
+    EXPECT_TRUE(context.Get<Fixture>().WaitForCanHeartbeat()) << "No application answered after the installation";
 }

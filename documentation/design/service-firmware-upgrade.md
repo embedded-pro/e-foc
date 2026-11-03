@@ -273,17 +273,18 @@ the board it is published for. A dry run builds and signs with the development k
 
 ### Part K — verification
 
-| Level                 | What it shows                                                                                                                                                                                                                         | Requirements                           |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
-| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake | REQ-UPD-001 to 008, 011 to 014         |
-| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                                        | REQ-BOOT-001 to 007                    |
-| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile                                                | REQ-UPD-001 to 004, 006, 007, 013, 014 |
-| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                                                 | REQ-UPD-005, REQ-BOOT-001 to 004       |
-| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                       | REQ-UPD-009, REQ-UPD-010               |
+| Level                 | What it shows                                                                                                                                                                                                                                                                              | Requirements                      |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| Unit tests            | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                      | REQ-UPD-001 to 008, 011 to 014    |
+| Bootloader host tests | Valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts                                                                                                             | REQ-BOOT-001 to 007               |
+| Software in the loop  | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader | REQ-UPD-001 to 007, 011, 013, 014 |
+| Hardware in the loop  | Download, run, stop, apply and restart on the EK-TM4C1294XL, the new version read back (`@hil_motor`)                                                                                                                                                                                      | REQ-UPD-005, REQ-BOOT-001 to 004  |
+| CAN Commander tests   | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus                                                                                                                                                            | REQ-UPD-009, REQ-UPD-010          |
 
 The software-in-the-loop scenarios read the staging and journal files the emulated firmware wrote and check
-the pack and the journal in them. They send a small pack, built for the scenario with the real product name.
-The new feature goes into the shard that keeps the three balanced (`integration_tests/sil-shards.json`).
+the pack and the journal in them. Most send a small pack, built for the scenario with the real product name;
+only the scenario that applies the pack sends the application itself, since the bootloader checks the image it
+installs. The new feature goes into the shard that keeps the three balanced (`integration_tests/sil-shards.json`).
 
 ---
 

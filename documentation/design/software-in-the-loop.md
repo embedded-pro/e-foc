@@ -1248,6 +1248,11 @@ over CAN, stages it and, on Activate, restarts into the bootloader, which instal
 staged is what the bootloader finds after the reset, and what a scenario reads back after the run. The page
 is 256 bytes and the staging slot 256 KB, as Part I of the service's design gives for the emulated board.
 
+**The reset.** The application's software reset requests a system reset. The emulator restarts the machine in
+the same process: it loads the bootloader and the slot as at start (Part P), the bootloader finds *ready to
+deploy* in `journal.bin` and installs the pack from `staging.bin`. The terminal and the CAN channel stay
+connected across it, so a scenario sees the node fall silent and its heartbeat come back.
+
 **What the harness sends.** The firmware-upgrade category carries no sequence byte, so the steps send its
 commands as raw frames and wait for each answer, one block in flight, as a client does, and keep the client's
 heartbeat going meanwhile. The downloads send a small pack, a few hundred bytes of image built for the
@@ -1255,16 +1260,27 @@ scenario with the library's pack builder and the emulated board's product name: 
 header but not the image, which only the bootloader decrypts. A refused pack differs in one thing: another
 board's product name, or a CRC that does not match.
 
+**Why the apply starts from a staged pack.** The emulated serial port that carries the CAN lines hands the
+firmware about one character per poll, every millisecond, so a block and its answer take about 32 ms and the
+whole application, some 39 000 blocks, about 20 minutes, beyond what a shard can spend on one scenario. The
+scenario that applies a pack therefore starts where a finished download leaves the board: the application's
+pack in `staging.bin`, built as above, and the journal reading *downloaded*. The firmware reads both at
+start-up and reports the staged version, Activate goes over CAN, and the bootloader installs the pack at the
+reset. That the download writes exactly what it received into `staging.bin` is the first scenario's check.
+
 **Scenarios** (`firmware_upgrade.feature`, `@sil`):
 
 | Scenario                                         | The scenario sees                                                                                                               | Requirements               |
 |--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------|
 | A pack is downloaded and staged                  | Begin answered with the page size; Verify ok; the journal reads *downloaded*; the slot erased past the pack; the staged version | REQ-UPD-001, 004, 007, 013 |
+| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                | REQ-UPD-011                |
 | A download is refused while the motor runs       | Begin answered Busy; nothing staged                                                                                             | REQ-UPD-002                |
+| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                    | REQ-UPD-005                |
 | The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                 | REQ-UPD-003, 006           |
 | A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                     | REQ-UPD-004, 006           |
 | A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                  | REQ-UPD-004, 006           |
 | The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                         | REQ-UPD-014                |
+| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* and the heartbeat comes back; the staged version zero | REQ-UPD-005, 007, 011      |
 
 **Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
 (`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.
