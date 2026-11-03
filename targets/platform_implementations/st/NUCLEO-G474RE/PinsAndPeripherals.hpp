@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "hal/interfaces/DutyCycle.hpp"
 #include "hal_st/stm32fxxx/DefaultClockNucleoG474xxx.hpp"
 #include "hal_st/stm32fxxx/GpioStm.hpp"
@@ -83,8 +82,6 @@ namespace application
 
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
         constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxDutyPercent) };
-        constexpr static uint32_t pwmFrequencyHz{ 20000 };
-        constexpr static hal::DutyCycle minPulseDuty{ foc::MinimumPulseDuty(static_cast<float>(application::BoardCharacteristics::measuredDeadBandNanoseconds), pwmFrequencyHz) };
 
         extern const std::array<hal::PwmStmBase::ChannelConfig, 3> pwmPhases;
     }

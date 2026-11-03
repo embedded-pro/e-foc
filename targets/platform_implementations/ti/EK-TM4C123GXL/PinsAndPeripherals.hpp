@@ -77,7 +77,6 @@ namespace application
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator0;
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
         constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(100) };
-        constexpr static hal::DutyCycle minPulseDuty{};
 
         extern std::array<hal_pwm::PinChannel, 3> pwmPhases;
     }

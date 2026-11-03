@@ -309,6 +309,7 @@ namespace application
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
+        hal::DutyCycle minPulseDuty{};
         EncoderZero encoderZero;
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;

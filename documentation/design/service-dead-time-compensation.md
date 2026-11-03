@@ -100,8 +100,9 @@ ones the offset correction needs anyway.
 A board with no figure for the dead band it runs reports none, and its duties pass unchanged.
 
 The same dead band sets the minimum pulse of the duty path. `foc::KeepLowSideShuntsReadable` receives
-`foc::MinimumPulseDuty(dead band, PWM frequency)` from the board (`Peripheral::minPulseDuty`, 1 % on E-FOC-HARDWARE at
-20 kHz, none on FRDM-MC-LVPMSM and EK-TM4C123GXL) or, in QEMU and model-in-the-loop, from the plant's
+`foc::MinimumPulseDuty(dead band, PWM frequency)`, which the TI and ST platforms work out in `ConfigureAdcAndPwm` from the
+motor board's dead band and the PWM frequency being configured (1 % on E-FOC-HARDWARE at 20 kHz, 0.5 % at the 10 kHz
+`hardware_test` default, none on FRDM-MC-LVPMSM) or, in QEMU and model-in-the-loop, from the plant's
 `minimum_pulse_ns`. It extends the shunt shift so the lowest leg is 0 rather than a pulse shorter than the dead band, and
 rounds a second short leg to 0 or the minimum pulse (REQ-TRQ-012; `documentation/theory/power-stage.md` §4).
 

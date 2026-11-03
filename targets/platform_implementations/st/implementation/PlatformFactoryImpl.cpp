@@ -233,6 +233,7 @@ namespace application
         ReconfigureAdc(sampleAndHold);
         ReconfigurePwm(baseFrequency, deadTime);
         pwmBaseFrequency = baseFrequency;
+        minPulseDuty = foc::MinimumPulseDuty(static_cast<float>(BoardCharacteristics::measuredDeadBandNanoseconds), baseFrequency.Value());
     }
 
     void PlatformFactoryImpl::ReconfigureAdc(SampleAndHold sampleAndHold)
@@ -417,7 +418,7 @@ namespace application
         if (protectionTripped)
             return;
 
-        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty, Peripheral::minPulseDuty);
+        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty, minPulseDuty);
         shuntReadout.Applied(readable);
 
         peripherals->pwm->Start(readable.a, readable.b, readable.c);
