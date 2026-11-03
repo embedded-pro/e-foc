@@ -579,10 +579,12 @@ momentary deassertion still cannot arm the bridge.
 blocks a clear nor satisfies the verification — such a platform behaves exactly as it did before the gate
 existed. Reporting `clear` instead would assert a verification the hardware never made, and a fault on those
 platforms comes from software (calibration failure, CAN bus-off, watchdog) rather than from a physical
-condition anything could hold. **Every platform reports `unknown` today**: the TI protection comparators are
-ADC digital comparators on a PWM-triggered ADC, which stops converting once the bridge is stopped, so no
-reading taken while faulted distinguishes a cleared condition from an unevaluated one. The gate is in place and
-tested, and becomes load-bearing as soon as a platform can answer — see REQ-EH-013.
+condition anything could hold. The TI protection comparators are ADC digital comparators on a
+PWM-triggered ADC, which stops converting once the bridge is stopped, so the comparators cannot be read while
+faulted. TI and the NUCLEO-G474RE therefore answer from their latched trips and a fresh bus-voltage reading
+(`core/platform_abstraction/BoardProtection.hpp`, `documentation/design/error-handling.md`), QEMU from its
+simulated protection, and only the EK-TM4C123GXL, NUCLEO-H563ZI and a platform with no protection report
+`unknown`. See REQ-EH-013.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
 have happened without an intervening clean run, further clears are refused and a reset is required. Two

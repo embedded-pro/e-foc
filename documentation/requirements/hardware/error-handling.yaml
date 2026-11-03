@@ -121,7 +121,10 @@
     peripheral status register. A platform shall report unavailable whenever it cannot
     observe the condition, including where its protection comparators are driven by a
     peripheral that stops evaluating once the power stage is stopped; reporting clear in
-    that case would assert a verification the hardware has not made.
+    that case would assert a verification the hardware has not made. A platform that can
+    observe the condition through a path that survives the stopped power stage, namely its
+    latched trips and a fresh bus-voltage reading against the board's overvoltage and
+    undervoltage thresholds, shall report asserted or clear from it.
 
 - id: REQ-EH-014
   title: Every phase-current sample is checked against the board's over-current trip

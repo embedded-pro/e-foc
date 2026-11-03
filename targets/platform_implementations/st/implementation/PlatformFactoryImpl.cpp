@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
+#include "core/platform_abstraction/BoardProtection.hpp"
 #include "generated/stm32fxxx/PinoutTableDefault.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -45,12 +46,7 @@ namespace application
 
         constexpr uint32_t eepromI2cTiming{ 0xf0d42c35 };
 
-        bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c)
-        {
-            constexpr float limit{ BoardCharacteristics::overcurrentThresholdAmps };
-
-            return std::abs(a.Value()) > limit || std::abs(b.Value()) > limit || std::abs(c.Value()) > limit;
-        }
+        constexpr BoardProtectionLimits protectionLimits{ Peripheral::overvoltageThresholdVolts, Peripheral::undervoltageThresholdVolts };
 
         hal::SynchronousAdcStm::Config PowerSupplyAdcConfig()
         {
@@ -402,7 +398,7 @@ namespace application
 
                 if (protectionTripped)
                     CutPowerStage();
-                else if (ExceedsOverCurrent(currents.a, currents.b, currents.c))
+                else if (ExceedsOverCurrent(currents.a, currents.b, currents.c, BoardCharacteristics::overcurrentThresholdAmps))
                     TripProtection(BoardProtectionReason::overCurrent);
                 else
                     onPhaseCurrentsReady(currents);
@@ -479,7 +475,10 @@ namespace application
 
     PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
     {
-        return PlatformFactory::BoardProtectionState::unknown;
+        return EvaluateBoardProtection(protectionTripped, false, protectionLimits, [this]()
+            {
+                return PowerSupplyVoltage();
+            });
     }
 
     void PlatformFactoryImpl::Reset()

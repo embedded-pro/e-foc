@@ -78,6 +78,8 @@ namespace application
             application::BoardCharacteristics::OvercurrentThresholdCounts(adcReferenceVoltage, adcResolution);
         constexpr static uint16_t undervoltageThresholdCounts =
             application::BoardCharacteristics::UndervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
+        constexpr static float overvoltageThresholdVolts{ application::BoardCharacteristics::overvoltageThresholdVolts };
+        constexpr static float undervoltageThresholdVolts{ application::BoardCharacteristics::undervoltageThresholdVolts };
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
