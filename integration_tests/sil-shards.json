@@ -6,6 +6,7 @@
       "integration_tests/features/current_stream.feature",
       "integration_tests/features/fault_supervision.feature",
       "integration_tests/features/firmware_identity.feature",
+      "integration_tests/features/firmware_upgrade.feature",
       "integration_tests/features/watchdog.feature"
     ],
     [

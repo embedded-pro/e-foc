@@ -41,9 +41,15 @@ namespace integration
         return *target;
     }
 
+    PackSource TargetPackSource()
+    {
+        auto& emulated = EmulatedBootloader();
+        return PackSource{ emulated.ApplicationImage(), emulated.DevelopmentKeySet(), E_FOC_EMULATED_PRODUCT_NAME, emulatedSlotStart, E_FOC_EMULATED_BOARD_KIND };
+    }
+
     std::vector<uint8_t> DevelopmentSignedPack(const application::PackDescription& description)
     {
-        const auto keys = application::ParseKeySet(EmulatedBootloader().DevelopmentKeySet());
+        const auto keys = application::ParseKeySet(TargetPackSource().developmentKeySet);
         if (!std::holds_alternative<application::KeySet>(keys))
             throw std::runtime_error{ "The development key set is not a key set" };
 
