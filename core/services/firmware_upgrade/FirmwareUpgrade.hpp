@@ -6,9 +6,10 @@
 #include "core/services/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/services/firmware_upgrade/FirmwareUpgradeDrive.hpp"
 #include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
+#include "core/services/firmware_upgrade/StagedPackReader.hpp"
+#include "core/services/firmware_upgrade/StagingWriter.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/ByteRange.hpp"
-#include "infra/util/Crc.hpp"
 #include "infra/util/Function.hpp"
 #include <array>
 #include <chrono>
@@ -22,8 +23,8 @@ namespace services
         , public FirmwareUpgradeControl
     {
     public:
-        static constexpr uint16_t maxPageSize{ 256 };
-        static constexpr uint8_t blockSize{ 6 };
+        static constexpr uint16_t maxPageSize{ StagingWriter::maxPageSize };
+        static constexpr uint8_t blockSize{ StagingWriter::blockSize };
         static constexpr infra::Duration inactivityDeadline{ std::chrono::seconds(30) };
         static constexpr infra::Duration restartDelay{ std::chrono::milliseconds(250) };
         static constexpr infra::Duration discardRetry{ std::chrono::milliseconds(100) };
@@ -60,31 +61,13 @@ namespace services
         bool Downloading() const;
         std::optional<FwuError> BeginRefusal(uint32_t firmwareSize) const;
         void StartDownload(uint32_t firmwareSize);
-
-        void EraseNextSector();
-        void OnSectorErased();
-        void CheckErasedChunk();
-        void OnErasedChunk(uint32_t length);
-        void OnSlotErased();
-
-        void AcceptBlock(infra::ConstByteRange data);
-        void ProgramPage();
-        void OnPageWritten();
-        void OnPageProgrammed();
-        void CompleteBlock();
-
-        void StartCrc();
-        void ReadNextCrcChunk();
-        void OnCrcChunk(uint32_t length);
-        void ReadHeader(const infra::Function<void()>& onRead);
-        void ReadEpilogue();
-        void ReadImagePrologue();
-        void FinishHeader();
-        uint32_t HeaderReadLimit() const;
-        void OnVerifiedHeader();
+        void OnSlotErased(bool erased);
+        void OnBlockStored(bool stored);
+        void CheckCrc(uint32_t expectedCrc);
+        void OnVerifiedHeader(const PackHeader& header);
         void ReadStagedVersion();
 
-        bool FlashDone();
+        bool FlashBusy() const;
         bool TakeAbort();
         void DoAbort();
         void Fail(FwuError result);
@@ -100,29 +83,16 @@ namespace services
         FirmwareUpgradeDrive& drive;
         infra::Function<void()> reset;
         std::optional<bootloader::StatusJournal> journal;
+        std::array<uint8_t, maxPageSize> scratch{};
+        std::optional<StagingWriter> writer;
+        std::optional<StagedPackReader> reader;
 
         State state{ State::idle };
-        bool flashBusy{ false };
         bool abortRequested{ false };
         infra::Function<void()> abortDone;
 
         uint32_t packSize{ 0 };
-        uint32_t received{ 0 };
         uint16_t nextBlock{ 0 };
-        uint32_t eraseSector{ 0 };
-        uint32_t readAddress{ 0 };
-        uint32_t readEnd{ 0 };
-        uint32_t pageAddress{ 0 };
-        uint16_t pageFill{ 0 };
-        std::array<uint8_t, maxPageSize> page{};
-        std::array<uint8_t, maxPageSize> readBack{};
-        std::array<uint8_t, blockSize> carry{};
-        uint8_t carryFill{ 0 };
-
-        uint32_t expectedCrc{ 0 };
-        infra::Crc32 crc;
-        PackHeader header{};
-        infra::Function<void()> onHeaderRead;
         FirmwareVersion stagedVersion{};
 
         infra::Function<void(FwuError, uint16_t)> beginDone;
