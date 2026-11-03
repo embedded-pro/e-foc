@@ -19,6 +19,8 @@ add_library(e_foc.integration_tests.steps OBJECT
     ResponseSteps.cpp
     StateMachineSteps.cpp
     UartSteps.cpp
+    UpgradePacks.cpp
+    UpgradePacks.hpp
     WatchdogSteps.cpp
 )
 
