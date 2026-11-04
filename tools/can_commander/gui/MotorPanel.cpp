@@ -167,7 +167,11 @@ namespace tool
         StopApplying("emergency stop");
         pendingCommand = "Emergency Stop";
         pendingCommandType = can::focEmergencyStopId;
-        return client.SendEmergencyStop(nodeId);
+        if (!client.SendEmergencyStop(nodeId))
+            return false;
+
+        transfer.EmergencyStopSent(nodeId);
+        return true;
     }
 
     void MotorPanel::ConnectCommands()

@@ -30,6 +30,7 @@ namespace tool
     {
         staged,
         cancelled,
+        stopped,
         refused,
         noAnswer,
         notSent
@@ -92,6 +93,7 @@ namespace tool
         bool Discard(uint16_t nodeId);
         bool Apply(uint16_t nodeId, const services::FirmwareVersion& staged);
         void Abandon();
+        void EmergencyStopSent(uint16_t nodeId);
 
         void OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status);
         void OnFirmwareIdentity(uint16_t nodeId, const FirmwareIdentity& identity);
@@ -104,6 +106,7 @@ namespace tool
         void OnProgressResponse(services::FwuState state, uint16_t blocksReceived, uint16_t totalBlocks) override;
 
         bool Answers(TransferPhase expected) const;
+        bool Downloading() const;
         void Enter(TransferPhase next);
         void ReportProgress();
         uint16_t NumberOfBlocks() const;
