@@ -13,6 +13,10 @@ namespace services
     {
     public:
         StagedPackReader(hal::Flash& flash, infra::ByteRange scratch, const infra::Function<bool()>& proceed);
+        StagedPackReader(const StagedPackReader&) = delete;
+        StagedPackReader& operator=(const StagedPackReader&) = delete;
+        StagedPackReader(StagedPackReader&&) = delete;
+        StagedPackReader& operator=(StagedPackReader&&) = delete;
 
         void CheckCrc(uint32_t size, uint32_t expected, const infra::Function<void(bool)>& onChecked);
         void ReadHeader(uint32_t limit, const infra::Function<void(const PackHeader&)>& onRead);
