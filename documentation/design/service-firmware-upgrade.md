@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.7
+version: 0.3.8
 component: "service-firmware-upgrade"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.7                     |
+| Version   | 0.3.8                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-04                |
 
@@ -76,8 +76,11 @@ The service follows the state machine of the `can-lite` firmware-upgrade specifi
 difference: a verified pack is kept instead of being forgotten when the session ends. The category server stops
 its session timer on Verify and on Activate, also when it refuses them, so the service keeps its own inactivity
 deadline while a pack is received: 30 s after Begin was answered or the last command it accepted, after which
-the download ends as on Abort. The emergency stop ends a download the same way (Part F). After a successful
-Verify no deadline runs, so Activate may come at any later time, also after a restart.
+the download ends as on Abort. The category server's own session timer, which it starts on an accepted Begin
+and restarts on every acknowledged block, runs beside it with the same length and reaches the same end: its
+expiry is handled exactly as the service's deadline, so whichever fires first ends the download and the other
+finds nothing to end. The emergency stop ends a download the same way (Part F). After a successful Verify no
+deadline runs, so Activate may come at any later time, also after a restart.
 
 | State      | Meaning                                                                        | Drive and NVM interlock (Part G) |
 |------------|--------------------------------------------------------------------------------|----------------------------------|
@@ -112,12 +115,15 @@ FOC motor commands; a client tells them apart from the status it last read. A dr
 stopped in this sense: the fault is cleared first, so a download never starts while a fault is unexplained.
 
 An accepted Begin erases the status journal, which discards a pack that was staged before, then the entire
-staging slot, one sector per event-loop turn, and only then answers. The download therefore starts on a fully
-erased slot: 16 sectors on the EK-TM4C1294XL, whatever the pack's size. The answer carries the page size, the
-number of bytes the service collects before it programs them: 128 on the TI board and 256 on the emulated
-board (Part I).
+staging slot, one sector per event-loop turn, and only then answers. Each sector is read back after its erase,
+a chunk per turn, and a byte that does not read erased ends the download: the flash drivers report no error of
+their own, so the read-back is how the service sees a failed erase. The download therefore starts on a slot
+that is known to be erased: 16 sectors on the EK-TM4C1294XL, whatever the pack's size. The answer carries the
+page size, the number of bytes the service collects before it programs them: 128 on the TI board and 256 on
+the emulated board (Part I).
 
-- An erase that fails is answered `WriteError`, and the session goes to Error.
+- An erase that fails, or a sector that does not read back erased, is answered `WriteError`, and the session
+  goes to Error.
 - An Abort or the emergency stop during the erase stops it after the sector in progress. The pending Begin is
   answered `InvalidState`, then the Abort, and the session returns to Idle with the journal empty.
 - A second Begin during the erase is answered `Busy`.
@@ -129,10 +135,11 @@ board (Part I).
   next is written; a repeat of the block it acknowledged last is acknowledged again without being written,
   because only its acknowledgement was lost; any other index is answered `SequenceError` with nothing written.
 - The bytes are collected into one page. A full page is programmed into the staging slot, which Begin
-  erased; nothing is erased while blocks arrive, so each block costs at most one page program (Part G).
-- A flash failure is answered `WriteError` and the session goes to Error; the client starts the download
-  again with Begin. The page is not written a second time, because the ST internal flash cannot program a unit
-  twice without erasing it, and a second Begin erases the staging slot again.
+  erased, and read back and compared with what was sent before its last block is acknowledged; nothing is
+  erased while blocks arrive, so each block costs at most one page program and one read (Part G).
+- A page that does not read back as programmed is answered `WriteError` and the session goes to Error; the
+  client starts the download again with Begin. The page is not written a second time, because the ST internal
+  flash cannot program a unit twice without erasing it, and a second Begin erases the staging slot again.
 - A block that would take the download past the size given in Begin is answered `InvalidSize`.
 - A block that fills a page is acknowledged once the page is programmed. A command that arrives while a page
   is programmed is answered `Busy`, except Abort, which waits for it (Part F).
@@ -363,12 +370,12 @@ sequenceDiagram
     Drive-->>Service: Yes, Ready
     Service->>Staging: Erase the journal
     loop every sector of the staging slot
-        Service->>Staging: Erase one sector per event-loop turn
+        Service->>Staging: Erase one sector per event-loop turn, read it back
     end
     Service-->>Client: Begin response (page size)
     loop every block
         Client->>Service: Data block (index, 6 bytes)
-        Service->>Staging: Program each full page
+        Service->>Staging: Program each full page, read it back
         Service-->>Client: Block acknowledged
     end
     Client->>Service: Verify (CRC-32)
