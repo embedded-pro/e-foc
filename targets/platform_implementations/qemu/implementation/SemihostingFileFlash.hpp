@@ -16,8 +16,9 @@ namespace application
         void EraseSectors(uint32_t beginIndex, uint32_t endIndex) override;
 
     private:
-        void Load();
-        void Store() const;
+        bool Load();
+        void StoreAll() const;
+        void Store(uint32_t address, uint32_t length) const;
 
         const char* path;
         infra::ByteRange storage;

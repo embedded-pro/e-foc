@@ -8,6 +8,7 @@ namespace
     constexpr uint32_t kSysClose = 0x02;
     constexpr uint32_t kSysWrite = 0x05;
     constexpr uint32_t kSysRead = 0x06;
+    constexpr uint32_t kSysSeek = 0x0a;
 
     uint32_t Call(uint32_t operation, uint32_t* parameters)
     {
@@ -32,6 +33,12 @@ namespace application::semihosting
     {
         uint32_t parameter = static_cast<uint32_t>(handle);
         Call(kSysClose, &parameter);
+    }
+
+    bool FileSeek(int handle, uint32_t position)
+    {
+        uint32_t parameters[2] = { static_cast<uint32_t>(handle), position };
+        return Call(kSysSeek, parameters) == 0;
     }
 
     uint32_t FileWrite(int handle, const void* data, uint32_t length)

@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.0
+version: 1.13.1
 component: "software-in-the-loop"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.0                      |
+| Version   | 1.13.1                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-11-03                  |
 
@@ -1194,8 +1194,11 @@ does not describe.
   listener would, so waiting on a halted target ends on time.
 
 **Staging and journal.** Both are files in the scenario folder, so they last across a restart of the
-emulator. A missing file reads as erased. The bootloader reads the pack from `staging.bin` and writes each
-journal entry through to `journal.bin`.
+emulator. A missing file reads as erased, and the firmware creates it, erased, at start-up. The bootloader
+reads the pack from `staging.bin` and writes each journal entry through to `journal.bin`. A write-through
+opens the file in place and writes only the bytes a program or an erase changed, so a file is never
+truncated while the harness reads it, and a semihosting call that fails stops the firmware instead of
+letting it run on with a file that differs from its memory.
 
 **What the harness writes and reads.** The harness builds every pack with the embedded-infrastructure
 library's pack builder, the one the release uses, from the application image the build produced (every
