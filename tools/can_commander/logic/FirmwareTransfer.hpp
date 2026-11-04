@@ -28,6 +28,7 @@ namespace tool
         staged,
         cancelled,
         refused,
+        noAnswer,
         notSent
     };
 
@@ -56,6 +57,10 @@ namespace tool
     {
     public:
         static constexpr std::size_t blockSize{ 6 };
+        static constexpr uint8_t attempts{ 3 };
+        static constexpr infra::Duration beginTimeout{ std::chrono::seconds(10) };
+        static constexpr infra::Duration blockTimeout{ std::chrono::seconds(1) };
+        static constexpr infra::Duration verifyTimeout{ std::chrono::seconds(10) };
         static constexpr infra::Duration answerTimeout{ std::chrono::seconds(2) };
 
         explicit FirmwareTransfer(CanCommandClient& client);
@@ -83,6 +88,9 @@ namespace tool
         uint32_t BytesSent() const;
         void SendNextBlock();
         void SendVerify();
+        void OnNoBlockAnswer();
+        void AskProgress();
+        void GiveUp();
         void FinishDownload(DownloadOutcome outcome, services::FwuError error = services::FwuError::ok);
         void StopTimers();
 
@@ -93,6 +101,7 @@ namespace tool
         std::vector<uint8_t> pack;
         uint32_t crc32{ 0 };
         uint16_t nextBlock{ 0 };
+        uint8_t failures{ 0 };
         infra::TimerSingleShot answerTimer;
     };
 
