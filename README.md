@@ -208,14 +208,14 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 
 Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 
-| Asset                                                  | Content                                                                                            |
-|--------------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| `e_foc-firmware-<board>-<tag>.tar.gz`                  | `.elf` and `.hex` of every application built for the board                                         |
+| Asset                                                  | Content                                                                                                                                                                                             |
+|--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-<tag>.tar.gz`                  | `.elf` and `.hex` of every application built for the board                                                                                                                                          |
 | `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed |
-| `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)                  |
-| `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                                    |
-| `eFocDesign.pdf`                                       | the complete design booklet                                                                        |
-| `e_foc-documentation-<tag>.zip`                        | the individual design, theory and requirements documents as PDFs                                   |
+| `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)                                                                                                                   |
+| `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
+| `eFocDesign.pdf`                                       | the complete design booklet                                                                                                                                                                         |
+| `e_foc-documentation-<tag>.zip`                        | the individual design, theory and requirements documents as PDFs                                                                                                                                    |
 
 Configuring a build from the source archive still downloads the dependencies CMake declares with
 `FetchContent` (such as `ui-cpp` and GoogleTest).
