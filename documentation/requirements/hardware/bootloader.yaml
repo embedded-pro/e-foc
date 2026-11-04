@@ -1,5 +1,7 @@
 - id: REQ-BOOT-001
   title: The application starts only when it is intact
+  status: verified
+  verification: sil
   shall: >
     At every reset the bootloader shall start the application only when the application
     slot holds a valid image descriptor, the SHA-256 of the image matches it, the image's
@@ -9,6 +11,8 @@
 
 - id: REQ-BOOT-002
   title: Only a signed pack for this board is installed
+  status: verified
+  verification: sil
   shall: >
     The bootloader shall install a staged upgrade pack only when its status journal reads
     ready to deploy or deploy started, its product name names this board and its
@@ -19,6 +23,8 @@
 
 - id: REQ-BOOT-003
   title: The image is decrypted while it is installed
+  status: verified
+  verification: sil
   shall: >
     The bootloader shall decrypt the pack's application image with AES-128-CTR, using the
     key built into the bootloader and the image's initial counter, while it writes the image
@@ -27,6 +33,8 @@
 
 - id: REQ-BOOT-004
   title: An interrupted installation resumes
+  status: verified
+  verification: sil
   shall: >
     The bootloader shall record deploy started before it erases the application slot and
     deployed after it has written the image and its descriptor. A reset or a power loss
@@ -35,21 +43,36 @@
 
 - id: REQ-BOOT-005
   title: Installation progress never rewrites a programmed flash unit
+  status: implemented
+  verification: [unit, inspection]
   shall: >
     The bootloader and the application shall record the progress of an installation as
     entries in the status journal, each written into an erased programming unit, and shall
     never program a unit of the staging slot or the journal that has already been programmed
     since its last erase.
+  rationale: >
+    The journal is the embedded-infra-lib status journal, whose own tests show that every record
+    takes a fresh programming unit; the firmware-upgrade unit tests show that each staging page is
+    programmed once into the slot Begin erased. Those library tests run in that repository, not in
+    this one, so the rest is verified by inspection.
 
 - id: REQ-BOOT-006
   title: The bootloader fits its region and runs without interrupts
+  status: verified
+  verification: [sil, inspection]
   shall: >
     The bootloader shall fit in the first 32 KB of flash, shall enable no interrupt and start
     no watchdog, and shall point the vector table at the application slot before it starts
     the application.
+  rationale: >
+    The linker limits the bootloader to its 32 KB region; the bootloader's main enables no
+    interrupt and starts no watchdog, and the library's jump points the vector table at the slot.
+    The emulated boot through the bootloader shows the application starting.
 
 - id: REQ-BOOT-007
   title: An image for another microcontroller is never written
+  status: verified
+  verification: sil
   shall: >
     Before it erases any part of the application slot, the bootloader shall decrypt the start
     of the staged image and refuse it, recording invalid with its wrong-target error code and
