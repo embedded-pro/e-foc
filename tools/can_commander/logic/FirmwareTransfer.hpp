@@ -20,7 +20,10 @@ namespace tool
         erasing,
         sending,
         verifying,
-        cancelling
+        cancelling,
+        discarding,
+        activating,
+        restarting
     };
 
     enum class DownloadOutcome : uint8_t
@@ -28,6 +31,17 @@ namespace tool
         staged,
         cancelled,
         refused,
+        noAnswer,
+        notSent
+    };
+
+    enum class ApplyOutcome : uint8_t
+    {
+        updated,
+        oldVersionKept,
+        noNode,
+        refused,
+        noAnswer,
         notSent
     };
 
@@ -48,6 +62,9 @@ namespace tool
 
         virtual void OnTransferProgress(uint16_t nodeId, const TransferProgress& progress) = 0;
         virtual void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) = 0;
+        virtual void OnDiscardFinished(uint16_t nodeId, bool acknowledged) = 0;
+        virtual void OnApplyFinished(uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running) = 0;
+        virtual void OnTransferAbandoned(uint16_t nodeId) = 0;
     };
 
     class FirmwareTransfer
@@ -56,7 +73,13 @@ namespace tool
     {
     public:
         static constexpr std::size_t blockSize{ 6 };
+        static constexpr uint8_t attempts{ 3 };
+        static constexpr infra::Duration beginTimeout{ std::chrono::seconds(10) };
+        static constexpr infra::Duration blockTimeout{ std::chrono::seconds(1) };
+        static constexpr infra::Duration verifyTimeout{ std::chrono::seconds(10) };
         static constexpr infra::Duration answerTimeout{ std::chrono::seconds(2) };
+        static constexpr infra::Duration restartTimeout{ std::chrono::seconds(30) };
+        static constexpr infra::Duration identityRetry{ std::chrono::seconds(5) };
 
         explicit FirmwareTransfer(CanCommandClient& client);
 
@@ -66,8 +89,12 @@ namespace tool
 
         bool StartDownload(uint16_t nodeId, const InspectedPack& pack);
         void Cancel();
+        bool Discard(uint16_t nodeId);
+        bool Apply(uint16_t nodeId, const services::FirmwareVersion& staged);
+        void Abandon();
 
         void OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status);
+        void OnFirmwareIdentity(uint16_t nodeId, const FirmwareIdentity& identity);
 
     private:
         void OnBeginResponse(services::FwuError status, uint16_t pageSize) override;
@@ -83,7 +110,12 @@ namespace tool
         uint32_t BytesSent() const;
         void SendNextBlock();
         void SendVerify();
+        void OnNoBlockAnswer();
+        void AskProgress();
+        void GiveUp();
         void FinishDownload(DownloadOutcome outcome, services::FwuError error = services::FwuError::ok);
+        void FinishDiscard(bool acknowledged);
+        void FinishApply(ApplyOutcome outcome, services::FwuError error = services::FwuError::ok, const services::FirmwareVersion& running = {});
         void StopTimers();
 
         CanCommandClient& client;
@@ -93,7 +125,11 @@ namespace tool
         std::vector<uint8_t> pack;
         uint32_t crc32{ 0 };
         uint16_t nextBlock{ 0 };
+        uint8_t failures{ 0 };
+        services::FirmwareVersion expected;
         infra::TimerSingleShot answerTimer;
+        infra::TimerSingleShot restartTimer;
+        infra::TimerRepeating identityTimer;
     };
 
     std::optional<std::chrono::seconds> TimeLeft(uint32_t bytesSent, uint32_t totalBytes, std::chrono::milliseconds elapsed);

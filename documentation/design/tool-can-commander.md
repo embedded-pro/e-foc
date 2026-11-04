@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.0
+version: 0.10.2
 component: "tool-can-commander"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.0               |
+| Version   | 0.10.2               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-03           |
 
@@ -406,9 +406,10 @@ The tool never chains the two: a finished download ends with the pack staged and
 nothing more.
 
 - **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
-  release, by its asset name (`service-firmware-upgrade.md` Part J). When that release is newer than the
-  version the motor reports, the Firmware tab says so and the motor's tab carries a marker. *Open Pack File…*
-  takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
+  release, by its asset name, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` with the board named as
+  the Diagnostics tab names it and the release's own tag (`service-firmware-upgrade.md` Part J). When that
+  release is newer than the version the motor reports, the Firmware tab says so and the motor's tab carries a
+  marker. *Open Pack File…* takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
   version or board, so the tab explains that and offers nothing. A node that reports its version but refuses
   the staged version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade
   service: the tab says that this firmware cannot be updated over CAN and offers no download. Only a board with
@@ -439,10 +440,12 @@ nothing more.
   Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
-  node to come back, then reads its version. The update succeeded when the node reports the staged version. A
-  node that comes back with the old version had its pack refused by the bootloader, which kept the old
-  application: the tool says so and logs it. A node that does not come back is reported as a failed update that
-  needs a debugger to recover.
+  node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
+  its firmware identity again when it comes back online, and every 5 s while it has not dropped off the bus,
+  which a restart faster than the 3 s offline timeout does not. The update succeeded when the node reports the
+  staged version. A node that comes back with the old version had its pack refused by the bootloader, which
+  kept the old application: the tool says so and logs it. A node that does not come back is reported as a
+  failed update that needs a debugger to recover.
 - **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
   wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
   microcontroller, and nothing was staged; *Try Again* restarts the download.

@@ -9,6 +9,16 @@ namespace tool
     {
         constexpr qsizetype sha256Bytes{ 32 };
 
+        std::optional<InstallerAsset> DownloadableAsset(const QJsonValue& asset)
+        {
+            const auto object = asset.toObject();
+            const QUrl url{ object.value("browser_download_url").toString() };
+            if (!url.isValid() || url.scheme() != "https")
+                return std::nullopt;
+
+            return InstallerAsset{ object.value("name").toString(), url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) };
+        }
+
         std::optional<InstallerAsset> FindInstaller(const QJsonArray& assets, InstallerPlatform platform)
         {
             const auto suffix = InstallerAssetSuffix(platform);
@@ -16,16 +26,20 @@ namespace tool
                 return std::nullopt;
 
             for (const auto& asset : assets)
-            {
-                const auto object = asset.toObject();
-                const auto name = object.value("name").toString();
-                const QUrl url{ object.value("browser_download_url").toString() };
-
-                if (name.endsWith(suffix) && url.isValid() && url.scheme() == "https")
-                    return InstallerAsset{ name, url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) };
-            }
+                if (auto installer = DownloadableAsset(asset); installer && installer->fileName.endsWith(suffix))
+                    return installer;
 
             return std::nullopt;
+        }
+
+        std::vector<InstallerAsset> FindFirmwarePacks(const QJsonArray& assets)
+        {
+            std::vector<InstallerAsset> packs;
+            for (const auto& asset : assets)
+                if (auto pack = DownloadableAsset(asset); pack && pack->fileName.startsWith(QLatin1String("e_foc-firmware-")) && pack->fileName.endsWith(QLatin1String(".upgrade")))
+                    packs.push_back(*pack);
+
+            return packs;
         }
     }
 
@@ -84,7 +98,17 @@ namespace tool
         if (!version || !pageUrl.isValid() || pageUrl.scheme() != "https")
             return std::nullopt;
 
-        return ReleaseInfo{ *version, tag, pageUrl, FindInstaller(root.value("assets").toArray(), platform) };
+        const auto assets = root.value("assets").toArray();
+        return ReleaseInfo{ *version, tag, pageUrl, FindInstaller(assets, platform), FindFirmwarePacks(assets) };
+    }
+
+    std::optional<InstallerAsset> FirmwarePackFor(const ReleaseInfo& release, const QString& boardName)
+    {
+        const auto name = QString("e_foc-firmware-%1-sync_foc_sensored-%2.upgrade").arg(boardName, release.tag);
+        for (const auto& pack : release.firmwarePacks)
+            if (pack.fileName == name)
+                return pack;
+        return std::nullopt;
     }
 
     UpdateEvaluation EvaluateLatestRelease(const QByteArray& json, const ReleaseVersion& current, InstallerPlatform platform)

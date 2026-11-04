@@ -37,11 +37,20 @@ namespace tool
         pack = inspected.bytes;
         crc32 = inspected.crc32;
         nextBlock = 0;
+        failures = 0;
         Enter(TransferPhase::erasing);
         ReportProgress();
 
         if (!category.SendBeginUpgrade(nodeId, static_cast<uint32_t>(pack.size())))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return true;
+        }
+
+        answerTimer.Start(beginTimeout, [this]()
+            {
+                GiveUp();
+            });
         return true;
     }
 
@@ -59,13 +68,77 @@ namespace tool
             });
     }
 
-    void FirmwareTransfer::OnCommandAck(uint16_t node, uint8_t categoryId, uint8_t commandType, services::CanAckStatus)
+    bool FirmwareTransfer::Discard(uint16_t node)
+    {
+        if (IsActive())
+            return false;
+
+        nodeId = node;
+        Enter(TransferPhase::discarding);
+        if (!category.SendAbort(nodeId))
+        {
+            FinishDiscard(false);
+            return true;
+        }
+
+        answerTimer.Start(answerTimeout, [this]()
+            {
+                FinishDiscard(false);
+            });
+        return true;
+    }
+
+    bool FirmwareTransfer::Apply(uint16_t node, const services::FirmwareVersion& staged)
+    {
+        if (IsActive())
+            return false;
+
+        nodeId = node;
+        expected = staged;
+        Enter(TransferPhase::activating);
+        if (!category.SendActivate(nodeId))
+        {
+            FinishApply(ApplyOutcome::notSent);
+            return true;
+        }
+
+        answerTimer.Start(answerTimeout, [this]()
+            {
+                FinishApply(ApplyOutcome::noAnswer);
+            });
+        return true;
+    }
+
+    void FirmwareTransfer::Abandon()
+    {
+        if (!IsActive())
+            return;
+
+        StopTimers();
+        Enter(TransferPhase::idle);
+        NotifyObservers([node = nodeId](auto& observer)
+            {
+                observer.OnTransferAbandoned(node);
+            });
+    }
+
+    void FirmwareTransfer::OnCommandAck(uint16_t node, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
         if (node != nodeId || categoryId != services::firmwareUpgradeCategoryId || commandType != services::fwuAbortId)
             return;
 
         if (phase == TransferPhase::cancelling)
             FinishDownload(DownloadOutcome::cancelled);
+        else if (phase == TransferPhase::discarding)
+            FinishDiscard(status == services::CanAckStatus::success);
+    }
+
+    void FirmwareTransfer::OnFirmwareIdentity(uint16_t node, const FirmwareIdentity& identity)
+    {
+        if (phase != TransferPhase::restarting || node != nodeId || identity.staged != services::FirmwareVersion{})
+            return;
+
+        FinishApply(identity.running == expected ? ApplyOutcome::updated : ApplyOutcome::oldVersionKept, FwuError::ok, identity.running);
     }
 
     void FirmwareTransfer::OnBeginResponse(FwuError status, uint16_t)
@@ -73,6 +146,7 @@ namespace tool
         if (!Answers(TransferPhase::erasing))
             return;
 
+        answerTimer.Cancel();
         if (status != FwuError::ok)
         {
             FinishDownload(DownloadOutcome::refused, status);
@@ -88,10 +162,14 @@ namespace tool
         if (!Answers(TransferPhase::sending) || (status == FwuError::ok && blockIndex != nextBlock))
             return;
 
-        if (status != FwuError::ok)
+        answerTimer.Cancel();
+        if (status == FwuError::sequenceError)
+            OnNoBlockAnswer();
+        else if (status != FwuError::ok)
             FinishDownload(DownloadOutcome::refused, status);
         else
         {
+            failures = 0;
             ++nextBlock;
             SendNextBlock();
         }
@@ -102,17 +180,52 @@ namespace tool
         if (!Answers(TransferPhase::verifying))
             return;
 
+        answerTimer.Cancel();
         if (status == FwuError::ok)
             FinishDownload(DownloadOutcome::staged);
         else
             FinishDownload(DownloadOutcome::refused, status);
     }
 
-    void FirmwareTransfer::OnActivateResponse(FwuError)
-    {}
+    void FirmwareTransfer::OnActivateResponse(FwuError status)
+    {
+        if (!Answers(TransferPhase::activating))
+            return;
 
-    void FirmwareTransfer::OnProgressResponse(services::FwuState, uint16_t, uint16_t)
-    {}
+        answerTimer.Cancel();
+        if (status != FwuError::ok)
+        {
+            FinishApply(ApplyOutcome::refused, status);
+            return;
+        }
+
+        Enter(TransferPhase::restarting);
+        ReportProgress();
+        restartTimer.Start(restartTimeout, [this]()
+            {
+                FinishApply(ApplyOutcome::noNode);
+            });
+        identityTimer.Start(identityRetry, [this]()
+            {
+                client.RequestFirmwareIdentity(nodeId);
+            });
+    }
+
+    void FirmwareTransfer::OnProgressResponse(services::FwuState state, uint16_t blocksReceived, uint16_t)
+    {
+        if (!Answers(TransferPhase::sending))
+            return;
+
+        answerTimer.Cancel();
+        if (state != services::FwuState::receiving)
+        {
+            FinishDownload(DownloadOutcome::refused, FwuError::invalidState);
+            return;
+        }
+
+        nextBlock = std::min(blocksReceived, NumberOfBlocks());
+        SendNextBlock();
+    }
 
     bool FirmwareTransfer::Answers(TransferPhase expectedPhase) const
     {
@@ -160,7 +273,15 @@ namespace tool
             data.push_back(pack[index]);
 
         if (!category.SendDataBlock(nodeId, nextBlock, data))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(blockTimeout, [this]()
+            {
+                OnNoBlockAnswer();
+            });
     }
 
     void FirmwareTransfer::SendVerify()
@@ -168,7 +289,43 @@ namespace tool
         Enter(TransferPhase::verifying);
         ReportProgress();
         if (!category.SendVerify(nodeId, crc32))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(verifyTimeout, [this]()
+            {
+                GiveUp();
+            });
+    }
+
+    void FirmwareTransfer::OnNoBlockAnswer()
+    {
+        if (++failures >= attempts)
+            GiveUp();
+        else
+            AskProgress();
+    }
+
+    void FirmwareTransfer::AskProgress()
+    {
+        if (!category.SendQueryProgress(nodeId))
+        {
+            FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(blockTimeout, [this]()
+            {
+                OnNoBlockAnswer();
+            });
+    }
+
+    void FirmwareTransfer::GiveUp()
+    {
+        category.SendAbort(nodeId);
+        FinishDownload(DownloadOutcome::noAnswer);
     }
 
     void FirmwareTransfer::FinishDownload(DownloadOutcome outcome, FwuError error)
@@ -181,9 +338,31 @@ namespace tool
             });
     }
 
+    void FirmwareTransfer::FinishDiscard(bool acknowledged)
+    {
+        StopTimers();
+        Enter(TransferPhase::idle);
+        NotifyObservers([node = nodeId, acknowledged](auto& observer)
+            {
+                observer.OnDiscardFinished(node, acknowledged);
+            });
+    }
+
+    void FirmwareTransfer::FinishApply(ApplyOutcome outcome, FwuError error, const services::FirmwareVersion& running)
+    {
+        StopTimers();
+        Enter(TransferPhase::idle);
+        NotifyObservers([node = nodeId, outcome, error, running](auto& observer)
+            {
+                observer.OnApplyFinished(node, outcome, error, running);
+            });
+    }
+
     void FirmwareTransfer::StopTimers()
     {
         answerTimer.Cancel();
+        restartTimer.Cancel();
+        identityTimer.Cancel();
     }
 
     std::optional<std::chrono::seconds> TimeLeft(uint32_t bytesSent, uint32_t totalBytes, std::chrono::milliseconds elapsed)
