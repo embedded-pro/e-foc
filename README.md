@@ -281,8 +281,9 @@ version without opening a window (on Windows, run it from a console).
 - *Help → Report Issue* opens a pre-filled GitHub issue with the version, OS and recent log lines for you
   to review and submit.
 - At startup and every 24 hours the tool checks the latest GitHub release and shows a banner when a newer
-  version exists. *Install Update…* downloads the installer, checks it against the SHA-256 published with the
-  release, then installs it and restarts — after Windows asks for permission, or after your password on Linux.
+  version exists. *Install Update…* downloads the installer, checks it against the SHA-256 digest GitHub
+  records for the asset, then installs it and restarts — after Windows asks for permission, or after your
+  password on Linux.
   Installing waits until the CAN bus is disconnected. Portable archives get a download link instead. Turn the
   checks off with *Help → Check for Updates Automatically* or `--no-update-check`.
 
