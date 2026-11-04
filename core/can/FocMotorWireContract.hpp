@@ -244,7 +244,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 50> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 53> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -295,6 +295,9 @@ namespace can
         { FocParameter::firmwareVersionMinor, "firmwareVersionMinor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::firmwareVersionPatch, "firmwareVersionPatch", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::boardKind, "boardKind", "-", 0.0f, 5.0f, true, false, true },
+        { FocParameter::stagedVersionMajor, "stagedVersionMajor", "-", 0.0f, 255.0f, true, false, true },
+        { FocParameter::stagedVersionMinor, "stagedVersionMinor", "-", 0.0f, 255.0f, true, false, true },
+        { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, 255.0f, true, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

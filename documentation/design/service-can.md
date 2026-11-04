@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.9.1
+version: 0.9.2
 component: can-service
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.9.1                    |
+| Version   | 0.9.2                    |
 | Component | can-service              |
-| Date      | 2026-11-01               |
+| Date      | 2026-11-03               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -285,10 +285,10 @@ the node reports 2.6 or newer.
 | `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
 | `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
 
-This firmware answers `0xB1`–`0xB4` and does not yet answer `0xB5`–`0xB7`: a query for a staged-version
-parameter is answered `invalidPayload` until the bootloader work serves them. The version numbers are those of
-the CMake project version the build was configured with, and the board kind is the one the platform reports
-(`application::BoardKind`); a client reads `0xB1`–`0xB4` and nothing else of 2.6 from this firmware.
+This firmware answers all seven. The version numbers are those of the CMake project version the build was
+configured with, and the board kind is the one the platform reports (`application::BoardKind`). The staged
+version is the product version of the pack the firmware-upgrade service holds staged
+(`service-firmware-upgrade.md` Part D); a board that cannot be updated answers it with zero.
 
 **Contract 2.7 — missing phase.** Version 2.7 adds one fault code; nothing in 2.6 changes.
 
@@ -365,7 +365,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xB4`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x17`–`0x19`, `0x80`–`0xB7`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 

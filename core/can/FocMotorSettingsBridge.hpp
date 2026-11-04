@@ -2,17 +2,23 @@
 
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
+#include "core/services/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace can
 {
     class FocMotorSettingsBridge
     {
     public:
+        using FirmwareUpgrade = std::optional<std::reference_wrapper<services::FirmwareUpgradeControl>>;
+
         FocMotorSettingsBridge(FocMotorCategoryServer& server, state_machine::ControlModeStateMachine& controlMode,
-            application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware);
+            application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware,
+            FirmwareUpgrade firmwareUpgrade = std::nullopt);
 
         void SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone);
         void SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone);
@@ -43,6 +49,7 @@ namespace can
         application::PlatformDiagnostics& diagnostics;
         FocResetCause resetCause;
         FocFirmwareIdentity firmware;
+        FirmwareUpgrade firmwareUpgrade;
 
         infra::Function<void()> pendingNvmDoneCallback;
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;

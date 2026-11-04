@@ -11,6 +11,7 @@ target_link_libraries(e_foc.can PUBLIC
     can_lite.client
     can_lite.tracing_protocol
     can_lite.tracing
+    e_foc.services.firmware_upgrade.interfaces
     e_foc.state_machine
     services.tracer
 )
@@ -30,6 +31,8 @@ target_sources(e_foc.can PRIVATE
     FocMotorCategoryClient.cpp
     FocMotorCanBridge.hpp
     FocMotorCanBridge.cpp
+    FirmwareUpgradeInterlock.hpp
+    FirmwareUpgradeInterlock.cpp
     FocMotorCommandOutcome.hpp
     FocMotorCommissioningBridge.hpp
     FocMotorCommissioningBridge.cpp

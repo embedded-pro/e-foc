@@ -2063,3 +2063,55 @@ TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Reports_That_Torque_Mode_H
 
     EXPECT_THAT(OutputOf("es"), HasSubstr("online estimates are not available in torque mode"));
 }
+
+TEST_F(ControlModeStateMachineTest, IsStoppedAndIdle_While_Idle_With_Nothing_Outstanding)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_TRUE(subject->IsStoppedAndIdle());
+}
+
+TEST_F(ControlModeStateMachineTest, IsStoppedAndIdle_Is_False_While_A_Select_Nvm_Write_Is_In_Flight)
+{
+    GivenNvmAlwaysInvalid();
+    infra::Function<void(services::NvmStatus)> deferredSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&deferredSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                deferredSave = onDone;
+            }));
+    ConstructSubject();
+
+    subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
+    EXPECT_FALSE(subject->IsStoppedAndIdle());
+
+    deferredSave(services::NvmStatus::Ok);
+    EXPECT_TRUE(subject->IsStoppedAndIdle());
+}
+
+TEST_F(ControlModeStateMachineTest, Held_Async_Work_Refuses_Calibrate_And_Select_Until_Released)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    subject->HoldAsyncWork();
+    EXPECT_FALSE(subject->IsStoppedAndIdle());
+
+    state_machine::CommandResult calibrateResult{ state_machine::CommandResult::ok };
+    subject->ActiveStateMachine().CmdCalibrate([&calibrateResult](state_machine::CommandResult r)
+        {
+            calibrateResult = r;
+        });
+    EXPECT_EQ(calibrateResult, state_machine::CommandResult::rejected);
+
+    state_machine::SelectResult selectResult{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&selectResult](state_machine::SelectResult r)
+        {
+            selectResult = r;
+        });
+    EXPECT_EQ(selectResult, state_machine::SelectResult::busy);
+
+    subject->ReleaseAsyncWork();
+    EXPECT_TRUE(subject->IsStoppedAndIdle());
+}
