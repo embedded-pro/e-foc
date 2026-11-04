@@ -15,6 +15,10 @@ namespace services
         static constexpr uint8_t blockSize{ 6 };
 
         StagingWriter(hal::Flash& flash, uint16_t pageSize, infra::ByteRange scratch, const infra::Function<bool()>& proceed);
+        StagingWriter(const StagingWriter&) = delete;
+        StagingWriter& operator=(const StagingWriter&) = delete;
+        StagingWriter(StagingWriter&&) = delete;
+        StagingWriter& operator=(StagingWriter&&) = delete;
 
         void Erase(const infra::Function<void(bool)>& onErased);
         void Append(infra::ConstByteRange data, const infra::Function<void(bool)>& onAppended);
