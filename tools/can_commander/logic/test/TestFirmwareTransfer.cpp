@@ -1,5 +1,7 @@
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
@@ -26,6 +28,9 @@ namespace
 
         MOCK_METHOD(void, OnTransferProgress, (uint16_t nodeId, const TransferProgress& progress), (override));
         MOCK_METHOD(void, OnDownloadFinished, (uint16_t nodeId, DownloadOutcome outcome, services::FwuError error), (override));
+        MOCK_METHOD(void, OnDiscardFinished, (uint16_t nodeId, bool acknowledged), (override));
+        MOCK_METHOD(void, OnApplyFinished, (uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running), (override));
+        MOCK_METHOD(void, OnTransferAbandoned, (uint16_t nodeId), (override));
     };
 
     struct Sent
@@ -106,9 +111,20 @@ namespace
             Fwu(services::fwuVerifyResponseId, { static_cast<uint8_t>(error) });
         }
 
+        void ActivateAnswered(FwuError error = FwuError::ok)
+        {
+            Fwu(services::fwuActivateResponseId, { static_cast<uint8_t>(error) });
+        }
+
         void ProgressAnswered(services::FwuState state, uint16_t received, uint16_t total)
         {
             Fwu(services::fwuProgressResponseId, { static_cast<uint8_t>(state), static_cast<uint8_t>(received >> 8), static_cast<uint8_t>(received), static_cast<uint8_t>(total >> 8), static_cast<uint8_t>(total) });
+        }
+
+        void BringCompatible(uint16_t node, uint8_t minor)
+        {
+            Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, node, {});
+            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, minor });
         }
 
         std::vector<Sent> SentUpgradeFrames() const
@@ -124,6 +140,15 @@ namespace
         Sent LastUpgradeFrame() const
         {
             return SentUpgradeFrames().back();
+        }
+
+        std::size_t CountIdentityReads() const
+        {
+            return static_cast<std::size_t>(std::ranges::count_if(sent, [](const Sent& frame)
+                {
+                    return frame.category == can::focMotorCategoryId && frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
+                           frame.payload[1] >= static_cast<uint8_t>(can::FocParameter::firmwareVersionMajor) && frame.payload[1] <= static_cast<uint8_t>(can::FocParameter::stagedVersionPatch);
+                }));
         }
 
         void DownloadUntilVerify(const InspectedPack& pack)
@@ -185,6 +210,8 @@ TEST_F(TestFirmwareTransfer, only_one_download_runs_on_the_bus)
     ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
 
     EXPECT_FALSE(transfer.StartDownload(2, Pack(20)));
+    EXPECT_FALSE(transfer.Apply(2, { 1, 7, 0 }));
+    EXPECT_FALSE(transfer.Discard(2));
     EXPECT_TRUE(transfer.IsActive());
     EXPECT_EQ(1, transfer.ActiveNode());
 }
@@ -309,6 +336,101 @@ TEST_F(TestFirmwareTransfer, a_cancel_without_an_acknowledgement_still_ends_canc
 
     EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::cancelled, FwuError::ok));
     ForwardTime(FirmwareTransfer::answerTimeout);
+}
+
+TEST_F(TestFirmwareTransfer, discard_sends_abort_and_reports_the_acknowledgement)
+{
+    ASSERT_TRUE(transfer.Discard(1));
+    EXPECT_EQ(services::fwuAbortId, LastUpgradeFrame().messageType);
+
+    EXPECT_CALL(observer, OnDiscardFinished(1, true));
+    transfer.OnCommandAck(1, services::firmwareUpgradeCategoryId, services::fwuAbortId, services::CanAckStatus::success);
+    EXPECT_FALSE(transfer.IsActive());
+}
+
+TEST_F(TestFirmwareTransfer, discard_without_an_acknowledgement_reports_it)
+{
+    ASSERT_TRUE(transfer.Discard(1));
+
+    EXPECT_CALL(observer, OnDiscardFinished(1, false));
+    ForwardTime(FirmwareTransfer::answerTimeout);
+}
+
+TEST_F(TestFirmwareTransfer, apply_sends_activate_and_confirms_the_staged_version_once_the_node_reports_nothing_staged)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    EXPECT_EQ(services::fwuActivateId, LastUpgradeFrame().messageType);
+
+    ActivateAnswered();
+    EXPECT_EQ(TransferPhase::restarting, progresses.back().phase);
+
+    transfer.OnFirmwareIdentity(1, FirmwareIdentity{ { 1, 6, 0 }, 1, { 1, 7, 0 } });
+    EXPECT_TRUE(transfer.IsActive());
+
+    EXPECT_CALL(observer, OnApplyFinished(1, ApplyOutcome::updated, FwuError::ok, services::FirmwareVersion{ 1, 7, 0 }));
+    transfer.OnFirmwareIdentity(1, FirmwareIdentity{ { 1, 7, 0 }, 1, {} });
+}
+
+TEST_F(TestFirmwareTransfer, a_node_back_with_its_old_version_had_its_pack_refused_by_the_bootloader)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+
+    EXPECT_CALL(observer, OnApplyFinished(1, ApplyOutcome::oldVersionKept, FwuError::ok, services::FirmwareVersion{ 1, 6, 0 }));
+    transfer.OnFirmwareIdentity(1, FirmwareIdentity{ { 1, 6, 0 }, 1, {} });
+}
+
+TEST_F(TestFirmwareTransfer, a_node_back_with_firmware_without_the_upgrade_service_is_back)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+
+    EXPECT_CALL(observer, OnApplyFinished(1, ApplyOutcome::updated, FwuError::ok, services::FirmwareVersion{ 1, 7, 0 }));
+    transfer.OnFirmwareIdentity(1, FirmwareIdentity{ { 1, 7, 0 }, 1, {}, false });
+}
+
+TEST_F(TestFirmwareTransfer, a_node_not_back_within_thirty_seconds_is_a_failed_update)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+    ForwardTime(FirmwareTransfer::restartTimeout - std::chrono::milliseconds(1));
+
+    EXPECT_CALL(observer, OnApplyFinished(1, ApplyOutcome::noNode, FwuError::ok, services::FirmwareVersion{}));
+    ForwardTime(std::chrono::milliseconds(1));
+}
+
+TEST_F(TestFirmwareTransfer, activate_refused_reports_the_refusal)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+
+    EXPECT_CALL(observer, OnApplyFinished(1, ApplyOutcome::refused, FwuError::busy, services::FirmwareVersion{}));
+    ActivateAnswered(FwuError::busy);
+}
+
+TEST_F(TestFirmwareTransfer, while_restarting_the_identity_is_read_again_every_five_seconds)
+{
+    BringCompatible(1, 8);
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+    const auto before = CountIdentityReads();
+
+    ForwardTime(FirmwareTransfer::identityRetry);
+
+    EXPECT_GT(CountIdentityReads(), before);
+}
+
+TEST_F(TestFirmwareTransfer, abandon_stops_without_a_frame)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    const auto before = SentUpgradeFrames().size();
+
+    EXPECT_CALL(observer, OnTransferAbandoned(1));
+    transfer.Abandon();
+
+    EXPECT_FALSE(transfer.IsActive());
+    ForwardTime(std::chrono::minutes(1));
+    EXPECT_EQ(before, SentUpgradeFrames().size());
 }
 
 TEST(FirmwareTransferTimeLeft, the_time_left_follows_the_rate_so_far)

@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.0
+version: 0.10.1
 component: "tool-can-commander"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.0               |
+| Version   | 0.10.1               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-03           |
 
@@ -439,10 +439,12 @@ nothing more.
   Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
-  node to come back, then reads its version. The update succeeded when the node reports the staged version. A
-  node that comes back with the old version had its pack refused by the bootloader, which kept the old
-  application: the tool says so and logs it. A node that does not come back is reported as a failed update that
-  needs a debugger to recover.
+  node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
+  its firmware identity again when it comes back online, and every 5 s while it has not dropped off the bus,
+  which a restart faster than the 3 s offline timeout does not. The update succeeded when the node reports the
+  staged version. A node that comes back with the old version had its pack refused by the bootloader, which
+  kept the old application: the tool says so and logs it. A node that does not come back is reported as a
+  failed update that needs a debugger to recover.
 - **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
   wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
   microcontroller, and nothing was staged; *Try Again* restarts the download.
