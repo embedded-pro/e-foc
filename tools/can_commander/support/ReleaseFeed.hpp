@@ -5,6 +5,7 @@
 #include <QString>
 #include <QUrl>
 #include <optional>
+#include <vector>
 
 namespace tool
 {
@@ -29,6 +30,7 @@ namespace tool
         QString tag;
         QUrl pageUrl;
         std::optional<InstallerAsset> installer;
+        std::vector<InstallerAsset> firmwarePacks;
     };
 
     enum class UpdateStatus
@@ -49,5 +51,6 @@ namespace tool
 
     std::optional<QByteArray> ParseSha256Digest(const QString& digest);
     std::optional<ReleaseInfo> ParseLatestRelease(const QByteArray& json, InstallerPlatform platform);
+    std::optional<InstallerAsset> FirmwarePackFor(const ReleaseInfo& release, const QString& boardName);
     UpdateEvaluation EvaluateLatestRelease(const QByteArray& json, const ReleaseVersion& current, InstallerPlatform platform);
 }
