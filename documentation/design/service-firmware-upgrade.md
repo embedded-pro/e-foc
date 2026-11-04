@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.7
+version: 0.3.8
 component: "service-firmware-upgrade"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.7                     |
+| Version   | 0.3.8                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-04                |
 
@@ -90,7 +90,8 @@ Verify no deadline runs, so Activate may come at any later time, also after a re
 | Restarting | Activate accepted; the reset follows within one second                         | held                             |
 
 At start-up the service reads the status journal. A journal that reads *downloaded* puts it in Staged, with
-the pack's version read from its header (Part H); any other status puts it in Idle. The journal is the
+the pack's version and size read from its header (Part H), so Query Progress reports the whole pack received;
+any other status puts it in Idle. The journal is the
 bootloader's own (`bootloader.md` Part B), read and written through the same library component, so both read
 the same entries.
 

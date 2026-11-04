@@ -139,12 +139,17 @@ namespace
             Fill(packFlash, 0x00);
         }
 
-        void Construct()
+        void Emplace()
         {
             service.emplace(server, application::FirmwareStaging{ packFlash, journalFlash, productName, applicationCapacity, pageSize }, drive, [this]()
                 {
                     reset.Call();
                 });
+        }
+
+        void Construct()
+        {
+            Emplace();
             ExecuteAllActions();
         }
 
@@ -585,6 +590,37 @@ TEST_F(FirmwareUpgradeTest, a_staged_pack_stays_staged_across_a_restart)
     EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
 }
 
+TEST_F(FirmwareUpgradeTest, begin_while_the_staged_header_is_still_read_at_start_up_is_answered_busy)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    service.reset();
+    Emplace();
+
+    std::optional<FwuError> result;
+    service->OnBeginUpgrade(400, [&result](FwuError error, uint16_t)
+        {
+            result = error;
+        });
+    EXPECT_EQ(FwuError::busy, result);
+    EXPECT_EQ(UpgradePackStatus::downloaded, JournalStatus());
+
+    ExecuteAllActions();
+    EXPECT_EQ((services::FirmwareVersion{ 2, 3, 4 }), service->StagedVersion());
+    EXPECT_EQ(FwuError::ok, Begin(400)->first);
+}
+
+TEST_F(FirmwareUpgradeTest, query_progress_after_a_restart_reports_the_staged_pack_complete)
+{
+    Construct();
+    const auto pack = MakePack();
+    EXPECT_EQ(FwuError::ok, Download(pack));
+    service.reset();
+    Construct();
+
+    EXPECT_EQ(std::make_tuple(FwuState::complete, NumberOfBlocks(pack), NumberOfBlocks(pack)), Progress());
+}
+
 TEST_F(FirmwareUpgradeTest, a_journal_that_reads_anything_but_downloaded_stages_nothing_at_start_up)
 {
     RecordJournal(UpgradePackStatus::readyToDeploy);
@@ -666,6 +702,52 @@ TEST_F(FirmwareUpgradeTest, abort_during_the_erase_stops_after_the_sector_and_an
     EXPECT_EQ(0x00, packFlash.sectors[1][0]);
     EXPECT_FALSE(service->IsRunning());
     EXPECT_EQ(0, drive.held);
+}
+
+TEST_F(FirmwareUpgradeTest, abort_while_a_page_is_programmed_finishes_the_page_then_answers_the_block_invalid_state_first)
+{
+    Construct();
+    const auto pack = MakePack();
+    Begin(static_cast<uint32_t>(pack.size()));
+    for (uint16_t index = 0; index != 5; ++index)
+        EXPECT_EQ(FwuError::ok, Block(index, pack));
+
+    std::vector<std::string> order;
+    std::optional<FwuError> lastBlock;
+    service->OnDataBlock(5, infra::ConstByteRange{ pack.data() + 30, pack.data() + 36 }, [&](FwuError error)
+        {
+            order.push_back("block");
+            lastBlock = error;
+        });
+    service->OnAbort([&order]()
+        {
+            order.push_back("abort");
+        });
+    EXPECT_TRUE(order.empty());
+
+    ExecuteAllActions();
+    EXPECT_EQ((std::vector<std::string>{ "block", "abort" }), order);
+    EXPECT_EQ(FwuError::invalidState, lastBlock);
+    EXPECT_EQ(std::vector<uint8_t>(pack.begin(), pack.begin() + pageSize), PackFlashContents(pageSize));
+    EXPECT_FALSE(service->IsRunning());
+    EXPECT_EQ(0, drive.held);
+    EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
+}
+
+TEST_F(FirmwareUpgradeTest, abort_while_restarting_changes_nothing_and_the_reset_follows)
+{
+    Construct();
+    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Activate());
+
+    EXPECT_TRUE(Abort());
+    EXPECT_TRUE(service->IsRunning());
+    EXPECT_EQ(1, drive.held);
+    EXPECT_EQ(UpgradePackStatus::readyToDeploy, JournalStatus());
+    EXPECT_EQ(FwuState::complete, std::get<0>(Progress()));
+
+    EXPECT_CALL(reset, Call());
+    ForwardTime(services::FirmwareUpgrade::restartDelay);
 }
 
 TEST_F(FirmwareUpgradeTest, abort_during_verify_answers_verify_invalid_state_first)

@@ -1,5 +1,6 @@
 #include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include <algorithm>
 
 namespace services
 {
@@ -145,8 +146,7 @@ namespace services
 
     void FirmwareUpgrade::OnQueryProgress(const infra::Function<void(FwuState, uint16_t, uint16_t)>& onResult)
     {
-        const auto totalBlocks = static_cast<uint16_t>((packSize + blockSize - 1) / blockSize);
-        onResult(ReportedState(), nextBlock, totalBlocks);
+        onResult(ReportedState(), nextBlock, TotalBlocks());
     }
 
     void FirmwareUpgrade::OnSessionTimeout()
@@ -282,6 +282,8 @@ namespace services
         reader->ReadHeader(staging->pack.TotalSize(), [this](const PackHeader& header)
             {
                 stagedVersion = ParseVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
+                packSize = std::min<uint32_t>(header.epilogue.headerLength + header.image.lengthOfHeaderAndImage, staging->pack.TotalSize());
+                nextBlock = TotalBlocks();
             });
     }
 
@@ -377,6 +379,11 @@ namespace services
             abortRequested = true;
         else
             EndDownload();
+    }
+
+    uint16_t FirmwareUpgrade::TotalBlocks() const
+    {
+        return static_cast<uint16_t>((packSize + blockSize - 1) / blockSize);
     }
 
     FwuState FirmwareUpgrade::ReportedState() const
