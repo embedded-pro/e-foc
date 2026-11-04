@@ -12,12 +12,14 @@ Feature: Firmware upgrade
     And the motor boots in torque mode
 
   @REQ-UPD-001 @REQ-UPD-004 @REQ-UPD-007 @REQ-UPD-013 @sil
-  Scenario: A pack is downloaded and staged
+  Scenario: A pack is downloaded and staged over a stale one
+    Given the staging slot holds a stale pack and the journal reads "deployed"
     When the target boots
     And a pack of version "2.3.4" is downloaded
     Then Begin Upgrade was answered with a page size of 256
     And the download is answered "ok"
     And the journal reads "downloaded"
+    And the journal holds one entry
     And the staging slot holds the pack and is erased past it
     And the drive reports the staged version "2.3.4"
     And the drive reports the version of its build and its board kind
@@ -35,11 +37,20 @@ Feature: Firmware upgrade
 
   @REQ-UPD-002 @sil
   Scenario: A download is refused while the motor runs
+    Given the staging slot holds a stale pack and the journal reads "downloaded"
     When the target boots
     And the rotor is aligned
     And the motor is enabled
     And Begin Upgrade is sent for a pack of version "2.3.4"
     Then Begin Upgrade is answered "busy"
+    And the journal reads "downloaded"
+    And the staging slot still holds the stale pack
+
+  @REQ-UPD-005 @sil
+  Scenario: Activate without a staged pack is refused
+    When the target boots
+    And Activate is sent
+    Then Activate is answered "not ready"
     And the journal reads "empty"
 
   @REQ-UPD-005 @sil
