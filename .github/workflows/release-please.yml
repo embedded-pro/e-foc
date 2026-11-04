@@ -118,6 +118,16 @@ jobs:
           for file in "$images"/*.hex; do hex+=(--hex "$file"); done
           "build/${{ matrix.target }}/_native_bootloader_image/bin/application.bootloader_image" inject-keys \
             --keys "$BOOTLOADER_KEYS" --elf "$images/e_foc.bootloader.main.elf" "${hex[@]}"
+      - name: Pack the application for an update over CAN
+        run: |
+          script="build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.upgrade_pack.cmake"
+          if [ ! -f "$script" ]; then
+            echo "::notice::${{ matrix.target }} has no bootloader: no upgrade pack"
+            exit 0
+          fi
+          cmake -D KEYS="$BOOTLOADER_KEYS" \
+            -D OUTPUT="e_foc-firmware-${{ matrix.target }}-sync_foc_sensored-${{ needs.release_please.outputs.version }}.upgrade" \
+            -P "$script"
       - name: Generate hex firmware
         run: |
           find "build/${{ matrix.target }}" -name "*.elf" -path "*/${{ matrix.configuration }}/*" -type f | while read -r elf; do
@@ -152,7 +162,9 @@ jobs:
         if: matrix.target == 'EK-TM4C1294XL'
         with:
           name: firmware-hex-${{ matrix.target }}
-          path: e_foc-firmware-${{ matrix.target }}-*.hex
+          path: |
+            e_foc-firmware-${{ matrix.target }}-*.hex
+            e_foc-firmware-${{ matrix.target }}-*.upgrade
           if-no-files-found: error
 
   package_source:
@@ -265,6 +277,7 @@ jobs:
             "e_foc-firmware-NUCLEO-G474RE-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.upgrade" \
             "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
             "e_foc-source-${v}.tar.gz" \
             "e_foc-documentation-${v}.zip"; do

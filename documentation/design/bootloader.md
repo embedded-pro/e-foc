@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: "bootloader"
-date: 2026-11-02
+date: 2026-11-03
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-02
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.5.0      |
+| Version   | 0.6.0      |
 | Component | bootloader |
-| Date      | 2026-11-02 |
+| Date      | 2026-11-03 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -134,7 +134,8 @@ components, with exactly one image:
   board or microcontroller is refused before anything is written. The application checks the same name when
   it verifies the pack, so the refusal comes before the user can apply it (`service-firmware-upgrade.md`
   Part D).
-- The **product version** is the release tag; the component is `sync_foc_sensored`.
+- The **product version** is the build's project version, the release tag without its leading `v`: the version
+  the application reports as running once the pack is installed. The component is `sync_foc_sensored`.
 - The prologue's status byte and error code are outside the signature and are not used: progress is kept in
   the status journal (Part D).
 - An image whose destination is not the start of the application slot, or whose size exceeds the slot less
@@ -319,6 +320,7 @@ host compiler, in the build directory's `_native_bootloader_image/bin`, where th
 | `bootloader-keys` | a key set                                            | the bootloader's 80-byte key slot (Part G)                               |
 | `inject-keys`     | a key set, the bootloader's ELF and its hex files    | the key slot written into each, at the key slot section's place (Part G) |
 | `descriptor`      | the application image, gaps filled with erased bytes | its 64-byte image descriptor (Part E)                                    |
+| `pack`            | a key set, the application image and its product     | the upgrade pack of Part B, signed and encrypted with that set           |
 
 `inject-keys` checks every file first and changes none unless all of them take the slot.
 
@@ -331,6 +333,19 @@ A key set file is 112 bytes: the AES key (16), the public key (64, the curve poi
 significant byte first) and the private key (32). The tool refuses a file of another size, or one whose
 public key is not the one its private key gives, so a damaged secret stops the build instead of producing a
 bootloader that refuses every pack.
+
+The image a pack carries is the application image the descriptor step copies out, without the descriptor: the
+bootloader writes the descriptor itself after an installation (Part E). Its destination is the start of the
+application slot.
+
+Like the keys, the pack is made after the build. Beside each application image the build writes a small CMake
+script that holds what the pack takes from the build: the image, the product name of Part B, the project
+version, the component, and the application and staging slots of the board's flash layout. The release workflow
+runs it with a key set and the asset's file name, and nothing else; continuous integration runs it with the
+development set on every build of a board with a bootloader. Before it writes the pack, the script checks that
+the image fits the slot less its descriptor, and that the application header at 1 KB carries this board's
+target identity (Part I) and the project version. After, it checks that the pack fits the staging slot and
+names the board's product. A failed check writes no pack and fails the workflow.
 
 ---
 
