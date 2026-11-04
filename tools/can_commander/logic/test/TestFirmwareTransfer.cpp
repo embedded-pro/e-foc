@@ -450,6 +450,42 @@ TEST_F(TestFirmwareTransfer, while_restarting_the_identity_is_read_again_every_f
     EXPECT_GT(CountIdentityReads(), before);
 }
 
+TEST_F(TestFirmwareTransfer, an_emergency_stop_sent_to_the_node_ends_its_download_without_a_frame)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    BlockAcked(0);
+    const auto before = SentUpgradeFrames().size();
+
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::stopped, FwuError::ok));
+    transfer.EmergencyStopSent(1);
+
+    EXPECT_FALSE(transfer.IsActive());
+    ForwardTime(std::chrono::minutes(1));
+    EXPECT_EQ(before, SentUpgradeFrames().size());
+}
+
+TEST_F(TestFirmwareTransfer, an_emergency_stop_sent_to_another_node_leaves_the_download_alone)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+
+    transfer.EmergencyStopSent(2);
+
+    EXPECT_TRUE(transfer.IsActive());
+    EXPECT_EQ(TransferPhase::sending, transfer.Phase());
+}
+
+TEST_F(TestFirmwareTransfer, an_emergency_stop_leaves_an_apply_waiting_for_the_node)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+
+    transfer.EmergencyStopSent(1);
+
+    EXPECT_EQ(TransferPhase::restarting, transfer.Phase());
+}
+
 TEST_F(TestFirmwareTransfer, abandon_stops_without_a_frame)
 {
     ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));

@@ -304,6 +304,9 @@ namespace tool
             case DownloadOutcome::cancelled:
                 Succeed("Download cancelled; nothing was staged.", IssueSeverity::warning);
                 break;
+            case DownloadOutcome::stopped:
+                Succeed(QString("The emergency stop ended the download of firmware %1; nothing was staged.").arg(version), IssueSeverity::warning);
+                break;
             case DownloadOutcome::refused:
                 Fail(QString("The controller refused firmware %1: %2").arg(version, QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::download))));
                 break;

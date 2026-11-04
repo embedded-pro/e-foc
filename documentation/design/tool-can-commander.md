@@ -440,7 +440,10 @@ nothing more.
   three times in a row before the download is given up. A progress bar shows the bytes sent out of the total
   and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
   with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
-  commandable. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply
+  commandable. An emergency stop sent to the motor ends its download on both sides: the controller drops the
+  pack (`service-firmware-upgrade.md` Part F) and the tool sends nothing more and says the stop ended the
+  download and nothing was staged. A staged pack and an apply under way are not affected, as on the
+  controller. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply
   Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
@@ -469,10 +472,11 @@ stateDiagram-v2
     Available --> Available : pack for another board or microcontroller, not offered
     Available --> Downloading : Download to Controller… confirmed, motor stopped
     Downloading --> Downloading : block acknowledged, or resent after Query Progress
-    Downloading --> Available : Cancel (Abort sent)
+    Downloading --> Available : Cancel (Abort sent), or emergency stop sent
     Downloading --> Failed : refused, or no answer after three tries
     Downloading --> Verifying : last block acknowledged
     Verifying --> Failed : CrcMismatch or NotReady
+    Verifying --> Available : emergency stop sent
     Verifying --> Staged : verified
     Staged --> Staged : motor runs, bus closes and reopens
     Staged --> Available : Discard (Abort sent)

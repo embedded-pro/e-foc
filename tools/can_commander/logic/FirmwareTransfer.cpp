@@ -56,7 +56,7 @@ namespace tool
 
     void FirmwareTransfer::Cancel()
     {
-        if (phase != TransferPhase::erasing && phase != TransferPhase::sending && phase != TransferPhase::verifying)
+        if (!Downloading())
             return;
 
         StopTimers();
@@ -120,6 +120,12 @@ namespace tool
             {
                 observer.OnTransferAbandoned(node);
             });
+    }
+
+    void FirmwareTransfer::EmergencyStopSent(uint16_t node)
+    {
+        if (node == nodeId && Downloading())
+            FinishDownload(DownloadOutcome::stopped);
     }
 
     void FirmwareTransfer::OnCommandAck(uint16_t node, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
@@ -230,6 +236,11 @@ namespace tool
     bool FirmwareTransfer::Answers(TransferPhase expectedPhase) const
     {
         return phase == expectedPhase && client.FrameOrigin().SourceNodeId() == nodeId;
+    }
+
+    bool FirmwareTransfer::Downloading() const
+    {
+        return phase == TransferPhase::erasing || phase == TransferPhase::sending || phase == TransferPhase::verifying;
     }
 
     void FirmwareTransfer::Enter(TransferPhase next)
