@@ -39,6 +39,8 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     SilPlantModel.hpp
     QemuTimer.cpp
     QemuTimer.hpp
+    SemihostingAsyncFlash.cpp
+    SemihostingAsyncFlash.hpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
     QemuConstants.hpp

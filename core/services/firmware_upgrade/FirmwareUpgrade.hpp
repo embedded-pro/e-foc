@@ -26,9 +26,11 @@ namespace services
         static constexpr uint16_t maxPageSize{ StagingWriter::maxPageSize };
         static constexpr uint8_t blockSize{ StagingWriter::blockSize };
         static constexpr infra::Duration inactivityDeadline{ std::chrono::seconds(30) };
+        static constexpr infra::Duration restartDelay{ std::chrono::milliseconds(250) };
+        static constexpr infra::Duration discardRetry{ std::chrono::milliseconds(100) };
 
         FirmwareUpgrade(FirmwareUpgradeCategoryServer& server, const std::optional<application::FirmwareStaging>& staging,
-            FirmwareUpgradeDrive& drive);
+            FirmwareUpgradeDrive& drive, const infra::Function<void()>& reset);
 
         void OnBeginUpgrade(uint32_t firmwareSize, const infra::Function<void(FwuError, uint16_t)>& onResult) override;
         void OnDataBlock(uint16_t blockIndex, infra::ConstByteRange data, const infra::Function<void(FwuError)>& onResult) override;
@@ -40,6 +42,7 @@ namespace services
 
         bool IsRunning() const override;
         FirmwareVersion StagedVersion() const override;
+        void EmergencyStop() override;
 
     private:
         enum class State : uint8_t
@@ -49,7 +52,8 @@ namespace services
             receiving,
             verifying,
             staged,
-            error
+            error,
+            restarting
         };
 
         static bool Holds(State state);
@@ -61,6 +65,7 @@ namespace services
         void OnBlockStored(bool stored);
         void CheckCrc(uint32_t expectedCrc);
         void OnVerifiedHeader(const PackHeader& header);
+        void ReadStagedVersion();
 
         bool FlashBusy() const;
         bool TakeAbort();
@@ -68,12 +73,15 @@ namespace services
         void Fail(FwuError result);
         void EndDownload();
         void AnswerPending(FwuError result);
+        void Discard();
+        void TryDiscard();
         void RestartDeadline();
         void OnDeadline();
         FwuState ReportedState() const;
 
         std::optional<application::FirmwareStaging> staging;
         FirmwareUpgradeDrive& drive;
+        infra::Function<void()> reset;
         std::optional<bootloader::StatusJournal> journal;
         std::array<uint8_t, maxPageSize> scratch{};
         std::optional<StagingWriter> writer;
@@ -92,5 +100,7 @@ namespace services
         infra::Function<void(FwuError)> verifyDone;
 
         infra::TimerSingleShot deadline;
+        infra::TimerSingleShot restartTimer;
+        infra::TimerRepeating discardTimer;
     };
 }

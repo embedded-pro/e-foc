@@ -16,12 +16,14 @@
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
+#include "hal_tiva/synchronous_tiva/SynchronousFlashInternal.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/Can.hpp"
 #include "hal_tiva/tiva/Dma.hpp"
 #include "hal_tiva/tiva/Eeprom.hpp"
+#include "hal_tiva/tiva/FlashInternal.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
@@ -81,6 +83,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
+        std::optional<FirmwareStaging> Staging() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -281,6 +284,10 @@ namespace application
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl{ adcForPhaseCurrentMeasurementImpl.currentPhaseAnalogPins[AdcForPhaseCurrentMeasurementImpl::powerSupplyPinIndex] };
             PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
+#ifdef E_FOC_PRODUCT_NAME
+            hal::tiva::FlashInternal stagingFlash{ StagingRegion() };
+            hal::tiva::SynchronousFlashInternal journalFlash{ JournalRegion() };
+#endif
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<PwmDriver> pwm;
@@ -297,6 +304,8 @@ namespace application
     private:
         static void ConfigureBoardIdPins();
         static uint8_t ReadBoardIdPins();
+        static infra::ConstByteRange StagingRegion();
+        static infra::ConstByteRange JournalRegion();
 
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;

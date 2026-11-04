@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: system
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.2.0                     |
+| Version   | 0.2.1                     |
 | Component | system                    |
-| Date      | 2026-11-01                |
+| Date      | 2026-11-03                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -206,15 +206,15 @@ keep `-fno-finite-math-only`, but the check does not depend on it.
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service                          | Responsibility                                                                                                                                                                                                                                                                                    |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                              |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                 |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                    |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                   |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                         |
-| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                        |
-| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received ([design](../design/service-firmware-upgrade.md)). |
+| Service                          | Responsibility                                                                                                                                                                                                                                                                                                                              |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                                                                        |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                                           |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                                              |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                                             |
+| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                                                                   |
+| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                                  |
+| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
 
 ### 3. CAN Service
 
