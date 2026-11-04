@@ -4,11 +4,41 @@
 #include "core/can/FocMotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
+#include <cmath>
+#include <span>
 #include <utility>
 
 namespace tool
 {
     using namespace services;
+
+    namespace
+    {
+        constexpr std::array<can::FocParameter, 7> identityParameters{
+            can::FocParameter::firmwareVersionMajor,
+            can::FocParameter::firmwareVersionMinor,
+            can::FocParameter::firmwareVersionPatch,
+            can::FocParameter::boardKind,
+            can::FocParameter::stagedVersionMajor,
+            can::FocParameter::stagedVersionMinor,
+            can::FocParameter::stagedVersionPatch,
+        };
+
+        constexpr std::size_t stagedVersionFirst{ 4 };
+
+        std::optional<std::size_t> IdentitySlot(can::FocParameter parameter)
+        {
+            const auto slot = std::ranges::find(identityParameters, parameter);
+            if (slot == identityParameters.end())
+                return std::nullopt;
+            return static_cast<std::size_t>(slot - identityParameters.begin());
+        }
+
+        uint8_t VersionNumber(const std::optional<float>& value)
+        {
+            return static_cast<uint8_t>(std::lround(value.value_or(0.0f)));
+        }
+    }
 
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter }
@@ -63,6 +93,11 @@ namespace tool
     bool CanCommandClient::SupportsSupervision(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, supervisionContractMinor);
+    }
+
+    bool CanCommandClient::SupportsFirmwareIdentity(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, firmwareContractMinor);
     }
 
     bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
@@ -314,6 +349,74 @@ namespace tool
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
+    void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
+    {
+        if (!SupportsFirmwareIdentity(nodeId) || IsIdentityQueued(nodeId))
+            return;
+
+        identities.erase(nodeId);
+        for (const auto parameter : identityParameters)
+            QueueRead(nodeId, Read{ can::focQueryParameterId, parameter });
+    }
+
+    bool CanCommandClient::IsIdentityQueued(uint16_t nodeId) const
+    {
+        const auto node = reads.find(nodeId);
+        return node != reads.end() && std::ranges::any_of(node->second.queued, [](const Read& read)
+                                          {
+                                              return read.commandType == can::focQueryParameterId && IdentitySlot(read.parameter).has_value();
+                                          });
+    }
+
+    void CanCommandClient::CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value)
+    {
+        const auto slot = IdentitySlot(parameter);
+        if (!slot.has_value())
+            return;
+
+        identities[nodeId].values[*slot] = value;
+        ReportIdentityWhenComplete(nodeId);
+    }
+
+    void CanCommandClient::OnReadRefused(uint16_t nodeId, uint8_t commandType)
+    {
+        const auto node = reads.find(nodeId);
+        if (commandType != can::focQueryParameterId || node == reads.end() || node->second.inFlight != commandType)
+            return;
+
+        const auto slot = IdentitySlot(node->second.inFlightParameter);
+        if (!slot.has_value() || *slot < stagedVersionFirst)
+            return;
+
+        identities[nodeId].stagingRefused = true;
+        ReportIdentityWhenComplete(nodeId);
+    }
+
+    void CanCommandClient::ReportIdentityWhenComplete(uint16_t nodeId)
+    {
+        const auto& partial = identities[nodeId];
+        const auto arrived = [&partial](std::size_t first, std::size_t count)
+        {
+            return std::ranges::all_of(std::span{ partial.values }.subspan(first, count), [](const std::optional<float>& value)
+                {
+                    return value.has_value();
+                });
+        };
+
+        const bool staged = arrived(stagedVersionFirst, identityParameters.size() - stagedVersionFirst);
+        if (!arrived(0, stagedVersionFirst) || (!staged && !partial.stagingRefused))
+            return;
+
+        const auto& values = partial.values;
+        const FirmwareIdentity identity{ { VersionNumber(values[0]), VersionNumber(values[1]), VersionNumber(values[2]) }, VersionNumber(values[3]),
+            staged ? services::FirmwareVersion{ VersionNumber(values[4]), VersionNumber(values[5]), VersionNumber(values[6]) } : services::FirmwareVersion{}, staged };
+        identities.erase(nodeId);
+        NotifyObservers([nodeId, &identity](auto& observer)
+            {
+                observer.OnFirmwareIdentityReceived(nodeId, identity);
+            });
+    }
+
     void CanCommandClient::RequestStatus(uint16_t nodeId)
     {
         if (Compatibility(nodeId) == can::ContractCompatibility::compatible)
@@ -346,6 +449,7 @@ namespace tool
             if (SendRead(nodeId, read))
             {
                 node.inFlight = read.commandType;
+                node.inFlightParameter = read.parameter;
                 node.timeout.Start(readTimeout, [this, nodeId, commandType = read.commandType]()
                     {
                         CompleteRead(nodeId, commandType);
@@ -383,6 +487,7 @@ namespace tool
     void CanCommandClient::ForgetReads(uint16_t nodeId)
     {
         const auto node = reads.find(nodeId);
+        identities.erase(nodeId);
         if (node == reads.end())
             return;
 
@@ -514,6 +619,7 @@ namespace tool
 
         RequestSettings(nodeId);
         RequestReadings(nodeId);
+        RequestFirmwareIdentity(nodeId);
         RequestStatus(nodeId);
     }
 
@@ -539,6 +645,7 @@ namespace tool
             {
                 observer.OnParameterReceived(nodeId, parameter, value);
             });
+        CollectIdentity(nodeId, parameter, value.value);
     }
 
     void CanCommandClient::DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const
@@ -581,6 +688,8 @@ namespace tool
 
         if (ackCategory == can::focMotorCategoryId && IsRead(ackMsgType))
         {
+            if (ackStatus != CanAckStatus::success)
+                OnReadRefused(nodeId, ackMsgType);
             CompleteRead(nodeId, ackMsgType);
             return true;
         }

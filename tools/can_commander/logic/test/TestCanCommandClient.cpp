@@ -103,6 +103,29 @@ namespace
             LogReceived(rawId, Message({ can::focMotorCategoryId, commandType, static_cast<uint8_t>(status), 0 }));
         }
 
+        void DeliverParameter(uint16_t node, can::FocParameter parameter, float value)
+        {
+            const auto bits = std::bit_cast<uint32_t>(value);
+            Receive(FocId(services::CanPriority::response, can::focParameterResponseId, node),
+                Message({ static_cast<uint8_t>(parameter), 0, static_cast<uint8_t>(bits >> 24), static_cast<uint8_t>(bits >> 16), static_cast<uint8_t>(bits >> 8), static_cast<uint8_t>(bits) }));
+        }
+
+        void DeliverRunningIdentity(uint16_t node, const FirmwareIdentity& identity)
+        {
+            DeliverParameter(node, can::FocParameter::firmwareVersionMajor, identity.running.major);
+            DeliverParameter(node, can::FocParameter::firmwareVersionMinor, identity.running.minor);
+            DeliverParameter(node, can::FocParameter::firmwareVersionPatch, identity.running.patch);
+            DeliverParameter(node, can::FocParameter::boardKind, identity.boardKind);
+        }
+
+        void DeliverIdentity(uint16_t node, const FirmwareIdentity& identity)
+        {
+            DeliverRunningIdentity(node, identity);
+            DeliverParameter(node, can::FocParameter::stagedVersionMajor, identity.staged.major);
+            DeliverParameter(node, can::FocParameter::stagedVersionMinor, identity.staged.minor);
+            DeliverParameter(node, can::FocParameter::stagedVersionPatch, identity.staged.patch);
+        }
+
         void DeliverContract(uint8_t major, uint16_t node, uint8_t minor = 0)
         {
             Receive(FocId(services::CanPriority::response, can::focContractVersionResponseId, node), Message({ major, minor }));
@@ -1071,4 +1094,82 @@ TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
     AnswerAllReads();
 
     EXPECT_EQ(can::focParameters.size() - WritableParameterCount(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
+{
+    RecordSends();
+    BringCompatible(1, 6);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)
+{
+    RecordSends();
+    BringCompatible(1, 5);
+    AnswerAllReads();
+    sent.clear();
+
+    client.RequestFirmwareIdentity(1);
+
+    EXPECT_FALSE(client.SupportsFirmwareIdentity(1));
+    EXPECT_EQ(0, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, the_firmware_identity_is_reported_once_every_value_arrived)
+{
+    BringOnline(1);
+    const FirmwareIdentity identity{ { 1, 6, 0 }, 1, { 1, 7, 2 } };
+
+    EXPECT_CALL(observer, OnParameterReceived(1, _, _)).Times(7);
+    EXPECT_CALL(observer, OnFirmwareIdentityReceived(1, identity));
+    DeliverIdentity(1, identity);
+}
+
+TEST_F(TestCanCommandClient, a_firmware_identity_request_reads_the_values_again_once)
+{
+    RecordSends();
+    BringCompatible(1, 6);
+    AnswerAllReads();
+    sent.clear();
+
+    client.RequestFirmwareIdentity(1);
+    client.RequestFirmwareIdentity(1);
+    AnswerAllReads();
+
+    EXPECT_EQ(7, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, firmware_that_refuses_the_staged_version_has_no_upgrade_service)
+{
+    RecordSends();
+    BringCompatible(1, 6);
+    AnswerAllReads();
+    sent.clear();
+    client.RequestFirmwareIdentity(1);
+    for (auto answered = 0; answered != 4; ++answered)
+        AnswerLastRead();
+    const FirmwareIdentity identity{ { 1, 6, 0 }, 1, {}, false };
+
+    EXPECT_CALL(observer, OnParameterReceived(1, _, _)).Times(4);
+    DeliverRunningIdentity(1, identity);
+    EXPECT_CALL(observer, OnFirmwareIdentityReceived(1, identity));
+    DeliverAck(can::focQueryParameterId, 1, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(TestCanCommandClient, a_refused_reading_other_than_the_staged_version_reports_no_identity)
+{
+    RecordSends();
+    BringCompatible(1, 6);
+    AnswerAllReads();
+    sent.clear();
+    client.RequestFirmwareIdentity(1);
+
+    EXPECT_CALL(observer, OnParameterReceived(1, _, _)).Times(4);
+    DeliverRunningIdentity(1, FirmwareIdentity{ { 1, 6, 0 }, 1, {} });
+    DeliverAck(can::focQueryParameterId, 1, services::CanAckStatus::invalidPayload);
 }
