@@ -312,7 +312,7 @@ TEST_F(FocStateMachinePositionCliTest, calibration_populates_inertia_and_velocit
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_NEAR(data.inertia, 0.005f, 1e-5f);
     EXPECT_NEAR(data.frictionViscous, 0.01f, 1e-5f);
-    EXPECT_GT(data.speedLoopBandwidth, 0.0f);
+    EXPECT_NEAR(data.speedLoopBandwidth, 100.0f, 1e-4f);
 }
 
 TEST_F(FocStateMachinePositionCliTest, calibrate_from_ready_re_runs_and_reaches_ready)

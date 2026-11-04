@@ -150,6 +150,15 @@ jobs:
           for file in "$images"/*.hex; do hex+=(--hex "$file"); done
           "build/${{ matrix.target }}/_native_bootloader_image/bin/application.bootloader_image" inject-keys \
             --keys targets/bootloader/keys/development.keys --elf "$images/e_foc.bootloader.main.elf" "${hex[@]}"
+      - name: Pack the application with the development keys
+        shell: bash
+        run: |
+          script="build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.upgrade_pack.cmake"
+          if [ ! -f "$script" ]; then
+            echo "::notice::${{ matrix.target }} has no bootloader: no upgrade pack"
+            exit 0
+          fi
+          cmake -D KEYS=targets/bootloader/keys/development.keys -D OUTPUT="$RUNNER_TEMP/sync_foc_sensored.upgrade" -P "$script"
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}

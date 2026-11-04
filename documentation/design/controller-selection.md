@@ -427,10 +427,10 @@ knob, its bandwidth; its integral zero and reference weight are design constants
 
 **Automatic bandwidth.** A bandwidth the operator has not set is *automatic*: the firmware keeps
 deriving it — the current loop from the PWM rate (a fifteenth of the switching frequency), the speed
-loop at 50 rad/s, the position loop at 2π·3 rad/s. The automatic current loop is also held below the
+loop at 100 rad/s, the position loop at 2π·3 rad/s. The automatic current loop is also held below the
 bandwidth at which its proportional gain, L·ω, turns the current-sensor noise the calibration measured
 into 0.08 V RMS of commanded voltage, and not below 1885 rad/s, ten times the 2π·30 Hz speed bandwidth
-of the tuning record's defaults and so 37 times the automatic speed loop (REQ-CTRL-017). On
+of the tuning record's defaults and so 19 times the automatic speed loop (REQ-CTRL-017). On
 the bench board the sense chain carries 38.5 mA RMS of noise; at the PWM-derived 8378 rad/s that
 became 0.40 V of voltage noise and an audible hiss, which was gone at 0.08 V. A record that holds no
 noise measurement keeps the PWM-derived value.
@@ -439,7 +439,7 @@ The calibration record also holds a `currentLoopBandwidth` and a `speedLoopBandw
 the acceptable range there is used instead of the derivation above (for the current loop, without the
 noise cap). Neither is measured. Calibration copies `currentLoopBandwidth` from the record it
 replaces — zero on a first calibration, which leaves the derivation in charge — and the mechanical
-identification writes a fixed 50 rad/s into `speedLoopBandwidth`, the value the derivation gives anyway.
+identification writes a fixed 100 rad/s into `speedLoopBandwidth`, the value the derivation gives anyway.
 Only a record built outside calibration, such as the software-in-the-loop NVM images (2000 and
 100 rad/s), holds anything else. The bandwidth is therefore a performance choice, not a motor property
 (`documentation/theory/closed-loop-control.md` §8).
@@ -576,7 +576,7 @@ repeat the selection after every power cycle. The motor state machine will trans
 | NvmRecord            | speedAlgorithm       | uint8             | 0–255                                         | As above                                                         |
 | NvmRecord            | positionAlgorithm    | uint8             | 0–255                                         | As above                                                         |
 | CalibrationRecord    | currentLoopBandwidth | rad/s (float)     | ≥ 0                                           | Not measured: carried from the previous record; 0 = automatic    |
-| CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Not measured: mechanical identification writes a fixed 50 rad/s  |
+| CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Not measured: mechanical identification writes a fixed 100 rad/s |
 | ConfigRecord         | loop tunings         | per knob          | `service-can.md` parameter table              | Operator's settings; a bandwidth of 0 is automatic               |
 
 ---
