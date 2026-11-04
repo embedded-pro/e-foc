@@ -103,7 +103,8 @@ namespace application
                     });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()), FirmwareIdentityOf(this->hardware.GetBoardKind()) },
-                    *electricalIdent, this->hardware.Tracer(), confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade);
+                    can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade },
+                    this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&

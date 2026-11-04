@@ -11,19 +11,16 @@ namespace can
         FocMotorCategoryServer& server,
         state_machine::ControlModeStateMachine& controlMode,
         const Platform& platform,
-        services::ElectricalParametersIdentification& electricalIdent,
-        services::Tracer& tracer,
-        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
-        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill,
-        FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade)
+        const Services& motorServices,
+        services::Tracer& tracer)
         : FocMotorCategoryServerObserver(server)
         , server(server)
         , controlMode(controlMode)
         , inverter(platform.inverter)
         , encoder(platform.encoder)
-        , commissioning(server, controlMode, electricalIdent, currentOffsets, standstill)
-        , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware, firmwareUpgrade)
-        , firmwareUpgrade(firmwareUpgrade)
+        , commissioning(server, controlMode, motorServices.electricalIdent, motorServices.currentOffsets, motorServices.standstill)
+        , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware, motorServices.firmwareUpgrade)
+        , firmwareUpgrade(motorServices.firmwareUpgrade)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
