@@ -161,8 +161,8 @@ $$
 
 24 × 4 mN·m = 0.096 N·m/rad on the bench. A position setpoint between two detents sits on a slope that pushes the
 rotor away; the loop holds it only if its own stiffness is larger. For the cascade it is
-$2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.023 N·m/rad at the default 50 rad/s speed and 18.8 rad/s position
-bandwidths: a quarter of the cogging's, and the rotor steps between detents instead
+$2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.046 N·m/rad at the default 100 rad/s speed and 18.8 rad/s position
+bandwidths: half the cogging's, and the rotor steps between detents instead
 (`documentation/theory/position-loop-pid.md`, *Limitations & Assumptions*). Holding without the map would take a
 speed bandwidth above about 210 rad/s.
 
@@ -187,7 +187,7 @@ K_t\, \bar{i}_q - J\,\bar\alpha = -\tau_{cog}(\theta) + T_f \operatorname{sgn}(\
 $$
 
 where the inertia term removes what went into accelerating the rotor (at 10 rad/s the bench cogging repeats at
-240 rad/s, far above a 50 rad/s speed loop, so most of it shows as acceleration, not current). Write the left
+240 rad/s, far above a 100 rad/s speed loop, so most of it shows as acceleration, not current). Write the left
 side as $\tau_+(\theta)$ for the forward run and $\tau_-(\theta)$ for the reverse run at the same speed. Then
 
 $$
@@ -297,7 +297,7 @@ The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles),
 
 1. **Periods.** $N_{cog} = \operatorname{lcm}(12, 8) = 24$; $C_T = 8 \times 12 / 24 = 4$, a high-cogging
    combination; $24/4 = 6$ periods per electrical period.
-2. **Frequency at 10 rad/s.** $24 \times 10 = 240$ rad/s, 38 Hz: above a 50 rad/s speed loop.
+2. **Frequency at 10 rad/s.** $24 \times 10 = 240$ rad/s, 38 Hz: above a 100 rad/s speed loop.
 3. **Speed ripple without compensation.** $0.004 / (12.4\times10^{-6} \times 24 \times 10) = 1.34$ rad/s, 13 % of
    the speed.
 4. **Detent stiffness.** $24 \times 0.004 = 0.096$ N·m/rad against the position cascade's
