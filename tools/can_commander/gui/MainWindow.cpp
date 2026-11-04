@@ -805,6 +805,9 @@ namespace tool
             motor->OnParameter(parameter, value);
     }
 
+    void MainWindow::OnFirmwareIdentityReceived(uint16_t, const FirmwareIdentity&)
+    {}
+
     void MainWindow::OnAdapterError(infra::BoundedConstString message)
     {
         Report(IssueSeverity::error, QString("CAN adapter: %1").arg(QString::fromUtf8(message.data(), static_cast<qsizetype>(message.size()))));

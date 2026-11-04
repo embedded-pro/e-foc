@@ -6,8 +6,10 @@
 #include "core/can/FocMotorCanClient.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "core/can/FocMotorMessages.hpp"
+#include "core/services/firmware_upgrade/FirmwareVersion.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Observer.hpp"
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <map>
@@ -20,6 +22,16 @@ namespace tool
     using FocFaultCode = can::FocFaultCode;
 
     class CanCommandClient;
+
+    struct FirmwareIdentity
+    {
+        services::FirmwareVersion running;
+        uint8_t boardKind{ 0 };
+        services::FirmwareVersion staged;
+        bool hasUpgradeService{ true };
+
+        bool operator==(const FirmwareIdentity& other) const = default;
+    };
 
     class CanCommandClientObserver
         : public infra::SingleObserver<CanCommandClientObserver, CanCommandClient>
@@ -46,6 +58,7 @@ namespace tool
         virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
         virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
+        virtual void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) = 0;
     };
 
     class CanCommandClient
@@ -62,6 +75,7 @@ namespace tool
         static constexpr uint8_t settingsContractMinor{ 1 };
         static constexpr uint8_t diagnosticsContractMinor{ 2 };
         static constexpr uint8_t supervisionContractMinor{ 4 };
+        static constexpr uint8_t firmwareContractMinor{ 6 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -73,6 +87,7 @@ namespace tool
         bool SupportsSettings(uint16_t nodeId) const;
         bool SupportsDiagnostics(uint16_t nodeId) const;
         bool SupportsSupervision(uint16_t nodeId) const;
+        bool SupportsFirmwareIdentity(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
@@ -101,6 +116,7 @@ namespace tool
         void RequestSettings(uint16_t nodeId);
         void RequestReadings(uint16_t nodeId);
         void RequestStatus(uint16_t nodeId);
+        void RequestFirmwareIdentity(uint16_t nodeId);
 
     private:
         struct NodeCommand
@@ -120,7 +136,14 @@ namespace tool
         {
             std::deque<Read> queued;
             std::optional<uint8_t> inFlight;
+            can::FocParameter inFlightParameter{ can::FocParameter::currentBandwidth };
             infra::TimerSingleShot timeout;
+        };
+
+        struct PartialIdentity
+        {
+            std::array<std::optional<float>, 7> values;
+            bool stagingRefused{ false };
         };
 
         void MarkBusy(uint16_t nodeId, uint8_t commandType);
@@ -137,6 +160,10 @@ namespace tool
         bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
         void RefreshStatus();
         static bool IsRead(uint8_t commandType);
+        void CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value);
+        void OnReadRefused(uint16_t nodeId, uint8_t commandType);
+        void ReportIdentityWhenComplete(uint16_t nodeId);
+        bool IsIdentityQueued(uint16_t nodeId) const;
 
         template<class Send>
         bool Tracked(uint16_t nodeId, uint8_t commandType, Send send);
@@ -168,6 +195,7 @@ namespace tool
         std::map<uint16_t, NodeCommand> commands;
         std::map<uint16_t, NodeReads> reads;
         std::map<uint16_t, uint8_t> contractMinors;
+        std::map<uint16_t, PartialIdentity> identities;
         std::set<uint16_t> onlineNodes;
         infra::TimerRepeating statusRefresh;
     };
