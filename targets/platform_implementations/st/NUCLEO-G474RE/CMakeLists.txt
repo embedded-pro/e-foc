@@ -6,6 +6,7 @@ target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTE
 )
 
 target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTERFACE
+    e_foc.boards
     hal_st.stm32fxxx
     hal_st.synchronous_stm32fxxx
 )

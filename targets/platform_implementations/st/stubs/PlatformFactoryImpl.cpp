@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/st/stubs/PlatformFactoryImpl.hpp"
+#include "generated/Boards.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
@@ -101,7 +102,7 @@ namespace application
 
     BoardKind PlatformFactoryImpl::GetBoardKind() const
     {
-        return static_cast<BoardKind>(Peripheral::boardKind);
+        return static_cast<BoardKind>(e_foc::board.kind);
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const

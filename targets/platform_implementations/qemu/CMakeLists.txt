@@ -1,15 +1,10 @@
 add_library(e_foc.platform_abstraction_qemu_board INTERFACE)
 
-target_compile_definitions(e_foc.platform_abstraction_qemu_board INTERFACE
-    E_FOC_BOARD_KIND=${E_FOC_EMULATED_BOARD_KIND}
-    E_FOC_DEVICE_FAMILY=${E_FOC_EMULATED_DEVICE_FAMILY}
-    E_FOC_DEVICE_IDENTITY=${E_FOC_EMULATED_DEVICE_IDENTITY}
-    E_FOC_PRODUCT_NAME="${E_FOC_EMULATED_PRODUCT_NAME}"
+target_link_libraries(e_foc.platform_abstraction_qemu_board INTERFACE
+    e_foc.boards
 )
 
 set_property(GLOBAL PROPERTY E_FOC_BOOTLOADER_LDSCRIPTS "${CMAKE_CURRENT_LIST_DIR}/ldscripts")
-set_property(GLOBAL PROPERTY E_FOC_PRODUCT_NAME "${E_FOC_EMULATED_PRODUCT_NAME}")
-set_property(GLOBAL PROPERTY E_FOC_IMAGE_TARGET ${E_FOC_EMULATED_BOARD_KIND} ${E_FOC_EMULATED_DEVICE_FAMILY} ${E_FOC_EMULATED_DEVICE_IDENTITY})
 
 function(e_foc_qemu_target_linker_scripts target)
     cmake_parse_arguments(PARSE_ARGV 1 E_FOC_LAYOUT "APPLICATION;BOOTLOADER" "" "")

@@ -2,9 +2,9 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.6
+version: 0.3.7
 component: "service-firmware-upgrade"
-date: 2026-11-03
+date: 2026-11-04
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.6                     |
+| Version   | 0.3.7                     |
 | Component | service-firmware-upgrade  |
-| Date      | 2026-11-03                |
+| Date      | 2026-11-04                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -231,7 +231,7 @@ board and microcontroller its packs name (`bootloader.md` Part B), so a client p
 talks to and shows what waits to be applied.
 
 The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the version header EmIL
-generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which each board's `Peripheral::boardKind` sets; the staged-version
+generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which returns the kind of the board the build is for, from the header the build generates from the board definitions (`bootloader.md` Part B); the staged-version
 parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
 `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, emulated `5`, unknown `0`.
 
@@ -248,11 +248,13 @@ parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board ki
 A board without a staging slot still answers the category: Begin with `InvalidSize`, Verify with
 `InvalidState`, Activate with `NotReady`.
 
-The platform provides the staging flash and the status journal, the product name, the application slot's
-capacity and the page size; the service depends on these abstractions only. On the emulated target the files
-`staging.bin` and `journal.bin` stand in for the staging flash and the journal as the EEPROM file stands in for
-the NVM, so a scenario can read back what the firmware staged; they are the files the emulated bootloader
-reads (`software-in-the-loop.md` Part P).
+The platform provides the staging flash and the status journal, the board identification its packs carry as
+product name (`bootloader.md` Part B), the application slot's capacity and the page size; the service depends
+on these abstractions only. Whether a board has staging follows from its bootloader layout, not from its
+identification, which every board has: a board whose layout places no staging slot provides none. On the
+emulated target the files `staging.bin` and `journal.bin` stand in for the staging flash and the journal as the
+EEPROM file stands in for the NVM, so a scenario can read back what the firmware staged; they are the files the
+emulated bootloader reads (`software-in-the-loop.md` Part P).
 
 ### Part J — release assets
 

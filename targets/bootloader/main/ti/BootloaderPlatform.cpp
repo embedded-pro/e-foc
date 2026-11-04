@@ -1,4 +1,5 @@
 #include "BootloaderPlatform.hpp"
+#include "generated/Boards.hpp"
 #include DEVICE_HEADER
 #include "hal/cortex_m/JumpToApplication.hpp"
 
@@ -46,7 +47,7 @@ namespace bootloader
 
     ImageTarget BootloaderPlatform::Target() const
     {
-        return ImageTarget{ E_FOC_BOARD_KIND, DeviceFamily::tivaTm4c, (SYSCTL->DID0 >> deviceClassShift) & deviceClassMask };
+        return ImageTarget{ e_foc::board.kind, static_cast<DeviceFamily>(e_foc::deviceFamily), (SYSCTL->DID0 >> deviceClassShift) & deviceClassMask };
     }
 
     void BootloaderPlatform::Start(uint32_t slotBegin)

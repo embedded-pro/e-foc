@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.3
+version: 0.10.4
 component: "tool-can-commander"
-date: 2026-11-03
+date: 2026-11-04
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.3               |
+| Version   | 0.10.4               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-03           |
+| Date      | 2026-11-04           |
 
 ---
 
@@ -420,11 +420,13 @@ nothing more.
   per-user cache, in its `firmware` folder, and checked against the size and SHA-256 the release publishes, as
   the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
   opened, is read before it is offered: its magic, its header version, a size the staging slot holds (256 KB),
-  a product name that names the board the node reports and that board's microcontroller, a product version of
-  three numbers from 0 to 255, and the one application image that ends the pack, as the controller checks them
-  (`service-firmware-upgrade.md` Part D). A pack for another board or another microcontroller, an STM32 pack
-  for a Tiva board for example, is not offered, and the tab names both. The controller and its bootloader
-  check again (`bootloader.md` Part I); the tool does not check the signature.
+  a product name that is the board identification of the board the node reports (`bootloader.md` Part B),
+  which names that board and its microcontroller, a product version of three numbers from 0 to 255, and the one
+  application image that ends the pack, as the controller checks them (`service-firmware-upgrade.md` Part D).
+  The tool knows every board's identification from the same header the firmware is built with. A pack for
+  another board or another microcontroller, an STM32 pack for a Tiva board for example, is not offered, and
+  the tab names both. The controller and its bootloader check again (`bootloader.md` Part I); the tool does not
+  check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
   motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same

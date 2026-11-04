@@ -6,15 +6,11 @@ target_include_directories(e_foc.tool.can_commander.logic PUBLIC
 )
 
 target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
+    e_foc.boards
     e_foc.can
     e_foc.services.firmware_upgrade.pack_header
     can_lite.categories.firmware_upgrade
     can_lite.drivers.interface
-)
-
-target_compile_definitions(e_foc.tool.can_commander.logic PUBLIC
-    "E_FOC_EK_TM4C1294XL_PRODUCT_NAME=\"${E_FOC_EK_TM4C1294XL_PRODUCT_NAME}\""
-    "E_FOC_EMULATED_PRODUCT_NAME=\"${E_FOC_EMULATED_PRODUCT_NAME}\""
 )
 
 target_sources(e_foc.tool.can_commander.logic PRIVATE

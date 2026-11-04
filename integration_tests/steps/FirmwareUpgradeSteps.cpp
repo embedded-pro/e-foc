@@ -3,6 +3,7 @@
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "generated/Boards.hpp"
 #include "generated/Version.h"
 #include "integration_tests/steps/UpgradePacks.hpp"
 #include "integration_tests/support/CanParameters.hpp"
@@ -136,7 +137,7 @@ WHEN(R"(a pack of version {string} for another board is downloaded)", (std::stri
 {
     auto& download = context.Get<ScenarioSetup>().download;
     auto description = PackOf(version, SmallImage());
-    description.productName = E_FOC_HIL_PRODUCT_NAME;
+    description.productName = e_foc::boards::ekTm4c1294xl.identification;
     Prepare(download, description);
     Download(context.Get<Fixture>(), download);
 }

@@ -3,6 +3,7 @@
 #include "bootloader/ApplicationInstaller.hpp"
 #include "bootloader/BootSequence.hpp"
 #include "bootloader/StatusJournal.hpp"
+#include "generated/Boards.hpp"
 #include "upgrade/boot_loader/DecryptorAesTiny.hpp"
 #include "upgrade/boot_loader/VerifierEcDsa.hpp"
 #include <array>
@@ -49,7 +50,7 @@ int main()
     bootloader::StatusJournal journal{ platform.JournalFlash() };
     bootloader::ApplicationInstaller installer{ decryptor, checkDecryptor, platform.SlotFlash(), layout, target, infra::MakeRange(buffer) };
 
-    bootloader::BootSequence{ { platform.PackFlash(), journal, installer, decryptor, verifier, E_FOC_PRODUCT_NAME, slot, layout, target, platform } }.Run();
+    bootloader::BootSequence{ { platform.PackFlash(), journal, installer, decryptor, verifier, e_foc::board.identification, slot, layout, target, platform } }.Run();
 
     for (;;)
     {

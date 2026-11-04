@@ -1,0 +1,20 @@
+#pragma once
+
+#include <cstdint>
+
+namespace e_foc::boards
+{
+    struct Board
+    {
+        uint8_t kind;
+        const char* microcontroller;
+        const char* identification;
+    };
+
+    inline constexpr Board ekTm4c1294xl{ @E_FOC_EK_TM4C1294XL_BOARD_KIND@, "@E_FOC_EK_TM4C1294XL_MICROCONTROLLER@", "@E_FOC_EK_TM4C1294XL_IDENTIFICATION@" };
+    inline constexpr Board nucleoG474re{ @E_FOC_NUCLEO_G474RE_BOARD_KIND@, "@E_FOC_NUCLEO_G474RE_MICROCONTROLLER@", "@E_FOC_NUCLEO_G474RE_IDENTIFICATION@" };
+    inline constexpr Board nucleoH563zi{ @E_FOC_NUCLEO_H563ZI_BOARD_KIND@, "@E_FOC_NUCLEO_H563ZI_MICROCONTROLLER@", "@E_FOC_NUCLEO_H563ZI_IDENTIFICATION@" };
+    inline constexpr Board ekTm4c123gxl{ @E_FOC_EK_TM4C123GXL_BOARD_KIND@, "@E_FOC_EK_TM4C123GXL_MICROCONTROLLER@", "@E_FOC_EK_TM4C123GXL_IDENTIFICATION@" };
+    inline constexpr Board emulated{ @E_FOC_EMULATED_BOARD_KIND@, "@E_FOC_EMULATED_MICROCONTROLLER@", "@E_FOC_EMULATED_IDENTIFICATION@" };
+}
+@E_FOC_TARGET_BOARD_DEFINITION@

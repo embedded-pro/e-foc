@@ -27,8 +27,8 @@ function(e_foc_flash_layout_address output layout symbol)
 endfunction()
 
 function(e_foc_add_upgrade_pack_script target)
-    get_property(product GLOBAL PROPERTY E_FOC_PRODUCT_NAME)
-    get_property(imageTarget GLOBAL PROPERTY E_FOC_IMAGE_TARGET)
+    set(product "${E_FOC_${E_FOC_BOARD}_IDENTIFICATION}")
+    set(imageTarget ${E_FOC_${E_FOC_BOARD}_BOARD_KIND} ${E_FOC_${E_FOC_BOARD}_DEVICE_FAMILY} ${E_FOC_${E_FOC_BOARD}_DEVICE_IDENTITY})
     get_property(ldscripts GLOBAL PROPERTY E_FOC_BOOTLOADER_LDSCRIPTS)
 
     set(layout "${ldscripts}/flash_layout.ld")

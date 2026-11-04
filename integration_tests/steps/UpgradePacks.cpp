@@ -1,6 +1,7 @@
 #include "integration_tests/steps/UpgradePacks.hpp"
 #include "application/bootloader_image/KeySet.hpp"
 #include "bootloader/StatusJournal.hpp"
+#include "generated/Boards.hpp"
 #include "generated/Version.h"
 #include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
@@ -47,7 +48,7 @@ namespace integration
         PackSource HardwarePackSource()
         {
             auto image = std::filesystem::path{ hil::GetBridgeConfig().firmwareElf }.replace_extension(".image.bin");
-            return PackSource{ ReadFile(image.string()), ReadFile(DevelopmentKeysPath()), E_FOC_HIL_PRODUCT_NAME, hilSlotStart, E_FOC_HIL_BOARD_KIND };
+            return PackSource{ ReadFile(image.string()), ReadFile(DevelopmentKeysPath()), e_foc::boards::ekTm4c1294xl.identification, hilSlotStart, e_foc::boards::ekTm4c1294xl.kind };
         }
 
         bool Random(std::span<uint8_t> bytes)
@@ -72,7 +73,7 @@ namespace integration
     PackSource TargetPackSource()
     {
         if (auto* emulated = BootloaderTarget::Instance())
-            return PackSource{ emulated->ApplicationImage(), emulated->DevelopmentKeySet(), E_FOC_EMULATED_PRODUCT_NAME, emulatedSlotStart, E_FOC_EMULATED_BOARD_KIND };
+            return PackSource{ emulated->ApplicationImage(), emulated->DevelopmentKeySet(), e_foc::boards::emulated.identification, emulatedSlotStart, e_foc::boards::emulated.kind };
         return HardwarePackSource();
     }
 

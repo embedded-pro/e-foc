@@ -2,6 +2,7 @@
 #include "bootloader/ImageFormat.hpp"
 #include "core/platform_abstraction/BoardProtection.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "generated/Boards.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
@@ -49,7 +50,6 @@ namespace application
 
     extern "C" uint32_t SystemCoreClock;
 
-#ifdef E_FOC_PRODUCT_NAME
     extern "C"
     {
         [[gnu::weak]] extern const uint8_t __application_slot_start[];
@@ -64,7 +64,6 @@ namespace application
     {
         constexpr uint16_t stagingPageSize{ 128 };
     }
-#endif
 
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
         : onInitialized(onInitialized)
@@ -123,7 +122,7 @@ namespace application
 
     BoardKind PlatformFactoryImpl::GetBoardKind() const
     {
-        return static_cast<BoardKind>(Peripheral::boardKind);
+        return static_cast<BoardKind>(e_foc::board.kind);
     }
 
     void PlatformFactoryImpl::ConfigureBoardIdPins()
@@ -441,14 +440,13 @@ namespace application
         return diagnostics;
     }
 
-#ifdef E_FOC_PRODUCT_NAME
     std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         if (StagingRegion().empty())
             return std::nullopt;
 
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, E_FOC_PRODUCT_NAME, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
@@ -460,10 +458,4 @@ namespace application
     {
         return infra::ConstByteRange{ __status_journal_start, __status_journal_end };
     }
-#else
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
-    {
-        return std::nullopt;
-    }
-#endif
 }

@@ -1,5 +1,6 @@
 #include "tools/can_commander/logic/FirmwarePack.hpp"
 #include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
+#include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include <algorithm>
@@ -13,12 +14,17 @@ namespace tool
     {
         constexpr uint16_t knownHeaderVersion{ 1 };
 
+        constexpr FirmwareBoard Described(const e_foc::boards::Board& board, bool hasBootloader, bool hasReleasePack)
+        {
+            return FirmwareBoard{ board.kind, {}, board.microcontroller, board.identification, hasBootloader, hasReleasePack };
+        }
+
         constexpr std::array<FirmwareBoard, 5> boards{ {
-            { 1, {}, "TM4C1294NCPDT", E_FOC_EK_TM4C1294XL_PRODUCT_NAME, true },
-            { 2, {}, "STM32G474RE", {}, false },
-            { 3, {}, "STM32H563ZI", {}, false },
-            { 4, {}, "TM4C123GH6PM", {}, false },
-            { 5, {}, "mps2-an386", E_FOC_EMULATED_PRODUCT_NAME, false },
+            Described(e_foc::boards::ekTm4c1294xl, true, true),
+            Described(e_foc::boards::nucleoG474re, false, false),
+            Described(e_foc::boards::nucleoH563zi, false, false),
+            Described(e_foc::boards::ekTm4c123gxl, false, false),
+            Described(e_foc::boards::emulated, true, false),
         } };
 
         template<class T>
@@ -74,7 +80,7 @@ namespace tool
 
     bool CanBeUpdated(const FirmwareBoard& board)
     {
-        return !board.productName.empty();
+        return board.hasBootloader;
     }
 
     PackInspection InspectPack(const std::vector<uint8_t>& bytes, const FirmwareBoard& board)
