@@ -4,7 +4,7 @@ type: design
 status: accepted
 version: 1.12.0
 component: "software-in-the-loop"
-date: 2026-10-30
+date: 2026-11-02
 ---
 
 | Field     | Value                       |
@@ -14,7 +14,7 @@ date: 2026-10-30
 | Status    | accepted                    |
 | Version   | 1.12.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-10-30                  |
+| Date      | 2026-11-02                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1157,6 +1157,86 @@ class it replaced bit for bit.
 
 ---
 
+### Part P — Booting through the bootloader
+
+Every emulated scenario starts the way a board with a bootloader starts: the bootloader at the start of code
+memory checks the application slot and starts the application in it (`bootloader.md` Parts A, C, E and H).
+A scenario about anything else therefore also shows that the bootloader starts an intact application, and
+the bootloader's own scenarios stage packs and read what it recorded.
+
+**Layout.** The emulated board is laid out like the EK-TM4C1294XL, in the emulator's 4 MB of code RAM:
+
+| Region           | Where                                     | Holds                                                                   |
+|------------------|-------------------------------------------|-------------------------------------------------------------------------|
+| Bootloader       | `0x00000000`, 32 KB                       | the bootloader, its key slot in the last 80 bytes                       |
+| Application slot | `0x00008000`, 256 KB                      | the application, its header at 1 KB and its descriptor in the last 64 B |
+| Staging          | file `staging.bin` in the scenario folder | the pack, 256 KB at most                                                |
+| Journal          | file `journal.bin` in the scenario folder | the status journal, 16 KB                                               |
+
+**What the emulator loads.** At every start the emulator loads the bootloader, whose key slot holds the
+public development key set (`bootloader.md` Part G), and puts into the application slot what the scenario
+chose: the application as it was built (the default), nothing, or the application with one byte of its
+image changed. The slot is loaded as one raw image, the way a debugger programs it: the application's image,
+erased bytes up to the descriptor, and the descriptor its build wrote in the slot's last 64 bytes. The check at
+every reset therefore passes on it exactly as on a board. Loading the application's ELF file instead would fill
+the gap between the vector table and the header with zeros, which the descriptor, computed over erased gaps,
+does not describe.
+
+**What the emulator cannot do.** Three differences from a board, each visible in a scenario:
+
+- The code memory is RAM that the emulator fills again at every reset, the watchdog's reset included. An
+  image the bootloader installs runs until the next reset, so a scenario that installs reads its result
+  before any reset.
+- There is no device-identity register: the bootloader and the application's header name the same constant
+  (`bootloader.md` Part I).
+- A bootloader that starts nothing writes that it halted to the debug log, stays silent on CAN and reads no
+  frame. The harness drops a frame the target does not take within the send timeout, as a bus with no
+  listener would, so waiting on a halted target ends on time.
+
+**Staging and journal.** Both are files in the scenario folder, so they last across a restart of the
+emulator. A missing file reads as erased. The bootloader reads the pack from `staging.bin` and writes each
+journal entry through to `journal.bin`.
+
+**What the harness writes and reads.** The harness builds every pack with the embedded-infrastructure
+library's pack builder, the one the release uses, from the application image the build produced (every
+section but the descriptor, gaps erased), signed and encrypted with the public development key set. For the
+refusals it builds packs that differ in one thing: another product name, a signature with one byte changed,
+an image whose header names another board, or another destination. A pack larger than the slot cannot be
+staged, since staging is the slot's size, so the image-size refusal stays with the library's own tests. It
+writes journal entries with
+the library's status journal and reads the journal back after the run, so a scenario checks the status and
+error code the bootloader recorded.
+
+**Scenarios** (`bootloader.feature`, `@sil`):
+
+| Scenario                                         | Staged                    | Slot                              | The scenario sees                                      | Requirements      |
+|--------------------------------------------------|---------------------------|-----------------------------------|--------------------------------------------------------|-------------------|
+| The application starts through the bootloader    | nothing                   | the application                   | the heartbeat                                          | REQ-BOOT-001, 006 |
+| A staged pack is installed                       | a pack, *ready to deploy* | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-BOOT-002, 003 |
+| An interrupted installation is repeated          | a pack, *deploy started*  | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-BOOT-004      |
+| A downloaded pack waits for the apply            | a pack, *downloaded*      | the application                   | the heartbeat; the journal still reads *downloaded*    | REQ-BOOT-002      |
+| A pack with a bad signature is refused           | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, signature error              | REQ-BOOT-002      |
+| A pack for another product is refused            | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, product error                | REQ-BOOT-002      |
+| A pack for another board is refused before erase | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-target error           | REQ-BOOT-007      |
+| A pack for another destination is refused        | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-destination error      | REQ-BOOT-003      |
+| A damaged application is not started             | nothing                   | the application, one byte changed | no heartbeat; the debug log says the bootloader halted | REQ-BOOT-001      |
+| An empty slot is not started                     | nothing                   | nothing                           | no heartbeat; the debug log says the bootloader halted | REQ-BOOT-001      |
+
+A refused pack leaves the application in the slot, which the heartbeat after the refusal shows. The
+firmware-upgrade service's scenarios add the other half: the application downloading the pack into
+`staging.bin` and recording *ready to deploy* itself (`service-firmware-upgrade.md` Part K).
+
+A scenario reads the journal only after the heartbeat, or after the time it waits for one, so the bootloader
+has finished writing it.
+
+**Continuous integration.** The emulated build produces the bootloader and the application. The harness
+injects the development key set into the bootloader it loads, in memory, with the library's key slot code;
+the bootloader file stays as built. The bootloader, the application and the application's image and
+descriptor files go to the software-in-the-loop shards, which name the bootloader in
+`QEMU_SIL_BOOTLOADER_ELF`, find the image and descriptor next to the application, and read the key set from
+`targets/bootloader/keys/development.keys` (`E_FOC_DEVELOPMENT_KEYS` overrides it). `bootloader.feature`
+goes into the lightest shard.
+
 ## Interfaces
 
 **Provided to scenarios:** a named plant (one of the reference motors, or a variation on the
@@ -1175,7 +1255,7 @@ watchdog reset leaves a marker in a host file (`watchdog_reset.bin`) that the ne
 reset cause reads `watchdog` once and `powerUp` otherwise.
 
 **The terminal** stays on the first serial port for a person debugging a run, and what the target
-prints is the scenario's debug log. No scenario writes to the terminal or reads a verdict from the
-log.
+prints is the scenario's debug log. No scenario writes to the terminal, and the only verdict read from
+the log is the bootloader's halt, since the bootloader has no CAN (Part P).
 
 **Not required:** any test-only command. The target's CAN and terminal surfaces are the product's.

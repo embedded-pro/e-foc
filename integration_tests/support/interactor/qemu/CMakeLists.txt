@@ -6,6 +6,7 @@ target_include_directories(e_foc.integration_tests.interactor.qemu PUBLIC
 
 target_link_libraries(e_foc.integration_tests.interactor.qemu PUBLIC
     e_foc.integration_tests.interactor.interfaces
+    application.bootloader_image_lib
     hal.interfaces
     GTest::gtest
 )

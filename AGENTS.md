@@ -142,9 +142,9 @@ On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the 
 descriptor with EmIL's `emil_bootloader_image_descriptor` and `application.bootloader_image` (`bootloader.md` Part J). A debugger
 programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`.
 
-`qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the software-in-the-loop shards.
+`qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
-**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts.
+**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
 Its `release_tools_build` job calls `build-tools.yml`, the same workflow the release uses, so every PR
 builds, packages and install-tests the Linux and Windows tools exactly as a release does (MSVC with
 warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubuntu-latest`); signing
@@ -174,7 +174,7 @@ cmake --preset host && cmake --build build/host --config Debug -j$(nproc)
 ctest --test-dir build/host -C Debug -E "e_foc.integration_tests" --output-on-failure
 
 # 3. SIL binary must link (QEMU firmware required for runtime correctness)
-cmake --preset qemu-foc-sensored && cmake --build build/qemu-foc-sensored --target e_foc.sync_foc_sensored.main -j$(nproc)
+cmake --preset qemu-foc-sensored && cmake --build build/qemu-foc-sensored --target e_foc.bootloader.main e_foc.sync_foc_sensored.main -j$(nproc)
 QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf \
   build/host/integration_tests/main/Debug/e_foc.integration_tests \
   --mode sil integration_tests/features/ -t "@sil"
@@ -228,6 +228,7 @@ It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to ho
 Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
 
 **Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`.
+Every scenario boots through the emulated bootloader, which the harness loads with the public development key set; `staging.bin` and `journal.bin` in the scenario directory are its staging slot and status journal (Part P).
 `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
 
 **SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines in the `plant.rec` record file it writes into the scenario directory (control-tick time base, never written from the ISR),

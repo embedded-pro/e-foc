@@ -5,6 +5,7 @@
 #include <deque>
 #include <fstream>
 #include <functional>
+#include <optional>
 #include <string>
 #include <sys/types.h>
 #include <vector>
@@ -20,11 +21,17 @@ namespace sil
             hal::Can::Message message;
         };
 
+        struct Images
+        {
+            std::string bootloaderElf;
+            std::optional<std::string> slotImage;
+        };
+
         QemuSilSession() = default;
         ~QemuSilSession();
 
-        bool Start(const std::string& elfPath);
-        bool Restart(const std::string& elfPath);
+        bool Start(const Images& images);
+        bool Restart(const Images& images);
         void Stop();
 
         bool CreateScenarioDirectory();
@@ -37,7 +44,7 @@ namespace sil
 
         std::string DebugLogTail() const;
 
-        bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data);
+        bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data, std::chrono::milliseconds timeout);
         bool WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out, std::chrono::milliseconds timeout);
         const std::vector<CanFrame>& ReceivedFrames() const;
 

@@ -8,6 +8,7 @@ namespace bootloader
     {
         tivaTm4c = 1,
         stm32 = 2,
+        emulated = 3,
     };
 
     struct ImageTarget

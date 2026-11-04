@@ -1,5 +1,6 @@
 #pragma once
 
+#include "integration_tests/support/interactor/interfaces/BootloaderTarget.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
 #include <chrono>
@@ -9,10 +10,19 @@
 
 namespace sil
 {
-    class QemuInteractor : public integration::TargetInteractor
+    struct QemuImages
+    {
+        std::string applicationElf;
+        std::string bootloaderElf;
+        std::string developmentKeySet;
+    };
+
+    class QemuInteractor
+        : public integration::TargetInteractor
+        , public integration::BootloaderTarget
     {
     public:
-        explicit QemuInteractor(std::string elfPath);
+        explicit QemuInteractor(QemuImages images);
 
         void Setup() override;
         void Teardown() override;
@@ -39,8 +49,23 @@ namespace sil
         std::vector<std::string> TakePlantRecord(std::chrono::milliseconds timeout) override;
         std::string DebugLog() const override;
 
+        std::vector<uint8_t> ApplicationImage() const override;
+        std::vector<uint8_t> DevelopmentKeySet() const override;
+        void ConfigureSlot(Slot slot) override;
+        void ConfigureStaging(const std::vector<uint8_t>& pack) override;
+        void ConfigureJournal(const std::vector<uint8_t>& journal) override;
+        std::vector<uint8_t> Journal() const override;
+
     private:
-        std::string elfPath;
+        QemuSilSession::Images LaunchImages();
+        bool WriteWhileStopped(const std::string& name, const std::vector<uint8_t>& contents);
+
+        QemuImages images;
+        std::vector<uint8_t> bootloader;
+        std::vector<uint8_t> applicationImage;
+        std::vector<uint8_t> applicationDescriptor;
+        std::vector<uint8_t> developmentKeySet;
+        Slot slot{ Slot::application };
         QemuSilSession session;
     };
 }

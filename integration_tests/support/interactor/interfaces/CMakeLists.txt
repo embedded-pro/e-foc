@@ -1,4 +1,6 @@
 add_library(e_foc.integration_tests.interactor.interfaces OBJECT
+    BootloaderTarget.hpp
+    BootloaderTarget.cpp
     TargetInteractor.hpp
     TargetInteractor.cpp
     TerminalInteractor.hpp
