@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.4
+version: 0.10.5
 component: "tool-can-commander"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.4               |
+| Version   | 0.10.5               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-04           |
 
@@ -436,7 +436,9 @@ nothing more.
   controller answers once it has erased its whole staging slot, the progress bar reading "Erasing…" until
   then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
   pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
-  three times in a row before the download is given up. A progress bar shows the bytes sent out of the total
+  three times in a row before the download is given up. A block or Verify answered `Busy`, which the controller
+  gives while it programs a page, counts as unanswered: the block is sent again from where the controller
+  stands, and Verify is sent again. A progress bar shows the bytes sent out of the total
   and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
   with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
   commandable. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply

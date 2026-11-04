@@ -297,6 +297,42 @@ TEST_F(TestFirmwareTransfer, a_block_refused_out_of_sequence_asks_for_progress)
     EXPECT_TRUE(transfer.IsActive());
 }
 
+TEST_F(TestFirmwareTransfer, a_block_answered_busy_while_a_page_programs_asks_for_progress_and_resends)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    BlockAcked(0);
+
+    BlockAcked(1, FwuError::busy);
+    EXPECT_EQ(services::fwuQueryProgressId, LastUpgradeFrame().messageType);
+    EXPECT_TRUE(transfer.IsActive());
+
+    ProgressAnswered(services::FwuState::receiving, 1, 4);
+    EXPECT_EQ(services::fwuDataBlockId, LastUpgradeFrame().messageType);
+    EXPECT_EQ(1, LastUpgradeFrame().payload[1]);
+}
+
+TEST_F(TestFirmwareTransfer, verify_answered_busy_while_a_page_programs_is_sent_again)
+{
+    const auto pack = Pack(20);
+    DownloadUntilVerify(pack);
+    const auto verifies = [this]()
+    {
+        return std::ranges::count_if(SentUpgradeFrames(), [](const Sent& frame)
+            {
+                return frame.messageType == services::fwuVerifyId;
+            });
+    };
+    ASSERT_EQ(1, verifies());
+
+    VerifyAnswered(FwuError::busy);
+    EXPECT_EQ(2, verifies());
+    EXPECT_TRUE(transfer.IsActive());
+
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::staged, FwuError::ok));
+    VerifyAnswered();
+}
+
 TEST_F(TestFirmwareTransfer, a_progress_answer_outside_receiving_ends_the_download_refused)
 {
     ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));

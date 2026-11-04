@@ -111,6 +111,7 @@ namespace tool
         void SendNextBlock();
         void SendVerify();
         void OnNoBlockAnswer();
+        void RetryVerify();
         void AskProgress();
         void GiveUp();
         void FinishDownload(DownloadOutcome outcome, services::FwuError error = services::FwuError::ok);
