@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.1
+version: 0.6.2
 component: "bootloader"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.1      |
+| Version   | 0.6.2      |
 | Component | bootloader |
 | Date      | 2026-11-04 |
 
@@ -438,7 +438,7 @@ sequenceDiagram
 | Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                                |
 | Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                          |
 | Largest image        | the application slot less its 64-byte descriptor                                                                                                           |
-| Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                                |
+| Check at every reset | one SHA-256 over the image at the reset clock; not yet measured on the board (Open Question 4)                                                              |
 | Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption           |
 | Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                   |
 | Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                              |
@@ -456,5 +456,5 @@ sequenceDiagram
 | 1 | Which SPI NOR device holds the NUCLEO-G474RE's staging slot, and on which SPI and chip-select? | A JEDEC serial NOR of 1 MB or more on the motor board / a flash board on the NUCLEO headers | open                                                                                            |
 | 2 | Should the bootloader refuse a pack older than the installed application?                      | Monotonic version counter in the journal / accept any signed pack (current)                 | open                                                                                            |
 | 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | closed: every emulated scenario boots through the bootloader (`software-in-the-loop.md` Part P) |
-| 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open                                                                                            |
+| 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open: unmeasured; the hardware apply scenario's `[METRIC]` line, Activate to heartbeat, pins it |
 | 5 | How does the NUCLEO-G474RE image get below the 256 KB a pack may hold?                         | Trim the image / leave that board without updates (current)                                 | open                                                                                            |
