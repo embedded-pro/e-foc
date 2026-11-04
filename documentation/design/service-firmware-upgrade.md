@@ -2,9 +2,9 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: "service-firmware-upgrade"
-date: 2026-11-01
+date: 2026-11-03
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.2.1                     |
+| Version   | 0.3.0                     |
 | Component | service-firmware-upgrade  |
-| Date      | 2026-11-01                |
+| Date      | 2026-11-03                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -139,10 +139,11 @@ per event-loop turn, and checks:
    against the value Verify carries; otherwise `CrcMismatch`;
 2. the pack header, as far as it can be read without the key: the magic, header version 1, a product name
    equal to this firmware's own, which names the board and the microcontroller part (`bootloader.md` Part B),
-   and one image whose target is the application and whose length fits the application slot less its
-   descriptor; otherwise `NotReady`, the specification's answer for "no application". The image's destination
-   and exact size are encrypted; the bootloader checks them before it erases anything (`bootloader.md` Parts C
-   and I).
+   a product version of three decimal numbers from 0 to 255, major, minor and patch, separated by dots
+   (Part H), and one image whose target is the application, which ends the pack, and whose length, less its
+   image header and its AES counter, fits the application slot less its descriptor; otherwise `NotReady`, the
+   specification's answer for "no application". The image's destination and exact size are encrypted; the
+   bootloader checks them before it erases anything (`bootloader.md` Parts C and I).
 
 A pack built for another microcontroller, an STM32 pack sent to a Tiva board for example, names another part
 and fails the second check; the bootloader would refuse it again (`bootloader.md` Part I). The signature is
@@ -207,7 +208,8 @@ them as the NVM design describes (`service-nvm.md`, version check).
 Contract 2.6 adds read-only parameters to the FOC motor contract (`service-can.md` Part A, "Contract 2.6"):
 the major, minor and patch numbers of the running firmware's release version, the board kind, and the version
 of the staged pack, zero when none is staged. The running version is the one the release workflow stamps into
-the build; the staged version is the product version in the staged pack's header. A board kind maps to the
+the build; the staged version is the product version in the staged pack's header, which Verify requires to
+read as three numbers from 0 to 255, the range the parameters carry (Part D). A board kind maps to the
 board and microcontroller its packs name (`bootloader.md` Part B), so a client picks the pack for the board it
 talks to and shows what waits to be applied.
 
