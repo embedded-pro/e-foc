@@ -42,11 +42,13 @@ namespace tool
 
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter }
+        , firmwareUpgrade{ focClient.ProtocolClient().Transport(), focClient.ProtocolClient() }
         , statusRefresh{ statusRefreshInterval, [this]()
             {
                 RefreshStatus();
             } }
     {
+        focClient.ProtocolClient().RegisterCategory(firmwareUpgrade);
         CanProtocolClientObserver::Attach(focClient.ProtocolClient());
         can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
         services::CanBusAdapterObserver::Attach(adapter);
@@ -98,6 +100,16 @@ namespace tool
     bool CanCommandClient::SupportsFirmwareIdentity(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, firmwareContractMinor);
+    }
+
+    services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
+    {
+        return firmwareUpgrade;
+    }
+
+    const can::CanFrameOrigin& CanCommandClient::FrameOrigin() const
+    {
+        return focClient.Origin();
     }
 
     bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const

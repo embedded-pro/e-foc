@@ -8,6 +8,7 @@ target_include_directories(e_foc.tool.can_commander.logic PUBLIC
 target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
     e_foc.can
     e_foc.services.firmware_upgrade.pack_header
+    can_lite.categories.firmware_upgrade
     can_lite.drivers.interface
 )
 
@@ -23,6 +24,8 @@ target_sources(e_foc.tool.can_commander.logic PRIVATE
     CommandDescriptions.cpp
     FirmwarePack.hpp
     FirmwarePack.cpp
+    FirmwareTransfer.hpp
+    FirmwareTransfer.cpp
     MotorSettings.hpp
     MotorSettings.cpp
     RecoveryAdvice.hpp
