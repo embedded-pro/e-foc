@@ -368,10 +368,22 @@ namespace tool
         emit TransferChanged();
     }
 
-    void MotorFirmware::OnTransferAbandoned()
+    void MotorFirmware::OnTransferAbandoned(TransferPhase phase)
     {
         tab.HideProgress();
-        FailDownload("The download was abandoned when the bus closed; the controller drops it after 30 s without a command.");
+        switch (phase)
+        {
+            case TransferPhase::activating:
+            case TransferPhase::restarting:
+                Succeed("The bus closed during the apply; the controller restarts and its bootloader installs the pack on its own. Reconnect and read the version to confirm the update.", IssueSeverity::warning);
+                break;
+            case TransferPhase::discarding:
+                Fail("The discard was abandoned when the bus closed; the pack may still be staged at the next connection.");
+                break;
+            default:
+                FailDownload("The download was abandoned when the bus closed; the controller drops it after 30 s without a command.");
+                break;
+        }
         emit TransferChanged();
     }
 

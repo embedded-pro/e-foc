@@ -30,7 +30,7 @@ namespace
         MOCK_METHOD(void, OnDownloadFinished, (uint16_t nodeId, DownloadOutcome outcome, services::FwuError error), (override));
         MOCK_METHOD(void, OnDiscardFinished, (uint16_t nodeId, bool acknowledged), (override));
         MOCK_METHOD(void, OnApplyFinished, (uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running), (override));
-        MOCK_METHOD(void, OnTransferAbandoned, (uint16_t nodeId), (override));
+        MOCK_METHOD(void, OnTransferAbandoned, (uint16_t nodeId, TransferPhase phase), (override));
     };
 
     struct Sent
@@ -522,18 +522,43 @@ TEST_F(TestFirmwareTransfer, an_emergency_stop_leaves_an_apply_waiting_for_the_n
     EXPECT_EQ(TransferPhase::restarting, transfer.Phase());
 }
 
-TEST_F(TestFirmwareTransfer, abandon_stops_without_a_frame)
+TEST_F(TestFirmwareTransfer, abandon_stops_without_a_frame_and_names_the_phase_it_abandoned)
 {
     ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
     BeginAnswered();
     const auto before = SentUpgradeFrames().size();
 
-    EXPECT_CALL(observer, OnTransferAbandoned(1));
+    EXPECT_CALL(observer, OnTransferAbandoned(1, TransferPhase::sending));
     transfer.Abandon();
 
     EXPECT_FALSE(transfer.IsActive());
     ForwardTime(std::chrono::minutes(1));
     EXPECT_EQ(before, SentUpgradeFrames().size());
+}
+
+TEST_F(TestFirmwareTransfer, abandon_during_an_apply_names_the_restart_it_leaves_running)
+{
+    ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
+    ActivateAnswered();
+
+    EXPECT_CALL(observer, OnTransferAbandoned(1, TransferPhase::restarting));
+    transfer.Abandon();
+
+    EXPECT_FALSE(transfer.IsActive());
+}
+
+TEST(FirmwareTransferAbandonment, the_consequence_names_what_goes_on_without_the_tool)
+{
+    const auto download = AbandonmentConsequence(TransferPhase::sending);
+    EXPECT_EQ(download, AbandonmentConsequence(TransferPhase::erasing));
+    EXPECT_EQ(download, AbandonmentConsequence(TransferPhase::verifying));
+    EXPECT_EQ(download, AbandonmentConsequence(TransferPhase::cancelling));
+    EXPECT_EQ("The download is abandoned; the controller drops it after 30 s without a command, and nothing is installed. A pack already staged stays staged.", download);
+    EXPECT_EQ("The discard was sent, and whether the controller took it is unknown: the pack may still be staged at the next connection.", AbandonmentConsequence(TransferPhase::discarding));
+    const auto apply = AbandonmentConsequence(TransferPhase::activating);
+    EXPECT_EQ(apply, AbandonmentConsequence(TransferPhase::restarting));
+    EXPECT_EQ("The apply goes on without the tool: the controller restarts and its bootloader installs the staged pack. Reconnect and read the version to confirm the update.", apply);
+    EXPECT_EQ("", AbandonmentConsequence(TransferPhase::idle));
 }
 
 TEST(FirmwareTransferTimeLeft, the_time_left_follows_the_rate_so_far)

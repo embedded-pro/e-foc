@@ -464,9 +464,13 @@ nothing more.
   emergency stop, an abort or its 30 s inactivity deadline, and `SessionTimeout` that it ended it after 30 s
   without a block; nothing was staged either way. Every text names the step it answers, so the same answer
   reads differently for a download and for an apply.
-- **Bus.** Disconnecting or closing the tool during a download asks first. Doing it anyway abandons the
-  download, which the controller drops after 30 s without a command. A staged pack is not affected by the bus
-  closing; it is still there, and still offered for apply, at the next connection.
+- **Bus.** Disconnecting or closing the tool during a transfer asks first, and the question says what goes on
+  without the tool. During a download, doing it anyway abandons the download, which the controller drops after
+  30 s without a command, and nothing is installed. During an apply, once Activate was sent, the controller
+  restarts and its bootloader installs the staged pack whether the tool watches or not: the tab says so and
+  asks to reconnect and read the version. During a discard, whether the controller took the Abort is unknown,
+  and the pack may still be staged. A staged pack is not affected by the bus closing; it is still there, and
+  still offered for apply, at the next connection.
 - Every step, refusal and failure goes to the issue log, with the motor and the versions.
 
 ```mermaid

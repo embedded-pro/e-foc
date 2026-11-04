@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace tool
@@ -65,7 +66,7 @@ namespace tool
         virtual void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) = 0;
         virtual void OnDiscardFinished(uint16_t nodeId, bool acknowledged) = 0;
         virtual void OnApplyFinished(uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running) = 0;
-        virtual void OnTransferAbandoned(uint16_t nodeId) = 0;
+        virtual void OnTransferAbandoned(uint16_t nodeId, TransferPhase phase) = 0;
     };
 
     class FirmwareTransfer
@@ -137,4 +138,5 @@ namespace tool
     };
 
     std::optional<std::chrono::seconds> TimeLeft(uint32_t bytesSent, uint32_t totalBytes, std::chrono::milliseconds elapsed);
+    std::string AbandonmentConsequence(TransferPhase phase);
 }
