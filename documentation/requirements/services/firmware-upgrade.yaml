@@ -79,6 +79,8 @@
 
 - id: REQ-UPD-009
   title: The CAN Commander offers only a checked pack for the motor's board and microcontroller
+  status: implemented
+  verification: unit
   shall: >
     The CAN Commander shall offer a firmware pack for a motor only after checking a downloaded
     pack's size and SHA-256 against those the release publishes, and every pack's product name
@@ -105,6 +107,8 @@
 
 - id: REQ-UPD-012
   title: The user starts the download and the apply separately
+  status: implemented
+  verification: unit
   shall: >
     The motor controller shall never begin a download or an apply on its own. The CAN Commander
     shall send Begin Upgrade only on the user's download action and Activate only on the user's

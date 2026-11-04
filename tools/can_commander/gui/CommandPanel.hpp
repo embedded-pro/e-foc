@@ -4,6 +4,7 @@
 #include "tools/can_commander/gui/ConfigurationTab.hpp"
 #include "tools/can_commander/gui/ControllersTab.hpp"
 #include "tools/can_commander/gui/DiagnosticsTab.hpp"
+#include "tools/can_commander/gui/FirmwareTab.hpp"
 #include "tools/can_commander/gui/MotorParametersTab.hpp"
 #include "tools/can_commander/gui/SetpointKnob.hpp"
 #include <QComboBox>
@@ -35,6 +36,7 @@ namespace tool
         MotorParametersTab& MotorParameters() const;
         ConfigurationTab& Configuration() const;
         DiagnosticsTab& Diagnostics() const;
+        FirmwareTab& Firmware() const;
         std::array<SettingsPage*, 3> SettingsPages() const;
         std::optional<can::FocMotorMode> ActiveControlMode() const;
 
@@ -89,6 +91,7 @@ namespace tool
         MotorParametersTab* motorParameters;
         ConfigurationTab* configuration;
         DiagnosticsTab* diagnostics;
+        FirmwareTab* firmware;
         std::vector<QWidget*> commandWidgets;
         std::array<SetpointControls, 3> setpoints{};
         std::optional<can::FocMotorMode> activeMode;
