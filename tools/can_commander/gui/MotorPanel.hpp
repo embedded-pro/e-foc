@@ -1,8 +1,10 @@
 #pragma once
 
 #include "tools/can_commander/gui/CommandPanel.hpp"
+#include "tools/can_commander/gui/MotorFirmware.hpp"
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
+#include "tools/can_commander/logic/FirmwareTransfer.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "tools/can_commander/logic/RecoveryAdvice.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
@@ -24,10 +26,12 @@ namespace tool
     public:
         using Reporter = std::function<void(IssueSeverity, const QString&)>;
 
-        MotorPanel(CanCommandClient& client, uint16_t nodeId, Reporter reporter, QWidget* parent = nullptr);
+        MotorPanel(CanCommandClient& client, FirmwareTransfer& transfer, uint16_t nodeId, Reporter reporter, QWidget* parent = nullptr);
 
         uint16_t NodeId() const;
         QString Title() const;
+        QString TabText() const;
+        QString FirmwareSummary() const;
         QString Summary() const;
         ui::theme::StatusLevel Level() const;
         bool AcceptsEmergencyStop() const;
@@ -48,6 +52,9 @@ namespace tool
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnAlgorithms(const can::FocAlgorithms& algorithms);
         void OnParameter(can::FocParameter parameter, can::FocParameterValue value);
+        void OnFirmwareIdentity(const FirmwareIdentity& identity);
+        void SetLatestRelease(const ReleaseInfo& release);
+        MotorFirmware& Firmware();
 
     signals:
         void StatusChanged();
@@ -91,6 +98,7 @@ namespace tool
         bool IsLegacy() const;
 
         CanCommandClient& client;
+        FirmwareTransfer& transfer;
         const uint16_t nodeId;
         Reporter reporter;
 
@@ -99,6 +107,7 @@ namespace tool
         QLabel* activityLabel{ nullptr };
         CommandPanel* commandPanel{ nullptr };
         TelemetryPanel* telemetryPanel{ nullptr };
+        MotorFirmware* firmware{ nullptr };
 
         bool busConnected{ false };
         std::optional<bool> nodeOnline;

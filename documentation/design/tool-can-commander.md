@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.2
+version: 0.10.3
 component: "tool-can-commander"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.2               |
+| Version   | 0.10.3               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-03           |
 
@@ -409,21 +409,22 @@ nothing more.
   release, by its asset name, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` with the board named as
   the Diagnostics tab names it and the release's own tag (`service-firmware-upgrade.md` Part J). When that
   release is newer than the version the motor reports, the Firmware tab says so and the motor's tab carries a
-  marker. *Open Pack File…* takes a local pack instead, for a development build. A node older than contract 2.6 cannot report its
-  version or board, so the tab explains that and offers nothing. A node that reports its version but refuses
-  the staged version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade
-  service: the tab says that this firmware cannot be updated over CAN and offers no download. Only a board with
-  a bootloader can be updated, today the EK-TM4C1294XL and the emulated board; for any other the tab says that
-  the board has no bootloader to install a pack.
+  marker, an arrow after the motor's name, with the release in the tab's tooltip. *Open Pack File…* takes a
+  local pack instead, for a development build. A node older than contract 2.6 cannot report its version or
+  board, so the tab explains that and offers nothing. A node that reports its version but refuses the staged
+  version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade service: the tab
+  says that this firmware cannot be updated over CAN and offers no download. Only a board with a bootloader can
+  be updated, today the EK-TM4C1294XL and the emulated board; for any other the tab says that the board has no
+  bootloader to install a pack.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
-  per-user cache and checked against the size and SHA-256 the release publishes, as the self-upgrade checks its
-  installer; a file that does not match is deleted. Every pack, downloaded or opened, is read before it is
-  offered: its magic, its header version, a size the staging slot holds (256 KB), a product name that names
-  the board the node reports and that board's microcontroller, a product version of three numbers from 0 to
-  255, and the one application image that ends the pack, as the controller checks them
-  (`service-firmware-upgrade.md` Part D). A pack for another board or another
-  microcontroller, an STM32 pack for a Tiva board for example, is not offered, and the tab names both. The
-  controller and its bootloader check again (`bootloader.md` Part I); the tool does not check the signature.
+  per-user cache, in its `firmware` folder, and checked against the size and SHA-256 the release publishes, as
+  the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
+  opened, is read before it is offered: its magic, its header version, a size the staging slot holds (256 KB),
+  a product name that names the board the node reports and that board's microcontroller, a product version of
+  three numbers from 0 to 255, and the one application image that ends the pack, as the controller checks them
+  (`service-firmware-upgrade.md` Part D). A pack for another board or another microcontroller, an STM32 pack
+  for a Tiva board for example, is not offered, and the tab names both. The controller and its bootloader
+  check again (`bootloader.md` Part I); the tool does not check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
   motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
