@@ -88,6 +88,8 @@
 
 - id: REQ-UPD-010
   title: The CAN Commander confirms the update from the controller
+  status: implemented
+  verification: unit
   shall: >
     The CAN Commander shall report a firmware update as successful only when the motor
     controller comes back online after Activate and reports the version of the pack it staged,
