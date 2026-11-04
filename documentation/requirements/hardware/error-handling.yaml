@@ -145,6 +145,8 @@
 
 - id: REQ-EH-014
   title: Every phase-current sample is checked against the board's over-current trip
+  status: implemented
+  verification: [unit, inspection]
   shall: >
     On a board whose over-current comparator watches a current that the phase-current sampling
     instant cannot see, the platform shall compare each phase-current sample with the board's
