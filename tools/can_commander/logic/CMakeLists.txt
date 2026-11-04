@@ -24,6 +24,8 @@ target_sources(e_foc.tool.can_commander.logic PRIVATE
     CommandDescriptions.cpp
     FirmwarePack.hpp
     FirmwarePack.cpp
+    FirmwareTransfer.hpp
+    FirmwareTransfer.cpp
     MotorSettings.hpp
     MotorSettings.cpp
     RecoveryAdvice.hpp

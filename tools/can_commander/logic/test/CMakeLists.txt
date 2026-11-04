@@ -14,6 +14,7 @@ target_sources(e_foc.tool.can_commander.logic_test PRIVATE
     TestCanCommandClient.cpp
     TestCommandDescriptions.cpp
     TestFirmwarePack.cpp
+    TestFirmwareTransfer.cpp
     TestMotorSettings.cpp
     TestRecoveryAdvice.cpp
     TestSetpointAxis.cpp
