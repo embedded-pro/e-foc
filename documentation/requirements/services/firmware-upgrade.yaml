@@ -83,8 +83,9 @@
   verification: unit
   shall: >
     The CAN Commander shall offer a firmware pack for a motor only after checking a downloaded
-    pack's size and SHA-256 against those the release publishes, and every pack's product name
-    against the board the motor reports and that board's microcontroller, and shall enable the
+    pack's size and SHA-256 against the size and digest GitHub records for the release asset, and
+    every pack's product name against the board the motor reports and that board's microcontroller,
+    and shall enable the
     download and the apply only while that motor's last status reads idle or ready, it has no
     command pending and no other motor on the bus is downloading.
 

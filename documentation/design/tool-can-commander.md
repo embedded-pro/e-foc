@@ -302,12 +302,13 @@ three numbers.
 
 The installer is the release asset whose name ends in the platform's installer suffix (Part H). Installing
 it from inside the tool needs the tool to run from an installed package (not a portable archive), the
-release to publish the asset's SHA-256 digest and, on Linux, `pkexec` and `apt-get` to be present.
+asset to carry the SHA-256 digest GitHub records for every uploaded release asset (the release workflow
+publishes no checksum file of its own) and, on Linux, `pkexec` and `apt-get` to be present.
 When any of them is missing, the banner offers the installer download, or the release page, instead.
 
 Installing always starts with the user: *Install Update…* asks for confirmation and says what happens next.
 The tool then downloads the installer with visible progress, which the user can cancel, and checks the
-received file's size and SHA-256 against the values published with the release. A file that does not match
+received file's size and SHA-256 against the size and digest GitHub records for the asset. A file that does not match
 is deleted and never run. Downloading may happen while a bus is open, but installing closes or restarts the
 tool, so it waits until the bus is disconnected: the banner says so, and installation continues on request
 once the bus is closed.
@@ -417,7 +418,7 @@ nothing more.
   be updated, today the EK-TM4C1294XL and the emulated board; for any other the tab says that the board has no
   bootloader to install a pack.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
-  per-user cache, in its `firmware` folder, and checked against the size and SHA-256 the release publishes, as
+  per-user cache, in its `firmware` folder, and checked against the size and SHA-256 digest GitHub records for the asset, as
   the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
   opened, is read before it is offered: its magic, its header version, a size the staging slot holds (256 KB),
   a product name that is the board identification of the board the node reports (`bootloader.md` Part B),
@@ -500,7 +501,7 @@ stateDiagram-v2
 | Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
 | CAN service client        | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
 | Release feed              | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
-| Firmware packs            | Firmware update                                              | Release assets named as in `service-firmware-upgrade.md` Part J, with a published SHA-256            |
+| Firmware packs            | Firmware update                                              | Release assets named as in `service-firmware-upgrade.md` Part J, each with the digest GitHub records |
 | Firmware-upgrade category | Firmware update                                              | `can-lite` firmware-upgrade specification; the controller answers as `service-firmware-upgrade.md`   |
 | Elevation                 | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                          |
 | Web browser               | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
@@ -689,7 +690,7 @@ sequenceDiagram
 | Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                  |
 | Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                              |
 | Automatic checks       | at startup and every 24 h while running                                                                                                               |
-| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match the release                                                           |
+| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                          |
 | Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; about two minutes for 256 KB |
 | Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                             |
 | Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                              |
