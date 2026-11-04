@@ -14,7 +14,7 @@ namespace tool
         constexpr const char* applyHint = "Restart the controller so that its bootloader installs the staged pack";
         constexpr const char* discardHint = "Tell the controller to forget the staged pack";
         constexpr const char* cancelHint = "Stop the download; nothing is staged";
-        constexpr const char* tryAgainHint = "Start the download again from the beginning";
+        constexpr const char* tryAgainHint = "Download the pack again from the beginning, after confirming";
 
         QLabel* ValueLabel(const QString& accessibleName)
         {

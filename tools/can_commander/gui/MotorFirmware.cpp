@@ -70,7 +70,7 @@ namespace tool
     {
         connect(&tab, &FirmwareTab::OpenPackRequested, this, &MotorFirmware::OpenPack);
         connect(&tab, &FirmwareTab::DownloadRequested, this, &MotorFirmware::Download);
-        connect(&tab, &FirmwareTab::TryAgainRequested, this, &MotorFirmware::StartTransfer);
+        connect(&tab, &FirmwareTab::TryAgainRequested, this, &MotorFirmware::Download);
         connect(&tab, &FirmwareTab::ApplyRequested, this, &MotorFirmware::Apply);
         connect(&tab, &FirmwareTab::DiscardRequested, this, &MotorFirmware::Discard);
         connect(&tab, &FirmwareTab::CancelRequested, this, [this]()
@@ -175,7 +175,7 @@ namespace tool
     void MotorFirmware::FetchReleasePack(const InstallerAsset& asset)
     {
         fetching = true;
-        failed = false;
+        downloadFailed = false;
         Report(IssueSeverity::info, QString("downloading %1").arg(asset.fileName));
         tab.ShowProgress(0, asset.size, "Downloading the release pack…");
         downloader.Start(asset, QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/firmware");
@@ -214,7 +214,7 @@ namespace tool
 
         chosenPack = inspection.pack;
         chosenSource = source;
-        failed = false;
+        downloadFailed = false;
         ClearOutcome();
         Report(IssueSeverity::info, QString("%1 %2 checked: firmware %3 for the %4").arg(fromRelease ? "release pack" : "pack file", source, Version(chosenPack->version), ToQt(board->name)));
         Refresh();
@@ -234,7 +234,7 @@ namespace tool
         if (!chosenPack || !DownloadReason().isEmpty())
             return;
 
-        failed = false;
+        downloadFailed = false;
         ClearOutcome();
         transferClock.start();
         if (transfer.StartDownload(nodeId, *chosenPack))
@@ -305,16 +305,22 @@ namespace tool
                 Succeed("Download cancelled; nothing was staged.", IssueSeverity::warning);
                 break;
             case DownloadOutcome::refused:
-                Fail(QString("The controller refused firmware %1: %2").arg(version, QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::download))));
+                FailDownload(QString("The controller refused firmware %1: %2").arg(version, QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::download))));
                 break;
             case DownloadOutcome::noAnswer:
-                Fail(QString("The controller stopped answering; the download of firmware %1 was given up.").arg(version));
+                FailDownload(QString("The controller stopped answering; the download of firmware %1 was given up.").arg(version));
                 break;
             default:
-                Fail("The CAN adapter refused a frame; the download stopped.");
+                FailDownload("The CAN adapter refused a frame; the download stopped.");
                 break;
         }
         emit TransferChanged();
+    }
+
+    void MotorFirmware::FailDownload(const QString& message)
+    {
+        downloadFailed = true;
+        Fail(message);
     }
 
     void MotorFirmware::OnDiscardFinished(bool acknowledged)
@@ -354,20 +360,19 @@ namespace tool
     void MotorFirmware::OnTransferAbandoned()
     {
         tab.HideProgress();
-        Fail("The download was abandoned when the bus closed; the controller drops it after 30 s without a command.");
+        FailDownload("The download was abandoned when the bus closed; the controller drops it after 30 s without a command.");
         emit TransferChanged();
     }
 
     void MotorFirmware::Fail(const QString& message)
     {
-        failed = true;
         ShowOutcome(message, StatusLevel::Fault);
         Report(IssueSeverity::error, message);
     }
 
     void MotorFirmware::Succeed(const QString& message, IssueSeverity severity)
     {
-        failed = false;
+        downloadFailed = false;
         ShowOutcome(message, severity == IssueSeverity::info ? StatusLevel::Ok : StatusLevel::Warning);
         Report(severity, message);
     }
@@ -466,7 +471,7 @@ namespace tool
         actions.discard = actions.apply;
         actions.openPack = CommonReason().isEmpty();
         actions.cancel = IsDownloading() || fetching;
-        actions.tryAgain = failed && chosenPack.has_value();
+        actions.tryAgain = downloadFailed && chosenPack.has_value();
         tab.SetActions(actions);
         RefreshStatus();
         emit StatusChanged();
