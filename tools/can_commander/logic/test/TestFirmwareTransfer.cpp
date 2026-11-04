@@ -286,6 +286,27 @@ TEST_F(TestFirmwareTransfer, an_acknowledged_block_starts_the_count_of_tries_aga
     EXPECT_TRUE(transfer.IsActive());
 }
 
+TEST_F(TestFirmwareTransfer, a_block_refused_out_of_sequence_asks_for_progress)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+
+    BlockAcked(0, FwuError::sequenceError);
+
+    EXPECT_EQ(services::fwuQueryProgressId, LastUpgradeFrame().messageType);
+    EXPECT_TRUE(transfer.IsActive());
+}
+
+TEST_F(TestFirmwareTransfer, a_progress_answer_outside_receiving_ends_the_download_refused)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    ForwardTime(FirmwareTransfer::blockTimeout);
+
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::refused, FwuError::invalidState));
+    ProgressAnswered(services::FwuState::idle, 0, 0);
+}
+
 TEST_F(TestFirmwareTransfer, an_acknowledgement_of_another_block_is_ignored)
 {
     ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
@@ -314,6 +335,16 @@ TEST_F(TestFirmwareTransfer, a_crc_mismatch_on_verify_ends_the_download_refused)
 
     EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::refused, FwuError::crcMismatch));
     VerifyAnswered(FwuError::crcMismatch);
+}
+
+TEST_F(TestFirmwareTransfer, verify_unanswered_for_ten_seconds_gives_up_and_aborts)
+{
+    DownloadUntilVerify(Pack(20));
+    ForwardTime(FirmwareTransfer::verifyTimeout - std::chrono::milliseconds(1));
+
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::noAnswer, FwuError::ok));
+    ForwardTime(std::chrono::milliseconds(1));
+    EXPECT_EQ(services::fwuAbortId, LastUpgradeFrame().messageType);
 }
 
 TEST_F(TestFirmwareTransfer, cancel_sends_abort_and_ends_cancelled_once_acknowledged)
