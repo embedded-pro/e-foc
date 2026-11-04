@@ -10,6 +10,10 @@ target_link_libraries(e_foc.platform_abstraction_cortex_m_common INTERFACE
     hal.cortex_m
 )
 
+target_sources(e_foc.platform_abstraction_cortex_m_common INTERFACE
+    ImageTarget.hpp
+)
+
 function(e_foc_flash_layout_address output layout symbol)
     file(STRINGS "${layout}" line REGEX "^${symbol} = ")
     if(NOT line MATCHES "^${symbol} = (0x[0-9A-Fa-f]+|[0-9]+)(K?)")
