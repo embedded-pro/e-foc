@@ -44,7 +44,7 @@ Feature: Bootloader
     And a development-signed pack "with a bad signature" is staged and the journal reads "ready to deploy"
     When the emulated target starts
     Then the application sends its heartbeat
-    And the journal reads "invalid" with error code 1
+    And the journal reads "invalid" with the error "invalid signature"
 
   @REQ-BOOT-002 @sil
   Scenario: A pack for another product is refused
@@ -52,7 +52,7 @@ Feature: Bootloader
     And a development-signed pack "for another product" is staged and the journal reads "ready to deploy"
     When the emulated target starts
     Then the application sends its heartbeat
-    And the journal reads "invalid" with error code 2
+    And the journal reads "invalid" with the error "unknown product"
 
   @REQ-BOOT-007 @sil
   Scenario: A pack for another board is refused before the slot is erased
@@ -60,7 +60,7 @@ Feature: Bootloader
     And a development-signed pack "for another board" is staged and the journal reads "ready to deploy"
     When the emulated target starts
     Then the application sends its heartbeat
-    And the journal reads "invalid" with error code 1000
+    And the journal reads "invalid" with the error "wrong target"
 
   @REQ-BOOT-003 @sil
   Scenario: A pack for another destination is refused
@@ -68,7 +68,7 @@ Feature: Bootloader
     And a development-signed pack "for another destination" is staged and the journal reads "ready to deploy"
     When the emulated target starts
     Then the application sends its heartbeat
-    And the journal reads "invalid" with error code 1001
+    And the journal reads "invalid" with the error "wrong destination"
 
   @REQ-BOOT-001 @sil
   Scenario: A damaged application is not started

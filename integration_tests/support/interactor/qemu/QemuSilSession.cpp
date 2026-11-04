@@ -1,4 +1,5 @@
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
+#include "integration_tests/support/interactor/interfaces/BootloaderTarget.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -31,7 +32,13 @@ namespace
     constexpr auto kPumpSlice = std::chrono::milliseconds{ 10 };
     constexpr auto kGdbAttachTimeout = std::chrono::milliseconds{ 300000 };
     constexpr auto kStopTimeout = std::chrono::milliseconds{ 2000 };
-    constexpr const char* kSlotAddress = "0x00008000";
+
+    std::string HexAddress(uint32_t address)
+    {
+        char text[16]{};
+        std::snprintf(text, sizeof(text), "0x%08x", address);
+        return text;
+    }
 
     std::optional<std::string> AbsolutePath(const std::string& path)
     {
@@ -190,7 +197,7 @@ namespace sil
         const auto absoluteSlot = images.slotImage ? AbsolutePath(*images.slotImage) : std::optional<std::string>{ "" };
         if (!absoluteElf || !absoluteSlot)
             return false;
-        const std::string slotLoader = "loader,file=" + *absoluteSlot + ",addr=" + kSlotAddress + ",force-raw=on";
+        const std::string slotLoader = "loader,file=" + *absoluteSlot + ",addr=" + HexAddress(integration::applicationSlotStart) + ",force-raw=on";
 
         std::error_code error;
         std::filesystem::remove(scenarioDirectory + "/" + kPlantRecordName, error);

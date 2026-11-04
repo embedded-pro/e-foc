@@ -1,11 +1,10 @@
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
 #include "application/bootloader_image/ElfSection.hpp"
 #include "application/bootloader_image/KeySet.hpp"
+#include "integration_tests/support/interactor/interfaces/Files.hpp"
 #include <algorithm>
 #include <chrono>
-#include <fstream>
 #include <gtest/gtest.h>
-#include <iterator>
 #include <utility>
 #include <variant>
 
@@ -14,12 +13,6 @@ namespace sil
     namespace
     {
         constexpr uint32_t descriptorSize = 64;
-
-        std::vector<uint8_t> ReadFile(const std::string& path)
-        {
-            std::ifstream file{ path, std::ios::binary };
-            return { std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
-        }
 
         std::string Sibling(const std::string& elfPath, const std::string& suffix)
         {
@@ -49,10 +42,10 @@ namespace sil
 
     void QemuInteractor::Setup()
     {
-        bootloader = ReadFile(images.bootloaderElf);
-        applicationImage = ReadFile(Sibling(images.applicationElf, ".image.bin"));
-        applicationDescriptor = ReadFile(Sibling(images.applicationElf, ".descriptor.bin"));
-        developmentKeySet = ReadFile(images.developmentKeySet);
+        bootloader = integration::RequireBinaryFile(images.bootloaderElf);
+        applicationImage = integration::RequireBinaryFile(Sibling(images.applicationElf, ".image.bin"));
+        applicationDescriptor = integration::RequireBinaryFile(Sibling(images.applicationElf, ".descriptor.bin"));
+        developmentKeySet = integration::RequireBinaryFile(images.developmentKeySet);
 
         ASSERT_FALSE(applicationImage.empty()) << "[QEMU] no application image beside " << images.applicationElf;
         ASSERT_EQ(descriptorSize, applicationDescriptor.size()) << "[QEMU] no image descriptor beside " << images.applicationElf;
@@ -233,14 +226,14 @@ namespace sil
 
     std::vector<uint8_t> QemuInteractor::Journal() const
     {
-        auto journal = ReadFile(session.ScenarioDirectory() + "/journal.bin");
+        auto journal = integration::ReadBinaryFile(session.ScenarioDirectory() + "/journal.bin").value_or(std::vector<uint8_t>{});
         journal.resize(integration::emulatedJournalSize, 0xff);
         return journal;
     }
 
     std::vector<uint8_t> QemuInteractor::Staging() const
     {
-        auto staging = ReadFile(session.ScenarioDirectory() + "/staging.bin");
+        auto staging = integration::ReadBinaryFile(session.ScenarioDirectory() + "/staging.bin").value_or(std::vector<uint8_t>{});
         staging.resize(integration::emulatedStagingSize, 0xff);
         return staging;
     }
