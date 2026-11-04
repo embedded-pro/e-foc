@@ -101,6 +101,7 @@ jobs:
             echo "::error::BOOTLOADER_KEYS_RELEASE is not set: a release bootloader without keys could never update a board"
             exit 1
           fi
+          umask 077
           printf '%s' "$BOOTLOADER_KEYS_RELEASE" | base64 -d > "$RUNNER_TEMP/bootloader.keys"
           echo "BOOTLOADER_KEYS=$RUNNER_TEMP/bootloader.keys" >> "$GITHUB_ENV"
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
@@ -276,6 +277,7 @@ jobs:
             "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-G474RE-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
+            "e_foc-firmware-EK-TM4C1294XL-bootloader-${v}.hex" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.upgrade" \
             "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
@@ -296,7 +298,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="${{ needs.release_please.outputs.version }}"
-          for asset in "e_foc-can_commander-${v}-windows-x86_64-setup.exe" "e_foc-can_commander-${v}-linux-x86_64.deb"; do
+          for asset in \
+            "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
+            "e_foc-can_commander-${v}-linux-x86_64.deb" \
+            "e_foc-firmware-EK-TM4C1294XL-bootloader-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.upgrade"; do
             gh attestation verify "release-assets/$asset" --repo "${{ github.repository }}"
           done
       - name: Upload release assets
