@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.1
+version: 0.6.2
 component: "bootloader"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.1      |
+| Version   | 0.6.2      |
 | Component | bootloader |
 | Date      | 2026-11-04 |
 
@@ -347,9 +347,10 @@ script that holds what the pack takes from the build: the image, the product nam
 version, the component, and the application and staging slots of the board's flash layout. The release workflow
 runs it with a key set and the asset's file name, and nothing else; continuous integration runs it with the
 development set on every build of a board with a bootloader. Before it writes the pack, the script checks that
-the image fits the slot less its descriptor, and that the application header at 1 KB carries this board's
-target identity (Part I) and the project version. After, it checks that the pack fits the staging slot and
-names the board's product. A failed check writes no pack and fails the workflow.
+the project version is a release version of three decimal numbers, that the image fits the slot less its
+descriptor, and that the application header at 1 KB carries this board's target identity (Part I) and the
+project version. After, it checks that the pack fits the staging slot and names the board's product. A failed
+check writes no pack and fails the workflow.
 
 ---
 
