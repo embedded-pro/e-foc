@@ -278,20 +278,24 @@ namespace tool
         switch (progress.phase)
         {
             case TransferPhase::erasing:
-                tab.ShowBusy("Erasing…");
+                phaseText = "Erasing the controller's staging slot…";
+                tab.ShowBusy();
                 break;
             case TransferPhase::sending:
             {
+                phaseText.clear();
                 const auto left = TimeLeft(progress.bytesSent, progress.totalBytes, std::chrono::milliseconds{ transferClock.elapsed() });
                 const auto format = QString("%1 of %2%3").arg(Kilobytes(progress.bytesSent), Kilobytes(progress.totalBytes), left ? QString(", about %1 left").arg(Duration(*left)) : QString());
                 tab.ShowProgress(progress.bytesSent, progress.totalBytes, format);
                 break;
             }
             case TransferPhase::verifying:
-                tab.ShowBusy("Verifying…");
+                phaseText = "Verifying the pack on the controller…";
+                tab.ShowBusy();
                 break;
             case TransferPhase::restarting:
-                tab.ShowBusy("Restarting: waiting for the controller to come back…");
+                phaseText = "Restarting: waiting for the controller to come back…";
+                tab.ShowBusy();
                 break;
             default:
                 break;
@@ -301,7 +305,7 @@ namespace tool
 
     void MotorFirmware::OnDownloadFinished(DownloadOutcome outcome, services::FwuError error)
     {
-        tab.HideProgress();
+        EndPhase();
         const auto version = chosenPack ? Version(chosenPack->version) : QString();
         switch (outcome)
         {
@@ -346,7 +350,7 @@ namespace tool
 
     void MotorFirmware::OnApplyFinished(ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running)
     {
-        tab.HideProgress();
+        EndPhase();
         switch (outcome)
         {
             case ApplyOutcome::updated:
@@ -370,7 +374,7 @@ namespace tool
 
     void MotorFirmware::OnTransferAbandoned(TransferPhase phase)
     {
-        tab.HideProgress();
+        EndPhase();
         switch (phase)
         {
             case TransferPhase::activating:
@@ -413,10 +417,18 @@ namespace tool
         RefreshStatus();
     }
 
+    void MotorFirmware::EndPhase()
+    {
+        phaseText.clear();
+        tab.HideProgress();
+    }
+
     void MotorFirmware::RefreshStatus()
     {
         if (!outcomeText.isEmpty())
             tab.ShowStatus(outcomeText, outcomeLevel);
+        else if (!phaseText.isEmpty())
+            tab.ShowStatus(phaseText, StatusLevel::Neutral);
         else if (const auto reason = DownloadReason(); !reason.isEmpty() && !IsDownloading())
             tab.ShowStatus(reason, StatusLevel::Neutral);
         else

@@ -434,19 +434,21 @@ nothing more.
   rule and answers `Busy` to a request that arrives while it runs.
 - **Download.** A confirmation names the motor and the version, and says that the motor stays stopped until
   the download ends, about two minutes for 256 KB, and that nothing is installed yet. Then Begin, which the
-  controller answers once it has erased its whole staging slot, the progress bar reading "Erasing…" until
-  then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
+  controller answers once it has erased its whole staging slot, the status line reading "Erasing the
+  controller's staging slot…" over a busy bar until then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
   pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
   three times in a row before the download is given up. A block or Verify answered `Busy`, which the controller
   gives while it programs a page, counts as unanswered: the block is sent again from where the controller
   stands, and Verify is sent again. A progress bar shows the bytes sent out of the total
   and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
-  with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
-  commandable. An emergency stop sent to the motor ends its download on both sides: the controller drops the
+  with the reason "Firmware transfer in progress: the other commands wait until it ends. The emergency stop
+  stays available."; every other motor stays commandable. An emergency stop sent to the motor ends its download on both sides: the controller drops the
   pack (`service-firmware-upgrade.md` Part F) and the tool sends nothing more and says the stop ended the
   download and nothing was staged. A staged pack and an apply under way are not affected, as on the
   controller. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply
-  Firmware…* and *Discard*, which sends Abort and forgets the staged pack.
+  Firmware…* and *Discard*, which sends Abort and forgets the staged pack. Verifying and, after Activate, the
+  wait for the controller read the same way: the status line names the step over a busy bar, since a busy bar
+  shows no text of its own.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
   node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
