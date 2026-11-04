@@ -1,3 +1,4 @@
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "core/can/FocMotorSettings.hpp"
@@ -1172,4 +1173,12 @@ TEST_F(TestCanCommandClient, a_refused_reading_other_than_the_staged_version_rep
     EXPECT_CALL(observer, OnParameterReceived(1, _, _)).Times(4);
     DeliverRunningIdentity(1, FirmwareIdentity{ { 1, 6, 0 }, 1, {} });
     DeliverAck(can::focQueryParameterId, 1, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(TestCanCommandClient, a_firmware_upgrade_answer_names_the_node_it_came_from)
+{
+    BringOnline(3);
+    Receive(services::MakeCanId(services::CanPriority::response, services::firmwareUpgradeCategoryId, services::fwuVerifyResponseId, 3), Message({ 0 }));
+
+    EXPECT_EQ(3, client.FrameOrigin().SourceNodeId());
 }

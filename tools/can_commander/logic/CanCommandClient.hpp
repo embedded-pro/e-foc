@@ -1,5 +1,6 @@
 #pragma once
 
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeCategoryClient.hpp"
 #include "can-lite/client/CanProtocolClient.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/drivers/interface/CanBusAdapter.hpp"
@@ -118,6 +119,9 @@ namespace tool
         void RequestStatus(uint16_t nodeId);
         void RequestFirmwareIdentity(uint16_t nodeId);
 
+        services::FirmwareUpgradeCategoryClient& FirmwareUpgrade();
+        const can::CanFrameOrigin& FrameOrigin() const;
+
     private:
         struct NodeCommand
         {
@@ -192,6 +196,7 @@ namespace tool
         void DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const;
 
         can::FocMotorCanClient focClient;
+        services::FirmwareUpgradeCategoryClient firmwareUpgrade;
         std::map<uint16_t, NodeCommand> commands;
         std::map<uint16_t, NodeReads> reads;
         std::map<uint16_t, uint8_t> contractMinors;
