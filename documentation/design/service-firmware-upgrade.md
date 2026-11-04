@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.7
+version: 0.3.8
 component: "service-firmware-upgrade"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.7                     |
+| Version   | 0.3.8                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-04                |
 
@@ -287,10 +287,14 @@ continuous integration on every pull request, so the step a release takes is the
 The hardware scenario downloads the application it runs, as a pack signed with the development key set,
 so the board needs the bootloader with that key set, as every build programmed by a debugger has
 (`bootloader.md` Part G). The software-in-the-loop scenarios read the staging and journal files the emulated
-firmware wrote and check the pack and the journal in them. Most send a small pack, built for the scenario with
-the real product name; only the scenario that applies the pack sends the application itself, since the
-bootloader checks the image it installs. The new feature goes into the shard that keeps the three balanced
-(`integration_tests/sil-shards.json`).
+firmware wrote and check the pack and the journal in them. Every scenario that downloads sends a small pack,
+built for the scenario with the real product name. The scenario that applies does not download: the harness
+writes the application itself, as a pack, into the staging file before the target boots, since the bootloader
+checks the image it installs and a full-size download over the emulated serial port would take too long
+(`software-in-the-loop.md` Part Q). The emulator refills the application slot at every reset, so that scenario
+proves the install by the journal reading *deployed* and the heartbeat coming back, not by a changed image; the
+bootloader's own scenarios install into an empty slot (`software-in-the-loop.md` Part P). The new feature goes
+into the shard that keeps the three balanced (`integration_tests/sil-shards.json`).
 
 ---
 
