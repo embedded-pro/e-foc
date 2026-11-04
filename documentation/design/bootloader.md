@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.1
+version: 0.6.2
 component: "bootloader"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.1      |
+| Version   | 0.6.2      |
 | Component | bootloader |
 | Date      | 2026-11-04 |
 
@@ -132,7 +132,8 @@ components, with exactly one image:
   part, as in `e-foc EK-TM4C1294XL TM4C1294NCPDT`, `e-foc EK-TM4C123GXL TM4C123GH6PM`,
   `e-foc NUCLEO-H563ZI STM32H563ZI`, `e-foc NUCLEO-G474RE STM32G474RE` and `e-foc emulated mps2-an386`. Every
   board has one, with a bootloader or not. It is defined once, in the board's definition in the build, beside
-  the board kind; the build generates one header from those definitions, which the application, the
+  the board kind, the board's name and whether it carries a bootloader; the build generates one header from
+  those definitions, which the application, the
   bootloader, the software-in-the-loop harness and the CAN Commander read, and the packer takes it from the same
   definitions, never from a typed argument. The library names the field *product name*; the format does not
   change. The bootloader compares it with its own, so a pack for another board or microcontroller is refused

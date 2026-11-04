@@ -2,7 +2,6 @@
 #include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
-#include "tools/can_commander/logic/MotorSettings.hpp"
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -14,18 +13,19 @@ namespace tool
     {
         constexpr uint16_t knownHeaderVersion{ 1 };
 
-        constexpr FirmwareBoard Described(const e_foc::boards::Board& board, bool hasBootloader, bool hasReleasePack)
+        constexpr FirmwareBoard Described(const e_foc::boards::Board& board)
         {
-            return FirmwareBoard{ board.kind, {}, board.microcontroller, board.identification, hasBootloader, hasReleasePack };
+            const bool releasePack = board.bootloader && board.kind != e_foc::boards::emulated.kind;
+            return FirmwareBoard{ board.kind, board.name, board.microcontroller, board.identification, board.bootloader, releasePack };
         }
 
-        constexpr std::array<FirmwareBoard, 5> boards{ {
-            Described(e_foc::boards::ekTm4c1294xl, true, true),
-            Described(e_foc::boards::nucleoG474re, false, false),
-            Described(e_foc::boards::nucleoH563zi, false, false),
-            Described(e_foc::boards::ekTm4c123gxl, false, false),
-            Described(e_foc::boards::emulated, true, false),
-        } };
+        constexpr auto boards = []()
+        {
+            std::array<FirmwareBoard, e_foc::boards::all.size()> described{};
+            for (std::size_t index = 0; index != described.size(); ++index)
+                described[index] = Described(e_foc::boards::all[index]);
+            return described;
+        }();
 
         template<class T>
         bool ReadAt(const std::vector<uint8_t>& bytes, std::size_t offset, T& value)
@@ -72,10 +72,7 @@ namespace tool
         const auto board = std::ranges::find(boards, kind, &FirmwareBoard::kind);
         if (board == boards.end())
             return std::nullopt;
-
-        auto named = *board;
-        named.name = BoardKindName(static_cast<float>(kind));
-        return named;
+        return *board;
     }
 
     bool CanBeUpdated(const FirmwareBoard& board)

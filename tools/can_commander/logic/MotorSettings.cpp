@@ -1,5 +1,6 @@
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include "generated/Boards.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -101,7 +102,7 @@ namespace tool
             { FocParameter::firmwareVersionMajor, "Firmware major version", "Firmware major:", {}, "Major number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionMinor, "Firmware minor version", "Firmware minor:", {}, "Minor number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionPatch, "Firmware patch version", "Firmware patch:", {}, "Patch number of the release version of the running firmware.", {} },
-            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on; Emulated is the QEMU software-in-the-loop target.", {} },
+            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on; emulated is the QEMU software-in-the-loop target.", {} },
             { FocParameter::stagedVersionMajor, "Staged major version", "Staged major:", {}, "Major number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the release version of the pack staged for an update; 0 when none is staged.", {} },
@@ -302,8 +303,11 @@ namespace tool
 
     std::string_view BoardKindName(float kind)
     {
-        static constexpr std::array<std::string_view, 6> names{ "Unknown", "EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI", "EK-TM4C123GXL", "Emulated" };
-        return NameAt(names, kind);
+        const auto board = std::ranges::find_if(e_foc::boards::all, [kind](const e_foc::boards::Board& candidate)
+            {
+                return static_cast<float>(candidate.kind) == kind;
+            });
+        return board != e_foc::boards::all.end() ? board->name : "Unknown";
     }
 
     const SettingPresentation& PresentationOf(can::FocParameter parameter)
