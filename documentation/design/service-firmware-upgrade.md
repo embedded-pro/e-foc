@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: "service-firmware-upgrade"
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.0                     |
+| Version   | 0.3.1                     |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-03                |
 
@@ -88,7 +88,9 @@ time, also after a restart.
 | Restarting | Activate accepted; the reset follows within one second                         | held                             |
 
 At start-up the service reads the status journal. A journal that reads *downloaded* puts it in Staged, with
-the pack's version read from its header (Part H); any other status puts it in Idle.
+the pack's version read from its header (Part H); any other status puts it in Idle. The journal is the
+bootloader's own (`bootloader.md` Part B), read and written through the same library component, so both read
+the same entries.
 
 ### Part B — Begin Upgrade: the download
 
@@ -129,11 +131,15 @@ number of bytes the service collects before it programs them: 128 on the TI boar
   again with Begin. The page is not written a second time, because the ST internal flash cannot program a unit
   twice without erasing it, and a second Begin erases the staging slot again.
 - A block that would take the download past the size given in Begin is answered `InvalidSize`.
+- A block that fills a page is acknowledged once the page is programmed. A command that arrives while a page
+  is programmed is answered `Busy`, except Abort, which waits for it (Part F).
 
 ### Part D — Verify: the end of the download
 
-Verify first programs the last, partly filled page, then reads the pack back from the staging slot, a chunk
-per event-loop turn, and checks:
+Verify is answered `InvalidState` unless a pack is being received, and `InvalidSize` until every byte of the
+size given in Begin has arrived; the download stays open after either. Otherwise Verify first programs the
+last, partly filled page, then reads the pack back from the staging slot, a chunk per event-loop turn, and
+checks:
 
 1. the CRC-32 of exactly the Begin size, in the variant the `can-lite` specification fixes (section 4.3),
    against the value Verify carries; otherwise `CrcMismatch`;
@@ -176,7 +182,8 @@ them as the NVM design describes (`service-nvm.md`, version check).
 ### Part F — Abort and the inactivity deadline
 
 - Abort while a pack is being received, or the inactivity deadline, ends the download: the session returns to
-  Idle, the interlock is released and the journal stays empty, so nothing is staged.
+  Idle, the interlock is released and the journal stays empty, so nothing is staged. A Begin or Verify still
+  unanswered is answered `InvalidState` first.
 - Abort in Staged or Error discards the staged pack and the service returns to Idle. The pack is unavailable at
   once: Activate is answered `NotReady` and the staged version reads zero. Erasing the journal stalls flash, so
   it is carried out only while the drive is stopped (`Idle` or `Ready`) with nothing outstanding; an Abort that
@@ -228,9 +235,13 @@ parameters (`0xB5`–`0xB7`) wait for the bootloader work. Board kinds: `EK-TM4C
 | Emulated      | file `staging.bin` in the scenario directory      | 256 B | 262 144 B     |
 | EK-TM4C123GXL | none: Begin is answered `InvalidSize`             | —     | 0             |
 
-The platform provides the staging flash, the application slot's limits, the board kind and the product name;
-the service depends on these abstractions only. On the emulated target the file stands in for the staging
-flash as the EEPROM file stands in for the NVM, so a scenario can read back what the firmware staged.
+A board without a staging slot still answers the category: Begin with `InvalidSize`, Verify with
+`InvalidState`, Activate with `NotReady`.
+
+The platform provides the staging flash and the status journal, the product name, the application slot's
+capacity and the page size; the service depends on these abstractions only. On the emulated target the file
+stands in for the staging flash as the EEPROM file stands in for the NVM, so a scenario can read back what
+the firmware staged.
 
 ### Part J — release assets
 
@@ -269,20 +280,21 @@ the journal in it. The new feature goes into the shard that keeps the three bala
 
 ### Provided
 
-| Interface                        | Purpose                                         | Contract                                                                                                                                                                |
-|----------------------------------|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Firmware-upgrade category server | Download and apply a pack over CAN              | `can-lite` firmware-upgrade specification; answers as Parts B to F                                                                                                      |
-| Running state                    | Interlock with the drive                        | True while a pack is received, from an accepted Begin, through the erase, until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
-| Firmware identity                | Running and staged version, board, for a client | Contract 2.6 parameters (Part H)                                                                                                                                        |
+| Interface                        | Purpose                            | Contract                                                                                                                                                                |
+|----------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Firmware-upgrade category server | Download and apply a pack over CAN | `can-lite` firmware-upgrade specification; answers as Parts B to F                                                                                                      |
+| Running state                    | Interlock with the drive           | True while a pack is received, from an accepted Begin, through the erase, until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
+| Staged version                   | The version waiting to be applied  | The staged pack's product version, zero when none is staged (Part H)                                                                                                    |
 
 ### Required
 
-| Interface                  | Purpose                                | Contract                                                                               |
-|----------------------------|----------------------------------------|----------------------------------------------------------------------------------------|
-| Staging flash              | Hold the received pack and the journal | Asynchronous flash of the platform; erase per sector, write any byte range             |
-| Control-mode state machine | Drive state, pending work              | Begin and Activate admitted only in `Idle` or `Ready` with nothing outstanding         |
-| Platform software reset    | Restart into the bootloader            | Does not return                                                                        |
-| CAN protocol server        | Category registration                  | Registered beside the FOC motor category on the drive's node (`service-can.md` Part K) |
+| Interface                  | Purpose                     | Contract                                                                               |
+|----------------------------|-----------------------------|----------------------------------------------------------------------------------------|
+| Staging flash              | Hold the received pack      | Asynchronous flash of the platform; erase per sector, write any byte range             |
+| Status journal flash       | Record the pack's status    | Synchronous flash of the platform, read and written as the bootloader does             |
+| Control-mode state machine | Drive state, pending work   | Begin and Activate admitted only in `Idle` or `Ready` with nothing outstanding         |
+| Platform software reset    | Restart into the bootloader | Does not return                                                                        |
+| CAN protocol server        | Category registration       | Registered beside the FOC motor category on the drive's node (`service-can.md` Part K) |
 
 ---
 
@@ -300,9 +312,10 @@ stateDiagram-v2
     Erasing --> Error : erase failed
     Erasing --> Idle : Abort
     Receiving --> Receiving : next block or repeat of the last
-    Receiving --> Verifying : Verify
+    Receiving --> Verifying : Verify, every byte received
     Receiving --> Error : flash write failed
     Receiving --> Idle : Abort or 30 s without a command
+    Verifying --> Idle : Abort
     Verifying --> Staged : CRC, board and microcontroller match
     Verifying --> Error : CRC or header mismatch
     Staged --> Staged : drive runs, controller restarts
