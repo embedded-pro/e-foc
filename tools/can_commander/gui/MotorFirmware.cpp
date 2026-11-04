@@ -1,4 +1,5 @@
 #include "tools/can_commander/gui/MotorFirmware.hpp"
+#include "tools/can_commander/logic/FirmwareRefusal.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include <QDir>
 #include <QFile>
@@ -37,25 +38,6 @@ namespace tool
         bool IsStopped(std::optional<FocMotorState> state)
         {
             return state == FocMotorState::idle || state == FocMotorState::partialCalibration || state == FocMotorState::ready;
-        }
-
-        QString RefusalText(services::FwuError error)
-        {
-            switch (error)
-            {
-                case services::FwuError::busy:
-                    return "the motor was not stopped or had work outstanding. Stop it, wait, and try again.";
-                case services::FwuError::crcMismatch:
-                    return "the pack did not arrive intact, and nothing was staged.";
-                case services::FwuError::notReady:
-                    return "the pack is not for this board and microcontroller, and nothing was staged.";
-                case services::FwuError::invalidSize:
-                    return "the pack does not fit its staging slot.";
-                case services::FwuError::writeError:
-                    return "it could not write its staging slot.";
-                default:
-                    return QString("it answered with code %1.").arg(static_cast<int>(error));
-            }
         }
 
         std::optional<std::vector<uint8_t>> ReadPackFile(const QString& path)
@@ -323,7 +305,7 @@ namespace tool
                 Succeed("Download cancelled; nothing was staged.", IssueSeverity::warning);
                 break;
             case DownloadOutcome::refused:
-                Fail(QString("The controller refused firmware %1: %2").arg(version, RefusalText(error)));
+                Fail(QString("The controller refused firmware %1: %2").arg(version, QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::download))));
                 break;
             case DownloadOutcome::noAnswer:
                 Fail(QString("The controller stopped answering; the download of firmware %1 was given up.").arg(version));
@@ -360,7 +342,7 @@ namespace tool
                 Fail(QString("%1 did not come back within 30 s: the update failed, and recovering the controller needs a debugger.").arg(MotorName()));
                 break;
             case ApplyOutcome::refused:
-                Fail(QString("The controller refused to apply the pack: %1").arg(RefusalText(error)));
+                Fail(QString("The controller refused to apply the pack: %1").arg(QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::apply))));
                 break;
             default:
                 Fail("The controller did not answer Activate; nothing was installed.");

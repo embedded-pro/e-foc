@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.4
+version: 0.10.5
 component: "tool-can-commander"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.4               |
+| Version   | 0.10.5               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-04           |
 
@@ -451,7 +451,11 @@ nothing more.
   failed update that needs a debugger to recover.
 - **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
   wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
-  microcontroller, and nothing was staged; *Try Again* restarts the download.
+  microcontroller, and nothing was staged; *Try Again* restarts the download. `NotReady` on Activate means no
+  pack is staged on the controller. `InvalidState` on a block or Verify means the controller ended the
+  download first, by an emergency stop, an abort or its 30 s inactivity deadline, and `SessionTimeout` that it
+  ended it after 30 s without a block; nothing was staged either way. Every text names the step it answers,
+  so the same answer reads differently for a download and for an apply.
 - **Bus.** Disconnecting or closing the tool during a download asks first. Doing it anyway abandons the
   download, which the controller drops after 30 s without a command. A staged pack is not affected by the bus
   closing; it is still there, and still offered for apply, at the next connection.
