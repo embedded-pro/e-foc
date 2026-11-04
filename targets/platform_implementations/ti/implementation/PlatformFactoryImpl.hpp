@@ -33,7 +33,6 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
-#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 
@@ -312,10 +311,9 @@ namespace application
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
         uint8_t boardId{ 0 };
-        [[no_unique_address]] CycleCounter cycleCounter;
+        hal::cortex::DataWatchpointAndTrace cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
-        volatile bool controlLoopEntered{ false };
         volatile bool overCurrentTripped{ false };
         volatile bool pwmFaultAsserted{ false };
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };

@@ -30,15 +30,20 @@ namespace can
             FocFirmwareIdentity firmware;
         };
 
+        struct Services
+        {
+            services::ElectricalParametersIdentification& electricalIdent;
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
+            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill;
+            FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
+        };
+
         FocMotorCanBridge(
             FocMotorCategoryServer& server,
             state_machine::ControlModeStateMachine& controlMode,
             const Platform& platform,
-            services::ElectricalParametersIdentification& electricalIdent,
-            services::Tracer& tracer,
-            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
-            std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt,
-            FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade = std::nullopt);
+            const Services& motorServices,
+            services::Tracer& tracer);
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };

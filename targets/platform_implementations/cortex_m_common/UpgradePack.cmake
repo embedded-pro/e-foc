@@ -1,0 +1,108 @@
+foreach(argument IN ITEMS KEYS OUTPUT)
+    if(NOT DEFINED ${argument})
+        message(FATAL_ERROR "No ${argument} given: cmake -D KEYS=<key set> -D OUTPUT=<pack> -P ${CMAKE_SCRIPT_MODE_FILE}")
+    endif()
+endforeach()
+
+function(little_endian_hex output value size)
+    math(EXPR number "${value}" OUTPUT_FORMAT HEXADECIMAL)
+    string(SUBSTRING "${number}" 2 -1 digits)
+    math(EXPR width "${size} * 2")
+    string(LENGTH "${digits}" length)
+    while(length LESS width)
+        string(PREPEND digits "0")
+        string(LENGTH "${digits}" length)
+    endwhile()
+
+    set(bytes "")
+    while(length GREATER 0)
+        math(EXPR length "${length} - 2")
+        string(SUBSTRING "${digits}" ${length} 2 byte)
+        string(APPEND bytes "${byte}")
+    endwhile()
+
+    string(TOLOWER "${bytes}" bytes)
+    set(${output} "${bytes}" PARENT_SCOPE)
+endfunction()
+
+function(check_image)
+    file(SIZE "${IMAGE}" imageSize)
+    math(EXPR capacity "${SLOT_END} - ${SLOT_START} - 64")
+    if(imageSize GREATER capacity)
+        message(FATAL_ERROR "${IMAGE} is ${imageSize} bytes; the application slot holds ${capacity} beside its descriptor.")
+    endif()
+
+    string(REPLACE "." ";" version "${PRODUCT_VERSION}")
+    list(GET version 0 major)
+    list(GET version 1 minor)
+    list(GET version 2 patch)
+    list(GET IMAGE_TARGET 0 boardKind)
+    list(GET IMAGE_TARGET 1 family)
+    list(GET IMAGE_TARGET 2 device)
+
+    little_endian_hex(magic 0x48414d45 4)
+    little_endian_hex(headerVersion 1 2)
+    little_endian_hex(majorBytes ${major} 2)
+    little_endian_hex(minorBytes ${minor} 2)
+    little_endian_hex(patchBytes ${patch} 2)
+    little_endian_hex(boardBytes ${boardKind} 2)
+    little_endian_hex(familyBytes ${family} 2)
+    little_endian_hex(deviceBytes ${device} 4)
+
+    file(READ "${IMAGE}" header OFFSET 1024 LIMIT 24 HEX)
+    string(SUBSTRING "${header}" 0 12 identification)
+    string(SUBSTRING "${header}" 16 12 headerVersionBytes)
+    string(SUBSTRING "${header}" 32 16 targetBytes)
+
+    if(NOT identification STREQUAL "${magic}${headerVersion}")
+        message(FATAL_ERROR "${IMAGE} has no application header at 1 KB.")
+    endif()
+    if(NOT headerVersionBytes STREQUAL "${majorBytes}${minorBytes}${patchBytes}")
+        message(FATAL_ERROR "${IMAGE} is not version ${PRODUCT_VERSION}.")
+    endif()
+    if(NOT targetBytes STREQUAL "${boardBytes}${familyBytes}${deviceBytes}")
+        message(FATAL_ERROR "${IMAGE} is not built for ${PRODUCT}: its target identity differs.")
+    endif()
+endfunction()
+
+function(refuse_pack reason)
+    file(REMOVE "${OUTPUT}")
+    message(FATAL_ERROR "${reason}")
+endfunction()
+
+function(check_pack)
+    file(SIZE "${OUTPUT}" packSize)
+    if(packSize GREATER STAGING_SIZE)
+        refuse_pack("${OUTPUT} is ${packSize} bytes; the staging slot holds ${STAGING_SIZE}.")
+    endif()
+
+    file(READ "${OUTPUT}" prologue LIMIT 16 HEX)
+    string(SUBSTRING "${prologue}" 30 2 high)
+    string(SUBSTRING "${prologue}" 28 2 low)
+    math(EXPR productOffset "16 + 0x${high}${low} + 8")
+    file(READ "${OUTPUT}" productName OFFSET ${productOffset} LIMIT 64 HEX)
+
+    string(HEX "${PRODUCT}" expected)
+    string(LENGTH "${expected}" length)
+    while(length LESS 128)
+        string(APPEND expected "0")
+        string(LENGTH "${expected}" length)
+    endwhile()
+
+    if(NOT productName STREQUAL expected)
+        refuse_pack("${OUTPUT} does not name ${PRODUCT}.")
+    endif()
+endfunction()
+
+check_image()
+
+execute_process(
+    COMMAND "${TOOL}" pack --keys "${KEYS}" --image "${IMAGE}" --destination ${SLOT_START} --product "${PRODUCT}"
+        --product-version "${PRODUCT_VERSION}" --component "${COMPONENT}" --output "${OUTPUT}"
+    RESULT_VARIABLE result
+)
+if(NOT result EQUAL 0)
+    message(FATAL_ERROR "application.bootloader_image wrote no pack.")
+endif()
+
+check_pack()
