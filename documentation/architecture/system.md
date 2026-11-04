@@ -2,7 +2,7 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: system
 date: 2026-11-03
 ---
@@ -12,7 +12,7 @@ date: 2026-11-03
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.2.1                     |
+| Version   | 0.2.2                     |
 | Component | system                    |
 | Date      | 2026-11-03                |
 
@@ -357,8 +357,9 @@ These are never used directly by the FOC core or services — only by the PAL co
 
 ### 8. Bootloader
 
-A single-stage bootloader sits at the start of flash on every board that has room for two images, ahead of
-the application ([design](../design/bootloader.md)). At every reset it checks the application slot against
+A single-stage bootloader sits at the start of flash, ahead of the application, on the EK-TM4C1294XL and the
+emulated board today; the ST boards with room for two images get it later ([design](../design/bootloader.md),
+Open Question 6). At every reset it checks the application slot against
 its image descriptor and starts it; when the application has staged a firmware pack and the user has applied
 it, it first verifies the pack's ECDSA-P256 signature, board and microcontroller, decrypts it with AES-128-CTR
 and installs it. An image built for another microcontroller is refused before anything is erased: the image

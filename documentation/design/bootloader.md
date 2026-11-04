@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.1
+version: 0.6.2
 component: "bootloader"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.1      |
+| Version   | 0.6.2      |
 | Component | bootloader |
 | Date      | 2026-11-04 |
 
@@ -82,6 +82,11 @@ bytes of the application slot are the image descriptor (Part E).
 | Emulated      | 4 MB of code RAM        | `0x00000000`, 32 KB | `0x00008000`, 256 KB          | semihosting file `staging.bin`, 256 KB       | file `journal.bin`      | 229 KB       |
 | EK-TM4C123GXL | 256 KB, 1 KB sectors    | none                | `0x00000000`                  | none                                         | none                    | 255 KB       |
 
+The EK-TM4C1294XL and the emulated board are built with this layout today. The NUCLEO-H563ZI and NUCLEO-G474RE
+rows are the layout those boards take once they get the bootloader (Open Question 6); until then each is linked
+standalone from the start of its flash, programmed with a debugger, carries no application header and has no
+staging slot (`service-firmware-upgrade.md` Part I).
+
 On the EK-TM4C1294XL:
 
 ```text
@@ -103,9 +108,9 @@ On the EK-TM4C1294XL:
 - The application is linked at the start of its slot. It moves the vector table to the slot before it enables
   any interrupt, because neither the TI startup nor the ST system initialisation does: the TI startup leaves the
   table at address 0 and the H5 system initialisation sets it to the start of flash.
-- On the NUCLEO-H563ZI the staging slot is the second bank, so the application programs it while running from
-  the first bank without stalling. Bank swapping stays off: the bootloader copies the image instead.
-- On the NUCLEO-G474RE the application slot spans both banks, and the staging slot is an SPI NOR device on the
+- On the NUCLEO-H563ZI the staging slot will be the second bank, so the application programs it while running
+  from the first bank without stalling. Bank swapping stays off: the bootloader copies the image instead.
+- On the NUCLEO-G474RE the application slot will span both banks, and the staging slot an SPI NOR device on the
   motor board (Open Question 1).
 - A pack may be as large as the staging slot, 262 144 bytes, which is below the 393 216 bytes a `can-lite`
   firmware-upgrade transfer can address. The image it carries may fill the application slot less its
@@ -252,13 +257,13 @@ only when software starts them, and the application does (`watchdog.md`).
 
 ### Part H — per board
 
-| Board         | Application slot flash      | Staging flash                        | Bootloader                         |
-|---------------|-----------------------------|--------------------------------------|------------------------------------|
-| EK-TM4C1294XL | TI internal flash, blocking | TI internal flash, blocking          | yes                                |
-| NUCLEO-H563ZI | ST internal flash, bank 1   | ST internal flash, bank 2            | yes                                |
-| NUCLEO-G474RE | ST internal flash           | SPI NOR on the motor board, blocking | yes, once the board has the device |
-| Emulated      | code RAM, refilled at reset | file in the scenario directory       | yes                                |
-| EK-TM4C123GXL | —                           | —                                    | no                                 |
+| Board         | Application slot flash      | Staging flash                        | Bootloader                                                      |
+|---------------|-----------------------------|--------------------------------------|-----------------------------------------------------------------|
+| EK-TM4C1294XL | TI internal flash, blocking | TI internal flash, blocking          | yes                                                             |
+| NUCLEO-H563ZI | ST internal flash, bank 1   | ST internal flash, bank 2            | planned (Open Question 6)                                       |
+| NUCLEO-G474RE | ST internal flash           | SPI NOR on the motor board, blocking | planned, once the board has the device (Open Questions 1 and 6) |
+| Emulated      | code RAM, refilled at reset | file in the scenario directory       | yes                                                             |
+| EK-TM4C123GXL | —                           | —                                    | no                                                              |
 
 The emulated target boots through the bootloader like a board with one: every software-in-the-loop scenario
 starts with the bootloader's check of the application slot, and the bootloader's own scenarios stage packs
@@ -273,10 +278,10 @@ An image built for one microcontroller must never be written into another, an ST
 example. The bootloader cannot trust the pack's labels alone, because a label is written by the packer and can
 be wrong; the image says itself what it was built for, and the chip says what it is.
 
-**Application header.** Every application image carries a 64-byte application header at offset 1 KB from the
-start of its slot, past the vector table of every supported microcontroller. It holds a magic value, the
-board kind (`service-can.md`, contract 2.6), the firmware version (the project version, from the version header
-embedded-infra-lib generates at build time) and the target identity: the device
+**Application header.** Every application image built with the layout of Part A carries a 64-byte application
+header at offset 1 KB from the start of its slot, past the vector table of every supported microcontroller. It
+holds a magic value, the board kind (`service-can.md`, contract 2.6), the firmware version (the project version,
+from the version header embedded-infra-lib generates at build time) and the target identity: the device
 identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
 device-identity register gives. The header is compiled from the board's definition, the one the rest of the image
 is compiled from, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
@@ -288,6 +293,10 @@ TM4C123 but not one TM4C129 part from another; the board kind beside it does.
 | STM32H563ZI     | device identifier `0x484`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
 | STM32G474RE     | device identifier `0x469`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
 | Emulated        | the constant `0x00000386`, with the emulated tag      | none: the bootloader uses the same constant |
+
+The TI and emulated identities are in those boards' definitions in the build today. The ST rows are the values
+the NUCLEO-H563ZI and NUCLEO-G474RE definitions take when those boards get the layout (Open Question 6); until
+then their definitions carry no identity and their images no application header.
 
 **Checks, in order.** A wrong pack is stopped at the first layer that can see the mistake; each later layer
 holds even if an earlier one was skipped or its label was wrong:
@@ -445,7 +454,7 @@ sequenceDiagram
 | Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                               |
 | Recovery             | a broken application slot with no valid pack needs a debugger                                                                                              |
 | Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set |
-| Boards               | EK-TM4C1294XL and NUCLEO-H563ZI; NUCLEO-G474RE once its motor board carries SPI NOR flash; not the EK-TM4C123GXL                                           |
+| Boards               | EK-TM4C1294XL and the emulated board; NUCLEO-H563ZI and NUCLEO-G474RE planned (Open Questions 6 and 1); not the EK-TM4C123GXL                             |
 
 ---
 
@@ -458,3 +467,4 @@ sequenceDiagram
 | 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | closed: every emulated scenario boots through the bootloader (`software-in-the-loop.md` Part P) |
 | 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock (current) / start the PLL in the bootloader                            | open                                                                                            |
 | 5 | How does the NUCLEO-G474RE image get below the 256 KB a pack may hold?                         | Trim the image / leave that board without updates (current)                                 | open                                                                                            |
+| 6 | When do the NUCLEO-H563ZI and NUCLEO-G474RE get the bootloader and the application layout?     | An ST bootloader platform over the ST flash drivers with Part A's layout / stay standalone   | open: both boards are linked standalone today                                                   |
