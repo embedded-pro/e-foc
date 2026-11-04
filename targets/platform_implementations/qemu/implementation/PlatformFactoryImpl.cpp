@@ -1,6 +1,7 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
 #include "bootloader/ImageFormat.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
+#include "generated/Boards.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
@@ -242,7 +243,7 @@ namespace application
 
     BoardKind PlatformFactoryImpl::GetBoardKind() const
     {
-        return BoardKind::emulated;
+        return static_cast<BoardKind>(e_foc::board.kind);
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const
@@ -289,7 +290,7 @@ namespace application
     std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ stagingFlash, journalFlash, E_FOC_PRODUCT_NAME, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const

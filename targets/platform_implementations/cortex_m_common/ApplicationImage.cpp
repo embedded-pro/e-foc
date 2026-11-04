@@ -1,4 +1,5 @@
 #include "bootloader/ImageFormat.hpp"
+#include "generated/Boards.hpp"
 #include "generated/Version.h"
 #include "targets/bootloader/ImageTarget.hpp"
 #include <array>
@@ -10,7 +11,7 @@ namespace
 {
     constexpr uintptr_t vtorAddress = 0xE000ED08u;
 
-    constexpr bootloader::ImageTarget target{ E_FOC_BOARD_KIND, static_cast<bootloader::DeviceFamily>(E_FOC_DEVICE_FAMILY), E_FOC_DEVICE_IDENTITY };
+    constexpr bootloader::ImageTarget target{ e_foc::board.kind, static_cast<bootloader::DeviceFamily>(e_foc::deviceFamily), e_foc::deviceIdentity };
 
     constexpr std::array<uint8_t, bootloader::imageDescriptorSize> ErasedDescriptor()
     {

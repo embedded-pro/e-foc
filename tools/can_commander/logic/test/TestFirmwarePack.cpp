@@ -1,9 +1,11 @@
+#include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/FirmwarePack.hpp"
 #include "upgrade/pack/UpgradePackHeader.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -30,7 +32,7 @@ namespace
 
     struct PackShape
     {
-        std::string productName{ E_FOC_EK_TM4C1294XL_PRODUCT_NAME };
+        std::string productName{ e_foc::boards::ekTm4c1294xl.identification };
         std::string productVersion{ "1.7.0" };
         uint16_t headerVersion{ 1 };
         uint32_t imageSize{ 300 };
@@ -78,6 +80,15 @@ TEST(FirmwarePack, every_board_kind_names_its_board_and_microcontroller)
     EXPECT_EQ("Emulated", Board(5).name);
     EXPECT_FALSE(BoardOfKind(0).has_value());
     EXPECT_FALSE(BoardOfKind(6).has_value());
+}
+
+TEST(FirmwarePack, every_board_carries_the_identification_its_firmware_is_built_with)
+{
+    EXPECT_EQ(std::string_view{ e_foc::boards::ekTm4c1294xl.identification }, Board(1).productName);
+    EXPECT_EQ(std::string_view{ e_foc::boards::nucleoG474re.identification }, Board(2).productName);
+    EXPECT_EQ(std::string_view{ e_foc::boards::nucleoH563zi.identification }, Board(3).productName);
+    EXPECT_EQ(std::string_view{ e_foc::boards::ekTm4c123gxl.identification }, Board(4).productName);
+    EXPECT_EQ(std::string_view{ e_foc::boards::emulated.identification }, Board(5).productName);
 }
 
 TEST(FirmwarePack, only_boards_with_a_bootloader_can_be_updated)

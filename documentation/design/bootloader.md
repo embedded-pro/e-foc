@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.0
+version: 0.6.1
 component: "bootloader"
-date: 2026-11-03
+date: 2026-11-04
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.0      |
+| Version   | 0.6.1      |
 | Component | bootloader |
-| Date      | 2026-11-03 |
+| Date      | 2026-11-04 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -128,12 +128,16 @@ components, with exactly one image:
 | Image epilogue  | destination address (the start of the application slot) and image size                                   | yes    | yes       |
 | Image           | the application binary, as the debugger would program it into the slot                                   | yes    | yes       |
 
-- The **product name** is `e-foc`, the board and the microcontroller part: `e-foc EK-TM4C1294XL TM4C1294NCPDT`,
-  `e-foc NUCLEO-H563ZI STM32H563ZI`, `e-foc NUCLEO-G474RE STM32G474RE`. The packer takes it from the build of
-  that board, never from a typed argument. The bootloader compares it with its own, so a pack for another
-  board or microcontroller is refused before anything is written. The application checks the same name when
-  it verifies the pack, so the refusal comes before the user can apply it (`service-firmware-upgrade.md`
-  Part D).
+- The **product name** field holds the **board identification**: `e-foc`, the board and the microcontroller
+  part, as in `e-foc EK-TM4C1294XL TM4C1294NCPDT`, `e-foc EK-TM4C123GXL TM4C123GH6PM`,
+  `e-foc NUCLEO-H563ZI STM32H563ZI`, `e-foc NUCLEO-G474RE STM32G474RE` and `e-foc emulated mps2-an386`. Every
+  board has one, with a bootloader or not. It is defined once, in the board's definition in the build, beside
+  the board kind; the build generates one header from those definitions, which the application, the
+  bootloader, the software-in-the-loop harness and the CAN Commander read, and the packer takes it from the same
+  definitions, never from a typed argument. The library names the field *product name*; the format does not
+  change. The bootloader compares it with its own, so a pack for another board or microcontroller is refused
+  before anything is written. The application checks the same identification when it verifies the pack, so the
+  refusal comes before the user can apply it (`service-firmware-upgrade.md` Part D).
 - The **product version** is the build's project version, the release tag without its leading `v`: the version
   the application reports as running once the pack is installed. The component is `sync_foc_sensored`.
 - The prologue's status byte and error code are outside the signature and are not used: progress is kept in
@@ -274,8 +278,8 @@ start of its slot, past the vector table of every supported microcontroller. It 
 board kind (`service-can.md`, contract 2.6), the firmware version (the project version, from the version header
 embedded-infra-lib generates at build time) and the target identity: the device
 identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
-device-identity register gives. The header is compiled from the same target definitions that compile the rest
-of the image, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
+device-identity register gives. The header is compiled from the board's definition, the one the rest of the image
+is compiled from, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
 TM4C123 but not one TM4C129 part from another; the board kind beside it does.
 
 | Microcontroller | Device identity the header carries                    | Where the chip reports it                   |

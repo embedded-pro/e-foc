@@ -15,6 +15,7 @@ namespace tool
         std::string_view name;
         std::string_view microcontroller;
         std::string_view productName;
+        bool hasBootloader;
         bool hasReleasePack;
     };
 

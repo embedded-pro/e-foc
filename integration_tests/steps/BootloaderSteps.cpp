@@ -1,5 +1,6 @@
 #include "bootloader/StatusJournal.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "generated/Boards.hpp"
 #include "integration_tests/steps/UpgradePacks.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
@@ -24,7 +25,7 @@ namespace
 
     application::PackDescription Description(const std::string& defect)
     {
-        application::PackDescription description{ E_FOC_EMULATED_PRODUCT_NAME, "", "sync_foc_sensored", emulatedSlotStart, EmulatedBootloader().ApplicationImage() };
+        application::PackDescription description{ e_foc::boards::emulated.identification, "", "sync_foc_sensored", emulatedSlotStart, EmulatedBootloader().ApplicationImage() };
 
         if (defect == "for another product")
             description.productName = "e-foc another product";

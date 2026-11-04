@@ -284,10 +284,8 @@ namespace application
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl{ adcForPhaseCurrentMeasurementImpl.currentPhaseAnalogPins[AdcForPhaseCurrentMeasurementImpl::powerSupplyPinIndex] };
             PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
-#ifdef E_FOC_PRODUCT_NAME
             hal::tiva::FlashInternal stagingFlash{ StagingRegion() };
             hal::tiva::SynchronousFlashInternal journalFlash{ JournalRegion() };
-#endif
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<PwmDriver> pwm;

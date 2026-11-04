@@ -1,4 +1,5 @@
 #include "BootloaderPlatform.hpp"
+#include "generated/Boards.hpp"
 #include "hal/cortex_m/JumpToApplication.hpp"
 #include "hal/cortex_m/Semihosting.hpp"
 #include "infra/util/ReallyAssert.hpp"
@@ -44,7 +45,7 @@ namespace bootloader
 
     ImageTarget BootloaderPlatform::Target() const
     {
-        return ImageTarget{ E_FOC_BOARD_KIND, DeviceFamily::emulated, E_FOC_DEVICE_IDENTITY };
+        return ImageTarget{ e_foc::board.kind, static_cast<DeviceFamily>(e_foc::deviceFamily), e_foc::deviceIdentity };
     }
 
     void BootloaderPlatform::Start(uint32_t slotBegin)

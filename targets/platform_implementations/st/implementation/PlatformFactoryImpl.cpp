@@ -1,5 +1,6 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
 #include "core/platform_abstraction/BoardProtection.hpp"
+#include "generated/Boards.hpp"
 #include "generated/stm32fxxx/PinoutTableDefault.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -159,7 +160,7 @@ namespace application
 
     BoardKind PlatformFactoryImpl::GetBoardKind() const
     {
-        return static_cast<BoardKind>(Peripheral::boardKind);
+        return static_cast<BoardKind>(e_foc::board.kind);
     }
 
     void PlatformFactoryImpl::ConfigureBoardIdPins()
