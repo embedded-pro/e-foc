@@ -37,11 +37,20 @@ namespace tool
         pack = inspected.bytes;
         crc32 = inspected.crc32;
         nextBlock = 0;
+        failures = 0;
         Enter(TransferPhase::erasing);
         ReportProgress();
 
         if (!category.SendBeginUpgrade(nodeId, static_cast<uint32_t>(pack.size())))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return true;
+        }
+
+        answerTimer.Start(beginTimeout, [this]()
+            {
+                GiveUp();
+            });
         return true;
     }
 
@@ -73,6 +82,7 @@ namespace tool
         if (!Answers(TransferPhase::erasing))
             return;
 
+        answerTimer.Cancel();
         if (status != FwuError::ok)
         {
             FinishDownload(DownloadOutcome::refused, status);
@@ -88,10 +98,14 @@ namespace tool
         if (!Answers(TransferPhase::sending) || (status == FwuError::ok && blockIndex != nextBlock))
             return;
 
-        if (status != FwuError::ok)
+        answerTimer.Cancel();
+        if (status == FwuError::sequenceError)
+            OnNoBlockAnswer();
+        else if (status != FwuError::ok)
             FinishDownload(DownloadOutcome::refused, status);
         else
         {
+            failures = 0;
             ++nextBlock;
             SendNextBlock();
         }
@@ -102,6 +116,7 @@ namespace tool
         if (!Answers(TransferPhase::verifying))
             return;
 
+        answerTimer.Cancel();
         if (status == FwuError::ok)
             FinishDownload(DownloadOutcome::staged);
         else
@@ -111,8 +126,21 @@ namespace tool
     void FirmwareTransfer::OnActivateResponse(FwuError)
     {}
 
-    void FirmwareTransfer::OnProgressResponse(services::FwuState, uint16_t, uint16_t)
-    {}
+    void FirmwareTransfer::OnProgressResponse(services::FwuState state, uint16_t blocksReceived, uint16_t)
+    {
+        if (!Answers(TransferPhase::sending))
+            return;
+
+        answerTimer.Cancel();
+        if (state != services::FwuState::receiving)
+        {
+            FinishDownload(DownloadOutcome::refused, FwuError::invalidState);
+            return;
+        }
+
+        nextBlock = std::min(blocksReceived, NumberOfBlocks());
+        SendNextBlock();
+    }
 
     bool FirmwareTransfer::Answers(TransferPhase expectedPhase) const
     {
@@ -160,7 +188,15 @@ namespace tool
             data.push_back(pack[index]);
 
         if (!category.SendDataBlock(nodeId, nextBlock, data))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(blockTimeout, [this]()
+            {
+                OnNoBlockAnswer();
+            });
     }
 
     void FirmwareTransfer::SendVerify()
@@ -168,7 +204,43 @@ namespace tool
         Enter(TransferPhase::verifying);
         ReportProgress();
         if (!category.SendVerify(nodeId, crc32))
+        {
             FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(verifyTimeout, [this]()
+            {
+                GiveUp();
+            });
+    }
+
+    void FirmwareTransfer::OnNoBlockAnswer()
+    {
+        if (++failures >= attempts)
+            GiveUp();
+        else
+            AskProgress();
+    }
+
+    void FirmwareTransfer::AskProgress()
+    {
+        if (!category.SendQueryProgress(nodeId))
+        {
+            FinishDownload(DownloadOutcome::notSent);
+            return;
+        }
+
+        answerTimer.Start(blockTimeout, [this]()
+            {
+                OnNoBlockAnswer();
+            });
+    }
+
+    void FirmwareTransfer::GiveUp()
+    {
+        category.SendAbort(nodeId);
+        FinishDownload(DownloadOutcome::noAnswer);
     }
 
     void FirmwareTransfer::FinishDownload(DownloadOutcome outcome, FwuError error)

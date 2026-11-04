@@ -106,6 +106,11 @@ namespace
             Fwu(services::fwuVerifyResponseId, { static_cast<uint8_t>(error) });
         }
 
+        void ProgressAnswered(services::FwuState state, uint16_t received, uint16_t total)
+        {
+            Fwu(services::fwuProgressResponseId, { static_cast<uint8_t>(state), static_cast<uint8_t>(received >> 8), static_cast<uint8_t>(received), static_cast<uint8_t>(total >> 8), static_cast<uint8_t>(total) });
+        }
+
         std::vector<Sent> SentUpgradeFrames() const
         {
             std::vector<Sent> frames;
@@ -201,6 +206,57 @@ TEST_F(TestFirmwareTransfer, begin_refused_ends_the_download_with_the_refusal)
 
     EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::refused, FwuError::busy));
     BeginAnswered(FwuError::busy);
+}
+
+TEST_F(TestFirmwareTransfer, begin_unanswered_for_ten_seconds_gives_up_and_aborts)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    ForwardTime(FirmwareTransfer::beginTimeout - std::chrono::milliseconds(1));
+
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::noAnswer, FwuError::ok));
+    ForwardTime(std::chrono::milliseconds(1));
+    EXPECT_EQ(services::fwuAbortId, LastUpgradeFrame().messageType);
+}
+
+TEST_F(TestFirmwareTransfer, a_block_unanswered_for_a_second_asks_for_progress_and_resends_from_where_the_controller_stands)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    BlockAcked(0);
+
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    EXPECT_EQ(services::fwuQueryProgressId, LastUpgradeFrame().messageType);
+
+    ProgressAnswered(services::FwuState::receiving, 1, 4);
+    EXPECT_EQ(services::fwuDataBlockId, LastUpgradeFrame().messageType);
+    EXPECT_EQ(0, LastUpgradeFrame().payload[0]);
+    EXPECT_EQ(1, LastUpgradeFrame().payload[1]);
+}
+
+TEST_F(TestFirmwareTransfer, three_tries_in_a_row_without_an_answer_give_the_download_up)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    EXPECT_CALL(observer, OnDownloadFinished(1, DownloadOutcome::noAnswer, FwuError::ok));
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    EXPECT_EQ(services::fwuAbortId, LastUpgradeFrame().messageType);
+}
+
+TEST_F(TestFirmwareTransfer, an_acknowledged_block_starts_the_count_of_tries_again)
+{
+    ASSERT_TRUE(transfer.StartDownload(1, Pack(20)));
+    BeginAnswered();
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    ProgressAnswered(services::FwuState::receiving, 0, 4);
+    BlockAcked(0);
+
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    ForwardTime(FirmwareTransfer::blockTimeout);
+    EXPECT_TRUE(transfer.IsActive());
 }
 
 TEST_F(TestFirmwareTransfer, an_acknowledgement_of_another_block_is_ignored)
