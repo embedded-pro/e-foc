@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.1
+version: 0.6.2
 component: "bootloader"
 date: 2026-11-04
 ---
@@ -12,7 +12,7 @@ date: 2026-11-04
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.1      |
+| Version   | 0.6.2      |
 | Component | bootloader |
 | Date      | 2026-11-04 |
 
@@ -113,6 +113,10 @@ On the EK-TM4C1294XL:
   image whose pack fits the staging slot.
 - The NUCLEO-G474RE image, 259 KB today, is larger than any pack the staging slot holds; that board gets updates
   only once its image fits (Open Question 5).
+- `hardware_test` is linked standalone from the start of flash on every board, the EK-TM4C1294XL included:
+  programming its hex image replaces the bootloader, and the board gets the bootloader back only when the
+  bootloader and `sync_foc_sensored` images are programmed again (Part J). It carries no application header and
+  no image descriptor, so it never travels as a pack and the bootloader would never start it.
 
 ### Part B — upgrade pack
 

@@ -140,7 +140,8 @@ packs for a board that carries it. The release set is the only secret, `BOOTLOAD
 
 On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the application slot and the build stamps its image
 descriptor with EmIL's `emil_bootloader_image_descriptor` and `application.bootloader_image` (`bootloader.md` Part J). A debugger
-programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`.
+programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`. `hardware_test` is linked
+standalone at the start of flash on every board and replaces the bootloader when it is programmed.
 
 `qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
