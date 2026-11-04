@@ -3,6 +3,7 @@ ENTRY(Reset_Handler)
 REGION_ALIAS("REGION_TEXT", FLASH);
 REGION_ALIAS("REGION_RAM", RAM);
 
+PROVIDE(__Main_Stack_Size = 1024);
 _estack = ORIGIN(REGION_RAM) + LENGTH(REGION_RAM);
 
 SECTIONS
@@ -72,6 +73,8 @@ SECTIONS
     } > REGION_RAM
 
     end = _ebss;
+
+    ASSERT(end <= (_estack - __Main_Stack_Size), "static RAM reaches into the reserved main stack")
 
     /DISCARD/ :
     {
