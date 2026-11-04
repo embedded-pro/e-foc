@@ -33,6 +33,7 @@ namespace tool
         bool IsDownloading() const;
 
         void SetLatestRelease(const ReleaseInfo& release);
+        bool OfferPackFile(const std::vector<uint8_t>& bytes, const QString& source);
         void SetMotorState(std::optional<FocMotorState> state);
         void OnFirmwareIdentity(const FirmwareIdentity& identity);
         void ForgetNodeState();
