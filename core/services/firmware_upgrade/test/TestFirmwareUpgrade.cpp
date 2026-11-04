@@ -2,6 +2,7 @@
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
+#include "core/services/firmware_upgrade/test_doubles/TestPack.hpp"
 #include "hal/interfaces/test_doubles/FlashStub.hpp"
 #include "hal/synchronous_interfaces/test_doubles/SynchronousFlashStub.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
@@ -9,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <algorithm>
-#include <cstring>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,9 +25,10 @@ namespace
     constexpr uint32_t sectorSize{ 1024 };
     constexpr uint32_t numberOfSectors{ 4 };
     constexpr uint32_t applicationCapacity{ 2048 };
-    constexpr const char* productName{ "e-foc test board" };
-    constexpr uint32_t signatureLength{ 64 };
-    constexpr uint32_t aesCounterSize{ 16 };
+    constexpr const char* productName{ services::test::testPackProductName };
+
+    using PackDescription = services::test::TestPackDescription;
+    using services::test::MakeTestPack;
 
     class DriveFake
         : public services::FirmwareUpgradeDrive
@@ -68,59 +69,6 @@ namespace
 
         std::optional<uint32_t> failingSector;
     };
-
-    template<class T>
-    void Append(std::vector<uint8_t>& bytes, const T& value)
-    {
-        const auto* begin = reinterpret_cast<const uint8_t*>(&value);
-        bytes.insert(bytes.end(), begin, begin + sizeof(T));
-    }
-
-    template<std::size_t N>
-    std::array<char, N> Text(const std::string& text)
-    {
-        std::array<char, N> result{};
-        std::copy_n(text.begin(), std::min(text.size(), N), result.begin());
-        return result;
-    }
-
-    struct PackDescription
-    {
-        std::string productName{ ::productName };
-        std::string productVersion{ "2.3.4" };
-        std::string target{ "app" };
-        uint16_t headerVersion{ 1 };
-        uint32_t numberOfImages{ 1 };
-        uint32_t imageSize{ 300 };
-        std::array<uint8_t, 3> magic{ 'U', 'P', 'H' };
-        uint32_t trailing{ 0 };
-    };
-
-    std::vector<uint8_t> MakePack(const PackDescription& description = {})
-    {
-        application::UpgradePackHeaderPrologue prologue{ UpgradePackStatus::readyToDeploy, description.magic, 0, 0, 2, signatureLength };
-        application::UpgradePackHeaderEpilogue epilogue{};
-        epilogue.headerVersion = description.headerVersion;
-        epilogue.headerLength = sizeof(prologue) + signatureLength + sizeof(epilogue);
-        epilogue.numberOfImages = description.numberOfImages;
-        epilogue.productName = Text<64>(description.productName);
-        epilogue.productVersion = Text<64>(description.productVersion);
-        epilogue.componentName = Text<64>("sync_foc_sensored");
-
-        application::ImageHeaderPrologue image{};
-        image.lengthOfHeaderAndImage = sizeof(image) + aesCounterSize + sizeof(application::ImageHeaderEpilogue) + description.imageSize;
-        image.targetName = Text<8>(description.target);
-        image.encryptionAndMacMethod = 1;
-
-        std::vector<uint8_t> pack;
-        Append(pack, prologue);
-        pack.insert(pack.end(), signatureLength, 0x5a);
-        Append(pack, epilogue);
-        Append(pack, image);
-        for (uint32_t i = 0; i != image.lengthOfHeaderAndImage - sizeof(image) + description.trailing; ++i)
-            pack.push_back(static_cast<uint8_t>(i * 7 + 3));
-        return pack;
-    }
 
     uint32_t CrcOf(const std::vector<uint8_t>& bytes)
     {
@@ -419,7 +367,7 @@ TEST_F(FirmwareUpgradeTest, a_sector_that_does_not_erase_answers_begin_write_err
 TEST_F(FirmwareUpgradeTest, blocks_are_programmed_into_the_staging_slot_page_by_page)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
 
     EXPECT_EQ(FwuError::ok, Begin(static_cast<uint32_t>(pack.size()))->first);
     SendAllBlocks(pack);
@@ -432,7 +380,7 @@ TEST_F(FirmwareUpgradeTest, blocks_are_programmed_into_the_staging_slot_page_by_
 TEST_F(FirmwareUpgradeTest, a_block_that_fills_a_page_is_acknowledged_once_the_page_is_programmed)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
 
     for (uint16_t index = 0; index != 5; ++index)
@@ -458,7 +406,7 @@ TEST_F(FirmwareUpgradeTest, a_block_that_fills_a_page_is_acknowledged_once_the_p
 TEST_F(FirmwareUpgradeTest, a_repeat_of_the_last_acknowledged_block_is_acknowledged_again_without_being_written)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     EXPECT_EQ(FwuError::ok, Block(0, pack));
 
@@ -470,7 +418,7 @@ TEST_F(FirmwareUpgradeTest, a_repeat_of_the_last_acknowledged_block_is_acknowled
 TEST_F(FirmwareUpgradeTest, a_block_out_of_order_is_answered_sequence_error_and_written_nowhere)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     EXPECT_EQ(FwuError::ok, Block(0, pack));
 
@@ -496,7 +444,7 @@ TEST_F(FirmwareUpgradeTest, a_block_past_the_size_given_in_begin_is_answered_inv
 TEST_F(FirmwareUpgradeTest, a_block_outside_a_download_is_answered_invalid_state)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
 
     EXPECT_EQ(FwuError::invalidState, Block(0, pack));
 }
@@ -504,7 +452,7 @@ TEST_F(FirmwareUpgradeTest, a_block_outside_a_download_is_answered_invalid_state
 TEST_F(FirmwareUpgradeTest, a_page_that_does_not_read_back_as_written_is_answered_write_error)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     packFlash.stopAfterWriteSteps = 0;
 
@@ -520,7 +468,7 @@ TEST_F(FirmwareUpgradeTest, a_page_that_does_not_read_back_as_written_is_answere
 TEST_F(FirmwareUpgradeTest, verify_stages_a_checked_pack_records_downloaded_and_releases_the_drive)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
 
     EXPECT_EQ(FwuError::ok, Download(pack));
     EXPECT_EQ(pack, PackFlashContents(static_cast<uint32_t>(pack.size())));
@@ -534,7 +482,7 @@ TEST_F(FirmwareUpgradeTest, verify_stages_a_checked_pack_records_downloaded_and_
 TEST_F(FirmwareUpgradeTest, verify_with_another_crc_answers_crc_mismatch_and_stages_nothing)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     SendAllBlocks(pack);
 
@@ -549,7 +497,7 @@ TEST_F(FirmwareUpgradeTest, verify_with_another_crc_answers_crc_mismatch_and_sta
 TEST_F(FirmwareUpgradeTest, verify_before_every_byte_arrived_is_answered_invalid_size_and_the_download_continues)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     EXPECT_EQ(FwuError::ok, Block(0, pack));
 
@@ -571,7 +519,7 @@ TEST_F(FirmwareUpgradeTest, a_pack_whose_header_fails_the_check_answers_verify_n
     PackDescription description;
     description.productName = "e-foc EK-TM4C1294XL TM4C1294NCPDT";
 
-    EXPECT_EQ(FwuError::notReady, Download(MakePack(description)));
+    EXPECT_EQ(FwuError::notReady, Download(MakeTestPack(description)));
     EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
     EXPECT_EQ(services::FirmwareVersion{}, service->StagedVersion());
     EXPECT_EQ(0, drive.held);
@@ -580,7 +528,7 @@ TEST_F(FirmwareUpgradeTest, a_pack_whose_header_fails_the_check_answers_verify_n
 TEST_F(FirmwareUpgradeTest, a_staged_pack_stays_staged_across_a_restart)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     service.reset();
     Construct();
@@ -593,7 +541,7 @@ TEST_F(FirmwareUpgradeTest, a_staged_pack_stays_staged_across_a_restart)
 TEST_F(FirmwareUpgradeTest, begin_while_the_staged_header_is_still_read_at_start_up_is_answered_busy)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
     service.reset();
     Emplace();
 
@@ -613,7 +561,7 @@ TEST_F(FirmwareUpgradeTest, begin_while_the_staged_header_is_still_read_at_start
 TEST_F(FirmwareUpgradeTest, query_progress_after_a_restart_reports_the_staged_pack_complete)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     EXPECT_EQ(FwuError::ok, Download(pack));
     service.reset();
     Construct();
@@ -640,7 +588,7 @@ TEST_F(FirmwareUpgradeTest, activate_without_a_staged_pack_is_answered_not_ready
 TEST_F(FirmwareUpgradeTest, activate_while_the_drive_runs_is_answered_busy_and_keeps_the_pack_staged)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
     drive.stoppedAndIdle = false;
 
     EXPECT_EQ(FwuError::busy, Activate());
@@ -651,7 +599,7 @@ TEST_F(FirmwareUpgradeTest, activate_while_the_drive_runs_is_answered_busy_and_k
 TEST_F(FirmwareUpgradeTest, activate_records_ready_to_deploy_answers_and_resets_after_the_restart_delay)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     EXPECT_EQ(FwuError::ok, Activate());
     EXPECT_EQ(UpgradePackStatus::readyToDeploy, JournalStatus());
@@ -666,7 +614,7 @@ TEST_F(FirmwareUpgradeTest, activate_records_ready_to_deploy_answers_and_resets_
 TEST_F(FirmwareUpgradeTest, begin_while_restarting_is_answered_busy)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
     EXPECT_EQ(FwuError::ok, Activate());
 
     EXPECT_EQ(FwuError::busy, Begin(400)->first);
@@ -677,7 +625,7 @@ TEST_F(FirmwareUpgradeTest, begin_while_restarting_is_answered_busy)
 TEST_F(FirmwareUpgradeTest, abort_during_a_download_returns_to_idle_with_the_journal_empty)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     EXPECT_EQ(FwuError::ok, Block(0, pack));
 
@@ -707,7 +655,7 @@ TEST_F(FirmwareUpgradeTest, abort_during_the_erase_stops_after_the_sector_and_an
 TEST_F(FirmwareUpgradeTest, abort_while_a_page_is_programmed_finishes_the_page_then_answers_the_block_invalid_state_first)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     for (uint16_t index = 0; index != 5; ++index)
         EXPECT_EQ(FwuError::ok, Block(index, pack));
@@ -737,7 +685,7 @@ TEST_F(FirmwareUpgradeTest, abort_while_a_page_is_programmed_finishes_the_page_t
 TEST_F(FirmwareUpgradeTest, abort_while_restarting_changes_nothing_and_the_reset_follows)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
     EXPECT_EQ(FwuError::ok, Activate());
 
     EXPECT_TRUE(Abort());
@@ -753,7 +701,7 @@ TEST_F(FirmwareUpgradeTest, abort_while_restarting_changes_nothing_and_the_reset
 TEST_F(FirmwareUpgradeTest, abort_during_verify_answers_verify_invalid_state_first)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     SendAllBlocks(pack);
 
@@ -770,7 +718,7 @@ TEST_F(FirmwareUpgradeTest, abort_during_verify_answers_verify_invalid_state_fir
 TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_discards_it_at_once_and_erases_the_journal_once_the_drive_is_stopped)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
     drive.stoppedAndIdle = false;
 
     EXPECT_TRUE(Abort());
@@ -789,7 +737,7 @@ TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_discards_it_at_once_and_erase
 TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_while_the_drive_is_stopped_erases_the_journal_at_once)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     EXPECT_TRUE(Abort());
     EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());
@@ -798,7 +746,7 @@ TEST_F(FirmwareUpgradeTest, abort_of_a_staged_pack_while_the_drive_is_stopped_er
 TEST_F(FirmwareUpgradeTest, abort_after_a_failed_verify_returns_to_idle)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     SendAllBlocks(pack);
     Verify(0);
@@ -810,7 +758,7 @@ TEST_F(FirmwareUpgradeTest, abort_after_a_failed_verify_returns_to_idle)
 TEST_F(FirmwareUpgradeTest, the_download_ends_30_s_after_the_last_accepted_command)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
 
     ForwardTime(services::FirmwareUpgrade::inactivityDeadline - std::chrono::seconds(1));
@@ -828,7 +776,7 @@ TEST_F(FirmwareUpgradeTest, the_download_ends_30_s_after_the_last_accepted_comma
 TEST_F(FirmwareUpgradeTest, no_deadline_runs_for_a_staged_pack)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     ForwardTime(std::chrono::minutes(5));
     EXPECT_EQ((services::FirmwareVersion{ 2, 3, 4 }), service->StagedVersion());
@@ -837,7 +785,7 @@ TEST_F(FirmwareUpgradeTest, no_deadline_runs_for_a_staged_pack)
 TEST_F(FirmwareUpgradeTest, the_session_timeout_of_the_category_ends_a_download)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
 
     service->OnSessionTimeout();
@@ -848,7 +796,7 @@ TEST_F(FirmwareUpgradeTest, the_session_timeout_of_the_category_ends_a_download)
 TEST_F(FirmwareUpgradeTest, the_emergency_stop_ends_a_download_without_an_abort_answer)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     Begin(static_cast<uint32_t>(pack.size()));
     EXPECT_EQ(FwuError::ok, Block(0, pack));
 
@@ -878,7 +826,7 @@ TEST_F(FirmwareUpgradeTest, the_emergency_stop_during_the_erase_answers_begin_in
 TEST_F(FirmwareUpgradeTest, the_emergency_stop_keeps_a_staged_pack_and_an_accepted_activate)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     service->EmergencyStop();
     EXPECT_EQ((services::FirmwareVersion{ 2, 3, 4 }), service->StagedVersion());
@@ -892,7 +840,7 @@ TEST_F(FirmwareUpgradeTest, the_emergency_stop_keeps_a_staged_pack_and_an_accept
 TEST_F(FirmwareUpgradeTest, query_progress_reports_the_blocks_received_and_the_blocks_of_the_pack)
 {
     Construct();
-    const auto pack = MakePack();
+    const auto pack = MakeTestPack();
     EXPECT_EQ(FwuState::idle, std::get<0>(Progress()));
 
     Begin(static_cast<uint32_t>(pack.size()));
@@ -905,7 +853,7 @@ TEST_F(FirmwareUpgradeTest, query_progress_reports_the_blocks_received_and_the_b
 TEST_F(FirmwareUpgradeTest, a_new_begin_discards_a_staged_pack)
 {
     Construct();
-    EXPECT_EQ(FwuError::ok, Download(MakePack()));
+    EXPECT_EQ(FwuError::ok, Download(MakeTestPack()));
 
     EXPECT_EQ(FwuError::ok, Begin(400)->first);
     EXPECT_EQ(UpgradePackStatus::empty, JournalStatus());

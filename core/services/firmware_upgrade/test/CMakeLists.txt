@@ -6,6 +6,7 @@ target_link_libraries(e_foc.services.firmware_upgrade_test PUBLIC
     gmock_main
     can_lite.test_util
     e_foc.services.firmware_upgrade
+    e_foc.services.firmware_upgrade.test_pack
     hal.interfaces_test_doubles
     hal.synchronous_interfaces_test_doubles
     infra.timer_test_helper

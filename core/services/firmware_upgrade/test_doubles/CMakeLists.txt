@@ -9,3 +9,19 @@ target_link_libraries(e_foc.services.firmware_upgrade_mock INTERFACE
 target_sources(e_foc.services.firmware_upgrade_mock INTERFACE
     FirmwareUpgradeControlMock.hpp
 )
+
+add_library(e_foc.services.firmware_upgrade.test_pack STATIC)
+emil_build_for(e_foc.services.firmware_upgrade.test_pack HOST All BOOL E_FOC_BUILD_TESTS)
+
+target_include_directories(e_foc.services.firmware_upgrade.test_pack PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../../../>"
+)
+
+target_link_libraries(e_foc.services.firmware_upgrade.test_pack PUBLIC
+    e_foc.services.firmware_upgrade.pack_header
+)
+
+target_sources(e_foc.services.firmware_upgrade.test_pack PRIVATE
+    TestPack.hpp
+    TestPack.cpp
+)

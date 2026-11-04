@@ -1,4 +1,5 @@
 #include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
+#include "core/services/firmware_upgrade/test_doubles/TestPack.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <functional>
@@ -6,32 +7,11 @@
 
 namespace
 {
-    using application::UpgradePackStatus;
+    using PackDescription = services::test::TestPackDescription;
+    using services::test::Text;
 
     constexpr uint32_t applicationCapacity{ 2048 };
-    constexpr const char* productName{ "e-foc test board" };
-    constexpr uint32_t signatureLength{ 64 };
-    constexpr uint32_t aesCounterSize{ 16 };
-
-    template<std::size_t N>
-    std::array<char, N> Text(const std::string& text)
-    {
-        std::array<char, N> result{};
-        std::copy_n(text.begin(), std::min(text.size(), N), result.begin());
-        return result;
-    }
-
-    struct PackDescription
-    {
-        std::string productName{ ::productName };
-        std::string productVersion{ "2.3.4" };
-        std::string target{ "app" };
-        uint16_t headerVersion{ 1 };
-        uint32_t numberOfImages{ 1 };
-        uint32_t imageSize{ 300 };
-        std::array<uint8_t, 3> magic{ 'U', 'P', 'H' };
-        uint32_t trailing{ 0 };
-    };
+    constexpr const char* productName{ services::test::testPackProductName };
 
     struct Pack
     {
@@ -41,20 +21,7 @@ namespace
 
     Pack MakePack(const PackDescription& description = {})
     {
-        Pack pack{};
-        pack.header.prologue = application::UpgradePackHeaderPrologue{ UpgradePackStatus::readyToDeploy, description.magic, 0, 0, 2, signatureLength };
-        pack.header.epilogue.headerVersion = description.headerVersion;
-        pack.header.epilogue.headerLength = sizeof(pack.header.prologue) + signatureLength + sizeof(pack.header.epilogue);
-        pack.header.epilogue.numberOfImages = description.numberOfImages;
-        pack.header.epilogue.productName = Text<64>(description.productName);
-        pack.header.epilogue.productVersion = Text<64>(description.productVersion);
-        pack.header.image.lengthOfHeaderAndImage = sizeof(pack.header.image) + aesCounterSize + sizeof(application::ImageHeaderEpilogue) + description.imageSize;
-        pack.header.image.targetName = Text<8>(description.target);
-        pack.header.image.encryptionAndMacMethod = 1;
-
-        const auto packSize = pack.header.epilogue.headerLength + pack.header.image.lengthOfHeaderAndImage + description.trailing;
-        pack.limits = services::PackLimits{ productName, applicationCapacity, packSize };
-        return pack;
+        return Pack{ services::test::MakeTestPackHeader(description), services::PackLimits{ productName, applicationCapacity, services::test::TestPackSize(description) } };
     }
 
     std::optional<services::FirmwareVersion> Check(const PackDescription& description = {})
@@ -86,7 +53,7 @@ TEST(PackHeaderCheckTest, the_epilogue_follows_the_prologue_and_its_signature)
 {
     const auto pack = MakePack();
 
-    EXPECT_EQ(sizeof(application::UpgradePackHeaderPrologue) + signatureLength, services::EpilogueOffset(pack.header.prologue));
+    EXPECT_EQ(sizeof(application::UpgradePackHeaderPrologue) + services::test::testPackSignatureLength, services::EpilogueOffset(pack.header.prologue));
 }
 
 TEST(PackHeaderCheckTest, a_version_is_three_numbers_from_0_to_255)
