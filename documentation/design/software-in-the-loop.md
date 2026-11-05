@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.1
+version: 1.13.2
 component: "software-in-the-loop"
-date: 2026-11-03
+date: 2026-11-05
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.1                      |
+| Version   | 1.13.2                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-03                  |
+| Date      | 2026-11-05                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1169,8 +1169,8 @@ the bootloader's own scenarios stage packs and read what it recorded.
 | Region           | Where                                     | Holds                                                                   |
 |------------------|-------------------------------------------|-------------------------------------------------------------------------|
 | Bootloader       | `0x00000000`, 32 KB                       | the bootloader, its key slot in the last 80 bytes                       |
-| Application slot | `0x00008000`, 256 KB                      | the application, its header at 1 KB and its descriptor in the last 64 B |
-| Staging          | file `staging.bin` in the scenario folder | the pack, 256 KB at most                                                |
+| Application slot | `0x00008000`, 320 KB                      | the application, its header at 1 KB and its descriptor in the last 64 B |
+| Staging          | file `staging.bin` in the scenario folder | the pack, 320 KB at most                                                |
 | Journal          | file `journal.bin` in the scenario folder | the status journal, 16 KB                                               |
 
 **What the emulator loads.** At every start the emulator loads the bootloader, whose key slot holds the
@@ -1249,7 +1249,7 @@ over CAN, stages it and, on Activate, restarts into the bootloader, which instal
 **Staging on the emulated board.** The application stages into the same two files the bootloader reads,
 `staging.bin` and `journal.bin` (Part P), and writes each change through to its file, so what the application
 staged is what the bootloader finds after the reset, and what a scenario reads back after the run. The page
-is 256 bytes and the staging slot 256 KB, as Part I of the service's design gives for the emulated board.
+is 256 bytes and the staging slot 320 KB, as Part I of the service's design gives for the emulated board.
 
 **The reset.** The application's software reset requests a system reset. The emulator restarts the machine in
 the same process: it loads the bootloader and the slot as at start (Part P), the bootloader finds *ready to

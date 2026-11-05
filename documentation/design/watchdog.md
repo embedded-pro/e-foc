@@ -2,9 +2,9 @@
 title: "Watchdog Design"
 type: design
 status: draft
-version: 0.4.1
+version: 0.4.2
 component: "watchdog"
-date: 2026-11-02
+date: 2026-11-05
 ---
 
 | Field     | Value           |
@@ -12,9 +12,9 @@ date: 2026-11-02
 | Title     | Watchdog Design |
 | Type      | design          |
 | Status    | draft           |
-| Version   | 0.4.1           |
+| Version   | 0.4.2           |
 | Component | watchdog        |
-| Date      | 2026-11-02      |
+| Date      | 2026-11-05      |
 
 ---
 
@@ -105,7 +105,7 @@ must not be able to preempt any interrupt that could hang:
 
 | Platform         | Hardware                            | Early-warning period               | Expiration timeout           |
 |------------------|-------------------------------------|------------------------------------|------------------------------|
-| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                       |
+| TI (TM4C129)     | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                       |
 | ST NUCLEO-G474RE | Window watchdog, prescaler 8        | Fixed by PCLK1 (≈12 ms at 170 MHz) | 100 ms (nine early warnings) |
 | ST NUCLEO-H563ZI | Window watchdog, prescaler 1        | Fixed by PCLK1                     | 100 ms                       |
 | Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                              | 100 ms                       |

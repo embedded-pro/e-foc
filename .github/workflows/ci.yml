@@ -82,7 +82,7 @@ jobs:
       matrix:
         configuration: ["RelWithDebInfo"]
         target:
-          ["EK-TM4C1294XL", "EK-TM4C123GXL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
+          ["EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
         # Each budget is the same slice of time on every MCU, in cycles of its clock: 37.5 us inner loop (75% of
         # the 20 kHz period), 166.7 us outer loop, 50 us identification path (the whole period: it runs only
         # while calibrating, where nothing but the 1 kHz outer loop competes for it).
@@ -101,15 +101,6 @@ jobs:
             inner-max-cycles: 6375
             outer-max-cycles: 28333
             identification-max-cycles: 8500
-          # Report only: at 80 MHz the inner loop does not fit its 37.5 us slice, so the budgets are shown, not enforced.
-          - target: EK-TM4C123GXL
-            budget-analysis: true
-            report-only: true
-            clock-mhz: 80
-            linker-script: infra/hal/ti/tiva/ldscripts/mem_tm4c123gh6pm.ld
-            inner-max-cycles: 3000
-            outer-max-cycles: 13333
-            identification-max-cycles: 4000
     env:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}

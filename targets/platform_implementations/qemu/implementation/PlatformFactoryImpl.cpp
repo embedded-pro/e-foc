@@ -31,7 +31,7 @@ namespace
     constexpr uintptr_t aircrAddress{ 0xE000ED0Cu };
     constexpr uint32_t systemResetRequest{ 0x05FA0004u };
 
-    std::array<uint8_t, 256 * 1024> stagingStorage;
+    std::array<uint8_t, 320 * 1024> stagingStorage;
     std::array<uint8_t, 16 * 1024> journalStorage;
 
     // No reset-cause register and reset reloads RAM, so the watchdog leaves its record in a host file.

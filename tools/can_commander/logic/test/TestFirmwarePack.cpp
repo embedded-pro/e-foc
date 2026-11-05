@@ -39,9 +39,9 @@ TEST(FirmwarePack, every_board_kind_names_its_board_and_microcontroller)
     EXPECT_EQ("TM4C1294NCPDT", Board(1).microcontroller);
     EXPECT_EQ("NUCLEO-G474RE", Board(2).name);
     EXPECT_EQ("NUCLEO-H563ZI", Board(3).name);
-    EXPECT_EQ("EK-TM4C123GXL", Board(4).name);
     EXPECT_EQ("emulated", Board(5).name);
     EXPECT_FALSE(BoardOfKind(0).has_value());
+    EXPECT_FALSE(BoardOfKind(4).has_value());
     EXPECT_FALSE(BoardOfKind(6).has_value());
 }
 
@@ -50,7 +50,6 @@ TEST(FirmwarePack, every_board_carries_the_identification_its_firmware_is_built_
     EXPECT_EQ(std::string_view{ e_foc::boards::ekTm4c1294xl.identification }, Board(1).productName);
     EXPECT_EQ(std::string_view{ e_foc::boards::nucleoG474re.identification }, Board(2).productName);
     EXPECT_EQ(std::string_view{ e_foc::boards::nucleoH563zi.identification }, Board(3).productName);
-    EXPECT_EQ(std::string_view{ e_foc::boards::ekTm4c123gxl.identification }, Board(4).productName);
     EXPECT_EQ(std::string_view{ e_foc::boards::emulated.identification }, Board(5).productName);
 }
 

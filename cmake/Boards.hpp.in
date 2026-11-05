@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -17,9 +18,14 @@ namespace e_foc::boards
     inline constexpr Board ekTm4c1294xl{ @E_FOC_EK_TM4C1294XL_BOARD_KIND@, "@E_FOC_EK_TM4C1294XL_NAME@", "@E_FOC_EK_TM4C1294XL_MICROCONTROLLER@", "@E_FOC_EK_TM4C1294XL_IDENTIFICATION@", @E_FOC_EK_TM4C1294XL_BOOTLOADER@ };
     inline constexpr Board nucleoG474re{ @E_FOC_NUCLEO_G474RE_BOARD_KIND@, "@E_FOC_NUCLEO_G474RE_NAME@", "@E_FOC_NUCLEO_G474RE_MICROCONTROLLER@", "@E_FOC_NUCLEO_G474RE_IDENTIFICATION@", @E_FOC_NUCLEO_G474RE_BOOTLOADER@ };
     inline constexpr Board nucleoH563zi{ @E_FOC_NUCLEO_H563ZI_BOARD_KIND@, "@E_FOC_NUCLEO_H563ZI_NAME@", "@E_FOC_NUCLEO_H563ZI_MICROCONTROLLER@", "@E_FOC_NUCLEO_H563ZI_IDENTIFICATION@", @E_FOC_NUCLEO_H563ZI_BOOTLOADER@ };
-    inline constexpr Board ekTm4c123gxl{ @E_FOC_EK_TM4C123GXL_BOARD_KIND@, "@E_FOC_EK_TM4C123GXL_NAME@", "@E_FOC_EK_TM4C123GXL_MICROCONTROLLER@", "@E_FOC_EK_TM4C123GXL_IDENTIFICATION@", @E_FOC_EK_TM4C123GXL_BOOTLOADER@ };
     inline constexpr Board emulated{ @E_FOC_EMULATED_BOARD_KIND@, "@E_FOC_EMULATED_NAME@", "@E_FOC_EMULATED_MICROCONTROLLER@", "@E_FOC_EMULATED_IDENTIFICATION@", @E_FOC_EMULATED_BOOTLOADER@ };
 
-    inline constexpr std::array<Board, 5> all{ ekTm4c1294xl, nucleoG474re, nucleoH563zi, ekTm4c123gxl, emulated };
+    // Kind 4 was the EK-TM4C123GXL; it is retired and never reused.
+    inline constexpr std::array<Board, 4> all{ ekTm4c1294xl, nucleoG474re, nucleoH563zi, emulated };
+
+    constexpr uint8_t LargestKind()
+    {
+        return std::ranges::max(all, {}, &Board::kind).kind;
+    }
 }
 @E_FOC_TARGET_BOARD_DEFINITION@
