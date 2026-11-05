@@ -23,6 +23,7 @@ namespace application
         const foc::FocTorque& GetController() const;
         foc::SpeedLimitable& SpeedLimiter();
         foc::CurrentLimitable& CurrentLimiter();
+        foc::BusVoltageTrackable& BusVoltageTracker();
 
         foc::MotionObservation ObserveMotion() const override;
 

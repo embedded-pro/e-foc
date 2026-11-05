@@ -50,6 +50,11 @@ namespace application
         return focController;
     }
 
+    foc::BusVoltageTrackable& TorqueStateMachine::BusVoltageTracker()
+    {
+        return focController;
+    }
+
     foc::MotionObservation TorqueStateMachine::ObserveMotion() const
     {
         return focController.ObserveMotion();

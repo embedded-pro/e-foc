@@ -289,6 +289,17 @@ GIVEN(R"(the motor cable is pulled {int} ms after enable)", (int delayMs))
     setup.plant.cableDisconnectDelayMs = static_cast<uint32_t>(delayMs);
 }
 
+GIVEN(R"(the supply steps to {float} of its voltage {int} ms after enable)", (float scale, int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Stepping the supply needs a simulated target";
+    ASSERT_FALSE(setup.booted) << "The supply step must be scheduled before the target boots";
+    ASSERT_GT(scale, 0.0f) << "A zero scale is how a scenario says the supply never steps";
+
+    setup.plant.supplyStepScale = scale;
+    setup.plant.supplyStepDelayMs = static_cast<uint32_t>(delayMs);
+}
+
 GIVEN(R"(a hand turns the shaft by {float} rad over {int} ms, {int} ms after enable, and holds it)", (float radians, int turnMs, int delayMs))
 {
     auto& setup = context.Get<ScenarioSetup>();

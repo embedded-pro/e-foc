@@ -74,6 +74,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                              |
 | [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                              |
 | [Service: Rotor Standstill](../design/service-standstill.md)                           | Waits for the rotor to come to rest before the offsets are measured                    |
+| [Service: Bus Voltage](../design/service-bus-voltage.md)                               | Measures the bus every 10 ms so that the duties follow it                              |
 | [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample            |
 | [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures          |
 | [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for    |

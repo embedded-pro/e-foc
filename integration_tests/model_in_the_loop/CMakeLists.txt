@@ -19,6 +19,7 @@ target_link_libraries(e_foc.model_in_the_loop PUBLIC
     e_foc.services.electrical_system_ident
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
+    e_foc.services.bus_voltage
     e_foc.integration_tests.plant
     e_foc.integration_tests.response
     numerical.controllers.implementations

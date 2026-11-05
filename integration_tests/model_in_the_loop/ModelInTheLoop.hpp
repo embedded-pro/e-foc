@@ -2,6 +2,7 @@
 
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/bus_voltage/BusVoltageMonitor.hpp"
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -176,6 +177,14 @@ namespace mil
         services::ConfigData configData;
         foc::CurrentStream currentStream;
         std::optional<state_machine::ControlModeStateMachine> controlMode;
+        services::BusVoltageMonitor busVoltage{ [this]()
+            {
+                return drive.PowerSupplyVoltage();
+            },
+            [this](foc::Volts measured)
+            {
+                controlMode->TrackBusVoltage(measured);
+            } };
 
         std::vector<std::string> recordLines;
         integration::response::PlantTrace trace;

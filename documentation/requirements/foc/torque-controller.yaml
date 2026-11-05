@@ -168,13 +168,16 @@
 
 - id: REQ-TRQ-013
   title: The duties follow the measured bus voltage
-  status: draft
+  status: verified
   verification: [sil, unit]
   shall: >
-    In every control mode, the current law's gains, its feed-forwards and the reported q-axis
-    voltage shall stay those of the bus voltage the motor model was configured with. Once a bus
-    voltage is measured, the cascade shall divide every per-unit voltage the law commands by the
-    ratio r of the measured to the configured bus voltage before modulating it, and shall limit
-    the law's output to a magnitude of r instead of 1, with r held within 0.5 to 2. A new
-    measurement shall be in force from the next control period, also while Enabled, and with no
-    measurement r shall be 1.
+    In every control mode, the drive shall measure the bus voltage every 10 ms while it runs and
+    filter it with a 50 ms time constant. The current law's gains, its feed-forwards and the
+    reported q-axis voltage shall stay those of the bus voltage the motor model was configured
+    with; the cascade shall divide every per-unit voltage the law commands by the ratio r of the
+    filtered to the configured bus voltage before modulating it, and shall limit the law's output
+    to a magnitude of r instead of 1, with r held within 0.5 to 2. A new measurement shall be in
+    force from the next control period, also while Enabled, and with no measurement r shall be 1.
+    With the sliding-mode current law holding a held rotor at 1 A, a supply that steps to 0.6 of
+    its voltage shall leave the mean q-axis current from 0.1 s to 1 s after the step within 2 % of
+    1 A.

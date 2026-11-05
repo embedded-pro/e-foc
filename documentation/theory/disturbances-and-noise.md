@@ -2,7 +2,7 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "disturbances-and-noise"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.2.0                                  |
+| Version   | 0.2.1                                  |
 | Component | disturbances-and-noise                 |
 | Date      | 2026-11-05                             |
 
@@ -180,9 +180,12 @@ speed falls with it. Scaling the modulator by $V_{assumed}/V_{actual}$ restores 
 touching the gains or the feed-forwards, and the largest voltage the law may ask for becomes $V_{actual}/V_{assumed}$
 of the configured circle. *e-foc today:* $V_{dc}$ is read once at boot
 (`targets/sync_foc_sensored/main/instantiations/Logic.cpp`) and used for the normalisation and the
-identification. The cascades can follow a measured bus that way (`documentation/design/foc-torque.md`, Bus Voltage
-Tracking), but no platform measures the bus while running yet; the hardware comparators still trip on the live bus
-(18 V and 58 V on E-FOC-HARDWARE).
+identification. While the drive runs, the event loop reads the bus every 10 ms, filters it with a 50 ms time constant
+(`documentation/design/service-bus-voltage.md`) and the cascades follow it that way (`documentation/design/foc-torque.md`,
+Bus Voltage Tracking): with the sliding-mode law, which has no integrator to hide the gain error, a supply that sags to
+0.6 leaves a held rotor's current at 0.999 of a 1 A command where it fell to 0.896 without the tracking. The
+identification procedures still use the boot value, and the hardware comparators still trip on the live bus (18 V and
+58 V on E-FOC-HARDWARE).
 
 **PWM current ripple.** Within each period the phase current ripples around its average. The peak-to-peak
 ripple of phase a, over all angles, simulated for centre-aligned common-mode-injection SVM at 20 kHz:
