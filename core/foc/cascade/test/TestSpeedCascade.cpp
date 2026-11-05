@@ -699,3 +699,188 @@ TEST_F(TestSpeedCascade, the_observed_demand_is_the_current_the_speed_loop_comma
 
     EXPECT_NEAR(focSpeed->ObserveMotion().demandedTorqueCurrent.Value(), 1.5f, 1e-6f);
 }
+
+namespace
+{
+    class TestSpeedCascadeRamp
+        : public TestSpeedCascade
+    {
+    public:
+        void SetUp() override
+        {
+            TestSpeedCascade::SetUp();
+            EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+        }
+
+        void Ticks(uint32_t count)
+        {
+            const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+
+            for (uint32_t outer = 0; outer != count; ++outer)
+            {
+                for (uint32_t tick = 0; tick != prescaler; ++tick)
+                {
+                    foc::Radians held{ 0.0f };
+                    focSpeed->Calculate(ZeroCurrents(), held);
+                }
+
+                lowPriorityInterruptMock.TriggerHandler();
+            }
+        }
+
+        float Reference() const
+        {
+            return focSpeed->ObserveMotion().demandedSpeed.Value();
+        }
+
+        void Ramp(float acceleration, float deceleration)
+        {
+            focSpeed->RampSpeed(foc::RadiansPerSecondSquared{ acceleration }, foc::RadiansPerSecondSquared{ deceleration });
+        }
+    };
+}
+
+TEST_F(TestSpeedCascadeRamp, without_a_ramp_the_setpoint_is_the_reference_at_once)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascadeRamp, the_reference_grows_by_the_acceleration_each_outer_loop_period)
+{
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    EXPECT_NEAR(Reference(), 0.0f, 1e-6f);
+
+    Ticks(1);
+    EXPECT_NEAR(Reference(), 0.5f, 1e-5f);
+
+    Ticks(3);
+    EXPECT_NEAR(Reference(), 2.0f, 1e-5f);
+
+    Ticks(100);
+    EXPECT_NEAR(Reference(), 12.0f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, the_reference_shrinks_by_the_deceleration)
+{
+    Ramp(1000.0f, 2000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    Ticks(100);
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
+    Ticks(1);
+
+    EXPECT_NEAR(Reference(), 11.0f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, a_reversal_decelerates_to_zero_before_it_accelerates)
+{
+    Ramp(1000.0f, 2000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 1.5f });
+    Ticks(100);
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ -2.0f });
+    Ticks(1);
+    EXPECT_NEAR(Reference(), 0.5f, 1e-5f);
+
+    Ticks(1);
+    EXPECT_NEAR(Reference(), 0.0f, 1e-5f);
+
+    Ticks(1);
+    EXPECT_NEAR(Reference(), -0.5f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, a_reverse_setpoint_accelerates_at_the_acceleration)
+{
+    Ramp(1000.0f, 2000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ -12.0f });
+
+    Ticks(2);
+
+    EXPECT_NEAR(Reference(), -1.0f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, a_direction_without_a_rate_is_not_limited)
+{
+    Ramp(1000.0f, 0.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    Ticks(100);
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 2.0f });
+    Ticks(1);
+
+    EXPECT_NEAR(Reference(), 2.0f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, every_enable_starts_the_ramp_from_zero)
+{
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    Ticks(100);
+    focSpeed->Disable();
+
+    focSpeed->Enable();
+    EXPECT_NEAR(Reference(), 0.0f, 1e-6f);
+
+    Ticks(1);
+    EXPECT_NEAR(Reference(), 0.5f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, a_ramp_set_while_enabled_is_in_force_from_the_next_period)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    Ticks(1);
+
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
+    Ticks(1);
+
+    EXPECT_NEAR(Reference(), 11.5f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, turning_the_ramp_off_hands_the_setpoint_to_the_loop_at_once)
+{
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+    Ticks(1);
+
+    Ramp(0.0f, 0.0f);
+
+    EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascadeRamp, an_operator_enable_after_a_speed_command_is_ramped_again)
+{
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 12.0f });
+    focSpeed->DisableSpeedCommand();
+
+    focSpeed->Enable();
+    Ticks(1);
+
+    EXPECT_NEAR(Reference(), 0.5f, 1e-5f);
+}
+
+TEST_F(TestSpeedCascadeRamp, a_calibration_speed_command_is_not_ramped)
+{
+    Ramp(1000.0f, 1000.0f);
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 12.0f });
+
+    EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
+
+    Ticks(1);
+    EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
+}

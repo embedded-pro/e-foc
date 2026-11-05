@@ -105,7 +105,8 @@
     mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
     undervoltage→underVoltage, overtemperature→overTemperature, encoderLoss→sensorFault,
     stall→stall, phaseMissing→phaseMissing, hardwareFault→hardwareFault,
-    calibrationFailed→calibrationFailed, none→none.
+    calibrationFailed→calibrationFailed, overspeed→overSpeed,
+    followingError→followingError, none→none.
 
 - id: REQ-INT-014
   title: Telemetry reports the measured mechanical speed

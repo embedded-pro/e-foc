@@ -15,6 +15,7 @@ namespace foc
     class TorqueCascade
         : public FocTorque
         , public CurrentCommandable
+        , public SpeedLimitable
     {
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
@@ -35,8 +36,11 @@ namespace foc
         void CommandCurrent(Ampere quadrature) override;
         Volts QuadratureVoltage() const override;
 
+        void LimitSpeed(RadiansPerSecond limit) override;
+
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
+        void UpdateSpeedLimit();
         IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;
 
         [[no_unique_address]] Park park;
@@ -58,6 +62,9 @@ namespace foc
         bool previousAngleValid{ false };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastIq{ 0.0f };
+        RadiansPerSecond speedLimit{ 0.0f };
+        // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
+        volatile float inverseElectricalSpeedLimit{ 0.0f };
         CurrentStream* currentStream{ nullptr };
     };
 }

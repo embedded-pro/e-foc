@@ -4,6 +4,7 @@
 #include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -29,6 +30,7 @@ namespace state_machine
     {
         SanitizeTunings(this->configData);
         SanitizeSupervision(this->configData);
+        SanitizeLimits(this->configData);
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
     }
@@ -139,7 +141,8 @@ namespace state_machine
         auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm);
         if (sm == nullptr)
             return false;
-        sm->GetController().SetPoint(setpoint);
+        const auto limit = configData.limits.overspeedLimit;
+        sm->GetController().SetPoint(foc::RadiansPerSecond{ std::clamp(setpoint.Value(), -limit, limit) });
         return true;
     }
 
@@ -282,6 +285,8 @@ namespace state_machine
                 TransitionPolicy::Auto,
                 nvmActivity,
                 rotorReference));
+
+        ApplyLimits();
     }
 
     void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)
@@ -772,7 +777,16 @@ namespace state_machine
 
     void ControlModeStateMachine::PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone)
     {
+        ApplyLimits();
         configWriter.Persist(onDone);
+    }
+
+    void ControlModeStateMachine::ApplyLimits()
+    {
+        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
+            sm->SpeedLimiter().LimitSpeed(foc::RadiansPerSecond{ configData.limits.overspeedLimit });
+        else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            sm->RampSpeed(foc::RadiansPerSecondSquared{ configData.limits.speedAcceleration }, foc::RadiansPerSecondSquared{ configData.limits.speedDeceleration });
     }
 
     bool ControlModeStateMachine::HasPendingConfigWrite() const

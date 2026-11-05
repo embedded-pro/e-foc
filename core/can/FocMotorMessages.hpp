@@ -69,7 +69,9 @@ namespace can
         stall = 6,
         phaseMissing = 7,
         hardwareFault = 8,
-        calibrationFailed = 9
+        calibrationFailed = 9,
+        overSpeed = 10,
+        followingError = 11
     };
 
     enum class FocMotorCategoryError : uint8_t
@@ -137,6 +139,11 @@ namespace can
         fluxLinkage = 0x43,
         inertia = 0x44,
         viscousFriction = 0x45,
+        overspeedLimit = 0x50,
+        followingErrorWindow = 0x51,
+        followingErrorTime = 0x52,
+        speedAcceleration = 0x53,
+        speedDeceleration = 0x54,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,

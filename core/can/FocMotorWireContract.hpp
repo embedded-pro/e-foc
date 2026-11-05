@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 8;
+    static constexpr uint8_t focContractVersionMinor = 9;
 
     enum class FieldType : uint8_t
     {
@@ -245,7 +245,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 53> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 58> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -275,6 +275,11 @@ namespace can
         { FocParameter::supervisionPositionError, "supervisionPositionError", "rad", foc::CommandLimits::minSupervisionPositionError, foc::CommandLimits::maxSupervisionPositionError, false, false },
         { FocParameter::supervisionStillExcursion, "supervisionStillExcursion", "rad", foc::CommandLimits::minSupervisionStillExcursion, foc::CommandLimits::maxSupervisionStillExcursion, false, false },
         { FocParameter::stallDetection, "stallDetection", "-", 0.0f, 1.0f, true, false },
+        { FocParameter::overspeedLimit, "overspeedLimit", "rad/s", foc::CommandLimits::minOverspeedLimit, foc::CommandLimits::maxOverspeedLimit, false, false },
+        { FocParameter::followingErrorWindow, "followingErrorWindow", "rad", 0.0f, foc::CommandLimits::maxFollowingErrorWindow, false, false },
+        { FocParameter::followingErrorTime, "followingErrorTime", "s", foc::CommandLimits::minFollowingErrorTime, foc::CommandLimits::maxFollowingErrorTime, false, false },
+        { FocParameter::speedAcceleration, "speedAcceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
+        { FocParameter::speedDeceleration, "speedDeceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },

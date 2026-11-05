@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.9.2
+version: 0.10.0
 component: can-service
-date: 2026-11-03
+date: 2026-11-05
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.9.2                    |
+| Version   | 0.10.0                   |
 | Component | can-service              |
-| Date      | 2026-11-03               |
+| Date      | 2026-11-05               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -331,6 +331,28 @@ Adding enumerators leaves the meaning of the existing ones unchanged, which keep
 was in 2.4. A client older than 2.8 shows the new state and codes as unknown, and a script that waited for `idle`
 after a calibration waits for `ready` from a 2.8 server. `FaultCode::watchdogTimeout` was never raised and its
 value was never persisted or sent, so it was removed instead of given a wire code.
+
+**Contract 2.9 — limits and protection.** Version 2.9 adds stored settings and fault codes; nothing in 2.8
+changes. The settings are drive-wide limits kept in the configuration record (`service-nvm.md`). Like the
+supervision settings of 2.4 they can be written in any state, are answered once stored, and a write that cannot
+be stored is taken back; each takes effect as its table says.
+
+| ID     | Parameter              | Unit   | Range                  | Automatic | Takes effect                                               |
+|--------|------------------------|--------|------------------------|-----------|------------------------------------------------------------|
+| `0x50` | `overspeedLimit`       | rad/s  | 1 – 5000               | no        | immediately: speed limiter, setpoint hold and monitor      |
+| `0x51` | `followingErrorWindow` | rad    | 0 – 3.2, 0 off         | no        | at the monitor's next evaluation, within 1 ms              |
+| `0x52` | `followingErrorTime`   | s      | 0.001 – 10             | no        | at the monitor's next evaluation, within 1 ms              |
+| `0x53` | `speedAcceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
+| `0x54` | `speedDeceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
+
+| `FocFaultCode`   | Value | `state_machine::FaultCode` | Raised by                                          |
+|------------------|-------|----------------------------|----------------------------------------------------|
+| `overSpeed`      | 10    | `overspeed`                | Overspeed monitor (`fault-supervision.md` G)       |
+| `followingError` | 11    | `followingError`           | Following-error monitor (`fault-supervision.md` H) |
+
+Adding enumerators leaves the meaning of the existing ones unchanged, which keeps it a minor version, as `stall`
+was in 2.4. A client older than 2.9 shows the new codes as unknown faults, and asks for the new parameters only
+when the server reports 2.9 or newer, since an older one answers `invalidPayload` for each.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

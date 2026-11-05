@@ -2,9 +2,9 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.1.3
+version: 0.2.0
 component: foc-speed
-date: 2026-10-22
+date: 2026-11-05
 ---
 
 | Field     | Value             |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.1.3             |
+| Version   | 0.2.0             |
 | Component | foc-speed         |
-| Date      | 2026-10-22        |
+| Date      | 2026-11-05        |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -120,9 +120,53 @@ one-millisecond mean of the q-axis voltage only while the command is active. The
 cascades share this mode through their common speed-loop base. Enable, Disable and a speed command end
 it.
 
+### Speed Ramp
+
+Without a ramp a setpoint step reaches the speed loop as a step, so the only bound on the acceleration is the
+current clamp: every step accelerates at the current limit, the loop saturates, and a deceleration at the limit
+returns the most energy to the supply. The operator can bound both from the configuration record
+(REQ-SPD-010):
+
+| Setting            | Default      | Range              | Meaning                                                 |
+|--------------------|--------------|--------------------|---------------------------------------------------------|
+| Speed acceleration | 0 (no limit) | 0 – 100 000 rad/s² | Largest rate at which the reference's magnitude grows   |
+| Speed deceleration | 0 (no limit) | 0 – 100 000 rad/s² | Largest rate at which the reference's magnitude shrinks |
+
+With either rate set, the setpoint becomes a target and the outer loop owns the speed reference. Each tick,
+before the speed law runs, it moves the reference towards the target by at most the rate over one outer-loop
+period: the acceleration while the reference moves away from zero, the deceleration while it moves towards it.
+A reversal therefore decelerates to zero first and then accelerates, and a step that would carry the
+reference through zero stops at zero for that tick. A rate of zero leaves that direction unlimited, so a drive
+can, for instance, ramp up and stop at the current limit. With both at zero the setpoint is the reference, as
+before.
+
+The reference starts from zero at every Enable, the rotor being at rest when the drive enables, so the first
+setpoint after a start is ramped as well. While a calibration step commands the speed (the mechanical
+identification's speed commands) the ramp is bypassed and each command is the reference at once: identification
+needs the excitation it designed. Disable ends the bypass, so the operator's next Enable is ramped again. The
+outer loop writes the reference only while a ramp is in force; otherwise the setpoint writes it, and turning
+the ramp off hands the latest setpoint to the loop at once.
+
+The laws follow the ramp with a lag and receive no acceleration feed-forward, so a law with integral action
+carries the ramp's effort in its integrator and overshoots a little when the ramp ends: on the nominal plant at
+100 rad/s² to 20 rad/s, 2.7 % under the PI and 2.2 % under the two-DOF law, below 1 % under LQI and ADRC.
+
+The rates reach the outer loop as single-precision stores, written by the control-mode state machine whenever
+the mode is activated and whenever the configuration record is written, in any state.
+
+```mermaid
+flowchart LR
+    SP["Speed setpoint"] --> T["Target"]
+    T --> R{"Ramp: step ≤ rate / f_outer
+accel away from 0, decel towards 0"}
+    R --> REF["Speed reference"]
+    REF --> L["Speed law"]
+    REF --> R
+```
+
 ### Enable and Disable
 
-**Enable**: resets and arms all three PID controllers (speed, d-axis, q-axis). The last speed setpoint is preserved so the motor resumes commanding toward the previous target.
+**Enable**: resets and arms all three PID controllers (speed, d-axis, q-axis). The last speed setpoint is preserved so the motor resumes commanding toward the previous target; with a ramp set, the reference starts from zero and ramps towards it.
 
 **Disable**: disarms all three PIDs. `Calculate()` returns zero duty cycles. The outer loop continues to receive its LPI callbacks but produces no Iq output while disarmed.
 
@@ -139,21 +183,22 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface                    | Purpose                                                                                                       | Contract                                                                                                                                                                                                                                      |
-|------------------------------|---------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Configure                    | Supplies the motor model, including the pole-pair count used for the electrical angle.                        | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                                                                             |
-| Enable                       | Arms all three PIDs and resets their integrator state.                                                        | Safe to call repeatedly. Speed setpoint is preserved.                                                                                                                                                                                         |
-| Disable                      | Disarms all PIDs and forces zero duty cycle output.                                                           | Safe to call from any context.                                                                                                                                                                                                                |
-| SetCurrentTunings            | Sets the current loop closed-loop bandwidth.                                                                  | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`.                                                                                                                                     |
-| SetSpeedTunings              | Sets the speed loop closed-loop bandwidth.                                                                    | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent.                                                                                                                       |
-| SetPoint                     | Sets the speed setpoint in radians per second.                                                                | Written atomically; used on the next outer-loop cycle.                                                                                                                                                                                        |
-| Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                                                      | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                        |
-| OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                                            | Pure query; no side effects. Can be called before Enable.                                                                                                                                                                                     |
-| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                                                 | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
-| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                                                 | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |
-| SetCurrentStream             | Attaches the current stream whose window the inner loop fills (`service-can.md` Part J).                      | Called once, before the first `Calculate()`. The stream outlives the controller.                                                                                                                                                              |
-| ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.                                     | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-INT-014) and the encoder plausibility monitor (REQ-SM-028).                                                                                                 |
-| Current command              | Bypasses the speed loop and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts, and zero outside the command.                                                                                     |
+| Interface                    | Purpose                                                                                                               | Contract                                                                                                                                                                                                                                      |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure                    | Supplies the motor model, including the pole-pair count used for the electrical angle.                                | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                                                                             |
+| Enable                       | Arms all three PIDs and resets their integrator state.                                                                | Safe to call repeatedly. Speed setpoint is preserved.                                                                                                                                                                                         |
+| Disable                      | Disarms all PIDs and forces zero duty cycle output.                                                                   | Safe to call from any context.                                                                                                                                                                                                                |
+| SetCurrentTunings            | Sets the current loop closed-loop bandwidth.                                                                          | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`.                                                                                                                                     |
+| SetSpeedTunings              | Sets the speed loop closed-loop bandwidth.                                                                            | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent.                                                                                                                       |
+| SetPoint                     | Sets the speed setpoint in radians per second.                                                                        | Written atomically; used on the next outer-loop cycle, through the speed ramp when one is set.                                                                                                                                                |
+| Speed ramp                   | Sets the acceleration and deceleration, in rad/s², that bound the speed reference; zero leaves a direction unlimited. | Callable in any state, also while Enabled; in force from the next outer-loop cycle.                                                                                                                                                           |
+| Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                                                              | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                        |
+| OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                                                    | Pure query; no side effects. Can be called before Enable.                                                                                                                                                                                     |
+| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                                                         | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
+| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                                                         | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |
+| SetCurrentStream             | Attaches the current stream whose window the inner loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                                                                                                                              |
+| ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.                                             | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-INT-014) and the encoder plausibility monitor (REQ-SM-028).                                                                                                 |
+| Current command              | Bypasses the speed loop and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies.         | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts, and zero outside the command.                                                                                     |
 
 ### Required
 

@@ -54,6 +54,10 @@ namespace can
                 return FocFaultCode::hardwareFault;
             case state_machine::FaultCode::calibrationFailed:
                 return FocFaultCode::calibrationFailed;
+            case state_machine::FaultCode::overspeed:
+                return FocFaultCode::overSpeed;
+            case state_machine::FaultCode::followingError:
+                return FocFaultCode::followingError;
         }
 
         return FocFaultCode::none;

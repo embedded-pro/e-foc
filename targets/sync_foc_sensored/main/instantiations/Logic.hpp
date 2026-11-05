@@ -30,6 +30,8 @@
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/supervision/EncoderFreezeMonitor.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
+#include "core/supervision/FollowingErrorMonitor.hpp"
+#include "core/supervision/OverspeedMonitor.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
@@ -75,6 +77,8 @@ namespace application
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         supervision::EncoderFreezeMonitor encoderFreeze;
         supervision::PhaseLossMonitor phaseLoss;
+        supervision::OverspeedMonitor overspeed;
+        supervision::FollowingErrorMonitor followingError;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 

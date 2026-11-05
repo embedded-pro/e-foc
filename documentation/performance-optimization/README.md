@@ -2,9 +2,9 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.0.1
+version: 1.0.2
 component: "foc"
-date: 2026-04-07
+date: 2026-11-05
 ---
 
 | Field     | Value                             |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.0.1                             |
+| Version   | 1.0.2                             |
 | Component | foc                               |
-| Date      | 2026-04-07                        |
+| Date      | 2026-11-05                        |
 
 ## Overview
 
@@ -424,6 +424,11 @@ GPIO_ClearPin(DEBUG_PIN);
 **Measured inner-loop cost** (`EK-TM4C1294XL`, `-O3`, `fast-math`, LUT sin/cos): **1074–1353 cycles**,
 of which the FOC calculation itself is 739–860 — roughly 23 % of the 20 kHz period. A non-optimised
 build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
+
+The torque cascade's speed limiter (`foc-torque.md`) adds a sign test, an absolute value, a multiply-add, a
+clamp and a multiply on the q-axis setpoint each sample, about ten cycles, with no division: the limit reaches
+the interrupt as its reciprocal. It is defined beside `Calculate()` in the same translation unit and inlined
+into it, so the cycle gate measures it as part of `TorqueCascade::Calculate` without a new symbol.
 
 ### Key Performance Sensitivities
 

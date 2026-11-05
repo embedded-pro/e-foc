@@ -10,6 +10,7 @@ namespace foc
         , public SpeedCommandable
         , public CurrentCommandable
         , public CoggingCompensable
+        , public SpeedRampable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -46,11 +47,22 @@ namespace foc
         void ClearCoggingMap() override;
         using CascadeWithSpeedLoop::SetCurrentStream;
 
+        void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) override;
+
     private:
         void LowPriorityHandler();
+        bool IsRamped() const;
+        void ApplyReference(float value);
+        void RampReference();
 
     private:
         RadiansPerSecond lastSpeedSetPoint{ 0.0f };
         hal::Hertz outerLoopFrequency;
+        // Written by the event loop, read by the outer loop; mechanical rad/s per outer-loop period, zero when unlimited.
+        volatile float accelerationStep{ 0.0f };
+        volatile float decelerationStep{ 0.0f };
+        volatile float target{ 0.0f };
+        volatile float reference{ 0.0f };
+        volatile bool speedCommandActive{ false };
     };
 }

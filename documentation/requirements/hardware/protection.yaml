@@ -1,0 +1,30 @@
+- id: REQ-PRT-003
+  title: Overspeed supervision and a speed limiter in torque mode
+  status: verified
+  verification: [sil, mil]
+  shall: >
+    The drive shall hold one overspeed limit in the configuration record, settable from 1 to
+    5000 rad/s with a default of 1000 rad/s, in force from its next use in any state. In torque
+    mode the drive shall scale a torque current that pushes the rotor further in the direction it
+    turns linearly from its commanded value at 90 % of the limit to zero at the limit, and shall
+    leave a current that brakes the rotor unchanged. In speed mode a speed setpoint beyond the
+    limit shall be held at the limit. In every control mode, while Enabled, the drive shall enter
+    Fault with overspeed when the measured speed exceeds 110 % of the limit in five consecutive
+    1 ms evaluations of the event loop. With a 1 A torque command, no load and a 100 rad/s limit,
+    the speed shall settle between 90 and 100 rad/s and shall not pass 102 rad/s on the way; with
+    an outside torque that drives the rotor past 110 rad/s, the drive shall fault within 10 ms of
+    passing it.
+
+- id: REQ-PRT-004
+  title: Following-error window in position mode
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall hold a following-error window, settable from 0 to 3.2 rad with 0 turning the
+    check off and 0 as the default, and a following-error time, settable from 0.001 to 10 s with
+    a default of 0.1 s, in the configuration record, in force from their next use in any state.
+    While Enabled in position mode with a window above zero, the drive shall enter Fault with
+    followingError when the magnitude of the wrapped mechanical position error between the
+    setpoint and the measured position exceeds the window without a break for the time, measured
+    from the first 1 ms evaluation of the event loop that sees it. A load the drive cannot hold
+    shall fault it within the time plus 20 ms of its position error passing the window.

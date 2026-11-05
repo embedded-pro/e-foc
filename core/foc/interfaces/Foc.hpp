@@ -126,6 +126,24 @@ namespace foc
         virtual void ClearCoggingMap() = 0;
     };
 
+    class SpeedLimitable
+    {
+    protected:
+        ~SpeedLimitable() = default;
+
+    public:
+        virtual void LimitSpeed(RadiansPerSecond limit) = 0;
+    };
+
+    class SpeedRampable
+    {
+    protected:
+        ~SpeedRampable() = default;
+
+    public:
+        virtual void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) = 0;
+    };
+
     class SpeedCommandable
     {
     protected:

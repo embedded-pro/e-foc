@@ -139,6 +139,7 @@ namespace state_machine
         bool CanActivatePendingSelect() const;
         SettingResult SettingGate() const;
         void ApplyOperatorTunings();
+        void ApplyLimits();
         void StoreAndPersist(const OnSetting& onDone);
         void CompleteSetting(SettingResult result);
         static SettingResult ToSettingResult(foc::SelectResult result);

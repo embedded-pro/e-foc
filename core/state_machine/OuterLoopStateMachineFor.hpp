@@ -56,6 +56,12 @@ namespace application
             return focController;
         }
 
+        void RampSpeed(foc::RadiansPerSecondSquared acceleration, foc::RadiansPerSecondSquared deceleration)
+        {
+            if constexpr (std::is_base_of_v<foc::SpeedRampable, Cascade>)
+                focController.RampSpeed(acceleration, deceleration);
+        }
+
         foc::MotionObservation ObserveMotion() const override
         {
             return focController.ObserveMotion();

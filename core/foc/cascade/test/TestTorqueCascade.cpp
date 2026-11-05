@@ -493,3 +493,156 @@ TEST_F(TestTorqueCascade, the_observed_demand_is_the_q_axis_setpoint)
 
     EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 1.5f, 1e-6f);
 }
+
+namespace
+{
+    class TestTorqueCascadeSpeedLimit
+        : public TestTorqueCascade
+    {
+    public:
+        static constexpr float limit{ 10.0f };
+        static constexpr std::size_t samples{ 2000 };
+
+        void SetUp() override
+        {
+            TestTorqueCascade::SetUp();
+            focTorque->Disable();
+            EXPECT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+            focTorque->LimitSpeed(foc::RadiansPerSecond{ limit });
+            focTorque->Enable();
+        }
+
+        static foc::PhasePwmDutyCycles Spin(foc::TorqueCascade& cascade, float mechanicalSpeed)
+        {
+            const float step = mechanicalSpeed / 20000.0f;
+            float angle = 0.0f;
+            foc::PhasePwmDutyCycles result{ hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0) };
+
+            for (std::size_t sample = 0; sample != samples; ++sample)
+            {
+                foc::Radians position{ angle };
+                result = cascade.Calculate(ZeroCurrents(), position);
+                angle = foc::detail::PositionWithWrapAround(angle + step);
+            }
+
+            return result;
+        }
+
+        foc::PhasePwmDutyCycles Unlimited(float quadrature, float mechanicalSpeed) const
+        {
+            foc::TorqueCascade reference{ testMaxCurrent };
+            reference.Configure(MotorParameters(polePairs));
+            EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+            reference.Enable();
+            reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ quadrature } });
+            return Spin(reference, mechanicalSpeed);
+        }
+
+        static void ExpectSameDuty(const foc::PhasePwmDutyCycles& actual, const foc::PhasePwmDutyCycles& expected)
+        {
+            EXPECT_NEAR(DutyPercent(actual.a), DutyPercent(expected.a), 1e-2f);
+            EXPECT_NEAR(DutyPercent(actual.b), DutyPercent(expected.b), 1e-2f);
+            EXPECT_NEAR(DutyPercent(actual.c), DutyPercent(expected.c), 1e-2f);
+        }
+    };
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_current_that_pushes_the_rotor_towards_the_limit_is_folded_linearly_from_90_percent)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    const auto limited = Spin(*focTorque, 0.95f * limit);
+
+    ExpectSameDuty(limited, Unlimited(0.1f, 0.95f * limit));
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.1f, 1e-3f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_reverse_current_that_pushes_a_reversing_rotor_is_folded_as_well)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ -0.2f } });
+
+    const auto limited = Spin(*focTorque, -0.95f * limit);
+
+    ExpectSameDuty(limited, Unlimited(-0.1f, -0.95f * limit));
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_current_that_brakes_the_rotor_is_not_folded)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ -0.2f } });
+
+    const auto limited = Spin(*focTorque, 0.95f * limit);
+
+    ExpectSameDuty(limited, Unlimited(-0.2f, 0.95f * limit));
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), -0.2f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, beyond_the_limit_no_current_pushes_the_rotor)
+{
+    foc::TorqueCascade reference{ testMaxCurrent };
+    reference.Configure(MotorParameters(polePairs));
+    EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    reference.Enable();
+
+    const float step = 1.2f * limit / 20000.0f;
+    float angle = 0.0f;
+    foc::PhasePwmDutyCycles limited{ hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0) };
+    foc::PhasePwmDutyCycles unlimited{ limited };
+
+    for (std::size_t sample = 0; sample != samples; ++sample)
+    {
+        if (sample == samples / 2)
+            focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+        foc::Radians position{ angle };
+        foc::Radians referencePosition{ angle };
+        limited = focTorque->Calculate(ZeroCurrents(), position);
+        unlimited = reference.Calculate(ZeroCurrents(), referencePosition);
+        angle = foc::detail::PositionWithWrapAround(angle + step);
+    }
+
+    ExpectSameDuty(limited, unlimited);
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, below_90_percent_of_the_limit_the_setpoint_is_taken_unchanged)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    Spin(*focTorque, 0.85f * limit);
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.2f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_limit_of_zero_folds_nothing)
+{
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    const auto unlimited = Spin(*focTorque, 1.2f * limit);
+
+    ExpectSameDuty(unlimited, Unlimited(0.2f, 1.2f * limit));
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.2f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_limit_set_while_enabled_is_in_force_from_the_next_sample)
+{
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+    Spin(*focTorque, 0.95f * limit);
+
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ limit });
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.1f, 1e-3f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, the_limit_is_kept_across_a_reconfiguration_with_other_pole_pairs)
+{
+    focTorque->Disable();
+    focTorque->Configure(MotorParameters(2));
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    Spin(*focTorque, 0.95f * limit);
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.1f, 1e-3f);
+}

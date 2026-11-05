@@ -92,6 +92,12 @@ namespace can
             case FocParameter::supervisionStillExcursion:
             case FocParameter::stallDetection:
                 return ParameterGroup::supervision;
+            case FocParameter::overspeedLimit:
+            case FocParameter::followingErrorWindow:
+            case FocParameter::followingErrorTime:
+            case FocParameter::speedAcceleration:
+            case FocParameter::speedDeceleration:
+                return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
         }
@@ -263,6 +269,45 @@ namespace can
                 break;
             default:
                 config.supervision.window = value;
+                break;
+        }
+    }
+
+    float LimitSettingOf(const services::ConfigData& config, FocParameter parameter)
+    {
+        switch (parameter)
+        {
+            case FocParameter::followingErrorWindow:
+                return config.limits.followingErrorWindow;
+            case FocParameter::followingErrorTime:
+                return config.limits.followingErrorTime;
+            case FocParameter::speedAcceleration:
+                return config.limits.speedAcceleration;
+            case FocParameter::speedDeceleration:
+                return config.limits.speedDeceleration;
+            default:
+                return config.limits.overspeedLimit;
+        }
+    }
+
+    void WriteLimitSetting(services::ConfigData& config, FocParameter parameter, float value)
+    {
+        switch (parameter)
+        {
+            case FocParameter::followingErrorWindow:
+                config.limits.followingErrorWindow = value;
+                break;
+            case FocParameter::followingErrorTime:
+                config.limits.followingErrorTime = value;
+                break;
+            case FocParameter::speedAcceleration:
+                config.limits.speedAcceleration = value;
+                break;
+            case FocParameter::speedDeceleration:
+                config.limits.speedDeceleration = value;
+                break;
+            default:
+                config.limits.overspeedLimit = value;
                 break;
         }
     }

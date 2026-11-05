@@ -5,6 +5,7 @@
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -313,6 +314,18 @@ THEN(R"(the {word} step response shall rise within {float} ms)", (std::string si
     EXPECT_LE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose too slowly";
 }
 
+THEN(R"(the {word} step response shall take at least {float} ms to rise)", (std::string signalWord, float riseMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    RequireCapturedTrace(setup);
+    const auto signal = RequireSignal(signalWord);
+
+    const auto metrics = StepMetricsFor(setup, signal, 2.0f, AlgorithmLabel(setup, signal));
+    ASSERT_TRUE(metrics.has_value());
+
+    EXPECT_GE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose faster than its ramp allows";
+}
+
 THEN(R"(the {word} response tail shall stay within {float} % of the step)", (std::string signalWord, float tailPercent))
 {
     auto& setup = context.Get<ScenarioSetup>();
@@ -383,6 +396,20 @@ THEN(R"(the d-axis current shall be below {int} mA RMS from {int} to {int} ms af
     const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
     ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
     EXPECT_LT(*rms, static_cast<float>(limitMa)) << "d-axis current " << *rms << " mA RMS between " << fromMs << " and " << toMs << " ms";
+}
+
+THEN(R"(the peak speed shall stay below {float} rad\/s)", (float limit))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+
+    ASSERT_FALSE(setup.trace.Samples().empty()) << "No plant samples captured";
+    float peak{ 0.0f };
+    for (const auto& sample : setup.trace.Samples())
+        peak = std::max(peak, std::abs(sample.omegaMech));
+
+    std::fprintf(stderr, "[METRIC] sil peak_speed value=%.3f limit=%.3f\n", peak, limit);
+    EXPECT_LT(peak, limit) << "The rotor reached " << peak << " rad/s";
 }
 
 THEN(R"(the response shall have no dropped samples)")

@@ -102,6 +102,11 @@ namespace tool
         return SupportsMinor(nodeId, firmwareContractMinor);
     }
 
+    bool CanCommandClient::SupportsLimits(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, limitsContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -346,9 +351,13 @@ namespace tool
 
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
         const bool supervision = SupportsSupervision(nodeId);
+        const bool limits = SupportsLimits(nodeId);
         for (const auto& descriptor : can::focParameters)
-            if (!descriptor.readOnly && (supervision || can::GroupOf(descriptor.id) != can::ParameterGroup::supervision))
+        {
+            const auto group = can::GroupOf(descriptor.id);
+            if (!descriptor.readOnly && (supervision || group != can::ParameterGroup::supervision) && (limits || group != can::ParameterGroup::limits))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+        }
     }
 
     void CanCommandClient::RequestReadings(uint16_t nodeId)

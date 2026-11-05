@@ -63,6 +63,14 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , overspeed{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
+        , followingError{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
@@ -130,6 +138,22 @@ namespace application
                 phaseLoss.Enable([this]()
                     {
                         return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
+                    });
+                overspeed.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                overspeed.Enable([this]()
+                    {
+                        return foc::RadiansPerSecond{ controlMode->Config().limits.overspeedLimit };
+                    });
+                followingError.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                followingError.Enable([this]()
+                    {
+                        return supervision::FollowingErrorSettingsFrom(controlMode->Config());
                     });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {

@@ -77,6 +77,7 @@ namespace tool
         static constexpr uint8_t diagnosticsContractMinor{ 2 };
         static constexpr uint8_t supervisionContractMinor{ 4 };
         static constexpr uint8_t firmwareContractMinor{ 6 };
+        static constexpr uint8_t limitsContractMinor{ 9 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -89,6 +90,7 @@ namespace tool
         bool SupportsDiagnostics(uint16_t nodeId) const;
         bool SupportsSupervision(uint16_t nodeId) const;
         bool SupportsFirmwareIdentity(uint16_t nodeId) const;
+        bool SupportsLimits(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);

@@ -23,6 +23,8 @@ target_link_libraries(e_foc.supervision_test PUBLIC
 target_sources(e_foc.supervision_test PRIVATE
     TestEncoderFreezeMonitor.cpp
     TestEncoderPlausibilityMonitor.cpp
+    TestFollowingErrorMonitor.cpp
+    TestOverspeedMonitor.cpp
     TestPhaseLossMonitor.cpp
 )
 

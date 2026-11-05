@@ -37,6 +37,11 @@ namespace application
         return focController;
     }
 
+    foc::SpeedLimitable& TorqueStateMachine::SpeedLimiter()
+    {
+        return focController;
+    }
+
     foc::MotionObservation TorqueStateMachine::ObserveMotion() const
     {
         return focController.ObserveMotion();

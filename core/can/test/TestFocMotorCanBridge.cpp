@@ -1302,6 +1302,31 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_CalibrationFailed_MapsToCalibration
     EXPECT_EQ(9u, static_cast<uint8_t>(can::FocFaultCode::calibrationFailed));
 }
 
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overspeed_MapsToOverSpeed)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::overspeed);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overSpeed));
+    EXPECT_EQ(10u, static_cast<uint8_t>(can::FocFaultCode::overSpeed));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_FollowingError_MapsToFollowingError)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::followingError);
+
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::followingError));
+    EXPECT_EQ(11u, static_cast<uint8_t>(can::FocFaultCode::followingError));
+}
+
 TEST_F(FocMotorCanBridgeTest, BroadcastFault_None_MapsToNone)
 {
     ConstructFixture();
@@ -1961,6 +1986,33 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_StallDetectionOff_IsAcceptedWhileTheD
     ASSERT_TRUE(savedConfig.has_value());
     EXPECT_EQ(savedConfig->stallDetection, uint8_t{ 0 });
     ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_TheOverspeedLimit_IsStoredAndInForceWhileTheDriveRuns)
+{
+    ConstructFixtureInReady();
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::overspeedLimit, 120.0f);
+
+    ASSERT_TRUE(savedConfig.has_value());
+    EXPECT_NEAR(savedConfig->limits.overspeedLimit, 120.0f, 1e-6f);
+    ExpectAnswered(120.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_AnOverspeedLimitThatCannotBeStored_IsTakenBack)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    ExpectConfigSaved(services::NvmStatus::WriteFailed);
+    DispatchSetParameter(can::FocParameter::overspeedLimit, 120.0f);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
+    EXPECT_NEAR(coordinator->Config().limits.overspeedLimit, services::LimitSettings{}.overspeedLimit, 1e-6f);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_ASupervisionSettingThatCannotBeStored_IsTakenBack)

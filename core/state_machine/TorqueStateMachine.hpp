@@ -21,6 +21,7 @@ namespace application
 
         foc::FocTorque& GetController();
         const foc::FocTorque& GetController() const;
+        foc::SpeedLimitable& SpeedLimiter();
 
         foc::MotionObservation ObserveMotion() const override;
 
