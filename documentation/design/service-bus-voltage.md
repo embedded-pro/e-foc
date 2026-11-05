@@ -2,7 +2,7 @@
 title: "Service: Bus Voltage"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-bus-voltage
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Bus Voltage |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.0                |
+| Version   | 0.2.0                |
 | Component | service-bus-voltage  |
 | Date      | 2026-11-05           |
 
@@ -41,7 +41,8 @@ scale its duties by the measured over the configured voltage (`foc-torque.md`, B
 **Is NOT responsible for:**
 - Scaling the duties, which the cascade does
 - Bus over- and under-voltage protection, which the board's comparators and the fault path handle
-- The bus voltage the identification procedures use, which is still the one read at boot
+- The bus voltage the resistance and inductance identification use, which they read from the platform
+  themselves at the start and the end of each measurement (`service-electrical-ident.md`)
 
 ---
 
@@ -90,8 +91,8 @@ new motor model returns to the configured bus until the next value, at most 10 m
 
 ## Constraints & Limitations
 
-| Constraint     | Description                                                                                                        |
-|----------------|--------------------------------------------------------------------------------------------------------------------|
-| Tracking lag   | The 10 ms poll and the 50 ms filter follow a slow sag; a bus that moves within a few milliseconds is followed late |
-| Blocking read  | The read blocks the event loop for its conversion; a non-blocking read needs a triggered conversion per board      |
-| Identification | Resistance, inductance and flux-linkage identification still convert duty to volts with the boot value             |
+| Constraint     | Description                                                                                                                                      |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| Tracking lag   | The 10 ms poll and the 50 ms filter follow a slow sag; a bus that moves within a few milliseconds is followed late                               |
+| Blocking read  | The read blocks the event loop for its conversion; a non-blocking read needs a triggered conversion per board                                    |
+| Identification | Flux-linkage identification reads the cascade's q-axis voltage, which the tracking keeps true; resistance and inductance read the bus themselves |

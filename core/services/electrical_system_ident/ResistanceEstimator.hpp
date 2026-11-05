@@ -30,7 +30,10 @@ namespace services
             std::optional<foc::Ohm> resistance;
         };
 
+        using BusVoltage = infra::Function<foc::Volts()>;
+
         ResistanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc);
+        ResistanceEstimator(drivers::ThreePhaseInverter& driver, const BusVoltage& busVoltage);
         ~ResistanceEstimator();
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
@@ -53,7 +56,8 @@ namespace services
         static constexpr std::size_t steadyStateSamplesSize = 123;
 
         drivers::ThreePhaseInverter& driver;
-        foc::Volts vdc;
+        BusVoltage busVoltage;
+        float busAtMeasurementStart{ 0.0f };
 
         Config activeConfig;
         foc::PhasePwmDutyCycles heldDuties{};

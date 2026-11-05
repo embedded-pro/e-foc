@@ -623,3 +623,39 @@ TEST_F(ResistanceEstimatorTest, a_sample_between_a_no_sample_failure_and_the_bri
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());
 }
+
+TEST_F(ResistanceEstimatorTest, the_terminal_voltage_takes_the_mean_bus_over_the_measurement)
+{
+    float bus = 24.0f;
+    infra::WithSharedAccess<services::ResistanceEstimator> tracking{ driverMock, [&bus]()
+        {
+            return foc::Volts{ bus };
+        } };
+    const float meanBus = 22.0f;
+    const float terminalR = 1.5f;
+    const float steadyStateCurrent = 0.15f * meanBus / terminalR;
+    services::ResistanceEstimator::Result result{};
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete);
+    tracking->Start(measurementConfig, [&result](auto r)
+        {
+            result = r;
+        });
+    ForwardTime(std::chrono::milliseconds{ 50 });
+
+    bus = 20.0f;
+    EXPECT_CALL(driverMock, Stop());
+    for (std::size_t i = 0; i < samplesToComplete; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ steadyStateCurrent }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
+
+    ASSERT_TRUE(result.resistance.has_value());
+    EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.01f);
+}
