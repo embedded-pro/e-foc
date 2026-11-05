@@ -3,7 +3,7 @@
 #include "bootloader/BootSequence.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousFlashInternal.hpp"
 #include "infra/util/ByteRange.hpp"
-#include "targets/bootloader/ImageTarget.hpp"
+#include "targets/platform_implementations/cortex_m_common/ImageTarget.hpp"
 
 namespace bootloader
 {

@@ -1,7 +1,7 @@
 #include "bootloader/ImageFormat.hpp"
 #include "generated/Boards.hpp"
 #include "generated/Version.h"
-#include "targets/bootloader/ImageTarget.hpp"
+#include "targets/platform_implementations/cortex_m_common/ImageTarget.hpp"
 #include <array>
 #include <cstdint>
 

@@ -15,6 +15,7 @@ target_include_directories(e_foc.bootloader.main PRIVATE
 
 target_link_libraries(e_foc.bootloader.main PRIVATE
     bootloader
+    e_foc.platform_abstraction_cortex_m_common
     ${boardLibrary}
 )
 
@@ -24,7 +25,6 @@ target_sources(e_foc.bootloader.main PRIVATE
     Main.cpp
     ${platformDir}/BootloaderPlatform.cpp
     ${platformDir}/BootloaderPlatform.hpp
-    ../ImageTarget.hpp
 )
 
 if(TARGET_MCU_VENDOR STREQUAL "ti")

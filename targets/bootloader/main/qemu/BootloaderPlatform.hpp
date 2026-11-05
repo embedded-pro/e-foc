@@ -3,7 +3,7 @@
 #include "bootloader/BootSequence.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
-#include "targets/bootloader/ImageTarget.hpp"
+#include "targets/platform_implementations/cortex_m_common/ImageTarget.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFileFlash.hpp"
 
 namespace bootloader
