@@ -35,9 +35,6 @@ namespace
     const std::map<std::string, services::FwuError> answers{
         { "ok", services::FwuError::ok },
         { "busy", services::FwuError::busy },
-        { "invalid size", services::FwuError::invalidSize },
-        { "sequence error", services::FwuError::sequenceError },
-        { "write error", services::FwuError::writeError },
         { "CRC mismatch", services::FwuError::crcMismatch },
         { "not ready", services::FwuError::notReady },
         { "invalid state", services::FwuError::invalidState },

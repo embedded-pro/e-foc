@@ -1,3 +1,5 @@
+#include "bootloader/ApplicationInstaller.hpp"
+#include "bootloader/ImageFormat.hpp"
 #include "bootloader/StatusJournal.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "generated/Boards.hpp"
@@ -11,7 +13,9 @@
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include "upgrade/pack/UpgradePackHeader.hpp"
 #include <chrono>
+#include <cstddef>
 #include <gtest/gtest.h>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -20,17 +24,32 @@ using namespace integration;
 
 namespace
 {
-    constexpr std::size_t headerTargetOffset = 0x400 + 16;
-    constexpr uint8_t anotherBoardKind = 1;
+    constexpr std::size_t headerTargetOffset = bootloader::applicationHeaderOffset + offsetof(bootloader::ApplicationHeader, target);
+    const auto& anotherBoard = e_foc::boards::ekTm4c1294xl;
+
+    const std::map<std::string, uint32_t> errorCodes{
+        { "invalid signature", application::upgradeErrorCodeInvalidSignature },
+        { "unknown product", application::upgradeErrorCodeUnknownProductName },
+        { "wrong target", bootloader::errorWrongTarget },
+        { "wrong destination", bootloader::errorWrongDestination },
+    };
+
+    uint32_t ErrorCodeNamed(const std::string& name)
+    {
+        const auto code = errorCodes.find(name);
+        if (code == errorCodes.end())
+            throw std::runtime_error{ "Unknown bootloader error: " + name };
+        return code->second;
+    }
 
     application::PackDescription Description(const std::string& defect)
     {
-        application::PackDescription description{ e_foc::boards::emulated.identification, "", "sync_foc_sensored", emulatedSlotStart, EmulatedBootloader().ApplicationImage() };
+        application::PackDescription description{ e_foc::boards::emulated.identification, "", "sync_foc_sensored", applicationSlotStart, EmulatedBootloader().ApplicationImage() };
 
         if (defect == "for another product")
-            description.productName = "e-foc another product";
+            description.productName = anotherBoard.identification;
         else if (defect == "for another board")
-            description.image.at(headerTargetOffset) = anotherBoardKind;
+            description.image.at(headerTargetOffset) = anotherBoard.kind;
         else if (defect == "for another destination")
             description.destination = 0;
         else if (!defect.empty() && defect != "with a bad signature")
@@ -107,9 +126,9 @@ THEN(R"(the journal reads {string})", (std::string status))
     EXPECT_EQ(JournalStatusNamed(status), recorded) << "The journal reads " << static_cast<int>(recorded) << " with error code " << errorCode;
 }
 
-THEN(R"(the journal reads {string} with error code {int})", (std::string status, int expectedErrorCode))
+THEN(R"(the journal reads {string} with the error {string})", (std::string status, std::string error))
 {
     const auto [recorded, errorCode] = RecordedJournal();
     EXPECT_EQ(JournalStatusNamed(status), recorded) << "The journal reads " << static_cast<int>(recorded);
-    EXPECT_EQ(static_cast<uint32_t>(expectedErrorCode), errorCode);
+    EXPECT_EQ(ErrorCodeNamed(error), errorCode);
 }

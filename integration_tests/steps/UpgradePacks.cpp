@@ -4,12 +4,11 @@
 #include "generated/Boards.hpp"
 #include "generated/Version.h"
 #include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
+#include "integration_tests/support/interactor/interfaces/Files.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <map>
 #include <random>
 #include <span>
@@ -20,8 +19,6 @@ namespace integration
 {
     namespace
     {
-        constexpr uint32_t hilSlotStart = 0x00008000;
-
         const std::map<std::string, application::UpgradePackStatus> statuses{
             { "empty", application::UpgradePackStatus::empty },
             { "downloaded", application::UpgradePackStatus::downloaded },
@@ -30,14 +27,6 @@ namespace integration
             { "deployed", application::UpgradePackStatus::deployed },
             { "invalid", application::UpgradePackStatus::invalid },
         };
-
-        std::vector<uint8_t> ReadFile(const std::string& path)
-        {
-            std::ifstream file{ path, std::ios::binary };
-            if (!file)
-                throw std::runtime_error{ "Cannot read " + path };
-            return { std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
-        }
 
         std::string DevelopmentKeysPath()
         {
@@ -48,7 +37,7 @@ namespace integration
         PackSource HardwarePackSource()
         {
             auto image = std::filesystem::path{ hil::GetBridgeConfig().firmwareElf }.replace_extension(".image.bin");
-            return PackSource{ ReadFile(image.string()), ReadFile(DevelopmentKeysPath()), e_foc::boards::ekTm4c1294xl.identification, hilSlotStart, e_foc::boards::ekTm4c1294xl.kind };
+            return PackSource{ RequireBinaryFile(image.string()), RequireBinaryFile(DevelopmentKeysPath()), e_foc::boards::ekTm4c1294xl.identification, applicationSlotStart, e_foc::boards::ekTm4c1294xl.kind };
         }
 
         bool Random(std::span<uint8_t> bytes)
@@ -73,7 +62,7 @@ namespace integration
     PackSource TargetPackSource()
     {
         if (auto* emulated = BootloaderTarget::Instance())
-            return PackSource{ emulated->ApplicationImage(), emulated->DevelopmentKeySet(), e_foc::boards::emulated.identification, emulatedSlotStart, e_foc::boards::emulated.kind };
+            return PackSource{ emulated->ApplicationImage(), emulated->DevelopmentKeySet(), e_foc::boards::emulated.identification, applicationSlotStart, e_foc::boards::emulated.kind };
         return HardwarePackSource();
     }
 
