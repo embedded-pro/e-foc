@@ -64,7 +64,7 @@ Feature: Position Travel
     And the motor is enabled
     Then the targetReached read over CAN shall become 1 within 1000 ms
     When a position setpoint of -2.5 rad is applied
-    Then the targetReached read over CAN shall become 1 within 3000 ms
+    Then the targetReached read over CAN shall become 1 within 1100 ms
     When the response is captured for 3000 ms after the last setpoint
     Then the rotor shall travel at least 4.0 rad after the last setpoint
 

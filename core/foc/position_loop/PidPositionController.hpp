@@ -22,6 +22,7 @@ namespace foc
         PositionOutput Compute(const PositionControlContext& context);
 
     private:
+        static float HeldBack(float clamped, float referencePart);
         float SpeedEnvelope() const;
         bool ApplyGains();
 
@@ -31,6 +32,8 @@ namespace foc
         float integralGain{ 0.0f };
         float relaxationRate{ 0.0f };
         float output{ 0.0f };
+        // The part of a reference step the clamp held back, applied as the output leaves the clamp.
+        float heldBackReference{ 0.0f };
         float previousReference{ 0.0f };
         float previousMeasured{ 0.0f };
         bool primed{ false };
