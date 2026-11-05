@@ -69,7 +69,7 @@ namespace tool
         void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) override;
         void OnDiscardFinished(uint16_t nodeId, bool acknowledged) override;
         void OnApplyFinished(uint16_t nodeId, ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running) override;
-        void OnTransferAbandoned(uint16_t nodeId) override;
+        void OnTransferAbandoned(uint16_t nodeId, TransferPhase phase) override;
         bool ConfirmAbandonTransfer(const QString& action);
         void SetLatestRelease(const ReleaseInfo& release);
         void BuildMenus();

@@ -860,10 +860,10 @@ namespace tool
             motor->Firmware().Refresh();
     }
 
-    void MainWindow::OnTransferAbandoned(uint16_t nodeId)
+    void MainWindow::OnTransferAbandoned(uint16_t nodeId, TransferPhase phase)
     {
         if (auto* motor = Motor(nodeId))
-            motor->Firmware().OnTransferAbandoned();
+            motor->Firmware().OnTransferAbandoned(phase);
     }
 
     bool MainWindow::ConfirmAbandonTransfer(const QString& action)
@@ -872,7 +872,7 @@ namespace tool
         if (!node.has_value())
             return true;
 
-        const auto text = QString("Motor %1 is in the middle of a firmware transfer. %2 anyway?\n\nThe download is abandoned; the controller drops it after 30 s without a command, and nothing is installed. A pack already staged stays staged.").arg(*node).arg(action);
+        const auto text = QString("Motor %1 is in the middle of a firmware transfer. %2 anyway?\n\n%3").arg(*node).arg(action, QString::fromStdString(AbandonmentConsequence(transfer.Phase())));
         if (QMessageBox::warning(this, action, text, QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes)
             return false;
 

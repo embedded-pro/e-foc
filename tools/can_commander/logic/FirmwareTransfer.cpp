@@ -115,10 +115,11 @@ namespace tool
             return;
 
         StopTimers();
+        const auto abandoned = phase;
         Enter(TransferPhase::idle);
-        NotifyObservers([node = nodeId](auto& observer)
+        NotifyObservers([node = nodeId, abandoned](auto& observer)
             {
-                observer.OnTransferAbandoned(node);
+                observer.OnTransferAbandoned(node, abandoned);
             });
     }
 
@@ -394,5 +395,24 @@ namespace tool
         const auto remaining = static_cast<int64_t>(totalBytes) - static_cast<int64_t>(bytesSent);
         const auto milliseconds = remaining * elapsed.count() / static_cast<int64_t>(bytesSent);
         return std::chrono::seconds{ (milliseconds + 999) / 1000 };
+    }
+
+    std::string AbandonmentConsequence(TransferPhase phase)
+    {
+        switch (phase)
+        {
+            case TransferPhase::erasing:
+            case TransferPhase::sending:
+            case TransferPhase::verifying:
+            case TransferPhase::cancelling:
+                return "The download is abandoned; the controller drops it after 30 s without a command, and nothing is installed. A pack already staged stays staged.";
+            case TransferPhase::discarding:
+                return "The discard was sent, and whether the controller took it is unknown: the pack may still be staged at the next connection.";
+            case TransferPhase::activating:
+            case TransferPhase::restarting:
+                return "The apply goes on without the tool: the controller restarts and its bootloader installs the staged pack. Reconnect and read the version to confirm the update.";
+            default:
+                return {};
+        }
     }
 }

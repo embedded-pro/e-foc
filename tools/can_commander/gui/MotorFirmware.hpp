@@ -43,7 +43,7 @@ namespace tool
         void OnDownloadFinished(DownloadOutcome outcome, services::FwuError error);
         void OnDiscardFinished(bool acknowledged);
         void OnApplyFinished(ApplyOutcome outcome, services::FwuError error, const services::FirmwareVersion& running);
-        void OnTransferAbandoned();
+        void OnTransferAbandoned(TransferPhase phase);
 
     signals:
         void StatusChanged();
