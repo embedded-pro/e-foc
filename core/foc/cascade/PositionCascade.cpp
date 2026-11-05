@@ -31,6 +31,11 @@ namespace foc
         lastPositionSetPoint = point;
     }
 
+    void PositionCascade::LimitTravel(Radians minimum, Radians maximum)
+    {
+        travelLimits = TravelLimits{ minimum, maximum };
+    }
+
     void PositionCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
     {
         SetCurrentTuningsImpl(tunings);
@@ -158,7 +163,8 @@ namespace foc
     MotionObservation PositionCascade::ObserveMotion() const
     {
         auto observation = ObserveSpeedLoopMotion();
-        observation.positionError = Radians{ WrappedPositionError(lastPositionSetPoint, Radians{ CurrentMechanicalAngle() }) };
+        const auto context = ControlContext(travelLimits, 0.0f);
+        observation.positionError = Radians{ PositionDifference(context.reference, context.measured, context.direct) };
 
         // A law that commands the current leaves the speed reference wherever the speed loop's last user put it
         if (commandsCurrent)
@@ -187,7 +193,8 @@ namespace foc
             return;
         }
 
-        auto command = positionLoop.Compute(PositionControlContext{ Radians{ CurrentMechanicalAngle() }, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } });
+        const auto limits = travelLimits;
+        auto command = positionLoop.Compute(ControlContext(limits, mechanicalSpeed));
         commandsCurrent = command.kind != PositionOutputKind::speedReference;
 
         if (command.kind == PositionOutputKind::speedReference)

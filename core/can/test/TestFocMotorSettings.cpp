@@ -149,6 +149,21 @@ TEST(FocMotorSettings, the_position_window_and_its_time_are_limits)
     EXPECT_EQ(can::GroupOf(can::FocParameter::positionWindowTime), can::ParameterGroup::limits);
 }
 
+TEST(FocMotorSettings, the_travel_limits_are_limits)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::positionMinimum, -1.5f);
+    can::WriteLimitSetting(config, can::FocParameter::positionMaximum, 2.5f);
+
+    EXPECT_NEAR(config.limits.positionMinimum, -1.5f, 1e-6f);
+    EXPECT_NEAR(config.limits.positionMaximum, 2.5f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::positionMinimum), -1.5f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::positionMaximum), 2.5f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::positionMinimum), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::positionMaximum), can::ParameterGroup::limits);
+}
+
 TEST(FocMotorSettings, the_target_reached_flag_is_a_motion_reading)
 {
     EXPECT_EQ(can::GroupOf(can::FocParameter::targetReached), can::ParameterGroup::motion);

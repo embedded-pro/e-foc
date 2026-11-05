@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 65> presentations{ {
+        constexpr std::array<SettingPresentation, 67> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -94,6 +94,8 @@ namespace tool
             { FocParameter::peakCurrentTime, "Peak time", "Peak time:", " s", "How long a cold motor may carry its peak current before the limit folds back to the continuous current.", {} },
             { FocParameter::positionWindow, "Position window", "Position window:", " rad", "Position error within which position mode counts its target as reached; 0 keeps the target reported not reached.", {} },
             { FocParameter::positionWindowTime, "Position window time", "Window time:", " s", "How long the position error has to stay within the position window before the target is reported reached.", {} },
+            { FocParameter::positionMinimum, "Position minimum", "Minimum:", " rad", "Lowest position, from the alignment zero, position mode accepts and moves to. The limits are off while the minimum is not below the maximum.", {} },
+            { FocParameter::positionMaximum, "Position maximum", "Maximum:", " rad", "Highest position, from the alignment zero, position mode accepts and moves to. Between the limits the motor moves the direct way, never across the angle outside them.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -302,14 +304,19 @@ namespace tool
         return Slice(38, 2);
     }
 
+    std::span<const SettingPresentation> TravelLimitSettings()
+    {
+        return Slice(40, 2);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(40, 24);
+        return Slice(42, 24);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(64, 1);
+        return Slice(66, 1);
     }
 
     namespace

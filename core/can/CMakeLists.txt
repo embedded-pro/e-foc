@@ -12,6 +12,7 @@ target_link_libraries(e_foc.can PUBLIC
     can_lite.tracing_protocol
     can_lite.tracing
     e_foc.boards
+    e_foc.foc.math
     e_foc.services.firmware_upgrade.interfaces
     e_foc.state_machine
     services.tracer

@@ -794,13 +794,18 @@ namespace state_machine
         const foc::RadiansPerSecond overspeedLimit{ configData.limits.overspeedLimit };
         const foc::RadiansPerSecondSquared acceleration{ configData.limits.speedAcceleration };
         const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
+        const foc::Radians positionMinimum{ configData.limits.positionMinimum };
+        const foc::Radians positionMaximum{ configData.limits.positionMaximum };
 
         std::visit([&]<class Machine>(Machine& sm)
             {
                 if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
                     sm.SpeedLimiter().LimitSpeed(overspeedLimit);
                 else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                {
                     sm.RampSpeed(acceleration, deceleration);
+                    sm.LimitTravel(positionMinimum, positionMaximum);
+                }
             },
             activeSm);
 

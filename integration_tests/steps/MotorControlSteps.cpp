@@ -70,6 +70,14 @@ WHEN(R"(a position setpoint of {float} rad is applied)", (float rad))
     setup.lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad, fixture.ServerNodeId(), commandsBefore };
 }
 
+THEN(R"(a position setpoint of {float} rad shall be refused)", (float rad))
+{
+    auto& fixture = context.Get<Fixture>();
+    EXPECT_FALSE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetPositionSetpointId,
+        EncodeFixed16BE(rad, can::focPositionScale)))
+        << "The target accepted a position setpoint of " << rad << " rad";
+}
+
 THEN(R"(the state machine shall be in the running state)")
 {
     auto& fixture = context.Get<Fixture>();

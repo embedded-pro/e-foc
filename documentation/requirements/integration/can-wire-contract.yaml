@@ -174,3 +174,15 @@
     configuration record, refused with invalidPayload outside its range without changing anything,
     and read back unchanged after a restart; targetReached shall be refused by SetParameter with
     invalidPayload.
+
+- id: REQ-CAN-017
+  title: The software position limits are settable over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.11 shall add, without changing any 2.10 message, the stored settings
+    positionMinimum (0x5B) and positionMaximum (0x5C) in rad, -3.2 to 3.2. Each setting shall be
+    writable in any state, answered with the value held once it is stored in the configuration
+    record, refused with invalidPayload outside its range without changing anything, and read back
+    unchanged after a restart; with the limits on, a position setpoint outside them shall be
+    acknowledged invalidPayload.

@@ -18,6 +18,7 @@ namespace tool
         void SetSupervisionUnavailable(const QString& reason);
         void SetLimitsUnavailable(const QString& reason);
         void SetTargetWindowUnavailable(const QString& reason);
+        void SetTravelLimitsUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -27,6 +28,7 @@ namespace tool
         void BuildSupervisionGroup();
         void BuildLimitsGroup();
         void BuildTargetWindowGroup();
+        void BuildTravelLimitsGroup();
         void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };
@@ -34,5 +36,6 @@ namespace tool
         QString supervisionReason;
         QString limitsReason;
         QString targetWindowReason;
+        QString travelLimitsReason;
     };
 }

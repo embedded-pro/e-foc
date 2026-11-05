@@ -30,6 +30,11 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f } }).value;
         }
 
+        float DirectCommand(float reference, float measured)
+        {
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, true }).value;
+        }
+
         foc::CascadePPositionController controller;
     };
 }
@@ -87,6 +92,14 @@ TEST_F(TestCascadePPositionController, an_error_across_the_seam_commands_the_sho
     controller.SetTunings(TuningsWithBandwidth(5.0f));
 
     EXPECT_NEAR(Command(pi - 0.1f, -pi + 0.1f), -1.0f, 1e-3f);
+}
+
+TEST_F(TestCascadePPositionController, within_travel_limits_an_error_across_the_seam_commands_the_direct_way)
+{
+    controller.SetTunings(TuningsWithBandwidth(5.0f));
+
+    EXPECT_NEAR(DirectCommand(-pi + 0.1f, pi - 0.1f), 5.0f * (-2.0f * pi + 0.2f), 1e-3f);
+    EXPECT_NEAR(DirectCommand(pi - 0.1f, -pi + 0.1f), 5.0f * (2.0f * pi - 0.2f), 1e-3f);
 }
 
 TEST_F(TestCascadePPositionController, half_a_turn_of_error_sits_on_the_boundary_and_drives_forward)

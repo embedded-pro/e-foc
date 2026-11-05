@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.12.0
+version: 0.13.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.12.0                   |
+| Version   | 0.13.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -376,6 +376,19 @@ A host that sequences moves sends a position setpoint and queries `targetReached
 query is answered after the setpoint, from the error against that setpoint, so it never carries the previous
 move's flag. A client older than 2.10 asks for the new parameters only when the server reports 2.10 or newer,
 since an older one answers `invalidPayload` for each.
+
+**Contract 2.11 — software position limits.** Version 2.11 adds two stored settings; nothing in 2.10 changes.
+They are drive-wide limits like those of 2.9 and are off while the minimum is not below the maximum
+(`foc-position.md`, Software Position Limits).
+
+| ID     | Parameter         | Unit | Range                      | Automatic | Takes effect                               |
+|--------|-------------------|------|----------------------------|-----------|--------------------------------------------|
+| `0x5B` | `positionMinimum` | rad  | −3.2 – 3.2, off when ≥ max | no        | at the next 1 kHz tick (`foc-position.md`) |
+| `0x5C` | `positionMaximum` | rad  | −3.2 – 3.2, off when ≤ min | no        | at the next 1 kHz tick (`foc-position.md`) |
+
+With the limits on, `SetPositionSetpoint` with a setpoint outside them, taken modulo 2π into [−π, π), is
+acknowledged `invalidPayload` and changes nothing, as a setpoint beyond ±2π is. A client older than 2.11
+asks for the new parameters only when the server reports 2.11 or newer.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

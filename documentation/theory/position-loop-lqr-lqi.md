@@ -2,9 +2,9 @@
 title: "Position Loop — P1: LQR / LQI"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.1.0
 component: "position-loop-lqr-lqi"
-date: 2026-08-31
+date: 2026-11-05
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Position Loop — P1: LQR / LQI |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 1.0.0                         |
+| Version   | 1.1.0                         |
 | Component | position-loop-lqr-lqi         |
-| Date      | 2026-08-31                    |
+| Date      | 2026-11-05                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -112,7 +112,8 @@ $[K_\theta, K_\omega, K_I]$ ordering the augmentation above suggests.
 
 **The error sign.** $e_\theta = \theta_m - \theta_m^*$, the wrapped error negated, and the solver
 returns $u = -Kx$. The two together give the same law as the LQR section; taken separately, either
-one alone inverts the feedback.
+one alone inverts the feedback. Inside software position limits the error is the plain difference
+instead of the wrapped one (`position-loop-pid.md`, Angle-Error Wrapping).
 
 **Q is normalised, and R comes from the bandwidth.** The weights are ratios against the
 position-error weight rather than absolute penalties, and the input penalty is set from the desired

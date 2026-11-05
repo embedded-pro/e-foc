@@ -40,7 +40,7 @@ namespace foc
         if (currentPerNormalizedInput == 0.0f)
             return { PositionOutputKind::currentReference, 0.0f };
 
-        const auto deviation = -WrappedPositionError(context.reference, context.measured);
+        const auto deviation = -PositionDifference(context.reference, context.measured, context.direct);
         const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
 
         accumulatedDeviation += deviation;

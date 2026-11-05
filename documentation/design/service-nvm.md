@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.7.0
+version: 0.8.0
 component: service-nvm
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.7.0                        |
+| Version   | 0.8.0                        |
 | Component | service-nvm                  |
 | Date      | 2026-11-05                   |
 
@@ -52,12 +52,13 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 140 bytes |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 148 bytes |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
-The configuration record's layout is at version 8. The position window and its time (`foc-position.md` Target
-Reached) took its data from 132 to 140 bytes, as version 7 had taken it from 96 to 132 bytes for the drive-wide
+The configuration record's layout is at version 9. The software position limits (`foc-position.md` Software
+Position Limits) took its data from 140 to 148 bytes, as version 8 had taken it from 132 to 140 bytes for the
+position window and its time (`foc-position.md` Target Reached) and version 7 from 96 to 132 bytes for the drive-wide
 limits (`fault-supervision.md` Parts G and H, `foc-speed.md` Speed Ramp, `service-can.md` command timeout,
 `fault-supervision.md` Part I) and version 6 from 76 to 96 bytes for the supervision
 settings (`fault-supervision.md` Part D) and version 5 from 20 to 76 bytes for the operator's tuning settings
@@ -246,7 +247,7 @@ stateDiagram-v2
 zero there, which reads as not measured and keeps the automatic current-loop bandwidth an earlier
 firmware derived, so the layout stays at version 4 and no stored calibration is invalidated.
 
-**ConfigData** (140 bytes total):
+**ConfigData** (148 bytes total):
 
 | Field                  | Physical unit            | Description                                                                                                    |
 |------------------------|--------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -272,7 +273,8 @@ acceleration and deceleration, 0–100 000 rad/s², 0 (no limit) by default (`fo
 0–60 s, 0 (off) by default (`service-can.md` Part F); and the continuous and peak current, 0–100 A, 0 by default
 (off, and the board limit), with the peak time, 0.1–60 s, default 1 (`fault-supervision.md` Part I); and the
 position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000-count encoder), with its time,
-0–10 s, default 0.02 (`foc-position.md` Target Reached).
+0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, −3.2–3.2 rad,
+both 0 (off) by default (`foc-position.md` Software Position Limits).
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible

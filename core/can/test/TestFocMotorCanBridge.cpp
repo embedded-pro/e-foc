@@ -745,6 +745,37 @@ TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InPositionModeAndReady_AcksS
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_OutsideTheTravelLimits_RejectsInvalidPayload)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    coordinator->Config().limits.positionMinimum = -0.5f;
+    coordinator->Config().limits.positionMaximum = 0.5f;
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 100);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_WithinTheTravelLimits_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    coordinator->Config().limits.positionMinimum = -0.5f;
+    coordinator->Config().limits.positionMaximum = 0.5f;
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 40);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
 TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InSpeedMode_RejectsWithModeMismatch)
 {
     ConstructFixture();

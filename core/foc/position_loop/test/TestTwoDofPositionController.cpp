@@ -30,6 +30,11 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference } }).value;
         }
 
+        float FirstDirectCommand(float measured, float reference)
+        {
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, true }).value;
+        }
+
         foc::TwoDofPositionController controller;
     };
 }
@@ -58,6 +63,15 @@ TEST_F(TestTwoDofPositionController, a_setpoint_across_the_seam_is_approached_th
     controller.Configure(ValidParameters());
 
     EXPECT_LT(FirstCommand(-nearSeam, nearSeam), 0.0f);
+}
+
+TEST_F(TestTwoDofPositionController, within_travel_limits_a_setpoint_across_the_seam_is_approached_the_direct_way)
+{
+    controller.Configure(ValidParameters());
+
+    EXPECT_LT(FirstDirectCommand(nearSeam, -nearSeam), 0.0f);
+    controller.Reset();
+    EXPECT_GT(FirstDirectCommand(-nearSeam, nearSeam), 0.0f);
 }
 
 TEST_F(TestTwoDofPositionController, the_shaped_reference_never_leaves_the_seam_neighbourhood)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/math/TravelLimits.hpp"
 #include "core/foc/position_loop/PositionControllerSelector.hpp"
 #include "foc/interfaces/Foc.hpp"
 
@@ -13,6 +14,7 @@ namespace foc
         , public CoggingCompensable
         , public CurrentLimitable
         , public BusVoltageTrackable
+        , public PositionLimitable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -51,14 +53,26 @@ namespace foc
         void ClearCoggingMap() override;
         void LimitCurrent(Ampere limit) override;
         void TrackBusVoltage(Volts measured) override;
+        void LimitTravel(Radians minimum, Radians maximum) override;
         using CascadeWithSpeedLoop::SetCurrentStream;
 
     private:
         void LowPriorityHandler();
 
+        OPTIMIZE_FOR_SPEED PositionControlContext ControlContext(const TravelLimits& limits, float mechanicalSpeed) const
+        {
+            const Radians measured{ CurrentMechanicalAngle() };
+            if (!limits.IsOn())
+                return { measured, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } };
+
+            return { measured, limits.Hold(lastPositionSetPoint), RadiansPerSecond{ mechanicalSpeed }, true };
+        }
+
         PositionControllerSelector positionLoop;
         hal::Hertz outerLoopFrequency;
         Radians lastPositionSetPoint{ 0.0f };
+        // Written by the event loop; each outer-loop tick works on one copy, so its IsOn check guards its clamp.
+        TravelLimits travelLimits;
         RadiansPerSecond speedCommand{ 0.0f };
         bool speedCommandActive{ false };
         volatile bool commandsCurrent{ false };

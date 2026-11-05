@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.11.0               |
+| Version   | 0.12.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -255,6 +255,10 @@ flowchart LR
   Target Reached): position mode reports the target reached once its error has stayed within the window for
   the time, and a window of zero keeps the report off, as the group says. They are stored at once and in force
   within 1 ms, in any state.
+  Its **Travel Limits** group holds the position minimum and maximum of contract 2.11 (`foc-position.md`,
+  Software Position Limits). The group says they are measured from the alignment zero and are off while the
+  minimum is not below the maximum, and that when on, position mode refuses a setpoint outside them and moves
+  the direct way between them. They are stored at once and in force from the next control period.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -279,7 +283,8 @@ fault* or *Calibration failed*. A node older than 2.9 has no limits: the command
 Limits fields are disabled with the reason, and it never reports *Overspeed*, *Following error* or *Command
 timeout*. A node older than 2.10 has no target window: the commander does not ask it for the
 position window, its time or the target-reached reading, and the Target Window fields are disabled with the
-reason.
+reason. A node older than 2.11 has no travel limits: the commander does not ask it for them, and the
+Travel Limits fields are disabled with the reason.
 
 ### Part K — diagnostics
 

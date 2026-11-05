@@ -24,6 +24,7 @@ namespace tool
         BuildSupervisionGroup();
         BuildLimitsGroup();
         BuildTargetWindowGroup();
+        BuildTravelLimitsGroup();
         Content().addStretch();
 
         Refresh();
@@ -87,6 +88,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildTravelLimitsGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Travel Limits", group);
+        AddEditors(form, TravelLimitSettings());
+
+        auto* note = new QLabel("Measured from the alignment zero, and off while the minimum is not below the maximum. When "
+                                "on, position mode refuses a setpoint outside them and moves the direct way between them, "
+                                "never across the angle outside them. Stored at once and in force from the next control period.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -111,6 +125,16 @@ namespace tool
             return;
 
         limitsReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
+    void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
+    {
+        if (reason == travelLimitsReason)
+            return;
+
+        travelLimitsReason = reason;
         ShowAvailability();
         Refresh();
     }
@@ -142,6 +166,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? limitsReason : legacyReason);
             else if (IsIn(TargetWindowSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? targetWindowReason : legacyReason);
+            else if (IsIn(TravelLimitSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? travelLimitsReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

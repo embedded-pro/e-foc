@@ -13,4 +13,5 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestFastTrigonometry.cpp
     TestFiniteGuard.cpp
     TestParameterValidation.cpp
+    TestTravelLimits.cpp
 )

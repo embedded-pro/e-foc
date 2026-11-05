@@ -67,6 +67,7 @@ namespace tool
     std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> LimitSettings();
     std::span<const SettingPresentation> TargetWindowSettings();
+    std::span<const SettingPresentation> TravelLimitSettings();
     std::span<const SettingPresentation> Readings();
     std::span<const SettingPresentation> StatusReadings();
     std::string_view ResetCauseName(float cause);

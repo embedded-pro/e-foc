@@ -531,6 +531,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::TravelLimitsUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTravelLimits(nodeId))
+            return QString("Needs firmware contract 2.11 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -542,6 +549,7 @@ namespace tool
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
+        commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();

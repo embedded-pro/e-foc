@@ -1,5 +1,6 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCommandOutcome.hpp"
+#include "core/foc/math/TravelLimits.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
 #include <limits>
@@ -193,8 +194,9 @@ namespace can
 
     void FocMotorCanBridge::OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone)
     {
+        const foc::TravelLimits limits{ foc::Radians{ controlMode.Config().limits.positionMinimum }, foc::Radians{ controlMode.Config().limits.positionMaximum } };
         if (SetpointRejected(can::focSetPositionSetpointId, state_machine::ControlMode::position,
-                std::fabs(value.Value()) <= maxPositionSetpoint))
+                std::fabs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
             return;
 
         if (controlMode.TrySetPosition(value))

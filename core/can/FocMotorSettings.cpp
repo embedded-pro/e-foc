@@ -116,6 +116,8 @@ namespace can
             case FocParameter::peakCurrentTime:
             case FocParameter::positionWindow:
             case FocParameter::positionWindowTime:
+            case FocParameter::positionMinimum:
+            case FocParameter::positionMaximum:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -316,6 +318,10 @@ namespace can
                 return config.limits.positionWindow;
             case FocParameter::positionWindowTime:
                 return config.limits.positionWindowTime;
+            case FocParameter::positionMinimum:
+                return config.limits.positionMinimum;
+            case FocParameter::positionMaximum:
+                return config.limits.positionMaximum;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -354,6 +360,12 @@ namespace can
                 break;
             case FocParameter::positionWindowTime:
                 config.limits.positionWindowTime = value;
+                break;
+            case FocParameter::positionMinimum:
+                config.limits.positionMinimum = value;
+                break;
+            case FocParameter::positionMaximum:
+                config.limits.positionMaximum = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

@@ -27,9 +27,9 @@ namespace foc
 
     PositionOutput PidPositionController::Compute(const PositionControlContext& context)
     {
-        const auto error = WrappedPositionError(context.reference, context.measured);
-        const auto referenceStep = primed ? WrappedPositionError(context.reference, Radians{ previousReference }) : error;
-        const auto measuredStep = primed ? WrappedPositionError(context.measured, Radians{ previousMeasured }) : 0.0f;
+        const auto error = PositionDifference(context.reference, context.measured, context.direct);
+        const auto referenceStep = primed ? PositionDifference(context.reference, Radians{ previousReference }, context.direct) : error;
+        const auto measuredStep = primed ? PositionDifference(context.measured, Radians{ previousMeasured }, context.direct) : 0.0f;
 
         previousReference = context.reference.Value();
         previousMeasured = context.measured.Value();

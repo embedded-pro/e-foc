@@ -54,6 +54,8 @@ namespace services
         float peakCurrentTime = 1.0f;
         float positionWindow = 2.0f * std::numbers::pi_v<float> * 4.0f / 4000.0f;
         float positionWindowTime = 0.02f;
+        float positionMinimum = 0.0f;
+        float positionMaximum = 0.0f;
     };
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
@@ -77,7 +79,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 140, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 148, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {
