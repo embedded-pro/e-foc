@@ -33,7 +33,7 @@ namespace tool
         void ShowFirmware(const QString& running, const QString& staged, const QString& release, const QString& pack);
         void ShowStatus(const QString& text, ui::theme::StatusLevel level);
         void ShowProgress(qint64 done, qint64 total, const QString& format);
-        void ShowBusy(const QString& text);
+        void ShowBusy();
         void HideProgress();
         void SetActions(const FirmwareActions& actions);
 

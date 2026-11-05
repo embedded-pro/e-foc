@@ -109,10 +109,9 @@ namespace tool
         progress->setVisible(true);
     }
 
-    void FirmwareTab::ShowBusy(const QString& text)
+    void FirmwareTab::ShowBusy()
     {
         progress->setRange(0, 0);
-        progress->setFormat(text);
         progress->setVisible(true);
     }
 

@@ -66,6 +66,7 @@ namespace tool
         void Succeed(const QString& message, IssueSeverity severity = IssueSeverity::info);
         void ShowOutcome(const QString& message, ui::theme::StatusLevel level);
         void ClearOutcome();
+        void EndPhase();
         void RefreshStatus();
 
         std::optional<FirmwareBoard> Board() const;
@@ -97,6 +98,7 @@ namespace tool
         QString chosenSource;
         bool fetching{ false };
         bool downloadFailed{ false };
+        QString phaseText;
         QString outcomeText;
         ui::theme::StatusLevel outcomeLevel{ ui::theme::StatusLevel::Neutral };
         QElapsedTimer transferClock;
