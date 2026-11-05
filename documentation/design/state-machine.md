@@ -660,8 +660,16 @@ Hardware protection events reach the state machine through `PlatformFaultNotifie
 | `underVoltage`          | `undervoltage`    |
 | `overTemperature`       | `overtemperature` |
 
-The fault supervisor (`fault-supervision.md`) raises `encoderLoss`, `stall` and `phaseMissing` through the same notifier,
+The fault supervisor (`fault-supervision.md`) raises `encoderLoss`, `stall`, `phaseMissing`, `overspeed` and `followingError` through the same notifier,
+as the CAN command timeout (`service-can.md` Part F) raises `commandTimeout`,
 from the event loop, so the state machine handles them as it handles a board protection trip.
+
+The control-mode state machine hands the overspeed limit of the configuration record (`fault-supervision.md` Part G)
+to the torque cascade's speed limiter (`foc-torque.md`) whenever it activates a mode and whenever the record is
+written, in any state, and holds a speed setpoint beyond the limit at the limit before it reaches the speed cascade.
+It hands the speed ramp of the record to the speed cascade the same way, and keeps the latest current limit of the
+motor overload model (`fault-supervision.md` Part I), handing it to the active cascade whenever the model changes it
+and whenever a mode is activated.
 
 A protection event raised before the state machine has registered its handler is discarded by the
 state machine. A platform whose protection reflects a *standing* condition rather than an edge is
@@ -1043,18 +1051,18 @@ sequenceDiagram
 
 ## Data Model
 
-| Entity            | Field                  | Type / Unit                    | Range     | Notes                                                                                                                                                                         |
-|-------------------|------------------------|--------------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255     | Number of electrical pole pairs                                                                                                                                               |
-| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                               |
-| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0       | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                         |
-| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019) |
-| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                        |
-| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                         |
-| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                |
-| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                     |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017       |
-| `FaultCode`       | —                      | enum (uint8)                   | 10 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`                         |
+| Entity            | Field                  | Type / Unit                    | Range     | Notes                                                                                                                                                                                                  |
+|-------------------|------------------------|--------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255     | Number of electrical pole pairs                                                                                                                                                                        |
+| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                                                        |
+| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0       | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                                                  |
+| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019)                          |
+| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                 |
+| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                  |
+| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                                         |
+| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                              |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017                                |
+| `FaultCode`       | —                      | enum (uint8)                   | 13 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout` |
 
 A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware
 resets the target, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the

@@ -2,9 +2,9 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: "supervision"
-date: 2026-10-30
+date: 2026-11-05
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.1                    |
+| Version   | 0.4.0                    |
 | Component | supervision              |
-| Date      | 2026-10-30               |
+| Date      | 2026-11-05               |
 
 ---
 
@@ -34,6 +34,12 @@ date: 2026-10-30
 - Watching an enabled drive, in every control mode, for an encoder reading that stops dead faster than the rotor
   could physically stop, and raising `encoderLoss` (REQ-SM-028, Part F). This is the watch that covers torque
   mode, where the drive demands no motion for Parts A to C to judge.
+- Watching an enabled drive, in every control mode, for a rotor that turns faster than the overspeed limit allows,
+  and raising `overspeed` (REQ-PRT-003, Part G).
+- Watching an enabled position drive for a position error that stays beyond the operator's following-error
+  window for the following-error time, and raising `followingError` (REQ-PRT-004, Part H).
+- Keeping a thermal model of the motor's winding from its current and folding the drive's current limit back
+  from the peak to the continuous rating when the motor is overloaded (REQ-PRT-001, Part I).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -49,7 +55,11 @@ date: 2026-10-30
   at low speed. Part F needs a speed the rotor could not have shed, and Parts A to C need a demand; an encoder
   that stops below that speed in torque mode is found at the next alignment (`service-alignment.md`, encoder
   follow check).
-- Protecting the motor from heat while a stall is not reported. With stall reporting off, a held rotor can
+- Limiting the speed. The torque cascade folds its current against the overspeed limit (`foc-torque.md`) and
+  the control-mode state machine holds a speed setpoint at it; Part G only faults a rotor that passed both.
+- Measuring the winding temperature. Part I models the heat the current puts in from the ratings alone; a
+  winding that heats from outside, or a rating set too high, is not seen.
+- Protecting the motor from heat while a stall is not reported, unless the continuous rating of Part I is set. With stall reporting off, a held rotor can
   carry up to the current limit; only the thermal protection of the board watches that.
 
 ---
@@ -243,15 +253,132 @@ stateDiagram-v2
     Reported --> Moving : drive leaves Enabled
 ```
 
+### Part G — Overspeed
+
+A fourth watch, the overspeed monitor, reads the speed the active drive measures every 1 ms on the event loop
+while the drive is `Enabled`, in every mode. An evaluation counts when the magnitude of that speed exceeds
+110 % of the overspeed limit; five evaluations that count in a row raise `overspeed` once, and the monitor stays
+silent until the drive leaves `Enabled`. An evaluation that does not count starts the count again.
+
+The overspeed limit is one drive-wide setting of the configuration record (`service-nvm.md`), read at every
+evaluation, so a value written over CAN (`service-can.md`, contract 2.9) is in force from the next one:
+
+| Setting         | Default    | Range          | Meaning                                                             |
+|-----------------|------------|----------------|---------------------------------------------------------------------|
+| Overspeed limit | 1000 rad/s | 1 – 5000 rad/s | Mechanical speed the torque limiter folds against; faulted at 110 % |
+
+The same limit bounds the speed twice before the monitor sees it: the torque cascade folds a current that pushes
+the rotor towards it to zero (`foc-torque.md`, Speed Limiter), and the control-mode state machine holds a speed
+setpoint beyond it at the limit (`state-machine.md`). A healthy drive therefore never reaches 110 %; the
+monitor catches an outside torque that drives the rotor past the limit, a speed or position loop that overshoots
+through a tuning or sensor fault, and a load that runs away in position mode.
+
+The speed is the one the drive reports in its motion observation: the filtered per-sample speed in torque mode,
+the outer loop's window speed in speed and position modes. Five 1 ms evaluations bound the reaction to
+5–6 ms after the speed passes 110 %, inside the 10 ms of REQ-PRT-003, and keep a single noisy speed sample from
+faulting the drive. The fault is raised through the same notifier as the other watches, so the drive cuts its
+power stage and coasts, as for every other fault.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Counting : Enabled and |ω| > 1.1 · limit
+    Counting --> Idle : |ω| ≤ 1.1 · limit
+    Counting --> Reported : five evaluations in a row, overspeed raised
+    Reported --> Idle : drive leaves Enabled
+```
+
+### Part H — Following error
+
+A fifth watch, the following-error monitor, reads the position error the active drive observes every 1 ms on
+the event loop while the drive is `Enabled`. It is the mechanical setpoint minus the measured angle, wrapped to
+half a turn, the same error Part A judges; only position mode has one, the other modes report zero and are
+never faulted. An evaluation counts when the magnitude of the error exceeds the following-error window. The span
+starts at the first evaluation that counts; when the evaluations have counted without a break for the
+following-error time, the monitor raises `followingError` once and stays silent until the drive leaves
+`Enabled`. An evaluation that does not count ends the span.
+
+| Setting                | Default | Range        | Meaning                                           |
+|------------------------|---------|--------------|---------------------------------------------------|
+| Following-error window | 0 (off) | 0 – 3.2 rad  | Position error that counts; 0 turns the check off |
+| Following-error time   | 0.1 s   | 0.001 – 10 s | How long the error has to stay beyond the window  |
+
+Both are drive-wide limits of the configuration record (`service-nvm.md`), read at every evaluation, so a value
+written over CAN (`service-can.md`, contract 2.9) is in force from the next one.
+
+The window is off by default because the position setpoint reaches the loop as a step: the error right after a
+step is the step itself, and it stays beyond any window narrower than the step for as long as the loop needs to
+cover the distance — about 145 ms for a 1.5 rad step under the position PID on the bench plant. An operator who
+commands steps sets the window above the largest step, or the time above the time the largest step takes to
+come inside the window; one who streams a smooth setpoint can set both tight. A rotor jammed while the drive
+pushes for motion is reported as a stall by Parts A to C whether or not the window is set; the following error
+adds a rotor that moves but does not keep up, such as a load the current limit cannot overcome.
+
+The fault is raised through the same notifier as the other watches, so the drive cuts its power stage and
+coasts, as for every other fault.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Counting : Enabled, window above zero and |error| > window
+    Counting --> Idle : |error| ≤ window
+    Counting --> Reported : beyond the window for the following-error time, followingError raised
+    Reported --> Idle : drive leaves Enabled
+```
+
+### Part I — Motor overload
+
+A motor is rated for a continuous current it can carry for ever and a peak current it can carry for a limited
+time; the board's current limit is a third, flat bound. The overload model keeps the ratings apart. Every 1 ms
+on the event loop, in every state, it updates a thermal state θ, in A², from the torque current the active drive
+measures:
+
+  dθ/dt = (i² − θ)/τ,  τ = t_peak / −ln(1 − i_cont²/i_peak²)
+
+τ is chosen so that a cold motor (θ = 0) carrying the peak current reaches θ = i_cont² after exactly the peak
+time. While θ stays below i_cont² the drive may carry the peak current; once θ reaches i_cont² the current limit
+folds back to the continuous rating, and it is released to the peak again only once θ has fallen below half of
+i_cont², so the limit does not chatter at the threshold. A motor that keeps carrying its continuous rating holds
+θ at i_cont² and stays folded back, as it should.
+
+| Setting            | Default         | Range      | Meaning                                                   |
+|--------------------|-----------------|------------|-----------------------------------------------------------|
+| Continuous current | 0 (off)         | 0 – 100 A  | Current the motor carries for ever; 0 turns the model off |
+| Peak current       | 0 (board limit) | 0 – 100 A  | Current a cold motor may carry for the peak time          |
+| Peak time          | 1 s             | 0.1 – 60 s | How long a cold motor may carry the peak current          |
+
+Both ratings are capped at the board's current limit. A continuous rating at or above the peak leaves no overload
+regime: the current is limited to the continuous rating flatly. With the continuous rating at zero the model is
+off, θ is cleared and the board's limit is in force, as before.
+
+The state is never reset by the lifecycle: a disabled drive measures no current, so θ decays with τ, and a
+Disable followed by an Enable does not hand a hot motor its peak again. A reset of the controller does clear it;
+the model then assumes a cold motor.
+
+The limit reaches the cascades through the control-mode state machine, which keeps the latest one and hands it to
+the active cascade whenever the model changes it and whenever a mode is activated. Each cascade bounds its q-axis
+reference by it in the control interrupt, next to the board's limit (`foc-torque.md`, `foc-speed.md`). A speed or
+position law whose output the fold-back cuts keeps integrating up to its own clamp at the board's limit, so when
+the limit is released the current may rise to the peak at once; the law's anti-windup still bounds its state.
+Each change of the limit is traced.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Peak
+    Peak --> FoldedBack : θ ≥ i_cont², limit = continuous rating
+    FoldedBack --> Peak : θ < 0.5 · i_cont², limit = peak rating
+```
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface | Purpose                                                          | Contract                                                                               |
-|-----------|------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| Fault     | Reports a stall, an encoder loss or a missing phase to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Interface     | Purpose                                                                                           | Contract                                                                               |
+|---------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Current limit | Hands the overload model's current limit to its owner (Part I)                                    | Called from the event loop when the limit changes                                      |
 
 ### Required
 
@@ -259,6 +386,6 @@ stateDiagram-v2
 |------------------|--------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
 | Active drive     | Lifecycle state and the motion the drive observes                                          | Read every evaluation; the observation is written by the control interrupts  |
 | Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
-| Settings         | The configuration record's supervision fields                                              | Read every evaluation                                                        |
-| Repeating timer  | 10 ms evaluation period (1 ms for Part F)                                                  | Runs on the event loop                                                       |
+| Settings         | The configuration record's supervision fields and limits                                   | Read every evaluation                                                        |
+| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I)                                            | Runs on the event loop                                                       |
 | Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

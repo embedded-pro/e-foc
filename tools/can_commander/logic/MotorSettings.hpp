@@ -65,6 +65,7 @@ namespace tool
     std::span<const SettingPresentation> MotorParameterSettings();
     std::span<const SettingPresentation> StartupSettings();
     std::span<const SettingPresentation> SupervisionSettings();
+    std::span<const SettingPresentation> LimitSettings();
     std::span<const SettingPresentation> Readings();
     std::string_view ResetCauseName(float cause);
     std::string_view BoardKindName(float kind);

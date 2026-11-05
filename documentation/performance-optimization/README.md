@@ -421,6 +421,15 @@ GPIO_ClearPin(DEBUG_PIN);
 of which the FOC calculation itself is 739–860 — roughly 23 % of the 20 kHz period. A non-optimised
 build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
 
+The torque cascade's speed limiter (`foc-torque.md`) adds a sign test, an absolute value, a multiply-add, a
+clamp and a multiply on the q-axis setpoint each sample, about ten cycles, with no division: the limit reaches
+the interrupt as its reciprocal. It is defined beside `Calculate()` in the same translation unit and inlined
+into it, so the cycle gate measures it as part of `TorqueCascade::Calculate` without a new symbol.
+
+The motor overload protection's current limit adds one volatile load and a clamp of the q-axis reference to each
+cascade's inner loop; in the speed and position cascades it replaces the constant bound of the clamp that was
+already there, so it costs nothing there.
+
 ### Key Performance Sensitivities
 
 | Code Pattern           | Cycle Impact       | Recommendation                      |

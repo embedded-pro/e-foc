@@ -216,4 +216,9 @@ namespace foc
     {
         ClearCoggingMapImpl();
     }
+
+    void PositionCascade::LimitCurrent(Ampere limit)
+    {
+        LimitCurrentImpl(limit);
+    }
 }

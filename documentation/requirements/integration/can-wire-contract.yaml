@@ -146,3 +146,18 @@
     by the status telemetry and the fault event. Every fault the drive raises shall be reported
     with a code of its own, none going out as none, and a drive in Ready shall be reported as
     ready, distinctly from a drive in Idle, which is reported as idle or partialCalibration.
+
+- id: REQ-CAN-015
+  title: Drive-wide limits are settable over CAN and their faults have codes of their own
+  status: verified
+  verification: sil
+  shall: >
+    Contract version 2.9 shall add, without changing any 2.8 message, the stored settings
+    overspeedLimit (0x50) in rad/s, followingErrorWindow (0x51) in rad, followingErrorTime
+    (0x52) in s, speedAcceleration (0x53) and speedDeceleration (0x54) in rad/s² and
+    commandTimeout (0x55) in s, continuousCurrent (0x56) and peakCurrent (0x57) in A and
+    peakCurrentTime (0x58) in s, and overSpeed (10), followingError (11) and commandTimeout (12)
+    values of the fault code carried by the status telemetry and the fault event. Each setting
+    shall be writable in any state, answered with the value held once it is stored in the
+    configuration record, refused with invalidPayload outside its range without changing
+    anything, and read back unchanged after a restart.

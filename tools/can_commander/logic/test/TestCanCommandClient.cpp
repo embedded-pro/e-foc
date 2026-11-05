@@ -175,6 +175,23 @@ namespace
                 }));
         }
 
+        static std::size_t LimitParameterCount()
+        {
+            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
+                {
+                    return can::GroupOf(descriptor.id) == can::ParameterGroup::limits;
+                }));
+        }
+
+        bool QueriedALimit() const
+        {
+            return std::ranges::any_of(sent, [](const SentFrame& frame)
+                {
+                    return frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
+                           can::GroupOf(static_cast<can::FocParameter>(frame.payload[1])) == can::ParameterGroup::limits;
+                });
+        }
+
         bool QueriedASupervisionParameter() const
         {
             return std::ranges::any_of(sent, [](const SentFrame& frame)
@@ -790,7 +807,7 @@ TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
     AnswerAllReads();
 
     EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
     EXPECT_FALSE(QueriedAReadOnlyParameter());
     EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
 }
@@ -896,7 +913,7 @@ TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
     DeliverAck(can::focAlignId);
     AnswerAllReads();
 
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
@@ -995,7 +1012,7 @@ TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
     EXPECT_TRUE(QueriedAReadOnlyParameter());
 }
 
@@ -1018,6 +1035,28 @@ TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_setting
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsSupervision(1));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
+{
+    RecordSends();
+    BringCompatible(1, 8);
+
+    AnswerAllReads();
+
+    EXPECT_FALSE(client.SupportsLimits(1));
+    EXPECT_FALSE(QueriedALimit());
+}
+
+TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
+{
+    RecordSends();
+    BringCompatible(1, 9);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsLimits(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
@@ -1064,7 +1103,7 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
@@ -1079,7 +1118,7 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
@@ -1105,7 +1144,7 @@ TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)

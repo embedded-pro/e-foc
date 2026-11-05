@@ -29,13 +29,14 @@ namespace tool
         using Position = can::FocPositionAlgorithm;
 
         constexpr std::string_view radPerSecond{ " rad/s" };
+        constexpr std::string_view radPerSecondSquared{ " rad/s\xC2\xB2" };
         constexpr std::string_view ohm{ " \xCE\xA9" };
         constexpr std::string_view kilogramSquareMetre{ " kg\xC2\xB7m\xC2\xB2" };
         constexpr std::string_view frictionUnit{ " N\xC2\xB7m\xC2\xB7s/rad" };
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 53> presentations{ {
+        constexpr std::array<SettingPresentation, 62> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -82,6 +83,15 @@ namespace tool
             { FocParameter::supervisionPositionError, "Supervision position error", "Position error:", " rad", "Position error from which the drive counts as demanding motion. Above 3.14 rad only a speed reference counts.", {} },
             { FocParameter::supervisionStillExcursion, "Supervision still excursion", "Still excursion:", " rad", "Travel within which the encoder reading counts as still.", {} },
             { FocParameter::stallDetection, "Stall reporting", "Report stalls:", {}, "Raise a stall fault when an outside force pushes the rotor against the drive and holds it there. Encoder loss is reported either way.", {} },
+            { FocParameter::overspeedLimit, "Overspeed limit", "Overspeed limit:", radPerSecond, "Speed the rotor is kept below. Torque mode folds its current to zero over the last tenth of the limit, speed mode holds a setpoint beyond it at the limit, and every mode faults with overspeed above 110 % of it.", {} },
+            { FocParameter::followingErrorWindow, "Following-error window", "Following-error window:", " rad", "Position error that position mode may not exceed for longer than the following-error time; 0 turns the check off. Set it above the largest position step you command.", {} },
+            { FocParameter::followingErrorTime, "Following-error time", "Following-error time:", " s", "How long the position error may stay beyond the following-error window before the drive faults.", {} },
+            { FocParameter::speedAcceleration, "Speed acceleration", "Acceleration:", radPerSecondSquared, "Largest rate at which speed mode lets its speed reference grow towards the setpoint; 0 leaves it unlimited.", {} },
+            { FocParameter::speedDeceleration, "Speed deceleration", "Deceleration:", radPerSecondSquared, "Largest rate at which speed mode lets its speed reference shrink towards the setpoint, also through a reversal; 0 leaves it unlimited.", {} },
+            { FocParameter::commandTimeout, "Command timeout", "Command timeout:", " s", "Longest a running motor may go without a Start or a setpoint over CAN before it faults; 0 turns the check off. This tool sends a setpoint only when you change it, so with a timeout set a motor it starts faults once the timeout runs out.", {} },
+            { FocParameter::continuousCurrent, "Continuous current", "Continuous current:", " A", "Current the motor can carry for ever. Once a thermal model of the winding says the motor has carried more for too long, the current limit folds back to it; 0 turns the model off.", {} },
+            { FocParameter::peakCurrent, "Peak current", "Peak current:", " A", "Current a cold motor may carry for the peak time; 0 means the board's current limit, which also caps it.", {} },
+            { FocParameter::peakCurrentTime, "Peak time", "Peak time:", " s", "How long a cold motor may carry its peak current before the limit folds back to the continuous current.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -279,9 +289,14 @@ namespace tool
         return Slice(23, 6);
     }
 
+    std::span<const SettingPresentation> LimitSettings()
+    {
+        return Slice(29, 9);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(29, 24);
+        return Slice(38, 24);
     }
 
     namespace

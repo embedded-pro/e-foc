@@ -85,7 +85,7 @@ graph TD
     Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint knob"]
     Commands --> Controllers["Controllers: algorithm and settings per loop"]
     Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align, identify, calibrate"]
-    Commands --> Configuration["Configuration: start-up settings, fault supervision"]
+    Commands --> Configuration["Configuration: start-up settings, fault supervision, limits"]
     Commands --> Diagnostics["Diagnostics: readings the controller reports"]
     Commands --> Firmware["Firmware: version, board, update"]
 ```
@@ -236,6 +236,16 @@ flowchart LR
   force within 10 ms, in any state. While *Report stalls* is off — stored, or only edited — the group warns,
   in the warning colour and in words, that a rotor held against the drive can carry up to the current limit
   with no fault and only the board's thermal protection watches it; encoder loss is reported either way.
+  Its **Limits** group holds the drive-wide limits of contract 2.9 (`service-can.md`): the overspeed limit
+  that torque mode folds its current against, speed mode holds a setpoint at and every mode faults beyond
+  (`fault-supervision.md` Part G), the following-error window and time of position mode (Part H) and the
+  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp), the command timeout
+  (`service-can.md` Part F) and the motor's continuous and peak current ratings with the peak time
+  (`fault-supervision.md` Part I); a following-error window, a rate, a timeout or a continuous rating of zero
+  turns that limit off, a peak rating of zero means the board's limit, and each field's tooltip says so. The command timeout's tooltip also warns that the commander sends a setpoint
+  only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
+  setpoint. They are stored at once and in force from the next control period, in any
+  state; the group says that a drive beyond 110 % of the limit faults and coasts.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -254,7 +264,11 @@ sent with the 2.0 bandwidth commands and not read back; the motor parameter fiel
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
 reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware fault* or *Calibration failed*.
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a
+node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware
+fault* or *Calibration failed*. A node older than 2.9 has no limits: the commander does not ask it for them, the
+Limits fields are disabled with the reason, and it never reports *Overspeed*, *Following error* or *Command
+timeout*.
 
 ### Part K — diagnostics
 

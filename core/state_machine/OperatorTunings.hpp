@@ -21,4 +21,5 @@ namespace state_machine
 
     void SanitizeTunings(services::ConfigData& config);
     void SanitizeSupervision(services::ConfigData& config);
+    void SanitizeLimits(services::ConfigData& config);
 }

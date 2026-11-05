@@ -4,8 +4,11 @@
 #include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include <algorithm>
 #include <cmath>
 #include <optional>
+#include <type_traits>
+#include <variant>
 
 namespace state_machine
 {
@@ -29,6 +32,7 @@ namespace state_machine
     {
         SanitizeTunings(this->configData);
         SanitizeSupervision(this->configData);
+        SanitizeLimits(this->configData);
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
     }
@@ -139,7 +143,8 @@ namespace state_machine
         auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm);
         if (sm == nullptr)
             return false;
-        sm->GetController().SetPoint(setpoint);
+        const auto limit = configData.limits.overspeedLimit;
+        sm->GetController().SetPoint(foc::RadiansPerSecond{ std::clamp(setpoint.Value(), -limit, limit) });
         return true;
     }
 
@@ -282,6 +287,8 @@ namespace state_machine
                 TransitionPolicy::Auto,
                 nvmActivity,
                 rotorReference));
+
+        ApplyLimits();
     }
 
     void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)
@@ -772,7 +779,47 @@ namespace state_machine
 
     void ControlModeStateMachine::PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone)
     {
+        ApplyLimits();
         configWriter.Persist(onDone);
+    }
+
+    void ControlModeStateMachine::LimitCurrent(foc::Ampere limit)
+    {
+        currentLimit = limit;
+        ApplyCurrentLimit();
+    }
+
+    void ControlModeStateMachine::ApplyLimits()
+    {
+        const foc::RadiansPerSecond overspeedLimit{ configData.limits.overspeedLimit };
+        const foc::RadiansPerSecondSquared acceleration{ configData.limits.speedAcceleration };
+        const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
+
+        std::visit([&]<class Machine>(Machine& sm)
+            {
+                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
+                    sm.SpeedLimiter().LimitSpeed(overspeedLimit);
+                else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.RampSpeed(acceleration, deceleration);
+            },
+            activeSm);
+
+        ApplyCurrentLimit();
+    }
+
+    void ControlModeStateMachine::ApplyCurrentLimit()
+    {
+        if (!currentLimit.has_value())
+            return;
+
+        std::visit([limit = *currentLimit]<class Machine>(Machine& sm)
+            {
+                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
+                    sm.CurrentLimiter().LimitCurrent(limit);
+                else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.LimitCurrent(limit);
+            },
+            activeSm);
     }
 
     bool ControlModeStateMachine::HasPendingConfigWrite() const

@@ -19,6 +19,7 @@ namespace foc
         , maxCurrent{ maxCurrent }
         , outerLoopFrequency{ lowPriorityFrequency }
         , speedDifferentiator{ lowPriorityFrequency }
+        , quadratureLimit{ maxCurrent.Value() }
         , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
         , estimatorWindow{ baseFrequency, prescaler, dutyUpdateDelayPeriods }
         , directAxisExcitation{ Ampere{ maxCurrent.Value() * excitationCurrentFraction }, excitationFrequency, lowPriorityFrequency, excitationBurst, excitationCycle }
@@ -132,7 +133,8 @@ namespace foc
         if (currentStream != nullptr)
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
-        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -maxCurrent.Value(), maxCurrent.Value());
+        const float limit = quadratureLimit;
+        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -limit, limit);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
 
         const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
@@ -152,6 +154,11 @@ namespace foc
         }
 
         return duties;
+    }
+
+    void CascadeWithSpeedLoop::LimitCurrentImpl(Ampere limit)
+    {
+        quadratureLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
     }
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)

@@ -2,9 +2,9 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: service-cogging-compensation
-date: 2026-10-22
+date: 2026-11-05
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Cogging Compensation |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.1.0                         |
+| Version   | 0.3.0                         |
 | Component | service-cogging-compensation  |
-| Date      | 2026-10-22                    |
+| Date      | 2026-11-05                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -39,12 +39,13 @@ between the neighbouring detents instead (`documentation/theory/position-loop-pi
 **Is responsible for:**
 - Measuring the cogging torque over one electrical period during the full calibration, in speed
   and position mode, and storing it with the calibration record
-- Adding the measured torque, as current, to what the speed and position cascades ask of the
-  winding at every control interrupt
+- Adding the measured torque, as current, to what the torque, speed and position cascades ask of
+  the winding at every control interrupt
 - Keeping that addition out of the torque the online mechanical estimator regresses
 
 **Is NOT responsible for:**
-- Torque mode, which runs no mechanical identification and so measures no map
+- Measuring a map in torque mode, which runs no mechanical identification; it compensates with the map a
+  speed or position calibration stored in the shared record
 - A rotor angle reference across power cycles, which the alignment provides (Part E)
 
 ---
@@ -139,6 +140,14 @@ depth. The bins average the torque across their width, which takes about 2.5 % o
 The map is cleared before the mechanical identification runs, so a calibration measures the plant
 without the compensation from an earlier one.
 
+Torque mode compensates with the same map once a speed or position calibration has stored one, since the
+calibration record is shared by the modes. Its cascade adds the current to the operator's q-axis setpoint
+after the speed limiter (`foc-torque.md`), so the limiter folds the operator's torque and not the cogging's,
+and holds the sum within the current limit. The compensation is added, not part of the command: the demand the
+cascade reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step,
+such as the flux-linkage identification's, is not compensated, and a new calibration clears the map before it
+identifies the motor, as in the other modes (REQ-TRQ-012).
+
 The online mechanical estimator regresses the current without the compensation's share. The
 compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
 the inertia, the friction, and only what the map missed (`service-mechanical-ident.md`).
@@ -150,8 +159,8 @@ the inertia, the friction, and only what the map missed (`service-mechanical-ide
   the map was measured. A map applied after a later alignment is shifted by that much, and the
   compensation leaves a residual that grows with the shift. Within the power cycle that measured
   the map there is no shift.
-- **Torque mode.** It runs no mechanical identification and measures no map, and its setpoint is
-  passed through without the compensation.
+- **Torque mode without a stored map.** It runs no mechanical identification and measures no map of its
+  own; until a speed or position calibration has stored one, its setpoint is passed through uncompensated.
 - **Differences between pole pairs.** One electrical period holds the average of the four.
 
 ---
@@ -194,10 +203,10 @@ sequenceDiagram
 
 ### Provided
 
-| Interface            | Purpose                                                  | Contract                                                                  |
-|----------------------|----------------------------------------------------------|---------------------------------------------------------------------------|
-| Cogging mapping      | Measure the map during the calibration                   | One run at a time; reports a map or none exactly once, unless aborted     |
-| Cogging compensation | Load or clear the map in the speed and position cascades | Takes effect at the next control interrupt; a cleared map adds no current |
+| Interface            | Purpose                                                          | Contract                                                                  |
+|----------------------|------------------------------------------------------------------|---------------------------------------------------------------------------|
+| Cogging mapping      | Measure the map during the calibration                           | One run at a time; reports a map or none exactly once, unless aborted     |
+| Cogging compensation | Load or clear the map in the torque, speed and position cascades | Takes effect at the next control interrupt; a cleared map adds no current |
 
 ### Required
 
@@ -225,6 +234,11 @@ sequenceDiagram
     direction and scales with the torque constant.
   - The cascade asks for the cogging current at standstill once a map is loaded and stops when it
     is cleared, and the mechanical estimator's window leaves the compensation out.
+  - The torque cascade adds the cogging current to the operator's setpoint, within the current
+    limit, not to a calibration's current command, and reports the operator's demand.
+- **MIL and SIL.** On the bench plant, with the map a speed-mode calibration measured, a 0.12 A
+  torque command turns the rotor; without a map it stays in a detent (REQ-TRQ-012). The SIL
+  scenario read 61.8 rad of travel in 2 s with the map and 0.010 rad without.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
   - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
     3.90 mN·m against 4.0 across runs;

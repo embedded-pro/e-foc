@@ -135,3 +135,23 @@
     requirement measured, rounded up: 7.86 percent on CI for the step from rest, and 7.38 percent
     on CI for this one, against 3.5 to 5.8 percent over twenty local runs. Both use the same law on
     the same plant, so they carry one bound (software-in-the-loop.md Part I).
+
+- id: REQ-TRQ-012
+  title: Cogging compensation in torque mode
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    When the calibration record holds a cogging map and the torque constant is known, the torque
+    mode shall add, at every control interrupt, the map's current at the rotor's electrical angle
+    to the operator's q-axis setpoint after the speed limiter, and shall hold the sum within the
+    current limit. The demand the drive reports shall stay the operator's command. A current
+    command of a calibration step shall not be compensated, and a new calibration shall clear the
+    map before it identifies the motor. On the bench plant, with the map the full calibration
+    measured, a torque command of 0.12 A, above the shaft's dry friction but below the dry
+    friction and the cogging together, shall turn the rotor through at least one revolution in
+    2 s; without a map the same command shall leave it in a detent.
+  rationale: >
+    At 0.12 A the bench motor's 5.0 mN·m clears the 3.7 mN·m of dry friction but not the 7.7 mN·m
+    of dry friction and cogging together. A larger command lets the current-sense noise of the
+    emulated board shake an uncompensated rotor out of its detents, so it no longer tells the two
+    apart. The SIL scenario read 61.8 rad with the map and 0.010 rad without.

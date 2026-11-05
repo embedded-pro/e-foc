@@ -104,6 +104,44 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_each_supervision_setting_outside
     EXPECT_EQ(config.stallDetection, uint8_t{ 1 });
 }
 
+TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its_default)
+{
+    config.limits.overspeedLimit = 0.5f;
+    config.limits.followingErrorWindow = -1.0f;
+    config.limits.followingErrorTime = 20.0f;
+    config.limits.speedAcceleration = -5.0f;
+    config.limits.speedDeceleration = 2.0e5f;
+    config.limits.commandTimeout = 61.0f;
+    config.limits.continuousCurrent = -1.0f;
+    config.limits.peakCurrent = 500.0f;
+    config.limits.peakCurrentTime = 0.0f;
+
+    state_machine::SanitizeLimits(config);
+
+    EXPECT_NEAR(config.limits.overspeedLimit, services::LimitSettings{}.overspeedLimit, 1e-6f);
+    EXPECT_NEAR(config.limits.followingErrorWindow, services::LimitSettings{}.followingErrorWindow, 1e-6f);
+    EXPECT_NEAR(config.limits.followingErrorTime, services::LimitSettings{}.followingErrorTime, 1e-6f);
+    EXPECT_NEAR(config.limits.speedAcceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.speedDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.commandTimeout, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.continuousCurrent, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.peakCurrent, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.peakCurrentTime, services::LimitSettings{}.peakCurrentTime, 1e-6f);
+}
+
+TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
+{
+    config.limits.overspeedLimit = 50.0f;
+    config.limits.followingErrorWindow = 0.3f;
+    config.limits.followingErrorTime = 0.05f;
+
+    state_machine::SanitizeLimits(config);
+
+    EXPECT_NEAR(config.limits.overspeedLimit, 50.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.followingErrorWindow, 0.3f, 1e-6f);
+    EXPECT_NEAR(config.limits.followingErrorTime, 0.05f, 1e-6f);
+}
+
 TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)
 {
     config.stallDetection = 0;

@@ -46,5 +46,16 @@ namespace foc
         static constexpr float maxSupervisionPositionError{ 3.2f };
         static constexpr float minSupervisionStillExcursion{ 1.0e-3f };
         static constexpr float maxSupervisionStillExcursion{ 1.0f };
+
+        static constexpr float minOverspeedLimit{ 1.0f };
+        static constexpr float maxOverspeedLimit{ 5000.0f };
+        static constexpr float maxFollowingErrorWindow{ 3.2f };
+        static constexpr float minFollowingErrorTime{ 0.001f };
+        static constexpr float maxFollowingErrorTime{ 10.0f };
+        static constexpr float maxSpeedRate{ 100000.0f };
+        static constexpr float maxCommandTimeout{ 60.0f };
+        static constexpr float maxRatedCurrent{ 100.0f };
+        static constexpr float minPeakCurrentTime{ 0.1f };
+        static constexpr float maxPeakCurrentTime{ 60.0f };
     };
 }

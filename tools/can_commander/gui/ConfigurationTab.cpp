@@ -2,14 +2,15 @@
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <algorithm>
+#include <span>
 
 namespace tool
 {
     namespace
     {
-        bool IsSupervisionSetting(can::FocParameter parameter)
+        bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter)
         {
-            return std::ranges::any_of(SupervisionSettings(), [parameter](const SettingPresentation& setting)
+            return std::ranges::any_of(settings, [parameter](const SettingPresentation& setting)
                 {
                     return setting.parameter == parameter;
                 });
@@ -21,6 +22,7 @@ namespace tool
     {
         BuildStartupGroup();
         BuildSupervisionGroup();
+        BuildLimitsGroup();
         Content().addStretch();
 
         Refresh();
@@ -58,6 +60,19 @@ namespace tool
         form.addRow(stallWarning);
     }
 
+    void ConfigurationTab::BuildLimitsGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Limits", group);
+        AddEditors(form, LimitSettings());
+
+        auto* note = new QLabel("One set for every control mode, stored at once and in force within 1 ms, also while the motor "
+                                "runs. Above 110 % of the overspeed limit, or beyond the following-error window for its time in "
+                                "position mode, the drive faults and coasts.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -76,6 +91,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetLimitsUnavailable(const QString& reason)
+    {
+        if (reason == limitsReason)
+            return;
+
+        limitsReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::Refresh()
     {
         const auto* stall = EditorFor(can::FocParameter::stallDetection);
@@ -87,8 +112,10 @@ namespace tool
     void ConfigurationTab::ShowAvailability()
     {
         for (auto* editor : Editors())
-            if (IsSupervisionSetting(editor->Parameter()))
+            if (IsIn(SupervisionSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? supervisionReason : legacyReason);
+            else if (IsIn(LimitSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? limitsReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

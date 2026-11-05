@@ -16,7 +16,10 @@ namespace state_machine
         hardwareFault,
         calibrationFailed,
         stall,
-        phaseMissing
+        phaseMissing,
+        overspeed,
+        followingError,
+        commandTimeout
     };
 
     constexpr const char* FaultCodeName(FaultCode code)
@@ -43,6 +46,12 @@ namespace state_machine
                 return "stall";
             case FaultCode::phaseMissing:
                 return "phaseMissing";
+            case FaultCode::overspeed:
+                return "overspeed";
+            case FaultCode::followingError:
+                return "followingError";
+            case FaultCode::commandTimeout:
+                return "commandTimeout";
         }
 
         return "unknown";

@@ -16,6 +16,7 @@ namespace tool
 
         void SetLegacy(bool legacyContract) override;
         void SetSupervisionUnavailable(const QString& reason);
+        void SetLimitsUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -23,10 +24,12 @@ namespace tool
     private:
         void BuildStartupGroup();
         void BuildSupervisionGroup();
+        void BuildLimitsGroup();
         void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };
         QString legacyReason;
         QString supervisionReason;
+        QString limitsReason;
     };
 }

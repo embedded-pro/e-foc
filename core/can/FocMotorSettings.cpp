@@ -55,32 +55,43 @@ namespace can
                     return std::nullopt;
             }
         }
+
+        std::optional<ParameterGroup> LoopGroupOf(FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::currentBandwidth:
+                case FocParameter::currentSwitchingGain:
+                case FocParameter::currentBoundaryLayer:
+                case FocParameter::currentTwoStepDeadbeat:
+                    return ParameterGroup::currentLoop;
+                case FocParameter::speedBandwidth:
+                case FocParameter::speedErrorWeight:
+                case FocParameter::speedIntegralWeight:
+                case FocParameter::speedObserverBandwidthRatio:
+                case FocParameter::speedReferenceTimeConstant:
+                    return ParameterGroup::speedLoop;
+                case FocParameter::positionBandwidth:
+                case FocParameter::positionErrorWeight:
+                case FocParameter::positionSpeedErrorWeight:
+                case FocParameter::positionIntegralWeight:
+                case FocParameter::positionReferenceTimeConstant:
+                    return ParameterGroup::positionLoop;
+                default:
+                    return std::nullopt;
+            }
+        }
     }
 
     ParameterGroup GroupOf(FocParameter parameter)
     {
         if (const auto reading = ReadingGroupOf(parameter))
             return *reading;
+        if (const auto loop = LoopGroupOf(parameter))
+            return *loop;
 
         switch (parameter)
         {
-            case FocParameter::currentBandwidth:
-            case FocParameter::currentSwitchingGain:
-            case FocParameter::currentBoundaryLayer:
-            case FocParameter::currentTwoStepDeadbeat:
-                return ParameterGroup::currentLoop;
-            case FocParameter::speedBandwidth:
-            case FocParameter::speedErrorWeight:
-            case FocParameter::speedIntegralWeight:
-            case FocParameter::speedObserverBandwidthRatio:
-            case FocParameter::speedReferenceTimeConstant:
-                return ParameterGroup::speedLoop;
-            case FocParameter::positionBandwidth:
-            case FocParameter::positionErrorWeight:
-            case FocParameter::positionSpeedErrorWeight:
-            case FocParameter::positionIntegralWeight:
-            case FocParameter::positionReferenceTimeConstant:
-                return ParameterGroup::positionLoop;
             case FocParameter::encoderResolution:
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
@@ -92,6 +103,16 @@ namespace can
             case FocParameter::supervisionStillExcursion:
             case FocParameter::stallDetection:
                 return ParameterGroup::supervision;
+            case FocParameter::overspeedLimit:
+            case FocParameter::followingErrorWindow:
+            case FocParameter::followingErrorTime:
+            case FocParameter::speedAcceleration:
+            case FocParameter::speedDeceleration:
+            case FocParameter::commandTimeout:
+            case FocParameter::continuousCurrent:
+            case FocParameter::peakCurrent:
+            case FocParameter::peakCurrentTime:
+                return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
         }
@@ -263,6 +284,65 @@ namespace can
                 break;
             default:
                 config.supervision.window = value;
+                break;
+        }
+    }
+
+    float LimitSettingOf(const services::ConfigData& config, FocParameter parameter)
+    {
+        switch (parameter)
+        {
+            case FocParameter::followingErrorWindow:
+                return config.limits.followingErrorWindow;
+            case FocParameter::followingErrorTime:
+                return config.limits.followingErrorTime;
+            case FocParameter::speedAcceleration:
+                return config.limits.speedAcceleration;
+            case FocParameter::speedDeceleration:
+                return config.limits.speedDeceleration;
+            case FocParameter::commandTimeout:
+                return config.limits.commandTimeout;
+            case FocParameter::continuousCurrent:
+                return config.limits.continuousCurrent;
+            case FocParameter::peakCurrent:
+                return config.limits.peakCurrent;
+            case FocParameter::peakCurrentTime:
+                return config.limits.peakCurrentTime;
+            default:
+                return config.limits.overspeedLimit;
+        }
+    }
+
+    void WriteLimitSetting(services::ConfigData& config, FocParameter parameter, float value)
+    {
+        switch (parameter)
+        {
+            case FocParameter::followingErrorWindow:
+                config.limits.followingErrorWindow = value;
+                break;
+            case FocParameter::followingErrorTime:
+                config.limits.followingErrorTime = value;
+                break;
+            case FocParameter::speedAcceleration:
+                config.limits.speedAcceleration = value;
+                break;
+            case FocParameter::speedDeceleration:
+                config.limits.speedDeceleration = value;
+                break;
+            case FocParameter::commandTimeout:
+                config.limits.commandTimeout = value;
+                break;
+            case FocParameter::continuousCurrent:
+                config.limits.continuousCurrent = value;
+                break;
+            case FocParameter::peakCurrent:
+                config.limits.peakCurrent = value;
+                break;
+            case FocParameter::peakCurrentTime:
+                config.limits.peakCurrentTime = value;
+                break;
+            default:
+                config.limits.overspeedLimit = value;
                 break;
         }
     }

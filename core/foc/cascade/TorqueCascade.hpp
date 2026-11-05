@@ -6,6 +6,7 @@
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
@@ -15,6 +16,9 @@ namespace foc
     class TorqueCascade
         : public FocTorque
         , public CurrentCommandable
+        , public SpeedLimitable
+        , public CurrentLimitable
+        , public CoggingCompensable
     {
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
@@ -35,9 +39,16 @@ namespace foc
         void CommandCurrent(Ampere quadrature) override;
         Volts QuadratureVoltage() const override;
 
+        void LimitSpeed(RadiansPerSecond limit) override;
+        void LimitCurrent(Ampere limit) override;
+        void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
+        void ClearCoggingMap() override;
+
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
+        void UpdateSpeedLimit();
         IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;
+        float LimitedQuadrature(float quadrature, float electricalSpeed, float feedForward) const;
 
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
@@ -49,15 +60,32 @@ namespace foc
         IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
         TripleBuffer<IdAndIqPoint> setPointBuffer;
 
-        float electricalSpeedScale{ 0.0f };
-        filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };
+        struct SpeedMeasurement
+        {
+            float scale{ 0.0f };
+            filters::passive::ExponentialMovingAverage<float> filter{ 1.0f };
+            float previousMechanicalAngle{ 0.0f };
+            bool previousAngleValid{ false };
+        };
+
+        struct DriveLimits
+        {
+            RadiansPerSecond speed{ 0.0f };
+            // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
+            volatile float inverseElectricalSpeed{ 0.0f };
+            // Written by the event loop, read by the control interrupt; never above the envelope.
+            volatile float current{ 0.0f };
+        };
+
+        SpeedMeasurement speedMeasurement;
         QuadratureVoltageWindow voltageWindow;
         float voltageScale{ 0.0f };
         uint32_t samplesPerMillisecond{ 1 };
-        float previousMechanicalAngle{ 0.0f };
-        bool previousAngleValid{ false };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastIq{ 0.0f };
+        DriveLimits limits;
+        CoggingFeedForward coggingFeedForward;
+        volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };
     };
 }

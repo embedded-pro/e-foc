@@ -22,6 +22,7 @@
       "integration_tests/features/control_modes.feature",
       "integration_tests/features/control_performance.feature",
       "integration_tests/features/controller_matrix.feature",
+      "integration_tests/features/drive_limits.feature",
       "integration_tests/features/motor_control.feature",
       "integration_tests/features/parameter_identification.feature",
       "integration_tests/features/protection_faults.feature"

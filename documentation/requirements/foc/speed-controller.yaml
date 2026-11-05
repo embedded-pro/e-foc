@@ -92,3 +92,24 @@
     (documentation/theory/foc-plant-models.md, Reference motors); it is small on purpose, so that the loop
     stays out of current saturation and the numbers measure the control law rather than the current limit.
     The 0.5 N·m step is 182 percent of that rated torque.
+
+- id: REQ-SPD-010
+  title: Speed acceleration and deceleration ramps
+  status: verified
+  verification: [sil, mil]
+  shall: >
+    The drive shall hold a speed acceleration and a speed deceleration in the configuration
+    record, each settable from 0 to 100000 rad/s² with 0, the default, meaning no limit, in force
+    from the next outer-loop period in any state. In speed mode the speed reference shall move
+    towards the operator's setpoint by at most the acceleration per second while its magnitude
+    grows and by at most the deceleration per second while it shrinks, a reversal decelerating
+    to zero before it accelerates; a reference starts from zero at every Enable. A speed command
+    of a calibration step shall not be ramped. At 100 rad/s², a step of the setpoint from 0 to
+    20 rad/s shall bring the speed within 0.5 rad/s of 20 rad/s in 200 ms ± 10 % with an
+    overshoot below 3.5 %, for every speed control law.
+  rationale: >
+    The laws follow the ramp with a lag and no acceleration feed-forward, so the integrating laws
+    carry the ramp's effort in their integrator and overshoot when the ramp ends: 2.7 % under the
+    PI and 2.2 % under the two-DOF law on the nominal plant, below 1 % under LQI and ADRC
+    (integration_tests/model_in_the_loop/test/TestDriveLimits.cpp). The 3.5 % bound leaves a
+    margin above the worst.

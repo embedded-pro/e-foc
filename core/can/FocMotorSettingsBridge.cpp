@@ -31,10 +31,18 @@ namespace can
             }
         }
 
+        bool IsStoredSetting(FocParameter parameter)
+        {
+            const auto group = GroupOf(parameter);
+            return group == ParameterGroup::startup || group == ParameterGroup::supervision || group == ParameterGroup::limits;
+        }
+
         float StoredSettingOf(const services::ConfigData& config, FocParameter parameter)
         {
             if (GroupOf(parameter) == ParameterGroup::supervision)
                 return SupervisionSettingOf(config, parameter);
+            if (GroupOf(parameter) == ParameterGroup::limits)
+                return LimitSettingOf(config, parameter);
             return static_cast<float>(StartupSettingOf(config, parameter));
         }
 
@@ -42,6 +50,8 @@ namespace can
         {
             if (GroupOf(parameter) == ParameterGroup::supervision)
                 WriteSupervisionSetting(config, parameter, value);
+            else if (GroupOf(parameter) == ParameterGroup::limits)
+                WriteLimitSetting(config, parameter, value);
             else
                 WriteStartupSetting(config, parameter, static_cast<uint32_t>(value));
         }
@@ -176,7 +186,7 @@ namespace can
 
         if (GroupOf(parameter) == ParameterGroup::motor)
             controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
-        else if (GroupOf(parameter) == ParameterGroup::startup || GroupOf(parameter) == ParameterGroup::supervision)
+        else if (IsStoredSetting(parameter))
             SetStoredSetting(parameter, value);
         else
             SetLoopSetting(parameter, value, completed);
@@ -200,6 +210,7 @@ namespace can
                 return HeldMotorParameter(parameter);
             case ParameterGroup::startup:
             case ParameterGroup::supervision:
+            case ParameterGroup::limits:
                 return FocParameterValue{ StoredSettingOf(controlMode.Config(), parameter), false };
             case ParameterGroup::calibrationRecord:
                 return HeldCalibrationReading(parameter);

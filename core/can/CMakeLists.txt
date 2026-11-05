@@ -43,6 +43,8 @@ target_sources(e_foc.can PRIVATE
     FocMotorCanClient.cpp
     FocMotorCurrentStreamer.hpp
     FocMotorCurrentStreamer.cpp
+    CanCommandTimeout.hpp
+    CanCommandTimeout.cpp
     CanLivenessWatchdog.hpp
     CanLivenessWatchdog.cpp
     UntracedStreamCan.hpp

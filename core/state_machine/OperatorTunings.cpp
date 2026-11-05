@@ -121,4 +121,20 @@ namespace state_machine
         if (config.stallDetection > 1)
             config.stallDetection = services::ConfigData{}.stallDetection;
     }
+
+    void SanitizeLimits(services::ConfigData& config)
+    {
+        constexpr services::LimitSettings defaults{};
+        auto& stored = config.limits;
+
+        stored.overspeedLimit = WithinOrDefault(stored.overspeedLimit, CommandLimits::minOverspeedLimit, CommandLimits::maxOverspeedLimit, defaults.overspeedLimit);
+        stored.followingErrorWindow = WithinOrDefault(stored.followingErrorWindow, 0.0f, CommandLimits::maxFollowingErrorWindow, defaults.followingErrorWindow);
+        stored.followingErrorTime = WithinOrDefault(stored.followingErrorTime, CommandLimits::minFollowingErrorTime, CommandLimits::maxFollowingErrorTime, defaults.followingErrorTime);
+        stored.speedAcceleration = WithinOrDefault(stored.speedAcceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedAcceleration);
+        stored.speedDeceleration = WithinOrDefault(stored.speedDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedDeceleration);
+        stored.commandTimeout = WithinOrDefault(stored.commandTimeout, 0.0f, CommandLimits::maxCommandTimeout, defaults.commandTimeout);
+        stored.continuousCurrent = WithinOrDefault(stored.continuousCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.continuousCurrent);
+        stored.peakCurrent = WithinOrDefault(stored.peakCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.peakCurrent);
+        stored.peakCurrentTime = WithinOrDefault(stored.peakCurrentTime, CommandLimits::minPeakCurrentTime, CommandLimits::maxPeakCurrentTime, defaults.peakCurrentTime);
+    }
 }

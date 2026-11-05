@@ -32,6 +32,12 @@ namespace
             return can::FocFaultCode::hardwareFault;
         if (name == "calibration")
             return can::FocFaultCode::calibrationFailed;
+        if (name == "overspeed")
+            return can::FocFaultCode::overSpeed;
+        if (name == "following-error")
+            return can::FocFaultCode::followingError;
+        if (name == "command-timeout")
+            return can::FocFaultCode::commandTimeout;
         return std::nullopt;
     }
 }

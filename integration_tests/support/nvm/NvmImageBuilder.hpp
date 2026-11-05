@@ -7,7 +7,7 @@
 
 namespace sil
 {
-    static constexpr std::size_t nvmImageSize = 256;
+    static constexpr std::size_t nvmImageSize = 512;
     static constexpr uint32_t calibrationRegionOffset = 0;
     static constexpr uint32_t configRegionOffset = 128;
 

@@ -16,6 +16,7 @@ namespace can
         motor,
         startup,
         supervision,
+        limits,
         calibrationRecord,
         onlineEstimate,
         loopStatistics,
@@ -41,6 +42,9 @@ namespace can
 
     float SupervisionSettingOf(const services::ConfigData& config, FocParameter parameter);
     void WriteSupervisionSetting(services::ConfigData& config, FocParameter parameter, float value);
+
+    float LimitSettingOf(const services::ConfigData& config, FocParameter parameter);
+    void WriteLimitSetting(services::ConfigData& config, FocParameter parameter, float value);
 
     foc::CurrentAlgorithm ToCurrentAlgorithm(uint8_t algorithm);
     foc::SpeedAlgorithm ToSpeedAlgorithm(uint8_t algorithm);

@@ -4,6 +4,7 @@
 #include "can-lite/server/CanProtocolServer.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
 #include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
+#include "core/can/CanCommandTimeout.hpp"
 #include "core/can/CanLivenessWatchdog.hpp"
 #include "core/can/FirmwareUpgradeInterlock.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
@@ -30,6 +31,9 @@
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/supervision/EncoderFreezeMonitor.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
+#include "core/supervision/FollowingErrorMonitor.hpp"
+#include "core/supervision/MotorOverload.hpp"
+#include "core/supervision/OverspeedMonitor.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
@@ -46,7 +50,7 @@ namespace application
         static constexpr uint32_t calibrationRegionOffset = 0;
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
-        static constexpr uint32_t configRegionSize = 128;
+        static constexpr uint32_t configRegionSize = 256;
         static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
         static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
@@ -75,6 +79,10 @@ namespace application
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         supervision::EncoderFreezeMonitor encoderFreeze;
         supervision::PhaseLossMonitor phaseLoss;
+        supervision::OverspeedMonitor overspeed;
+        supervision::FollowingErrorMonitor followingError;
+        can::CanCommandTimeout commandTimeout;
+        supervision::MotorOverload motorOverload;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 

@@ -49,6 +49,7 @@ namespace can
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };
 
         void BroadcastFault(state_machine::FaultCode code);
+        void ObserveCommands(const infra::Function<void()>& onAccepted);
 
         void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
@@ -82,6 +83,7 @@ namespace can
         void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         bool SetpointAllowedInCurrentState() const;
+        void NotifyCommandAccepted();
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
@@ -92,5 +94,6 @@ namespace can
         FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
+        infra::Function<void()> commandAccepted;
     };
 }

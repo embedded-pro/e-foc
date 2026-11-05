@@ -221,6 +221,12 @@ namespace tool
                 return "Hardware fault";
             case FocFaultCode::calibrationFailed:
                 return "Calibration failed";
+            case FocFaultCode::overSpeed:
+                return "Overspeed";
+            case FocFaultCode::followingError:
+                return "Following error";
+            case FocFaultCode::commandTimeout:
+                return "Command timeout";
             default:
                 return "Unknown";
         }

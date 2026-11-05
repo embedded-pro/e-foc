@@ -715,6 +715,34 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeed_Returns_True_When_Speed_Mode_
     EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ 10.0f }));
 }
 
+TEST_F(ControlModeStateMachineExtTest, a_speed_setpoint_beyond_the_overspeed_limit_is_held_at_the_limit)
+{
+    GivenNvmAlwaysInvalid();
+    services::ConfigData config{};
+    config.defaultControlMode = static_cast<uint8_t>(state_machine::ControlMode::speed);
+    config.limits.overspeedLimit = 50.0f;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ 80.0f }));
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().demandedSpeed.Value(), 50.0f, 1e-6f);
+
+    EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ -80.0f }));
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().demandedSpeed.Value(), -50.0f, 1e-6f);
+
+    EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ 20.0f }));
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().demandedSpeed.Value(), 20.0f, 1e-6f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, a_stored_overspeed_limit_outside_its_range_is_replaced_by_its_default)
+{
+    GivenNvmAlwaysInvalid();
+    services::ConfigData config{};
+    config.limits.overspeedLimit = -3.0f;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_NEAR(subject->Config().limits.overspeedLimit, services::LimitSettings{}.overspeedLimit, 1e-6f);
+}
+
 TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position_Mode_Active)
 {
     GivenNvmAlwaysInvalid();

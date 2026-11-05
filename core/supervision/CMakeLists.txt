@@ -20,6 +20,12 @@ target_sources(e_foc.supervision PRIVATE
     EncoderFreezeMonitor.cpp
     EncoderPlausibilityMonitor.hpp
     EncoderPlausibilityMonitor.cpp
+    FollowingErrorMonitor.hpp
+    FollowingErrorMonitor.cpp
+    MotorOverload.hpp
+    MotorOverload.cpp
+    OverspeedMonitor.hpp
+    OverspeedMonitor.cpp
     PhaseLossMonitor.hpp
     PhaseLossMonitor.cpp
 )

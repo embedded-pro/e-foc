@@ -1,0 +1,64 @@
+- id: REQ-PRT-003
+  title: Overspeed supervision and a speed limiter in torque mode
+  status: verified
+  verification: [sil, mil]
+  shall: >
+    The drive shall hold one overspeed limit in the configuration record, settable from 1 to
+    5000 rad/s with a default of 1000 rad/s, in force from its next use in any state. In torque
+    mode the drive shall scale a torque current that pushes the rotor further in the direction it
+    turns linearly from its commanded value at 90 % of the limit to zero at the limit, and shall
+    leave a current that brakes the rotor unchanged. In speed mode a speed setpoint beyond the
+    limit shall be held at the limit. In every control mode, while Enabled, the drive shall enter
+    Fault with overspeed when the measured speed exceeds 110 % of the limit in five consecutive
+    1 ms evaluations of the event loop. With a 1 A torque command, no load and a 100 rad/s limit,
+    the speed shall settle between 90 and 100 rad/s and shall not pass 102 rad/s on the way; with
+    an outside torque that drives the rotor past 110 rad/s, the drive shall fault within 10 ms of
+    passing it.
+
+- id: REQ-PRT-004
+  title: Following-error window in position mode
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall hold a following-error window, settable from 0 to 3.2 rad with 0 turning the
+    check off and 0 as the default, and a following-error time, settable from 0.001 to 10 s with
+    a default of 0.1 s, in the configuration record, in force from their next use in any state.
+    While Enabled in position mode with a window above zero, the drive shall enter Fault with
+    followingError when the magnitude of the wrapped mechanical position error between the
+    setpoint and the measured position exceeds the window without a break for the time, measured
+    from the first 1 ms evaluation of the event loop that sees it. A load the drive cannot hold
+    shall fault it within the time plus 20 ms of its position error passing the window.
+
+- id: REQ-PRT-007
+  title: A CAN client that stops commanding an enabled drive faults it
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall hold a command timeout in the configuration record, settable from 0 to 60 s
+    with 0, the default, turning it off, in force from its next use in any state. While Enabled
+    with a timeout above zero, the drive shall enter Fault with commandTimeout when neither an
+    accepted Start command nor an accepted torque, speed or position setpoint command has
+    arrived over CAN for the timeout, counted from the later of the latest such command and the
+    entry to Enabled, within 10 ms of the timeout running out. Other commands and the CAN
+    client's heartbeat shall not count, so a client whose application hangs while its CAN stack
+    keeps running is caught. With a 500 ms timeout and a client that sends no setpoint after its
+    Start, the drive shall leave Enabled 500 ms ± 10 ms after the Start.
+
+- id: REQ-PRT-001
+  title: Motor overload protection with continuous and peak current ratings
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall hold a continuous current rating, settable from 0 to 100 A with 0, the
+    default, turning the protection off, a peak current rating, settable from 0 to 100 A with 0,
+    the default, meaning the board's current limit, and a peak time, settable from 0.1 to 60 s
+    with a default of 1 s, in the configuration record, in force from their next use in any
+    state. With a continuous rating set, the drive shall keep a thermal state h in A², updated
+    every 1 ms from the measured torque current i as dh/dt = (i² - h)/T with the time constant
+    T = t_peak / ln(i_peak² / (i_peak² - i_cont²)), in every state, so that it survives a Disable
+    and an Enable. The drive shall limit its torque current to the peak rating while h stays below
+    i_cont², fold it back to the continuous rating once h reaches i_cont², and release it to the
+    peak again once h falls below 0.5·i_cont². Neither rating shall exceed the board's current
+    limit, and a continuous rating at or above the peak shall limit the current to it flatly.
+    With 2 A continuous and 3 A peak for 2 s, a held rotor commanded 3 A from cold shall carry
+    3 A for 2.0 s ± 10 % and 2 A after it.

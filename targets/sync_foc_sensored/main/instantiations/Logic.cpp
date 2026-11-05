@@ -63,6 +63,23 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , overspeed{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
+        , followingError{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
+        , commandTimeout{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
+        , motorOverload{ hardware.MaxCurrentSupported(), [this](foc::Ampere limit)
+            {
+                this->hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
+                controlMode->LimitCurrent(limit);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
@@ -106,6 +123,26 @@ namespace application
                     can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade },
                     this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
+                canBridge->ObserveCommands([this]()
+                    {
+                        commandTimeout.CommandAccepted();
+                    });
+                commandTimeout.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                motorOverload.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                motorOverload.Enable([this]()
+                    {
+                        return supervision::OverloadRatingsFrom(controlMode->Config());
+                    });
+                commandTimeout.Enable([this]()
+                    {
+                        return std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(controlMode->Config().limits.commandTimeout));
+                    });
                 currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
@@ -130,6 +167,22 @@ namespace application
                 phaseLoss.Enable([this]()
                     {
                         return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
+                    });
+                overspeed.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                overspeed.Enable([this]()
+                    {
+                        return foc::RadiansPerSecond{ controlMode->Config().limits.overspeedLimit };
+                    });
+                followingError.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                followingError.Enable([this]()
+                    {
+                        return supervision::FollowingErrorSettingsFrom(controlMode->Config());
                     });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {

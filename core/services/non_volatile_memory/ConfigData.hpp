@@ -40,6 +40,19 @@ namespace services
         float stillExcursion = 0.01f;
     };
 
+    struct LimitSettings
+    {
+        float overspeedLimit = 1000.0f;
+        float followingErrorWindow = 0.0f;
+        float followingErrorTime = 0.1f;
+        float speedAcceleration = 0.0f;
+        float speedDeceleration = 0.0f;
+        float commandTimeout = 0.0f;
+        float continuousCurrent = 0.0f;
+        float peakCurrent = 0.0f;
+        float peakCurrentTime = 1.0f;
+    };
+
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
     {
@@ -51,6 +64,7 @@ namespace services
         SpeedLoopSettings speedLoop;
         PositionLoopSettings positionLoop;
         SupervisionSettings supervision;
+        LimitSettings limits;
         uint8_t defaultControlMode = 0;
         uint8_t currentAlgorithm = 0;
         uint8_t speedAlgorithm = 0;
@@ -60,7 +74,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 96, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 132, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {
