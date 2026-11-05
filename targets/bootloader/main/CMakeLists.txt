@@ -39,6 +39,9 @@ if(TARGET_MCU_VENDOR STREQUAL "ti")
         hal.cortex_m
         ti.hal_driver
     )
+    target_compile_definitions(e_foc.bootloader.main PRIVATE
+        HARDWARE_CLOCKS_HEADER="targets/platform_implementations/ti/${E_FOC_TARGET_BOARD}/Clocks.hpp"
+    )
     e_foc_ti_target_linker_scripts(e_foc.bootloader.main BOOTLOADER)
 elseif(E_FOC_TARGET_PLATFORM STREQUAL "qemu")
     target_link_libraries(e_foc.bootloader.main PRIVATE e_foc.qemu.semihosting)

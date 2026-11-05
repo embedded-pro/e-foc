@@ -3,9 +3,9 @@
 #include "hal/interfaces/DutyCycle.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
-#include "hal_tiva/tiva/ClockTm4c129.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
+#include "targets/platform_implementations/ti/EK-TM4C1294XL/Clocks.hpp"
 #include "targets/platform_implementations/ti/implementation/SharedGpioPin.hpp"
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 
@@ -98,18 +98,5 @@ namespace application
         constexpr std::size_t eventDispatcherSize{ 24 };
         constexpr std::size_t canReceiveBufferSize{ 16 };
         constexpr std::size_t faultStatusSize{ 448 };
-    }
-
-    namespace Clocks
-    {
-        inline void Initialize()
-        {
-            uint32_t frequency = 120000000;
-            hal::tiva::crystalFrequency hseValue = hal::tiva::crystalFrequency::_25_MHz;
-            hal::tiva::oscillatorSource oscSource = hal::tiva::oscillatorSource::main;
-            hal::tiva::systemClockVco systemClockVco = hal::tiva::systemClockVco::_240_MHz;
-            bool usesPll = true;
-            hal::tiva::ConfigureClock(frequency, hseValue, oscSource, systemClockVco, usesPll);
-        }
     }
 }

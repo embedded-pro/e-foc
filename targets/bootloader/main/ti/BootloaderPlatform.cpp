@@ -1,12 +1,15 @@
 #include "BootloaderPlatform.hpp"
 #include "generated/Boards.hpp"
 #include DEVICE_HEADER
+#include HARDWARE_CLOCKS_HEADER
 #include "hal/cortex_m/JumpToApplication.hpp"
 
 extern "C"
 {
     void HardwareInitialization()
-    {}
+    {
+        application::Clocks::Initialize();
+    }
 
     void Default_Handler_Forwarded()
     {

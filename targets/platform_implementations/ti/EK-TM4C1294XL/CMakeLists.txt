@@ -12,6 +12,7 @@ target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTERFACE
 )
 
 target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_BOARD} INTERFACE
+    Clocks.hpp
     PinsAndPeripherals.hpp
 )
 
