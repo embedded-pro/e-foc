@@ -2,7 +2,7 @@
 title: "The Sensing Chain — Shunts, Amplifiers, ADC and Encoder"
 type: theory
 status: draft
-version: 0.1.2
+version: 0.1.3
 component: "sensing-chain"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | The Sensing Chain — Shunts, Amplifiers, ADC and Encoder |
 | Type      | theory                                                  |
 | Status    | draft                                                   |
-| Version   | 0.1.2                                                   |
+| Version   | 0.1.3                                                   |
 | Component | sensing-chain                                           |
 | Date      | 2026-11-05                                              |
 
@@ -140,8 +140,9 @@ measurement keeps the mean of two windows whose offsets agree within 10 mA on ev
 do not, and fails without an agreeing pair, so a single disturbed window is never stored. On the bench a
 back-to-back calibration once read one phase 52 mA low in one window, which the second window now catches
 (`documentation/design/service-current-offsets.md`). The first Enable after power-up, a control-mode switch or a
-Fault measures them again at rest and uses the new values when each phase is within 50 mA of the stored one;
-drift that builds up while the drive runs is not tracked. The hardware-characterisation plan measures each
+Fault measures them again at rest and uses the new values when each phase is within 50 mA of the stored one, which
+holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-TRQ-014); drift that
+builds up while the drive runs is not tracked. The hardware-characterisation plan measures each
 condition cold and after ten minutes of PWM to separate it from noise.
 
 ### 4. Gain Errors and Phase Mismatch

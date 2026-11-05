@@ -2,7 +2,7 @@
 title: "Service: Current Sensor Offsets"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: service-current-offsets
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Current Sensor Offsets |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.2.0                           |
+| Version   | 0.2.1                           |
 | Component | service-current-offsets         |
 | Date      | 2026-11-05                      |
 
@@ -204,6 +204,12 @@ and an electrical identification over CAN stores them within the same 5 mA (REQ-
 With a phase sensor 20 mA from the offset its calibration record stores, the first Start enables the
 drive; with it 100 mA away the Start is refused and the drive stays Ready (REQ-CAL-022,
 `motor_control.feature`).
+
+The refresh is what keeps the torque current right after a sensor drifts. On the bench current-sense chain, with
+phase A 20 mA from its calibration and the rotor held 90 electrical degrees from its aligned position, where an
+uncorrected phase-A offset lands on the q axis as two thirds of itself, the winding's mean q-axis current over
+1.5 s is within 0.1 mA of a 0, 0.1, 1.0 and 3.0 A command against a limit of 1 % plus 5 mA (REQ-TRQ-014,
+`control_performance.feature`).
 
 In the model in the loop, phase B read 52 mA low for the first 105 ms of the measurement, which covers
 most of the first window. Without the confirmation the stored phase B offset was 49 mA off; with it,
