@@ -112,11 +112,34 @@ TEST_F(OverTemperatureTest, a_cooling_winding_restores_the_board_limit)
     temperature = foc::Celsius{ 115.0f };
     Run(std::chrono::milliseconds(100));
     temperature = foc::Celsius{ 90.0f };
-    Run(std::chrono::milliseconds(100));
+    Run(std::chrono::seconds(10));
 
     EXPECT_NEAR(10.0f, monitor.Limit().Value(), 1e-5f);
     ASSERT_FALSE(limits.empty());
     EXPECT_NEAR(10.0f, limits.back().Value(), 1e-5f);
+}
+
+TEST_F(OverTemperatureTest, a_jump_of_the_estimate_is_followed_with_a_one_second_time_constant)
+{
+    Run(std::chrono::milliseconds(100));
+    temperature = foc::Celsius{ 170.0f };
+
+    Run(std::chrono::milliseconds(100));
+    EXPECT_NEAR(10.0f, monitor.Limit().Value(), 1e-5f);
+
+    Run(std::chrono::seconds(2));
+    EXPECT_NEAR(0.0f, monitor.Limit().Value(), 1e-6f);
+}
+
+TEST_F(OverTemperatureTest, the_filter_starts_again_from_the_estimate_once_the_temperature_was_unknown)
+{
+    temperature = std::nullopt;
+    Run(std::chrono::milliseconds(100));
+    temperature = foc::Celsius{ 110.0f };
+
+    Run(std::chrono::milliseconds(100));
+
+    EXPECT_NEAR(10.0f * 10.0f / 15.0f, monitor.Limit().Value(), 1e-4f);
 }
 
 TEST_F(OverTemperatureTest, an_unknown_temperature_keeps_the_board_limit_and_never_trips)

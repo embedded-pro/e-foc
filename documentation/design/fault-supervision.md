@@ -423,8 +423,12 @@ the drive's only thermal protection. Without a calibrated resistance the tempera
 estimate is the read-only parameter `windingTemperature` of contract 2.13 (`service-can.md`), not a number while
 it is unknown.
 
-**Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRT-008).
-While the temperature T is known it derates the drive's current limit linearly over the temperature margin below the
+**Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRT-008) and
+acts on it through a first-order filter with a 1 s time constant, started from the first known value. A winding cannot
+move noticeably within a second; an estimate that does is not heat. A cable pulled from a running drive is one: the open
+phase reads as a resistance 1.6 times the calibrated one at once, about 170 °C, and the phase-loss monitor (Part E)
+answers it within its 50 ms span, before the filter has carried the derating anywhere near it. While the filtered
+temperature T is known it derates the drive's current limit linearly over the temperature margin below the
 temperature limit T_max: the full board limit up to T_max − margin, falling to zero at T_max. The control mode takes
 the lower of this limit and the overload model's (Part I), and the cascades clamp their q-axis reference to it as for
 the overload model. At or above T_max, while the drive is `Enabled`, the monitor raises `overtemperature` once and

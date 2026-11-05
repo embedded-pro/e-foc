@@ -10,6 +10,7 @@ namespace supervision
         , onLimit{ onLimit }
         , onFault{ onFault }
         , limit{ boardLimit }
+        , smoothing{ 1.0f - std::exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
     {}
 
     void OverTemperature::Enable(const infra::Function<Settings()>& settings)
@@ -38,11 +39,23 @@ namespace supervision
             return;
 
         const auto enabled = std::holds_alternative<state_machine::Enabled>(activeDrive().CurrentState());
-        const auto measured = temperature();
+        const auto measured = Filtered(temperature());
         const auto current = settings();
 
         Derate(measured, current);
         Trip(enabled, measured, current);
+    }
+
+    std::optional<foc::Celsius> OverTemperature::Filtered(const std::optional<foc::Celsius>& measured)
+    {
+        if (!measured.has_value())
+            filteredCelsius.reset();
+        else if (!filteredCelsius.has_value())
+            filteredCelsius = measured->Value();
+        else
+            *filteredCelsius += smoothing * (measured->Value() - *filteredCelsius);
+
+        return filteredCelsius.has_value() ? std::optional{ foc::Celsius{ *filteredCelsius } } : std::nullopt;
     }
 
     void OverTemperature::Derate(const std::optional<foc::Celsius>& measured, const Settings& current)

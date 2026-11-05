@@ -8,7 +8,9 @@ Feature: Thermal Protection
 
   While the temperature is known the current limit falls linearly over the temperature margin
   below the temperature limit, to zero at the limit, and at the limit the drive faults with
-  overtemperature, not sooner than 5 s after the Enable (REQ-PRT-008). In the derating scenario a
+  overtemperature, not sooner than 5 s after the Enable (REQ-PRT-008). The protection acts on the
+  estimate filtered with a 1 s time constant, so the current is measured once the filter has
+  settled. In the derating scenario a
   strongly damped rotor settles well below a far speed setpoint, so the speed loop asks for all the
   current the limit allows, and a large thermal capacitance keeps the winding from heating
   noticeably while the current is measured.
@@ -42,10 +44,10 @@ Feature: Thermal Protection
   Scenario: A winding near the temperature limit derates the current a damped rotor draws
     Given a nominal motor plant
     And a motor plant with:
-      | ambient_celsius              | 110.0  |
-      | thermal_capacitance          | 1000.0 |
-      | viscous_damping_nm_s_per_rad | 0.003  |
-    And the plant response is recorded at 100 Hz for up to 400 samples
+      | ambient_celsius              | 110.0   |
+      | thermal_capacitance          | 10000.0 |
+      | viscous_damping_nm_s_per_rad | 0.003   |
+    And the plant response is recorded at 100 Hz for up to 800 samples
     And the motor is already calibrated
     And the motor boots in speed mode
     When the target boots
@@ -54,8 +56,8 @@ Feature: Thermal Protection
     And the rotor is aligned
     And the motor is enabled
     And a speed setpoint of 300 rad/s is applied
-    And the response is captured for 3000 ms after enable
-    Then the q-axis current shall average between 9.5 and 10.5 A from 2000 to 3000 ms after enable
+    And the response is captured for 7000 ms after enable
+    Then the q-axis current shall average between 9.5 and 10.5 A from 6000 to 7000 ms after enable
 
   @sil @REQ-PRT-008
   Scenario: A winding past the temperature limit faults the drive
