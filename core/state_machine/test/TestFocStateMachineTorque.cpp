@@ -2,7 +2,14 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstdint>
+#include <functional>
+
+MATCHER_P3(OffsetsNear, a, b, c, "")
+{
+    return std::abs(arg.a.Value() - a) < 1e-6f && std::abs(arg.b.Value() - b) < 1e-6f && std::abs(arg.c.Value() - c) < 1e-6f;
+}
 
 namespace
 {
@@ -278,6 +285,79 @@ namespace
                     }));
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
             sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
+
+        StrictMock<services::PhaseCurrentOffsetsMock> offsetsMock;
+        StrictMock<services::RotorStandstillMock> standstillMock;
+        infra::Function<void(bool)> standstillDone;
+        infra::Function<void(std::optional<foc::PhaseCurrents>)> measurementDone;
+        std::optional<state_machine::CommandResult> enableResult;
+
+        TestedStateMachine CreateStateMachineRefreshingOffsets()
+        {
+            EXPECT_CALL(offsetsMock, IsRunning()).WillRepeatedly(Return(false));
+            EXPECT_CALL(offsetsMock, Abort()).Times(AnyNumber());
+            EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
+
+            return TestedStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .currentOffsets = offsetsMock, .standstill = standstillMock },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                nvmActivity
+            };
+        }
+
+        static services::CalibrationData RecordWithOffsets()
+        {
+            auto data = ValidRecord();
+            data.currentOffsetA = 0.010f;
+            data.currentOffsetB = -0.020f;
+            data.currentOffsetC = 0.030f;
+            return data;
+        }
+
+        void GivenStoredOffsets()
+        {
+            GivenFaultNotifierRegistered();
+            GivenNvmHolds(RecordWithOffsets());
+            EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.010f, -0.020f, 0.030f))).Times(AtLeast(1));
+        }
+
+        void EnableAsync(TestedStateMachine& sm)
+        {
+            sm.CmdEnableAsync([this](state_machine::CommandResult result)
+                {
+                    enableResult = result;
+                });
+        }
+
+        void ExpectRefreshStarted()
+        {
+            EXPECT_CALL(standstillMock, Await(_)).WillOnce(SaveArg<0>(&standstillDone));
+        }
+
+        void RotorComesToRest()
+        {
+            EXPECT_CALL(offsetsMock, Measure(_)).WillOnce(SaveArg<0>(&measurementDone));
+            standstillDone(true);
+        }
+
+        void RefreshMeasures(const foc::PhaseCurrents& offsets)
+        {
+            RotorComesToRest();
+            measurementDone(offsets);
+        }
+
+        template<class Service>
+        void ExpectAbortNow(Service& mock, const std::function<void()>& action)
+        {
+            EXPECT_CALL(mock, Abort());
+            action();
+            Mock::VerifyAndClearExpectations(&mock);
+            EXPECT_CALL(mock, Abort()).Times(AnyNumber());
         }
     };
 }
@@ -3488,4 +3568,223 @@ namespace
 
         faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     }
+}
+
+TEST_F(FocStateMachineTorqueCliTest, the_first_enable_measures_the_offsets_at_rest_while_ready)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+    EXPECT_FALSE(enableResult.has_value());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, offsets_within_50_mA_of_the_record_are_applied_and_the_drive_enables)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.055f, -0.020f, 0.030f)));
+    EXPECT_CALL(inverterMock, Start());
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.055f }, foc::Ampere{ -0.020f }, foc::Ampere{ 0.030f } });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_offset_more_than_50_mA_from_the_record_refuses_the_enable)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.010f }, foc::Ampere{ -0.075f }, foc::Ampere{ 0.030f } });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_rotor_that_does_not_come_to_rest_refuses_the_enable)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(SaveArg<0>(&standstillDone));
+    EnableAsync(sm);
+
+    standstillDone(false);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_failed_offset_measurement_refuses_the_enable)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    RotorComesToRest();
+    measurementDone(std::nullopt);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_later_enable_does_not_measure_the_offsets_again)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+    EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.012f, -0.020f, 0.030f)));
+    EXPECT_CALL(inverterMock, Start()).Times(2);
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.012f }, foc::Ampere{ -0.020f }, foc::Ampere{ 0.030f } });
+    sm.CmdDisable();
+
+    enableResult.reset();
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_fault_makes_the_next_enable_measure_the_offsets_again)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+    EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.012f, -0.020f, 0.030f)));
+    EXPECT_CALL(inverterMock, Start());
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.012f }, foc::Ampere{ -0.020f }, foc::Ampere{ 0.030f } });
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+
+    enableResult.reset();
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(enableResult.has_value());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_disable_during_the_offset_refresh_abandons_it_and_refuses_the_enable)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+    RotorComesToRest();
+
+    ExpectAbortNow(offsetsMock, [&sm]()
+        {
+            EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdDisable());
+        });
+    EXPECT_CALL(offsetsMock, IsRunning()).WillRepeatedly(Return(false));
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::rejected, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_the_offset_refresh_abandons_it)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    sm.CmdEmergencyStop();
+    standstillDone(true);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, the_synchronous_enable_is_accepted_while_the_offsets_are_refreshed)
+{
+    GivenStoredOffsets();
+    auto sm = CreateStateMachineRefreshingOffsets();
+    AlignAfterBoot(sm);
+    ExpectRefreshStarted();
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdEnable());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.010f, -0.020f, 0.030f)));
+    EXPECT_CALL(inverterMock, Start());
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.010f }, foc::Ampere{ -0.020f }, foc::Ampere{ 0.030f } });
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_enable_refused_without_a_callback_reports_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_refused_in_idle_reports_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EnableAsync(sm);
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_without_an_offset_measurement_enables_at_once)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start());
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_that_faults_as_the_bridge_starts_reports_aborted_by_fault)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start())
+        .WillOnce(Invoke([this]()
+            {
+                faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+            }));
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
 }

@@ -166,17 +166,49 @@ namespace application
         };
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 2> FocLifecycleTable::OperationRows()
+    constexpr std::array<FocLifecycleTable::Transition, 6> FocLifecycleTable::OperationRows()
     {
         return {
+            Machine::InternalRow<state_machine::Ready, state_machine::Enable>(
+                [](LifecycleContext& context, state_machine::Ready& ready, const state_machine::Enable& command)
+                {
+                    context.operation.BeginOffsetRefresh(ready, command);
+                },
+                [](const LifecycleContext& context, const state_machine::Ready& ready, const state_machine::Enable&)
+                {
+                    return context.operation.IsOffsetRefreshDue() && !context.lifecycle.HasPendingAsyncWork() && context.operation.IsEnableAllowed(ready);
+                }),
             Machine::Row<state_machine::Ready, state_machine::Enable, state_machine::Enabled>(
                 [](const LifecycleContext& context, const state_machine::Ready& ready, const state_machine::Enable&)
                 {
-                    return !context.lifecycle.HasPendingAsyncWork() && context.operation.IsEnableAllowed(ready);
+                    return !context.operation.IsOffsetRefreshDue() && !context.lifecycle.HasPendingAsyncWork() && context.operation.IsEnableAllowed(ready);
                 },
-                [](LifecycleContext& context, state_machine::Ready&, const state_machine::Enable&)
+                [](LifecycleContext& context, state_machine::Ready&, const state_machine::Enable& command)
                 {
-                    return context.operation.BuildEnabled();
+                    return context.operation.BuildEnabled(command);
+                }),
+            Machine::Row<state_machine::Ready, state_machine::OffsetsRefreshed, state_machine::Enabled>(
+                [](const LifecycleContext& context, const state_machine::Ready& ready, const state_machine::OffsetsRefreshed& event)
+                {
+                    return event.outcome == state_machine::OffsetRefreshOutcome::refreshed && context.operation.IsEnableAllowed(ready);
+                },
+                [](LifecycleContext& context, state_machine::Ready&, const state_machine::OffsetsRefreshed&)
+                {
+                    return context.operation.BuildEnabledAfterOffsetRefresh();
+                }),
+            Machine::InternalRow<state_machine::Ready, state_machine::OffsetsRefreshed>(
+                [](LifecycleContext& context, state_machine::Ready&, const state_machine::OffsetsRefreshed& event)
+                {
+                    context.operation.RefuseAfterOffsetRefresh(event.outcome);
+                }),
+            Machine::InternalRow<state_machine::Ready, state_machine::Disable>(
+                [](LifecycleContext& context, state_machine::Ready&, const state_machine::Disable&)
+                {
+                    context.operation.AbandonOffsetRefresh();
+                },
+                [](const LifecycleContext& context, const state_machine::Ready&, const state_machine::Disable&)
+                {
+                    return context.operation.IsRefreshingOffsets();
                 }),
             Machine::Row<state_machine::Enabled, state_machine::Disable, state_machine::Ready>(nullptr,
                 [](LifecycleContext& context, state_machine::Enabled&, const state_machine::Disable&)
@@ -368,7 +400,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 50> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 54> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }

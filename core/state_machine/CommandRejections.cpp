@@ -31,7 +31,8 @@ namespace application
         std::visit([]<class Command>(const Command& command)
             {
                 if constexpr (CarriesCallback<Command>)
-                    command.onDone.Callback()(state_machine::CommandResult::rejected);
+                    if (command.onDone.Callback() != nullptr)
+                        command.onDone.Callback()(state_machine::CommandResult::rejected);
             },
             event);
     }

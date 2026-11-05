@@ -116,6 +116,12 @@ namespace state_machine
 
         virtual void CmdCalibrate(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEnable() = 0;
+
+        virtual void CmdEnableAsync(const infra::Function<void(CommandResult)>& onDone)
+        {
+            onDone(CmdEnable());
+        }
+
         virtual CommandResult CmdDisable() = 0;
         virtual CommandResult CmdClearFault() = 0;
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;

@@ -2,9 +2,9 @@
 title: "Service: Current Sensor Offsets"
 type: design
 status: draft
-version: 0.1.2
+version: 0.2.0
 component: service-current-offsets
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Service: Current Sensor Offsets |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.1.2                           |
+| Version   | 0.2.0                           |
 | Component | service-current-offsets         |
-| Date      | 2026-10-29                      |
+| Date      | 2026-11-05                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -34,7 +34,8 @@ the rotation turns into a ripple at the electrical frequency, and it hides small
 bench rotor's viscous friction (`documentation/design/software-in-the-loop.md`, Part M).
 
 **Is responsible for:**
-- Measuring each phase sensor's zero-current reading at the start of the full calibration
+- Measuring each phase sensor's zero-current reading at the start of the full calibration, and
+  again at the first Enable after power-up, a control-mode switch or a Fault
 - Confirming each measurement with a second one, so a single disturbed window is never stored
 - Handing the offsets in force to the inverter compensation stage, which removes them from every
   phase-current sample before any consumer receives it
@@ -104,16 +105,39 @@ delivered from the event loop.
 
 ### Part C — The life of the offsets
 
-| Event                              | Offsets afterwards                                                         |
-|------------------------------------|----------------------------------------------------------------------------|
-| Full calibration, first step       | Measured and applied at once, so every later step reads corrected currents |
-| Calibration record saved           | Stored with it and traced as `Ia_mA`, `Ib_mA`, `Ic_mA`                     |
-| Boot with a stored record          | Applied, whether or not the record is complete for the mode                |
-| Calibration cleared                | Zero                                                                       |
-| Electrical identification over CAN | Measured at rest and applied before R/L, then stored with its record       |
-| Re-alignment                       | Kept: it copies the record                                                 |
+| Event                                                         | Offsets afterwards                                                                                                         |
+|---------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Full calibration, first step                                  | Measured and applied at once, so every later step reads corrected currents                                                 |
+| Calibration record saved                                      | Stored with it and traced as `Ia_mA`, `Ib_mA`, `Ic_mA`                                                                     |
+| Boot with a stored record                                     | Applied, whether or not the record is complete for the mode                                                                |
+| Calibration cleared                                           | Zero                                                                                                                       |
+| Electrical identification over CAN                            | Measured at rest and applied before R/L, then stored with its record                                                       |
+| Re-alignment                                                  | Kept: it copies the record                                                                                                 |
+| First Enable after power-up, a control-mode switch or a Fault | Re-measured at rest; applied when every phase is within 50 mA of the record, otherwise the record's stay in force (Part D) |
 
 A record written before this step existed carries zero offsets, which applies no correction.
+
+### Part D — The refresh at enable
+
+An amplifier's offset drifts with temperature and age after the calibration that measured it
+(`documentation/theory/sensing-chain.md` §3). The drive therefore measures the offsets again, by the
+procedure of Part B, at the first Enable after power-up, after a control-mode switch and after every
+Fault. The drive stays Ready throughout: it waits for the rotor to come to rest, as the calibration
+does, so that no winding current is taken for sensor bias, and then measures.
+
+| Outcome                                                   | Offsets in force  | Enable                         |
+|-----------------------------------------------------------|-------------------|--------------------------------|
+| Every phase within 50 mA of the record                    | The measured ones | Proceeds to Enabled            |
+| A phase more than 50 mA from the record                   | The record's      | Refused: calibration failed    |
+| The rotor does not come to rest, or the measurement fails | The record's      | Refused: calibration failed    |
+| Disable, emergency stop or a fault meanwhile              | The record's      | Refused; the measurement stops |
+
+The comparison is always against the record, never against an earlier refresh, so a sensor that
+creeps cannot walk the offsets away from the calibration a few milliamperes at a time. A difference
+of more than 50 mA is larger than any drift the sensing chain's budget allows for, so it points at a
+fault or at a different board, and only a new calibration may store it. The refreshed offsets are
+not written to the calibration record; later Enables use them without measuring until the next
+power-up, control-mode switch or Fault.
 
 ---
 
@@ -176,6 +200,10 @@ Against plants whose phases are biased by +27, −18 and +54 mA with 35 mA of no
 calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor,
 and an electrical identification over CAN stores them within the same 5 mA (REQ-CAL-015,
 `parameter_identification.feature`).
+
+With a phase sensor 20 mA from the offset its calibration record stores, the first Start enables the
+drive; with it 100 mA away the Start is refused and the drive stays Ready (REQ-CAL-022,
+`motor_control.feature`).
 
 In the model in the loop, phase B read 52 mA low for the first 105 ms of the measurement, which covers
 most of the first window. Without the confirmation the stored phase B offset was 49 mA off; with it,

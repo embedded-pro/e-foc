@@ -7,6 +7,7 @@
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/util/Function.hpp"
+#include <cstdint>
 #include <optional>
 #include <variant>
 
@@ -126,6 +127,20 @@ namespace state_machine
     struct Enable
     {
         static constexpr const char* name{ "Enable" };
+        CommandCallback onDone;
+    };
+
+    enum class OffsetRefreshOutcome : uint8_t
+    {
+        refreshed,
+        drifted,
+        failed
+    };
+
+    struct OffsetsRefreshed
+    {
+        static constexpr const char* name{ "OffsetsRefreshed" };
+        OffsetRefreshOutcome outcome;
     };
 
     struct Disable
@@ -203,6 +218,7 @@ namespace state_machine
         CoggingMapped,
         CalibrationSaved,
         Enable,
+        OffsetsRefreshed,
         Disable,
         ClearFault,
         EmergencyStop,
