@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.3
+version: 1.13.4
 component: "software-in-the-loop"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.3                      |
+| Version   | 1.13.4                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-11-05                  |
 
