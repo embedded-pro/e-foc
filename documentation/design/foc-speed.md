@@ -2,7 +2,7 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: foc-speed
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.2.0             |
+| Version   | 0.3.0             |
 | Component | foc-speed         |
 | Date      | 2026-11-05        |
 
@@ -199,6 +199,7 @@ stateDiagram-v2
 | SetPoint                     | Sets the speed setpoint in radians per second.                                                                        | Written atomically; used on the next outer-loop cycle, through the speed ramp when one is set.                                                                                                                                                |
 | Speed ramp                   | Sets the acceleration and deceleration, in rad/s², that bound the speed reference; zero leaves a direction unlimited. | Callable in any state, also while Enabled; in force from the next outer-loop cycle.                                                                                                                                                           |
 | Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                                                              | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                        |
+| TrackBusVoltage              | Hands a measured bus voltage to the inner loop (`foc-torque.md`, Bus Voltage Tracking).                               | Called from the event loop; in force from the next `Calculate()`, also while Enabled.                                                                                                                                                         |
 | OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                                                    | Pure query; no side effects. Can be called before Enable.                                                                                                                                                                                     |
 | SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                                                         | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
 | SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                                                         | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |

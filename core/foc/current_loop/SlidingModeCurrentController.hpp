@@ -21,7 +21,7 @@ namespace foc
             auto d = ComputeAxis(context.measured.d, context.reference.d);
             auto q = ComputeAxis(context.measured.q, context.reference.q);
 
-            return LimitToModulationCircle(decoupling.Apply({ d, q }, context));
+            return LimitToModulationCircle(decoupling.Apply({ d, q }, context), context.busRatio);
         }
 
     private:

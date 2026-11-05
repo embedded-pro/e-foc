@@ -23,7 +23,7 @@ namespace foc
             const RotatingFrame command{ referenceGain * context.reference.d - feedbackGain * predicted.d - disturbance.d, referenceGain * context.reference.q - feedbackGain * predicted.q - disturbance.q };
 
             const auto decoupled = decoupling.Apply(command, context);
-            const auto applied = LimitToModulationCircle(decoupled);
+            const auto applied = LimitToModulationCircle(decoupled, context.busRatio);
             const RotatingFrame effective{ command.d + applied.d - decoupled.d, command.q + applied.q - decoupled.q };
 
             expected = delayed ? predicted : Predict(context.measured, effective);

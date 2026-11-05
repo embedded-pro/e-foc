@@ -108,3 +108,12 @@ TEST_F(TestDecoupledPidCurrentController, reset_clears_the_embedded_pid_state)
     EXPECT_NEAR(output.d, 0.0f, tolerance);
     EXPECT_NEAR(output.q, 0.0f, tolerance);
 }
+
+TEST_F(TestDecoupledPidCurrentController, a_bus_below_the_configured_voltage_shrinks_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    const auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f, 0.5f });
+
+    EXPECT_NEAR(std::hypot(output.d, output.q), 0.5f, 1e-4f);
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/BusVoltageRatio.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/DirectAxisExcitation.hpp"
 #include "core/foc/cascade/EstimatorChannel.hpp"
@@ -60,6 +61,7 @@ namespace foc
         void ClearCoggingMapImpl();
         void SetCurrentStream(CurrentStream& stream);
         void LimitCurrentImpl(Ampere limit);
+        void TrackBusVoltageImpl(Volts measured);
 
     private:
         [[no_unique_address]] Park park;
@@ -85,6 +87,7 @@ namespace foc
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
         float vdcInvScale{ 1.0f };
+        BusVoltageRatio busRatio;
         volatile bool enabled{ false };
 
         EstimatorChannel estimators;

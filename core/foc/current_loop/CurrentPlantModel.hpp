@@ -41,14 +41,14 @@ namespace foc
         float backEmfScale{ 0.0f };
     };
 
-    ALWAYS_INLINE_HOT foc::RotatingFrame LimitToModulationCircle(const foc::RotatingFrame& voltages)
+    ALWAYS_INLINE_HOT foc::RotatingFrame LimitToModulationCircle(const foc::RotatingFrame& voltages, float radius = 1.0f)
     {
         const auto squaredMagnitude = voltages.d * voltages.d + voltages.q * voltages.q;
 
-        if (squaredMagnitude <= 1.0f)
+        if (squaredMagnitude <= radius * radius)
             return voltages;
 
-        const auto scale = 1.0f / math::Sqrt(squaredMagnitude);
+        const auto scale = radius / math::Sqrt(squaredMagnitude);
 
         return { voltages.d * scale, voltages.q * scale };
     }

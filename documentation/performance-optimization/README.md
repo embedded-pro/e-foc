@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.0.2
+version: 1.1.0
 component: "foc"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.0.2                             |
+| Version   | 1.1.0                             |
 | Component | foc                               |
 | Date      | 2026-11-05                        |
 
@@ -248,6 +248,8 @@ The 20 kHz path should do only the work that changes from one sample to the next
 - **Do not stack pass-through stages.** The sensor offsets and the dead-time correction are one stage between the
   platform and the loop, so a sample and a duty each cross one call instead of two.
 - **Divide out one ratio.** Choosing the tighter of two bounds by cross-multiplying leaves one division instead of two.
+  The bus-voltage ratio follows the same rule: the event loop stores r and 1/r, so the interrupt multiplies the
+  modulator's scale by 1/r and compares the voltage's squared magnitude with r² without a division.
 - **Run the law that is configured.** A general controller whose limits never clamp and whose derivative gain is zero
   is replaced by the two-state law it reduces to.
 - **Publish windows, not samples.** The current stream (`documentation/design/service-can.md` Part J) adds Id and Iq

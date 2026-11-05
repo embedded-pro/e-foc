@@ -754,3 +754,48 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_calibration_current_command_is_not_compens
 
     ExpectCentredDuty(focTorque->Calculate(ZeroCurrents(), position));
 }
+
+TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_doubles_the_duty_for_the_same_command)
+{
+    foc::TorqueCascade nominal{ testMaxCurrent };
+    nominal.Configure(MotorParameters(polePairs));
+    nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
+    nominal.Enable();
+    nominal.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    focTorque->TrackBusVoltage(foc::Volts{ 12.0f });
+
+    foc::Radians nominalPosition{ 0.0f };
+    foc::Radians position{ 0.0f };
+    const auto expected = nominal.Calculate(ZeroCurrents(), nominalPosition);
+    const auto halved = focTorque->Calculate(ZeroCurrents(), position);
+
+    ASSERT_TRUE(IsOffCentre(expected));
+    EXPECT_NEAR(DutyPercent(halved.a) - 50.0f, 2.0f * (DutyPercent(expected.a) - 50.0f), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.b) - 50.0f, 2.0f * (DutyPercent(expected.b) - 50.0f), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.c) - 50.0f, 2.0f * (DutyPercent(expected.c) - 50.0f), 0.1f);
+}
+
+TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_same_duties)
+{
+    foc::TorqueCascade nominal{ testMaxCurrent };
+    nominal.Configure(MotorParameters(polePairs));
+    nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
+    nominal.Enable();
+    nominal.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 10.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 10.0f } });
+
+    focTorque->TrackBusVoltage(foc::Volts{ 12.0f });
+
+    foc::Radians nominalPosition{ 0.0f };
+    foc::Radians position{ 0.0f };
+    const auto expected = nominal.Calculate(ZeroCurrents(), nominalPosition);
+    const auto halved = focTorque->Calculate(ZeroCurrents(), position);
+
+    EXPECT_NEAR(DutyPercent(halved.a), DutyPercent(expected.a), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.b), DutyPercent(expected.b), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.c), DutyPercent(expected.c), 0.1f);
+}

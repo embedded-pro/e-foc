@@ -251,3 +251,28 @@ TEST_F(TestCurrentPlantModel, a_nan_electrical_parameter_is_rejected)
 
     EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
 }
+
+TEST_F(TestCurrentPlantModel, a_voltage_vector_inside_a_smaller_modulation_circle_is_left_untouched)
+{
+    const auto output = foc::LimitToModulationCircle({ 0.18f, -0.24f }, 0.5f);
+
+    EXPECT_NEAR(output.d, 0.18f, tolerance);
+    EXPECT_NEAR(output.q, -0.24f, tolerance);
+}
+
+TEST_F(TestCurrentPlantModel, a_voltage_vector_outside_a_smaller_modulation_circle_is_scaled_onto_it)
+{
+    const auto output = foc::LimitToModulationCircle({ 0.6f, -0.8f }, 0.5f);
+
+    EXPECT_NEAR(std::hypot(output.d, output.q), 0.5f, 1e-5f);
+    EXPECT_NEAR(output.d, 0.3f, 1e-5f);
+    EXPECT_NEAR(output.q, -0.4f, 1e-5f);
+}
+
+TEST_F(TestCurrentPlantModel, a_larger_modulation_circle_admits_a_voltage_beyond_one)
+{
+    const auto output = foc::LimitToModulationCircle({ 0.9f, 1.2f }, 1.5f);
+
+    EXPECT_NEAR(output.d, 0.9f, 1e-5f);
+    EXPECT_NEAR(output.q, 1.2f, 1e-5f);
+}

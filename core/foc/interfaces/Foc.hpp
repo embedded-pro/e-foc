@@ -144,6 +144,15 @@ namespace foc
         virtual void LimitCurrent(Ampere limit) = 0;
     };
 
+    class BusVoltageTrackable
+    {
+    protected:
+        ~BusVoltageTrackable() = default;
+
+    public:
+        virtual void TrackBusVoltage(Volts measured) = 0;
+    };
+
     class SpeedRampable
     {
     protected:

@@ -13,6 +13,8 @@ namespace foc
         RotatingFrame measured{ 0.0f, 0.0f };
         RotatingFrame reference{ 0.0f, 0.0f };
         float electricalSpeed{ 0.0f };
+        // Measured over configured bus voltage: the per-unit magnitude the bridge can make.
+        float busRatio{ 1.0f };
     };
 
     template<typename T>

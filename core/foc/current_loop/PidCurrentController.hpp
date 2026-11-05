@@ -18,7 +18,7 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            const auto applied = LimitToModulationCircle(Propose(context));
+            const auto applied = LimitToModulationCircle(Propose(context), context.busRatio);
 
             CommitRealized(applied);
 

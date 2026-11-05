@@ -240,3 +240,15 @@ TEST_F(TestDutyConversion, an_infinite_modulation_saturates_to_a_defined_endpoin
     EXPECT_EQ(DutyPercent(duties.b), 0);
     EXPECT_EQ(DutyPercent(duties.c), 50);
 }
+
+TEST_F(TestSpaceVectorModulation, an_inverse_bus_ratio_scales_the_voltage_before_it_is_modulated)
+{
+    const auto voltage = VectorAt(0.4f, 0.3f);
+
+    const auto scaled = spaceVectorModulation.Generate(voltage, 2.0f);
+    const auto expected = spaceVectorModulation.Generate(foc::TwoPhase{ voltage.alpha * 2.0f, voltage.beta * 2.0f });
+
+    EXPECT_NEAR(Fraction(scaled.a), Fraction(expected.a), oneStep);
+    EXPECT_NEAR(Fraction(scaled.b), Fraction(expected.b), oneStep);
+    EXPECT_NEAR(Fraction(scaled.c), Fraction(expected.c), oneStep);
+}
