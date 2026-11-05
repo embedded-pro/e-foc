@@ -106,7 +106,7 @@
     undervoltage→underVoltage, overtemperature→overTemperature, encoderLoss→sensorFault,
     stall→stall, phaseMissing→phaseMissing, hardwareFault→hardwareFault,
     calibrationFailed→calibrationFailed, overspeed→overSpeed,
-    followingError→followingError, none→none.
+    followingError→followingError, commandTimeout→commandTimeout, none→none.
 
 - id: REQ-INT-014
   title: Telemetry reports the measured mechanical speed

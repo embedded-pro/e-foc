@@ -695,6 +695,80 @@ TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_ExceedsInverterCurrent_Rejects
     EXPECT_FALSE(categoryErrorSent);
 }
 
+TEST_F(FocMotorCanBridgeTest, AnAcceptedSetpoint_IsReportedToTheCommandObserver)
+{
+    ConstructFixtureInReady();
+    uint32_t accepted{ 0 };
+    bridge->ObserveCommands([&accepted]()
+        {
+            ++accepted;
+        });
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetTorqueSetpointId, 100);
+
+    EXPECT_EQ(1u, accepted);
+}
+
+TEST_F(FocMotorCanBridgeTest, ARejectedSetpoint_IsNotReportedToTheCommandObserver)
+{
+    ConstructFixtureInReady();
+    uint32_t accepted{ 0 };
+    bridge->ObserveCommands([&accepted]()
+        {
+            ++accepted;
+        });
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetTorqueSetpointId, 32767);
+    GivenModeSelected(can::FocMotorMode::speed);
+    DispatchSetpoint(can::focSetTorqueSetpointId, 0);
+
+    EXPECT_EQ(0u, accepted);
+}
+
+TEST_F(FocMotorCanBridgeTest, AnAcceptedStart_IsReportedToTheCommandObserver)
+{
+    ConstructFixtureInReady();
+    uint32_t accepted{ 0 };
+    bridge->ObserveCommands([&accepted]()
+        {
+            ++accepted;
+        });
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    EXPECT_EQ(1u, accepted);
+}
+
+TEST_F(FocMotorCanBridgeTest, ARefusedStart_IsNotReportedToTheCommandObserver)
+{
+    ConstructFixture();
+    uint32_t accepted{ 0 };
+    bridge->ObserveCommands([&accepted]()
+        {
+            ++accepted;
+        });
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    EXPECT_EQ(0u, accepted);
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_CommandTimeout_MapsToCommandTimeout)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::commandTimeout);
+
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::commandTimeout));
+    EXPECT_EQ(12u, static_cast<uint8_t>(can::FocFaultCode::commandTimeout));
+}
+
 TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_IsRejected)
 {
     ConstructFixture();

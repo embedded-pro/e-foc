@@ -53,5 +53,6 @@ namespace foc
         static constexpr float minFollowingErrorTime{ 0.001f };
         static constexpr float maxFollowingErrorTime{ 10.0f };
         static constexpr float maxSpeedRate{ 100000.0f };
+        static constexpr float maxCommandTimeout{ 60.0f };
     };
 }

@@ -108,6 +108,7 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     can::WriteLimitSetting(config, can::FocParameter::followingErrorTime, 0.25f);
     can::WriteLimitSetting(config, can::FocParameter::speedAcceleration, 300.0f);
     can::WriteLimitSetting(config, can::FocParameter::speedDeceleration, 600.0f);
+    can::WriteLimitSetting(config, can::FocParameter::commandTimeout, 0.5f);
 
     EXPECT_NEAR(config.limits.overspeedLimit, 250.0f, 1e-6f);
     EXPECT_NEAR(config.limits.followingErrorWindow, 0.4f, 1e-6f);
@@ -120,6 +121,8 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::speedDeceleration), 600.0f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedAcceleration), can::ParameterGroup::limits);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedDeceleration), can::ParameterGroup::limits);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::commandTimeout), 0.5f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::commandTimeout), can::ParameterGroup::limits);
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::overspeedLimit), 250.0f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::overspeedLimit), can::ParameterGroup::limits);
 }

@@ -71,7 +71,8 @@ namespace can
         hardwareFault = 8,
         calibrationFailed = 9,
         overSpeed = 10,
-        followingError = 11
+        followingError = 11,
+        commandTimeout = 12
     };
 
     enum class FocMotorCategoryError : uint8_t
@@ -144,6 +145,7 @@ namespace can
         followingErrorTime = 0x52,
         speedAcceleration = 0x53,
         speedDeceleration = 0x54,
+        commandTimeout = 0x55,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,

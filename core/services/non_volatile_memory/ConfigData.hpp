@@ -47,6 +47,7 @@ namespace services
         float followingErrorTime = 0.1f;
         float speedAcceleration = 0.0f;
         float speedDeceleration = 0.0f;
+        float commandTimeout = 0.0f;
     };
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
@@ -70,7 +71,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 116, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 120, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {

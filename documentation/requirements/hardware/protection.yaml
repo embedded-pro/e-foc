@@ -28,3 +28,18 @@
     setpoint and the measured position exceeds the window without a break for the time, measured
     from the first 1 ms evaluation of the event loop that sees it. A load the drive cannot hold
     shall fault it within the time plus 20 ms of its position error passing the window.
+
+- id: REQ-PRT-007
+  title: A CAN client that stops commanding an enabled drive faults it
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall hold a command timeout in the configuration record, settable from 0 to 60 s
+    with 0, the default, turning it off, in force from its next use in any state. While Enabled
+    with a timeout above zero, the drive shall enter Fault with commandTimeout when neither an
+    accepted Start command nor an accepted torque, speed or position setpoint command has
+    arrived over CAN for the timeout, counted from the later of the latest such command and the
+    entry to Enabled, within 10 ms of the timeout running out. Other commands and the CAN
+    client's heartbeat shall not count, so a client whose application hangs while its CAN stack
+    keeps running is caught. With a 500 ms timeout and a client that sends no setpoint after its
+    Start, the drive shall leave Enabled 500 ms ± 10 ms after the Start.

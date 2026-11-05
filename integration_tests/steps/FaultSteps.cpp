@@ -36,6 +36,8 @@ namespace
             return can::FocFaultCode::overSpeed;
         if (name == "following-error")
             return can::FocFaultCode::followingError;
+        if (name == "command-timeout")
+            return can::FocFaultCode::commandTimeout;
         return std::nullopt;
     }
 }

@@ -18,7 +18,8 @@ namespace state_machine
         stall,
         phaseMissing,
         overspeed,
-        followingError
+        followingError,
+        commandTimeout
     };
 
     constexpr const char* FaultCodeName(FaultCode code)
@@ -49,6 +50,8 @@ namespace state_machine
                 return "overspeed";
             case FaultCode::followingError:
                 return "followingError";
+            case FaultCode::commandTimeout:
+                return "commandTimeout";
         }
 
         return "unknown";

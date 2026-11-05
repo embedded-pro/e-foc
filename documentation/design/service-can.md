@@ -344,11 +344,13 @@ be stored is taken back; each takes effect as its table says.
 | `0x52` | `followingErrorTime`   | s      | 0.001 – 10             | no        | at the monitor's next evaluation, within 1 ms              |
 | `0x53` | `speedAcceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
 | `0x54` | `speedDeceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
+| `0x55` | `commandTimeout`       | s      | 0 – 60, 0 off          | no        | at the next 1 ms evaluation (Part F, Command timeout)      |
 
 | `FocFaultCode`   | Value | `state_machine::FaultCode` | Raised by                                          |
 |------------------|-------|----------------------------|----------------------------------------------------|
 | `overSpeed`      | 10    | `overspeed`                | Overspeed monitor (`fault-supervision.md` G)       |
 | `followingError` | 11    | `followingError`           | Following-error monitor (`fault-supervision.md` H) |
+| `commandTimeout` | 12    | `commandTimeout`           | Command timeout (Part F)                           |
 
 Adding enumerators leaves the meaning of the existing ones unchanged, which keeps it a minor version, as `stall`
 was in 2.4. A client older than 2.9 shows the new codes as unknown faults, and asks for the new parameters only
@@ -510,6 +512,35 @@ when it ends, so a client waiting on one keeps sending frames; `CanProtocolClien
 `heartbeatInterval` for this.
 
 It is composed in the instantiation layer alongside the CAN bridge, so the bridge and category server stay free of lifecycle policy.
+
+**Command timeout.** Liveness alone does not catch a client whose application hangs while its CAN stack
+keeps running: the heartbeat goes on, the client never goes offline, and the drive keeps executing its last
+setpoint. `CanCommandTimeout` watches what the client asks for instead (REQ-PRT-007). The bridge tells it
+of every accepted Start and every accepted torque, speed or position setpoint; nothing else counts, the
+heartbeat included. Every 1 ms on the event loop, while the drive is `Enabled` and the command timeout of the
+configuration record is above zero, it compares the time since the later of the latest such command and the
+entry to `Enabled` with the timeout; once the timeout has run out it raises `commandTimeout` through the
+platform fault notifier, once, and stays silent until the drive leaves `Enabled`. The drive cuts its power
+stage and coasts, and enters `Fault` rather than `Ready`, so the client finds out why when it comes back.
+
+| Setting         | Default | Range    | Meaning                                                        |
+|-----------------|---------|----------|----------------------------------------------------------------|
+| Command timeout | 0 (off) | 0 – 60 s | Longest silence of Start and setpoints a running drive accepts |
+
+The timeout is off by default because a client that commands one setpoint and then only watches, as the CAN
+Commander does, is a legitimate use; a client that streams setpoints sets it to a few of its periods. While
+the timeout is zero the count keeps restarting, so a timeout written while the drive runs counts from the write.
+A drive enabled from the terminal is watched the same way: with a timeout set, it needs setpoints over CAN.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Counting : enters Enabled (count starts)
+    Counting --> Counting : accepted Start or setpoint (count restarts)
+    Counting --> Reported : timeout above zero and run out, commandTimeout raised
+    Counting --> Idle : leaves Enabled
+    Reported --> Idle : leaves Enabled
+```
 
 ### Part G — Fault Broadcast Priority
 

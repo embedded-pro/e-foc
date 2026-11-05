@@ -144,7 +144,7 @@ namespace mil
         void DrainRecords();
 
         static constexpr uint32_t calibrationRegionSize = 128;
-        static constexpr uint32_t configRegionSize = 128;
+        static constexpr uint32_t configRegionSize = 256;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
         static constexpr std::size_t recordsPerDrain = 16;

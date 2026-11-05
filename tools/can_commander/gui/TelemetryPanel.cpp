@@ -225,6 +225,8 @@ namespace tool
                 return "Overspeed";
             case FocFaultCode::followingError:
                 return "Following error";
+            case FocFaultCode::commandTimeout:
+                return "Command timeout";
             default:
                 return "Unknown";
         }

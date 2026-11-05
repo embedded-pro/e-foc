@@ -11,7 +11,7 @@ namespace application
         : public hal::Eeprom
     {
     public:
-        static constexpr uint32_t storageSize = 256;
+        static constexpr uint32_t storageSize = 512;
 
         explicit SemihostingEeprom(const char* filePath);
 

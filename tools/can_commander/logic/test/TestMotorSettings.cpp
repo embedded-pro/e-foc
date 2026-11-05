@@ -67,8 +67,8 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::supervisionWindow, SupervisionSettings().front().parameter);
     EXPECT_EQ(FocParameter::stallDetection, SupervisionSettings().back().parameter);
     EXPECT_EQ(FocParameter::overspeedLimit, LimitSettings().front().parameter);
-    EXPECT_EQ(FocParameter::speedDeceleration, LimitSettings().back().parameter);
-    EXPECT_EQ(5u, LimitSettings().size());
+    EXPECT_EQ(FocParameter::commandTimeout, LimitSettings().back().parameter);
+    EXPECT_EQ(6u, LimitSettings().size());
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::stagedVersionPatch, Readings().back().parameter);
 }

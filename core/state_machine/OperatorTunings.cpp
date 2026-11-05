@@ -132,5 +132,6 @@ namespace state_machine
         stored.followingErrorTime = WithinOrDefault(stored.followingErrorTime, CommandLimits::minFollowingErrorTime, CommandLimits::maxFollowingErrorTime, defaults.followingErrorTime);
         stored.speedAcceleration = WithinOrDefault(stored.speedAcceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedAcceleration);
         stored.speedDeceleration = WithinOrDefault(stored.speedDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedDeceleration);
+        stored.commandTimeout = WithinOrDefault(stored.commandTimeout, 0.0f, CommandLimits::maxCommandTimeout, defaults.commandTimeout);
     }
 }

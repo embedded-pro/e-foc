@@ -239,8 +239,11 @@ flowchart LR
   Its **Limits** group holds the drive-wide limits of contract 2.9 (`service-can.md`): the overspeed limit
   that torque mode folds its current against, speed mode holds a setpoint at and every mode faults beyond
   (`fault-supervision.md` Part G), the following-error window and time of position mode (Part H) and the
-  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp); a following-error window or
-  a rate of zero turns that limit off, and each field's tooltip says so. They are stored at once and in force from the next control period, in any
+  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp) and the command timeout
+  (`service-can.md` Part F); a following-error window, a rate or a timeout of zero turns that limit off, and
+  each field's tooltip says so. The command timeout's tooltip also warns that the commander sends a setpoint
+  only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
+  setpoint. They are stored at once and in force from the next control period, in any
   state; the group says that a drive beyond 110 % of the limit faults and coasts.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
@@ -260,7 +263,7 @@ sent with the 2.0 bandwidth commands and not read back; the motor parameter fiel
 reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
 Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
 reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware fault* or *Calibration failed*. A node older than 2.9 has no limits: the commander does not ask it for them, the Limits fields are disabled with the reason, and it never reports *Overspeed* or *Following error*.
+the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware fault* or *Calibration failed*. A node older than 2.9 has no limits: the commander does not ask it for them, the Limits fields are disabled with the reason, and it never reports *Overspeed*, *Following error* or *Command timeout*.
 
 ### Part K — diagnostics
 

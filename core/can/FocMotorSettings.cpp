@@ -97,6 +97,7 @@ namespace can
             case FocParameter::followingErrorTime:
             case FocParameter::speedAcceleration:
             case FocParameter::speedDeceleration:
+            case FocParameter::commandTimeout:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -285,6 +286,8 @@ namespace can
                 return config.limits.speedAcceleration;
             case FocParameter::speedDeceleration:
                 return config.limits.speedDeceleration;
+            case FocParameter::commandTimeout:
+                return config.limits.commandTimeout;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -305,6 +308,9 @@ namespace can
                 break;
             case FocParameter::speedDeceleration:
                 config.limits.speedDeceleration = value;
+                break;
+            case FocParameter::commandTimeout:
+                config.limits.commandTimeout = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

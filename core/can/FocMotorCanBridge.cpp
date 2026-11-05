@@ -58,6 +58,8 @@ namespace can
                 return FocFaultCode::overSpeed;
             case state_machine::FaultCode::followingError:
                 return FocFaultCode::followingError;
+            case state_machine::FaultCode::commandTimeout:
+                return FocFaultCode::commandTimeout;
         }
 
         return FocFaultCode::none;
@@ -78,9 +80,23 @@ namespace can
         return FocMotorState::idle;
     }
 
+    void FocMotorCanBridge::ObserveCommands(const infra::Function<void()>& onAccepted)
+    {
+        commandAccepted = onAccepted;
+    }
+
+    void FocMotorCanBridge::NotifyCommandAccepted()
+    {
+        if (commandAccepted != nullptr)
+            commandAccepted();
+    }
+
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(server, can::focStartId, controlMode.ActiveStateMachine().CmdEnable(), onDone);
+        const auto result = controlMode.ActiveStateMachine().CmdEnable();
+        if (result == state_machine::CommandResult::ok)
+            NotifyCommandAccepted();
+        ReportCommandOutcome(server, can::focStartId, result, onDone);
     }
 
     void FocMotorCanBridge::OnStop(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -136,7 +152,10 @@ namespace can
             return;
 
         if (controlMode.TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, value }))
+        {
+            NotifyCommandAccepted();
             onDone();
+        }
         else
             server.SendCategoryError(can::focSetTorqueSetpointId, FocMotorCategoryError::modeMismatch);
     }
@@ -148,7 +167,10 @@ namespace can
             return;
 
         if (controlMode.TrySetSpeed(value))
+        {
+            NotifyCommandAccepted();
             onDone();
+        }
         else
             server.SendCategoryError(can::focSetSpeedSetpointId, FocMotorCategoryError::modeMismatch);
     }
@@ -160,7 +182,10 @@ namespace can
             return;
 
         if (controlMode.TrySetPosition(value))
+        {
+            NotifyCommandAccepted();
             onDone();
+        }
         else
             server.SendCategoryError(can::focSetPositionSetpointId, FocMotorCategoryError::modeMismatch);
     }
