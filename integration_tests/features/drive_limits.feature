@@ -122,7 +122,7 @@ Feature: Drive Limits
     When the target boots
     And the commandTimeout is set to 0.5 over CAN
     And the rotor is aligned
-    And the motor is enabled
+    And the motor start command is issued
     And a torque setpoint of 0.2 A is applied
     Then the state machine shall report a command-timeout fault
 
