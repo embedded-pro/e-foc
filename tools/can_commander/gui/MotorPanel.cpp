@@ -524,6 +524,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::TargetWindowUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTargetWindow(nodeId))
+            return QString("Needs firmware contract 2.10 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -534,6 +541,7 @@ namespace tool
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
+        commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();
@@ -744,6 +752,8 @@ namespace tool
         for (auto* page : commandPanel->SettingsPages())
             page->ShowValue(parameter, value);
         commandPanel->Diagnostics().ShowValue(parameter, value);
+        if (parameter == can::FocParameter::targetReached)
+            telemetryPanel->OnTargetReached(value.value >= 0.5f);
     }
 
     void MotorPanel::OfferRecovery(uint8_t commandType, Refusal refusal)

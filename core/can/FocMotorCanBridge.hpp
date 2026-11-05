@@ -50,6 +50,7 @@ namespace can
 
         void BroadcastFault(state_machine::FaultCode code);
         void ObserveCommands(const infra::Function<void()>& onAccepted);
+        void ReportTargetReached(const infra::Function<bool()>& isReached);
 
         void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;

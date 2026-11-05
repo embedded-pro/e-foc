@@ -107,6 +107,11 @@ namespace tool
         return SupportsMinor(nodeId, limitsContractMinor);
     }
 
+    bool CanCommandClient::SupportsTargetWindow(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, targetWindowContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -121,6 +126,22 @@ namespace tool
     {
         const auto minor = contractMinors.find(nodeId);
         return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= minimumMinor;
+    }
+
+    bool CanCommandClient::SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const
+    {
+        if (parameter == can::FocParameter::positionWindow || parameter == can::FocParameter::positionWindowTime)
+            return SupportsTargetWindow(nodeId);
+
+        switch (can::GroupOf(parameter))
+        {
+            case can::ParameterGroup::supervision:
+                return SupportsSupervision(nodeId);
+            case can::ParameterGroup::limits:
+                return SupportsLimits(nodeId);
+            default:
+                return true;
+        }
     }
 
     infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
@@ -352,14 +373,9 @@ namespace tool
             return;
 
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
-        const bool supervision = SupportsSupervision(nodeId);
-        const bool limits = SupportsLimits(nodeId);
         for (const auto& descriptor : can::focParameters)
-        {
-            const auto group = can::GroupOf(descriptor.id);
-            if (!descriptor.readOnly && (supervision || group != can::ParameterGroup::supervision) && (limits || group != can::ParameterGroup::limits))
+            if (!descriptor.readOnly && SupportsSetting(nodeId, descriptor.id))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
-        }
     }
 
     void CanCommandClient::RequestReadings(uint16_t nodeId)
@@ -368,7 +384,7 @@ namespace tool
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly)
+            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
@@ -442,8 +458,12 @@ namespace tool
 
     void CanCommandClient::RequestStatus(uint16_t nodeId)
     {
-        if (Compatibility(nodeId) == can::ContractCompatibility::compatible)
-            QueueRead(nodeId, Read{ can::focRequestTelemetryId });
+        if (Compatibility(nodeId) != can::ContractCompatibility::compatible)
+            return;
+
+        QueueRead(nodeId, Read{ can::focRequestTelemetryId });
+        if (SupportsTargetWindow(nodeId))
+            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
     }
 
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)

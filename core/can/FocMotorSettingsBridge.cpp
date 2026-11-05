@@ -220,6 +220,8 @@ namespace can
                 return HeldLoopStatistic(parameter);
             case ParameterGroup::platform:
                 return HeldPlatformReading(parameter);
+            case ParameterGroup::motion:
+                return FocParameterValue{ targetReached != nullptr && targetReached() ? 1.0f : 0.0f, false };
             default:
                 return HeldLoopSetting(parameter);
         }
@@ -228,6 +230,11 @@ namespace can
     void FocMotorSettingsBridge::ClearDiagnostics()
     {
         diagnostics.Reset();
+    }
+
+    void FocMotorSettingsBridge::ReportTargetReached(const infra::Function<bool()>& isReached)
+    {
+        targetReached = isReached;
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldCalibrationReading(FocParameter parameter) const

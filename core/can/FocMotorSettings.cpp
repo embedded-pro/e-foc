@@ -51,6 +51,8 @@ namespace can
                 case FocParameter::stagedVersionMinor:
                 case FocParameter::stagedVersionPatch:
                     return ParameterGroup::platform;
+                case FocParameter::targetReached:
+                    return ParameterGroup::motion;
                 default:
                     return std::nullopt;
             }
@@ -112,6 +114,8 @@ namespace can
             case FocParameter::continuousCurrent:
             case FocParameter::peakCurrent:
             case FocParameter::peakCurrentTime:
+            case FocParameter::positionWindow:
+            case FocParameter::positionWindowTime:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -308,6 +312,10 @@ namespace can
                 return config.limits.peakCurrent;
             case FocParameter::peakCurrentTime:
                 return config.limits.peakCurrentTime;
+            case FocParameter::positionWindow:
+                return config.limits.positionWindow;
+            case FocParameter::positionWindowTime:
+                return config.limits.positionWindowTime;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -340,6 +348,12 @@ namespace can
                 break;
             case FocParameter::peakCurrentTime:
                 config.limits.peakCurrentTime = value;
+                break;
+            case FocParameter::positionWindow:
+                config.limits.positionWindow = value;
+                break;
+            case FocParameter::positionWindowTime:
+                config.limits.positionWindowTime = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

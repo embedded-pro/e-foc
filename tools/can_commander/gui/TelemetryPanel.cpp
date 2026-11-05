@@ -1,7 +1,9 @@
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "tools/can_commander/gui/DisplayFormat.hpp"
+#include "tools/can_commander/logic/MotorSettings.hpp"
 #include "tools/can_commander/logic/SetpointAxis.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QFormLayout>
@@ -15,6 +17,7 @@ namespace tool
 
     namespace
     {
+        using ui::backend::qt::ToQt;
         using ui::model::FieldId;
         using ui::model::FieldKind;
         using ui::model::FieldSpec;
@@ -62,8 +65,11 @@ namespace tool
         auto* statusLayout = new QFormLayout(statusGroup);
         motorStateLabel = new QLabel();
         faultLabel = new QLabel();
+        targetReachedLabel = new QLabel();
+        targetReachedLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::targetReached).description));
         statusLayout->addRow("State:", motorStateLabel);
         statusLayout->addRow("Fault:", faultLabel);
+        statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::targetReached).label), targetReachedLabel);
         layout->addWidget(statusGroup);
 
         BuildForm(measurements, measurementFields, measurementValues, "Measurements");
@@ -120,6 +126,8 @@ namespace tool
         ui::backend::qt::StyleStatusLabel(*motorStateLabel, ui::theme::StatusLevel::Neutral);
         faultLabel->setText(placeholder);
         ui::backend::qt::StyleStatusLabel(*faultLabel, ui::theme::StatusLevel::Neutral);
+        targetReachedLabel->setText(placeholder);
+        ui::backend::qt::StyleStatusLabel(*targetReachedLabel, ui::theme::StatusLevel::Neutral);
         ShowPlaceholders(measurements);
         ShowPlaceholders(parameters);
     }
@@ -168,6 +176,12 @@ namespace tool
         Show(parameters, resistance, static_cast<double>(resistanceOhm));
         Show(parameters, inductance, static_cast<double>(inductanceMilliHenry));
         Show(parameters, polePairs, static_cast<double>(polePairsValue));
+    }
+
+    void TelemetryPanel::OnTargetReached(bool reached)
+    {
+        targetReachedLabel->setText(reached ? "Yes" : "No");
+        ui::backend::qt::StyleStatusLabel(*targetReachedLabel, reached ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
     }
 
     void TelemetryPanel::ShowFault(FocFaultCode fault)

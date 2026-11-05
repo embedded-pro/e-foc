@@ -399,10 +399,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_8)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_10)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(9, can::focContractVersionMinor);
+    EXPECT_EQ(10, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)

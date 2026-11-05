@@ -161,3 +161,16 @@
     shall be writable in any state, answered with the value held once it is stored in the
     configuration record, refused with invalidPayload outside its range without changing
     anything, and read back unchanged after a restart.
+
+- id: REQ-CAN-016
+  title: The position window is settable over CAN and the target-reached flag is readable
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.10 shall add, without changing any 2.9 message, the stored settings
+    positionWindow (0x59) in rad, 0 to 3.2, and positionWindowTime (0x5A) in s, 0 to 10, and the
+    read-only parameter targetReached (0xC0), 1 when the target is reached and 0 otherwise. Each
+    setting shall be writable in any state, answered with the value held once it is stored in the
+    configuration record, refused with invalidPayload outside its range without changing anything,
+    and read back unchanged after a restart; targetReached shall be refused by SetParameter with
+    invalidPayload.

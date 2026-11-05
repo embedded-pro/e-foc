@@ -10,9 +10,11 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <optional>
 #include <string>
+#include <thread>
 
 using namespace integration;
 
@@ -78,6 +80,45 @@ THEN(R"(the {word} read over CAN shall be {float})", (std::string name, float ex
     ASSERT_TRUE(held.has_value()) << "The target did not report " << name;
     EXPECT_FALSE(held->automatic) << name << " is reported as automatic";
     EXPECT_NEAR(held->value, expected, std::abs(expected) * 1.0e-6f) << name;
+}
+
+THEN(R"(the {word} read over CAN shall become {float} within {int} ms)", (std::string name, float expected, int timeoutMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto parameter = ParameterNamed(name);
+    ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+
+    const auto start = std::chrono::steady_clock::now();
+    const auto deadline = start + std::chrono::milliseconds{ timeoutMs };
+    std::optional<can::FocParameterValue> held;
+    do
+    {
+        held = ReadParameter(fixture, *parameter);
+        if (held.has_value() && held->value == expected)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 20 });
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    std::printf("[METRIC] sil %s_became_%g_ms value=%lld\n", name.c_str(), static_cast<double>(expected), static_cast<long long>(elapsed.count()));
+    ASSERT_TRUE(held.has_value()) << "The target did not report " << name;
+    EXPECT_EQ(held->value, expected) << name << " did not become " << expected << " within " << timeoutMs << " ms";
+}
+
+THEN(R"(the {word} read over CAN shall stay {float} for {int} ms)", (std::string name, float expected, int durationMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto parameter = ParameterNamed(name);
+    ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ durationMs };
+    do
+    {
+        const auto held = ReadParameter(fixture, *parameter);
+        ASSERT_TRUE(held.has_value()) << "The target did not report " << name;
+        ASSERT_EQ(held->value, expected) << name << " left " << expected;
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
+    } while (std::chrono::steady_clock::now() < deadline);
 }
 
 THEN(R"(the {word} read over CAN shall be automatic)", (std::string name))

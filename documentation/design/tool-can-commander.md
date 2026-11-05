@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.7
+version: 0.11.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.7               |
+| Version   | 0.11.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -27,8 +27,8 @@ date: 2026-11-05
   parameters, the start-up settings, alignment and identification, plus one emergency stop that reaches all
   of them.
 - Showing each controller's state as that controller reports it: heartbeat, firmware contract
-  compatibility, motor state and fault, active control mode, measurements, identified motor parameters and
-  every setting it holds.
+  compatibility, motor state and fault, whether position mode reached its target, active control mode,
+  measurements, identified motor parameters and every setting it holds.
 - Keeping a persistent issue log per user, and turning it into a pre-filled bug report on request.
 - Telling the user when a newer release exists, without ever blocking the tool.
 - Updating a motor controller's firmware over CAN, from the release for its board or from a pack file, in two
@@ -110,6 +110,7 @@ graph TD
 | Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value                     | that node's setpoint acknowledgement    |
 | Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted                            | that node's parameter responses         |
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
+| Target reached                                    | *Yes* once position mode reports its target reached, *No* otherwise; "—" before 2.10                      | `targetReached`, read with each status  |
 | Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
 | Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
@@ -120,6 +121,10 @@ delivers up to 1000 samples a second from each node; the panel keeps only each n
 paints it on a 40 ms timer, so nine streaming nodes cost the event loop at most 225 repaints a second, and
 stream frames stay out of the raw frame log. A fault on one motor stays visible in the
 overview row and on its tab while another motor is being commanded.
+
+The target-reached row sits in the Motor Status group under the state and fault, and is read with every status
+rather than on Refresh, so a flag from the previous move is replaced within a second and right after the next
+setpoint is accepted.
 
 ### Part D — commands and the emergency stop
 
@@ -246,6 +251,10 @@ flowchart LR
   only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
   setpoint. They are stored at once and in force from the next control period, in any
   state; the group says that a drive beyond 110 % of the limit faults and coasts.
+  Its **Target Window** group holds the position window and its time of contract 2.10 (`foc-position.md`,
+  Target Reached): position mode reports the target reached once its error has stayed within the window for
+  the time, and a window of zero keeps the report off, as the group says. They are stored at once and in force
+  within 1 ms, in any state.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -268,7 +277,9 @@ the Fault Supervision fields are disabled with the reason. Its faults never read
 node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware
 fault* or *Calibration failed*. A node older than 2.9 has no limits: the commander does not ask it for them, the
 Limits fields are disabled with the reason, and it never reports *Overspeed*, *Following error* or *Command
-timeout*.
+timeout*. A node older than 2.10 has no target window: the commander does not ask it for the
+position window, its time or the target-reached reading, and the Target Window fields are disabled with the
+reason.
 
 ### Part K — diagnostics
 
@@ -710,7 +721,7 @@ sequenceDiagram
 | Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                        |
 | Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase          |
 | Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                          |
-| Status reads           | each compatible node every 1 s and after every accepted command                                                                                          |
+| Status reads           | each compatible node every 1 s and after every accepted command; from contract 2.10 each also reads the target-reached flag                              |
 | Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                          |
 | On-screen event log    | newest 5000 lines                                                                                                                                        |
 | Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                                  |

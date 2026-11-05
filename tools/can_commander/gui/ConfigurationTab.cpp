@@ -23,6 +23,7 @@ namespace tool
         BuildStartupGroup();
         BuildSupervisionGroup();
         BuildLimitsGroup();
+        BuildTargetWindowGroup();
         Content().addStretch();
 
         Refresh();
@@ -73,6 +74,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildTargetWindowGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Target Window", group);
+        AddEditors(form, TargetWindowSettings());
+
+        auto* note = new QLabel("Position mode reports its target reached once the position error has stayed within the "
+                                "window for the window time; a window of 0 keeps it reported not reached. Stored at once "
+                                "and in force within 1 ms, also while the motor runs.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -101,6 +115,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetTargetWindowUnavailable(const QString& reason)
+    {
+        if (reason == targetWindowReason)
+            return;
+
+        targetWindowReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::Refresh()
     {
         const auto* stall = EditorFor(can::FocParameter::stallDetection);
@@ -116,6 +140,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? supervisionReason : legacyReason);
             else if (IsIn(LimitSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? limitsReason : legacyReason);
+            else if (IsIn(TargetWindowSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? targetWindowReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

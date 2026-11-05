@@ -69,6 +69,11 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::overspeedLimit, LimitSettings().front().parameter);
     EXPECT_EQ(FocParameter::peakCurrentTime, LimitSettings().back().parameter);
     EXPECT_EQ(9u, LimitSettings().size());
+    EXPECT_EQ(FocParameter::positionWindow, TargetWindowSettings().front().parameter);
+    EXPECT_EQ(FocParameter::positionWindowTime, TargetWindowSettings().back().parameter);
+    EXPECT_EQ(2u, TargetWindowSettings().size());
+    EXPECT_EQ(FocParameter::targetReached, StatusReadings().front().parameter);
+    EXPECT_EQ(1u, StatusReadings().size());
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::stagedVersionPatch, Readings().back().parameter);
 }
@@ -87,8 +92,10 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(StartupSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(SupervisionSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(LimitSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(TargetWindowSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::all_of(StatusReadings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + LimitSettings().size() + Readings().size());
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + LimitSettings().size() + TargetWindowSettings().size() + Readings().size() + StatusReadings().size());
 }
 
 TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)

@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include <array>
 #include <cstdint>
+#include <numbers>
 
 namespace services
 {
@@ -51,6 +52,8 @@ namespace services
         float continuousCurrent = 0.0f;
         float peakCurrent = 0.0f;
         float peakCurrentTime = 1.0f;
+        float positionWindow = 2.0f * std::numbers::pi_v<float> * 4.0f / 4000.0f;
+        float positionWindowTime = 0.02f;
     };
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
@@ -74,7 +77,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 132, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 140, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {

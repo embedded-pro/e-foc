@@ -85,6 +85,7 @@ namespace tool
         QString DiagnosticsUnavailableReason() const;
         QString SupervisionUnavailableReason() const;
         QString LimitsUnavailableReason() const;
+        QString TargetWindowUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 
