@@ -805,6 +805,28 @@ namespace state_machine
             activeSm);
 
         ApplyCurrentLimit();
+        ApplyBusVoltage();
+    }
+
+    void ControlModeStateMachine::TrackBusVoltage(foc::Volts measured)
+    {
+        busVoltage = measured;
+        ApplyBusVoltage();
+    }
+
+    void ControlModeStateMachine::ApplyBusVoltage()
+    {
+        if (!busVoltage.has_value())
+            return;
+
+        std::visit([measured = *busVoltage]<class Machine>(Machine& sm)
+            {
+                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
+                    sm.BusVoltageTracker().TrackBusVoltage(measured);
+                else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.TrackBusVoltage(measured);
+            },
+            activeSm);
     }
 
     void ControlModeStateMachine::ApplyCurrentLimit()

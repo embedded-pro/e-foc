@@ -51,6 +51,11 @@ Feature: Disturbance Rejection
   the bandwidth, with the proportional term weighting the reference at three
   quarters so that the zero does not overshoot the step.
 
+  The bus can sag as well. A supply that steps to 0.6 of its voltage scales the voltage every
+  per-unit command makes, which a law with an integrator absorbs but the sliding-mode law does not;
+  the drive measures the bus every 10 ms and scales its duties back, so that law stays at its
+  command (REQ-TRQ-013).
+
   @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop rejects a <torque> Nm torque step while holding 20 rad/s
     Given a nominal motor plant
@@ -118,3 +123,19 @@ Feature: Disturbance Rejection
     Examples:
       | algorithm |
       | pid       |
+
+  @sil @REQ-TRQ-013
+  Scenario: A supply that sags to 0.6 of its voltage leaves the sliding-mode current law at its command
+    Given a nominal motor plant
+    And the plant response is recorded at 1000 Hz for up to 2000 samples
+    And a hand turns the shaft by 0.01 rad over 1 ms, 0 ms after enable, and holds it
+    And the supply steps to 0.6 of its voltage 1000 ms after enable
+    And the motor is already calibrated
+    And the current loop runs the sliding algorithm
+    And the motor boots in torque mode
+    When the target boots
+    And the rotor is aligned
+    And a torque setpoint of 1.0 A is applied
+    And the motor is enabled
+    And the response is captured for 2000 ms after enable
+    Then the q-axis current shall average between 0.98 and 1.02 A from 1100 to 2000 ms after enable

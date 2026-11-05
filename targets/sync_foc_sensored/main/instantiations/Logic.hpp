@@ -17,6 +17,7 @@
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/bus_voltage/BusVoltageMonitor.hpp"
 #include "core/services/cli/TerminalDiagnostics.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
@@ -83,6 +84,7 @@ namespace application
         supervision::FollowingErrorMonitor followingError;
         can::CanCommandTimeout commandTimeout;
         supervision::MotorOverload motorOverload;
+        services::BusVoltageMonitor busVoltage;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 

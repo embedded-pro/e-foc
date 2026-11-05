@@ -61,6 +61,11 @@ namespace application
             focController.LimitCurrent(limit);
         }
 
+        void TrackBusVoltage(foc::Volts measured)
+        {
+            focController.TrackBusVoltage(measured);
+        }
+
         void RampSpeed(foc::RadiansPerSecondSquared acceleration, foc::RadiansPerSecondSquared deceleration)
         {
             if constexpr (std::is_base_of_v<foc::SpeedRampable, Cascade>)

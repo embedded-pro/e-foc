@@ -149,6 +149,9 @@ namespace application
         const auto cableDisconnectDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->cableDisconnectDelayMs) * baseHz / 1000u);
         cableDisconnect.Configure(plantConfig->cableDisconnectDelayMs != 0 ? std::make_optional(cableDisconnectDelay) : std::nullopt);
 
+        const auto supplyStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->supplyStepDelayMs) * baseHz / 1000u);
+        supplyStep.Configure(plantConfig->supplyStepScale > 0.0f ? std::make_optional(supplyStepDelay) : std::nullopt);
+
         ConfigureShaftGrip(baseHz);
 
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
@@ -388,6 +391,12 @@ namespace application
             model.SetFaultInjection(activeFaultInjection);
         }
 
+        if (supplyStep.Fire(tick))
+        {
+            activeFaultInjection.supplyVoltageScale = plantConfig->supplyStepScale;
+            model.SetFaultInjection(activeFaultInjection);
+        }
+
         if (shaftGrip.Fire(tick))
             model.GripShaft(shaftTurnSpeed);
 
@@ -425,6 +434,7 @@ namespace application
         torqueStep.Begin();
         encoderFreeze.Begin();
         cableDisconnect.Begin();
+        supplyStep.Begin();
         shaftGrip.Begin();
         shaftHold.Begin();
         boardProtection.SetArmed(true);

@@ -216,6 +216,7 @@ namespace mil
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
                         .lowPriorityInterrupt = lowPriorityInterrupt });
+                busVoltage.Start();
             });
 
         Run(kBootTime);
@@ -224,6 +225,7 @@ namespace mil
 
     ModelInTheLoop::~ModelInTheLoop()
     {
+        busVoltage.Stop();
         controlMode.reset();
         clock.ExecuteAllActions();
     }

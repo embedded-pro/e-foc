@@ -64,6 +64,7 @@ namespace state_machine
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
         void LimitCurrent(foc::Ampere limit);
+        void TrackBusVoltage(foc::Volts measured);
 
         void ApplyOnlineEstimates();
 
@@ -142,6 +143,7 @@ namespace state_machine
         void ApplyOperatorTunings();
         void ApplyLimits();
         void ApplyCurrentLimit();
+        void ApplyBusVoltage();
         void StoreAndPersist(const OnSetting& onDone);
         void CompleteSetting(SettingResult result);
         static SettingResult ToSettingResult(foc::SelectResult result);
@@ -163,6 +165,7 @@ namespace state_machine
         infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;
         uint8_t previousDefaultControlMode{ 0 };
         std::optional<foc::Ampere> currentLimit;
+        std::optional<foc::Volts> busVoltage;
 
         std::variant<std::monostate,
             application::TorqueStateMachine,

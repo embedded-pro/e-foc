@@ -86,6 +86,9 @@ namespace sil
         uint32_t shaftGripDelayMs;
         uint32_t shaftTurnMs;
         uint32_t cableDisconnectDelayMs;
+        // Zero means the supply never steps; otherwise the open-circuit voltage it steps to, as a fraction.
+        float supplyStepScale;
+        uint32_t supplyStepDelayMs;
 
         uint8_t polePairs;
         uint8_t faultFlags;
@@ -94,10 +97,10 @@ namespace sil
         uint8_t dutyDelayPeriods;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 240, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 248, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 11;
+    static constexpr uint8_t plantConfigLayoutVersion = 12;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

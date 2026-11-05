@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.2
+version: 1.13.3
 component: "software-in-the-loop"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.2                      |
+| Version   | 1.13.3                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-11-05                  |
 
@@ -346,6 +346,11 @@ hand takes it whatever torque the drive produces — the hand is stronger than a
 reads that motion, so the firmware sees a rotor overpowered and then stalled. The grip is three fields of
 the plant description, the delay, the duration and the angle, which took the record to layout version 10;
 an angle of zero means no hand.
+
+The supply can step as well: a set time after enable its open-circuit voltage changes to a set fraction of the
+configured one and stays there, so a scenario can sag or raise the bus under a running drive. The step is two
+fields of the plant description, the fraction and the delay, which took the record to layout version 12; a
+fraction of zero means the supply never steps.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen

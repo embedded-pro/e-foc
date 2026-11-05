@@ -2,7 +2,7 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: foc-torque
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.4.0              |
+| Version   | 0.4.1              |
 | Component | foc-torque         |
 | Date      | 2026-11-05         |
 
@@ -106,7 +106,8 @@ converts per-unit to volts with it. A bus that sags under load or rises under re
 scale the voltage the winding gets by V_meas / V_cfg, and with it the loop gain, the feed-forwards and the
 reported voltage.
 
-`TrackBusVoltage()` hands the cascade a measured bus voltage. The cascade keeps every configured number and
+`TrackBusVoltage()` hands the cascade a measured bus voltage; the bus-voltage service reads it every 10 ms
+and filters it (`service-bus-voltage.md`). The cascade keeps every configured number and
 scales only the output: the modulator divides each per-unit phase voltage by r = V_meas / V_cfg, so the duty
 gives the winding the voltage the law asked for, and the law limits its output to a magnitude of r, the
 largest voltage the measured bus can make, which keeps its anti-windup honest. r is held within 0.5 to 2 so

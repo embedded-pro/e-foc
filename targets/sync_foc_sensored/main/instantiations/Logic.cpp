@@ -80,6 +80,14 @@ namespace application
                 this->hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
                 controlMode->LimitCurrent(limit);
             } }
+        , busVoltage{ [this]()
+            {
+                return this->hardware.PowerSupplyVoltage();
+            },
+            [this](foc::Volts measured)
+            {
+                controlMode->TrackBusVoltage(measured);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
@@ -139,6 +147,7 @@ namespace application
                     {
                         return supervision::OverloadRatingsFrom(controlMode->Config());
                     });
+                busVoltage.Start();
                 commandTimeout.Enable([this]()
                     {
                         return std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(controlMode->Config().limits.commandTimeout));

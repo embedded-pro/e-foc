@@ -1,4 +1,5 @@
 add_subdirectory(alignment)
+add_subdirectory(bus_voltage)
 add_subdirectory(cli)
 add_subdirectory(cogging_compensation)
 add_subdirectory(current_offsets)
