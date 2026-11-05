@@ -185,7 +185,8 @@ namespace
 
         static constexpr std::size_t targetWindowParameterCount{ 3 };
         static constexpr std::size_t travelLimitParameterCount{ 2 };
-        static constexpr std::size_t readWithTheStatus{ 1 };
+        static constexpr std::size_t readWithTheStatus{ 2 };
+        static constexpr std::size_t thermalParameterCount{ 2 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -1076,7 +1077,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
@@ -1103,20 +1104,49 @@ TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
 
     EXPECT_TRUE(client.SupportsTargetWindow(1));
     EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
 }
 
-TEST_F(TestCanCommandClient, a_2_11_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_12_node_is_not_asked_for_its_winding_temperature)
 {
     RecordSends();
-    BringCompatible(1, 11);
+    BringCompatible(1, 12);
 
+    AnswerAllReads();
+    ForwardTime(CanCommandClient::statusRefreshInterval);
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsTravelLimits(1));
+    EXPECT_FALSE(client.SupportsThermal(1));
+    EXPECT_FALSE(Queried(can::FocParameter::calibrationTemperature));
+    EXPECT_FALSE(Queried(can::FocParameter::windingTemperature));
+}
+
+TEST_F(TestCanCommandClient, a_2_13_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, 13);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsThermal(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_13_node_is_asked_for_its_winding_temperature_with_every_status)
+{
+    RecordSends();
+    BringCompatible(1, 13);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId, can::focQueryParameterId }), SentTypes());
+    EXPECT_TRUE(Queried(can::FocParameter::windingTemperature));
 }
 
 TEST_F(TestCanCommandClient, a_2_10_node_is_asked_whether_it_reached_its_target_with_every_status)

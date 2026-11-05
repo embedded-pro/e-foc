@@ -44,6 +44,7 @@ namespace can
         FocParameterValue HeldOnlineEstimate(FocParameter parameter) const;
         FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
         FocParameterValue HeldPlatformReading(FocParameter parameter) const;
+        FocParameterValue HeldWindingTemperature() const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;

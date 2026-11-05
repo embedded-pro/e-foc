@@ -19,6 +19,7 @@ namespace tool
         void SetLimitsUnavailable(const QString& reason);
         void SetTargetWindowUnavailable(const QString& reason);
         void SetTravelLimitsUnavailable(const QString& reason);
+        void SetThermalUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -29,6 +30,7 @@ namespace tool
         void BuildLimitsGroup();
         void BuildTargetWindowGroup();
         void BuildTravelLimitsGroup();
+        void BuildThermalGroup();
         void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };
@@ -37,5 +39,6 @@ namespace tool
         QString limitsReason;
         QString targetWindowReason;
         QString travelLimitsReason;
+        QString thermalReason;
     };
 }

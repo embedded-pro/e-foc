@@ -154,6 +154,7 @@ namespace can
         positionWindowTime = 0x5A,
         positionMinimum = 0x5B,
         positionMaximum = 0x5C,
+        calibrationTemperature = 0x5D,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,
@@ -187,7 +188,8 @@ namespace can
         stagedVersionMajor = 0xB5,
         stagedVersionMinor = 0xB6,
         stagedVersionPatch = 0xB7,
-        targetReached = 0xC0
+        targetReached = 0xC0,
+        windingTemperature = 0xC1
     };
 
     struct FocFirmwareIdentity

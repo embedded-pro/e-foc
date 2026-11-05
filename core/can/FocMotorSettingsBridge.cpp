@@ -2,7 +2,9 @@
 #include "core/can/FocMotorSettings.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "core/foc/math/WindingTemperature.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include <limits>
 
 namespace can
 {
@@ -222,6 +224,8 @@ namespace can
                 return HeldPlatformReading(parameter);
             case ParameterGroup::motion:
                 return FocParameterValue{ targetReached != nullptr && targetReached() ? 1.0f : 0.0f, false };
+            case ParameterGroup::thermal:
+                return HeldWindingTemperature();
             default:
                 return HeldLoopSetting(parameter);
         }
@@ -271,6 +275,15 @@ namespace can
             default:
                 return FocParameterValue{ estimates->viscousFriction.Value(), false };
         }
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const
+    {
+        const auto estimates = controlMode.ActiveStateMachine().CurrentOnlineEstimates();
+        const auto temperature = estimates.has_value()
+                                     ? foc::WindingTemperatureFromResistance(estimates->resistance, foc::Ohm{ controlMode.CalibrationRecord().rPhase }, foc::Celsius{ controlMode.Config().limits.calibrationTemperature })
+                                     : std::nullopt;
+        return FocParameterValue{ temperature.has_value() ? temperature->Value() : std::numeric_limits<float>::quiet_NaN(), false };
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldLoopStatistic(FocParameter parameter) const

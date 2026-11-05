@@ -194,3 +194,14 @@
   shall: >
     Contract version 2.12 shall add, without changing any 2.11 message, the positionLimit (13)
     value of the fault code carried by the status telemetry and the fault event.
+
+- id: REQ-CAN-019
+  title: The winding temperature and its calibration temperature are readable and settable over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.13 shall add, without changing any 2.12 message, the stored setting
+    calibrationTemperature (0x5D) in degC, -40 to 100, writable in any state, answered with the
+    value held once stored, refused with invalidPayload outside its range and read back unchanged
+    after a restart, and the read-only parameter windingTemperature (0xC1) in degC, not a number
+    while the temperature is unknown.

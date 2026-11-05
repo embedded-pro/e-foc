@@ -25,6 +25,7 @@ namespace tool
         BuildLimitsGroup();
         BuildTargetWindowGroup();
         BuildTravelLimitsGroup();
+        BuildThermalGroup();
         Content().addStretch();
 
         Refresh();
@@ -101,6 +102,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildThermalGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Thermal", group);
+        AddEditors(form, ThermalSettings());
+
+        auto* note = new QLabel("The board has no temperature sensor: speed and position mode infer the winding temperature from "
+                                "the online resistance estimate, starting from the winding's temperature when the calibration "
+                                "measured its resistance. Torque mode has no estimate. Stored at once.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -125,6 +139,16 @@ namespace tool
             return;
 
         limitsReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
+    void ConfigurationTab::SetThermalUnavailable(const QString& reason)
+    {
+        if (reason == thermalReason)
+            return;
+
+        thermalReason = reason;
         ShowAvailability();
         Refresh();
     }
@@ -168,6 +192,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? targetWindowReason : legacyReason);
             else if (IsIn(TravelLimitSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? travelLimitsReason : legacyReason);
+            else if (IsIn(ThermalSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? thermalReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

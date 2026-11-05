@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: "supervision"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.5.0                    |
+| Version   | 0.6.0                    |
 | Component | supervision              |
 | Date      | 2026-11-05               |
 
@@ -42,6 +42,8 @@ date: 2026-11-05
   from the peak to the continuous rating when the motor is overloaded (REQ-PRT-001, Part I).
 - Watching an enabled position drive for a rotor carried more than four encoder counts past the software
   position limits, and raising `positionLimit` (REQ-POS-016, Part J).
+- Inferring the winding's temperature from the online resistance estimate in speed and position mode
+  (REQ-PRT-002, Part K).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -393,6 +395,28 @@ stateDiagram-v2
     Watching --> Reported : more than four counts outside the limits, positionLimit raised
     Reported --> Watching : drive leaves Enabled
 ```
+
+### Part K — Winding temperature
+
+The board has no temperature input, so the drive infers the winding's temperature from its resistance
+(REQ-PRT-002). In speed and position mode the online electrical estimator follows the phase resistance R through
+its d-axis excitation bursts, 4 s at the start of every 60 s (`service-electrical-ident.md`). Copper's resistance
+rises 0.393 % per kelvin, so with the resistance R_cal the calibration record holds, measured at the calibration
+temperature T_cal, the winding is at
+
+T = T_cal + (R / R_cal − 1) / 0.00393
+
+T_cal is a stored drive-wide setting, 25 °C by default: an operator who calibrates a motor that is not at 25 °C
+sets it to the motor's temperature at the calibration. The estimator starts from R_cal whenever a calibration is
+applied — at boot, after a calibration and when the mode is activated — so T reads T_cal until the first burst
+after the next Enable has moved it, and it then follows the winding at the pace of the bursts, about once a
+minute, which a winding's thermal time constant of minutes allows. While the drive is stopped the estimate keeps
+its last value, which a cooling winding only lowers.
+
+Torque mode runs no electrical estimator: there the temperature is unknown, and the overload model of Part I is
+the drive's only thermal protection. Without a calibrated resistance the temperature is unknown as well. The
+estimate is the read-only parameter `windingTemperature` of contract 2.13 (`service-can.md`), not a number while
+it is unknown.
 
 ---
 

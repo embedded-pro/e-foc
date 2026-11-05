@@ -13,6 +13,7 @@ namespace foc
         using Ohm = infra::BaseUnit<12>;
         using Weber = infra::BaseUnit<13>;
         using KilogramMeterSquared = infra::BaseUnit<14>;
+        using Celsius = infra::BaseUnit<15>;
 
         using Radians = Angle;
         using RevPerSecond = Revolution::Div<infra::Second>;
@@ -34,4 +35,5 @@ namespace foc
     using KilogramMeterSquared = infra::Quantity<unit::KilogramMeterSquared, float>;
     using MilliHenry = infra::Quantity<unit::Henry::Scale<infra::StaticRational<1, 1000>>, float>;
     using Ohm = infra::Quantity<unit::Ohm, float>;
+    using Celsius = infra::Quantity<unit::Celsius, float>;
 }

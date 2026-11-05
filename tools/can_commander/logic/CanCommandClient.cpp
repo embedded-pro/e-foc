@@ -117,6 +117,11 @@ namespace tool
         return SupportsMinor(nodeId, travelLimitsContractMinor);
     }
 
+    bool CanCommandClient::SupportsThermal(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, thermalContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -139,6 +144,8 @@ namespace tool
             return SupportsTargetWindow(nodeId);
         if (parameter == can::FocParameter::positionMinimum || parameter == can::FocParameter::positionMaximum)
             return SupportsTravelLimits(nodeId);
+        if (parameter == can::FocParameter::calibrationTemperature)
+            return SupportsThermal(nodeId);
 
         switch (can::GroupOf(parameter))
         {
@@ -391,7 +398,7 @@ namespace tool
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached)
+            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
@@ -471,6 +478,8 @@ namespace tool
         QueueRead(nodeId, Read{ can::focRequestTelemetryId });
         if (SupportsTargetWindow(nodeId))
             QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
+        if (SupportsThermal(nodeId))
+            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
     }
 
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)

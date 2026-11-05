@@ -121,6 +121,40 @@ THEN(R"(the {word} read over CAN shall stay {float} for {int} ms)", (std::string
     } while (std::chrono::steady_clock::now() < deadline);
 }
 
+THEN(R"(the {word} read over CAN shall come within {float} of {float} within {int} ms)", (std::string name, float tolerance, float expected, int timeoutMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto parameter = ParameterNamed(name);
+    ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+
+    const auto start = std::chrono::steady_clock::now();
+    const auto deadline = start + std::chrono::milliseconds{ timeoutMs };
+    std::optional<can::FocParameterValue> held;
+    do
+    {
+        held = ReadParameter(fixture, *parameter);
+        if (held.has_value() && std::abs(held->value - expected) <= tolerance)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    ASSERT_TRUE(held.has_value()) << "The target did not report " << name;
+    std::printf("[METRIC] sil %s value=%.3f expected=%.3f after_ms=%lld\n", name.c_str(), static_cast<double>(held->value), static_cast<double>(expected), static_cast<long long>(elapsed.count()));
+    EXPECT_NEAR(held->value, expected, tolerance) << name << " did not come within " << tolerance << " of " << expected << " within " << timeoutMs << " ms";
+}
+
+THEN(R"(the {word} read over CAN shall be unknown)", (std::string name))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto parameter = ParameterNamed(name);
+    ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+
+    const auto held = ReadParameter(fixture, *parameter);
+    ASSERT_TRUE(held.has_value()) << "The target did not report " << name;
+    EXPECT_TRUE(std::isnan(held->value)) << name << " reads " << held->value;
+}
+
 THEN(R"(the {word} read over CAN shall be automatic)", (std::string name))
 {
     auto& fixture = context.Get<Fixture>();

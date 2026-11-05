@@ -140,5 +140,6 @@ namespace state_machine
         stored.positionWindowTime = WithinOrDefault(stored.positionWindowTime, 0.0f, CommandLimits::maxPositionWindowTime, defaults.positionWindowTime);
         stored.positionMinimum = WithinOrDefault(stored.positionMinimum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMinimum);
         stored.positionMaximum = WithinOrDefault(stored.positionMaximum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMaximum);
+        stored.calibrationTemperature = WithinOrDefault(stored.calibrationTemperature, CommandLimits::minCalibrationTemperature, CommandLimits::maxCalibrationTemperature, defaults.calibrationTemperature);
     }
 }

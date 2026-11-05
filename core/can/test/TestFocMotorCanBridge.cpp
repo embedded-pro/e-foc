@@ -2480,6 +2480,43 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_OnlineEstimates_InTorqueMode_AreZer
     ExpectAnswered(0.0f, false);
 }
 
+TEST_F(FocMotorCanBridgeTest, QueryParameter_WindingTemperature_InTorqueMode_IsNotANumber)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::windingTemperature);
+
+    EXPECT_TRUE(std::isnan(AnsweredParameter().value));
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_WindingTemperature_InSpeedMode_FollowsTheOnlineResistanceFromTheCalibrationTemperature)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    coordinator->Config().limits.calibrationTemperature = 40.0f;
+    ResetCaptures();
+
+    const auto estimates = coordinator->ActiveStateMachine().CurrentOnlineEstimates();
+    ASSERT_TRUE(estimates.has_value());
+    const auto calibrated = coordinator->CalibrationRecord().rPhase;
+    ASSERT_GT(calibrated, 0.0f);
+
+    DispatchQueryParameter(can::FocParameter::windingTemperature);
+    ExpectAnswered(40.0f + (estimates->resistance.Value() / calibrated - 1.0f) / 0.00393f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_WindingTemperature_WithoutACalibratedResistance_IsNotANumber)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::windingTemperature);
+
+    EXPECT_TRUE(std::isnan(AnsweredParameter().value));
+}
+
 TEST_F(FocMotorCanBridgeTest, QueryParameter_OnlineEstimates_InSpeedMode_ReportTheEstimators)
 {
     ConstructFixture();

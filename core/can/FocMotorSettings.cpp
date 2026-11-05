@@ -53,6 +53,8 @@ namespace can
                     return ParameterGroup::platform;
                 case FocParameter::targetReached:
                     return ParameterGroup::motion;
+                case FocParameter::windingTemperature:
+                    return ParameterGroup::thermal;
                 default:
                     return std::nullopt;
             }
@@ -118,6 +120,7 @@ namespace can
             case FocParameter::positionWindowTime:
             case FocParameter::positionMinimum:
             case FocParameter::positionMaximum:
+            case FocParameter::calibrationTemperature:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -322,6 +325,8 @@ namespace can
                 return config.limits.positionMinimum;
             case FocParameter::positionMaximum:
                 return config.limits.positionMaximum;
+            case FocParameter::calibrationTemperature:
+                return config.limits.calibrationTemperature;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -366,6 +371,9 @@ namespace can
                 break;
             case FocParameter::positionMaximum:
                 config.limits.positionMaximum = value;
+                break;
+            case FocParameter::calibrationTemperature:
+                config.limits.calibrationTemperature = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

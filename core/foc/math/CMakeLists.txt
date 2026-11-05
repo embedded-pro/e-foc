@@ -17,6 +17,7 @@ target_sources(e_foc.foc.math INTERFACE
     FiniteGuard.hpp
     ParameterValidation.hpp
     TravelLimits.hpp
+    WindingTemperature.hpp
 )
 
 add_subdirectory(test)

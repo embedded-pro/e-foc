@@ -538,7 +538,7 @@ TEST_F(FocMotorCategoryServerTest, HandleSetParameter_ReadOnlyParameter_IsReject
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x80, 0.0f)));
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0xA0, 1.0f)));
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0xB0, 0.0f)));
-    for (uint8_t id : { 0xB1, 0xB2, 0xB3, 0xB4, 0xC0 })
+    for (uint8_t id : { 0xB1, 0xB2, 0xB3, 0xB4, 0xC0, 0xC1 })
         EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(id, 1.0f)));
     EXPECT_FALSE(ackSpy.last.has_value());
 }
