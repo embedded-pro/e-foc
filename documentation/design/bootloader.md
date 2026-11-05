@@ -225,8 +225,11 @@ debugger, the bootloader and the application each from its own hex file, starts 
 
 ### Part F — starting the application
 
-The bootloader uses no interrupt, no timer and no peripheral but the flash controller, so the processor is in
-its reset state apart from the flash controller, which it locks again. It points the vector table at the
+The bootloader runs on the main stack alone, with 16 KB of RAM reserved for it at the top of RAM by its link:
+the decrypted first 2 KB of an image, the signature verification and the digest contexts live there, and the
+link fails if the bootloader's static data ever reaches into that reservation. The application reserves 1 KB
+the same way. The bootloader uses no interrupt, no timer and no peripheral but the flash controller, so the
+processor is in its reset state apart from the flash controller, which it locks again. It points the vector table at the
 application slot, loads the stack pointer from the slot's first vector and branches to the reset handler in
 the second, through the embedded-infrastructure library's Cortex-M jump. The watchdog is not running at that point: the TI watchdog and the ST window watchdog both start
 only when software starts them, and the application does (`watchdog.md`).
@@ -449,7 +452,7 @@ sequenceDiagram
 
 | Constraint           | Value / Description                                                                                                                                        |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL                                                                                                |
+| Bootloader size      | a 32 KB region on every board; 15.7 KB on the EK-TM4C1294XL. 16 KB of RAM reserved for its stack, where the image's first 2 KB and the signature check live |
 | Largest pack         | the staging slot, 256 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                          |
 | Largest image        | the application slot less its 64-byte descriptor                                                                                                           |
 | Check at every reset | one SHA-256 over the image at the reset clock; the time it adds to a start is measured with the first build                                                |

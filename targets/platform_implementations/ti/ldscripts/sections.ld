@@ -2,7 +2,7 @@ PROVIDE(_Heap_Begin = end);
 PROVIDE(_Heap_Limit = _estack - __Main_Stack_Size);
 PROVIDE(_estack = ORIGIN(REGION_RAM) + LENGTH(REGION_RAM));
 
-__Main_Stack_Size = 1024;
+PROVIDE(__Main_Stack_Size = 1024);
 
 ENTRY(Reset_Handler)
 

@@ -1,3 +1,5 @@
+__Main_Stack_Size = 16K;
+
 MEMORY
 {
     FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 32K
