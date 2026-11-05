@@ -151,6 +151,8 @@ namespace can
         peakCurrentTime = 0x58,
         positionWindow = 0x59,
         positionWindowTime = 0x5A,
+        positionMinimum = 0x5B,
+        positionMaximum = 0x5C,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,

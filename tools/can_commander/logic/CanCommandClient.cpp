@@ -112,6 +112,11 @@ namespace tool
         return SupportsMinor(nodeId, targetWindowContractMinor);
     }
 
+    bool CanCommandClient::SupportsTravelLimits(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, travelLimitsContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -132,6 +137,8 @@ namespace tool
     {
         if (parameter == can::FocParameter::positionWindow || parameter == can::FocParameter::positionWindowTime)
             return SupportsTargetWindow(nodeId);
+        if (parameter == can::FocParameter::positionMinimum || parameter == can::FocParameter::positionMaximum)
+            return SupportsTravelLimits(nodeId);
 
         switch (can::GroupOf(parameter))
         {

@@ -743,6 +743,37 @@ TEST_F(ControlModeStateMachineExtTest, a_stored_overspeed_limit_outside_its_rang
     EXPECT_NEAR(subject->Config().limits.overspeedLimit, services::LimitSettings{}.overspeedLimit, 1e-6f);
 }
 
+TEST_F(ControlModeStateMachineExtTest, stored_travel_limits_hold_the_position_reference)
+{
+    GivenNvmAlwaysInvalid();
+    services::ConfigData config{};
+    config.defaultControlMode = static_cast<uint8_t>(state_machine::ControlMode::position);
+    config.limits.positionMinimum = -1.0f;
+    config.limits.positionMaximum = 1.0f;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_TRUE(subject->TrySetPosition(foc::Radians{ 2.0f }));
+
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().positionError.Value(), 1.0f, 1e-6f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, travel_limits_stored_later_reach_the_position_reference)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    services::ConfigData config{};
+    config.defaultControlMode = static_cast<uint8_t>(state_machine::ControlMode::position);
+    ConstructSubjectWithConfig(config);
+    EXPECT_TRUE(subject->TrySetPosition(foc::Radians{ 2.0f }));
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().positionError.Value(), 2.0f, 1e-6f);
+
+    subject->Config().limits.positionMinimum = -0.5f;
+    subject->Config().limits.positionMaximum = 0.5f;
+    subject->PersistConfig([](services::NvmStatus) {});
+
+    EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().positionError.Value(), 0.5f, 1e-6f);
+}
+
 TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position_Mode_Active)
 {
     GivenNvmAlwaysInvalid();

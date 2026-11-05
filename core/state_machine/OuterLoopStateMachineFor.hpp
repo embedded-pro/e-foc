@@ -72,6 +72,12 @@ namespace application
                 focController.RampSpeed(acceleration, deceleration);
         }
 
+        void LimitTravel(foc::Radians minimum, foc::Radians maximum)
+        {
+            if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)
+                focController.LimitTravel(minimum, maximum);
+        }
+
         foc::MotionObservation ObserveMotion() const override
         {
             return focController.ObserveMotion();

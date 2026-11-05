@@ -13,6 +13,8 @@ namespace foc
         Radians measured{ 0.0f };
         Radians reference{ 0.0f };
         RadiansPerSecond measuredSpeed{ 0.0f };
+        // Set within software position limits: both angles stay between them, so no difference is folded.
+        bool direct{ false };
     };
 
     struct PositionOutput

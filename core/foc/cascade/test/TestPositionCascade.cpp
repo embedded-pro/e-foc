@@ -603,6 +603,76 @@ TEST_F(TestPositionCascade, the_observed_motion_carries_the_position_error_left_
     EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 0.75f, 1e-5f);
 }
 
+TEST_F(TestPositionCascade, within_travel_limits_the_observed_error_is_the_direct_way_to_the_setpoint)
+{
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->LimitTravel(foc::Radians{ -3.1f }, foc::Radians{ 3.1f });
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ -3.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 3.0f };
+        focPosition->Calculate(ZeroCurrents(), held);
+    }
+
+    EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), -6.0f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, a_setpoint_beyond_the_travel_limits_is_held_at_the_nearer_limit)
+{
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->LimitTravel(foc::Radians{ -1.0f }, foc::Radians{ 1.0f });
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 2.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 0.5f };
+        focPosition->Calculate(ZeroCurrents(), held);
+    }
+
+    EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 0.5f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, travel_limits_that_are_off_leave_the_short_way_across_the_seam)
+{
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->LimitTravel(foc::Radians{ -3.1f }, foc::Radians{ 3.1f });
+    focPosition->LimitTravel(foc::Radians{ 0.0f }, foc::Radians{ 0.0f });
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ -3.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 3.0f };
+        focPosition->Calculate(ZeroCurrents(), held);
+    }
+
+    EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 2.0f * std::numbers::pi_v<float> - 6.0f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, within_travel_limits_a_setpoint_across_the_seam_drives_the_direct_way)
+{
+    PositionCascadeUnderTest limited{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    PositionCascadeUnderTest acrossTheSeam{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    PositionCascadeUnderTest backward{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    limited.cascade->LimitTravel(foc::Radians{ -3.1f }, foc::Radians{ 3.1f });
+
+    const auto limitedResult = DutyAfterOuterCycles(limited, -3.0f, 3.0f, 2);
+    const auto seamResult = DutyAfterOuterCycles(acrossTheSeam, -3.0f, 3.0f, 2);
+    const auto backwardResult = DutyAfterOuterCycles(backward, 0.0f, 3.0f, 2);
+
+    ExpectSameDuty(limitedResult, backwardResult);
+    EXPECT_TRUE(DutiesDiffer(limitedResult, seamResult));
+}
+
 TEST_F(TestPositionCascade, a_loaded_cogging_map_drives_the_winding_while_the_rotor_holds_its_setpoint)
 {
     auto tunings = foc::CurrentLoopTunings{};

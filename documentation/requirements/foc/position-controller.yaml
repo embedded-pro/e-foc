@@ -143,3 +143,14 @@
     report it not reached in every other mode and state, while the error is beyond the window, and
     in answer to any query that follows an accepted setpoint whose target lies beyond the window.
     A window of 0 shall keep the target reported not reached.
+
+- id: REQ-POS-015
+  title: Position travel kept within the software position limits
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    With a position minimum below the position maximum, position mode shall refuse a setpoint that,
+    taken modulo 2 pi into [-pi, pi), lies outside them, shall hold its reference within them, and
+    shall move the rotor between two points within them the direct way, never across the angle
+    outside them, whichever is the shorter way round. With the minimum not below the maximum the
+    limits shall be off.

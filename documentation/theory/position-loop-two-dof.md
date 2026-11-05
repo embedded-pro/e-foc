@@ -2,9 +2,9 @@
 title: "Position Loop — P3: Two-DOF"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.1.0
 component: "position-loop-two-dof"
-date: 2026-08-31
+date: 2026-11-05
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Position Loop — P3: Two-DOF |
 | Type      | theory                      |
 | Status    | draft                       |
-| Version   | 1.0.0                       |
+| Version   | 1.1.0                       |
 | Component | position-loop-two-dof       |
-| Date      | 2026-08-31                  |
+| Date      | 2026-11-05                  |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -76,7 +76,9 @@ $$
 with $\alpha = 1 - e^{-T_o/\tau_{ff}}$ and $\mathrm{wrap}(\cdot)$ folding onto $(-\pi, \pi]$. The state
 $\theta_f$ is seeded from the measured angle on reset and on the first sample; seeding it at zero
 would ramp the reference in from absolute zero on every enable. For $\tau_{ff} \le 0$ the prefilter
-is transparent and the raw setpoint passes through.
+is transparent and the raw setpoint passes through. Inside software position limits both wraps are
+dropped and the prefilter runs on the line: the setpoint and the filter state stay between the
+limits, which never contain the seam (`position-loop-pid.md`, Angle-Error Wrapping).
 
 **Relation to P2**: When $F(z) = 1$ and the feedback controller is a proportional P, the structure
 collapses to Cascade P→PI. Two-DOF position control is the generalisation — $F(z)$ independently

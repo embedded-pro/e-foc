@@ -17,7 +17,7 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context) const
         {
-            return { PositionOutputKind::speedReference, WrappedPositionError(context.reference, context.measured) * gain };
+            return { PositionOutputKind::speedReference, PositionDifference(context.reference, context.measured, context.direct) * gain };
         }
 
     private:

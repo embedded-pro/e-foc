@@ -138,5 +138,7 @@ namespace state_machine
         stored.peakCurrentTime = WithinOrDefault(stored.peakCurrentTime, CommandLimits::minPeakCurrentTime, CommandLimits::maxPeakCurrentTime, defaults.peakCurrentTime);
         stored.positionWindow = WithinOrDefault(stored.positionWindow, 0.0f, CommandLimits::maxPositionWindow, defaults.positionWindow);
         stored.positionWindowTime = WithinOrDefault(stored.positionWindowTime, 0.0f, CommandLimits::maxPositionWindowTime, defaults.positionWindowTime);
+        stored.positionMinimum = WithinOrDefault(stored.positionMinimum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMinimum);
+        stored.positionMaximum = WithinOrDefault(stored.positionMaximum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMaximum);
     }
 }

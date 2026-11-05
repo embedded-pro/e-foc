@@ -2,7 +2,7 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: foc-position
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.0                |
+| Version   | 0.3.0                |
 | Component | foc-position         |
 | Date      | 2026-11-05           |
 
@@ -36,11 +36,12 @@ date: 2026-11-05
 - Resetting the position, speed and current controller state on Enable / Disable
 - Accepting a position setpoint in mechanical radians and propagating all derived setpoints through the cascade
 - Reporting, through the drive, when the rotor has settled on its setpoint (Target Reached)
+- Keeping the reference, and the way the rotor takes to it, within the software position limits when they are set
 
 **Is NOT responsible for:**
 - Reading phase currents or encoder position directly from hardware — these are supplied by the Runner
 - Writing duty cycles to the PWM hardware — duty cycles are returned to the Runner
-- Multi-turn position tracking — the setpoint is a single-turn mechanical angle, and the loop always takes the shorter way round to it
+- Multi-turn position tracking — the setpoint is a single-turn mechanical angle, and without software position limits the loop takes the shorter way round to it
 - Flux weakening (Id is always commanded to 0 A)
 
 ---
@@ -144,6 +145,37 @@ stateDiagram-v2
     Settling --> Moving : error beyond the window, or leaves Enabled
     Settling --> Reached : within the window for the window time
     Reached --> Moving : error beyond the window, or leaves Enabled
+```
+
+### Software Position Limits
+
+Machines rely on software travel limits to protect their mechanics (REQ-POS-015). Two stored drive-wide
+limits, the position minimum and maximum, bound the travel in the frame the position is measured in: the
+mechanical angle from the alignment zero, in [−π, π). They are off while the minimum is not below the
+maximum, as both are 0 by default. A homing reference, once the drive has one, makes the same limits absolute.
+
+With the limits on:
+
+- A position setpoint outside them, taken modulo 2π into [−π, π), is refused and the previous one stays in
+  force (`service-can.md`, contract 2.11).
+- The cascade holds its reference within them, so a setpoint accepted before the limits were narrowed takes
+  the rotor to the nearer limit, never beyond it.
+- The position law takes the plain difference between the reference and θm instead of folding it into
+  [−π, π]. The interval between the limits never contains the encoder seam, so the plain difference is the
+  way that stays inside: from 2.9 rad to −2.9 rad within limits of ±3 rad the rotor turns 5.8 rad back
+  through zero rather than 0.48 rad across the seam. The position error the drive reports to its monitors is
+  the same difference.
+
+The cascade takes new limits at its next 1 kHz tick after they are stored, and on every mode activation.
+
+```mermaid
+flowchart LR
+    SP["setpoint, modulo 2π"] --> L{"limits on?"}
+    L -- no --> W["error folded into [−π, π]"]
+    L -- yes --> C["reference held in [min, max]"]
+    C --> D["plain difference to θm"]
+    W --> LAW["position law"]
+    D --> LAW
 ```
 
 ### LPI Callback Execution Order Within One 1 kHz Tick
@@ -252,7 +284,7 @@ graph LR
 | Outer loop rate                 | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                              |
 | Speed-reference clamp           | One loop bandwidth of speed per π radians of error, which bounds the approach speed at any position error.                          |
 | No multi-turn tracking          | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                                           |
-| Position wrap-around correction | The position error is folded into [−π, π], so a setpoint across the encoder seam moves the short way round.                         |
+| Position wrap-around correction | Folded into [−π, π] so a move across the seam takes the short way, except within software position limits.                          |
 | LPI callback order              | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
 | No flux weakening               | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
 | Cycle budget (inner loop)       | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |

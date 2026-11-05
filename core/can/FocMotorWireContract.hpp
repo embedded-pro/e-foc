@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 10;
+    static constexpr uint8_t focContractVersionMinor = 11;
 
     enum class FieldType : uint8_t
     {
@@ -245,7 +245,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 65> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 67> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -286,6 +286,8 @@ namespace can
         { FocParameter::peakCurrentTime, "peakCurrentTime", "s", foc::CommandLimits::minPeakCurrentTime, foc::CommandLimits::maxPeakCurrentTime, false, false },
         { FocParameter::positionWindow, "positionWindow", "rad", 0.0f, foc::CommandLimits::maxPositionWindow, false, false },
         { FocParameter::positionWindowTime, "positionWindowTime", "s", 0.0f, foc::CommandLimits::maxPositionWindowTime, false, false },
+        { FocParameter::positionMinimum, "positionMinimum", "rad", -foc::CommandLimits::maxPositionLimit, foc::CommandLimits::maxPositionLimit, false, false },
+        { FocParameter::positionMaximum, "positionMaximum", "rad", -foc::CommandLimits::maxPositionLimit, foc::CommandLimits::maxPositionLimit, false, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },

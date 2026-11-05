@@ -58,6 +58,11 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
+        float DirectCommand(float reference, float measured)
+        {
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, true }).value;
+        }
+
         float SettledPosition(float reference)
         {
             float position = 0.0f;
@@ -157,6 +162,15 @@ TEST_F(TestLqrPositionController, an_error_across_the_seam_drives_the_short_way_
     controller.Configure(ValidParameters());
 
     EXPECT_NEAR(Command(-pi + 0.0005f, pi - 0.0005f), Command(0.001f, 0.0f), tolerance);
+}
+
+TEST_F(TestLqrPositionController, within_travel_limits_an_error_across_the_seam_drives_the_direct_way)
+{
+    controller.Configure(ValidParameters());
+
+    EXPECT_LT(DirectCommand(-pi + 0.0005f, pi - 0.0005f), 0.0f);
+    controller.Reset();
+    EXPECT_GT(DirectCommand(pi - 0.0005f, -pi + 0.0005f), 0.0f);
 }
 
 TEST_F(TestLqrPositionController, an_error_across_the_seam_drives_the_short_way_backward)

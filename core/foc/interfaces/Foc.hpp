@@ -153,6 +153,16 @@ namespace foc
         virtual void TrackBusVoltage(Volts measured) = 0;
     };
 
+    class PositionLimitable
+    {
+    protected:
+        ~PositionLimitable() = default;
+
+    public:
+        // Off while minimum is not below maximum.
+        virtual void LimitTravel(Radians minimum, Radians maximum) = 0;
+    };
+
     class SpeedRampable
     {
     protected:

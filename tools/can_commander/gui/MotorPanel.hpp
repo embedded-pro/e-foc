@@ -86,6 +86,7 @@ namespace tool
         QString SupervisionUnavailableReason() const;
         QString LimitsUnavailableReason() const;
         QString TargetWindowUnavailableReason() const;
+        QString TravelLimitsUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 

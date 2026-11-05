@@ -117,6 +117,8 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.peakCurrentTime = 0.0f;
     config.limits.positionWindow = 3.3f;
     config.limits.positionWindowTime = -0.01f;
+    config.limits.positionMinimum = -3.3f;
+    config.limits.positionMaximum = 3.3f;
 
     state_machine::SanitizeLimits(config);
 
@@ -131,6 +133,8 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     EXPECT_NEAR(config.limits.peakCurrentTime, services::LimitSettings{}.peakCurrentTime, 1e-6f);
     EXPECT_NEAR(config.limits.positionWindow, services::LimitSettings{}.positionWindow, 1e-6f);
     EXPECT_NEAR(config.limits.positionWindowTime, services::LimitSettings{}.positionWindowTime, 1e-6f);
+    EXPECT_NEAR(config.limits.positionMinimum, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.positionMaximum, 0.0f, 1e-9f);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
@@ -140,6 +144,8 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
     config.limits.followingErrorTime = 0.05f;
     config.limits.positionWindow = 0.0f;
     config.limits.positionWindowTime = 0.0f;
+    config.limits.positionMinimum = -3.0f;
+    config.limits.positionMaximum = 3.2f;
 
     state_machine::SanitizeLimits(config);
 
@@ -148,6 +154,8 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
     EXPECT_NEAR(config.limits.followingErrorTime, 0.05f, 1e-6f);
     EXPECT_NEAR(config.limits.positionWindow, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.positionWindowTime, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.positionMinimum, -3.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.positionMaximum, 3.2f, 1e-6f);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)

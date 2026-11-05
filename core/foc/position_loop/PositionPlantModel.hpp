@@ -23,4 +23,9 @@ namespace foc
         constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         return std::remainder(reference.Value() - measured.Value(), two_pi);
     }
+
+    ALWAYS_INLINE_HOT float PositionDifference(Radians reference, Radians measured, bool direct)
+    {
+        return direct ? reference.Value() - measured.Value() : WrappedPositionError(reference, measured);
+    }
 }

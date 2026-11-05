@@ -54,6 +54,11 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
+        float DirectCommand(float reference, float measured)
+        {
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, true }).value;
+        }
+
         float PositionErrorAfterStep(float step, std::size_t samples)
         {
             constexpr float speedLoopBandwidth = 100.0f;
@@ -263,6 +268,23 @@ TEST_F(TestPidPositionController, an_error_across_the_seam_commands_the_short_wa
     controller.Configure(ValidParameters());
 
     EXPECT_NEAR(Command(pi - 0.1f, -pi + 0.1f), -ReferenceStepGain(tunings) * 0.2f * SpeedEnvelope(tunings), tolerance);
+}
+
+TEST_F(TestPidPositionController, within_travel_limits_an_error_across_the_seam_commands_the_direct_way)
+{
+    controller.Configure(ValidParameters());
+
+    EXPECT_LT(DirectCommand(-pi + 0.1f, pi - 0.1f), 0.0f);
+    controller.Reset();
+    EXPECT_GT(DirectCommand(pi - 0.1f, -pi + 0.1f), 0.0f);
+}
+
+TEST_F(TestPidPositionController, within_travel_limits_a_reference_step_across_the_seam_is_taken_the_direct_way)
+{
+    controller.Configure(ValidParameters());
+    DirectCommand(2.9f, 2.9f);
+
+    EXPECT_LT(DirectCommand(-2.9f, 2.9f), 0.0f);
 }
 
 TEST_F(TestPidPositionController, a_higher_bandwidth_widens_the_speed_envelope)

@@ -35,7 +35,7 @@ namespace foc
                 seeded = true;
             }
 
-            shapedReference = detail::PositionWithWrapAround(shapedReference + alpha * WrappedPositionError(context.reference, Radians{ shapedReference }));
+            shapedReference = detail::PositionWithWrapAround(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
 
             return Radians{ shapedReference };
         }

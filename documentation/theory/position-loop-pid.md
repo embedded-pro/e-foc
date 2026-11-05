@@ -2,9 +2,9 @@
 title: "Position Loop — P (Baseline)"
 type: theory
 status: draft
-version: 1.2.1
+version: 1.3.0
 component: "position-loop-pid"
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Position Loop — P (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.2.1                        |
+| Version   | 1.3.0                        |
 | Component | position-loop-pid            |
-| Date      | 2026-10-29                   |
+| Date      | 2026-11-05                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -114,6 +114,21 @@ $$
 
 Without wrapping, a $+3.1$ rad reference reached from $-3.1$ rad would command a $6.2$ rad
 (354°) rotation through the long arc instead of the $0.08$ rad short arc.
+
+**Inside software position limits.** With a position minimum and maximum set (`foc-position.md`,
+Software Position Limits), the short arc can leave the travel: from $2.9$ rad to $-2.9$ rad within
+limits of $\pm 3$ rad it crosses the seam, outside the limits. The reference is then held in
+$[\theta_{min}, \theta_{max}]$ and every difference, the error and both steps of the velocity form,
+is the plain difference: $\mathrm{wrap}(x)$ is replaced by $x$. The interval never contains the seam,
+so neither the reference nor the measured angle crosses it, and the plain difference is the way that
+stays inside, $-5.8$ rad back through zero.
+
+A step longer than $\pi / b$, about $4.2$ rad, saturates the velocity form on its first sample, which
+only the limits make possible: the clamp drops the part of $K_p\,b\,\Delta\theta^*$ beyond the speed
+envelope, and the integral alone closes what that part would have. In the software-in-the-loop run a
+$5$ rad move between limits of $\pm 3$ rad reaches the $6.28$ mrad target window after about $1.4$ s,
+without overshoot, against $0.1$ s for a $2.5$ rad move. The two-DOF law, whose feedback is this law,
+shares the tail.
 
 ### Integral zero and reference weighting
 

@@ -184,6 +184,7 @@ namespace
         }
 
         static constexpr std::size_t targetWindowParameterCount{ 3 };
+        static constexpr std::size_t travelLimitParameterCount{ 2 };
         static constexpr std::size_t readWithTheStatus{ 1 };
 
         bool Queried(can::FocParameter parameter) const
@@ -1075,7 +1076,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
@@ -1093,7 +1094,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
     EXPECT_FALSE(Queried(can::FocParameter::targetReached));
 }
 
-TEST_F(TestCanCommandClient, a_2_10_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
 {
     RecordSends();
     BringCompatible(1, 10);
@@ -1101,6 +1102,20 @@ TEST_F(TestCanCommandClient, a_2_10_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsTargetWindow(1));
+    EXPECT_FALSE(client.SupportsTravelLimits(1));
+    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
+    EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
+}
+
+TEST_F(TestCanCommandClient, a_2_11_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, 11);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsTravelLimits(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
