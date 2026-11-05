@@ -61,6 +61,8 @@ namespace can
                 return FocFaultCode::followingError;
             case state_machine::FaultCode::commandTimeout:
                 return FocFaultCode::commandTimeout;
+            case state_machine::FaultCode::positionLimit:
+                return FocFaultCode::positionLimit;
         }
 
         return FocFaultCode::none;

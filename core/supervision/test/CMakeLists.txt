@@ -27,6 +27,7 @@ target_sources(e_foc.supervision_test PRIVATE
     TestMotorOverload.cpp
     TestOverspeedMonitor.cpp
     TestPhaseLossMonitor.cpp
+    TestPositionLimitMonitor.cpp
     TestTargetReachedMonitor.cpp
 )
 

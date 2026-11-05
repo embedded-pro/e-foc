@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: "supervision"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.4.0                    |
+| Version   | 0.5.0                    |
 | Component | supervision              |
 | Date      | 2026-11-05               |
 
@@ -40,6 +40,8 @@ date: 2026-11-05
   window for the following-error time, and raising `followingError` (REQ-PRT-004, Part H).
 - Keeping a thermal model of the motor's winding from its current and folding the drive's current limit back
   from the peak to the continuous rating when the motor is overloaded (REQ-PRT-001, Part I).
+- Watching an enabled position drive for a rotor carried more than four encoder counts past the software
+  position limits, and raising `positionLimit` (REQ-POS-016, Part J).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -369,16 +371,39 @@ stateDiagram-v2
     FoldedBack --> Peak : θ < 0.5 · i_cont², limit = peak rating
 ```
 
+### Part J — Software position limit
+
+The software position limits keep the reference and the way to it between the position minimum and maximum
+(`foc-position.md`, Software Position Limits), but an outside force, or an overshoot, can still carry the rotor
+past them. A sixth watch, the position-limit monitor, reads the encoder's mechanical angle every 1 ms on the event
+loop while position mode is the active mode, the drive is `Enabled` and the limits are on. When the angle lies
+more than four encoder counts outside the limits — 2π · 4 / resolution, 6.28 mrad with the default 4000-count
+encoder — the monitor raises `positionLimit` (REQ-POS-016) once and stays silent until the drive leaves
+`Enabled`. The four counts keep a rotor settled on a limit, whose reading dithers by a count, from faulting.
+
+The angle is the one the loop works on, wrapped to [−π, π), so a rotor pushed past a limit and across the encoder
+seam reads as far outside the other limit and still faults. The limits and the encoder resolution are read at
+every evaluation, so a limit written over CAN is in force from the next one. Torque and speed mode are not
+watched: their travel is not bounded by the limits. The fault is raised through the same notifier as the other
+watches, so the drive cuts its power stage and coasts.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Watching
+    Watching --> Reported : more than four counts outside the limits, positionLimit raised
+    Reported --> Watching : drive leaves Enabled
+```
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface     | Purpose                                                                                           | Contract                                                                               |
-|---------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
-| Current limit | Hands the overload model's current limit to its owner (Part I)                                    | Called from the event loop when the limit changes                                      |
+| Interface     | Purpose                                                                                                                       | Contract                                                                               |
+|---------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed, a following error or a position-limit violation to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Current limit | Hands the overload model's current limit to its owner (Part I)                                                                | Called from the event loop when the limit changes                                      |
 
 ### Required
 

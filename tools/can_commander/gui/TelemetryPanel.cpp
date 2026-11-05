@@ -241,6 +241,8 @@ namespace tool
                 return "Following error";
             case FocFaultCode::commandTimeout:
                 return "Command timeout";
+            case FocFaultCode::positionLimit:
+                return "Position limit";
             default:
                 return "Unknown";
         }

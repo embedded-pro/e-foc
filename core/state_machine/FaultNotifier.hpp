@@ -19,7 +19,8 @@ namespace state_machine
         phaseMissing,
         overspeed,
         followingError,
-        commandTimeout
+        commandTimeout,
+        positionLimit
     };
 
     constexpr const char* FaultCodeName(FaultCode code)
@@ -52,6 +53,8 @@ namespace state_machine
                 return "followingError";
             case FaultCode::commandTimeout:
                 return "commandTimeout";
+            case FaultCode::positionLimit:
+                return "positionLimit";
         }
 
         return "unknown";

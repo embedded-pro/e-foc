@@ -186,3 +186,11 @@
     record, refused with invalidPayload outside its range without changing anything, and read back
     unchanged after a restart; with the limits on, a position setpoint outside them shall be
     acknowledged invalidPayload.
+
+- id: REQ-CAN-018
+  title: The position limit fault has a code of its own
+  status: verified
+  verification: sil
+  shall: >
+    Contract version 2.12 shall add, without changing any 2.11 message, the positionLimit (13)
+    value of the fault code carried by the status telemetry and the fault event.

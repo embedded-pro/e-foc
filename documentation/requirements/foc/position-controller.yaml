@@ -154,3 +154,13 @@
     shall move the rotor between two points within them the direct way, never across the angle
     outside them, whichever is the shorter way round. With the minimum not below the maximum the
     limits shall be off.
+
+- id: REQ-POS-016
+  title: A rotor carried past the software position limits faults the drive
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    While Enabled in position mode with the software position limits on, the drive shall enter
+    Fault with positionLimit within 2 ms of its measured position, wrapped to [-pi, pi), lying more
+    than four encoder counts outside the limits, and shall not do so in torque or speed mode or
+    while the limits are off.

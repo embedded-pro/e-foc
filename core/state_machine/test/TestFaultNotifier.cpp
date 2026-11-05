@@ -105,6 +105,7 @@ TEST_F(TestFaultNotifier, every_fault_code_traces_by_name)
     EXPECT_STREQ("overspeed", state_machine::FaultCodeName(state_machine::FaultCode::overspeed));
     EXPECT_STREQ("followingError", state_machine::FaultCodeName(state_machine::FaultCode::followingError));
     EXPECT_STREQ("commandTimeout", state_machine::FaultCodeName(state_machine::FaultCode::commandTimeout));
+    EXPECT_STREQ("positionLimit", state_machine::FaultCodeName(state_machine::FaultCode::positionLimit));
 }
 
 TEST_F(TestFaultNotifier, a_fault_code_outside_the_enumeration_traces_as_unknown)

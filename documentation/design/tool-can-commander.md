@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.12.0
+version: 0.13.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.12.0               |
+| Version   | 0.13.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -284,7 +284,7 @@ Limits fields are disabled with the reason, and it never reports *Overspeed*, *F
 timeout*. A node older than 2.10 has no target window: the commander does not ask it for the
 position window, its time or the target-reached reading, and the Target Window fields are disabled with the
 reason. A node older than 2.11 has no travel limits: the commander does not ask it for them, and the
-Travel Limits fields are disabled with the reason.
+Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*.
 
 ### Part K — diagnostics
 

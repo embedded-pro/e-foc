@@ -9,6 +9,9 @@ Feature: Position Travel
   With a position minimum below the position maximum, position mode refuses a setpoint outside
   them and moves the direct way between them, never across the angle outside them, whichever is
   the shorter way round (REQ-POS-015). The limits are measured from the alignment zero.
+  A rotor that an outside force carries more than four encoder counts past them faults the drive
+  with positionLimit (REQ-POS-016); stall reporting is turned off so that only the limit can
+  answer the hand that pushes the shaft.
 
   @sil @REQ-POS-014 @REQ-CAN-016
   Scenario: A position move reports its target reached once the rotor settles
@@ -79,6 +82,21 @@ Feature: Position Travel
     Then the targetReached read over CAN shall become 1 within 1000 ms
     And a position setpoint of 1.5 rad shall be refused
     And the targetReached read over CAN shall stay 1 for 500 ms
+
+  @sil @REQ-POS-016 @REQ-CAN-018
+  Scenario: A rotor pushed past the travel limits faults the drive
+    Given a nominal motor plant
+    And a hand turns the shaft by 0.5 rad over 100 ms, 1000 ms after enable, and holds it
+    And the motor is already calibrated
+    And the motor boots in position mode
+    When the target boots
+    And the stallDetection is set to 0 over CAN
+    And the positionMinimum is set to -1.0 over CAN
+    And the positionMaximum is set to 1.0 over CAN
+    And the rotor is aligned
+    And a position setpoint of 0.9 rad is applied
+    And the motor is enabled
+    Then the state machine shall report a position-limit fault
 
   @sil @REQ-CAN-016 @REQ-CAN-017
   Scenario: The position window, its time and the travel limits are stored and read back after a restart
