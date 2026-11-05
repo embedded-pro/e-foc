@@ -122,7 +122,7 @@ namespace tool
             case PackProblem::tooSmall:
                 return "The file is too small to be an upgrade pack.";
             case PackProblem::tooLarge:
-                return "The pack is larger than the controller's 256 KB staging slot.";
+                return "The pack is larger than the controller's 320 KB staging slot.";
             case PackProblem::notAPack:
                 return "The file is not an e-foc upgrade pack.";
             case PackProblem::unknownHeaderVersion:

@@ -359,15 +359,11 @@ Tier 1 gates three paths on two MCUs and reports them on a third, each path with
 binary, so a stage that matches on one MCU can still miss the other's half unnoticed. Each budget is the same
 slice of time on every MCU, in cycles of its clock:
 
-| Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) | EK-TM4C123GXL (80 MHz, report only) |
-|-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|-------------------------------------|
-| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    | 3000                                |
-| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   | 13333                               |
-| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    | 4000                                |
-
-At 80 MHz the EK-TM4C123GXL's inner loop is estimated at about 3700 cycles against its 3000-cycle slice, over 90% of
-the 20 kHz period, so its budgets are reported, not enforced: its banner flags a path over budget as a warning and
-the build does not fail. Running that board at 20 kHz needs a faster inner loop first.
+| Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
+|-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
+| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
+| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
+| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
 
 On a pull request each MCU gets one cycle banner and one memory banner. The cycle banner
 (`.github/scripts/cycle-analysis-banner.py`) shows one row per path (worst-case cycles and budget, both also as a

@@ -363,7 +363,7 @@ TEST_F(TestMotorSettings, names_the_board_kind_the_controller_reports)
     EXPECT_EQ("EK-TM4C1294XL", BoardKindName(1.0f));
     EXPECT_EQ("NUCLEO-G474RE", BoardKindName(2.0f));
     EXPECT_EQ("NUCLEO-H563ZI", BoardKindName(3.0f));
-    EXPECT_EQ("EK-TM4C123GXL", BoardKindName(4.0f));
+    EXPECT_EQ("Unknown", BoardKindName(4.0f));
     EXPECT_EQ("emulated", BoardKindName(5.0f));
     EXPECT_EQ("Unknown", BoardKindName(6.0f));
     EXPECT_EQ("Unknown", BoardKindName(-1.0f));

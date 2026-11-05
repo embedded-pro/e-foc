@@ -2,9 +2,9 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.8
+version: 0.3.9
 component: "service-firmware-upgrade"
-date: 2026-11-04
+date: 2026-11-05
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-04
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.8                     |
+| Version   | 0.3.9                     |
 | Component | service-firmware-upgrade  |
-| Date      | 2026-11-04                |
+| Date      | 2026-11-05                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -63,7 +63,7 @@ own.
 - Choosing a firmware version, where it comes from, or when to download or apply it. The user does, through a
   client.
 - Keeping the previous firmware. The bootloader overwrites it when it installs the new one.
-- Updating a board without a bootloader: the EK-TM4C123GXL, and the ST boards until they have one
+- Updating a board without a bootloader: the ST boards until they have one
   (`bootloader.md` Part A, Part I below).
 
 ---
@@ -108,7 +108,7 @@ erased:
 | No pack is being erased for or received                                             | `Busy`        |
 | The drive is stopped: `Idle` or `Ready`; never `Enabled`, `Calibrating` or `Fault`  | `Busy`        |
 | No asynchronous work is outstanding: no command pending, no NVM operation in flight | `Busy`        |
-| The size is at least one pack header and at most the staging slot, 256 KB           | `InvalidSize` |
+| The size is at least one pack header and at most the staging slot, 320 KB           | `InvalidSize` |
 | The board has a staging slot                                                        | `InvalidSize` |
 
 `Busy` covers the drive's state as well as a transfer in progress, as the `busy` category error does for the
@@ -241,17 +241,16 @@ talks to and shows what waits to be applied.
 The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the version header EmIL
 generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which returns the kind of the board the build is for, from the header the build generates from the board definitions (`bootloader.md` Part B); the staged-version
 parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
-`NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, emulated `5`, unknown `0`.
+`NUCLEO-H563ZI 3`, emulated `5`, unknown `0`; `4` was the EK-TM4C123GXL, whose support was dropped, and is never reused.
 
 ### Part I — per board
 
 | Board         | Staging flash                                                     | Page  | Pack capacity |
 |---------------|-------------------------------------------------------------------|-------|---------------|
-| EK-TM4C1294XL | internal flash, staging region of `bootloader.md`                 | 128 B | 262 144 B     |
-| Emulated      | file `staging.bin` in the scenario directory                      | 256 B | 262 144 B     |
+| EK-TM4C1294XL | internal flash, staging region of `bootloader.md`                 | 128 B | 327 680 B     |
+| Emulated      | file `staging.bin` in the scenario directory                      | 256 B | 327 680 B     |
 | NUCLEO-H563ZI | none until it has a bootloader; then internal flash, bank 2       | —     | 0             |
 | NUCLEO-G474RE | none until it has a bootloader; then SPI NOR (`bootloader.md` Q1) | —     | 0             |
-| EK-TM4C123GXL | none: Begin is answered `InvalidSize`                             | —     | 0             |
 
 A board without a staging slot still answers the category: Begin with `InvalidSize`, Verify with
 `InvalidState`, Activate with `NotReady`.
@@ -421,8 +420,8 @@ sequenceDiagram
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                            |
 | When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                            |
-| Pack size           | at most the staging slot, 256 KB (262 144 bytes), below the 393 216 bytes the transfer can address                               |
-| Throughput          | one block in flight; about 2–3 KB/s, so a 256 KB pack downloads in about two minutes                                             |
+| Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                               |
+| Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                     |
 | Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                            |
 | Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                         |
 | Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                                        |
@@ -430,7 +429,7 @@ sequenceDiagram
 | NVM writes          | refused with `busy` while a pack is received                                                                                     |
 | One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                 |
 | Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                              |
-| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader; not the EK-TM4C123GXL                          |
+| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                 |
 
 ---
 

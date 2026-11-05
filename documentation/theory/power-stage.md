@@ -2,9 +2,9 @@
 title: "The Power Stage — MOSFETs, Half-Bridges and Dead Time"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "power-stage"
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                                                 |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | The Power Stage — MOSFETs, Half-Bridges and Dead Time |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.0                                                 |
+| Version   | 0.1.1                                                 |
 | Component | power-stage                                           |
-| Date      | 2026-10-29                                            |
+| Date      | 2026-11-05                                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -300,7 +300,7 @@ Three properties of this scheme matter in practice:
   applies on platforms that report their protection status; the TI platform reports it as unknown, so there only
   the budget applies (`documentation/design/error-handling.md`).
 
-On the FRDM-MC-LVPMSM board with the TM4C123 there are no comparators; the shared software check is the only
+On the FRDM-MC-LVPMSM board there are no comparators; the shared software check is the only
 over-current protection.
 
 ### 8. Layout and Practical Hygiene

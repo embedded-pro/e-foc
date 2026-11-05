@@ -275,15 +275,15 @@ tell a client which firmware a node runs, on which board, and which pack waits t
 `SetParameter` with `invalidPayload`, and travel as the float of the number. A client asks for them only when
 the node reports 2.6 or newer.
 
-| ID     | Parameter              | Unit | Value                                                                                                 | Automatic |
-|--------|------------------------|------|-------------------------------------------------------------------------------------------------------|-----------|
-| `0xB1` | `firmwareVersionMajor` | -    | Major number of the running firmware's release version                                                | no        |
-| `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                                | no        |
-| `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                                | no        |
-| `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `EK-TM4C123GXL 4`, `emulated 5`; `0` unknown | no        |
-| `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged         | no        |
-| `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                            | no        |
-| `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                            | no        |
+| ID     | Parameter              | Unit | Value                                                                                           | Automatic |
+|--------|------------------------|------|-------------------------------------------------------------------------------------------------|-----------|
+| `0xB1` | `firmwareVersionMajor` | -    | Major number of the running firmware's release version                                          | no        |
+| `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                          | no        |
+| `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                          | no        |
+| `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `emulated 5`; `0` unknown; `4` retired | no        |
+| `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged   | no        |
+| `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                      | no        |
+| `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                      | no        |
 
 This firmware answers all seven. The version numbers are those of the CMake project version the build was
 configured with, and the board kind is the one the platform reports (`application::BoardKind`). The staged
@@ -595,11 +595,11 @@ flowchart LR
     V -- no --> D["node = 1 + board ID"]
 ```
 
-| Board                                    | ID jumpers                                                                                          | Board ID |
-|------------------------------------------|-----------------------------------------------------------------------------------------------------|----------|
-| EK-TM4C1294XL                            | PK0 (bit 0), PK1 (bit 1), PK2 (bit 2); a jumper to ground sets the bit                              | 0–7      |
-| NUCLEO-G474RE                            | E-FOC-HARDWARE switch SW1 on PC10 (bit 0), PC11 (bit 1), PC12 (bit 2); a closed switch sets the bit | 0–7      |
-| EK-TM4C123GXL, NUCLEO-H563ZI, host, QEMU | none                                                                                                | 0        |
+| Board                     | ID jumpers                                                                                          | Board ID |
+|---------------------------|-----------------------------------------------------------------------------------------------------|----------|
+| EK-TM4C1294XL             | PK0 (bit 0), PK1 (bit 1), PK2 (bit 2); a jumper to ground sets the bit                              | 0–7      |
+| NUCLEO-G474RE             | E-FOC-HARDWARE switch SW1 on PC10 (bit 0), PC11 (bit 1), PC12 (bit 2); a closed switch sets the bit | 0–7      |
+| NUCLEO-H563ZI, host, QEMU | none                                                                                                | 0        |
 
 With the default base, eight EK-TM4C1294XL or NUCLEO-G474RE boards set to 0–7 answer as nodes 1–8, the
 most one bus carries (`can-lite` tracks eight servers).

@@ -46,8 +46,8 @@ namespace tool
         std::string packMicrocontroller;
     };
 
-    inline constexpr uint32_t stagingCapacity{ 256 * 1024 };
-    inline constexpr uint32_t applicationCapacity{ 256 * 1024 - 64 };
+    inline constexpr uint32_t stagingCapacity{ 320 * 1024 };
+    inline constexpr uint32_t applicationCapacity{ 320 * 1024 - 64 };
 
     std::optional<FirmwareBoard> BoardOfKind(uint8_t kind);
     bool CanBeUpdated(const FirmwareBoard& board);

@@ -430,7 +430,7 @@ nothing more.
 - **The right board and microcontroller.** A release pack is downloaded with visible progress into the
   per-user cache, in its `firmware` folder, and checked against the size and SHA-256 digest GitHub records for the asset, as
   the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
-  opened, is read before it is offered: its magic, its header version, a size the staging slot holds (256 KB),
+  opened, is read before it is offered: its magic, its header version, a size the staging slot holds (320 KB),
   a product name that is the board identification of the board the node reports (`bootloader.md` Part B),
   which names that board and its microcontroller, a product version of three numbers from 0 to 255, and the one
   application image that ends the pack, as the controller checks them (`service-firmware-upgrade.md` Part D).
@@ -443,7 +443,7 @@ nothing more.
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
   rule and answers `Busy` to a request that arrives while it runs.
 - **Download.** A confirmation names the motor and the version, and says that the motor stays stopped until
-  the download ends, about two minutes for 256 KB, and that nothing is installed yet. Then Begin, which the
+  the download ends, two to three minutes for 320 KB, and that nothing is installed yet. Then Begin, which the
   controller answers once it has erased its whole staging slot, the status line reading "Erasing the
   controller's staging slot…" over a busy bar until then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
   pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
@@ -701,24 +701,24 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint             | Value / Description                                                                                                                                   |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                     |
-| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase       |
-| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                       |
-| Status reads           | each compatible node every 1 s and after every accepted command                                                                                       |
-| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                       |
-| On-screen event log    | newest 5000 lines                                                                                                                                     |
-| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                               |
-| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                                                                                |
-| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                  |
-| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                              |
-| Automatic checks       | at startup and every 24 h while running                                                                                                               |
-| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                          |
-| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; about two minutes for 256 KB |
-| Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                             |
-| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                              |
-| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                     |
+| Constraint             | Value / Description                                                                                                                                      |
+|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                        |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase          |
+| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                          |
+| Status reads           | each compatible node every 1 s and after every accepted command                                                                                          |
+| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                          |
+| On-screen event log    | newest 5000 lines                                                                                                                                        |
+| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                                  |
+| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                                                                                   |
+| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                     |
+| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                                 |
+| Automatic checks       | at startup and every 24 h while running                                                                                                                  |
+| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                             |
+| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB |
+| Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                |
+| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                                 |
+| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                        |
 
 ---
 

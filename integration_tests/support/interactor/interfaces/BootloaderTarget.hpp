@@ -6,9 +6,9 @@
 namespace integration
 {
     inline constexpr uint32_t applicationSlotStart = 0x00008000;
-    inline constexpr uint32_t emulatedSlotSize = 256 * 1024;
+    inline constexpr uint32_t emulatedSlotSize = 320 * 1024;
     inline constexpr uint32_t emulatedJournalSize = 16 * 1024;
-    inline constexpr uint32_t emulatedStagingSize = 256 * 1024;
+    inline constexpr uint32_t emulatedStagingSize = 320 * 1024;
 
     class BootloaderTarget
     {

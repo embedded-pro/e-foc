@@ -2,9 +2,9 @@
 title: "Error Handling Design"
 type: design
 status: stable
-version: 1.0.0
+version: 1.0.1
 component: "error-handling"
-date: 2026-04-13
+date: 2026-11-05
 ---
 
 | Field     | Value                 |
@@ -12,9 +12,9 @@ date: 2026-04-13
 | Title     | Error Handling Design |
 | Type      | design                |
 | Status    | stable                |
-| Version   | 1.0.0                 |
+| Version   | 1.0.1                 |
 | Component | error-handling        |
-| Date      | 2026-04-13            |
+| Date      | 2026-11-05            |
 
 ---
 
@@ -124,8 +124,7 @@ outside the board's overvoltage and undervoltage thresholds (a reading that is n
   latches hold until the bridge is stopped (`Stop()`), which the fault response does at once; after that the live
   bus reading is the evidence for an over- or undervoltage, and over-current is not observable while stopped
   because no current flows through a disabled bridge. Monitoring the bus while the stage is stopped, so a
-  condition that appears with no fault pending is seen, is out of scope here and belongs to #466. EK-TM4C123GXL
-  has no protection comparators and still reports `unknown`.
+  condition that appears with no fault pending is seen, is out of scope here and belongs to #466.
 - **NUCLEO-G474RE** — the same decision. Its checks run on the PWM-triggered samples, which stop with the bridge,
   so the latch (`protectionTripped`, set by `TripProtection` and by the watchdog) covers the trip until `Stop()`
   and a fresh `PowerSupplyVoltage()` reading against the same thresholds covers the rest. The reading is on

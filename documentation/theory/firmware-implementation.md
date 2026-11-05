@@ -2,9 +2,9 @@
 title: "From Equations to Firmware — Practical Implementation"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "firmware-implementation"
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                                                 |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | From Equations to Firmware — Practical Implementation |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.0                                                 |
+| Version   | 0.1.1                                                 |
 | Component | firmware-implementation                               |
-| Date      | 2026-10-29                                            |
+| Date      | 2026-11-05                                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -188,7 +188,7 @@ The code base forbids, in the control and platform layers (`AGENTS.md`):
 | No exceptions                               | Unwinding is unbounded in time and large in code; results are status values or `std::optional`        |
 | No virtual dispatch in the hot path         | Indirect calls cost cycles and prevent inlining                                                       |
 | Bounded containers, `std::array`            | Size known at compile time, no allocation                                                             |
-| Protected non-virtual interface destructors | A virtual destructor pulls in deleting-destructor code: about 18 KB on the TM4C123                    |
+| Protected non-virtual interface destructors | A virtual destructor pulls in deleting-destructor code: about 18 KB on a TM4C build                   |
 | Runtime controller choice by `std::variant` | Selecting an algorithm without heap or virtual calls (`documentation/design/controller-selection.md`) |
 
 ### 6. Sharing Data Between Rates
