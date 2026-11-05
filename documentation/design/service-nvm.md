@@ -29,7 +29,10 @@ date: 2026-11-05
 ## Responsibilities
 
 **Is responsible for:**
-- Persisting motor calibration data (R, L, pole pairs, encoder offset, PID gains, inertia, friction) and system configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings, target window, travel limits, temperature and bus voltage) across power cycles using MCU internal EEPROM
+- Persisting motor calibration data (R, L, pole pairs, encoder offset, PID gains, inertia, friction) and system
+  configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
+  settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
+  target window, travel limits, temperature and bus voltage) across power cycles using MCU internal EEPROM
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Detecting and signalling version mismatches when a stored record was written by a different firmware version
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
