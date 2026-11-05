@@ -375,10 +375,10 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| Fault     | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner |
-| Current limit | Hands the overload model's current limit to its owner (Part I) | Called from the event loop when the limit changes | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Interface     | Purpose                                                                                           | Contract                                                                               |
+|---------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Current limit | Hands the overload model's current limit to its owner (Part I)                                    | Called from the event loop when the limit changes                                      |
 
 ### Required
 
