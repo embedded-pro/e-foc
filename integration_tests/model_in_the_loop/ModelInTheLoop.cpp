@@ -196,7 +196,10 @@ namespace mil
         , inverterCompensation{ inverter, drive.InverterDeadTimeLoss() }
         , currentOffsets{ inverter, inverterCompensation }
         , confirmedCurrentOffsets{ *currentOffsets }
-        , electricalIdent{ inverterCompensation, drive, vdc }
+        , electricalIdent{ inverterCompensation, drive, [this]()
+            {
+                return drive.PowerSupplyVoltage();
+            } }
         , motorAlignment{ inverterCompensation, drive }
         , rotorStandstill{ drive }
     {

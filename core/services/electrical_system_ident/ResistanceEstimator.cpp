@@ -33,8 +33,15 @@ namespace
 namespace services
 {
     ResistanceEstimator::ResistanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc)
+        : ResistanceEstimator(driver, BusVoltage{ [vdc]()
+                                          {
+                                              return vdc;
+                                          } })
+    {}
+
+    ResistanceEstimator::ResistanceEstimator(drivers::ThreePhaseInverter& driver, const BusVoltage& busVoltage)
         : driver(driver)
-        , vdc(vdc)
+        , busVoltage(busVoltage)
     {}
 
     ResistanceEstimator::~ResistanceEstimator()
@@ -95,6 +102,7 @@ namespace services
 
     void ResistanceEstimator::StartMeasurementPhase()
     {
+        busAtMeasurementStart = busVoltage().Value();
         StartSampleWatchdog();
         driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currents)
             {
@@ -200,7 +208,8 @@ namespace services
             return Result{};
 
         const auto appliedDuty = foc::DutyFraction(heldDuties.a) - foc::DutyFraction(heldDuties.b);
-        const float terminalVoltage = appliedDuty * vdc.Value();
+        const float meanBus = 0.5f * (busAtMeasurementStart + busVoltage().Value());
+        const float terminalVoltage = appliedDuty * meanBus;
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                                          ? deltaTerminalFactor
                                          : wyeTerminalFactor;

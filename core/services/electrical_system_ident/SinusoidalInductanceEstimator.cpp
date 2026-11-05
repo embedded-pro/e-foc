@@ -18,8 +18,15 @@ namespace
 namespace services
 {
     SinusoidalInductanceEstimator::SinusoidalInductanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc)
+        : SinusoidalInductanceEstimator(driver, BusVoltage{ [vdc]()
+                                                    {
+                                                        return vdc;
+                                                    } })
+    {}
+
+    SinusoidalInductanceEstimator::SinusoidalInductanceEstimator(drivers::ThreePhaseInverter& driver, const BusVoltage& busVoltage)
         : driver(driver)
-        , vdc(vdc)
+        , busVoltage(busVoltage)
     {}
 
     SinusoidalInductanceEstimator::~SinusoidalInductanceEstimator()
@@ -63,7 +70,6 @@ namespace services
         phaseIncrement = omega / fs;
         injectionPhase = 0.0f;
         injectionAmplitude = foc::DutyFraction(activeConfig.injectionVoltage);
-        vTerminalAmplitude = injectionAmplitude * 0.75f * vdc.Value();
         terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                              ? deltaTerminalFactor
                              : wyeTerminalFactor;
@@ -79,6 +85,7 @@ namespace services
 
     void SinusoidalInductanceEstimator::BeginInjection()
     {
+        busAtInjectionStart = busVoltage().Value();
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 OnCurrentSample(currents);
@@ -130,6 +137,7 @@ namespace services
     void SinusoidalInductanceEstimator::Complete()
     {
         noSampleTimer.Cancel();
+        vTerminalAmplitude = injectionAmplitude * 0.75f * 0.5f * (busAtInjectionStart + busVoltage().Value());
 
         if (onDone)
             onDone(measurementComplete ? ComputeResult() : Result{});

@@ -34,7 +34,10 @@ namespace services
             float fitQuality{ 0.0f };
         };
 
+        using BusVoltage = infra::Function<foc::Volts()>;
+
         SinusoidalInductanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc);
+        SinusoidalInductanceEstimator(drivers::ThreePhaseInverter& driver, const BusVoltage& busVoltage);
         ~SinusoidalInductanceEstimator();
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
@@ -56,7 +59,8 @@ namespace services
         static constexpr float deltaTerminalFactor = 0.5f;
 
         drivers::ThreePhaseInverter& driver;
-        foc::Volts vdc;
+        BusVoltage busVoltage;
+        float busAtInjectionStart{ 0.0f };
         [[no_unique_address]] foc::ClarkePark transforms;
 
         Config activeConfig;

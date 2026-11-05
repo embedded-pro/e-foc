@@ -47,7 +47,10 @@ namespace application
         , inverterCompensation{ inverter, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
         , currentOffsets{ inverter, inverterCompensation }
         , confirmedCurrentOffsets{ *currentOffsets }
-        , electricalIdent{ inverterCompensation, hardware, vdc }
+        , electricalIdent{ inverterCompensation, hardware, [this]()
+            {
+                return this->hardware.PowerSupplyVoltage();
+            } }
         , motorAlignment{ inverterCompensation, hardware }
         , rotorStandstill{ hardware }
         , platformFaultNotifier{ hardware }

@@ -22,10 +22,17 @@ namespace
 namespace services
 {
     ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
+        : ElectricalParametersIdentificationImpl(driver, encoder, infra::Function<foc::Volts()>{ [vdc]()
+                                                                      {
+                                                                          return vdc;
+                                                                      } })
+    {}
+
+    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, const infra::Function<foc::Volts()>& busVoltage)
         : driver(driver)
         , encoder(encoder)
-        , resistanceEstimator(driver, vdc)
-        , inductanceEstimator(driver, vdc)
+        , resistanceEstimator(driver, busVoltage)
+        , inductanceEstimator(driver, busVoltage)
     {}
 
     void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone)

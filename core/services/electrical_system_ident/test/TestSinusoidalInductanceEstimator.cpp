@@ -621,3 +621,20 @@ TEST_F(SinusoidalInductanceEstimatorTest, a_sample_between_a_no_sample_failure_a
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->inductance.has_value());
 }
+
+TEST_F(SinusoidalInductanceEstimatorTest, the_injected_voltage_takes_the_mean_bus_over_the_injection)
+{
+    int reads = 0;
+    infra::WithSharedAccess<services::SinusoidalInductanceEstimator> tracking{ driverMock, [&reads]()
+        {
+            return foc::Volts{ reads++ == 0 ? 24.0f : 20.0f };
+        } };
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
+    };
+
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *tracking, config, 0.75f, 0.75f);
+
+    ASSERT_TRUE(result.inductance.has_value());
+    EXPECT_NEAR(result.inductance->Value(), expectedL * 22.0f / 24.0f, expectedL * 0.01f);
+}

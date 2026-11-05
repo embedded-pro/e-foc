@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.5.1
+version: 0.6.0
 component: service-electrical-ident
-date: 2026-10-23
+date: 2026-11-05
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.5.1                                         |
+| Version   | 0.6.0                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-10-23                                    |
+| Date      | 2026-11-05                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -134,8 +134,10 @@ A 5-sample moving-average filter (using a bounded deque of capacity 5) is applie
 ADC sample before it is pushed to the measurement buffer (bounded vector, capacity 123).
 
 When the buffer is full, the steady-state current is read from the mean of the last 10 % of the
-buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor. If
-$I_{ss} \leq 0$, the result is absent.
+buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor, where $V_{step}$
+is the test duty times the mean of the bus voltage read as the measurement starts and as it ends, so a bus
+that moves during the procedure is not taken for a change of resistance. If $I_{ss} \leq 0$, the result is
+absent.
 
 **No-sample watchdog:** a second `TimerSingleShot` is armed immediately after the DC duty is applied
 and resets on every ADC callback (during both settle and measurement phases). Default bound: 100 ms
@@ -186,7 +188,9 @@ Two phases run consecutively:
 2. **Measurement** — the Goertzel accumulates `measurementPeriods` full cycles of current samples
    (block size $N = N_{periods} \times N_{spp}$, bin $k = N_{periods}$). When `Ready()`, the
    complex result is delay-corrected (rotation by $e^{+j\omega d T_s}$ to cancel the $d$-sample
-   ADC pipeline lag), then converted to $\text{Im}(Z)$ and finally to per-phase inductance.
+   ADC pipeline lag), then converted to $\text{Im}(Z)$ and finally to per-phase inductance. The injected
+   amplitude in volts is the injection duty times the mean of the bus voltage read as the injection starts
+   and as it ends.
 
 The injected sine uses the interpolated sine table. The Goertzel bin phasor $e^{j\omega}$ and the
 delay rotation use the table's accurate form (within $1.3 \times 10^{-6}$, see
@@ -330,11 +334,11 @@ flowchart TD
 
 ### Required
 
-| Interface                | Purpose                                                             | Contract                                                 |
-|--------------------------|---------------------------------------------------------------------|----------------------------------------------------------|
-| `ThreePhaseInverter`     | Voltage application and ADC sampling callbacks for both stages      | Must not be concurrently claimed by any other controller |
-| `Encoder`                | Reads mechanical angle during pole-pairs sweep                      | Must be initialised before pole-pairs estimation begins  |
-| DC bus voltage (`Volts`) | Normalises applied voltage and interprets current in physical units | Must remain stable throughout any active procedure       |
+| Interface            | Purpose                                                        | Contract                                                                                                                |
+|----------------------|----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `ThreePhaseInverter` | Voltage application and ADC sampling callbacks for both stages | Must not be concurrently claimed by any other controller                                                                |
+| `Encoder`            | Reads mechanical angle during pole-pairs sweep                 | Must be initialised before pole-pairs estimation begins                                                                 |
+| DC bus voltage       | Converts the applied duty to volts                             | Read from the event loop at the start and the end of a measurement; a fixed value for a target that has no live reading |
 
 ---
 
