@@ -80,6 +80,7 @@ namespace tool
         static constexpr uint8_t supervisionContractMinor{ 4 };
         static constexpr uint8_t firmwareContractMinor{ 6 };
         static constexpr uint8_t limitsContractMinor{ 9 };
+        static constexpr uint8_t targetWindowContractMinor{ 10 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -93,6 +94,7 @@ namespace tool
         bool SupportsSupervision(uint16_t nodeId) const;
         bool SupportsFirmwareIdentity(uint16_t nodeId) const;
         bool SupportsLimits(uint16_t nodeId) const;
+        bool SupportsTargetWindow(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
@@ -166,6 +168,7 @@ namespace tool
         void ForgetReads(uint16_t nodeId);
         void OnAccepted(uint16_t nodeId, uint8_t commandType);
         bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
+        bool SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const;
         void RefreshStatus();
         static bool IsRead(uint8_t commandType);
         void CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value);

@@ -196,6 +196,18 @@ namespace application
                     {
                         return supervision::FollowingErrorSettingsFrom(controlMode->Config());
                     });
+                targetReached.Attach([this]() -> const state_machine::FocStateMachineBase*
+                    {
+                        return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+                    });
+                targetReached.Enable([this]()
+                    {
+                        return supervision::TargetReachedSettingsFrom(controlMode->Config());
+                    });
+                canBridge->ReportTargetReached([this]()
+                    {
+                        return targetReached.IsReached();
+                    });
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()

@@ -36,6 +36,7 @@
 #include "core/supervision/MotorOverload.hpp"
 #include "core/supervision/OverspeedMonitor.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
+#include "core/supervision/TargetReachedMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
@@ -82,6 +83,7 @@ namespace application
         supervision::PhaseLossMonitor phaseLoss;
         supervision::OverspeedMonitor overspeed;
         supervision::FollowingErrorMonitor followingError;
+        supervision::TargetReachedMonitor targetReached;
         can::CanCommandTimeout commandTimeout;
         supervision::MotorOverload motorOverload;
         services::BusVoltageMonitor busVoltage;

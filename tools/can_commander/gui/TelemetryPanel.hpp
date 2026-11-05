@@ -28,6 +28,7 @@ namespace tool
         void OnSpeedPosition(float speed, float position);
         void OnFaultEvent(FocFaultCode fault);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
+        void OnTargetReached(bool reached);
 
         void Clear();
 
@@ -51,6 +52,7 @@ namespace tool
         // turns red, which needs the widget itself.
         QLabel* motorStateLabel;
         QLabel* faultLabel;
+        QLabel* targetReachedLabel;
 
         struct StreamSample
         {

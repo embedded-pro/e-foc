@@ -183,6 +183,18 @@ namespace
                 }));
         }
 
+        static constexpr std::size_t targetWindowParameterCount{ 3 };
+        static constexpr std::size_t readWithTheStatus{ 1 };
+
+        bool Queried(can::FocParameter parameter) const
+        {
+            return std::ranges::any_of(sent, [parameter](const SentFrame& frame)
+                {
+                    return frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
+                           frame.payload[1] == static_cast<uint8_t>(parameter);
+                });
+        }
+
         bool QueriedALimit() const
         {
             return std::ranges::any_of(sent, [](const SentFrame& frame)
@@ -1017,7 +1029,8 @@ TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
     EXPECT_TRUE(QueriedAReadOnlyParameter());
 }
 
@@ -1040,7 +1053,7 @@ TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_setting
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
@@ -1062,7 +1075,60 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
+{
+    RecordSends();
+    BringCompatible(1, 9);
+
+    AnswerAllReads();
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_FALSE(client.SupportsTargetWindow(1));
+    EXPECT_FALSE(Queried(can::FocParameter::positionWindow));
+    EXPECT_FALSE(Queried(can::FocParameter::positionWindowTime));
+    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
+}
+
+TEST_F(TestCanCommandClient, a_2_10_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, 10);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsTargetWindow(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_10_node_is_asked_whether_it_reached_its_target_with_every_status)
+{
+    RecordSends();
+    BringCompatible(1, 10);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId }), SentTypes());
+    EXPECT_TRUE(Queried(can::FocParameter::targetReached));
+}
+
+TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_target_reached_flag_to_the_status)
+{
+    RecordSends();
+    BringCompatible(1, 10);
+    AnswerAllReads();
+    sent.clear();
+
+    client.RequestReadings(1);
+    AnswerAllReads();
+
+    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
 }
 
 TEST_F(TestCanCommandClient, a_2_1_node_is_not_asked_for_diagnostics)
@@ -1108,7 +1174,7 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
@@ -1123,7 +1189,7 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
@@ -1138,7 +1204,7 @@ TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
     DeliverAck(can::focClearDiagnosticsId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - WritableParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - WritableParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
@@ -1149,7 +1215,7 @@ TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)

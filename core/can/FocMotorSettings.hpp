@@ -20,7 +20,8 @@ namespace can
         calibrationRecord,
         onlineEstimate,
         loopStatistics,
-        platform
+        platform,
+        motion
     };
 
     ParameterGroup GroupOf(FocParameter parameter);

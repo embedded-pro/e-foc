@@ -2,9 +2,9 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.1.4
+version: 0.2.0
 component: foc-position
-date: 2026-10-30
+date: 2026-11-05
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.4                |
+| Version   | 0.2.0                |
 | Component | foc-position         |
-| Date      | 2026-10-30           |
+| Date      | 2026-11-05           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -35,6 +35,7 @@ date: 2026-10-30
 - Estimating rotor angular velocity from consecutive mechanical angle samples (same wrap-around compensation as speed control) for the middle loop
 - Resetting the position, speed and current controller state on Enable / Disable
 - Accepting a position setpoint in mechanical radians and propagating all derived setpoints through the cascade
+- Reporting, through the drive, when the rotor has settled on its setpoint (Target Reached)
 
 **Is NOT responsible for:**
 - Reading phase currents or encoder position directly from hardware — these are supplied by the Runner
@@ -119,6 +120,30 @@ stateDiagram-v2
     [*] --> Disabled
     Disabled --> Enabled : Enable\n(resets all 4 PIDs, preserves setpoint)
     Enabled --> Disabled : Disable\n(zero duty, all PIDs frozen)
+```
+
+### Target Reached
+
+A host that sequences moves needs to know when one is done. The drive reports the target reached once the
+position error — the wrapped difference between the setpoint and θm that the loop works on — has stayed
+within the position window for the position-window time (REQ-POS-014). An evaluation on the event loop every
+1 ms keeps that count, and the error is read again when a host asks: a setpoint the drive has accepted is
+never answered with the previous move's flag, because a target outside the window clears it at once, and the
+count starts over when the rotor arrives.
+
+The flag is clear in every other mode and in every state but Enabled, and leaving Enabled or the window
+restarts the count. A window of 0 keeps the flag clear. The window and its time are stored drive-wide limits,
+in force at the next evaluation: the window defaults to 6.28 mrad, four counts of the default 4000-count
+encoder, and the time to 20 ms (`service-nvm.md`). The flag is the read-only parameter `targetReached` of
+contract 2.10 (`service-can.md`).
+
+```mermaid
+stateDiagram-v2
+    [*] --> Moving
+    Moving --> Settling : error within the window
+    Settling --> Moving : error beyond the window, or leaves Enabled
+    Settling --> Reached : within the window for the window time
+    Reached --> Moving : error beyond the window, or leaves Enabled
 ```
 
 ### LPI Callback Execution Order Within One 1 kHz Tick
@@ -232,4 +257,5 @@ graph LR
 | No flux weakening               | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
 | Cycle budget (inner loop)       | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |
 | Controller state at Enable      | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
+| Target reached                  | Window and time from the configuration record, checked every 1 ms on the event loop and when asked.                                 |
 | Setpoint atomicity              | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |

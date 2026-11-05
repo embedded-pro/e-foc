@@ -28,6 +28,8 @@ target_sources(e_foc.supervision PRIVATE
     OverspeedMonitor.cpp
     PhaseLossMonitor.hpp
     PhaseLossMonitor.cpp
+    TargetReachedMonitor.hpp
+    TargetReachedMonitor.cpp
 )
 
 add_subdirectory(test)

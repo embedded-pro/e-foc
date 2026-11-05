@@ -149,6 +149,8 @@ namespace can
         continuousCurrent = 0x56,
         peakCurrent = 0x57,
         peakCurrentTime = 0x58,
+        positionWindow = 0x59,
+        positionWindowTime = 0x5A,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,
@@ -181,7 +183,8 @@ namespace can
         boardKind = 0xB4,
         stagedVersionMajor = 0xB5,
         stagedVersionMinor = 0xB6,
-        stagedVersionPatch = 0xB7
+        stagedVersionPatch = 0xB7,
+        targetReached = 0xC0
     };
 
     struct FocFirmwareIdentity

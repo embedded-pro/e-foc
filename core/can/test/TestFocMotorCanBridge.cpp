@@ -2493,6 +2493,33 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_ReportsThePackStagedF
     ExpectAnswered(4.0f, false);
 }
 
+TEST_F(FocMotorCanBridgeTest, QueryParameter_TargetReached_ReportsTheReportedFlag)
+{
+    ConstructFixture();
+    bool reached{ true };
+    bridge->ReportTargetReached([&reached]()
+        {
+            return reached;
+        });
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::targetReached);
+    ExpectAnswered(1.0f, false);
+
+    reached = false;
+    DispatchQueryParameter(can::FocParameter::targetReached);
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_TargetReached_IsZeroWithoutAReport)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::targetReached);
+    ExpectAnswered(0.0f, false);
+}
+
 TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_IsZeroOnABoardWithoutAnUpgradeService)
 {
     ConstructFixture();

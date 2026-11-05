@@ -132,3 +132,14 @@
     telemetry reports, shall be the mechanical angle from the zero the alignment set, wrapped to
     [-pi, pi) on every target whatever that zero is, so that a rotor settled on a setpoint within
     half a turn of the zero reports that setpoint.
+
+- id: REQ-POS-014
+  title: Target reached once the position error settles within the position window
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    In position mode, while Enabled, the drive shall report the target reached once the wrapped
+    position error has stayed within the position window for the position-window time, and shall
+    report it not reached in every other mode and state, while the error is beyond the window, and
+    in answer to any query that follows an accepted setpoint whose target lies beyond the window.
+    A window of 0 shall keep the target reported not reached.

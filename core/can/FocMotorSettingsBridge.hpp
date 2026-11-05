@@ -28,6 +28,7 @@ namespace can
         FocAlgorithms ActiveAlgorithms() const;
         FocParameterValue HeldValue(FocParameter parameter) const;
         void ClearDiagnostics();
+        void ReportTargetReached(const infra::Function<bool()>& isReached);
 
     private:
         bool SettingOutstanding() const;
@@ -50,6 +51,7 @@ namespace can
         FocResetCause resetCause;
         FocFirmwareIdentity firmware;
         FirmwareUpgrade firmwareUpgrade;
+        infra::Function<bool()> targetReached;
 
         infra::Function<void()> pendingNvmDoneCallback;
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;

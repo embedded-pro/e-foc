@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 62> presentations{ {
+        constexpr std::array<SettingPresentation, 65> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -92,6 +92,8 @@ namespace tool
             { FocParameter::continuousCurrent, "Continuous current", "Continuous current:", " A", "Current the motor can carry for ever. Once a thermal model of the winding says the motor has carried more for too long, the current limit folds back to it; 0 turns the model off.", {} },
             { FocParameter::peakCurrent, "Peak current", "Peak current:", " A", "Current a cold motor may carry for the peak time; 0 means the board's current limit, which also caps it.", {} },
             { FocParameter::peakCurrentTime, "Peak time", "Peak time:", " s", "How long a cold motor may carry its peak current before the limit folds back to the continuous current.", {} },
+            { FocParameter::positionWindow, "Position window", "Position window:", " rad", "Position error within which position mode counts its target as reached; 0 keeps the target reported not reached.", {} },
+            { FocParameter::positionWindowTime, "Position window time", "Window time:", " s", "How long the position error has to stay within the position window before the target is reported reached.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -116,6 +118,7 @@ namespace tool
             { FocParameter::stagedVersionMajor, "Staged major version", "Staged major:", {}, "Major number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the release version of the pack staged for an update; 0 when none is staged.", {} },
+            { FocParameter::targetReached, "Target reached", "Target reached:", {}, "Whether position mode's error has stayed within the position window for the window time. Read with every status, from firmware contract 2.10.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -294,9 +297,19 @@ namespace tool
         return Slice(29, 9);
     }
 
+    std::span<const SettingPresentation> TargetWindowSettings()
+    {
+        return Slice(38, 2);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(38, 24);
+        return Slice(40, 24);
+    }
+
+    std::span<const SettingPresentation> StatusReadings()
+    {
+        return Slice(64, 1);
     }
 
     namespace

@@ -134,6 +134,31 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     EXPECT_EQ(can::GroupOf(can::FocParameter::overspeedLimit), can::ParameterGroup::limits);
 }
 
+TEST(FocMotorSettings, the_position_window_and_its_time_are_limits)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::positionWindow, 0.02f);
+    can::WriteLimitSetting(config, can::FocParameter::positionWindowTime, 0.05f);
+
+    EXPECT_NEAR(config.limits.positionWindow, 0.02f, 1e-6f);
+    EXPECT_NEAR(config.limits.positionWindowTime, 0.05f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::positionWindow), 0.02f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::positionWindowTime), 0.05f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::positionWindow), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::positionWindowTime), can::ParameterGroup::limits);
+}
+
+TEST(FocMotorSettings, the_target_reached_flag_is_a_motion_reading)
+{
+    EXPECT_EQ(can::GroupOf(can::FocParameter::targetReached), can::ParameterGroup::motion);
+
+    const auto descriptor = can::FindParameter(can::FocParameter::targetReached);
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_TRUE(descriptor->readOnly);
+    EXPECT_TRUE(descriptor->integer);
+}
+
 TEST(FocMotorSettings, every_supervision_setting_reads_back_what_was_written)
 {
     for (const auto& descriptor : can::focParameters)

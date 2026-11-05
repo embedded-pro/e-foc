@@ -57,5 +57,7 @@ namespace foc
         static constexpr float maxRatedCurrent{ 100.0f };
         static constexpr float minPeakCurrentTime{ 0.1f };
         static constexpr float maxPeakCurrentTime{ 60.0f };
+        static constexpr float maxPositionWindow{ 3.2f };
+        static constexpr float maxPositionWindowTime{ 10.0f };
     };
 }

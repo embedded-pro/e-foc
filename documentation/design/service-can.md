@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.11.0                   |
+| Version   | 0.12.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -359,6 +359,24 @@ Adding enumerators leaves the meaning of the existing ones unchanged, which keep
 was in 2.4. A client older than 2.9 shows the new codes as unknown faults, and asks for the new parameters only
 when the server reports 2.9 or newer, since an older one answers `invalidPayload` for each.
 
+**Contract 2.10 — target reached.** Version 2.10 adds two stored settings and one read-only parameter;
+nothing in 2.9 changes. The settings are drive-wide limits like those of 2.9: they can be written in any state,
+are answered once stored, and a write that cannot be stored is taken back.
+
+| ID     | Parameter            | Unit | Range          | Automatic | Takes effect                                    |
+|--------|----------------------|------|----------------|-----------|-------------------------------------------------|
+| `0x59` | `positionWindow`     | rad  | 0 – 3.2, 0 off | no        | within 1 ms (`foc-position.md`, Target Reached) |
+| `0x5A` | `positionWindowTime` | s    | 0 – 10         | no        | within 1 ms (`foc-position.md`, Target Reached) |
+
+| ID     | Parameter       | Unit | Value                                                             | Automatic |
+|--------|-----------------|------|-------------------------------------------------------------------|-----------|
+| `0xC0` | `targetReached` | -    | `1` once the position error stayed within the window for its time | no        |
+
+A host that sequences moves sends a position setpoint and queries `targetReached` until it reads `1`. The
+query is answered after the setpoint, from the error against that setpoint, so it never carries the previous
+move's flag. A client older than 2.10 asks for the new parameters only when the server reports 2.10 or newer,
+since an older one answers `invalidPayload` for each.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -392,7 +410,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xB7`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x17`–`0x19`, `0x80`–`0xC0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 

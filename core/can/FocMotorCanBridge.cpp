@@ -85,6 +85,11 @@ namespace can
         commandAccepted = onAccepted;
     }
 
+    void FocMotorCanBridge::ReportTargetReached(const infra::Function<bool()>& isReached)
+    {
+        settings.ReportTargetReached(isReached);
+    }
+
     void FocMotorCanBridge::NotifyCommandAccepted()
     {
         if (commandAccepted != nullptr)
