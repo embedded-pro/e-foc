@@ -331,11 +331,16 @@ THEN(R"(the bootloader installs the pack and the application starts again)")
 THEN(R"(the drive falls silent and its heartbeat comes back)")
 {
     auto& fixture = context.Get<Fixture>();
+    const auto& download = context.Get<ScenarioSetup>().download;
+    ASSERT_TRUE(download.activatedAt.has_value()) << "Activate was not sent";
     const auto deadline = std::chrono::steady_clock::now() + silenceTimeout;
     bool fellSilent = false;
     while (!fellSilent && std::chrono::steady_clock::now() < deadline)
         fellSilent = !fixture.WaitForCanHeartbeat(silence);
 
     ASSERT_TRUE(fellSilent) << "The drive kept sending its heartbeat after Activate";
-    EXPECT_TRUE(fixture.WaitForCanHeartbeat(installTimeout)) << "No application answered after the installation";
+    const bool back = fixture.WaitForCanHeartbeat(installTimeout);
+    const auto elapsed = std::chrono::duration<double>{ std::chrono::steady_clock::now() - *download.activatedAt }.count();
+    std::printf("[METRIC] firmware upgrade activate_to_heartbeat_s=%.2f\n", elapsed);
+    EXPECT_TRUE(back) << "No application answered after the installation";
 }
