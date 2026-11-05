@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 67> presentations{ {
+        constexpr std::array<SettingPresentation, 69> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -96,6 +96,9 @@ namespace tool
             { FocParameter::positionWindowTime, "Position window time", "Window time:", " s", "How long the position error has to stay within the position window before the target is reported reached.", {} },
             { FocParameter::positionMinimum, "Position minimum", "Minimum:", " rad", "Lowest position, from the alignment zero, position mode accepts and moves to. The limits are off while the minimum is not below the maximum.", {} },
             { FocParameter::positionMaximum, "Position maximum", "Maximum:", " rad", "Highest position, from the alignment zero, position mode accepts and moves to. Between the limits the motor moves the direct way, never across the angle outside them.", {} },
+            { FocParameter::calibrationTemperature, "Calibration temperature", "Calibration temperature:", " \xC2\xB0"
+                                                                                                           "C",
+                "Winding temperature when the calibration measured the resistance; the winding-temperature estimate starts from it.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -121,6 +124,9 @@ namespace tool
             { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::targetReached, "Target reached", "Target reached:", {}, "Whether position mode's error has stayed within the position window for the window time. Read with every status, from firmware contract 2.10.", {} },
+            { FocParameter::windingTemperature, "Winding temperature", "Winding temperature:", " \xC2\xB0"
+                                                                                               "C",
+                "Winding temperature inferred from the online resistance estimate in speed and position mode; unknown in torque mode and without a calibration. Read with every status, from firmware contract 2.13.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -309,14 +315,19 @@ namespace tool
         return Slice(40, 2);
     }
 
+    std::span<const SettingPresentation> ThermalSettings()
+    {
+        return Slice(42, 1);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(42, 24);
+        return Slice(43, 24);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(66, 1);
+        return Slice(67, 2);
     }
 
     namespace

@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.14.0
+version: 0.15.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.14.0                   |
+| Version   | 0.15.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -398,6 +398,19 @@ asks for the new parameters only when the server reports 2.11 or newer.
 
 A client older than 2.12 shows the code as an unknown fault.
 
+**Contract 2.13 — winding temperature.** Version 2.13 adds one stored setting and one read-only parameter;
+nothing in 2.12 changes (`fault-supervision.md` Part K).
+
+| ID     | Parameter                | Unit | Range     | Automatic | Takes effect                     |
+|--------|--------------------------|------|-----------|-----------|----------------------------------|
+| `0x5D` | `calibrationTemperature` | degC | −40 – 100 | no        | at the next read of the estimate |
+
+| ID     | Parameter            | Unit | Value                                                                                       | Automatic |
+|--------|----------------------|------|---------------------------------------------------------------------------------------------|-----------|
+| `0xC1` | `windingTemperature` | degC | Winding temperature from the online resistance; not a number in torque mode or uncalibrated | no        |
+
+A client older than 2.13 asks for the new parameters only when the server reports 2.13 or newer.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -431,7 +444,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xC0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
+| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
 

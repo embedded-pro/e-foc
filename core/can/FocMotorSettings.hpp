@@ -21,7 +21,8 @@ namespace can
         onlineEstimate,
         loopStatistics,
         platform,
-        motion
+        motion,
+        thermal
     };
 
     ParameterGroup GroupOf(FocParameter parameter);

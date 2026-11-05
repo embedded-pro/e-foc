@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.13.0
+version: 0.14.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.13.0               |
+| Version   | 0.14.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -111,6 +111,7 @@ graph TD
 | Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted                            | that node's parameter responses         |
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
 | Target reached                                    | *Yes* once position mode reports its target reached, *No* otherwise; "—" before 2.10                      | `targetReached`, read with each status  |
+| Winding temperature                               | °C from the online resistance; "—" in torque mode, uncalibrated or before 2.13                            | `windingTemperature`, with each status  |
 | Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
 | Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
@@ -122,9 +123,9 @@ paints it on a 40 ms timer, so nine streaming nodes cost the event loop at most 
 stream frames stay out of the raw frame log. A fault on one motor stays visible in the
 overview row and on its tab while another motor is being commanded.
 
-The target-reached row sits in the Motor Status group under the state and fault, and is read with every status
-rather than on Refresh, so a flag from the previous move is replaced within a second and right after the next
-setpoint is accepted.
+The target-reached and winding-temperature rows sit in the Motor Status group under the state and fault, and are
+read with every status rather than on Refresh, so a flag from the previous move is replaced within a second and right
+after the next setpoint is accepted.
 
 ### Part D — commands and the emergency stop
 
@@ -259,6 +260,9 @@ flowchart LR
   Software Position Limits). The group says they are measured from the alignment zero and are off while the
   minimum is not below the maximum, and that when on, position mode refuses a setpoint outside them and moves
   the direct way between them. They are stored at once and in force from the next control period.
+  Its **Thermal** group holds the calibration temperature of contract 2.13 (`fault-supervision.md` Part K): the
+  winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
+  from. It is stored at once and in force at the next read of the estimate.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -284,7 +288,9 @@ Limits fields are disabled with the reason, and it never reports *Overspeed*, *F
 timeout*. A node older than 2.10 has no target window: the commander does not ask it for the
 position window, its time or the target-reached reading, and the Target Window fields are disabled with the
 reason. A node older than 2.11 has no travel limits: the commander does not ask it for them, and the
-Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*.
+Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*. A node
+older than 2.13 has no winding temperature: the commander does not ask it for the estimate or the calibration
+temperature, and the Thermal field is disabled with the reason.
 
 ### Part K — diagnostics
 

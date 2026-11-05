@@ -14,4 +14,5 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestFiniteGuard.cpp
     TestParameterValidation.cpp
     TestTravelLimits.cpp
+    TestWindingTemperature.cpp
 )

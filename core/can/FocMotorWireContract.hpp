@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 12;
+    static constexpr uint8_t focContractVersionMinor = 13;
 
     enum class FieldType : uint8_t
     {
@@ -245,7 +245,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 67> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 69> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -288,6 +288,7 @@ namespace can
         { FocParameter::positionWindowTime, "positionWindowTime", "s", 0.0f, foc::CommandLimits::maxPositionWindowTime, false, false },
         { FocParameter::positionMinimum, "positionMinimum", "rad", -foc::CommandLimits::maxPositionLimit, foc::CommandLimits::maxPositionLimit, false, false },
         { FocParameter::positionMaximum, "positionMaximum", "rad", -foc::CommandLimits::maxPositionLimit, foc::CommandLimits::maxPositionLimit, false, false },
+        { FocParameter::calibrationTemperature, "calibrationTemperature", "degC", foc::CommandLimits::minCalibrationTemperature, foc::CommandLimits::maxCalibrationTemperature, false, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },
@@ -313,6 +314,7 @@ namespace can
         { FocParameter::stagedVersionMinor, "stagedVersionMinor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::targetReached, "targetReached", "-", 0.0f, 1.0f, true, false, true },
+        { FocParameter::windingTemperature, "windingTemperature", "degC", -focMaxReading, focMaxReading, false, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

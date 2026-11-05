@@ -62,3 +62,15 @@
     limit, and a continuous rating at or above the peak shall limit the current to it flatly.
     With 2 A continuous and 3 A peak for 2 s, a held rotor commanded 3 A from cold shall carry
     3 A for 2.0 s ± 10 % and 2 A after it.
+
+- id: REQ-PRT-002
+  title: Winding temperature estimated from the online resistance
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    In speed and position mode the drive shall estimate the winding temperature as
+    T_cal + (R / R_cal - 1) / 0.00393 from the online resistance estimate R, the calibrated
+    resistance R_cal and a stored calibration temperature T_cal, settable from -40 to 100 degC
+    with a default of 25 degC, and shall report it within 10 K of the winding's temperature once an
+    excitation burst has run since the motor was enabled. In torque mode, or without a calibrated
+    resistance, it shall report the temperature as unknown.

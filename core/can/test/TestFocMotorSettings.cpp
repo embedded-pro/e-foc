@@ -164,6 +164,21 @@ TEST(FocMotorSettings, the_travel_limits_are_limits)
     EXPECT_EQ(can::GroupOf(can::FocParameter::positionMaximum), can::ParameterGroup::limits);
 }
 
+TEST(FocMotorSettings, the_calibration_temperature_is_a_limit_and_the_winding_temperature_a_thermal_reading)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::calibrationTemperature, 40.0f);
+
+    EXPECT_NEAR(config.limits.calibrationTemperature, 40.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::calibrationTemperature), 40.0f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::calibrationTemperature), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::windingTemperature), can::ParameterGroup::thermal);
+    const auto descriptor = can::FindParameter(can::FocParameter::windingTemperature);
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_TRUE(descriptor->readOnly);
+}
+
 TEST(FocMotorSettings, the_target_reached_flag_is_a_motion_reading)
 {
     EXPECT_EQ(can::GroupOf(can::FocParameter::targetReached), can::ParameterGroup::motion);

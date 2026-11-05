@@ -56,6 +56,7 @@ namespace services
         float positionWindowTime = 0.02f;
         float positionMinimum = 0.0f;
         float positionMaximum = 0.0f;
+        float calibrationTemperature = 25.0f;
     };
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
@@ -79,7 +80,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 148, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 152, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {

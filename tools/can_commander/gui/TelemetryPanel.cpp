@@ -10,6 +10,7 @@
 #include <QGroupBox>
 #include <QVBoxLayout>
 #include <chrono>
+#include <cmath>
 
 namespace tool
 {
@@ -70,6 +71,9 @@ namespace tool
         statusLayout->addRow("State:", motorStateLabel);
         statusLayout->addRow("Fault:", faultLabel);
         statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::targetReached).label), targetReachedLabel);
+        windingTemperatureLabel = new QLabel();
+        windingTemperatureLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::windingTemperature).description));
+        statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::windingTemperature).label), windingTemperatureLabel);
         layout->addWidget(statusGroup);
 
         BuildForm(measurements, measurementFields, measurementValues, "Measurements");
@@ -128,6 +132,7 @@ namespace tool
         ui::backend::qt::StyleStatusLabel(*faultLabel, ui::theme::StatusLevel::Neutral);
         targetReachedLabel->setText(placeholder);
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, ui::theme::StatusLevel::Neutral);
+        windingTemperatureLabel->setText(placeholder);
         ShowPlaceholders(measurements);
         ShowPlaceholders(parameters);
     }
@@ -182,6 +187,11 @@ namespace tool
     {
         targetReachedLabel->setText(reached ? "Yes" : "No");
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, reached ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
+    }
+
+    void TelemetryPanel::OnWindingTemperature(float celsius)
+    {
+        windingTemperatureLabel->setText(std::isfinite(celsius) ? QString("%1 \u00B0C").arg(static_cast<double>(celsius), 0, 'f', 0) : QString(placeholder));
     }
 
     void TelemetryPanel::ShowFault(FocFaultCode fault)

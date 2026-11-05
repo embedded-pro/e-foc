@@ -2,7 +2,7 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: "disturbances-and-noise"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.3.0                                  |
+| Version   | 0.4.0                                  |
 | Component | disturbances-and-noise                 |
 | Date      | 2026-11-05                             |
 
@@ -170,8 +170,10 @@ identified at has 31 % more resistance. NdFeB magnet flux falls about 0.1 %/K (f
 torque per ampere and back-EMF fall with it. Integral action absorbs both in the current and speed loops; a
 torque command converted to current with a cold $K_t$ delivers less torque on a hot motor, and model-based laws
 lose the accuracy of their model. *e-foc today:* the online estimator follows $R_s$
-(`documentation/design/service-electrical-ident.md`); the simulator models $R_s$ and $L_s$ against winding
-temperature but not $\psi_f$ (`core/foc/model/ThermalModel.cpp`).
+(`documentation/design/service-electrical-ident.md`), and the drive turns it back into a winding temperature,
+$T = T_{cal} + (R_s / R_{cal} - 1)/0.00393$, from the resistance $R_{cal}$ the calibration measured at
+$T_{cal}$ (`documentation/design/fault-supervision.md` Part K); the simulator models $R_s$ and $L_s$ against
+winding temperature but not $\psi_f$ (`core/foc/model/ThermalModel.cpp`).
 
 **Bus voltage.** The modulator works in per-unit of $V_{dc}/\sqrt3$, and the current-loop gains are normalised
 by $V_{dc}$. If the bus sags under load, each per-unit command produces proportionally less voltage: the

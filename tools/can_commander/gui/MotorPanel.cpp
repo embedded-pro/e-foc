@@ -538,6 +538,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::ThermalUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsThermal(nodeId))
+            return QString("Needs firmware contract 2.13 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -550,6 +557,7 @@ namespace tool
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
         commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
+        commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();
@@ -762,6 +770,8 @@ namespace tool
         commandPanel->Diagnostics().ShowValue(parameter, value);
         if (parameter == can::FocParameter::targetReached)
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
+        if (parameter == can::FocParameter::windingTemperature)
+            telemetryPanel->OnWindingTemperature(value.value);
     }
 
     void MotorPanel::OfferRecovery(uint8_t commandType, Refusal refusal)
