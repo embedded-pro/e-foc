@@ -77,7 +77,7 @@ TEST(FirmwarePack, every_board_kind_names_its_board_and_microcontroller)
     EXPECT_EQ("NUCLEO-G474RE", Board(2).name);
     EXPECT_EQ("NUCLEO-H563ZI", Board(3).name);
     EXPECT_EQ("EK-TM4C123GXL", Board(4).name);
-    EXPECT_EQ("Emulated", Board(5).name);
+    EXPECT_EQ("emulated", Board(5).name);
     EXPECT_FALSE(BoardOfKind(0).has_value());
     EXPECT_FALSE(BoardOfKind(6).has_value());
 }
@@ -122,7 +122,7 @@ TEST(FirmwarePack, a_pack_for_another_board_names_both_boards_and_microcontrolle
     EXPECT_EQ(PackProblem::anotherTarget, inspection.problem);
     EXPECT_EQ("EK-TM4C1294XL", inspection.packBoard);
     EXPECT_EQ("TM4C1294NCPDT", inspection.packMicrocontroller);
-    EXPECT_EQ("The pack is for EK-TM4C1294XL (TM4C1294NCPDT); this motor's board is Emulated (mps2-an386).", DescribePackProblem(inspection, Board(5)));
+    EXPECT_EQ("The pack is for EK-TM4C1294XL (TM4C1294NCPDT); this motor's board is emulated (mps2-an386).", DescribePackProblem(inspection, Board(5)));
 }
 
 TEST(FirmwarePack, a_board_without_a_bootloader_is_offered_nothing)

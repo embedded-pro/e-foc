@@ -5,6 +5,7 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "generated/Boards.hpp"
 #include "hal/interfaces/Can.hpp"
 #include <algorithm>
 #include <array>
@@ -294,7 +295,7 @@ namespace can
         { FocParameter::firmwareVersionMajor, "firmwareVersionMajor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::firmwareVersionMinor, "firmwareVersionMinor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::firmwareVersionPatch, "firmwareVersionPatch", "-", 0.0f, 255.0f, true, false, true },
-        { FocParameter::boardKind, "boardKind", "-", 0.0f, 5.0f, true, false, true },
+        { FocParameter::boardKind, "boardKind", "-", 0.0f, static_cast<float>(e_foc::boards::all.size()), true, false, true },
         { FocParameter::stagedVersionMajor, "stagedVersionMajor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::stagedVersionMinor, "stagedVersionMinor", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, 255.0f, true, false, true },
