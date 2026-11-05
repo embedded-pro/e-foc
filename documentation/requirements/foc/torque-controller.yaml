@@ -136,6 +136,16 @@
     on CI for this one, against 3.5 to 5.8 percent over twenty local runs. Both use the same law on
     the same plant, so they carry one bound (software-in-the-loop.md Part I).
 
+- id: REQ-TRQ-014
+  title: The winding carries the commanded torque current after the sensors drift
+  status: verified
+  verification: sil
+  shall: >
+    In torque mode on the bench current-sense chain, with one phase sensor 20 mA from the offset
+    its calibration stored and the rotor held 90 electrical degrees from its aligned position, the
+    q-axis current the winding carries, averaged from 0.5 s to 2 s after the Enable, shall be within
+    5 mA of zero at a 0 A command and within 1 % of the command plus 5 mA at 0.1, 1.0 and 3.0 A.
+
 - id: REQ-TRQ-012
   title: Cogging compensation in torque mode
   status: verified
