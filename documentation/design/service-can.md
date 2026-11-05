@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.16.0
+version: 0.17.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.16.0                   |
+| Version   | 0.17.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -420,6 +420,18 @@ changes (`fault-supervision.md` Part K). The trip raises the existing `overTempe
 | `0x5F` | `temperatureMargin` | K    | 1 – 50   | no        | at the next 100 ms evaluation |
 
 A client older than 2.14 asks for the new parameters only when the server reports 2.14 or newer.
+
+**Contract 2.15 — bus-voltage limits.** Version 2.15 adds two stored settings; nothing in 2.14 changes
+(`fault-supervision.md` Part L). They take `0x30` and `0x31`, a second block of limits, as `0x50`–`0x5F` is full. A
+filtered bus outside them while the drive is `Enabled` raises the existing `underVoltage` (3) or `overVoltage` (2)
+fault code, as a trip of the board's comparators does.
+
+| ID     | Parameter           | Unit | Range          | Automatic | Takes effect                    |
+|--------|---------------------|------|----------------|-----------|---------------------------------|
+| `0x30` | `busVoltageMinimum` | V    | 0 – 100, 0 off | no        | at the next bus value, in 10 ms |
+| `0x31` | `busVoltageMaximum` | V    | 0 – 100, 0 off | no        | at the next bus value, in 10 ms |
+
+A client older than 2.15 asks for the new parameters only when the server reports 2.15 or newer.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

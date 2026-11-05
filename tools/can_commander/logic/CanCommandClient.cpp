@@ -127,6 +127,11 @@ namespace tool
         return SupportsMinor(nodeId, overTemperatureContractMinor);
     }
 
+    bool CanCommandClient::SupportsBusVoltageLimits(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, busVoltageLimitsContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -153,6 +158,8 @@ namespace tool
             return SupportsThermal(nodeId);
         if (parameter == can::FocParameter::temperatureLimit || parameter == can::FocParameter::temperatureMargin)
             return SupportsOverTemperature(nodeId);
+        if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
+            return SupportsBusVoltageLimits(nodeId);
 
         switch (can::GroupOf(parameter))
         {

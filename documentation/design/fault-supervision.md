@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.7.0
+version: 0.8.0
 component: "supervision"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.7.0                    |
+| Version   | 0.8.0                    |
 | Component | supervision              |
 | Date      | 2026-11-05               |
 
@@ -45,6 +45,8 @@ date: 2026-11-05
 - Inferring the winding's temperature from the online resistance estimate in speed and position mode
   (REQ-PRT-002), derating the current limit as it nears the temperature limit and raising `overtemperature`
   at the limit (REQ-PRT-008, Part K).
+- Watching an enabled drive's filtered bus voltage against the operator's bus-voltage limits, and raising
+  `overvoltage` or `undervoltage` when it leaves them (REQ-PRT-009, Part L).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -64,6 +66,9 @@ date: 2026-11-05
   the control-mode state machine holds a speed setpoint at it; Part G only faults a rotor that passed both.
 - Measuring the winding temperature. Part I models the heat the current puts in from the ratings alone; a
   winding that heats from outside, or a rating set too high, is not seen.
+- Protecting the board from its bus. The board's own over- and under-voltage comparators trip the power stage
+  whatever the operator set; Part L only adds tighter limits a motor or a supply may need, at the pace of the
+  bus-voltage service.
 - Protecting the motor from heat while a stall is not reported, unless the continuous rating of Part I is set. With stall reporting off, a held rotor can
   carry up to the current limit; only the thermal protection of the board watches that.
 
@@ -458,16 +463,50 @@ stateDiagram-v2
     Reported --> FullLimit : drive leaves Enabled
 ```
 
+### Part L — Bus-voltage limits
+
+The board's comparators trip at the bus voltages the power stage survives, which a motor or a supply rated lower
+does not. A bus-voltage limit monitor holds the drive to two operator limits inside them (REQ-PRT-009). It takes each
+value the bus-voltage service hands on (`service-bus-voltage.md`): a reading every 10 ms, filtered with a 50 ms time
+constant. While the drive is `Enabled`, a value below the minimum raises `undervoltage` and a value above the maximum
+raises `overvoltage`, once, and the monitor stays silent until the drive leaves `Enabled`; the drive cuts its power
+stage and coasts, as for a trip of the board's comparators, and reports the same fault codes.
+
+The filter is the monitor's persistence: a single reading 10 V beyond the bus moves the filtered value by under 2 V, so
+noise and a short regeneration spike pass, and a step of the bus beyond a limit is answered within a few readings — a
+step to twice the distance between the bus and the limit at the fourth reading after it. A faster rise is the board
+comparators' to catch.
+
+The monitor does not watch a stopped drive. A supply switched off while the drive waits in `Idle` or `Ready` is no
+fault, and a drive enabled on a bus outside the limits faults at the first value after the enable, at most 10 ms
+later.
+
+| Setting             | Default | Range            | Meaning                                          |
+|---------------------|---------|------------------|--------------------------------------------------|
+| Bus voltage minimum | 0 V     | 0 – 100 V, 0 off | Filtered bus below which an enabled drive faults |
+| Bus voltage maximum | 0 V     | 0 – 100 V, 0 off | Filtered bus above which an enabled drive faults |
+
+Each limit is off at 0 and acts on its own, so a minimum at or above the maximum faults any enabled drive. Both are
+drive-wide limits of the configuration record (`service-nvm.md`), read at every value and settable over CAN
+(`service-can.md`, contract 2.15).
+
+```mermaid
+stateDiagram-v2
+    [*] --> Watching
+    Watching --> Reported : Enabled and filtered bus below the minimum or above the maximum, undervoltage or overvoltage raised
+    Reported --> Watching : drive leaves Enabled
+```
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface     | Purpose                                                                                                                       | Contract                                                                               |
-|---------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed, a following error or a position-limit violation to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
-| Current limit | Hands the overload model's current limit to its owner (Part I)                                                                | Called from the event loop when the limit changes                                      |
+| Interface     | Purpose                                                                                                                                                                      | Contract                                                                               |
+|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Fault         | Reports a stall, an encoder loss, a missing phase, an overspeed, a following error, a position-limit violation, an over-temperature or a bus outside its limits to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Current limit | Hands the overload model's current limit to its owner (Part I)                                                                                                               | Called from the event loop when the limit changes                                      |
 
 ### Required
 
@@ -476,5 +515,6 @@ stateDiagram-v2
 | Active drive     | Lifecycle state and the motion the drive observes                                          | Read every evaluation; the observation is written by the control interrupts  |
 | Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
 | Settings         | The configuration record's supervision fields and limits                                   | Read every evaluation                                                        |
+| Bus voltage      | Filtered bus voltage (Part L)                                                              | Handed on every 10 ms from the event loop                                    |
 | Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I)                                            | Runs on the event loop                                                       |
 | Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

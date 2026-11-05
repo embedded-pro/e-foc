@@ -135,6 +135,8 @@ namespace can
         positionSpeedErrorWeight = 0x22,
         positionIntegralWeight = 0x23,
         positionReferenceTimeConstant = 0x24,
+        busVoltageMinimum = 0x30,
+        busVoltageMaximum = 0x31,
         resistance = 0x40,
         inductance = 0x41,
         polePairs = 0x42,

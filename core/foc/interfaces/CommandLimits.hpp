@@ -66,5 +66,6 @@ namespace foc
         static constexpr float maxTemperatureLimit{ 200.0f };
         static constexpr float minTemperatureMargin{ 1.0f };
         static constexpr float maxTemperatureMargin{ 50.0f };
+        static constexpr float maxBusVoltageLimit{ 100.0f };
     };
 }

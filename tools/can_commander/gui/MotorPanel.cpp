@@ -552,6 +552,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::BusVoltageLimitsUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsBusVoltageLimits(nodeId))
+            return QString("Needs firmware contract 2.15 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -566,6 +573,7 @@ namespace tool
         commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
         commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
         commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
+        commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();

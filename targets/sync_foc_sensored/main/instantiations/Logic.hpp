@@ -30,6 +30,7 @@
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
+#include "core/supervision/BusVoltageLimitMonitor.hpp"
 #include "core/supervision/EncoderFreezeMonitor.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "core/supervision/FollowingErrorMonitor.hpp"
@@ -94,6 +95,7 @@ namespace application
         supervision::OverTemperature overTemperature;
         foc::Ampere overloadLimit;
         foc::Ampere thermalLimit;
+        supervision::BusVoltageLimitMonitor busVoltageLimits;
         services::BusVoltageMonitor busVoltage;
         services::ConfigData configData;
         foc::CurrentStream currentStream;

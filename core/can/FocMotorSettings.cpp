@@ -123,6 +123,8 @@ namespace can
             case FocParameter::calibrationTemperature:
             case FocParameter::temperatureLimit:
             case FocParameter::temperatureMargin:
+            case FocParameter::busVoltageMinimum:
+            case FocParameter::busVoltageMaximum:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -333,6 +335,10 @@ namespace can
                 return config.limits.temperatureLimit;
             case FocParameter::temperatureMargin:
                 return config.limits.temperatureMargin;
+            case FocParameter::busVoltageMinimum:
+                return config.limits.busVoltageMinimum;
+            case FocParameter::busVoltageMaximum:
+                return config.limits.busVoltageMaximum;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -386,6 +392,12 @@ namespace can
                 break;
             case FocParameter::temperatureMargin:
                 config.limits.temperatureMargin = value;
+                break;
+            case FocParameter::busVoltageMinimum:
+                config.limits.busVoltageMinimum = value;
+                break;
+            case FocParameter::busVoltageMaximum:
+                config.limits.busVoltageMaximum = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

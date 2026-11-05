@@ -39,9 +39,9 @@ TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mod
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_160)
+TEST_F(TestConfigData, config_data_sizeof_is_168)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 160 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 168 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
@@ -63,6 +63,8 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
     EXPECT_NEAR(cfg.limits.calibrationTemperature, 25.0f, 1e-6f);
     EXPECT_NEAR(cfg.limits.temperatureLimit, 120.0f, 1e-6f);
     EXPECT_NEAR(cfg.limits.temperatureMargin, 15.0f, 1e-6f);
+    EXPECT_NEAR(cfg.limits.busVoltageMinimum, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.busVoltageMaximum, 0.0f, 1e-9f);
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_settings)

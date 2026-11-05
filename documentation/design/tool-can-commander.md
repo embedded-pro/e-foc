@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.15.0
+version: 0.16.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.15.0               |
+| Version   | 0.16.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -264,6 +264,10 @@ flowchart LR
   winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
   from; and the temperature limit and margin of contract 2.14, over which speed and position mode derate the current
   and at which they fault. They are stored at once and in force within 100 ms.
+  Its **Supply Limits** group holds the bus-voltage minimum and maximum of contract 2.15 (`fault-supervision.md`
+  Part L). The group says each is off at 0, that a running drive faults with undervoltage or overvoltage when the
+  bus leaves them while a stopped one is not watched, and that the board's own trips stay in force. They are
+  stored at once and in force within 10 ms.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -292,7 +296,8 @@ reason. A node older than 2.11 has no travel limits: the commander does not ask 
 Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*. A node
 older than 2.13 has no winding temperature: the commander does not ask it for the estimate or the calibration
 temperature, and the Thermal fields are disabled with the reason; a node of 2.13 has no temperature limit or
-margin, and those two fields are disabled with the reason.
+margin, and those two fields are disabled with the reason. A node older than 2.15 has no bus-voltage limits: the
+commander does not ask it for them, and the Supply Limits fields are disabled with the reason.
 
 ### Part K — diagnostics
 
