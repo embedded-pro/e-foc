@@ -81,8 +81,7 @@ jobs:
       fail-fast: false
       matrix:
         configuration: ["RelWithDebInfo"]
-        target:
-          ["EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
+        target: ["EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
         # Each budget is the same slice of time on every MCU, in cycles of its clock: 37.5 us inner loop (75% of
         # the 20 kHz period), 166.7 us outer loop, 50 us identification path (the whole period: it runs only
         # while calibrating, where nothing but the 1 kHz outer loop competes for it).
