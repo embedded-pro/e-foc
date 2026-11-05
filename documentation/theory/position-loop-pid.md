@@ -2,7 +2,7 @@
 title: "Position Loop — P (Baseline)"
 type: theory
 status: draft
-version: 1.3.0
+version: 1.4.0
 component: "position-loop-pid"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Position Loop — P (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.3.0                        |
+| Version   | 1.4.0                        |
 | Component | position-loop-pid            |
 | Date      | 2026-11-05                   |
 
@@ -124,11 +124,14 @@ so neither the reference nor the measured angle crosses it, and the plain differ
 stays inside, $-5.8$ rad back through zero.
 
 A step longer than $\pi / b$, about $4.2$ rad, saturates the velocity form on its first sample, which
-only the limits make possible: the clamp drops the part of $K_p\,b\,\Delta\theta^*$ beyond the speed
-envelope, and the integral alone closes what that part would have. In the software-in-the-loop run a
-$5$ rad move between limits of $\pm 3$ rad reaches the $6.28$ mrad target window after about $1.4$ s,
-without overshoot, against $0.1$ s for a $2.5$ rad move. The two-DOF law, whose feedback is this law,
-shares the tail.
+only the limits make possible. A velocity form that simply clamps would drop the part of
+$K_p\,b\,\Delta\theta^*$ beyond the speed envelope and leave the integral alone to close it, a tail of
+more than a second on a $5$ rad move. The law instead holds that part back, $h[k]$ below, and applies it
+as the rotor's own steps bring the output inside the clamp, which is what a positional
+$K_p\,(b\,\theta^* - \theta)$ would do: in the software-in-the-loop run a $5$ rad move between limits of
+$\pm 3$ rad reaches the $6.28$ mrad target window in about $0.5$ s instead of $1.4$ s. Only the reference's share is held back: what the clamp takes from
+the integral or the measured steps is dropped as before, so the anti-windup is unchanged, and a law that
+never saturates on a reference step behaves exactly as without it.
 
 ### Integral zero and reference weighting
 
@@ -139,7 +142,10 @@ $$
 \omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta\theta^*[k] - \Delta\theta_m[k]\right) + K_i T_s^o\, e_\theta[k]
 $$
 
-in the velocity form the implementation uses, with every difference wrapped as the error is.
+in the velocity form the implementation uses, with every difference wrapped as the error is. With the
+output normalised to the speed envelope and clamped to $[-1, 1]$, the reference's share
+$r[k] = h[k-1] + K_p\,b\,\Delta\theta^*[k]$ enters the sum, and the part of what the clamp removes that has
+the sign of $r[k]$, at most $|r[k]|$, is held back as $h[k]$ for the next sample.
 
 The zero used to sit at the integral weight times the bandwidth, a twentieth of it with the default
 weight. That places a slow closed-loop pole just beside the zero, and the pair leaves a tail whose

@@ -54,9 +54,25 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
-        float DirectCommand(float reference, float measured)
+        float DirectCommand(float reference, float measured, float speed = 0.0f)
         {
-            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, true }).value;
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed }, true }).value;
+        }
+
+        float DirectPositionErrorAfterStep(float step, std::size_t samples)
+        {
+            constexpr float speedLoopBandwidth = 100.0f;
+            float position{ 0.0f };
+            float speed{ 0.0f };
+
+            for (std::size_t sample = 0; sample != samples; ++sample)
+            {
+                const auto reference = DirectCommand(step, position, speed);
+                speed += (reference - speed) * speedLoopBandwidth * samplePeriod;
+                position += speed * samplePeriod;
+            }
+
+            return step - position;
         }
 
         float PositionErrorAfterStep(float step, std::size_t samples)
@@ -285,6 +301,23 @@ TEST_F(TestPidPositionController, within_travel_limits_a_reference_step_across_t
     DirectCommand(2.9f, 2.9f);
 
     EXPECT_LT(DirectCommand(-2.9f, 2.9f), 0.0f);
+}
+
+TEST_F(TestPidPositionController, within_travel_limits_a_step_the_clamp_holds_back_settles_without_a_tail)
+{
+    controller.Configure(ValidParameters());
+
+    EXPECT_LT(std::abs(DirectPositionErrorAfterStep(5.0f, 300)), 0.005f * 5.0f);
+    controller.Reset();
+    EXPECT_LT(std::abs(DirectPositionErrorAfterStep(5.0f, 800)), 0.001f * 5.0f);
+}
+
+TEST_F(TestPidPositionController, a_step_the_clamp_holds_back_is_not_carried_past_a_reversed_reference)
+{
+    controller.Configure(ValidParameters());
+    DirectCommand(5.0f, 0.0f);
+
+    EXPECT_LT(DirectCommand(-0.5f, 0.0f), 0.0f);
 }
 
 TEST_F(TestPidPositionController, a_higher_bandwidth_widens_the_speed_envelope)
