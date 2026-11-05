@@ -47,6 +47,7 @@ namespace foc
     void TorqueCascade::Disable()
     {
         enabled = false;
+        currentCommandActive = false;
         voltageWindow.Close();
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
@@ -109,7 +110,7 @@ namespace foc
     {
         const auto mechanicalSpeed = polePairs > 0.0f ? lastElectricalSpeed / polePairs : 0.0f;
 
-        const auto demanded = LimitedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed);
+        const auto demanded = LimitedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed, 0.0f);
 
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f }, Ampere{ demanded } };
     }
@@ -125,10 +126,20 @@ namespace foc
         currentLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
     }
 
-    float TorqueCascade::LimitedQuadrature(float quadrature, float electricalSpeed) const
+    float TorqueCascade::LimitedQuadrature(float quadrature, float electricalSpeed, float feedForward) const
     {
         const float limit = currentLimit;
-        return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, inverseElectricalSpeedLimit), -limit, limit);
+        return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, inverseElectricalSpeedLimit) + feedForward, -limit, limit);
+    }
+
+    void TorqueCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
+    {
+        coggingFeedForward.Load(torque, torqueScale, torqueConstant);
+    }
+
+    void TorqueCascade::ClearCoggingMap()
+    {
+        coggingFeedForward.Clear();
     }
 
     void TorqueCascade::UpdateSpeedLimit()
@@ -145,6 +156,7 @@ namespace foc
     void TorqueCascade::EnableCurrentCommand()
     {
         requestedSetPoint = IdAndIqPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
+        currentCommandActive = true;
         Enable();
         voltageWindow.Open(samplesPerMillisecond);
     }
@@ -183,7 +195,8 @@ namespace foc
         if (currentStream != nullptr)
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& setPoint = setPointBuffer.Acquire();
-        const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed);
+        const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);
+        const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed });
         voltageWindow.Accumulate(voltage.q);
         return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));

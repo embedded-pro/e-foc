@@ -675,3 +675,82 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_current_limit_above_the_envelope_is_held_a
 
     EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), testMaxCurrent.Value(), 1e-6f);
 }
+
+namespace
+{
+    std::array<int8_t, 48> CoggingWave()
+    {
+        std::array<int8_t, 48> torque{};
+        for (std::size_t bin = 0; bin != torque.size(); ++bin)
+            torque[bin] = static_cast<int8_t>(std::lround(127.0f * std::sin(6.0f * (static_cast<float>(bin) + 0.5f) * 2.0f * std::numbers::pi_v<float> / 48.0f)));
+        return torque;
+    }
+
+    constexpr float coggingScale{ 0.01f / 127.0f };
+    const foc::NewtonMeter coggingTorqueConstant{ 0.1f };
+    constexpr float offPeakAngle{ 0.03f };
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_loaded_cogging_map_adds_the_cogging_current_to_the_setpoint)
+{
+    const auto torque = CoggingWave();
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->LoadCoggingMap(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    foc::Radians position{ offPeakAngle };
+    const auto compensated = focTorque->Calculate(ZeroCurrents(), position);
+
+    foc::CoggingFeedForward feedForward;
+    feedForward.Load(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
+    foc::TorqueCascade reference{ testMaxCurrent };
+    reference.Configure(MotorParameters(polePairs));
+    EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    reference.Enable();
+    reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ feedForward.CurrentAt(offPeakAngle * static_cast<float>(polePairs)) } });
+    foc::Radians referencePosition{ offPeakAngle };
+
+    ExpectSameDuty(compensated, reference.Calculate(ZeroCurrents(), referencePosition));
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_cleared_cogging_map_adds_nothing)
+{
+    const auto torque = CoggingWave();
+    focTorque->LoadCoggingMap(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
+    focTorque->ClearCoggingMap();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    foc::Radians position{ offPeakAngle };
+
+    ExpectCentredDuty(focTorque->Calculate(ZeroCurrents(), position));
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, the_cogging_current_is_held_within_the_current_limit)
+{
+    const auto torque = CoggingWave();
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->LoadCoggingMap(infra::MakeRange(torque), 127.0f * coggingScale, coggingTorqueConstant);
+    focTorque->LimitCurrent(foc::Ampere{ 0.2f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+    foc::Radians position{ offPeakAngle };
+    const auto limited = focTorque->Calculate(ZeroCurrents(), position);
+
+    foc::TorqueCascade reference{ testMaxCurrent };
+    reference.Configure(MotorParameters(polePairs));
+    EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    reference.Enable();
+    reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+    foc::Radians referencePosition{ offPeakAngle };
+
+    ExpectSameDuty(limited, reference.Calculate(ZeroCurrents(), referencePosition));
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_calibration_current_command_is_not_compensated)
+{
+    const auto torque = CoggingWave();
+    focTorque->LoadCoggingMap(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
+    focTorque->Disable();
+    focTorque->EnableCurrentCommand();
+    foc::Radians position{ offPeakAngle };
+
+    ExpectCentredDuty(focTorque->Calculate(ZeroCurrents(), position));
+}

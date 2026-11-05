@@ -1,4 +1,7 @@
 #include "core/state_machine/TorqueStateMachine.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 
 namespace application
 {
@@ -70,6 +73,22 @@ namespace application
     services::FluxLinkageIdentification* TorqueStateMachine::FluxLinkageIdent()
     {
         return resolvedFluxIdent;
+    }
+
+    void TorqueStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
+    {
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+
+        if (foc::IsFinitePositive(data.coggingTorqueScale) && foc::IsFinitePositive(torqueConstant.Value()))
+            focController.LoadCoggingMap(infra::MakeRange(data.coggingTorque), data.coggingTorqueScale, torqueConstant);
+        else
+            focController.ClearCoggingMap();
+    }
+
+    bool TorqueStateMachine::ApplyProvisionalCurrentControl(const services::CalibrationData& pending)
+    {
+        focController.ClearCoggingMap();
+        return FocStateMachineCommon::ApplyProvisionalCurrentControl(pending);
     }
 
     void TorqueStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)

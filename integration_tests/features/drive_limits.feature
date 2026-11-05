@@ -21,6 +21,11 @@ Feature: Drive Limits
   peak current for the peak time and then folds the current limit back to the continuous rating
   (REQ-PRT-001). The hand holds the rotor so that the commanded current flows the whole time.
 
+  Torque mode adds the cogging map a speed or position calibration stored to the operator's torque
+  (REQ-TRQ-012). On the bench, 0.12 A is more than the shaft's dry friction but less than the dry
+  friction and the cogging together: with the map it turns the rotor, without one it leaves the
+  rotor in a detent, a 24th of a turn wide.
+
   @sil @REQ-PRT-003
   Scenario: A torque command without load settles below the overspeed limit
     Given a nominal motor plant
@@ -152,6 +157,35 @@ Feature: Drive Limits
     Then the q-axis current shall average between 2.85 and 3.15 A from 200 to 1700 ms after enable
     And the q-axis current shall average between 1.9 and 2.1 A from 2400 to 3000 ms after enable
     And the state machine shall be in the running state
+
+  @sil @REQ-TRQ-012
+  Scenario: With the map a speed calibration stored, a small torque turns the rotor through the detents
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And the plant response is recorded at 100 Hz for up to 3000 samples
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run
+    And the torque control mode is selected
+    And the rotor is aligned
+    And the motor is enabled
+    And a torque setpoint of 0.12 A is applied
+    And the response is captured for 2000 ms after the last setpoint
+    Then the rotor shall travel at least 6.3 rad after the last setpoint
+
+  @sil @REQ-TRQ-012
+  Scenario: Without a cogging map, the same torque leaves the rotor in a detent
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And the plant response is recorded at 100 Hz for up to 400 samples
+    And the motor is already calibrated
+    And the motor boots in torque mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And a torque setpoint of 0.12 A is applied
+    And the response is captured for 2000 ms after the last setpoint
+    Then the rotor shall travel less than 0.26 rad after the last setpoint
 
   @sil @REQ-PRT-003 @REQ-PRT-004 @REQ-SPD-010 @REQ-PRT-007 @REQ-PRT-001 @REQ-CAN-015
   Scenario: The limits are stored and read back after a restart

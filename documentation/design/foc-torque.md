@@ -64,7 +64,8 @@ The sequence executed each cycle is:
 6. Park forward: (Iα, Iβ, θe) → (Id, Iq).
 7. Current stream: add Id and Iq to the stream window; on the window's last sample, store the two means and θm
    for the event loop (`service-can.md` Part J). Skipped when no stream is attached or the stream is stopped.
-8. Speed limiter: fold Iq_setpoint by the measured speed against the overspeed limit (Speed Limiter, below).
+8. Speed limiter: fold Iq_setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
+   add the cogging current at θe (`service-cogging-compensation.md` Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
 10. Inverse Park: (Vd, Vq, θe) → (Vα, Vβ).
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).

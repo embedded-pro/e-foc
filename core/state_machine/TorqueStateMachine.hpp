@@ -30,6 +30,8 @@ namespace application
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
+        void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
+        bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
         foc::CurrentLoopTunable& CurrentTunable() override;
         services::FluxLinkageIdentification* FluxLinkageIdent() override;
 

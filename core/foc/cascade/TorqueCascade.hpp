@@ -6,6 +6,7 @@
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
@@ -17,6 +18,7 @@ namespace foc
         , public CurrentCommandable
         , public SpeedLimitable
         , public CurrentLimitable
+        , public CoggingCompensable
     {
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
@@ -39,12 +41,14 @@ namespace foc
 
         void LimitSpeed(RadiansPerSecond limit) override;
         void LimitCurrent(Ampere limit) override;
+        void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
+        void ClearCoggingMap() override;
 
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
         void UpdateSpeedLimit();
         IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;
-        float LimitedQuadrature(float quadrature, float electricalSpeed) const;
+        float LimitedQuadrature(float quadrature, float electricalSpeed, float feedForward) const;
 
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
@@ -70,6 +74,8 @@ namespace foc
         volatile float inverseElectricalSpeedLimit{ 0.0f };
         // Written by the event loop, read by the control interrupt; never above the envelope.
         volatile float currentLimit;
+        CoggingFeedForward coggingFeedForward;
+        volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };
     };
 }

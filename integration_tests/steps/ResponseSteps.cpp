@@ -126,6 +126,27 @@ namespace
         return sum / static_cast<float>(count);
     }
 
+    std::optional<float> TravelAfterSetpoint(const ScenarioSetup& setup)
+    {
+        const auto stamp = SetpointStampAfterEnable(setup);
+        if (!stamp)
+            return std::nullopt;
+
+        std::optional<float> first;
+        float last{ 0.0f };
+        for (const auto& sample : setup.trace.Samples())
+            if (sample.tick >= *stamp)
+            {
+                if (!first)
+                    first = sample.thetaMech;
+                last = sample.thetaMech;
+            }
+
+        if (!first)
+            return std::nullopt;
+        return std::abs(last - *first);
+    }
+
     void RequireCapturedTrace(const ScenarioSetup& setup)
     {
         ASSERT_TRUE(setup.trace.StartTick().has_value()) << "No PLANT_START marker: was the plant response recorded and the motor enabled?";
@@ -444,6 +465,28 @@ THEN(R"(the q-axis current shall average between {float} and {float} A from {int
     std::fprintf(stderr, "[METRIC] sil iq_mean from_ms=%d to_ms=%d value=%.4f\n", fromMs, toMs, *mean);
     EXPECT_GE(*mean, low) << "q-axis current between " << fromMs << " and " << toMs << " ms";
     EXPECT_LE(*mean, high) << "q-axis current between " << fromMs << " and " << toMs << " ms";
+}
+
+THEN(R"(the rotor shall travel at least {float} rad after the last setpoint)", (float minimum))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+
+    const auto travel = TravelAfterSetpoint(setup);
+    ASSERT_TRUE(travel.has_value()) << "No plant samples after the last setpoint";
+    std::fprintf(stderr, "[METRIC] sil travel_rad value=%.3f\n", *travel);
+    EXPECT_GE(*travel, minimum) << "The rotor travelled " << *travel << " rad";
+}
+
+THEN(R"(the rotor shall travel less than {float} rad after the last setpoint)", (float maximum))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+
+    const auto travel = TravelAfterSetpoint(setup);
+    ASSERT_TRUE(travel.has_value()) << "No plant samples after the last setpoint";
+    std::fprintf(stderr, "[METRIC] sil travel_rad value=%.3f\n", *travel);
+    EXPECT_LT(*travel, maximum) << "The rotor travelled " << *travel << " rad";
 }
 
 THEN(R"(the response shall have no dropped samples)")

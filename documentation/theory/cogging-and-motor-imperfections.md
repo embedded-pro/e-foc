@@ -2,9 +2,9 @@
 title: "Cogging and Other Motor Imperfections"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "cogging-and-motor-imperfections"
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                                 |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Cogging and Other Motor Imperfections |
 | Type      | theory                                |
 | Status    | draft                                 |
-| Version   | 0.1.0                                 |
+| Version   | 0.1.1                                 |
 | Component | cogging-and-motor-imperfections       |
-| Date      | 2026-10-29                            |
+| Date      | 2026-11-05                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -222,9 +222,13 @@ periodic Catmull-Rom curve, interpolates linearly at run time (about the cost of
 keeps the sum inside the current limit. With it, every position law holds a setpoint between detents on the
 bench (`documentation/design/service-cogging-compensation.md` Part D).
 
+Torque mode measures no map of its own, but compensates with the one a speed or position calibration stored,
+adding it to the operator's torque command, so a small torque turns the rotor through the detents instead of
+stopping in one.
+
 What it does not reach: a map shifted by a later alignment that settled to a different side of a detent;
-torque mode, which measures no map; and the differences between pole pairs that a single electrical period
-averages out.
+torque mode before any speed or position calibration has stored a map; and the differences between pole pairs
+that a single electrical period averages out.
 
 ### 6. Other Motor Imperfections
 

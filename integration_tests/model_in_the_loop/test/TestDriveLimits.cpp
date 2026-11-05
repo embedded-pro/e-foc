@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <gtest/gtest.h>
+#include <numbers>
 
 namespace
 {
@@ -127,4 +128,73 @@ TEST(TestDriveLimits, every_speed_law_follows_the_acceleration_ramp_to_its_setpo
         EXPECT_LT(response->overshoot, 0.035f * target);
         EXPECT_TRUE(mil.Disable());
     }
+}
+
+namespace
+{
+    constexpr float detentTorqueCommand{ 0.12f };
+
+    mil::Scenario BenchWithCoggingAndDryFriction()
+    {
+        mil::Scenario scenario;
+        scenario.Plant("bench").Recorded(recordRateHz, 3000);
+        sil::DescribeBenchFrictionAndCogging(scenario.plant);
+        return scenario;
+    }
+
+    float TravelUnderTorque(mil::ModelInTheLoop& mil)
+    {
+        EXPECT_TRUE(mil.Enable());
+        EXPECT_TRUE(mil.SetTorque(detentTorqueCommand));
+        EXPECT_TRUE(mil.CaptureAfterSetpoint(2000.0f));
+
+        const auto& samples = mil.Trace().Samples();
+        const auto setpointTick = mil.SetpointTick();
+        float first{ 0.0f };
+        bool started{ false };
+        float last{ 0.0f };
+        for (const auto& sample : samples)
+        {
+            if (!setpointTick || sample.tick < *setpointTick)
+                continue;
+            if (!started)
+            {
+                first = sample.thetaMech;
+                started = true;
+            }
+            last = sample.thetaMech;
+        }
+
+        EXPECT_TRUE(mil.Disable());
+        return std::abs(last - first);
+    }
+}
+
+TEST(TestDriveLimits, with_the_stored_cogging_map_a_small_torque_turns_the_rotor_through_the_detents)
+{
+    auto scenario = BenchWithCoggingAndDryFriction();
+    scenario.BootsIn(state_machine::ControlMode::speed);
+    mil::ModelInTheLoop mil{ scenario };
+    ASSERT_TRUE(mil.Calibrate());
+    ASSERT_GT(mil::Identified(mil.CalibrationRecord(), mil::Quantity::cogging), 0.0f);
+    ASSERT_TRUE(mil.Select(state_machine::ControlMode::torque));
+    ASSERT_TRUE(mil.Align());
+
+    const auto travel = TravelUnderTorque(mil);
+    std::fprintf(stderr, "[METRIC] mil limits torque_cogging compensated travel_rad=%.3f\n", travel);
+
+    EXPECT_GT(travel, 2.0f * std::numbers::pi_v<float>);
+}
+
+TEST(TestDriveLimits, without_a_cogging_map_the_same_torque_stays_in_a_detent)
+{
+    auto scenario = BenchWithCoggingAndDryFriction();
+    scenario.Calibrated().BootsIn(state_machine::ControlMode::torque);
+    mil::ModelInTheLoop mil{ scenario };
+    ASSERT_TRUE(mil.Align());
+
+    const auto travel = TravelUnderTorque(mil);
+    std::fprintf(stderr, "[METRIC] mil limits torque_cogging uncompensated travel_rad=%.3f\n", travel);
+
+    EXPECT_LT(travel, 2.0f * std::numbers::pi_v<float> / 24.0f);
 }
