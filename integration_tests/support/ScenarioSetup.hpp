@@ -3,6 +3,7 @@
 #include "integration_tests/support/nvm/NvmImageBuilder.hpp"
 #include "integration_tests/support/plant/PlantPresets.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
+#include <chrono>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -43,7 +44,9 @@ namespace integration
     struct FirmwareDownload
     {
         std::vector<uint8_t> pack;
+        std::vector<uint8_t> stale;
         uint32_t crc{ 0 };
+        std::optional<std::chrono::steady_clock::time_point> activatedAt;
         std::optional<uint8_t> beginAnswer;
         std::optional<uint16_t> pageSize;
         std::optional<uint8_t> verifyAnswer;

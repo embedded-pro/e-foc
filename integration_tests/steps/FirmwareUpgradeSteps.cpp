@@ -1,3 +1,4 @@
+#include "bootloader/StatusJournal.hpp"
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <map>
 #include <optional>
@@ -27,7 +29,9 @@ using namespace integration;
 namespace
 {
     constexpr std::size_t smallImageSize = 600;
+    constexpr std::size_t staleImageSize = 4096;
     constexpr auto installTimeout = std::chrono::seconds{ 60 };
+    constexpr auto activateToDeployedBound = std::chrono::duration<double>{ 5.0 };
     constexpr auto silenceTimeout = std::chrono::seconds{ 10 };
     constexpr auto silence = std::chrono::milliseconds{ 1500 };
     constexpr auto journalPollInterval = std::chrono::milliseconds{ 100 };
@@ -48,12 +52,25 @@ namespace
         return static_cast<uint8_t>(answer->second);
     }
 
-    std::vector<uint8_t> SmallImage()
+    std::vector<uint8_t> Image(std::size_t size)
     {
-        std::vector<uint8_t> image(smallImageSize);
+        std::vector<uint8_t> image(size);
         for (std::size_t i = 0; i != image.size(); ++i)
             image[i] = static_cast<uint8_t>(i * 13 + 7);
         return image;
+    }
+
+    std::vector<uint8_t> SmallImage()
+    {
+        return Image(smallImageSize);
+    }
+
+    bool ErasedFrom(const std::vector<uint8_t>& memory, std::size_t offset)
+    {
+        return std::all_of(memory.begin() + static_cast<std::ptrdiff_t>(offset), memory.end(), [](uint8_t byte)
+            {
+                return byte == 0xff;
+            });
     }
 
     application::PackDescription PackOf(const std::string& version, std::vector<uint8_t> image)
@@ -178,9 +195,19 @@ WHEN(R"(the first {int} blocks are sent)", (int count))
 
 WHEN(R"(Activate is sent)")
 {
+    auto& download = context.Get<ScenarioSetup>().download;
     const auto answer = FirmwareUpgradeClient{ context.Get<Fixture>() }.Activate();
+    download.activatedAt = std::chrono::steady_clock::now();
     ASSERT_TRUE(answer.has_value()) << "Activate was not answered";
-    context.Get<ScenarioSetup>().download.activateAnswer = static_cast<uint8_t>(*answer);
+    download.activateAnswer = static_cast<uint8_t>(*answer);
+}
+
+GIVEN(R"(the staging slot holds a stale pack and the journal reads {string})", (std::string status))
+{
+    auto& download = context.Get<ScenarioSetup>().download;
+    download.stale = DevelopmentSignedPack(PackOf("9.9.9", Image(staleImageSize)));
+    EmulatedBootloader().ConfigureStaging(download.stale);
+    EmulatedBootloader().ConfigureJournal(JournalReading(JournalStatusNamed(status)));
 }
 
 WHEN(R"(Abort is sent)")
@@ -227,11 +254,22 @@ THEN(R"(the staging slot holds the pack and is erased past it)")
     const auto staging = EmulatedBootloader().Staging();
 
     EXPECT_TRUE(std::ranges::equal(pack, staging | std::views::take(pack.size()))) << "The staging slot does not hold the pack";
-    EXPECT_TRUE(std::all_of(staging.begin() + static_cast<std::ptrdiff_t>(pack.size()), staging.end(), [](uint8_t byte)
-        {
-            return byte == 0xff;
-        }))
-        << "The staging slot is not erased past the pack";
+    EXPECT_TRUE(ErasedFrom(staging, pack.size())) << "The staging slot is not erased past the pack";
+}
+
+THEN(R"(the staging slot still holds the stale pack)")
+{
+    const auto& stale = context.Get<ScenarioSetup>().download.stale;
+    const auto staging = EmulatedBootloader().Staging();
+
+    ASSERT_FALSE(stale.empty()) << "No stale pack was staged";
+    EXPECT_TRUE(std::ranges::equal(stale, staging | std::views::take(stale.size()))) << "The stale pack was touched";
+}
+
+THEN(R"(the journal holds one entry)")
+{
+    const auto journal = EmulatedBootloader().Journal();
+    EXPECT_TRUE(ErasedFrom(journal, sizeof(bootloader::StatusJournalEntry))) << "The journal holds more than one entry";
 }
 
 THEN(R"(the drive reports the staged version {string})", (std::string version))
@@ -277,11 +315,16 @@ THEN(R"(setting the telemetry rate to {int} Hz is refused as busy)", (int rateHz
 
 THEN(R"(the bootloader installs the pack and the application starts again)")
 {
-    const auto deadline = std::chrono::steady_clock::now() + installTimeout;
+    const auto& download = context.Get<ScenarioSetup>().download;
+    ASSERT_TRUE(download.activatedAt.has_value()) << "Activate was not sent";
+    const auto deadline = *download.activatedAt + installTimeout;
     while (RecordedJournal().first != application::UpgradePackStatus::deployed && std::chrono::steady_clock::now() < deadline)
         std::this_thread::sleep_for(journalPollInterval);
+    const auto installed = std::chrono::duration<double>{ std::chrono::steady_clock::now() - *download.activatedAt }.count();
 
     ASSERT_EQ(application::UpgradePackStatus::deployed, RecordedJournal().first) << "The bootloader did not record the pack deployed";
+    std::printf("[METRIC] firmware upgrade activate_to_deployed_s=%.2f\n", installed);
+    EXPECT_LE(installed, activateToDeployedBound.count()) << "The restart and the installation took too long after Activate";
     EXPECT_TRUE(context.Get<Fixture>().WaitForCanHeartbeat()) << "No application answered after the installation";
 }
 
