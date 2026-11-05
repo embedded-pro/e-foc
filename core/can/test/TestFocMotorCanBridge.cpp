@@ -224,11 +224,17 @@ namespace
         {
             services::ConfigData config{};
             config.defaultControlMode = 0;
+            application::CalibrationServices calibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } };
+            if (stateMachineRefreshesOffsets)
+            {
+                calibrationServices.currentOffsets = currentOffsetsMock;
+                calibrationServices.standstill = standstillMock;
+            }
             coordinator.emplace(
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
+                calibrationServices,
                 faultNotifierMock,
                 config,
                 state_machine::ControlModeStateMachine::OuterLoopArgs{
@@ -393,6 +399,8 @@ namespace
         StrictMock<services::PhaseCurrentOffsetsMock> currentOffsetsMock;
         StrictMock<services::RotorStandstillMock> standstillMock;
         bool bridgeMeasuresOffsets{ false };
+        bool stateMachineRefreshesOffsets{ false };
+        infra::Function<void(bool)> standstillDone;
         StrictMock<services::FirmwareUpgradeControlMock> firmwareUpgradeMock;
         bool bridgeHasFirmwareUpgrade{ false };
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
@@ -437,6 +445,74 @@ TEST_F(FocMotorCanBridgeTest, OnStart_InReady_AcksSuccess)
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_ThatRefreshesTheOffsets_AcksOnceTheDriveRuns)
+{
+    stateMachineRefreshesOffsets = true;
+    EXPECT_CALL(currentOffsetsMock, IsRunning()).WillRepeatedly(Return(false));
+    EXPECT_CALL(currentOffsetsMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(currentOffsetsMock, Apply(_)).Times(AnyNumber());
+    ConstructFixtureInReady();
+    ResetCaptures();
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(SaveArg<0>(&standstillDone));
+
+    DispatchCommand(can::focStartId);
+    EXPECT_FALSE(ackSpy.last.has_value());
+
+    EXPECT_CALL(currentOffsetsMock, Measure(_)).WillOnce(Invoke([](const infra::Function<void(std::optional<foc::PhaseCurrents>)>& done)
+        {
+            done(foc::PhaseCurrents{ foc::Ampere{ 0.01f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        }));
+    standstillDone(true);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_WithDriftedOffsets_SendsCalibrationFailedCategoryError)
+{
+    stateMachineRefreshesOffsets = true;
+    EXPECT_CALL(currentOffsetsMock, IsRunning()).WillRepeatedly(Return(false));
+    EXPECT_CALL(currentOffsetsMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(currentOffsetsMock, Apply(_)).Times(AnyNumber());
+    ConstructFixtureInReady();
+    ResetCaptures();
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(SaveArg<0>(&standstillDone));
+    DispatchCommand(can::focStartId);
+
+    EXPECT_CALL(currentOffsetsMock, Measure(_)).WillOnce(Invoke([](const infra::Function<void(std::optional<foc::PhaseCurrents>)>& done)
+        {
+            done(foc::PhaseCurrents{ foc::Ampere{ 0.1f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        }));
+    standstillDone(true);
+    ExecuteAllActions();
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focStartId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_WhileAStartIsStillPending_SendsBusy)
+{
+    stateMachineRefreshesOffsets = true;
+    EXPECT_CALL(currentOffsetsMock, IsRunning()).WillRepeatedly(Return(false));
+    EXPECT_CALL(currentOffsetsMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
+    EXPECT_CALL(currentOffsetsMock, Apply(_)).Times(AnyNumber());
+    ConstructFixtureInReady();
+    EXPECT_CALL(standstillMock, Await(_)).WillOnce(SaveArg<0>(&standstillDone));
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focStartId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnStop_InEnabled_AcksSuccess)

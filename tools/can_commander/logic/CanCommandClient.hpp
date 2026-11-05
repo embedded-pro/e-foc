@@ -70,6 +70,8 @@ namespace tool
     {
     public:
         static constexpr infra::Duration commandTimeout{ std::chrono::seconds(2) };
+        // The first Start after power-up waits up to 10 s for the rotor to rest before measuring the current offsets.
+        static constexpr infra::Duration startCommandTimeout{ std::chrono::seconds(12) };
         static constexpr infra::Duration motionCommandTimeout{ std::chrono::minutes(2) };
         static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };

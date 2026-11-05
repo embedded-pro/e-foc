@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.6.3
+version: 0.7.0
 component: state-machine
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.6.3                      |
+| Version   | 0.7.0                      |
 | Component | state-machine              |
 | Date      | 2026-11-05                 |
 
@@ -55,7 +55,7 @@ The state machine has five named states:
 |---------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and a rotor reference kept by a control-mode switch), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                          |
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                                                                                  |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true; the first after power-up, a mode switch or a Fault re-measures the offsets), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)      |
 | `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                |
 | `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                           |
 
@@ -488,6 +488,50 @@ The two-command split ensures the FSM enters `Calibrating` before any open-loop 
 The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
 
 The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` covers the electrical steps only (REQ-INT-011), so it must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
+
+### Refreshing the current offsets at enable
+
+The current sensors' offsets drift after the calibration that measured them
+(`service-current-offsets.md` Part D), so the first `Enable` after power-up, after a control-mode
+switch and after every `Fault` measures them again before the drive is enabled. The machine stays in
+`Ready` while it does: the `Enable` is accepted, the rotor is awaited at rest and the offsets are
+measured, and a completion event then decides the command.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant SM as State machine (Ready)
+    participant RS as Rotor standstill
+    participant CO as Current offsets
+
+    C->>SM: Enable(onDone)
+    note over SM: offsets stale: accept, stay Ready
+    SM->>RS: Await rest
+    RS-->>SM: at rest
+    SM->>CO: Measure (two confirming windows)
+    CO-->>SM: offsets
+    alt every phase within 50 mA of the record
+        SM->>CO: Apply(measured)
+        note over SM: OffsetsRefreshed → Enabled
+        SM-->>C: ok
+    else drifted, not at rest or no measurement
+        note over SM: OffsetsRefreshed, stay Ready
+        SM-->>C: calibrationFailed
+    end
+```
+
+- The offsets are stale when the machine is constructed, which is at power-up and at every
+  control-mode switch, and whenever it enters `Fault`. A refresh that ends in `Enabled` makes them
+  fresh, and every later `Enable` goes straight to `Enabled` as before. A drive built without an
+  offset measurement never refreshes.
+- While the refresh runs, `HasPendingAsyncWork()` is true, so a second `Enable`, a calibration, a
+  mode switch or a maintenance command is rejected. `Disable` abandons the refresh and refuses the
+  `Enable` with `rejected`; an emergency stop or a fault abandons it with `abortedByFault`. The
+  stored offsets stay in force in every refusal.
+- `CmdEnable()` returns as soon as the `Enable` is accepted, with `ok`, for the terminal and the
+  model in the loop, which watch the state. `CmdEnableAsync(onDone)` reports the outcome when the
+  `Enable` is decided, and the CAN bridge acknowledges `Start` from it (`service-can.md` Part D), so
+  a client sees the acknowledgement once the drive is running or has refused.
 
 ### Fault Safety
 

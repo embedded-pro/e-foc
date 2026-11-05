@@ -38,6 +38,7 @@ namespace application
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEnable() override;
+        void CmdEnableAsync(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdDisable() override;
         state_machine::CommandResult CmdClearFault() override;
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;

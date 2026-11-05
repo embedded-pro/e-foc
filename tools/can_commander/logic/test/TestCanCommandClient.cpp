@@ -521,12 +521,12 @@ TEST_F(TestCanCommandClient, a_rejection_reports_the_reason_and_ends_the_pending
 
 TEST_F(TestCanCommandClient, a_pending_command_times_out_after_the_command_timeout)
 {
-    client.SendStartMotor(1);
+    client.SendStopMotor(1);
 
     ForwardTime(CanCommandClient::commandTimeout - std::chrono::milliseconds(1));
     EXPECT_TRUE(client.IsBusy(1));
 
-    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStartId));
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStopId));
     ForwardTime(std::chrono::milliseconds(1));
     EXPECT_FALSE(client.IsBusy(1));
 }
@@ -762,9 +762,9 @@ TEST_F(TestCanCommandClientAdapterFails, every_command_stays_pending_when_the_ad
 
 TEST_F(TestCanCommandClientAdapterFails, timeout_after_failed_send_ends_the_pending_command)
 {
-    client.SendStartMotor(1);
+    client.SendStopMotor(1);
 
-    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStartId));
+    EXPECT_CALL(observer, OnCommandTimeout(1, can::focStopId));
     ForwardTime(CanCommandClient::commandTimeout);
 
     EXPECT_FALSE(client.IsBusy(1));
@@ -1002,6 +1002,11 @@ TEST_F(TestCanCommandClient, the_timeout_follows_the_command)
 {
     EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focSetParameterId));
     EXPECT_EQ(CanCommandClient::motionCommandTimeout, CanCommandClient::TimeoutFor(can::focAlignId));
+}
+
+TEST_F(TestCanCommandClient, a_start_waits_long_enough_for_the_rotor_to_rest_and_the_offsets_to_be_measured)
+{
+    EXPECT_EQ(std::chrono::seconds(12), CanCommandClient::TimeoutFor(can::focStartId));
 }
 
 TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)

@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.10.0
+version: 0.11.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.10.0                   |
+| Version   | 0.11.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -438,7 +438,7 @@ Registers response handlers for the server-to-client response message types. Res
 
 Implements the `FocMotorCategoryServerObserver` interface. Holds references to `FocMotorCategoryServer` and `ControlModeStateMachine`. Translates each observer callback into the appropriate state machine call:
 
-- `OnStart` → `CmdEnable()`; success calls the ack callback, rejection sends `invalidState`.
+- `OnStart` → `CmdEnableAsync(onDone)`; the ack is sent when the `Enable` is decided — at once, or after the offset refresh of the first `Enable` after power-up, a mode switch or a Fault (`state-machine.md`, Refreshing the current offsets at enable). Success calls the ack callback; a refusal sends the matching error.
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
@@ -756,8 +756,9 @@ sequenceDiagram
 
     CAN->>SRV: HandleMessage(focStartId, payload)
     SRV->>BRG: OnStart(ackCallback)
-    BRG->>SM: ActiveStateMachine().CmdEnable()
-    SM-->>BRG: CommandResult::ok
+    BRG->>SM: ActiveStateMachine().CmdEnableAsync(onDone)
+    note over SM: the first Enable after power-up, a mode switch or a Fault re-measures the current offsets first
+    SM-->>BRG: onDone(CommandResult::ok)
     BRG->>ACK: ackCallback(CanAckStatus::success)
     ACK->>CAN: SendCommandAck(category=0x02, type=0x01, success)
 ```

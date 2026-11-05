@@ -93,10 +93,21 @@ namespace can
 
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        const auto result = controlMode.ActiveStateMachine().CmdEnable();
-        if (result == state_machine::CommandResult::ok)
-            NotifyCommandAccepted();
-        ReportCommandOutcome(server, can::focStartId, result, onDone);
+        if (pendingStartCallback != nullptr)
+        {
+            server.SendCategoryError(can::focStartId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        pendingStartCallback = onDone;
+        controlMode.ActiveStateMachine().CmdEnableAsync([this](state_machine::CommandResult result)
+            {
+                auto callback = pendingStartCallback;
+                pendingStartCallback = nullptr;
+                if (result == state_machine::CommandResult::ok)
+                    NotifyCommandAccepted();
+                ReportCommandOutcome(server, can::focStartId, result, callback);
+            });
     }
 
     void FocMotorCanBridge::OnStop(const infra::Function<void(services::CanAckStatus)>& onDone)

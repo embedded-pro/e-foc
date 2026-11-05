@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.2
+version: 1.13.3
 component: "software-in-the-loop"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.2                      |
+| Version   | 1.13.3                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-11-05                  |
 
@@ -385,7 +385,9 @@ counted, the count is reported when recording stops, and the host also checks th
 samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric. Begin and End
 only raise flags the tick acts on, so the tick stays the ring's only writer, and each marker has a slot of its own
 that the tick fills and the event loop empties: a full ring can drop samples but never the record that reports the
-drops.
+drops. A Begin clears an End the tick has not acted on yet: the first Enable after power-up stops the bridge at the
+end of its offset measurement and starts it for the control loop before the next tick, and that stop belongs to the
+measurement, not to the recording the start begins.
 
 Between them those two rules set a ceiling on how long a recording can run, and it is worth
 stating because it is not the budget and it bites only the fast ones. The interrupt produces at

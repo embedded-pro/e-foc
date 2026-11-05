@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.10.6
+version: 0.10.7
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.6               |
+| Version   | 0.10.7               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -57,7 +57,7 @@ The tool is split so that everything but widget layout can be tested without a d
 - **Logic** — the command client, one for the whole bus. Every command names its node and every report says
   which node sent it. Per node it tracks: online (a frame was seen; offline after the protocol's 3 s server
   timeout or when the bus closes), firmware compatibility, and the last command sent until that command is
-  acknowledged, rejected or times out after 2 s (two minutes for alignment, identification and calibration). A newer
+  acknowledged, rejected or times out after 2 s (12 s for Start, whose first acknowledgement waits for the rotor to rest and the current offsets to be measured; two minutes for alignment, identification and calibration). A newer
   command — typically the emergency stop — takes over the slot and restarts the timeout; an acknowledgement
   of an older command no longer ends it. A command the client refuses locally leaves the slot untouched.
   Closing the bus ends every pending command and reports every node offline at once. The client also reads

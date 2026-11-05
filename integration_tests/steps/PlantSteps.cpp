@@ -267,6 +267,23 @@ GIVEN(R"(the stored calibration is off by:)")
     }
 }
 
+GIVEN(R"(the phase {word} current sensor has drifted by {float} A since the calibration)", (std::string phase, float drift))
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(setup.nvm.includeCalibration) << "Seed the calibration first (the motor is already calibrated)";
+    ASSERT_FALSE(setup.booted) << "The drift must be set before the target boots";
+
+    if (phase == "A")
+        setup.plant.noiseBiasAmpereA += drift;
+    else if (phase == "B")
+        setup.plant.noiseBiasAmpereB += drift;
+    else if (phase == "C")
+        setup.plant.noiseBiasAmpereC += drift;
+    else
+        FAIL() << "Unknown phase: " << phase;
+}
+
 WHEN(R"(the target boots)")
 {
     auto& setup = context.Get<ScenarioSetup>();

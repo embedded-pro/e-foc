@@ -41,6 +41,7 @@ namespace
         Edge{ State<state_machine::Ready>(), Event<state_machine::ClearCalibration>() },
         Edge{ State<state_machine::Ready>(), Event<state_machine::SetMotorParameter>() },
         Edge{ State<state_machine::Ready>(), Event<state_machine::Enable>() },
+        Edge{ State<state_machine::Ready>(), Event<state_machine::Disable>() },
         Edge{ State<state_machine::Calibrating>(), Event<state_machine::CompleteExternalCalibration>() },
         Edge{ State<state_machine::Calibrating>(), Event<state_machine::ReleaseExternalCalibration>() },
         Edge{ State<state_machine::Enabled>(), Event<state_machine::Disable>() },
@@ -68,6 +69,7 @@ namespace
 
     constexpr std::array<bool, StateId::count> onlyIdle{ true, false, false, false, false };
     constexpr std::array<bool, StateId::count> onlyCalibrating{ false, true, false, false, false };
+    constexpr std::array<bool, StateId::count> onlyReady{ false, false, true, false, false };
     constexpr std::array<bool, StateId::count> idleReadyAndFault{ true, false, true, false, true };
     constexpr std::array<bool, StateId::count> everywhere{ true, true, true, true, true };
 
@@ -85,6 +87,7 @@ namespace
         NonCommandEvent{ Event<state_machine::BootValidityChecked>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::MotorParameterSaved>(), idleReadyAndFault },
+        NonCommandEvent{ Event<state_machine::OffsetsRefreshed>(), onlyReady },
         NonCommandEvent{ Event<state_machine::FaultDetected>(), everywhere },
         NonCommandEvent{ Event<state_machine::EmergencyStop>(), everywhere },
     };

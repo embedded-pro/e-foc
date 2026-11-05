@@ -6,6 +6,11 @@ Feature: FOC Motor Control Modes
   mechanical parameters, which this command does not identify, so they stay out
   of Ready, report an incomplete calibration and refuse to enable.
 
+  The first Start after power-up measures the current sensors' offsets again at rest
+  (REQ-CAL-022). A sensor that drifted a little since the calibration is corrected and
+  the drive runs; one that drifted more than 50 mA refuses the Start, which asks for a
+  new calibration.
+
   @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-005 @REQ-SM-011 @REQ-CAN-014
   Scenario: Torque mode runs motor with current setpoint
     Given the torque motor system is initialised with no valid calibration data
@@ -33,3 +38,25 @@ Feature: FOC Motor Control Modes
     And the calibrate command is issued
     Then the state machine shall report incomplete calibration
     And the motor shall refuse to enable
+
+  @sil @REQ-CAL-022
+  Scenario: A current sensor 20 mA from its calibrated offset still lets the first Start run the drive
+    Given a nominal motor plant
+    And the motor is already calibrated
+    And the phase A current sensor has drifted by 0.02 A since the calibration
+    And the motor boots in torque mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    Then the state machine shall be in the running state
+
+  @sil @REQ-CAL-022
+  Scenario: A current sensor 100 mA from its calibrated offset refuses the first Start
+    Given a nominal motor plant
+    And the motor is already calibrated
+    And the phase A current sensor has drifted by 0.1 A since the calibration
+    And the motor boots in torque mode
+    When the target boots
+    And the rotor is aligned
+    Then the motor start shall be refused as a failed calibration
+    And the state machine shall be in the Ready state
