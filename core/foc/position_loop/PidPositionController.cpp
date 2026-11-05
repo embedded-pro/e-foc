@@ -22,6 +22,7 @@ namespace foc
     void PidPositionController::Reset()
     {
         output = 0.0f;
+        heldBackReference = 0.0f;
         primed = false;
     }
 
@@ -37,9 +38,20 @@ namespace foc
 
         const auto stationary = std::abs(context.measuredSpeed.Value()) < stationarySpeedRatio * SpeedEnvelope();
         const auto integral = stationary ? relaxationRate * (proportionalGain * error - output) : integralGain * error;
-        output = std::clamp(output + proportionalGain * (referenceWeight * referenceStep - measuredStep) + integral, -1.0f, 1.0f);
+        const auto referencePart = heldBackReference + proportionalGain * referenceWeight * referenceStep;
+        const auto candidate = output + referencePart - proportionalGain * measuredStep + integral;
+        output = std::clamp(candidate, -1.0f, 1.0f);
+        heldBackReference = HeldBack(candidate - output, referencePart);
 
         return { PositionOutputKind::speedReference, output * SpeedEnvelope() };
+    }
+
+    float PidPositionController::HeldBack(float clamped, float referencePart)
+    {
+        if (clamped * referencePart <= 0.0f)
+            return 0.0f;
+
+        return std::copysign(std::min(std::abs(clamped), std::abs(referencePart)), referencePart);
     }
 
     float PidPositionController::SpeedEnvelope() const
