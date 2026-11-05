@@ -449,6 +449,7 @@ namespace application
         return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
+    // Both regions lie in the upper flash half: an erase stalls every read of its own half, the watchdog handler included (flash_layout.ld)
     infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
     {
         return infra::ConstByteRange{ __staging_slot_start, __staging_slot_end };
