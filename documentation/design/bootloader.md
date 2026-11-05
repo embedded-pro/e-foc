@@ -118,6 +118,10 @@ On the EK-TM4C1294XL:
   image whose pack fits the staging slot.
 - The NUCLEO-G474RE image, 259 KB today, is larger than any pack the staging slot holds; that board gets updates
   only once its image fits (Open Question 5).
+- `hardware_test` is linked standalone from the start of flash on every board, the EK-TM4C1294XL included:
+  programming its hex image replaces the bootloader, and the board gets the bootloader back only when the
+  bootloader and `sync_foc_sensored` images are programmed again (Part J). It carries no application header and
+  no image descriptor, so it never travels as a pack and the bootloader would never start it.
 
 ### Part B — upgrade pack
 

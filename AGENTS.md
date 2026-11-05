@@ -140,7 +140,8 @@ packs for a board that carries it. The release set is the only secret, `BOOTLOAD
 
 On a board with a bootloader (EK-TM4C1294XL) `sync_foc_sensored` links into the application slot and the build stamps its image
 descriptor with EmIL's `emil_bootloader_image_descriptor` and `application.bootloader_image` (`bootloader.md` Part J). A debugger
-programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`.
+programs such a board with two images, `e_foc.bootloader.main.hex` and `e_foc.sync_foc_sensored.main.hex`. `hardware_test` is linked
+standalone at the start of flash on every board and replaces the bootloader when it is programmed.
 
 `qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
@@ -159,7 +160,7 @@ Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `stat
 **Release**: `release-please.yml` builds (through `build-tools.yml`, shared with CI) and attaches the Linux/Windows tools (including the CAN Commander `.deb` and NSIS `setup.exe`,
 each installed, launched and uninstalled on the runner first), the firmware archives, the EK-TM4C1294XL `.hex` images and its signed `.upgrade` pack as standalone assets, a full source archive with every submodule
 (`e_foc-source-<tag>.tar.gz`) and the documentation PDFs bundled in one `e_foc-documentation-<tag>.zip` when release-please creates a release (the booklet `eFocDesign.pdf` is attached on its own by `build-booklet.yml`).
-Every asset gets a Sigstore build-provenance attestation; the CAN Commander executable and installer are Authenticode-signed through SignPath once `SIGNPATH_ORGANIZATION_ID` is set (see `.github/signpath/README.md`).
+Every asset gets a Sigstore build-provenance attestation, the booklet from `build-booklet.yml`, and the release verifies the installers', the firmware images' and the pack's before it uploads them; the CAN Commander executable and installer are Authenticode-signed through SignPath once `SIGNPATH_ORGANIZATION_ID` is set (see `.github/signpath/README.md`).
 The CAN Commander's update check finds its installer by those asset-name suffixes (`-linux-x86_64.deb`, `-windows-x86_64-setup.exe`), and a board's pack by `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade`; keep them stable.
 Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow. A release fails without the `BOOTLOADER_KEYS_RELEASE` secret; a dry run uses the public development key set.
 `release-please-config.json` lists `feat`, `fix`, `perf`, `revert`, `docs`, `build` and `ci` commits in the changelog, so any of them opens or updates the release PR; `refactor`, `test`, `style` and `chore` stay hidden.
