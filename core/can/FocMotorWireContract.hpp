@@ -245,7 +245,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 59> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 62> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -281,6 +281,9 @@ namespace can
         { FocParameter::speedAcceleration, "speedAcceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
         { FocParameter::speedDeceleration, "speedDeceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
         { FocParameter::commandTimeout, "commandTimeout", "s", 0.0f, foc::CommandLimits::maxCommandTimeout, false, false },
+        { FocParameter::continuousCurrent, "continuousCurrent", "A", 0.0f, foc::CommandLimits::maxRatedCurrent, false, false },
+        { FocParameter::peakCurrent, "peakCurrent", "A", 0.0f, foc::CommandLimits::maxRatedCurrent, false, false },
+        { FocParameter::peakCurrentTime, "peakCurrentTime", "s", foc::CommandLimits::minPeakCurrentTime, foc::CommandLimits::maxPeakCurrentTime, false, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },

@@ -884,3 +884,41 @@ TEST_F(TestSpeedCascadeRamp, a_calibration_speed_command_is_not_ramped)
     Ticks(1);
     EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
 }
+
+TEST_F(TestSpeedCascadeRamp, a_current_limit_clamps_the_reference_the_speed_law_hands_the_inner_loop)
+{
+    focSpeed->LimitCurrent(foc::Ampere{ 1.0f });
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 500.0f });
+    Ticks(20);
+    foc::Radians held{ 0.0f };
+    const auto limited = focSpeed->Calculate(ZeroCurrents(), held);
+
+    testing::StrictMock<foc::LowPriorityInterruptMock> referenceInterrupt;
+    EXPECT_CALL(referenceInterrupt, Register(_)).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+    EXPECT_CALL(referenceInterrupt, Unregister()).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
+    EXPECT_CALL(referenceInterrupt, Trigger()).Times(testing::AnyNumber());
+    foc::SpeedCascade reference{ foc::Ampere{ 1.0f }, baseFrequency, referenceInterrupt, lowPriorityFrequency };
+    reference.Configure(MotorParameters(polePairs));
+    auto mechanics = MechanicalParameters();
+    mechanics.maxCurrent = foc::Ampere{ 1.0f };
+    reference.ConfigureMechanics(mechanics);
+    reference.SetCurrentTunings(foc::CurrentLoopTunings{});
+    reference.SetSpeedTunings(foc::SpeedLoopTunings{});
+    reference.Enable();
+    reference.SetPoint(foc::RadiansPerSecond{ 500.0f });
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    for (uint32_t outer = 0; outer != 20; ++outer)
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians position{ 0.0f };
+            reference.Calculate(ZeroCurrents(), position);
+        }
+        referenceInterrupt.TriggerHandler();
+    }
+    foc::Radians referencePosition{ 0.0f };
+    const auto expected = reference.Calculate(ZeroCurrents(), referencePosition);
+
+    ExpectSameDuty(limited, expected);
+}

@@ -134,6 +134,11 @@ commanded ratio between $I_d$ and $I_q$ rather than clipping one axis and rotati
 The envelope comes from the inverter's `MaxCurrentSupported()`, the same source the speed and
 position cascades take theirs from, so the three modes cannot disagree about the hardware limit.
 
+Below the envelope the motor's overload protection can set a lower current limit (`fault-supervision.md`
+Part I). Each sample the interrupt clamps the q-axis setpoint, after the speed limiter, to that limit; the
+limit reaches it as one single-precision store, written from the event loop in any state and capped at the
+envelope, and the demanded torque current the cascade reports is the clamped one.
+
 The (Id, Iq) pair is written outside the interrupt and read by it. It is handed over through a
 lock-free triple buffer — the same mechanism that carries estimator windows the other way — so the
 interrupt always reads a pair published together, never a new Id with the previous Iq.
@@ -199,6 +204,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | SetCurrentStream  | Attaches the current stream whose window the loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                        |
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 | Speed limit       | Sets the overspeed limit, in mechanical rad/s, that the speed limiter folds the q-axis setpoint against.        | Callable in any state, also while Enabled; in force from the next sample. A limit of zero folds nothing.                                |
+| Current limit     | Sets the current limit, in amperes, that the q-axis setpoint is clamped to below the envelope.                  | Callable in any state, also while Enabled; in force from the next sample. Capped at the envelope.                                       |
 
 ### Required
 

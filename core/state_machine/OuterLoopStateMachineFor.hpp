@@ -56,6 +56,11 @@ namespace application
             return focController;
         }
 
+        void LimitCurrent(foc::Ampere limit)
+        {
+            focController.LimitCurrent(limit);
+        }
+
         void RampSpeed(foc::RadiansPerSecondSquared acceleration, foc::RadiansPerSecondSquared deceleration)
         {
             if constexpr (std::is_base_of_v<foc::SpeedRampable, Cascade>)

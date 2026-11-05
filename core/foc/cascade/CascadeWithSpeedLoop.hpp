@@ -59,6 +59,7 @@ namespace foc
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
         void SetCurrentStream(CurrentStream& stream);
+        void LimitCurrentImpl(Ampere limit);
 
     private:
         [[no_unique_address]] Park park;
@@ -77,6 +78,8 @@ namespace foc
         volatile float lastMeanIq{ 0.0f };
         volatile float speedReference{ 0.0f };
         volatile float commandedCurrent{ 0.0f };
+        // Written by the event loop, read by the control interrupt; never above maxCurrent.
+        volatile float quadratureLimit;
         volatile bool currentCommandActive{ false };
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };

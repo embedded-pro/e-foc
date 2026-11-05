@@ -98,6 +98,12 @@ by −2π; if it is less than −π, it is shifted by +2π. This produces a sign
 
 The speed PID receives the speed error (setpoint minus estimate) and produces the Iq setpoint. Its output is clamped to ± maxCurrent (in Ampere), which directly limits the peak torque the motor can apply while tracking the speed command. This clamp is the primary over-current protection for the speed-control mode.
 
+The inner loop clamps the q-axis reference it receives, the law's output plus the cogging feed-forward, once
+more, to a current limit that starts at maxCurrent and that the motor's overload protection can lower
+(`fault-supervision.md` Part I). The limit reaches the interrupt as one single-precision store, written from the
+event loop in any state and capped at maxCurrent. The law does not see this second clamp: while it cuts the
+output the law keeps integrating up to its own clamp at maxCurrent.
+
 The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
 adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable. It runs in
 bursts, the first 4 s of every 60 s from each enable, and the setpoint is 0 A in between (see

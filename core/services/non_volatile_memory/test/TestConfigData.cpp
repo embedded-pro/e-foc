@@ -39,9 +39,9 @@ TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mod
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_120)
+TEST_F(TestConfigData, config_data_sizeof_is_132)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 120 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 132 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
@@ -53,6 +53,9 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
     EXPECT_NEAR(cfg.limits.speedAcceleration, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.speedDeceleration, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.commandTimeout, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.continuousCurrent, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.peakCurrent, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.peakCurrentTime, 1.0f, 1e-6f);
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_settings)

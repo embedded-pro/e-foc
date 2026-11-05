@@ -337,14 +337,17 @@ changes. The settings are drive-wide limits kept in the configuration record (`s
 supervision settings of 2.4 they can be written in any state, are answered once stored, and a write that cannot
 be stored is taken back; each takes effect as its table says.
 
-| ID     | Parameter              | Unit   | Range                  | Automatic | Takes effect                                               |
-|--------|------------------------|--------|------------------------|-----------|------------------------------------------------------------|
-| `0x50` | `overspeedLimit`       | rad/s  | 1 – 5000               | no        | immediately: speed limiter, setpoint hold and monitor      |
-| `0x51` | `followingErrorWindow` | rad    | 0 – 3.2, 0 off         | no        | at the monitor's next evaluation, within 1 ms              |
-| `0x52` | `followingErrorTime`   | s      | 0.001 – 10             | no        | at the monitor's next evaluation, within 1 ms              |
-| `0x53` | `speedAcceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
-| `0x54` | `speedDeceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp) |
-| `0x55` | `commandTimeout`       | s      | 0 – 60, 0 off          | no        | at the next 1 ms evaluation (Part F, Command timeout)      |
+| ID     | Parameter              | Unit   | Range                  | Automatic | Takes effect                                                       |
+|--------|------------------------|--------|------------------------|-----------|--------------------------------------------------------------------|
+| `0x50` | `overspeedLimit`       | rad/s  | 1 – 5000               | no        | immediately: speed limiter, setpoint hold and monitor              |
+| `0x51` | `followingErrorWindow` | rad    | 0 – 3.2, 0 off         | no        | at the monitor's next evaluation, within 1 ms                      |
+| `0x52` | `followingErrorTime`   | s      | 0.001 – 10             | no        | at the monitor's next evaluation, within 1 ms                      |
+| `0x53` | `speedAcceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp)         |
+| `0x54` | `speedDeceleration`    | rad/s2 | 0 – 100000, 0 no limit | no        | at the next outer-loop period (`foc-speed.md`, Speed Ramp)         |
+| `0x55` | `commandTimeout`       | s      | 0 – 60, 0 off          | no        | at the next 1 ms evaluation (Part F, Command timeout)              |
+| `0x56` | `continuousCurrent`    | A      | 0 – 100, 0 off         | no        | at the overload model's next evaluation (`fault-supervision.md` I) |
+| `0x57` | `peakCurrent`          | A      | 0 – 100, 0 board limit | no        | at the overload model's next evaluation (`fault-supervision.md` I) |
+| `0x58` | `peakCurrentTime`      | s      | 0.1 – 60               | no        | at the overload model's next evaluation (`fault-supervision.md` I) |
 
 | `FocFaultCode`   | Value | `state_machine::FaultCode` | Raised by                                          |
 |------------------|-------|----------------------------|----------------------------------------------------|

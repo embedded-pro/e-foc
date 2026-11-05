@@ -98,6 +98,9 @@ namespace can
             case FocParameter::speedAcceleration:
             case FocParameter::speedDeceleration:
             case FocParameter::commandTimeout:
+            case FocParameter::continuousCurrent:
+            case FocParameter::peakCurrent:
+            case FocParameter::peakCurrentTime:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -288,6 +291,12 @@ namespace can
                 return config.limits.speedDeceleration;
             case FocParameter::commandTimeout:
                 return config.limits.commandTimeout;
+            case FocParameter::continuousCurrent:
+                return config.limits.continuousCurrent;
+            case FocParameter::peakCurrent:
+                return config.limits.peakCurrent;
+            case FocParameter::peakCurrentTime:
+                return config.limits.peakCurrentTime;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -311,6 +320,15 @@ namespace can
                 break;
             case FocParameter::commandTimeout:
                 config.limits.commandTimeout = value;
+                break;
+            case FocParameter::continuousCurrent:
+                config.limits.continuousCurrent = value;
+                break;
+            case FocParameter::peakCurrent:
+                config.limits.peakCurrent = value;
+                break;
+            case FocParameter::peakCurrentTime:
+                config.limits.peakCurrentTime = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

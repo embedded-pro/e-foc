@@ -38,6 +38,8 @@ date: 2026-11-05
   and raising `overspeed` (REQ-PRT-003, Part G).
 - Watching an enabled position drive for a position error that stays beyond the operator's following-error
   window for the following-error time, and raising `followingError` (REQ-PRT-004, Part H).
+- Keeping a thermal model of the motor's winding from its current and folding the drive's current limit back
+  from the peak to the continuous rating when the motor is overloaded (REQ-PRT-001, Part I).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -55,7 +57,9 @@ date: 2026-11-05
   follow check).
 - Limiting the speed. The torque cascade folds its current against the overspeed limit (`foc-torque.md`) and
   the control-mode state machine holds a speed setpoint at it; Part G only faults a rotor that passed both.
-- Protecting the motor from heat while a stall is not reported. With stall reporting off, a held rotor can
+- Measuring the winding temperature. Part I models the heat the current puts in from the ratings alone; a
+  winding that heats from outside, or a rating set too high, is not seen.
+- Protecting the motor from heat while a stall is not reported, unless the continuous rating of Part I is set. With stall reporting off, a held rotor can
   carry up to the current limit; only the thermal protection of the board watches that.
 
 ---
@@ -322,15 +326,59 @@ stateDiagram-v2
     Reported --> Idle : drive leaves Enabled
 ```
 
+### Part I — Motor overload
+
+A motor is rated for a continuous current it can carry for ever and a peak current it can carry for a limited
+time; the board's current limit is a third, flat bound. The overload model keeps the ratings apart. Every 1 ms
+on the event loop, in every state, it updates a thermal state θ, in A², from the torque current the active drive
+measures:
+
+  dθ/dt = (i² − θ)/τ,  τ = t_peak / −ln(1 − i_cont²/i_peak²)
+
+τ is chosen so that a cold motor (θ = 0) carrying the peak current reaches θ = i_cont² after exactly the peak
+time. While θ stays below i_cont² the drive may carry the peak current; once θ reaches i_cont² the current limit
+folds back to the continuous rating, and it is released to the peak again only once θ has fallen below half of
+i_cont², so the limit does not chatter at the threshold. A motor that keeps carrying its continuous rating holds
+θ at i_cont² and stays folded back, as it should.
+
+| Setting            | Default         | Range      | Meaning                                                   |
+|--------------------|-----------------|------------|-----------------------------------------------------------|
+| Continuous current | 0 (off)         | 0 – 100 A  | Current the motor carries for ever; 0 turns the model off |
+| Peak current       | 0 (board limit) | 0 – 100 A  | Current a cold motor may carry for the peak time          |
+| Peak time          | 1 s             | 0.1 – 60 s | How long a cold motor may carry the peak current          |
+
+Both ratings are capped at the board's current limit. A continuous rating at or above the peak leaves no overload
+regime: the current is limited to the continuous rating flatly. With the continuous rating at zero the model is
+off, θ is cleared and the board's limit is in force, as before.
+
+The state is never reset by the lifecycle: a disabled drive measures no current, so θ decays with τ, and a
+Disable followed by an Enable does not hand a hot motor its peak again. A reset of the controller does clear it;
+the model then assumes a cold motor.
+
+The limit reaches the cascades through the control-mode state machine, which keeps the latest one and hands it to
+the active cascade whenever the model changes it and whenever a mode is activated. Each cascade bounds its q-axis
+reference by it in the control interrupt, next to the board's limit (`foc-torque.md`, `foc-speed.md`). A speed or
+position law whose output the fold-back cuts keeps integrating up to its own clamp at the board's limit, so when
+the limit is released the current may rise to the peak at once; the law's anti-windup still bounds its state.
+Each change of the limit is traced.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Peak
+    Peak --> FoldedBack : θ ≥ i_cont², limit = continuous rating
+    FoldedBack --> Peak : θ < 0.5 · i_cont², limit = peak rating
+```
+
 ---
 
 ## Interfaces
 
 ### Provided
 
-| Interface | Purpose                                                                                           | Contract                                                                               |
-|-----------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| Fault     | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner | At most once per enable and watch; called from the event loop, never from an interrupt |
+| Interface | Purpose | Contract |
+|-----------|---------|----------|
+| Fault     | Reports a stall, an encoder loss, a missing phase, an overspeed or a following error to its owner |
+| Current limit | Hands the overload model's current limit to its owner (Part I) | Called from the event loop when the limit changes | At most once per enable and watch; called from the event loop, never from an interrupt |
 
 ### Required
 
@@ -339,5 +387,5 @@ stateDiagram-v2
 | Active drive     | Lifecycle state and the motion the drive observes                                          | Read every evaluation; the observation is written by the control interrupts  |
 | Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
 | Settings         | The configuration record's supervision fields and limits                                   | Read every evaluation                                                        |
-| Repeating timer  | 10 ms evaluation period (1 ms for Parts F, G and H)                                        | Runs on the event loop                                                       |
+| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I)                                            | Runs on the event loop                                                       |
 | Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

@@ -25,6 +25,7 @@ namespace foc
 
     TorqueCascade::TorqueCascade(foc::Ampere maxCurrent)
         : maxCurrent{ maxCurrent }
+        , currentLimit{ maxCurrent.Value() }
     {
         really_assert(maxCurrent.Value() > 0);
     }
@@ -108,7 +109,7 @@ namespace foc
     {
         const auto mechanicalSpeed = polePairs > 0.0f ? lastElectricalSpeed / polePairs : 0.0f;
 
-        const auto demanded = FoldedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed, inverseElectricalSpeedLimit);
+        const auto demanded = LimitedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed);
 
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f }, Ampere{ demanded } };
     }
@@ -117,6 +118,17 @@ namespace foc
     {
         speedLimit = limit;
         UpdateSpeedLimit();
+    }
+
+    void TorqueCascade::LimitCurrent(Ampere limit)
+    {
+        currentLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
+    }
+
+    float TorqueCascade::LimitedQuadrature(float quadrature, float electricalSpeed) const
+    {
+        const float limit = currentLimit;
+        return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, inverseElectricalSpeedLimit), -limit, limit);
     }
 
     void TorqueCascade::UpdateSpeedLimit()
@@ -171,7 +183,7 @@ namespace foc
         if (currentStream != nullptr)
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& setPoint = setPointBuffer.Acquire();
-        const auto quadrature = FoldedQuadrature(setPoint.second.Value(), electricalSpeed, inverseElectricalSpeedLimit);
+        const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed });
         voltageWindow.Accumulate(voltage.q);
         return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));

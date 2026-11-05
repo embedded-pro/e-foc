@@ -17,6 +17,10 @@ Feature: Drive Limits
   timeout faults with commandTimeout (REQ-PRT-007), even while the client's heartbeat keeps it
   online. The timeout is off by default.
 
+  With a continuous current rating set, a thermal model of the winding lets a cold motor carry its
+  peak current for the peak time and then folds the current limit back to the continuous rating
+  (REQ-PRT-001). The hand holds the rotor so that the commanded current flows the whole time.
+
   @sil @REQ-PRT-003
   Scenario: A torque command without load settles below the overspeed limit
     Given a nominal motor plant
@@ -130,7 +134,26 @@ Feature: Drive Limits
     And the response is captured for 2000 ms after enable
     Then the state machine shall be in the running state
 
-  @sil @REQ-PRT-003 @REQ-PRT-004 @REQ-SPD-010 @REQ-PRT-007 @REQ-CAN-015
+  @sil @REQ-PRT-001
+  Scenario: A held rotor carries its peak current for the peak time and then its continuous rating
+    Given a nominal motor plant
+    And the plant response is recorded at 100 Hz for up to 400 samples
+    And a hand turns the shaft by 0.01 rad over 1 ms, 0 ms after enable, and holds it
+    And the motor is already calibrated
+    And the motor boots in torque mode
+    When the target boots
+    And the continuousCurrent is set to 2 over CAN
+    And the peakCurrent is set to 3 over CAN
+    And the peakCurrentTime is set to 2 over CAN
+    And the rotor is aligned
+    And a torque setpoint of 3 A is applied
+    And the motor is enabled
+    And the response is captured for 3000 ms after enable
+    Then the q-axis current shall average between 2.85 and 3.15 A from 200 to 1700 ms after enable
+    And the q-axis current shall average between 1.9 and 2.1 A from 2400 to 3000 ms after enable
+    And the state machine shall be in the running state
+
+  @sil @REQ-PRT-003 @REQ-PRT-004 @REQ-SPD-010 @REQ-PRT-007 @REQ-PRT-001 @REQ-CAN-015
   Scenario: The limits are stored and read back after a restart
     Given a nominal motor plant
     When the target boots
@@ -140,6 +163,9 @@ Feature: Drive Limits
     And the speedAcceleration is set to 300 over CAN
     And the speedDeceleration is set to 600 over CAN
     And the commandTimeout is set to 1.5 over CAN
+    And the continuousCurrent is set to 2 over CAN
+    And the peakCurrent is set to 3 over CAN
+    And the peakCurrentTime is set to 2.5 over CAN
     And the target restarts
     Then the overspeedLimit read over CAN shall be 250
     And the followingErrorWindow read over CAN shall be 0.4
@@ -147,3 +173,6 @@ Feature: Drive Limits
     And the speedAcceleration read over CAN shall be 300
     And the speedDeceleration read over CAN shall be 600
     And the commandTimeout read over CAN shall be 1.5
+    And the continuousCurrent read over CAN shall be 2
+    And the peakCurrent read over CAN shall be 3
+    And the peakCurrentTime read over CAN shall be 2.5

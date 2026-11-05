@@ -63,6 +63,7 @@ namespace state_machine
         bool TrySetTorque(foc::IdAndIqPoint setpoint);
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
+        void LimitCurrent(foc::Ampere limit);
 
         void ApplyOnlineEstimates();
 
@@ -140,6 +141,7 @@ namespace state_machine
         SettingResult SettingGate() const;
         void ApplyOperatorTunings();
         void ApplyLimits();
+        void ApplyCurrentLimit();
         void StoreAndPersist(const OnSetting& onDone);
         void CompleteSetting(SettingResult result);
         static SettingResult ToSettingResult(foc::SelectResult result);
@@ -160,6 +162,7 @@ namespace state_machine
         ControlMode pendingSelectMode{ ControlMode::torque };
         infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;
         uint8_t previousDefaultControlMode{ 0 };
+        std::optional<foc::Ampere> currentLimit;
 
         std::variant<std::monostate,
             application::TorqueStateMachine,

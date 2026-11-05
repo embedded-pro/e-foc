@@ -239,9 +239,10 @@ flowchart LR
   Its **Limits** group holds the drive-wide limits of contract 2.9 (`service-can.md`): the overspeed limit
   that torque mode folds its current against, speed mode holds a setpoint at and every mode faults beyond
   (`fault-supervision.md` Part G), the following-error window and time of position mode (Part H) and the
-  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp) and the command timeout
-  (`service-can.md` Part F); a following-error window, a rate or a timeout of zero turns that limit off, and
-  each field's tooltip says so. The command timeout's tooltip also warns that the commander sends a setpoint
+  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp), the command timeout
+  (`service-can.md` Part F) and the motor's continuous and peak current ratings with the peak time
+  (`fault-supervision.md` Part I); a following-error window, a rate, a timeout or a continuous rating of zero
+  turns that limit off, a peak rating of zero means the board's limit, and each field's tooltip says so. The command timeout's tooltip also warns that the commander sends a setpoint
   only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
   setpoint. They are stored at once and in force from the next control period, in any
   state; the group says that a drive beyond 110 % of the limit faults and coasts.

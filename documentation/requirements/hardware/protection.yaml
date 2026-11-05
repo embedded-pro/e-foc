@@ -43,3 +43,22 @@
     client's heartbeat shall not count, so a client whose application hangs while its CAN stack
     keeps running is caught. With a 500 ms timeout and a client that sends no setpoint after its
     Start, the drive shall leave Enabled 500 ms ± 10 ms after the Start.
+
+- id: REQ-PRT-001
+  title: Motor overload protection with continuous and peak current ratings
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall hold a continuous current rating, settable from 0 to 100 A with 0, the
+    default, turning the protection off, a peak current rating, settable from 0 to 100 A with 0,
+    the default, meaning the board's current limit, and a peak time, settable from 0.1 to 60 s
+    with a default of 1 s, in the configuration record, in force from their next use in any
+    state. With a continuous rating set, the drive shall keep a thermal state θ in A², updated
+    every 1 ms from the measured torque current i as dθ/dt = (i² − θ)/τ with
+    τ = t_peak / −ln(1 − i_cont²/i_peak²), in every state, so that it survives a Disable and an
+    Enable. The drive shall limit its torque current to the peak rating while θ stays below
+    i_cont², fold it back to the continuous rating once θ reaches i_cont², and release it to the
+    peak again once θ falls below 0.5·i_cont². Neither rating shall exceed the board's current
+    limit, and a continuous rating at or above the peak shall limit the current to it flatly.
+    With 2 A continuous and 3 A peak for 2 s, a held rotor commanded 3 A from cold shall carry
+    3 A for 2.0 s ± 10 % and 2 A after it.

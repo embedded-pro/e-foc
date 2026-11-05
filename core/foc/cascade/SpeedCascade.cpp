@@ -215,4 +215,9 @@ namespace foc
     {
         ClearCoggingMapImpl();
     }
+
+    void SpeedCascade::LimitCurrent(Ampere limit)
+    {
+        LimitCurrentImpl(limit);
+    }
 }

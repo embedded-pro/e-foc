@@ -22,6 +22,8 @@ target_sources(e_foc.supervision PRIVATE
     EncoderPlausibilityMonitor.cpp
     FollowingErrorMonitor.hpp
     FollowingErrorMonitor.cpp
+    MotorOverload.hpp
+    MotorOverload.cpp
     OverspeedMonitor.hpp
     OverspeedMonitor.cpp
     PhaseLossMonitor.hpp

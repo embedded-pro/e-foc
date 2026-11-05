@@ -781,12 +781,33 @@ namespace state_machine
         configWriter.Persist(onDone);
     }
 
+    void ControlModeStateMachine::LimitCurrent(foc::Ampere limit)
+    {
+        currentLimit = limit;
+        ApplyCurrentLimit();
+    }
+
     void ControlModeStateMachine::ApplyLimits()
     {
         if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
             sm->SpeedLimiter().LimitSpeed(foc::RadiansPerSecond{ configData.limits.overspeedLimit });
         else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
             sm->RampSpeed(foc::RadiansPerSecondSquared{ configData.limits.speedAcceleration }, foc::RadiansPerSecondSquared{ configData.limits.speedDeceleration });
+
+        ApplyCurrentLimit();
+    }
+
+    void ControlModeStateMachine::ApplyCurrentLimit()
+    {
+        if (!currentLimit.has_value())
+            return;
+
+        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
+            sm->CurrentLimiter().LimitCurrent(*currentLimit);
+        else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            sm->LimitCurrent(*currentLimit);
+        else if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            sm->LimitCurrent(*currentLimit);
     }
 
     bool ControlModeStateMachine::HasPendingConfigWrite() const

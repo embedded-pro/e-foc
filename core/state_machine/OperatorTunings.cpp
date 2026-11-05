@@ -133,5 +133,8 @@ namespace state_machine
         stored.speedAcceleration = WithinOrDefault(stored.speedAcceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedAcceleration);
         stored.speedDeceleration = WithinOrDefault(stored.speedDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedDeceleration);
         stored.commandTimeout = WithinOrDefault(stored.commandTimeout, 0.0f, CommandLimits::maxCommandTimeout, defaults.commandTimeout);
+        stored.continuousCurrent = WithinOrDefault(stored.continuousCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.continuousCurrent);
+        stored.peakCurrent = WithinOrDefault(stored.peakCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.peakCurrent);
+        stored.peakCurrentTime = WithinOrDefault(stored.peakCurrentTime, CommandLimits::minPeakCurrentTime, CommandLimits::maxPeakCurrentTime, defaults.peakCurrentTime);
     }
 }

@@ -75,6 +75,11 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , motorOverload{ hardware.MaxCurrentSupported(), [this](foc::Ampere limit)
+            {
+                this->hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
+                controlMode->LimitCurrent(limit);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
@@ -125,6 +130,14 @@ namespace application
                 commandTimeout.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
                         return controlMode->ActiveStateMachine();
+                    });
+                motorOverload.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                motorOverload.Enable([this]()
+                    {
+                        return supervision::OverloadRatingsFrom(controlMode->Config());
                     });
                 commandTimeout.Enable([this]()
                     {

@@ -104,6 +104,28 @@ namespace
         return std::sqrt(sumOfSquares / static_cast<float>(count)) * kMilliPerAmpere;
     }
 
+    std::optional<float> QuadratureCurrentMean(const ScenarioSetup& setup, int fromMs, int toMs)
+    {
+        const auto start = setup.trace.StartTick();
+        if (!start)
+            return std::nullopt;
+
+        const auto from = *start + TicksFromMilliseconds(setup, static_cast<float>(fromMs));
+        const auto to = *start + TicksFromMilliseconds(setup, static_cast<float>(toMs));
+        float sum{ 0.0f };
+        std::size_t count{ 0 };
+        for (const auto& sample : setup.trace.Samples())
+            if (sample.tick >= from && sample.tick < to)
+            {
+                sum += sample.iq;
+                ++count;
+            }
+
+        if (count == 0)
+            return std::nullopt;
+        return sum / static_cast<float>(count);
+    }
+
     void RequireCapturedTrace(const ScenarioSetup& setup)
     {
         ASSERT_TRUE(setup.trace.StartTick().has_value()) << "No PLANT_START marker: was the plant response recorded and the motor enabled?";
@@ -410,6 +432,18 @@ THEN(R"(the peak speed shall stay below {float} rad\/s)", (float limit))
 
     std::fprintf(stderr, "[METRIC] sil peak_speed value=%.3f limit=%.3f\n", peak, limit);
     EXPECT_LT(peak, limit) << "The rotor reached " << peak << " rad/s";
+}
+
+THEN(R"(the q-axis current shall average between {float} and {float} A from {int} to {int} ms after enable)", (float low, float high, int fromMs, int toMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+
+    const auto mean = QuadratureCurrentMean(setup, fromMs, toMs);
+    ASSERT_TRUE(mean.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
+    std::fprintf(stderr, "[METRIC] sil iq_mean from_ms=%d to_ms=%d value=%.4f\n", fromMs, toMs, *mean);
+    EXPECT_GE(*mean, low) << "q-axis current between " << fromMs << " and " << toMs << " ms";
+    EXPECT_LE(*mean, high) << "q-axis current between " << fromMs << " and " << toMs << " ms";
 }
 
 THEN(R"(the response shall have no dropped samples)")

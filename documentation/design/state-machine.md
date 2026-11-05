@@ -667,6 +667,9 @@ from the event loop, so the state machine handles them as it handles a board pro
 The control-mode state machine hands the overspeed limit of the configuration record (`fault-supervision.md` Part G)
 to the torque cascade's speed limiter (`foc-torque.md`) whenever it activates a mode and whenever the record is
 written, in any state, and holds a speed setpoint beyond the limit at the limit before it reaches the speed cascade.
+It hands the speed ramp of the record to the speed cascade the same way, and keeps the latest current limit of the
+motor overload model (`fault-supervision.md` Part I), handing it to the active cascade whenever the model changes it
+and whenever a mode is activated.
 
 A protection event raised before the state machine has registered its handler is discarded by the
 state machine. A platform whose protection reflects a *standing* condition rather than an edge is

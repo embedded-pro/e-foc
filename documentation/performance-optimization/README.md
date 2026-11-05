@@ -430,6 +430,10 @@ clamp and a multiply on the q-axis setpoint each sample, about ten cycles, with 
 the interrupt as its reciprocal. It is defined beside `Calculate()` in the same translation unit and inlined
 into it, so the cycle gate measures it as part of `TorqueCascade::Calculate` without a new symbol.
 
+The motor overload protection's current limit adds one volatile load and a clamp of the q-axis reference to each
+cascade's inner loop; in the speed and position cascades it replaces the constant bound of the clamp that was
+already there, so it costs nothing there.
+
 ### Key Performance Sensitivities
 
 | Code Pattern           | Cycle Impact       | Recommendation                      |

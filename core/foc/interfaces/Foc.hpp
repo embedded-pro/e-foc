@@ -135,6 +135,15 @@ namespace foc
         virtual void LimitSpeed(RadiansPerSecond limit) = 0;
     };
 
+    class CurrentLimitable
+    {
+    protected:
+        ~CurrentLimitable() = default;
+
+    public:
+        virtual void LimitCurrent(Ampere limit) = 0;
+    };
+
     class SpeedRampable
     {
     protected:

@@ -646,3 +646,32 @@ TEST_F(TestTorqueCascadeSpeedLimit, the_limit_is_kept_across_a_reconfiguration_w
 
     EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.1f, 1e-3f);
 }
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_current_limit_below_the_setpoint_clamps_the_q_axis_reference)
+{
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->LimitCurrent(foc::Ampere{ 0.1f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.2f } });
+
+    const auto limited = Spin(*focTorque, 0.5f * limit);
+
+    ExpectSameDuty(limited, Unlimited(0.1f, 0.5f * limit));
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), 0.1f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_current_limit_clamps_a_reverse_setpoint_as_well)
+{
+    focTorque->LimitSpeed(foc::RadiansPerSecond{ 0.0f });
+    focTorque->LimitCurrent(foc::Ampere{ 0.1f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ -0.2f } });
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), -0.1f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeSpeedLimit, a_current_limit_above_the_envelope_is_held_at_the_envelope)
+{
+    focTorque->LimitCurrent(foc::Ampere{ 100.0f });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 50.0f } });
+
+    EXPECT_NEAR(focTorque->ObserveMotion().demandedTorqueCurrent.Value(), testMaxCurrent.Value(), 1e-6f);
+}

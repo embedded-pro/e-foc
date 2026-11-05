@@ -32,6 +32,7 @@
 #include "core/supervision/EncoderFreezeMonitor.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "core/supervision/FollowingErrorMonitor.hpp"
+#include "core/supervision/MotorOverload.hpp"
 #include "core/supervision/OverspeedMonitor.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
@@ -81,6 +82,7 @@ namespace application
         supervision::OverspeedMonitor overspeed;
         supervision::FollowingErrorMonitor followingError;
         can::CanCommandTimeout commandTimeout;
+        supervision::MotorOverload motorOverload;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
 
