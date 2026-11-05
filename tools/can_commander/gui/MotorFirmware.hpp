@@ -61,6 +61,7 @@ namespace tool
         void Apply();
         void Discard();
         void Fail(const QString& message);
+        void FailDownload(const QString& message);
         void Succeed(const QString& message, IssueSeverity severity = IssueSeverity::info);
         void ShowOutcome(const QString& message, ui::theme::StatusLevel level);
         void ClearOutcome();
@@ -94,7 +95,7 @@ namespace tool
         std::optional<InspectedPack> chosenPack;
         QString chosenSource;
         bool fetching{ false };
-        bool failed{ false };
+        bool downloadFailed{ false };
         QString outcomeText;
         ui::theme::StatusLevel outcomeLevel{ ui::theme::StatusLevel::Neutral };
         QElapsedTimer transferClock;
