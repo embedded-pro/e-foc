@@ -258,3 +258,19 @@
     percent of 4.6 mWb through the bench's current-sense chain with each duty a period late, and
     in speed mode within 3 percent with the identified inertia within 5 percent, where keeping the
     configured flux linkage reads the inertia 52 percent high.
+
+- id: REQ-CAL-022
+  title: The first Enable after power-up or a fault re-measures the current offsets
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    In every control mode, the first Enable after power-up, after a control-mode switch and after
+    every Fault shall, while the drive stays Ready, wait for the rotor to come to rest and measure
+    the current sensors' offsets as the full calibration does (REQ-CAL-015). When every phase is
+    within 50 mA of the offset the calibration record stores, the drive shall apply the measured
+    offsets and enter Enabled; otherwise it shall keep the stored offsets, stay Ready and refuse
+    the Enable with calibrationFailed. A Disable, an emergency stop or a fault during the
+    measurement shall abandon it and refuse the Enable, and the CAN Start command shall be
+    acknowledged once the Enable is accepted or refused. Later Enables shall not measure until the
+    next power-up, control-mode switch or Fault. With one phase sensor 20 mA from its stored offset
+    the drive shall enter Enabled; with it 100 mA away it shall refuse the Start and stay Ready.

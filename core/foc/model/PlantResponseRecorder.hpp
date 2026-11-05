@@ -97,8 +97,12 @@ namespace foc
     template<std::size_t Capacity>
     void PlantResponseRecorder<Capacity>::Begin()
     {
-        if (IsEnabled())
-            pendingBegin.store(true, std::memory_order_release);
+        if (!IsEnabled())
+            return;
+
+        // A stop the control tick has not serviced yet belongs to the bridge's previous run, not to this one.
+        pendingEnd.store(false, std::memory_order_release);
+        pendingBegin.store(true, std::memory_order_release);
     }
 
     template<std::size_t Capacity>

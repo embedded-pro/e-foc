@@ -131,6 +131,8 @@ namespace tool
             case can::focIdentifyElectricalId:
             case can::focCalibrateId:
                 return motionCommandTimeout;
+            case can::focStartId:
+                return startCommandTimeout;
             default:
                 return commandTimeout;
         }

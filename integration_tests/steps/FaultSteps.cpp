@@ -1,5 +1,6 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include <chrono>
 #include <cmath>
@@ -60,6 +61,19 @@ THEN(R"(the motor shall refuse to run)")
     fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId);
     ASSERT_FALSE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 2 }))
         << "Motor reached the running state despite the fault condition";
+}
+
+THEN(R"(the motor start shall be refused as a failed calibration)")
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto mark = fixture.MarkCapture();
+
+    EXPECT_FALSE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId)) << "The target acknowledged the Start";
+
+    const auto error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
+    ASSERT_TRUE(error.has_value() && error->size() == 2) << "The target sent no category error";
+    EXPECT_EQ((*error)[0], can::focStartId);
+    EXPECT_EQ((*error)[1], static_cast<uint8_t>(can::FocMotorCategoryError::calibrationFailed));
 }
 
 WHEN(R"(the motor start command is issued)")

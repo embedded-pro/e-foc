@@ -2,9 +2,9 @@
 title: "The Sensing Chain — Shunts, Amplifiers, ADC and Encoder"
 type: theory
 status: draft
-version: 0.1.1
+version: 0.1.3
 component: "sensing-chain"
-date: 2026-10-30
+date: 2026-11-05
 ---
 
 | Field     | Value                                                   |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | The Sensing Chain — Shunts, Amplifiers, ADC and Encoder |
 | Type      | theory                                                  |
 | Status    | draft                                                   |
-| Version   | 0.1.1                                                   |
+| Version   | 0.1.3                                                   |
 | Component | sensing-chain                                           |
-| Date      | 2026-10-30                                              |
+| Date      | 2026-11-05                                              |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -139,9 +139,11 @@ the calibration record at boot. Each window discards 200 samples and averages 20
 measurement keeps the mean of two windows whose offsets agree within 10 mA on every phase, takes a third when they
 do not, and fails without an agreeing pair, so a single disturbed window is never stored. On the bench a
 back-to-back calibration once read one phase 52 mA low in one window, which the second window now catches
-(`documentation/design/service-current-offsets.md`). Drift after warm-up is not tracked; the
-hardware-characterisation plan measures each condition cold and after ten minutes of PWM to separate it from
-noise.
+(`documentation/design/service-current-offsets.md`). The first Enable after power-up, a control-mode switch or a
+Fault measures them again at rest and uses the new values when each phase is within 50 mA of the stored one, which
+holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-TRQ-014); drift that
+builds up while the drive runs is not tracked. The hardware-characterisation plan measures each
+condition cold and after ten minutes of PWM to separate it from noise.
 
 ### 4. Gain Errors and Phase Mismatch
 
@@ -237,7 +239,7 @@ drift of $R_s$ is tracked by the online estimator; nothing tracks the board's or
 | Error                          | Size on E-FOC-HARDWARE                             | Signature in dq  | Handled by                                                                                                             |
 |--------------------------------|----------------------------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------|
 | Static offsets                 | 18–54 mA raw                                       | $1 f_e$          | Offset calibration, < 1 mA residual on a measured phase; a rebuilt phase carries $-(o_a+o_b+o_c)$, −63 mA on the bench |
-| Offset drift after calibration | ~2–12 mA over a 50 K warm-up (estimated)           | $1 f_e$          | Nothing yet; re-calibration                                                                                            |
+| Offset drift after calibration | ~2–12 mA over a 50 K warm-up (estimated)           | $1 f_e$          | Re-measured at the first Enable after power-up, a mode switch or a Fault; not while running                            |
 | Gain mismatch between phases   | up to a few % (component tolerances)               | $2 f_e$          | Nothing yet                                                                                                            |
 | Common gain error              | up to ~3 %                                         | DC: torque scale | Integral action absorbs it in speed and position modes                                                                 |
 | Noise                          | 31–39 mA RMS                                       | Broadband        | Bandwidth cap; centre sampling                                                                                         |

@@ -51,6 +51,8 @@ target_sources(e_foc.state_machine PRIVATE
     CalibrationFlow.hpp
     CalibrationFlow.cpp
     CommandRejections.hpp
+    CurrentOffsetRefresh.cpp
+    CurrentOffsetRefresh.hpp
     CommandRejections.cpp
     FocLifecycleTable.hpp
     FocLifecycleTable.cpp

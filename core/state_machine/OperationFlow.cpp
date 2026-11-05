@@ -3,9 +3,10 @@
 
 namespace application
 {
-    OperationFlow::OperationFlow(const LifecycleEnvironment& environment, CalibrationFlow& calibration)
+    OperationFlow::OperationFlow(const LifecycleEnvironment& environment, CalibrationFlow& calibration, const CalibrationServices& services)
         : env(environment)
         , calibration(calibration)
+        , offsetRefresh(services.currentOffsets, services.standstill, environment.tracer)
     {}
 
     void OperationFlow::RegisterFaultHandler(state_machine::FaultNotifier& notifier)
@@ -57,9 +58,55 @@ namespace application
         return ready.rotorReferenceValid;
     }
 
-    state_machine::Enabled OperationFlow::BuildEnabled()
+    bool OperationFlow::IsOffsetRefreshDue() const
+    {
+        return offsetRefresh.IsDue();
+    }
+
+    bool OperationFlow::IsRefreshingOffsets() const
+    {
+        return offsetRefresh.IsRunning();
+    }
+
+    void OperationFlow::BeginOffsetRefresh(const state_machine::Ready& ready, const state_machine::Enable& command)
+    {
+        env.pending.Accept(command.onDone);
+
+        const auto& record = ready.loadedData;
+        offsetRefresh.Start(foc::PhaseCurrents{ foc::Ampere{ record.currentOffsetA }, foc::Ampere{ record.currentOffsetB }, foc::Ampere{ record.currentOffsetC } },
+            [this](state_machine::OffsetRefreshOutcome outcome)
+            {
+                env.machine.Dispatch(state_machine::OffsetsRefreshed{ outcome });
+            });
+    }
+
+    void OperationFlow::RefuseAfterOffsetRefresh(state_machine::OffsetRefreshOutcome outcome)
+    {
+        env.pending.Complete(outcome == state_machine::OffsetRefreshOutcome::refreshed ? state_machine::CommandResult::rejected : state_machine::CommandResult::calibrationFailed);
+    }
+
+    void OperationFlow::AbandonOffsetRefresh()
+    {
+        env.tracer.Trace() << "[SM] Enable abandoned: disabled while measuring the current offsets";
+        offsetRefresh.Abort();
+        env.pending.Complete(state_machine::CommandResult::rejected);
+    }
+
+    void OperationFlow::AbortOffsetRefresh()
+    {
+        offsetRefresh.Abort();
+    }
+
+    state_machine::Enabled OperationFlow::BuildEnabled(const state_machine::Enable& command)
+    {
+        env.pending.Accept(command.onDone);
+        return BuildEnabledAfterOffsetRefresh();
+    }
+
+    state_machine::Enabled OperationFlow::BuildEnabledAfterOffsetRefresh()
     {
         env.mode.PrepareForEnabled();
+        env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
         return state_machine::Enabled{};
     }
 
@@ -79,8 +126,11 @@ namespace application
         else
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
 
+        faultDispatched = false;
         faultController.EnterFault();
         faultController.SampleCondition();
+        offsetRefresh.Abort();
+        offsetRefresh.MarkStale();
 
         if (wasActive)
             env.mode.GetFocControl().Stop();
@@ -141,6 +191,7 @@ namespace application
         env.tracer.Trace() << "[SM] Emergency stop";
         env.mode.GetFocControl().Stop();
         calibration.Abort();
+        offsetRefresh.Abort();
     }
 
     void OperationFlow::StopWithoutTransition()
@@ -168,15 +219,18 @@ namespace application
         readyHandler = onReady;
     }
 
-    void OperationFlow::StartUnlessFaulted()
+    bool OperationFlow::StartUnlessFaulted()
     {
         if (DispatchPendingFault())
-            return;
+            return false;
 
         env.mode.GetFocControl().Start();
 
-        if (!DispatchPendingFault())
-            faultController.StartCleanRun();
+        if (DispatchPendingFault() || faultDispatched)
+            return false;
+
+        faultController.StartCleanRun();
+        return true;
     }
 
     bool OperationFlow::DispatchPendingFault()
@@ -186,14 +240,19 @@ namespace application
         if (!code.has_value())
             return false;
 
+        faultDispatched = true;
         env.machine.Dispatch(state_machine::FaultDetected{ *code });
         return true;
     }
 
     void OperationFlow::StateEntered(StateId state)
     {
+        // A fault raised by the start owns the pending result: the transition it queued completes it with abortedByFault.
         if (state.Is<state_machine::Enabled>())
-            StartUnlessFaulted();
+        {
+            if (!StartUnlessFaulted())
+                return;
+        }
         else
             faultController.StopCleanRun();
 

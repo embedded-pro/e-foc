@@ -94,6 +94,7 @@ namespace can
         FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
+        infra::Function<void(services::CanAckStatus)> pendingStartCallback;
         infra::Function<void()> commandAccepted;
     };
 }

@@ -70,6 +70,11 @@ Feature: FOC Control Performance
   the figures they are twice of are exact. See
   documentation/design/software-in-the-loop.md.
 
+  The torque-accuracy outline holds the rotor 90 electrical degrees from its aligned position,
+  where a phase-A sensor offset lands on the q axis, drifts that sensor 20 mA after the
+  calibration and measures the current the winding carries, which the offset refresh of the
+  first Start keeps within 1 % plus 5 mA of the command (REQ-TRQ-014).
+
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop steps from rest to 20 rad/s
     Given a nominal motor plant
@@ -280,3 +285,25 @@ Feature: FOC Control Performance
     And the motor is enabled
     And the response is captured for 1500 ms after enable
     Then the steady-state speed error shall be below 0.5 rad/s
+
+  @sil @REQ-TRQ-014
+  Scenario Outline: A held rotor carries the commanded current within 1 % and 5 mA after a 20 mA sensor drift
+    Given a bench motor plant
+    And the plant response is recorded at 1000 Hz for up to 2000 samples
+    And a hand turns the shaft by 0.3927 rad over 100 ms, 0 ms after enable, and holds it
+    And the motor is already calibrated
+    And the phase A current sensor has drifted by 0.02 A since the calibration
+    And the motor boots in torque mode
+    When the target boots
+    And the rotor is aligned
+    And a torque setpoint of <current> A is applied
+    And the motor is enabled
+    And the response is captured for 2000 ms after enable
+    Then the q-axis current shall average between <low> and <high> A from 500 to 2000 ms after enable
+
+    Examples:
+      | current | low    | high  |
+      | 0.0     | -0.005 | 0.005 |
+      | 0.1     | 0.094  | 0.106 |
+      | 1.0     | 0.985  | 1.015 |
+      | 3.0     | 2.965  | 3.035 |

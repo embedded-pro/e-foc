@@ -9,6 +9,7 @@
 #include "core/services/flux_linkage_ident/test_doubles/FluxLinkageIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
+#include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/PositionStateMachine.hpp"
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"

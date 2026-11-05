@@ -141,6 +141,22 @@ TEST_F(PlantResponseRecorderTest, end_emits_stopped_marker_and_disarms)
     EXPECT_EQ(records[2].dropped, 0u);
 }
 
+TEST_F(PlantResponseRecorderTest, a_begin_supersedes_an_end_that_no_capture_has_serviced_yet)
+{
+    recorder.Configure(1, 0);
+    recorder.End();
+    recorder.Begin();
+    recorder.Capture(At(1));
+    recorder.Capture(At(2));
+
+    const auto records = Drain();
+    ASSERT_EQ(records.size(), 3u);
+    EXPECT_EQ(records[0].kind, foc::PlantResponseKind::began);
+    EXPECT_EQ(records[1].kind, foc::PlantResponseKind::sample);
+    EXPECT_EQ(records[2].kind, foc::PlantResponseKind::sample);
+    EXPECT_EQ(records[2].sample.tick, 2u);
+}
+
 TEST_F(PlantResponseRecorderTest, full_ring_counts_drops_and_reports_them_on_stop)
 {
     recorder.Configure(1, 0);

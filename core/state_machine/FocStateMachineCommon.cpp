@@ -19,7 +19,7 @@ namespace application
         , calibration(environment, calibServices)
         , maintenance(environment, calibration)
         , boot(environment, calibration)
-        , operation(environment, calibration)
+        , operation(environment, calibration, calibServices)
         , context{ *this, calibration, maintenance, boot, operation, pendingCommand }
         , stateMachine(context, FocLifecycleTable::Table())
         , stateMachineTracer(stateMachine, tracer)
@@ -36,6 +36,7 @@ namespace application
     void FocStateMachineCommon::ReleaseExternalResources()
     {
         calibration.Abort();
+        operation.AbortOffsetRefresh();
         operation.UnregisterFaultHandler();
     }
 
@@ -70,7 +71,7 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
+        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || operation.IsRefreshingOffsets() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
@@ -99,6 +100,11 @@ namespace application
             return state_machine::CommandResult::abortedByFault;
 
         return state_machine::CommandResult::ok;
+    }
+
+    void FocStateMachineCommon::CmdEnableAsync(const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        Dispatch(state_machine::Enable{ state_machine::CommandCallback{ onDone } });
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdDisable()
