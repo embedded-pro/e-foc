@@ -545,6 +545,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::OverTemperatureUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsOverTemperature(nodeId))
+            return QString("Needs firmware contract 2.14 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -558,6 +565,7 @@ namespace tool
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
         commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
         commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
+        commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();

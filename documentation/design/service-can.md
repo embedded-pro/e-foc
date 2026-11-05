@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.15.0
+version: 0.16.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.15.0                   |
+| Version   | 0.16.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -410,6 +410,16 @@ nothing in 2.12 changes (`fault-supervision.md` Part K).
 | `0xC1` | `windingTemperature` | degC | Winding temperature from the online resistance; not a number in torque mode or uncalibrated | no        |
 
 A client older than 2.13 asks for the new parameters only when the server reports 2.13 or newer.
+
+**Contract 2.14 — over-temperature derating and trip.** Version 2.14 adds two stored settings; nothing in 2.13
+changes (`fault-supervision.md` Part K). The trip raises the existing `overTemperature` (4) fault code.
+
+| ID     | Parameter           | Unit | Range    | Automatic | Takes effect                  |
+|--------|---------------------|------|----------|-----------|-------------------------------|
+| `0x5E` | `temperatureLimit`  | degC | 40 – 200 | no        | at the next 100 ms evaluation |
+| `0x5F` | `temperatureMargin` | K    | 1 – 50   | no        | at the next 100 ms evaluation |
+
+A client older than 2.14 asks for the new parameters only when the server reports 2.14 or newer.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

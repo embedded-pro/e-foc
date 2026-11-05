@@ -90,6 +90,8 @@ namespace state_machine
 
         void SetMotorParameter(services::MotorParameter parameter, float value, const OnSetting& onDone);
         const services::CalibrationData& CalibrationRecord() const;
+        // From the online resistance estimate; nullopt in torque mode and without a calibrated resistance.
+        std::optional<foc::Celsius> WindingTemperature();
         foc::Weber DefaultFluxLinkage() const;
 
         services::ConfigData& Config();

@@ -885,6 +885,21 @@ TEST_F(TestSpeedCascadeRamp, a_calibration_speed_command_is_not_ramped)
     EXPECT_NEAR(Reference(), 12.0f, 1e-6f);
 }
 
+TEST_F(TestSpeedCascadeRamp, the_demanded_torque_current_is_the_one_the_current_limit_lets_through)
+{
+    focSpeed->LimitCurrent(foc::Ampere{ 1.0f });
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 500.0f });
+    Ticks(20);
+
+    EXPECT_NEAR(focSpeed->ObserveMotion().demandedTorqueCurrent.Value(), 1.0f, 1e-6f);
+
+    focSpeed->LimitCurrent(foc::Ampere{ 0.0f });
+    Ticks(1);
+
+    EXPECT_NEAR(focSpeed->ObserveMotion().demandedTorqueCurrent.Value(), 0.0f, 1e-6f);
+}
+
 TEST_F(TestSpeedCascadeRamp, a_current_limit_clamps_the_reference_the_speed_law_hands_the_inner_loop)
 {
     focSpeed->LimitCurrent(foc::Ampere{ 1.0f });

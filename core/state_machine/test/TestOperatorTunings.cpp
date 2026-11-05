@@ -120,6 +120,8 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.positionMinimum = -3.3f;
     config.limits.positionMaximum = 3.3f;
     config.limits.calibrationTemperature = 101.0f;
+    config.limits.temperatureLimit = 30.0f;
+    config.limits.temperatureMargin = 0.5f;
 
     state_machine::SanitizeLimits(config);
 
@@ -137,6 +139,8 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     EXPECT_NEAR(config.limits.positionMinimum, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.positionMaximum, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.calibrationTemperature, 25.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.temperatureLimit, 120.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.temperatureMargin, 15.0f, 1e-6f);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)

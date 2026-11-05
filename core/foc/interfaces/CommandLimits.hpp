@@ -62,5 +62,9 @@ namespace foc
         static constexpr float maxPositionLimit{ 3.2f };
         static constexpr float minCalibrationTemperature{ -40.0f };
         static constexpr float maxCalibrationTemperature{ 100.0f };
+        static constexpr float minTemperatureLimit{ 40.0f };
+        static constexpr float maxTemperatureLimit{ 200.0f };
+        static constexpr float minTemperatureMargin{ 1.0f };
+        static constexpr float maxTemperatureMargin{ 50.0f };
     };
 }
