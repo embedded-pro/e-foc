@@ -2,9 +2,9 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.1.1
+version: 0.2.0
 component: "disturbances-and-noise"
-date: 2026-10-29
+date: 2026-11-05
 ---
 
 | Field     | Value                                  |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.1.1                                  |
+| Version   | 0.2.0                                  |
 | Component | disturbances-and-noise                 |
-| Date      | 2026-10-29                             |
+| Date      | 2026-11-05                             |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -176,9 +176,13 @@ temperature but not $\psi_f$ (`core/foc/model/ThermalModel.cpp`).
 **Bus voltage.** The modulator works in per-unit of $V_{dc}/\sqrt3$, and the current-loop gains are normalised
 by $V_{dc}$. If the bus sags under load, each per-unit command produces proportionally less voltage: the
 effective loop gain, the bandwidth and every voltage feed-forward fall by $V_{actual}/V_{assumed}$, and the top
-speed falls with it. *e-foc today:* $V_{dc}$ is read once at boot
+speed falls with it. Scaling the modulator by $V_{assumed}/V_{actual}$ restores the applied voltage without
+touching the gains or the feed-forwards, and the largest voltage the law may ask for becomes $V_{actual}/V_{assumed}$
+of the configured circle. *e-foc today:* $V_{dc}$ is read once at boot
 (`targets/sync_foc_sensored/main/instantiations/Logic.cpp`) and used for the normalisation and the
-identification; the hardware comparators still trip on the live bus (18 V and 58 V on E-FOC-HARDWARE).
+identification. The cascades can follow a measured bus that way (`documentation/design/foc-torque.md`, Bus Voltage
+Tracking), but no platform measures the bus while running yet; the hardware comparators still trip on the live bus
+(18 V and 58 V on E-FOC-HARDWARE).
 
 **PWM current ripple.** Within each period the phase current ripples around its average. The peak-to-peak
 ripple of phase a, over all angles, simulated for centre-aligned common-mode-injection SVM at 20 kHz:

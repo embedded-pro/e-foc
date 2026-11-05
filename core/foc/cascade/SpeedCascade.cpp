@@ -216,6 +216,11 @@ namespace foc
         ClearCoggingMapImpl();
     }
 
+    void SpeedCascade::TrackBusVoltage(Volts measured)
+    {
+        TrackBusVoltageImpl(measured);
+    }
+
     void SpeedCascade::LimitCurrent(Ampere limit)
     {
         LimitCurrentImpl(limit);

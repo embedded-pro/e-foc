@@ -11,6 +11,7 @@ namespace foc
         , public CurrentCommandable
         , public CoggingCompensable
         , public CurrentLimitable
+        , public BusVoltageTrackable
         , public SpeedRampable
         , protected CascadeWithSpeedLoop
     {
@@ -47,6 +48,7 @@ namespace foc
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;
         void LimitCurrent(Ampere limit) override;
+        void TrackBusVoltage(Volts measured) override;
         using CascadeWithSpeedLoop::SetCurrentStream;
 
         void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) override;

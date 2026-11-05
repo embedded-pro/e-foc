@@ -75,6 +75,7 @@ namespace foc
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
         speedMeasurement.scale = polePairs * samplingFrequency;
         voltageScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
+        busRatio.Configure(parameters.busVoltage);
         samplesPerMillisecond = std::max<uint32_t>(1, parameters.samplingFrequency.Value() / 1000);
         speedMeasurement.filter.SetAlpha(1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency)));
         return ok;
@@ -119,6 +120,11 @@ namespace foc
     {
         limits.speed = limit;
         UpdateSpeedLimit();
+    }
+
+    void TorqueCascade::TrackBusVoltage(Volts measured)
+    {
+        busRatio.Track(measured);
     }
 
     void TorqueCascade::LimitCurrent(Ampere limit)
@@ -197,9 +203,9 @@ namespace foc
         const auto& setPoint = setPointBuffer.Acquire();
         const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);
         const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed });
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
         voltageWindow.Accumulate(voltage.q);
-        return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
     }
 
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)

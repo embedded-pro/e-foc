@@ -254,3 +254,12 @@ TEST_F(TestDeadbeatCurrentController, reset_forgets_the_voltage_error_it_learned
     EXPECT_NEAR(first.d, afterReset.d, tolerance);
     EXPECT_NEAR(first.q, afterReset.q, tolerance);
 }
+
+TEST_F(TestDeadbeatCurrentController, a_bus_below_the_configured_voltage_shrinks_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    const auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f, 0.5f });
+
+    EXPECT_NEAR(std::hypot(output.d, output.q), 0.5f, 1e-4f);
+}

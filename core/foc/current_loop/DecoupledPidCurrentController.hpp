@@ -17,7 +17,7 @@ namespace foc
         {
             const auto proposed = pid.Propose(context);
             const auto total = decoupling.Apply(proposed, context);
-            const auto applied = LimitToModulationCircle(total);
+            const auto applied = LimitToModulationCircle(total, context.busRatio);
 
             const auto d = proposed.d + (applied.d - total.d);
             const auto q = proposed.q + (applied.q - total.q);

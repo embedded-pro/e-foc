@@ -39,6 +39,7 @@ namespace foc
     {
         polePairs = static_cast<float>(parameters.polePairs);
         vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
+        busRatio.Configure(parameters.busVoltage);
         return currentLoop.Configure(parameters);
     }
 
@@ -135,9 +136,9 @@ namespace foc
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
         const float limit = quadratureLimit;
         const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -limit, limit);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed, busRatio.Ratio() });
 
-        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
         voltageWindow.Accumulate(voltage.q);
 
         estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
@@ -154,6 +155,11 @@ namespace foc
         }
 
         return duties;
+    }
+
+    void CascadeWithSpeedLoop::TrackBusVoltageImpl(Volts measured)
+    {
+        busRatio.Track(measured);
     }
 
     void CascadeWithSpeedLoop::LimitCurrentImpl(Ampere limit)

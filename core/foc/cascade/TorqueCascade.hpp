@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/BusVoltageRatio.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/cascade/TripleBuffer.hpp"
@@ -19,6 +20,7 @@ namespace foc
         , public SpeedLimitable
         , public CurrentLimitable
         , public CoggingCompensable
+        , public BusVoltageTrackable
     {
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
@@ -41,6 +43,7 @@ namespace foc
 
         void LimitSpeed(RadiansPerSecond limit) override;
         void LimitCurrent(Ampere limit) override;
+        void TrackBusVoltage(Volts measured) override;
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;
 
@@ -84,6 +87,7 @@ namespace foc
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastIq{ 0.0f };
         DriveLimits limits;
+        BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };

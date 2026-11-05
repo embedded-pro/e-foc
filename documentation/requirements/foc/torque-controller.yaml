@@ -155,3 +155,16 @@
     of dry friction and cogging together. A larger command lets the current-sense noise of the
     emulated board shake an uncompensated rotor out of its detents, so it no longer tells the two
     apart. The SIL scenario read 61.8 rad with the map and 0.010 rad without.
+
+- id: REQ-TRQ-013
+  title: The duties follow the measured bus voltage
+  status: draft
+  verification: [sil, unit]
+  shall: >
+    In every control mode, the current law's gains, its feed-forwards and the reported q-axis
+    voltage shall stay those of the bus voltage the motor model was configured with. Once a bus
+    voltage is measured, the cascade shall divide every per-unit voltage the law commands by the
+    ratio r of the measured to the configured bus voltage before modulating it, and shall limit
+    the law's output to a magnitude of r instead of 1, with r held within 0.5 to 2. A new
+    measurement shall be in force from the next control period, also while Enabled, and with no
+    measurement r shall be 1.

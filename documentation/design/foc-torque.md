@@ -2,7 +2,7 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: foc-torque
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.3.0              |
+| Version   | 0.4.0              |
 | Component | foc-torque         |
 | Date      | 2026-11-05         |
 
@@ -91,12 +91,28 @@ flowchart LR
 
 Two independent incremental PID controllers regulate the direct (d) and quadrature (q) current components independently. Both PIDs share the same structural properties:
 
-- **Output clamping**: symmetric to [−1, +1], representing a normalised fraction of the DC bus voltage.
+- **Output clamping**: the output magnitude is limited to the modulation circle, 1 at the configured DC bus voltage and r at a measured one (Bus Voltage Tracking).
 - **Anti-windup**: the integrator is clamped whenever the output reaches the saturation boundary, preventing integrator wind-up during transients.
 - **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth, normalised by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
 - **Incrementalism**: the PID uses the incremental (velocity) form, accumulating output from step to step, which naturally limits abrupt changes at Enable transitions.
 
 The d-axis setpoint is normally 0 A for a surface PMSM (Id = 0 gives maximum torque per ampere). Setting Id_setpoint to a non-zero negative value for flux weakening is structurally possible but the operational consequences are outside the scope of this document.
+
+### Bus Voltage Tracking
+
+Every number the current law is built from assumes the bus voltage `Configure()` supplied: the gains are
+normalised by it, the decoupling and back-EMF feed-forwards are scaled by it, and the reported q-axis voltage
+converts per-unit to volts with it. A bus that sags under load or rises under regeneration would otherwise
+scale the voltage the winding gets by V_meas / V_cfg, and with it the loop gain, the feed-forwards and the
+reported voltage.
+
+`TrackBusVoltage()` hands the cascade a measured bus voltage. The cascade keeps every configured number and
+scales only the output: the modulator divides each per-unit phase voltage by r = V_meas / V_cfg, so the duty
+gives the winding the voltage the law asked for, and the law limits its output to a magnitude of r, the
+largest voltage the measured bus can make, which keeps its anti-windup honest. r is held within 0.5 to 2 so
+that a failed measurement cannot multiply the duties, and it is 1 until a bus voltage is tracked. The event
+loop writes r and 1/r; the control interrupt reads them, so a period that sees one updated and not the other
+is off by one measurement's change for one period (REQ-TRQ-013).
 
 ### Enable and Disable
 
@@ -202,6 +218,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call.                          |
 | SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
 | Calculate         | Executes the full 12-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
+| TrackBusVoltage   | Hands a measured bus voltage (Bus Voltage Tracking).                                                            | Called from the event loop; in force from the next `Calculate()`, also while Enabled.                                                   |
 | SetCurrentStream  | Attaches the current stream whose window the loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                        |
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 | Speed limit       | Sets the overspeed limit, in mechanical rad/s, that the speed limiter folds the q-axis setpoint against.        | Callable in any state, also while Enabled; in force from the next sample. A limit of zero folds nothing.                                |

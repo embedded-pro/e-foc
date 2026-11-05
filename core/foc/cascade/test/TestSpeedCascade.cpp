@@ -922,3 +922,18 @@ TEST_F(TestSpeedCascadeRamp, a_current_limit_clamps_the_reference_the_speed_law_
 
     ExpectSameDuty(limited, expected);
 }
+
+TEST_F(TestSpeedCascade, a_bus_at_half_the_configured_voltage_doubles_the_inner_loop_duty)
+{
+    SpeedCascadeUnderTest nominal{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest halvedBus{ polePairs, foc::SpeedLoopTunings{} };
+    halvedBus.cascade->TrackBusVoltage(foc::Volts{ 12.0f });
+
+    const auto expected = FirstDutyAfterSpeedStep(nominal, 5.0f);
+    const auto halved = FirstDutyAfterSpeedStep(halvedBus, 5.0f);
+
+    ExpectOffCentreDuty(expected);
+    EXPECT_NEAR(DutyPercent(halved.a) - 50.0f, 2.0f * (DutyPercent(expected.a) - 50.0f), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.b) - 50.0f, 2.0f * (DutyPercent(expected.b) - 50.0f), 0.1f);
+    EXPECT_NEAR(DutyPercent(halved.c) - 50.0f, 2.0f * (DutyPercent(expected.c) - 50.0f), 0.1f);
+}

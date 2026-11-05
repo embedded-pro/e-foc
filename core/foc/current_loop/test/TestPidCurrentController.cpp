@@ -234,3 +234,12 @@ TEST_F(TestPidCurrentController, a_plant_whose_state_gain_leaves_the_unit_interv
     EXPECT_FALSE((foc::CurrentPlantModel{ -0.1f, 0.5f }.IsUsable()));
     EXPECT_FALSE((foc::CurrentPlantModel{ 1.0f, 0.5f }.IsUsable()));
 }
+
+TEST_F(TestPidCurrentController, a_bus_below_the_configured_voltage_shrinks_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    const auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f, 0.5f });
+
+    EXPECT_NEAR(std::hypot(output.d, output.q), 0.5f, 1e-4f);
+}

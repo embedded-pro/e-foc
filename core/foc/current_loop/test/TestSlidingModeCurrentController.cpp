@@ -222,3 +222,12 @@ TEST_F(TestSlidingModeCurrentController, a_step_from_rest_enters_a_ten_percent_b
 
     EXPECT_NEAR(current, 0.5f, 0.1f * 0.5f);
 }
+
+TEST_F(TestSlidingModeCurrentController, a_bus_below_the_configured_voltage_shrinks_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    const auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f, 0.5f });
+
+    EXPECT_NEAR(std::hypot(output.d, output.q), 0.5f, 1e-4f);
+}

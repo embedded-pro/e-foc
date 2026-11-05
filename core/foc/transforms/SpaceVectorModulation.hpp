@@ -24,8 +24,9 @@ namespace foc
     {
     public:
         OPTIMIZE_FOR_SPEED
-        PhasePwmDutyCycles Generate(const TwoPhase& voltagePhase) const
+        PhasePwmDutyCycles Generate(const TwoPhase& voltagePhase, float inverseBusRatio = 1.0f) const
         {
+            const float scale = invSqrt3 * inverseBusRatio;
             const float alphaHalf = voltagePhase.alpha * half;
             const float betaSqrt3 = voltagePhase.beta * sqrt3Div2;
 
@@ -37,14 +38,14 @@ namespace foc
             const auto vMin = std::min({ vA, vB, vC });
             const auto vCommon = (vMax + vMin) * -half;
 
-            return ToDutyCycles(ThreePhase{ Normalized(vA + vCommon), Normalized(vB + vCommon), Normalized(vC + vCommon) });
+            return ToDutyCycles(ThreePhase{ Normalized(vA + vCommon, scale), Normalized(vB + vCommon, scale), Normalized(vC + vCommon, scale) });
         }
 
     private:
         OPTIMIZE_FOR_SPEED
-        float Normalized(float phaseVoltage) const
+        static float Normalized(float phaseVoltage, float scale)
         {
-            return phaseVoltage * invSqrt3 + half;
+            return phaseVoltage * scale + half;
         }
 
         static constexpr float half{ 0.5f };
