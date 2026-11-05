@@ -155,8 +155,16 @@ namespace tool
             return;
         }
 
-        if (Offer(*bytes, QFileInfo(path).fileName(), false))
-            ShowOutcome(QString("%1 holds firmware %2 for this board; Download to Controller sends it.").arg(chosenSource, Version(chosenPack->version)), StatusLevel::Neutral);
+        OfferPackFile(*bytes, QFileInfo(path).fileName());
+    }
+
+    bool MotorFirmware::OfferPackFile(const std::vector<uint8_t>& bytes, const QString& source)
+    {
+        if (!Offer(bytes, source, false))
+            return false;
+
+        ShowOutcome(QString("%1 holds firmware %2 for this board; Download to Controller sends it.").arg(chosenSource, Version(chosenPack->version)), StatusLevel::Neutral);
+        return true;
     }
 
     void MotorFirmware::Download()
