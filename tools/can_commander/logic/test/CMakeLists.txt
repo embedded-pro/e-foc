@@ -6,6 +6,7 @@ target_link_libraries(e_foc.tool.can_commander.logic_test PUBLIC
     gmock_main
     infra.timer_test_helper
     e_foc.tool.can_commander.logic
+    e_foc.services.firmware_upgrade.test_pack
 )
 
 target_sources(e_foc.tool.can_commander.logic_test PRIVATE

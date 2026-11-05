@@ -1,7 +1,7 @@
+#include "core/services/firmware_upgrade/test_doubles/TestPack.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/FirmwarePack.hpp"
-#include "upgrade/pack/UpgradePackHeader.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <string>
@@ -12,56 +12,19 @@ namespace
 {
     using namespace tool;
 
-    constexpr uint32_t signatureLength{ 64 };
-    constexpr uint32_t aesCounterSize{ 16 };
-
-    template<class T>
-    void Append(std::vector<uint8_t>& bytes, const T& value)
-    {
-        const auto* begin = reinterpret_cast<const uint8_t*>(&value);
-        bytes.insert(bytes.end(), begin, begin + sizeof(T));
-    }
-
-    template<std::size_t N>
-    std::array<char, N> Text(const std::string& text)
-    {
-        std::array<char, N> result{};
-        std::copy_n(text.begin(), std::min(text.size(), N), result.begin());
-        return result;
-    }
-
     struct PackShape
+        : services::test::TestPackDescription
     {
-        std::string productName{ e_foc::boards::ekTm4c1294xl.identification };
-        std::string productVersion{ "1.7.0" };
-        uint16_t headerVersion{ 1 };
-        uint32_t imageSize{ 300 };
-        std::array<uint8_t, 3> magic{ 'U', 'P', 'H' };
+        PackShape()
+        {
+            productName = e_foc::boards::ekTm4c1294xl.identification;
+            productVersion = "1.7.0";
+        }
     };
 
     std::vector<uint8_t> MakePack(const PackShape& shape = {})
     {
-        application::UpgradePackHeaderPrologue prologue{ application::UpgradePackStatus::readyToDeploy, shape.magic, 0, 0, 2, signatureLength };
-        application::UpgradePackHeaderEpilogue epilogue{};
-        epilogue.headerVersion = shape.headerVersion;
-        epilogue.headerLength = sizeof(prologue) + signatureLength + sizeof(epilogue);
-        epilogue.numberOfImages = 1;
-        epilogue.productName = Text<64>(shape.productName);
-        epilogue.productVersion = Text<64>(shape.productVersion);
-
-        application::ImageHeaderPrologue image{};
-        image.lengthOfHeaderAndImage = sizeof(image) + aesCounterSize + sizeof(application::ImageHeaderEpilogue) + shape.imageSize;
-        image.targetName = Text<8>("app");
-        image.encryptionAndMacMethod = 1;
-
-        std::vector<uint8_t> pack;
-        pack.reserve(epilogue.headerLength + image.lengthOfHeaderAndImage);
-        Append(pack, prologue);
-        pack.insert(pack.end(), signatureLength, 0x5a);
-        Append(pack, epilogue);
-        Append(pack, image);
-        pack.resize(pack.size() + image.lengthOfHeaderAndImage - sizeof(image), 0x33);
-        return pack;
+        return services::test::MakeTestPack(shape);
     }
 
     FirmwareBoard Board(uint8_t kind)
