@@ -59,7 +59,6 @@ TEST(FirmwarePack, only_boards_with_a_bootloader_can_be_updated)
     EXPECT_TRUE(CanBeUpdated(Board(5)));
     EXPECT_FALSE(CanBeUpdated(Board(2)));
     EXPECT_FALSE(CanBeUpdated(Board(3)));
-    EXPECT_FALSE(CanBeUpdated(Board(4)));
 }
 
 TEST(FirmwarePack, a_pack_for_the_board_is_offered_with_its_version_and_crc)

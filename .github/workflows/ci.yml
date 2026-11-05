@@ -162,7 +162,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/inner
-          fail-over-max-cycles: ${{ !matrix.report-only && matrix.inner-max-cycles || '' }}
+          fail-over-max-cycles: ${{ matrix.inner-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-inner
       - name: Run outer loop cycle analysis
@@ -176,7 +176,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/outer
-          fail-over-max-cycles: ${{ !matrix.report-only && matrix.outer-max-cycles || '' }}
+          fail-over-max-cycles: ${{ matrix.outer-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-outer
       - name: Run identification path cycle analysis
@@ -190,7 +190,7 @@ jobs:
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
           output-dir: cycle-analysis/identification
-          fail-over-max-cycles: ${{ !matrix.report-only && matrix.identification-max-cycles || '' }}
+          fail-over-max-cycles: ${{ matrix.identification-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-identification
       - name: Compose cycle analysis banner
@@ -207,7 +207,6 @@ jobs:
           --analysis "Outer loop" cycle-analysis/outer "${{ matrix.outer-max-cycles }}"
           --analysis "Identification path" cycle-analysis/identification "${{ matrix.identification-max-cycles }}"
           --output cycle-analysis/banner.md
-          ${{ matrix.report-only && '--report-only' || '' }}
       - name: Post cycle analysis banner
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' && env.POST_PR_COMMENT == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
