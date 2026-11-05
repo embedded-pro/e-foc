@@ -437,7 +437,9 @@ nothing more.
   controller answers once it has erased its whole staging slot, the progress bar reading "Erasing…" until
   then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
   pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
-  three times in a row before the download is given up. A progress bar shows the bytes sent out of the total
+  three times in a row before the download is given up. A block or Verify answered `Busy`, which the controller
+  gives while it programs a page, counts as unanswered: the block is sent again from where the controller
+  stands, and Verify is sent again. A progress bar shows the bytes sent out of the total
   and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
   with the reason "firmware download in progress"; its emergency stop is not, and every other motor stays
   commandable. An emergency stop sent to the motor ends its download on both sides: the controller drops the

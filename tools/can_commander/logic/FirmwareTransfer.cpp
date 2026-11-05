@@ -169,7 +169,7 @@ namespace tool
             return;
 
         answerTimer.Cancel();
-        if (status == FwuError::sequenceError)
+        if (status == FwuError::sequenceError || status == FwuError::busy)
             OnNoBlockAnswer();
         else if (status != FwuError::ok)
             FinishDownload(DownloadOutcome::refused, status);
@@ -189,6 +189,8 @@ namespace tool
         answerTimer.Cancel();
         if (status == FwuError::ok)
             FinishDownload(DownloadOutcome::staged);
+        else if (status == FwuError::busy)
+            RetryVerify();
         else
             FinishDownload(DownloadOutcome::refused, status);
     }
@@ -317,6 +319,14 @@ namespace tool
             GiveUp();
         else
             AskProgress();
+    }
+
+    void FirmwareTransfer::RetryVerify()
+    {
+        if (++failures >= attempts)
+            GiveUp();
+        else
+            SendVerify();
     }
 
     void FirmwareTransfer::AskProgress()
