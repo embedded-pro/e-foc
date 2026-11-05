@@ -193,12 +193,37 @@ namespace sil
         if (scenarioDirectory.empty() && !CreateScenarioDirectory())
             return false;
 
-        const auto absoluteElf = AbsolutePath(images.bootloaderElf);
-        const auto absoluteSlot = images.slotImage ? AbsolutePath(*images.slotImage) : std::optional<std::string>{ "" };
-        if (!absoluteElf || !absoluteSlot)
+        const auto launch = ResolveLaunch(images);
+        if (!launch)
             return false;
-        const std::string slotLoader = "loader,file=" + *absoluteSlot + ",addr=" + HexAddress(integration::applicationSlotStart) + ",force-raw=on";
 
+        ResetRun();
+        const auto canPath = PrepareSockets();
+        if (!Spawn(*launch, canPath))
+            return false;
+
+        return Attach(canPath);
+    }
+
+    std::optional<QemuSilSession::Launch> QemuSilSession::ResolveLaunch(const Images& images)
+    {
+        const auto elf = AbsolutePath(images.bootloaderElf);
+        if (!elf)
+            return std::nullopt;
+
+        Launch launch{ *elf, std::nullopt };
+        if (images.slotImage)
+        {
+            const auto slot = AbsolutePath(*images.slotImage);
+            if (!slot)
+                return std::nullopt;
+            launch.slotLoader = "loader,file=" + *slot + ",addr=" + HexAddress(integration::applicationSlotStart) + ",force-raw=on";
+        }
+        return launch;
+    }
+
+    void QemuSilSession::ResetRun()
+    {
         std::error_code error;
         std::filesystem::remove(scenarioDirectory + "/" + kPlantRecordName, error);
         plantRecordOffset = 0;
@@ -210,15 +235,19 @@ namespace sil
 
         if (!debugLog.is_open())
             debugLog.open(scenarioDirectory + "/" + kDebugLogName, std::ios::out | std::ios::app);
+    }
 
+    std::string QemuSilSession::PrepareSockets()
+    {
         terminalPath = SocketPath("terminal");
         const std::string canPath = SocketPath("can");
         unlink(terminalPath.c_str());
         unlink(canPath.c_str());
+        return canPath;
+    }
 
-        const std::string terminalChardev = "socket,id=terminal,path=" + terminalPath + ",server=on,wait=off";
-        const std::string canChardev = "socket,id=can,path=" + canPath + ",server=on,wait=off";
-
+    bool QemuSilSession::Spawn(const Launch& launch, const std::string& canPath)
+    {
         int pipefd[2];
         if (pipe(pipefd) != 0)
             return false;
@@ -234,60 +263,54 @@ namespace sil
         if (pid == 0)
         {
             close(pipefd[0]);
-            const int devNull = open("/dev/null", O_RDWR);
-            if (devNull >= 0)
-            {
-                dup2(devNull, STDIN_FILENO);
-                close(devNull);
-            }
-            dup2(pipefd[1], STDOUT_FILENO);
-            dup2(pipefd[1], STDERR_FILENO);
-            close(pipefd[1]);
-
-            if (chdir(scenarioDirectory.c_str()) != 0)
-                _exit(1);
-
-            const bool gdbMode = (std::getenv("SIL_GDB") != nullptr);
-            std::vector<const char*> argv = {
-                "qemu-system-arm",
-                "-M",
-                "mps2-an386",
-                "-nographic",
-                "-chardev",
-                terminalChardev.c_str(),
-                "-chardev",
-                canChardev.c_str(),
-                "-semihosting-config",
-                "enable=on",
-                "-serial",
-                "chardev:terminal",
-                "-serial",
-                "chardev:can",
-                "-kernel",
-                absoluteElf->c_str(),
-            };
-            if (images.slotImage)
-            {
-                argv.push_back("-device");
-                argv.push_back(slotLoader.c_str());
-            }
-            const char* icountOverride = std::getenv("SIL_ICOUNT");
-            argv.push_back("-icount");
-            argv.push_back(icountOverride != nullptr ? icountOverride : kIcountShift);
-            if (gdbMode)
-            {
-                argv.push_back("-S");
-                argv.push_back("-gdb");
-                argv.push_back("tcp::1234");
-            }
-            argv.push_back(nullptr);
-            execvp("qemu-system-arm", const_cast<char* const*>(argv.data()));
-            _exit(1);
+            ExecEmulator(launch, canPath, pipefd[1]);
         }
 
         close(pipefd[1]);
         outPipeFd = pipefd[0];
+        return true;
+    }
 
+    void QemuSilSession::ExecEmulator(const Launch& launch, const std::string& canPath, int outputFd) const
+    {
+        const int devNull = open("/dev/null", O_RDWR);
+        if (devNull >= 0)
+        {
+            dup2(devNull, STDIN_FILENO);
+            close(devNull);
+        }
+        dup2(outputFd, STDOUT_FILENO);
+        dup2(outputFd, STDERR_FILENO);
+        close(outputFd);
+
+        if (chdir(scenarioDirectory.c_str()) != 0)
+            _exit(1);
+
+        const std::string terminalChardev = "socket,id=terminal,path=" + terminalPath + ",server=on,wait=off";
+        const std::string canChardev = "socket,id=can,path=" + canPath + ",server=on,wait=off";
+        const char* icount = std::getenv("SIL_ICOUNT");
+        std::vector<const char*> argv = { "qemu-system-arm", "-M", "mps2-an386", "-nographic", "-chardev", terminalChardev.c_str(), "-chardev", canChardev.c_str(),
+            "-semihosting-config", "enable=on", "-serial", "chardev:terminal", "-serial", "chardev:can", "-kernel", launch.elf.c_str() };
+        if (launch.slotLoader)
+        {
+            argv.push_back("-device");
+            argv.push_back(launch.slotLoader->c_str());
+        }
+        argv.push_back("-icount");
+        argv.push_back(icount != nullptr ? icount : kIcountShift);
+        if (std::getenv("SIL_GDB") != nullptr)
+        {
+            argv.push_back("-S");
+            argv.push_back("-gdb");
+            argv.push_back("tcp::1234");
+        }
+        argv.push_back(nullptr);
+        execvp("qemu-system-arm", const_cast<char* const*>(argv.data()));
+        _exit(1);
+    }
+
+    bool QemuSilSession::Attach(const std::string& canPath)
+    {
         const bool connected = ConnectSocket(canSockFd, canPath);
         unlink(canPath.c_str());
 

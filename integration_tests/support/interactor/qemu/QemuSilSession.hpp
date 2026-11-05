@@ -51,6 +51,18 @@ namespace sil
         std::vector<std::string> TakePlantRecord(std::chrono::milliseconds timeout);
 
     private:
+        struct Launch
+        {
+            std::string elf;
+            std::optional<std::string> slotLoader;
+        };
+
+        static std::optional<Launch> ResolveLaunch(const Images& images);
+        void ResetRun();
+        std::string PrepareSockets();
+        bool Spawn(const Launch& launch, const std::string& canPath);
+        [[noreturn]] void ExecEmulator(const Launch& launch, const std::string& canPath, int outputFd) const;
+        bool Attach(const std::string& canPath);
         bool ConnectSocket(int& fd, const std::string& path) const;
         bool Pump(std::chrono::milliseconds timeout);
         bool PumpUntil(std::chrono::steady_clock::time_point deadline, const std::function<bool()>& done);
