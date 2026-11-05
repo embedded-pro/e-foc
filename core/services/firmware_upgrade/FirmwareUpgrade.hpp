@@ -78,6 +78,7 @@ namespace services
         void RestartDeadline();
         void OnDeadline();
         FwuState ReportedState() const;
+        uint16_t TotalBlocks() const;
 
         std::optional<application::FirmwareStaging> staging;
         FirmwareUpgradeDrive& drive;
