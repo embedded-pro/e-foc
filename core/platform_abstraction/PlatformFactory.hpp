@@ -34,7 +34,6 @@ namespace application
         ekTm4c1294xl = 1,
         nucleoG474re = 2,
         nucleoH563zi = 3,
-        ekTm4c123gxl = 4,
         emulated = 5,
     };
 

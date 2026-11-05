@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.6.2
+version: 0.6.3
 component: state-machine
-date: 2026-11-01
+date: 2026-11-05
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-01
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.6.2                      |
+| Version   | 0.6.3                      |
 | Component | state-machine              |
-| Date      | 2026-11-01                 |
+| Date      | 2026-11-05                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -583,7 +583,7 @@ condition anything could hold. The TI protection comparators are ADC digital com
 PWM-triggered ADC, which stops converting once the bridge is stopped, so the comparators cannot be read while
 faulted. TI and the NUCLEO-G474RE therefore answer from their latched trips and a fresh bus-voltage reading
 (`core/platform_abstraction/BoardProtection.hpp`, `documentation/design/error-handling.md`), QEMU from its
-simulated protection, and only the EK-TM4C123GXL, NUCLEO-H563ZI and a platform with no protection report
+simulated protection, and only the NUCLEO-H563ZI and a platform with no protection report
 `unknown`. See REQ-EH-013.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears

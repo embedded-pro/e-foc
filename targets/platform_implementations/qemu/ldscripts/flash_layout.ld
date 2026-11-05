@@ -1,9 +1,9 @@
 __bootloader_start = 0x00000000;
 __bootloader_end = 0x00008000;
 __application_slot_start = 0x00008000;
-__application_slot_end = 0x00048000;
+__application_slot_end = 0x00058000;
 __staging_slot_start = 0;
-__staging_slot_end = 256K;
+__staging_slot_end = 320K;
 __status_journal_start = 0;
 __status_journal_end = 16K;
 __ram_start = 0x20000000;

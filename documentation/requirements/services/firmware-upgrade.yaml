@@ -117,11 +117,11 @@
     a finished download.
 
 - id: REQ-UPD-013
-  title: The whole 256 KB staging slot is erased before the download starts
+  title: The whole 320 KB staging slot is erased before the download starts
   status: verified
   verification: [unit, sil]
   shall: >
-    The motor controller shall hold a staging slot of 256 KB, answer Begin Upgrade for a larger
+    The motor controller shall hold a staging slot of 320 KB, answer Begin Upgrade for a larger
     pack with InvalidSize, and, after accepting Begin Upgrade, erase the status journal and the
     entire staging slot before answering it; an erase that fails shall be answered WriteError.
 

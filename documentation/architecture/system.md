@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.2.2
+version: 0.2.3
 component: system
-date: 2026-11-03
+date: 2026-11-05
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-03
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.2.2                     |
+| Version   | 0.2.3                     |
 | Component | system                    |
-| Date      | 2026-11-03                |
+| Date      | 2026-11-05                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -248,7 +248,7 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 | Serial terminal                             | Diagnostic trace and command-line interaction interface         |
 
 Concrete implementations exist for:
-- **TI Tiva (EK-TM4C1294XL, EK-TM4C123GXL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
+- **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
 - **ST STM32 (NUCLEO-G474RE, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`. The NUCLEO-G474RE drives E-FOC-HARDWARE; the NUCLEO-H563ZI still runs on peripheral stubs.
 - **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
 
@@ -256,8 +256,8 @@ On the Texas Instruments targets and the NUCLEO-G474RE the command console and t
 A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
 RTT writes are non-blocking and drop when no probe is reading.
 
-The TI boards size their console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
-application needs, because the EK-TM4C123GXL has 32 KiB of RAM. Each size has a reason, and growing a feature past
+The TI board sizes its console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
+application needs. Each size has a reason, and growing a feature past
 it should change the reason, not just the number:
 
 | Buffer                                            | Size      | Why this size                                                                                                                                                                                                                                                                             |
@@ -277,7 +277,7 @@ first, sorted by alignment, so the uDMA control table — which must be 1 KiB-al
 instead of forcing up to 1 KiB of padding after `.data`. The hal-ti `Gpio` driver keeps pin-interrupt handlers in a
 pool sized by the CMake cache variable `HAL_TI_GPIO_MAX_INTERRUPT_PINS` (default 8, 72 bytes each) and registers a
 port's interrupt only when a pin on it is enabled. A handler per pin would take 4.0 KiB more RAM on the TM4C129
-(120 pins) and 1.9 KiB more on the TM4C123, and `sync_foc_sensored` enables no pin interrupt at all.
+(120 pins), and `sync_foc_sensored` enables no pin interrupt at all.
 
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
 
@@ -381,7 +381,6 @@ flowchart LR
 | EK-TM4C1294XL | internal flash             | yes                   |
 | NUCLEO-H563ZI | internal flash, bank 2     | yes                   |
 | NUCLEO-G474RE | SPI NOR on the motor board | yes, once fitted      |
-| EK-TM4C123GXL | none (flash full)          | no                    |
 | Emulated      | file in the scenario       | application side only |
 
 ---

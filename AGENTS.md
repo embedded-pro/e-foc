@@ -93,7 +93,7 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
 
 - Interfaces = pure virtual methods and a **protected, non-virtual** destructor (`protected: ~I() = default;`), as EMIL does.
   Never `virtual ~I()`: nothing is deleted through an interface, and each virtual destructor adds a deleting destructor plus,
-  under multiple inheritance, a thunk per base — about 18 KB of flash on the TM4C123 build. Concrete classes declare no
+  under multiple inheritance, a thunk per base — about 18 KB of flash on a TM4C build. Concrete classes declare no
   destructor or a plain public one. Only host code that owns objects through a base pointer (`std::unique_ptr<Base>`) keeps one.
 - No exceptions. `std::optional<T>` or status enums. `assert()`/`really_assert()` for preconditions. Never swallow an error
 - SOLID + DIP: constructor injection via `PlatformFactory` and the hardware ports in `core/platform_abstraction/interfaces/Drivers.hpp`; depend on abstractions. No global state. One class, one control concern; RAII for resources.
@@ -130,7 +130,7 @@ cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # em
 cmake --preset qemu-foc-sensored && cmake --build --preset qemu-foc-sensored-RelWithDebInfo  # SIL firmware
 ```
 
-Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+Presets (`CMakePresets.json`): `host`, `host-single-Debug`, `coverage`, `EK-TM4C1294XL`, `NUCLEO-G474RE`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
 **Bootloader keys**: no key is a build input. The bootloader always builds with an erased key slot that refuses every pack;
 afterwards EmIL's `application.bootloader_image inject-keys --keys <set> --elf <bootloader elf> --hex <file>...` writes the slot into the
@@ -186,8 +186,7 @@ QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebIn
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 
 Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build, on EK-TM4C1294XL (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000 at 120 MHz)
-and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). EK-TM4C123GXL is analysed at the same slices at 80 MHz (3000 / 13333 / 4000)
-but report only: its inner loop does not fit, so its budgets are shown, not enforced. Each MCU gets one cycle banner and one memory banner on the PR.
+and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). Each MCU gets one cycle banner and one memory banner on the PR.
 It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
 
 **Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables

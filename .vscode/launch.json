@@ -170,12 +170,7 @@
             "id": "boardType",
             "type": "pickString",
             "description": "Select board type for HIL tests and target firmware",
-            "options": [
-                "EK-TM4C1294XL",
-                "EK-TM4C123GXL",
-                "NUCLEO-G474RE",
-                "NUCLEO-H563ZI"
-            ],
+            "options": ["EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI"],
             "default": "EK-TM4C1294XL"
         },
         {
