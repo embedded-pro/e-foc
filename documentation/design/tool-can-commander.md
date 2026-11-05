@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.14.0
+version: 0.14.1
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -486,8 +486,9 @@ nothing more.
   wait for the controller read the same way: the status line names the step over a busy bar, since a busy bar
   shows no text of its own.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
-  controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
-  node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
+  controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 90 s for the
+  node to come back, then reads its version: the EK-TM4C1294XL takes 30 s, installing at its reset clock
+  (`bootloader.md` Constraints). The node is back when it reports nothing staged: the tool reads
   its firmware identity again when it comes back online, and every 5 s while it has not dropped off the bus,
   which a restart faster than the 3 s offline timeout does not. The update succeeded when the node reports the
   staged version. A node that comes back with the old version had its pack refused by the bootloader, which
@@ -528,7 +529,7 @@ stateDiagram-v2
     Staged --> Available : Discard (Abort sent)
     Staged --> Restarting : Apply Firmware… confirmed, motor stopped
     Restarting --> Current : node back with the staged version
-    Restarting --> Available : old version kept, or no node within 30 s, reported as failed
+    Restarting --> Available : old version kept, or no node within 90 s, reported as failed
     Failed --> Downloading : Try Again confirmed
     Failed --> Available : another pack opened or offered
 ```
@@ -743,7 +744,7 @@ sequenceDiagram
 | Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                             |
 | Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB |
 | Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                |
-| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                                 |
+| Firmware restart       | after Apply, the node is back within 90 s and reports the staged version; the EK-TM4C1294XL takes 30 s (`bootloader.md` Constraints)                     |
 | Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                        |
 
 ---

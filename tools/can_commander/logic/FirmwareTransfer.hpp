@@ -80,7 +80,7 @@ namespace tool
         static constexpr infra::Duration blockTimeout{ std::chrono::seconds(1) };
         static constexpr infra::Duration verifyTimeout{ std::chrono::seconds(10) };
         static constexpr infra::Duration answerTimeout{ std::chrono::seconds(2) };
-        static constexpr infra::Duration restartTimeout{ std::chrono::seconds(30) };
+        static constexpr infra::Duration restartTimeout{ std::chrono::seconds(90) };
         static constexpr infra::Duration identityRetry{ std::chrono::seconds(5) };
 
         explicit FirmwareTransfer(CanCommandClient& client);

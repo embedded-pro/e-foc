@@ -360,7 +360,7 @@ namespace tool
                 Fail(QString("%1 came back with firmware %2: its bootloader refused the pack and kept the old firmware.").arg(MotorName(), Version(running)));
                 break;
             case ApplyOutcome::noNode:
-                Fail(QString("%1 did not come back within 30 s: the update failed, and recovering the controller needs a debugger.").arg(MotorName()));
+                Fail(QString("%1 did not come back within 90 s: the update failed, and recovering the controller needs a debugger.").arg(MotorName()));
                 break;
             case ApplyOutcome::refused:
                 Fail(QString("The controller refused to apply the pack: %1").arg(QString::fromStdString(FirmwareRefusalText(error, FirmwareStep::apply))));

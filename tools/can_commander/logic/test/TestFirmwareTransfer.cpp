@@ -456,7 +456,7 @@ TEST_F(TestFirmwareTransfer, a_node_back_with_firmware_without_the_upgrade_servi
     transfer.OnFirmwareIdentity(1, FirmwareIdentity{ { 1, 7, 0 }, 1, {}, false });
 }
 
-TEST_F(TestFirmwareTransfer, a_node_not_back_within_thirty_seconds_is_a_failed_update)
+TEST_F(TestFirmwareTransfer, a_node_not_back_within_ninety_seconds_is_a_failed_update)
 {
     ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
     ActivateAnswered();
