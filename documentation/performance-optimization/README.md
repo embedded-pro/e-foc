@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.2.0
+version: 1.2.1
 component: "foc"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.2.0                             |
+| Version   | 1.2.1                             |
 | Component | foc                               |
 | Date      | 2026-11-05                        |
 
@@ -259,9 +259,10 @@ The 20 kHz path should do only the work that changes from one sample to the next
   compares, and a cascade without a stream one pointer test. Every stream function is inlined into the cascade's `Calculate`, so the
   cycle analysis measures it there.
 
-The 1 kHz outer loop follows the same rules. The software position limits (`documentation/design/foc-position.md`) cost
-it one compare while they are off, and a wrap and a clamp of the reference while they are on; both are inlined into
-`PositionCascade::LowPriorityHandler`, so the outer-loop cycle analysis measures them there.
+The 1 kHz outer loop follows the same rules. The software position limits (`documentation/design/foc-position.md`) add
+a compare to the cascade and to each difference the position law takes, and a wrap and a clamp of the reference while
+they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate put at 976–1295
+cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
 
 ---
 
