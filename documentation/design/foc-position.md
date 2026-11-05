@@ -2,7 +2,7 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: foc-position
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.3.0                |
+| Version   | 0.4.0                |
 | Component | foc-position         |
 | Date      | 2026-11-05           |
 
@@ -166,7 +166,9 @@ With the limits on:
   through zero rather than 0.48 rad across the seam. The position error the drive reports to its monitors is
   the same difference.
 
-The cascade takes new limits at its next 1 kHz tick after they are stored, and on every mode activation.
+The cascade takes new limits at its next 1 kHz tick after they are stored, and on every mode activation. A rotor
+that an outside force or an overshoot carries more than four encoder counts past them faults the drive with
+`positionLimit` (`fault-supervision.md` Part J).
 
 ```mermaid
 flowchart LR

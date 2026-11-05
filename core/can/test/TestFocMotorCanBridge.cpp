@@ -876,6 +876,18 @@ TEST_F(FocMotorCanBridgeTest, BroadcastFault_CommandTimeout_MapsToCommandTimeout
     EXPECT_EQ(12u, static_cast<uint8_t>(can::FocFaultCode::commandTimeout));
 }
 
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_PositionLimit_MapsToPositionLimit)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::positionLimit);
+
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::positionLimit));
+    EXPECT_EQ(13u, static_cast<uint8_t>(can::FocFaultCode::positionLimit));
+}
+
 TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_IsRejected)
 {
     ConstructFixture();

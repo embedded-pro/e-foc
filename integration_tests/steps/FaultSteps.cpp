@@ -39,6 +39,8 @@ namespace
             return can::FocFaultCode::followingError;
         if (name == "command-timeout")
             return can::FocFaultCode::commandTimeout;
+        if (name == "position-limit")
+            return can::FocFaultCode::positionLimit;
         return std::nullopt;
     }
 }

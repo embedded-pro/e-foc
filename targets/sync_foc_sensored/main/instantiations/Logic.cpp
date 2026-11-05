@@ -74,6 +74,10 @@ namespace application
             {
                 platformFaultNotifier->Raise(code);
             } }
+        , positionLimit{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
         , commandTimeout{ [this](state_machine::FaultCode code)
             {
                 platformFaultNotifier->Raise(code);
@@ -203,6 +207,18 @@ namespace application
                 targetReached.Enable([this]()
                     {
                         return supervision::TargetReachedSettingsFrom(controlMode->Config());
+                    });
+                positionLimit.Attach([this]() -> const state_machine::FocStateMachineBase*
+                    {
+                        return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+                    },
+                    [this]()
+                    {
+                        return static_cast<drivers::Encoder&>(this->hardware).Read();
+                    });
+                positionLimit.Enable([this]()
+                    {
+                        return supervision::PositionLimitSettingsFrom(controlMode->Config());
                     });
                 canBridge->ReportTargetReached([this]()
                     {

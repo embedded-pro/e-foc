@@ -28,6 +28,8 @@ target_sources(e_foc.supervision PRIVATE
     OverspeedMonitor.cpp
     PhaseLossMonitor.hpp
     PhaseLossMonitor.cpp
+    PositionLimitMonitor.hpp
+    PositionLimitMonitor.cpp
     TargetReachedMonitor.hpp
     TargetReachedMonitor.cpp
 )

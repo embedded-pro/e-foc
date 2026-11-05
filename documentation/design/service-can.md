@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.13.0
+version: 0.14.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.13.0                   |
+| Version   | 0.14.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -389,6 +389,14 @@ They are drive-wide limits like those of 2.9 and are off while the minimum is no
 With the limits on, `SetPositionSetpoint` with a setpoint outside them, taken modulo 2π into [−π, π), is
 acknowledged `invalidPayload` and changes nothing, as a setpoint beyond ±2π is. A client older than 2.11
 asks for the new parameters only when the server reports 2.11 or newer.
+
+**Contract 2.12 — position limit fault.** Version 2.12 adds one fault code; nothing in 2.11 changes.
+
+| `FocFaultCode`  | Value | `state_machine::FaultCode` | Raised by                                         |
+|-----------------|-------|----------------------------|---------------------------------------------------|
+| `positionLimit` | 13    | `positionLimit`            | Position-limit monitor (`fault-supervision.md` J) |
+
+A client older than 2.12 shows the code as an unknown fault.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

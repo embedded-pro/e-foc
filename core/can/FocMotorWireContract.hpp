@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 11;
+    static constexpr uint8_t focContractVersionMinor = 12;
 
     enum class FieldType : uint8_t
     {
