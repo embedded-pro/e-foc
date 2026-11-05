@@ -25,9 +25,9 @@ namespace foc
 
     TorqueCascade::TorqueCascade(foc::Ampere maxCurrent)
         : maxCurrent{ maxCurrent }
-        , currentLimit{ maxCurrent.Value() }
     {
         really_assert(maxCurrent.Value() > 0);
+        limits.current = maxCurrent.Value();
     }
 
     void TorqueCascade::Enable()
@@ -35,8 +35,8 @@ namespace foc
         voltageWindow.Close();
         currentLoop.Reset();
         enabled = true;
-        speedFilter.Reset();
-        previousAngleValid = false;
+        speedMeasurement.filter.Reset();
+        speedMeasurement.previousAngleValid = false;
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
         if (currentStream != nullptr)
@@ -73,10 +73,10 @@ namespace foc
         const bool ok = currentLoop.Configure(parameters);
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
-        electricalSpeedScale = polePairs * samplingFrequency;
+        speedMeasurement.scale = polePairs * samplingFrequency;
         voltageScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         samplesPerMillisecond = std::max<uint32_t>(1, parameters.samplingFrequency.Value() / 1000);
-        speedFilter.SetAlpha(1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency)));
+        speedMeasurement.filter.SetAlpha(1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency)));
         return ok;
     }
 
@@ -117,19 +117,19 @@ namespace foc
 
     void TorqueCascade::LimitSpeed(RadiansPerSecond limit)
     {
-        speedLimit = limit;
+        limits.speed = limit;
         UpdateSpeedLimit();
     }
 
     void TorqueCascade::LimitCurrent(Ampere limit)
     {
-        currentLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
+        limits.current = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
     }
 
     float TorqueCascade::LimitedQuadrature(float quadrature, float electricalSpeed, float feedForward) const
     {
-        const float limit = currentLimit;
-        return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, inverseElectricalSpeedLimit) + feedForward, -limit, limit);
+        const float limit = limits.current;
+        return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, limits.inverseElectricalSpeed) + feedForward, -limit, limit);
     }
 
     void TorqueCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
@@ -144,8 +144,8 @@ namespace foc
 
     void TorqueCascade::UpdateSpeedLimit()
     {
-        const auto electricalLimit = speedLimit.Value() * polePairs;
-        inverseElectricalSpeedLimit = electricalLimit > 0.0f ? 1.0f / electricalLimit : 0.0f;
+        const auto electricalLimit = limits.speed.Value() * polePairs;
+        limits.inverseElectricalSpeed = electricalLimit > 0.0f ? 1.0f / electricalLimit : 0.0f;
     }
 
     void TorqueCascade::SetCurrentStream(CurrentStream& stream)
@@ -204,15 +204,15 @@ namespace foc
 
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)
     {
-        if (!previousAngleValid)
+        if (!speedMeasurement.previousAngleValid)
         {
-            previousMechanicalAngle = mechanicalAngle;
-            previousAngleValid = true;
+            speedMeasurement.previousMechanicalAngle = mechanicalAngle;
+            speedMeasurement.previousAngleValid = true;
             return 0.0f;
         }
 
-        const auto sampled = detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) * electricalSpeedScale;
-        previousMechanicalAngle = mechanicalAngle;
-        return speedFilter.Filter(sampled);
+        const auto sampled = detail::PositionWithWrapAround(mechanicalAngle - speedMeasurement.previousMechanicalAngle) * speedMeasurement.scale;
+        speedMeasurement.previousMechanicalAngle = mechanicalAngle;
+        return speedMeasurement.filter.Filter(sampled);
     }
 }

@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <type_traits>
+#include <variant>
 
 namespace state_machine
 {
@@ -789,10 +791,18 @@ namespace state_machine
 
     void ControlModeStateMachine::ApplyLimits()
     {
-        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-            sm->SpeedLimiter().LimitSpeed(foc::RadiansPerSecond{ configData.limits.overspeedLimit });
-        else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            sm->RampSpeed(foc::RadiansPerSecondSquared{ configData.limits.speedAcceleration }, foc::RadiansPerSecondSquared{ configData.limits.speedDeceleration });
+        const foc::RadiansPerSecond overspeedLimit{ configData.limits.overspeedLimit };
+        const foc::RadiansPerSecondSquared acceleration{ configData.limits.speedAcceleration };
+        const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
+
+        std::visit([&]<class Machine>(Machine& sm)
+            {
+                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
+                    sm.SpeedLimiter().LimitSpeed(overspeedLimit);
+                else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.RampSpeed(acceleration, deceleration);
+            },
+            activeSm);
 
         ApplyCurrentLimit();
     }
@@ -802,12 +812,14 @@ namespace state_machine
         if (!currentLimit.has_value())
             return;
 
-        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-            sm->CurrentLimiter().LimitCurrent(*currentLimit);
-        else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            sm->LimitCurrent(*currentLimit);
-        else if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            sm->LimitCurrent(*currentLimit);
+        std::visit([limit = *currentLimit]<class Machine>(Machine& sm)
+            {
+                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
+                    sm.CurrentLimiter().LimitCurrent(limit);
+                else if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.LimitCurrent(limit);
+            },
+            activeSm);
     }
 
     bool ControlModeStateMachine::HasPendingConfigWrite() const

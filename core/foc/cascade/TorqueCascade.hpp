@@ -60,20 +60,30 @@ namespace foc
         IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
         TripleBuffer<IdAndIqPoint> setPointBuffer;
 
-        float electricalSpeedScale{ 0.0f };
-        filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };
+        struct SpeedMeasurement
+        {
+            float scale{ 0.0f };
+            filters::passive::ExponentialMovingAverage<float> filter{ 1.0f };
+            float previousMechanicalAngle{ 0.0f };
+            bool previousAngleValid{ false };
+        };
+
+        struct DriveLimits
+        {
+            RadiansPerSecond speed{ 0.0f };
+            // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
+            volatile float inverseElectricalSpeed{ 0.0f };
+            // Written by the event loop, read by the control interrupt; never above the envelope.
+            volatile float current{ 0.0f };
+        };
+
+        SpeedMeasurement speedMeasurement;
         QuadratureVoltageWindow voltageWindow;
         float voltageScale{ 0.0f };
         uint32_t samplesPerMillisecond{ 1 };
-        float previousMechanicalAngle{ 0.0f };
-        bool previousAngleValid{ false };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastIq{ 0.0f };
-        RadiansPerSecond speedLimit{ 0.0f };
-        // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
-        volatile float inverseElectricalSpeedLimit{ 0.0f };
-        // Written by the event loop, read by the control interrupt; never above the envelope.
-        volatile float currentLimit;
+        DriveLimits limits;
         CoggingFeedForward coggingFeedForward;
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };

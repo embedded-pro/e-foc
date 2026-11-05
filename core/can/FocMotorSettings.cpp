@@ -55,32 +55,43 @@ namespace can
                     return std::nullopt;
             }
         }
+
+        std::optional<ParameterGroup> LoopGroupOf(FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::currentBandwidth:
+                case FocParameter::currentSwitchingGain:
+                case FocParameter::currentBoundaryLayer:
+                case FocParameter::currentTwoStepDeadbeat:
+                    return ParameterGroup::currentLoop;
+                case FocParameter::speedBandwidth:
+                case FocParameter::speedErrorWeight:
+                case FocParameter::speedIntegralWeight:
+                case FocParameter::speedObserverBandwidthRatio:
+                case FocParameter::speedReferenceTimeConstant:
+                    return ParameterGroup::speedLoop;
+                case FocParameter::positionBandwidth:
+                case FocParameter::positionErrorWeight:
+                case FocParameter::positionSpeedErrorWeight:
+                case FocParameter::positionIntegralWeight:
+                case FocParameter::positionReferenceTimeConstant:
+                    return ParameterGroup::positionLoop;
+                default:
+                    return std::nullopt;
+            }
+        }
     }
 
     ParameterGroup GroupOf(FocParameter parameter)
     {
         if (const auto reading = ReadingGroupOf(parameter))
             return *reading;
+        if (const auto loop = LoopGroupOf(parameter))
+            return *loop;
 
         switch (parameter)
         {
-            case FocParameter::currentBandwidth:
-            case FocParameter::currentSwitchingGain:
-            case FocParameter::currentBoundaryLayer:
-            case FocParameter::currentTwoStepDeadbeat:
-                return ParameterGroup::currentLoop;
-            case FocParameter::speedBandwidth:
-            case FocParameter::speedErrorWeight:
-            case FocParameter::speedIntegralWeight:
-            case FocParameter::speedObserverBandwidthRatio:
-            case FocParameter::speedReferenceTimeConstant:
-                return ParameterGroup::speedLoop;
-            case FocParameter::positionBandwidth:
-            case FocParameter::positionErrorWeight:
-            case FocParameter::positionSpeedErrorWeight:
-            case FocParameter::positionIntegralWeight:
-            case FocParameter::positionReferenceTimeConstant:
-                return ParameterGroup::positionLoop;
             case FocParameter::encoderResolution:
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
