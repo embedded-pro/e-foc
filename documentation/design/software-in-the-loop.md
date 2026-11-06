@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.4
+version: 1.13.5
 component: "software-in-the-loop"
 date: 2026-11-05
 ---
@@ -155,7 +155,7 @@ sequenceDiagram
     H->>H: write both images into the scenario directory
     H->>T: start the emulator there
     T->>T: read the plant, restore the configuration
-    H->>T: status request, every 50 ms
+    H->>T: status request, at most one a second
     T-->>H: CAN heartbeat
     S->>T: CAN commands
     T-->>S: acknowledgements and telemetry

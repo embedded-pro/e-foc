@@ -78,6 +78,7 @@ namespace integration
 
         TargetInteractor& interactor;
         std::chrono::steady_clock::time_point canReference{};
+        std::chrono::steady_clock::time_point lastStatusRequest{};
         static constexpr uint16_t kAssumedServerNodeId{ 1 };
 
         // Learnt from the first heartbeat: a board's node follows its board ID, so it is not always 1.
