@@ -112,8 +112,6 @@ namespace can
         bool HandleElectricalParamsResponse(const hal::Can::Message& data);
         bool HandleAlgorithmsResponse(const hal::Can::Message& data);
         bool HandleParameterResponse(const hal::Can::Message& data);
-        bool HandleFaultRecordResponse(const hal::Can::Message& data);
-        bool HandleFaultConditionsResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };
@@ -123,8 +121,22 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> electricalParamsResponse{ focElectricalParamsResponseId, *this, &FocMotorCategoryClient::HandleElectricalParamsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> algorithmsResponse{ focAlgorithmsResponseId, *this, &FocMotorCategoryClient::HandleAlgorithmsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> parameterResponse{ focParameterResponseId, *this, &FocMotorCategoryClient::HandleParameterResponse };
-        services::CanMessageHandler<FocMotorCategoryClient> faultRecordResponse{ focFaultRecordResponseId, *this, &FocMotorCategoryClient::HandleFaultRecordResponse };
-        services::CanMessageHandler<FocMotorCategoryClient> faultConditionsResponse{ focFaultConditionsResponseId, *this, &FocMotorCategoryClient::HandleFaultConditionsResponse };
+
+        class FaultHistoryMessages
+        {
+        public:
+            explicit FaultHistoryMessages(FocMotorCategoryClient& client);
+
+        private:
+            bool HandleFaultRecordResponse(const hal::Can::Message& data);
+            bool HandleFaultConditionsResponse(const hal::Can::Message& data);
+
+            FocMotorCategoryClient& client;
+            services::CanMessageHandler<FaultHistoryMessages> faultRecordResponse;
+            services::CanMessageHandler<FaultHistoryMessages> faultConditionsResponse;
+        };
+
+        FaultHistoryMessages faultHistoryMessages{ *this };
 
         const CanFrameOrigin& origin;
         NodeContracts contracts;
