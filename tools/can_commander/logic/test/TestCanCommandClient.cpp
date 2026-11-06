@@ -1366,3 +1366,73 @@ TEST_F(TestCanCommandClient, a_firmware_upgrade_answer_names_the_node_it_came_fr
 
     EXPECT_EQ(3, client.FrameOrigin().SourceNodeId());
 }
+
+TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_its_eight_newest_faults)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::faultHistoryContractMinor);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsFaultHistory(1));
+    std::vector<uint8_t> ages;
+    for (const auto& frame : sent)
+        if (frame.messageType == can::focQueryFaultHistoryId && frame.payload.size() == 2)
+            ages.push_back(frame.payload[1]);
+    EXPECT_EQ((std::vector<uint8_t>{ 0, 1, 2, 3, 4, 5, 6, 7 }), ages);
+}
+
+TEST_F(TestCanCommandClient, a_2_15_node_is_not_asked_for_its_fault_history)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::busVoltageLimitsContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    client.RequestFaultHistory(1);
+
+    EXPECT_FALSE(client.SupportsFaultHistory(1));
+    EXPECT_EQ(0u, Count(can::focQueryFaultHistoryId));
+}
+
+TEST_F(TestCanCommandClient, a_fault_record_is_reported_once_both_of_its_responses_arrived)
+{
+    BringOnline(1);
+    Receive(FocId(services::CanPriority::response, can::focFaultRecordResponseId, 1), Message({ 0x01, 0x02, 0x01, 0x00, 0x00, 0x05, 0xDC }));
+
+    EXPECT_CALL(observer, OnFaultRecordReceived(1, _)).WillOnce(Invoke([](uint16_t, const can::FocFaultRecord& record)
+        {
+            EXPECT_EQ(1, record.age);
+            EXPECT_EQ(can::FocFaultCode::overVoltage, record.code);
+            EXPECT_EQ(can::FocMotorMode::speed, record.mode);
+            EXPECT_EQ(1500u, record.uptimeMs);
+            EXPECT_EQ(12, record.powerUp);
+            EXPECT_NEAR(41.23f, record.busVoltage.Value(), 1e-4f);
+            EXPECT_NEAR(-2.5f, record.peakCurrent.Value(), 1e-4f);
+        }));
+    Receive(FocId(services::CanPriority::response, can::focFaultConditionsResponseId, 1), Message({ 0x01, 0x00, 0x0C, 0x10, 0x1B, 0xFF, 0x06 }));
+}
+
+TEST_F(TestCanCommandClient, fault_conditions_of_another_age_are_not_reported)
+{
+    BringOnline(1);
+    Receive(FocId(services::CanPriority::response, can::focFaultRecordResponseId, 1), Message({ 0x01, 0x02, 0x01, 0x00, 0x00, 0x05, 0xDC }));
+
+    Receive(FocId(services::CanPriority::response, can::focFaultConditionsResponseId, 1), Message({ 0x02, 0x00, 0x0C, 0x10, 0x1B, 0xFF, 0x06 }));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_clear_of_the_fault_history_reads_it_again)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::faultHistoryContractMinor);
+    AnswerAllReads();
+    EXPECT_TRUE(client.SendClearFaultHistory(1));
+    EXPECT_EQ(can::focClearFaultHistoryId, sent.back().messageType);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focClearFaultHistoryId, services::CanAckStatus::success));
+    DeliverAck(can::focClearFaultHistoryId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focFaultHistoryDepth, Count(can::focQueryFaultHistoryId));
+}

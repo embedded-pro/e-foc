@@ -28,5 +28,6 @@ namespace tool
         MOCK_METHOD(void, OnAlgorithmsReceived, (uint16_t nodeId, const can::FocAlgorithms& algorithms), (override));
         MOCK_METHOD(void, OnParameterReceived, (uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
         MOCK_METHOD(void, OnFirmwareIdentityReceived, (uint16_t nodeId, const FirmwareIdentity& identity), (override));
+        MOCK_METHOD(void, OnFaultRecordReceived, (uint16_t nodeId, const can::FocFaultRecord& record), (override));
     };
 }
