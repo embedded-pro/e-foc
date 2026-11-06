@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.4.1
+version: 0.5.0
 component: service-mechanical-ident
-date: 2026-10-23
+date: 2026-11-06
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.4.1                                         |
+| Version   | 0.5.0                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-10-23                                    |
+| Date      | 2026-11-06                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -586,4 +586,4 @@ The online forgetting factor $\lambda = 0.9995$ applies an exponential weight de
 
 ### Estimate Consumption
 
-Estimates are not applied automatically. The operator or application explicitly triggers a speed-PID retune via `ApplyOnlineEstimates()` on the state machine. See the State Machine design document for details.
+The estimate reaches the speed loop only through online recalibration (`online-recalibration.md`): once a direction's fit has settled, the estimator reports itself settled, and a settled estimate may replace the inertia and friction the loop is designed from while the drive is stopped.

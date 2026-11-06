@@ -120,6 +120,8 @@ namespace state_machine
 
         if (config.stallDetection > 1)
             config.stallDetection = services::ConfigData{}.stallDetection;
+        if (config.recalibrationMode > static_cast<uint8_t>(services::RecalibrationMode::automatic))
+            config.recalibrationMode = services::ConfigData{}.recalibrationMode;
     }
 
     void SanitizeLimits(services::ConfigData& config)

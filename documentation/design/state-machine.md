@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.7.1
+version: 0.8.0
 component: state-machine
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.7.1                      |
+| Version   | 0.8.0                      |
 | Component | state-machine              |
-| Date      | 2026-11-05                 |
+| Date      | 2026-11-06                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -876,25 +876,22 @@ sequenceDiagram
 
 The electrical estimator is seeded using `lD` (d-axis inductance), as the underlying model assumes a non-salient motor ($L_d \approx L_q$). For interior PMSMs, a 3-parameter model with separate Ld and Lq would be required; this is a known limitation.
 
-**Estimate consumption is explicit:** Estimates are NOT applied to PID gains continuously. The operator (or application logic) explicitly triggers a PID retune by calling `ApplyOnlineEstimates()`. This prevents gain oscillation before the estimators have converged and guards against applying poorly-conditioned estimates at runtime.
-
-When `ApplyOnlineEstimates()` is called while in `Enabled` state:
-1. Current inertia and friction estimates are read from the mechanical estimator
-2. Speed PID gains are recomputed using the bandwidth-based rule from `documentation/theory/speed-loop-pi.md`
-   ("What the implementation uses"): $k_p = 2 J \omega_{bw} / K_t$, $k_i = k_p \max(B_f/J,\ \omega_{bw}/4)\, T_s$
-   with $T_s$ the outer-loop sample period, where $J$ is the estimated inertia, $B_f$ the viscous friction, and
-   $K_t = \tfrac{3}{2} p \psi_f$ the torque constant derived from the calibration record
-3. Current resistance and inductance estimates are read from the electrical estimator
-4. Current PID gains are recomputed from the bandwidth-based tuning rule
-
-If called from any state other than `Enabled`, the call is silently ignored.
+**Estimates reach the loops only while the drive is stopped:** the gains are never redesigned while `Enabled`,
+where neither the current nor the speed loop design is interrupt-safe. Online recalibration
+(`online-recalibration.md`) decides when a settled estimate replaces the model the loops are designed from and
+applies it on entering `Ready` from `Enabled` (automatic mode) or on a Recalibrate command in a stopped state. The
+current loop is redesigned from the resistance and inductance in use, the speed loop from the inertia and friction
+in use with the bandwidth-based rule of `documentation/theory/speed-loop-pi.md` ("What the implementation uses"):
+$k_p = 2 J \omega_{bw} / K_t$, $k_i = k_p \max(B_f/J,\ \omega_{bw}/4)\, T_s$ with $T_s$ the outer-loop sample
+period and $K_t = \tfrac{3}{2} p \psi_f$ from the calibration record; the operator's loop settings are applied
+again afterwards, so the bandwidths do not change. The estimators are not seeded again.
 
 **Runtime control commands (CLI policy, speed/position modes only):**
 
-| Command           | Short | Description                                           |
-|-------------------|-------|-------------------------------------------------------|
-| `apply_estimates` | `ae`  | Apply online estimates to speed and current PID gains |
-| `estimate_status` | `es`  | Print current J, B (micro-units), R, Ld to the tracer |
+| Command           | Short | Description                                                   |
+|-------------------|-------|---------------------------------------------------------------|
+| `apply_estimates` | `ae`  | Recalibrate: adopt the settled online estimates while stopped |
+| `estimate_status` | `es`  | Print current J, B (micro-units), R, Ld to the tracer         |
 
 ### Control Mode Selection (`ControlModeStateMachine`)
 
@@ -1074,7 +1071,7 @@ sequenceDiagram
 | `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
 | `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. Used by `ControlModeStateMachine` to refuse destroying the machine.                   |
 | `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
-| `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
+| `ApplyModel(model)`       | Redesigns the current and speed loops from a motor model                               | Only effective while stopped; returns false otherwise. Keeps the estimators' state. Speed/position modes only (`online-recalibration.md`).                                                                                                                   |
 
 ### Required
 

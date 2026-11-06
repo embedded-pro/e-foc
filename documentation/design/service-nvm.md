@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: service-nvm
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.11.0                       |
+| Version   | 0.12.0                       |
 | Component | service-nvm                  |
-| Date      | 2026-11-05                   |
+| Date      | 2026-11-06                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -59,7 +59,9 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
-The configuration record's layout is at version 12. The bus-voltage minimum and maximum (`fault-supervision.md`
+The configuration record's layout is at version 13. The recalibration mode (`online-recalibration.md`) took one of
+the two reserved bytes, so a record written at version 12 reads as a version mismatch and the configuration returns to
+its defaults. Version 12's bus-voltage minimum and maximum (`fault-supervision.md`
 Part L) took its data from 160 to 168 bytes, as version 11 had taken it from 152 to 160 bytes for the temperature limit
 and margin (Part K), version 10 from 148 to 152 bytes for the calibration temperature and version 9 from 140 to 148 bytes for the software position
 limits (`foc-position.md` Software Position Limits) and version 8 from 132 to 140 bytes for the
@@ -271,6 +273,7 @@ firmware derived, so the layout stays at version 4 and no stored calibration is 
 | positionAlgorithm      | —                               | Position-loop algorithm selected on power-up                                                                   |
 | currentTwoStepDeadbeat | —                               | Two-step variant of the deadbeat current law                                                                   |
 | stallDetection         | —                               | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
+| recalibrationMode      | —                               | Online recalibration: 0 off (the default), 1 on command, 2 automatic (`online-recalibration.md`)               |
 
 The limits are the overspeed limit (`fault-supervision.md` Part G), 1–5000 rad/s, default 1000; the
 following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H); the speed
@@ -286,8 +289,8 @@ both 0 (off) by default (`foc-position.md` Software Position Limits); the calibr
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible
-only if a later firmware narrows a range without bumping the layout — is replaced by its default. The four-byte fields precede the byte-sized ones and two
-reserved bytes complete the last word, so the record has no implicit padding. The supervision fields and the
+only if a later firmware narrows a range without bumping the layout — is replaced by its default. The four-byte fields precede the byte-sized ones and a
+reserved byte completes the last word, so the record has no implicit padding. The supervision fields and the
 limits are checked the same way, one field at a time, against the command limits the wire contract also uses.
 
 The four selection fields are stored as raw byte identifiers. A record can pass the integrity check

@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.17.0
+version: 0.18.0
 component: can-service
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.17.0                   |
+| Version   | 0.18.0                   |
 | Component | can-service              |
-| Date      | 2026-11-05               |
+| Date      | 2026-11-06               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -433,6 +433,34 @@ fault code, as a trip of the board's comparators does.
 
 A client older than 2.15 asks for the new parameters only when the server reports 2.15 or newer.
 
+**Contract 2.16 — online recalibration.** Version 2.16 adds one command, one stored setting and six read-only
+parameters; nothing in 2.15 changes (`online-recalibration.md`). The command takes `0x1D`, leaving `0x1A`–`0x1C` to
+the quick stop and the fault history, which are numbered apart.
+
+| ID     | Message       | Direction | Fields | Answer                                                                        |
+|--------|---------------|-----------|--------|-------------------------------------------------------------------------------|
+| `0x1D` | `Recalibrate` | command   | —      | acknowledge once the settled estimates are adopted; the counters say how many |
+
+`Recalibrate` is refused with `invalidState` while the drive is not stopped or the mode is off, and with the
+category error `modeMismatch` in torque mode, which runs no estimators. Accepted with nothing to adopt, it changes
+nothing.
+
+| ID     | Parameter           | Unit | Range                            | Automatic | Takes effect     |
+|--------|---------------------|------|----------------------------------|-----------|------------------|
+| `0x76` | `recalibrationMode` | -    | 0 off, 1 on command, 2 automatic | no        | at the next stop |
+
+| ID     | Parameter                | Unit     | Value                                                            | Automatic |
+|--------|--------------------------|----------|------------------------------------------------------------------|-----------|
+| `0x94` | `modelResistance`        | ohm      | Resistance the current loop is designed from; `0` in torque mode | no        |
+| `0x95` | `modelInductance`        | mH       | Inductance the current loop is designed from, as above           | no        |
+| `0x96` | `modelInertia`           | kg.m2    | Inertia the speed loop is designed from, as above                | no        |
+| `0x97` | `modelViscousFriction`   | Nm.s/rad | Viscous friction the speed loop is designed from, as above       | no        |
+| `0x98` | `recalibrationsApplied`  | -        | Quantities recalibrated since power-up                           | no        |
+| `0x99` | `recalibrationsRejected` | -        | Settled readings outside their plausibility band since power-up  | no        |
+
+The model parameters equal the calibration record until a recalibration; the motor parameters (`0x40`–`0x45`) keep
+reading the record. A client older than 2.16 asks for none of them.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -492,6 +520,7 @@ The observer interface provides callbacks for:
 - `OnCalibrate`, `OnClearCalibration` — commands without fields, with a `CanAckStatus` result callback that
   is called when the sequence or the invalidation ends.
 - `OnClearDiagnostics` — a command without fields, with a completion callback.
+- `OnRecalibrate` — the recalibration command of contract 2.16, with a `CanAckStatus` result callback.
 
 The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
 one handler group of the server, so the server's own surface stays small as the contract grows.
@@ -559,6 +588,8 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   outstanding is answered `busy`.
 - `OnClearDiagnostics` → `PlatformDiagnostics::Reset()`, which restarts the control-loop and CAN statistics;
   always succeeds.
+- `OnRecalibrate` → `ControlModeStateMachine::CmdRecalibrate()`; not stopped or the mode off answers
+  `invalidState`, torque mode `modeMismatch`.
 
 The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
 `OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and `OnClearDiagnostics` — are

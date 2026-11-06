@@ -67,6 +67,7 @@ namespace
         MOCK_METHOD(void, OnCalibrate, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearCalibration, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnRecalibrate, ((const infra::Function<void()>&)), (override));
     };
 
     class ContractClientObserver
@@ -327,6 +328,10 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
     client.SendEmergencyStop(1);
     DeliverToServer();
 
+    EXPECT_CALL(serverObserver, OnRecalibrate(_));
+    client.SendRecalibrate(1);
+    DeliverToServer();
+
     EXPECT_CALL(serverObserver, OnSelectAlgorithm(can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof), _));
     client.SendSelectAlgorithm(1, can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof));
     DeliverToServer();
@@ -399,10 +404,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_15)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_16)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(15, can::focContractVersionMinor);
+    EXPECT_EQ(16, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
@@ -591,6 +596,7 @@ namespace
             { can::focCalibrateId, { 0x00 } },
             { can::focClearCalibrationId, { 0x00 } },
             { can::focClearDiagnosticsId, { 0x00 } },
+            { can::focRecalibrateId, { 0x00 } },
 
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
@@ -667,6 +673,7 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnCalibrate(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnClearCalibration(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnClearDiagnostics(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnRecalibrate(_)).Times(AnyNumber());
 
     for (const auto& descriptor : can::focMotorMessages)
     {

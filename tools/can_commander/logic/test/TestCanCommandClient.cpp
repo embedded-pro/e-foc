@@ -189,6 +189,8 @@ namespace
         static constexpr std::size_t thermalParameterCount{ 2 };
         static constexpr std::size_t overTemperatureParameterCount{ 2 };
         static constexpr std::size_t busVoltageLimitParameterCount{ 2 };
+        static constexpr std::size_t recalibrationParameterCount{ 7 };
+        static constexpr std::size_t recalibrationReadingCount{ 6 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -1033,7 +1035,7 @@ TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::targetReached));
     EXPECT_TRUE(QueriedAReadOnlyParameter());
 }
@@ -1057,7 +1059,7 @@ TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_setting
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
@@ -1079,7 +1081,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
@@ -1106,7 +1108,7 @@ TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
 
     EXPECT_TRUE(client.SupportsTargetWindow(1));
     EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
 }
@@ -1135,7 +1137,7 @@ TEST_F(TestCanCommandClient, a_2_13_node_is_not_asked_for_its_temperature_limit)
 
     EXPECT_TRUE(client.SupportsThermal(1));
     EXPECT_FALSE(client.SupportsOverTemperature(1));
-    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::temperatureLimit));
 }
 
@@ -1148,12 +1150,12 @@ TEST_F(TestCanCommandClient, a_2_14_node_is_not_asked_for_its_bus_voltage_limits
 
     EXPECT_TRUE(client.SupportsOverTemperature(1));
     EXPECT_FALSE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount - recalibrationParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::busVoltageMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::busVoltageMaximum));
 }
 
-TEST_F(TestCanCommandClient, a_2_15_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_15_node_is_read_for_every_parameter_but_the_recalibration_ones)
 {
     RecordSends();
     BringCompatible(1, 15);
@@ -1161,7 +1163,7 @@ TEST_F(TestCanCommandClient, a_2_15_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - recalibrationParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_13_node_is_asked_for_its_winding_temperature_with_every_status)
@@ -1248,7 +1250,7 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
@@ -1263,7 +1265,7 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
@@ -1278,7 +1280,7 @@ TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
     DeliverAck(can::focClearDiagnosticsId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - WritableParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - WritableParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
@@ -1289,7 +1291,7 @@ TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)
@@ -1365,4 +1367,15 @@ TEST_F(TestCanCommandClient, a_firmware_upgrade_answer_names_the_node_it_came_fr
     Receive(services::MakeCanId(services::CanPriority::response, services::firmwareUpgradeCategoryId, services::fwuVerifyResponseId, 3), Message({ 0 }));
 
     EXPECT_EQ(3, client.FrameOrigin().SourceNodeId());
+}
+
+TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::recalibrationContractMinor);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsRecalibration(1));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }

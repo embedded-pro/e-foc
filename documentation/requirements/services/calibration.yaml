@@ -274,3 +274,30 @@
     acknowledged once the Enable is accepted or refused. Later Enables shall not measure until the
     next power-up, control-mode switch or Fault. With one phase sensor 20 mA from its stored offset
     the drive shall enter Enabled; with it 100 mA away it shall refuse the Start and stay Ready.
+
+- id: REQ-CAL-023
+  title: A settled online estimate replaces the model in use only inside its band
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    In speed and position mode the drive shall treat an online estimate of the resistance,
+    inductance, inertia or viscous friction as a candidate only once its estimator reports it
+    settled and, for an automatic recalibration, once it has differed from the model the loops
+    are designed from by more than 10 percent for 5 s of running; it shall adopt a candidate only
+    within 0.7 to 2, 0.5 to 1.5, 0.5 to 5 and 0.2 to 5 times the commissioned resistance,
+    inductance, inertia and viscous friction, and count and trace each candidate outside its band
+    as rejected. With the stored inertia 1.5 times the plant's and automatic recalibration on, the
+    inertia in use after a run and a stop shall be within 10 percent of the plant's.
+
+- id: REQ-CAL-024
+  title: A recalibration redesigns the loops only while stopped and keeps their bandwidths
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    The drive shall apply a recalibration only on entering Ready from Enabled with the mode
+    automatic, or on a Recalibrate command while stopped with the mode on command or automatic;
+    it shall redesign the current loop from the resistance and inductance in use and the speed
+    and position loops from the inertia and friction in use, keep the loop bandwidths the operator
+    or the calibration set, leave the calibration record and the online estimators' state
+    unchanged, and start every power-up from the calibration record. With the mode off, the
+    default, the loops shall be designed from the calibration record only.

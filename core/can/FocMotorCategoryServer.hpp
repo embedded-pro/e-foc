@@ -49,6 +49,7 @@ namespace can
         virtual void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnClearDiagnostics(const infra::Function<void()>& onDone) = 0;
+        virtual void OnRecalibrate(const infra::Function<void()>& onAccepted) = 0;
     };
 
     class FocMotorCategoryServer
@@ -95,6 +96,7 @@ namespace can
         bool HandleSetParameter(const hal::Can::Message& data);
         bool HandleQueryParameter(const hal::Can::Message& data);
         bool HandleClearDiagnostics(const hal::Can::Message& data);
+        bool HandleRecalibrate(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };
@@ -144,5 +146,6 @@ namespace can
 
         CommissioningMessages commissioningMessages{ *this };
         services::CanMessageHandler<FocMotorCategoryServer> clearDiagnostics{ focClearDiagnosticsId, *this, &FocMotorCategoryServer::HandleClearDiagnostics };
+        services::CanMessageHandler<FocMotorCategoryServer> recalibrate{ focRecalibrateId, *this, &FocMotorCategoryServer::HandleRecalibrate };
     };
 }

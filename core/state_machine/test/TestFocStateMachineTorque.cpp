@@ -2951,49 +2951,6 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_cal_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, apply_online_estimates_does_not_change_state_when_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, apply_online_estimates_is_ignored_when_not_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
 TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_returns_ok)
 {
     GivenFaultNotifierRegistered();

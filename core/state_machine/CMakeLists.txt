@@ -32,6 +32,8 @@ target_sources(e_foc.state_machine PRIVATE
     ConfigWriter.cpp
     OperatorTunings.hpp
     OperatorTunings.cpp
+    Recalibration.cpp
+    Recalibration.hpp
     CalibrationContext.hpp
     CalibrationContext.cpp
     CalibrationOrchestrator.hpp

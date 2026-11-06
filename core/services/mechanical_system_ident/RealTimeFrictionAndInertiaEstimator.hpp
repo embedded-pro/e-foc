@@ -27,6 +27,7 @@ namespace services
 
         foc::NewtonMeterSecondSquared CurrentInertia() const override;
         foc::NewtonMeterSecondPerRadian CurrentFriction() const override;
+        bool HasSettled() const;
 
     private:
         using MotorRLS = MechanicalRls;
@@ -57,6 +58,7 @@ namespace services
 
         foc::NewtonMeter torqueConstant{ 1.0f };
         foc::NewtonMeterSecondSquared currentInertia{ 0.0f };
+        bool settled{ false };
         foc::NewtonMeterSecondPerRadian currentFriction{ 0.0f };
     };
 }

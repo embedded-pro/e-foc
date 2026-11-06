@@ -239,6 +239,39 @@ WHEN(R"(the online estimates are read)")
         << "The target did not report its online estimates over CAN";
 }
 
+WHEN(R"(the drive is recalibrated over CAN)")
+{
+    ASSERT_TRUE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focRecalibrateId))
+        << "The target refused the Recalibrate command";
+}
+
+THEN(R"(a recalibration over CAN shall be refused)")
+{
+    EXPECT_FALSE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focRecalibrateId))
+        << "The target accepted the Recalibrate command";
+}
+
+WHEN(R"(the model in use is read)")
+{
+    auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+
+    setup.inUse.resistanceOhm = ReadParameterValue(fixture, can::FocParameter::modelResistance);
+    setup.inUse.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::modelInductance);
+    setup.inUse.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::modelInertia);
+    setup.inUse.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::modelViscousFriction);
+
+    ASSERT_TRUE(setup.inUse.resistanceOhm.has_value() && setup.inUse.inductanceMilliHenry.has_value() &&
+                setup.inUse.inertiaKgM2.has_value() && setup.inUse.frictionNmSPerRad.has_value())
+        << "The target did not report the model in use over CAN";
+}
+
+THEN(R"(the {word} in use shall be within {float} % of the plant)", (std::string quantity, float limitPercent))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    CompareWithPlant(setup, setup.inUse, "in use", quantity, limitPercent, kReferenceCelsius);
+}
+
 THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::string quantity, float limitPercent))
 {
     const auto& setup = context.Get<ScenarioSetup>();

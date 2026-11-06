@@ -88,18 +88,14 @@ namespace state_machine
         return std::holds_alternative<Idle>(state) || std::holds_alternative<Ready>(state);
     }
 
-    struct AppliedEstimates
-    {
-        bool mechanics{ false };
-        bool electrical{ false };
-    };
-
     struct OnlineEstimates
     {
         foc::Ohm resistance;
         foc::MilliHenry inductance;
         foc::NewtonMeterSecondSquared inertia;
         foc::NewtonMeterSecondPerRadian viscousFriction;
+        bool electricalSettled{ false };
+        bool mechanicalSettled{ false };
     };
 
     class FocStateMachineBase
@@ -126,11 +122,6 @@ namespace state_machine
         virtual CommandResult CmdClearFault() = 0;
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEmergencyStop() = 0;
-
-        virtual AppliedEstimates ApplyOnlineEstimates()
-        {
-            return {};
-        }
 
         virtual std::optional<OnlineEstimates> CurrentOnlineEstimates()
         {

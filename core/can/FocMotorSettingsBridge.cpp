@@ -32,6 +32,12 @@ namespace can
             }
         }
 
+        bool IsRecalibrationReading(FocParameter parameter)
+        {
+            const auto id = static_cast<uint8_t>(parameter);
+            return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsRejected);
+        }
+
         bool IsStoredSetting(FocParameter parameter)
         {
             const auto group = GroupOf(parameter);
@@ -259,6 +265,9 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldOnlineEstimate(FocParameter parameter) const
     {
+        if (IsRecalibrationReading(parameter))
+            return HeldRecalibrationReading(parameter);
+
         const auto estimates = controlMode.ActiveStateMachine().CurrentOnlineEstimates();
         if (!estimates.has_value())
             return FocParameterValue{ 0.0f, false };
@@ -274,6 +283,39 @@ namespace can
             default:
                 return FocParameterValue{ estimates->viscousFriction.Value(), false };
         }
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldRecalibrationReading(FocParameter parameter) const
+    {
+        if (parameter == FocParameter::recalibrationsApplied)
+            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsApplied()), false };
+        if (parameter == FocParameter::recalibrationsRejected)
+            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsRejected()), false };
+
+        const auto model = controlMode.ModelInUse();
+        if (!model.has_value())
+            return FocParameterValue{ 0.0f, false };
+
+        switch (parameter)
+        {
+            case FocParameter::modelResistance:
+                return FocParameterValue{ model->resistance.Value(), false };
+            case FocParameter::modelInductance:
+                return FocParameterValue{ model->inductance.Value(), false };
+            case FocParameter::modelInertia:
+                return FocParameterValue{ model->inertia.Value(), false };
+            default:
+                return FocParameterValue{ model->viscousFriction.Value(), false };
+        }
+    }
+
+    void FocMotorSettingsBridge::Recalibrate(const infra::Function<void()>& onAccepted)
+    {
+        const auto result = controlMode.CmdRecalibrate();
+        if (result == state_machine::SettingResult::ok)
+            onAccepted();
+        else
+            ReportSettingFailure(focRecalibrateId, result);
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const

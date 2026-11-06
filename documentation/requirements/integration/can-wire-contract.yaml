@@ -225,3 +225,16 @@
     busVoltageMinimum (0x30) and busVoltageMaximum (0x31) in V, 0 to 100, each writable in any
     state, answered with the value held once stored, refused with invalidPayload outside its range
     and read back unchanged after a restart.
+
+- id: REQ-CAN-024
+  title: Online recalibration is selected, commanded and read over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.16 shall add, without changing any 2.15 message, the command Recalibrate
+    (0x1D), refused with invalidState while the drive is not stopped or the mode is off and with
+    modeMismatch in torque mode; the stored setting recalibrationMode (0x76), 0 off, 1 on command,
+    2 automatic, read back unchanged after a restart; and the read-only parameters
+    modelResistance, modelInductance, modelInertia and modelViscousFriction (0x94 to 0x97), the
+    model the loops are designed from, and recalibrationsApplied and recalibrationsRejected (0x98,
+    0x99), counted since power-up.

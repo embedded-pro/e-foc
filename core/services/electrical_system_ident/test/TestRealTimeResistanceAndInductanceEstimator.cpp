@@ -160,3 +160,19 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, under_sensor_noise_the_sett
 
     EXPECT_LT(worst, 0.02f);
 }
+
+TEST_F(TestRealTimeResistanceAndInductanceEstimator, an_estimate_is_settled_once_published_and_no_longer_after_a_new_seed)
+{
+    const Winding winding;
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+    EXPECT_FALSE(estimator.HasSettled());
+
+    WindowedWindingRun{ winding, estimator }.Run(0.5f, 100);
+    EXPECT_FALSE(estimator.HasSettled());
+
+    WindowedWindingRun{ winding, estimator }.Run(0.5f, 300);
+    EXPECT_TRUE(estimator.HasSettled());
+
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+    EXPECT_FALSE(estimator.HasSettled());
+}

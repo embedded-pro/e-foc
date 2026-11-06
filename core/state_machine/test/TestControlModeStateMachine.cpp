@@ -989,13 +989,14 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCali
         subject->ActiveStateMachine().CurrentState()));
 }
 
-TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_NoOp_In_Torque_Mode)
+TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_Refused_In_Torque_Mode)
 {
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
-    // No mock expectations — guard prevents ApplyOnlineEstimates() from being called
     InvokeCliCommand("ae");
+
+    EXPECT_EQ(state_machine::SettingResult::wrongMode, subject->CmdRecalibrate());
 }
 
 TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not_Crash)
@@ -1005,8 +1006,9 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not
     ConstructSubject();
     subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-    // ApplyOnlineEstimates() returns early when SM is not Enabled — no mock expectations
     InvokeCliCommand("ae");
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(subject->ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Torque)
@@ -1237,7 +1239,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Speed_Mode)
         subject->ActiveStateMachine().CurrentState()));
 }
 
-TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_In_Speed_Mode)
+TEST_F(ControlModeStateMachineLifecycleTest, Recalibrate_Is_Refused_While_Enabled_In_Speed_Mode)
 {
     GivenNvmAlwaysInvalid();
     GivenNvmSaveConfigSucceeds();
@@ -1251,10 +1253,52 @@ TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_I
     EXPECT_CALL(inverterMock, Start()).Times(1);
     subject->ActiveStateMachine().CmdEnable();
 
-    subject->ActiveStateMachine().ApplyOnlineEstimates();
+    subject->Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::onCommand);
 
+    EXPECT_EQ(state_machine::SettingResult::invalidState, subject->CmdRecalibrate());
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
         subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Recalibrate_With_The_Mode_Off_Is_Refused)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_EQ(state_machine::SettingResult::invalidState, subject->CmdRecalibrate());
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Recalibrate_While_Stopped_With_Nothing_Settled_Keeps_The_Calibration_Record)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+    subject->Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::onCommand);
+
+    EXPECT_EQ(state_machine::SettingResult::ok, subject->CmdRecalibrate());
+
+    const auto& record = subject->CalibrationRecord();
+    ASSERT_TRUE(subject->ModelInUse().has_value());
+    EXPECT_EQ((state_machine::MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } }), *subject->ModelInUse());
+    EXPECT_EQ(0, subject->RecalibrationsApplied());
+    EXPECT_EQ(0, subject->RecalibrationsRejected());
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Torque_Mode_Has_No_Model_In_Use)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_FALSE(subject->ModelInUse().has_value());
 }
 
 TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Position_Mode)

@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: service-electrical-ident
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.6.0                                         |
+| Version   | 0.7.0                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-11-05                                    |
+| Date      | 2026-11-06                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -427,6 +427,10 @@ until the next burst. A burst holds two memories of the estimator, which converg
 seeds of REQ-CAL-014; a winding that warms over minutes is still followed, a minute at a time. In simulation
 the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA RMS in the pause after it,
 while the speed reference steps between 30 and 50 rad/s (REQ-CAL-019).
+
+The estimator reports itself settled once it has published, after the 200 updates it needs from its seed. Online
+recalibration (`online-recalibration.md`) adopts an estimate only once it has settled, and only while the drive is
+stopped; nothing else changes the current loop's design from it.
 
 ### Publication
 

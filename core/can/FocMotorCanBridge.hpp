@@ -76,6 +76,7 @@ namespace can
         void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearDiagnostics(const infra::Function<void()>& onDone) override;
+        void OnRecalibrate(const infra::Function<void()>& onAccepted) override;
 
     private:
         static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);

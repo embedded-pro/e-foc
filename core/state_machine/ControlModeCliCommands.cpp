@@ -305,10 +305,11 @@ namespace state_machine
                 return sm.ActiveCommon();
             });
 
-        terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
-            [&sm](const infra::BoundedConstString&)
+        terminal.AddCommand({ { "apply_estimates", "ae", "Recalibrate from the settled online estimates while stopped" },
+            [&sm, &tracer](const infra::BoundedConstString&)
             {
-                sm.ApplyOnlineEstimates();
+                if (sm.CmdRecalibrate() != SettingResult::ok)
+                    tracer.Trace() << "[SM] Recalibration refused: stop the drive, select speed or position mode and set the mode on";
             } });
 
         terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },

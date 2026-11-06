@@ -2681,3 +2681,71 @@ TEST_F(FocMotorCanBridgeTest, FirmwareUpgradeInterlock_HoldsTheDriveUntilRelease
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InSpeedMode_IsTheCalibrationRecordUntilARecalibration)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+    const auto& record = coordinator->CalibrationRecord();
+
+    DispatchQueryParameter(can::FocParameter::modelResistance);
+    ExpectAnswered(record.rPhase, false);
+    DispatchQueryParameter(can::FocParameter::modelInductance);
+    ExpectAnswered(record.lD, false);
+    DispatchQueryParameter(can::FocParameter::modelInertia);
+    ExpectAnswered(record.inertia, false);
+    DispatchQueryParameter(can::FocParameter::modelViscousFriction);
+    ExpectAnswered(record.frictionViscous, false);
+    DispatchQueryParameter(can::FocParameter::recalibrationsApplied);
+    ExpectAnswered(0.0f, false);
+    DispatchQueryParameter(can::FocParameter::recalibrationsRejected);
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InTorqueMode_IsZero)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::modelInertia);
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, Recalibrate_InTorqueMode_IsAModeMismatch)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchCommand(can::focRecalibrateId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(can::focRecalibrateId, lastCategoryErrorOriginCmd);
+    EXPECT_EQ(can::FocMotorCategoryError::modeMismatch, lastCategoryError);
+}
+
+TEST_F(FocMotorCanBridgeTest, Recalibrate_WithTheModeOff_IsRefusedAsInvalidState)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchCommand(can::focRecalibrateId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focRecalibrateId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::invalidState, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCanBridgeTest, Recalibrate_OnCommandWhileStopped_IsAccepted)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    coordinator->Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::onCommand);
+    ResetCaptures();
+
+    DispatchCommand(can::focRecalibrateId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+}

@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 15;
+    static constexpr uint8_t focContractVersionMinor = 16;
 
     enum class FieldType : uint8_t
     {
@@ -155,7 +155,7 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 24> focMotorMessages{ {
+    inline constexpr std::array<MessageDescriptor, 25> focMotorMessages{ {
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
         MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
@@ -180,6 +180,7 @@ namespace can
         MakeDescriptor(focCalibrateId, "Calibrate", Direction::command),
         MakeDescriptor(focClearCalibrationId, "ClearCalibration", Direction::command),
         MakeDescriptor(focClearDiagnosticsId, "ClearDiagnostics", Direction::command),
+        MakeDescriptor(focRecalibrateId, "Recalibrate", Direction::command),
     } };
 
     inline constexpr std::array<MessageDescriptor, 8> focMotorResponses{ {
@@ -245,7 +246,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 73> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 80> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -319,6 +320,13 @@ namespace can
         { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::targetReached, "targetReached", "-", 0.0f, 1.0f, true, false, true },
         { FocParameter::windingTemperature, "windingTemperature", "degC", -focMaxReading, focMaxReading, false, false, true },
+        { FocParameter::recalibrationMode, "recalibrationMode", "-", 0.0f, 2.0f, true, false },
+        { FocParameter::modelResistance, "modelResistance", "ohm", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::modelInductance, "modelInductance", "mH", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::modelInertia, "modelInertia", "kg.m2", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::modelViscousFriction, "modelViscousFriction", "Nm.s/rad", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::recalibrationsApplied, "recalibrationsApplied", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::recalibrationsRejected, "recalibrationsRejected", "-", 0.0f, focMaxReading, true, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

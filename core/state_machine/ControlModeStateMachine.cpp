@@ -36,6 +36,10 @@ namespace state_machine
         SanitizeLimits(this->configData);
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
+        recalibrationTimer.Start(Recalibration::observationPeriod, [this]()
+            {
+                ObserveOnlineEstimates();
+            });
     }
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
@@ -158,15 +162,102 @@ namespace state_machine
         return true;
     }
 
-    void ControlModeStateMachine::ApplyOnlineEstimates()
+    SettingResult ControlModeStateMachine::CmdRecalibrate()
     {
-        const auto applied = ActiveStateMachine().ApplyOnlineEstimates();
+        if (ActiveOuterLoop() == nullptr)
+            return SettingResult::wrongMode;
 
-        if (auto* tunable = CurrentTunable(); applied.electrical && tunable != nullptr)
-            tunable->SetCurrentTunings(EffectiveCurrentTunings());
+        if (RecalibrationModeSetting() == services::RecalibrationMode::off)
+            return SettingResult::invalidState;
 
-        if (auto* tunable = SpeedTunable(); applied.mechanics && tunable != nullptr && tunable->SetSpeedTunings(*EffectiveSpeedTunings()) != foc::SelectResult::ok)
-            terminalAndTracer.tracer.Trace() << "[SM] Speed settings not applied: the active law cannot be designed with them";
+        if (const auto gate = SettingGate(); gate != SettingResult::ok)
+            return gate;
+
+        recalibration.Commission(CommissionedModel());
+        const auto outcome = recalibration.Decide(RecalibrationTrigger::command);
+        Report(outcome);
+        if (outcome.applied != 0)
+            ApplyModelInUse();
+        return SettingResult::ok;
+    }
+
+    std::optional<MotorModel> ControlModeStateMachine::ModelInUse() const
+    {
+        if (ActiveOuterLoop() == nullptr)
+            return std::nullopt;
+        return recalibration.InUse();
+    }
+
+    uint16_t ControlModeStateMachine::RecalibrationsApplied() const
+    {
+        return recalibration.Applied();
+    }
+
+    uint16_t ControlModeStateMachine::RecalibrationsRejected() const
+    {
+        return recalibration.Rejected();
+    }
+
+    void ControlModeStateMachine::ObserveOnlineEstimates()
+    {
+        if (std::holds_alternative<std::monostate>(activeSm) || !std::holds_alternative<Enabled>(ActiveStateMachine().CurrentState()))
+            return;
+
+        const auto estimates = ActiveStateMachine().CurrentOnlineEstimates();
+        if (!estimates.has_value())
+            return;
+
+        ranSinceStop = true;
+        recalibration.Observe(*estimates);
+    }
+
+    void ControlModeStateMachine::RecalibrateOnReady()
+    {
+        if (ActiveOuterLoop() == nullptr)
+            return;
+
+        recalibration.Commission(CommissionedModel());
+        if (ranSinceStop && RecalibrationModeSetting() == services::RecalibrationMode::automatic)
+            Report(recalibration.Decide(RecalibrationTrigger::automatic));
+
+        ranSinceStop = false;
+        ApplyModelInUse();
+    }
+
+    void ControlModeStateMachine::ApplyModelInUse()
+    {
+        auto* outerLoop = ActiveOuterLoop();
+        if (outerLoop == nullptr || recalibration.InUse() == recalibration.Commissioned())
+            return;
+
+        if (outerLoop->ApplyModel(recalibration.InUse()))
+            ApplyOperatorTunings();
+    }
+
+    void ControlModeStateMachine::Report(const Recalibration::Outcome& outcome)
+    {
+        constexpr std::array<const char*, Recalibration::quantities> names{ "resistance", "inductance", "inertia", "viscous friction" };
+        const auto& commissioned = recalibration.Commissioned();
+        const std::array<float, Recalibration::quantities> references{ commissioned.resistance.Value(), commissioned.inductance.Value(), commissioned.inertia.Value(), commissioned.viscousFriction.Value() };
+
+        for (std::size_t quantity = 0; quantity != Recalibration::quantities; ++quantity)
+        {
+            if (outcome.verdicts[quantity] == RecalibrationVerdict::applied)
+                terminalAndTracer.tracer.Trace() << "[SM] Recalibrated " << names[quantity] << ": " << outcome.readings[quantity] << " (commissioned " << references[quantity] << ")";
+            else if (outcome.verdicts[quantity] == RecalibrationVerdict::rejected)
+                terminalAndTracer.tracer.Trace() << "[SM] Rejected " << names[quantity] << " reading " << outcome.readings[quantity] << ": outside its band around " << references[quantity];
+        }
+    }
+
+    MotorModel ControlModeStateMachine::CommissionedModel() const
+    {
+        const auto& record = CalibrationRecord();
+        return MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } };
+    }
+
+    services::RecalibrationMode ControlModeStateMachine::RecalibrationModeSetting() const
+    {
+        return static_cast<services::RecalibrationMode>(configData.recalibrationMode);
     }
 
     TuningResult ControlModeStateMachine::CheckRedesignPreconditions() const
@@ -255,6 +346,7 @@ namespace state_machine
         const auto rotorReference = RotorReferenceToKeep();
         if (!std::holds_alternative<std::monostate>(activeSm))
             ActiveStateMachine().CmdEmergencyStop();
+        ranSinceStop = false;
 
         if (mode == ControlMode::speed)
             AttachAlgorithmRestore(activeSm.emplace<application::SpeedStateMachine>(
@@ -298,12 +390,14 @@ namespace state_machine
             {
                 algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
                 ApplyOperatorTunings();
+                RecalibrateOnReady();
             });
 
         if (std::holds_alternative<Ready>(stateMachine.CurrentState()))
         {
             algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
             ApplyOperatorTunings();
+            RecalibrateOnReady();
         }
     }
 

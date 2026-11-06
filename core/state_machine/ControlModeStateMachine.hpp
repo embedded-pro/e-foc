@@ -11,6 +11,7 @@
 #include "core/state_machine/NvmActivity.hpp"
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/state_machine/PositionStateMachine.hpp"
+#include "core/state_machine/Recalibration.hpp"
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "infra/util/Function.hpp"
@@ -66,7 +67,12 @@ namespace state_machine
         void LimitCurrent(foc::Ampere limit);
         void TrackBusVoltage(foc::Volts measured);
 
-        void ApplyOnlineEstimates();
+        // Adopts the settled online estimates now; refused unless stopped, with the mode off and in torque mode.
+        SettingResult CmdRecalibrate();
+        // The model the loops are designed from; nullopt in torque mode, which designs no outer loop.
+        std::optional<MotorModel> ModelInUse() const;
+        uint16_t RecalibrationsApplied() const;
+        uint16_t RecalibrationsRejected() const;
 
         TuningResult TrySetCurrentBandwidth(float bandwidth);
         TuningResult TrySetSpeedBandwidth(float bandwidth);
@@ -143,6 +149,12 @@ namespace state_machine
         bool CanActivatePendingSelect() const;
         SettingResult SettingGate() const;
         void ApplyOperatorTunings();
+        void ObserveOnlineEstimates();
+        void RecalibrateOnReady();
+        void ApplyModelInUse();
+        void Report(const Recalibration::Outcome& outcome);
+        MotorModel CommissionedModel() const;
+        services::RecalibrationMode RecalibrationModeSetting() const;
         void ApplyLimits();
         void ApplyCurrentLimit();
         void ApplyBusVoltage();
@@ -168,6 +180,9 @@ namespace state_machine
         uint8_t previousDefaultControlMode{ 0 };
         std::optional<foc::Ampere> currentLimit;
         std::optional<foc::Volts> busVoltage;
+        Recalibration recalibration;
+        bool ranSinceStop{ false };
+        infra::TimerRepeating recalibrationTimer;
 
         std::variant<std::monostate,
             application::TorqueStateMachine,

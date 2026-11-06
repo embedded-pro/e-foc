@@ -180,3 +180,14 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)
 
     EXPECT_EQ(config.stallDetection, uint8_t{ 0 });
 }
+
+TEST_F(OperatorTuningsTest, sanitising_turns_an_unknown_recalibration_mode_off_and_keeps_a_known_one)
+{
+    config.recalibrationMode = 3;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(static_cast<uint8_t>(services::RecalibrationMode::off), config.recalibrationMode);
+
+    config.recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::automatic);
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(static_cast<uint8_t>(services::RecalibrationMode::automatic), config.recalibrationMode);
+}
