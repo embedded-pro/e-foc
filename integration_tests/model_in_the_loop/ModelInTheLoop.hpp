@@ -1,16 +1,19 @@
 #pragma once
 
+#include "core/can/FocMotorCanBridge.hpp"
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/bus_voltage/BusVoltageMonitor.hpp"
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/fault_history/FaultHistory.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "core/supervision/PeakCurrent.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "infra/stream/StdStringOutputStream.hpp"
@@ -146,6 +149,7 @@ namespace mil
 
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionSize = 256;
+        static constexpr uint32_t faultHistoryRegionSize = 128;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
         static constexpr std::size_t recordsPerDrain = 16;
@@ -166,7 +170,8 @@ namespace mil
         const uint32_t ticksPerMillisecond;
         services::NvmEepromRegion calibrationRegion{ eeprom, sil::calibrationRegionOffset, calibrationRegionSize };
         services::NvmEepromRegion configRegion{ eeprom, sil::configRegionOffset, configRegionSize };
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+        services::NvmEepromRegion faultHistoryRegion{ eeprom, sil::faultHistoryRegionOffset, faultHistoryRegionSize };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
         services::InverterCompensation inverterCompensation;
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;
@@ -177,12 +182,16 @@ namespace mil
         services::ConfigData configData;
         foc::CurrentStream currentStream;
         std::optional<state_machine::ControlModeStateMachine> controlMode;
+        std::optional<services::FaultHistory> faultHistory;
+        supervision::PeakCurrent peakCurrent;
+        foc::Volts filteredBusVoltage{ 0.0f };
         services::BusVoltageMonitor busVoltage{ [this]()
             {
                 return drive.PowerSupplyVoltage();
             },
             [this](foc::Volts measured)
             {
+                filteredBusVoltage = measured;
                 controlMode->TrackBusVoltage(measured);
             } };
 

@@ -67,6 +67,8 @@ namespace
         MOCK_METHOD(void, OnCalibrate, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearCalibration, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnQueryFaultHistory, (uint8_t, (const infra::Function<void(const can::FocFaultRecord&)>&)), (override));
+        MOCK_METHOD(void, OnClearFaultHistory, ((const infra::Function<void(bool)>&)), (override));
     };
 
     class ContractClientObserver
@@ -399,10 +401,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_15)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_16)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(15, can::focContractVersionMinor);
+    EXPECT_EQ(16, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
@@ -591,6 +593,8 @@ namespace
             { can::focCalibrateId, { 0x00 } },
             { can::focClearCalibrationId, { 0x00 } },
             { can::focClearDiagnosticsId, { 0x00 } },
+            { can::focQueryFaultHistoryId, { 0x00, 0x02 } },
+            { can::focClearFaultHistoryId, { 0x00 } },
 
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
@@ -599,6 +603,8 @@ namespace
             { can::focContractVersionResponseId, { can::focContractVersionMajor, can::focContractVersionMinor } },
             { can::focAlgorithmsResponseId, { 0x01, 0x00, 0x02, 0x00 } },
             { can::focParameterResponseId, { 0x40, 0x00, 0x3E, 0xB8, 0x51, 0xEC } },
+            { can::focFaultRecordResponseId, { 0x02, 0x02, 0x01, 0x00, 0x00, 0x05, 0xDC } },
+            { can::focFaultConditionsResponseId, { 0x02, 0x00, 0x0C, 0x10, 0x1B, 0xFF, 0x06 } },
             { services::canCategoryErrorResponseMessageTypeId, { can::focStartId, static_cast<uint8_t>(can::FocMotorCategoryError::busy) } },
         };
         return vectors;
@@ -667,6 +673,8 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnCalibrate(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnClearCalibration(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnClearDiagnostics(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnQueryFaultHistory(_, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnClearFaultHistory(_)).Times(AnyNumber());
 
     for (const auto& descriptor : can::focMotorMessages)
     {

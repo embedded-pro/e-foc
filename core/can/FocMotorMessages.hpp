@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include <cstdint>
 
 namespace can
@@ -32,6 +33,8 @@ namespace can
     static constexpr uint8_t focCalibrateId = 0x17;
     static constexpr uint8_t focClearCalibrationId = 0x18;
     static constexpr uint8_t focClearDiagnosticsId = 0x19;
+    static constexpr uint8_t focQueryFaultHistoryId = 0x1B;
+    static constexpr uint8_t focClearFaultHistoryId = 0x1C;
 
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
@@ -40,6 +43,8 @@ namespace can
     static constexpr uint8_t focContractVersionResponseId = 0x92;
     static constexpr uint8_t focAlgorithmsResponseId = 0x93;
     static constexpr uint8_t focParameterResponseId = 0x96;
+    static constexpr uint8_t focFaultRecordResponseId = 0x9B;
+    static constexpr uint8_t focFaultConditionsResponseId = 0x9C;
 
     enum class FocMotorMode : uint8_t
     {
@@ -240,6 +245,17 @@ namespace can
         friend constexpr bool operator==(const FocParameterValue&, const FocParameterValue&) = default;
     };
 
+    struct FocFaultRecord
+    {
+        uint8_t age{ 0 };
+        FocFaultCode code{ FocFaultCode::none };
+        FocMotorMode mode{ FocMotorMode::torque };
+        uint32_t uptimeMs{ 0 };
+        int16_t powerUp{ 0 };
+        foc::Volts busVoltage{ 0.0f };
+        foc::Ampere peakCurrent{ 0.0f };
+    };
+
     static constexpr int32_t focCurrentScale = 10;
     static constexpr int32_t focSpeedScale = 1;
     static constexpr int32_t focPositionScale = 100;
@@ -248,6 +264,9 @@ namespace can
     static constexpr int32_t focPidScale = 1;
     static constexpr int32_t focStreamCurrentScale = 1000;
     static constexpr int32_t focStreamPositionScale = 10000;
+    static constexpr int32_t focRecordedVoltageScale = 100;
+    static constexpr int32_t focRecordedCurrentScale = 100;
+    static constexpr int32_t focPowerUpScale = 1;
 
     static constexpr uint32_t focMaxTelemetryRateHz = 1000;
 }

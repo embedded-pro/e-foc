@@ -10,6 +10,8 @@
 #include <gtest/gtest.h>
 #include <limits>
 #include <optional>
+#include <utility>
+#include <vector>
 
 namespace
 {
@@ -67,6 +69,8 @@ namespace
         MOCK_METHOD(void, OnCalibrate, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearCalibration, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnQueryFaultHistory, (uint8_t, (const infra::Function<void(const can::FocFaultRecord&)>&)), (override));
+        MOCK_METHOD(void, OnClearFaultHistory, ((const infra::Function<void(bool)>&)), (override));
     };
 
     class FocMotorCategoryServerTest
@@ -81,6 +85,7 @@ namespace
                     {
                         lastSentMsgType = services::ExtractCanMessageType(id.Get29BitId());
                         lastSentMsg = msg;
+                        sent.emplace_back(lastSentMsgType, msg);
                         if (lastSentMsgType == services::canCategoryErrorResponseMessageTypeId && msg.size() >= 2)
                         {
                             categoryErrorSent = true;
@@ -148,6 +153,7 @@ namespace
 
         uint8_t lastSentMsgType{};
         hal::Can::Message lastSentMsg;
+        std::vector<std::pair<uint8_t, hal::Can::Message>> sent;
         bool categoryErrorSent{ false };
         uint8_t lastCategoryErrorOriginCmd{};
         can::FocMotorCategoryError lastCategoryError{ can::FocMotorCategoryError::busy };
@@ -670,4 +676,62 @@ TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryCurrents_SaturatesCurrentsB
     EXPECT_TRUE(server.BroadcastTelemetryCurrents(0, foc::Ampere{ 40.0f }, foc::Ampere{ -40.0f }, foc::Radians{ 0.0f }, [](bool) {}));
 
     EXPECT_EQ(lastSentMsg, MakeMessage({ 0x00, 0x7F, 0xFF, 0x80, 0x00, 0x00, 0x00 }));
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleQueryFaultHistory_AnswersWithTheRecordAndItsConditions)
+{
+    EXPECT_CALL(observer, OnQueryFaultHistory(2, _))
+        .WillOnce(Invoke([](uint8_t age, const infra::Function<void(const can::FocFaultRecord&)>& onDone)
+            {
+                onDone(can::FocFaultRecord{ age, can::FocFaultCode::overVoltage, can::FocMotorMode::speed, 1500, 12, foc::Volts{ 41.23f }, foc::Ampere{ -2.5f } });
+            }));
+
+    server.HandleMessage(can::focQueryFaultHistoryId, MakeMessage({ 0x01, 0x02 }));
+
+    ASSERT_EQ(2u, sent.size());
+    EXPECT_EQ(can::focFaultRecordResponseId, sent[0].first);
+    EXPECT_EQ(MakeMessage({ 0x02, 0x02, 0x01, 0x00, 0x00, 0x05, 0xDC }), sent[0].second);
+    EXPECT_EQ(can::focFaultConditionsResponseId, sent[1].first);
+    EXPECT_EQ(MakeMessage({ 0x02, 0x00, 0x0C, 0x10, 0x1B, 0xFF, 0x06 }), sent[1].second);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focQueryFaultHistoryId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleQueryFaultHistory_WithoutAnAge_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focQueryFaultHistoryId, MakePayload(1)));
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleClearFaultHistory_AcknowledgesOnceStored)
+{
+    EXPECT_CALL(observer, OnClearFaultHistory(_))
+        .WillOnce(Invoke([](const infra::Function<void(bool)>& onDone)
+            {
+                onDone(true);
+            }));
+
+    server.HandleMessage(can::focClearFaultHistoryId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focClearFaultHistoryId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleClearFaultHistory_ThatIsNotStored_ReportsPersistenceFailed)
+{
+    EXPECT_CALL(observer, OnClearFaultHistory(_))
+        .WillOnce(Invoke([](const infra::Function<void(bool)>& onDone)
+            {
+                onDone(false);
+            }));
+
+    server.HandleMessage(can::focClearFaultHistoryId, MakePayload(1));
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(can::focClearFaultHistoryId, lastCategoryErrorOriginCmd);
+    EXPECT_EQ(can::FocMotorCategoryError::persistenceFailed, lastCategoryError);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(services::CanAckStatus::categoryError, ackSpy.last->status);
 }
