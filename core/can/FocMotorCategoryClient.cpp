@@ -11,7 +11,15 @@ namespace can
         , origin(origin)
     {
         AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryCurrents, contractVersionResponse,
-            electricalParamsResponse, algorithmsResponse, parameterResponse, faultRecordResponse, faultConditionsResponse);
+            electricalParamsResponse, algorithmsResponse, parameterResponse);
+    }
+
+    FocMotorCategoryClient::FaultHistoryMessages::FaultHistoryMessages(FocMotorCategoryClient& client)
+        : client(client)
+        , faultRecordResponse{ focFaultRecordResponseId, *this, &FaultHistoryMessages::HandleFaultRecordResponse }
+        , faultConditionsResponse{ focFaultConditionsResponseId, *this, &FaultHistoryMessages::HandleFaultConditionsResponse }
+    {
+        client.AddMessageTypes(faultRecordResponse, faultConditionsResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -417,7 +425,7 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryClient::HandleFaultRecordResponse(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::FaultHistoryMessages::HandleFaultRecordResponse(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focFaultRecordResponseId))
             return false;
@@ -431,7 +439,7 @@ namespace can
         if (mode > static_cast<uint8_t>(FocMotorMode::position))
             return false;
 
-        NotifyObservers([source = origin.SourceNodeId(), age, code, mode = static_cast<FocMotorMode>(mode), uptimeMs](auto& observer)
+        client.NotifyObservers([source = client.origin.SourceNodeId(), age, code, mode = static_cast<FocMotorMode>(mode), uptimeMs](auto& observer)
             {
                 observer.OnFaultRecordResponse(source, age, code, mode, uptimeMs);
             });
@@ -439,7 +447,7 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryClient::HandleFaultConditionsResponse(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::FaultHistoryMessages::HandleFaultConditionsResponse(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focFaultConditionsResponseId))
             return false;
@@ -450,7 +458,7 @@ namespace can
         const foc::Volts busVoltage{ reader.ReadFixed16(focRecordedVoltageScale) };
         const foc::Ampere peakCurrent{ reader.ReadFixed16(focRecordedCurrentScale) };
 
-        NotifyObservers([source = origin.SourceNodeId(), age, powerUp, busVoltage, peakCurrent](auto& observer)
+        client.NotifyObservers([source = client.origin.SourceNodeId(), age, powerUp, busVoltage, peakCurrent](auto& observer)
             {
                 observer.OnFaultConditionsResponse(source, age, powerUp, busVoltage, peakCurrent);
             });
