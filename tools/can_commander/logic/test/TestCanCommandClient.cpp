@@ -187,6 +187,7 @@ namespace
         static constexpr std::size_t travelLimitParameterCount{ 2 };
         static constexpr std::size_t readWithTheStatus{ 2 };
         static constexpr std::size_t thermalParameterCount{ 2 };
+        static constexpr std::size_t overTemperatureParameterCount{ 2 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -1077,7 +1078,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
@@ -1104,7 +1105,7 @@ TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
 
     EXPECT_TRUE(client.SupportsTargetWindow(1));
     EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
 }
@@ -1124,7 +1125,7 @@ TEST_F(TestCanCommandClient, a_2_12_node_is_not_asked_for_its_winding_temperatur
     EXPECT_FALSE(Queried(can::FocParameter::windingTemperature));
 }
 
-TEST_F(TestCanCommandClient, a_2_13_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_13_node_is_not_asked_for_its_temperature_limit)
 {
     RecordSends();
     BringCompatible(1, 13);
@@ -1132,6 +1133,19 @@ TEST_F(TestCanCommandClient, a_2_13_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsThermal(1));
+    EXPECT_FALSE(client.SupportsOverTemperature(1));
+    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount, Count(can::focQueryParameterId));
+    EXPECT_FALSE(Queried(can::FocParameter::temperatureLimit));
+}
+
+TEST_F(TestCanCommandClient, a_2_14_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, 14);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsOverTemperature(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 

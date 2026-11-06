@@ -1,5 +1,6 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "core/foc/math/WindingTemperature.hpp"
 #include "core/state_machine/ControlModeCliCommands.hpp"
 #include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
@@ -760,6 +761,15 @@ namespace state_machine
     const services::CalibrationData& ControlModeStateMachine::CalibrationRecord() const
     {
         return ActiveCommon().CalibrationRecord();
+    }
+
+    std::optional<foc::Celsius> ControlModeStateMachine::WindingTemperature()
+    {
+        const auto estimates = ActiveStateMachine().CurrentOnlineEstimates();
+        if (!estimates.has_value())
+            return std::nullopt;
+
+        return foc::WindingTemperatureFromResistance(estimates->resistance, foc::Ohm{ CalibrationRecord().rPhase }, foc::Celsius{ configData.limits.calibrationTemperature });
     }
 
     foc::Weber ControlModeStateMachine::DefaultFluxLinkage() const

@@ -43,16 +43,28 @@ namespace
             setup.trace.Consume(line);
     }
 
+    bool RecorderFull(const ScenarioSetup& setup)
+    {
+        return setup.plant.responseMaxSamples != 0 && setup.trace.Samples().size() >= setup.plant.responseMaxSamples;
+    }
+
     template<typename Predicate>
-    bool CaptureUntil(ScenarioSetup& setup, Predicate done)
+    bool CaptureUntil(Fixture& fixture, ScenarioSetup& setup, Predicate done)
     {
         const auto deadline = std::chrono::steady_clock::now() + kCaptureWallClockTimeout;
+        auto nextHeartbeat = std::chrono::steady_clock::now();
 
         while (std::chrono::steady_clock::now() < deadline)
         {
             FeedRecord(setup, std::chrono::milliseconds{ 0 });
             if (done())
                 return true;
+            // A capture can outlast the client timeout; a silent client would have the drive stop itself.
+            if (std::chrono::steady_clock::now() >= nextHeartbeat)
+            {
+                fixture.SendClientHeartbeat();
+                nextHeartbeat = std::chrono::steady_clock::now() + Fixture::kClientHeartbeatInterval;
+            }
             FeedRecord(setup, std::chrono::milliseconds{ 50 });
         }
 
@@ -319,11 +331,11 @@ WHEN(R"(the response is captured for {int} ms after enable)", (int milliseconds)
     auto& setup = context.Get<ScenarioSetup>();
     const auto window = TicksFromMilliseconds(setup, static_cast<float>(milliseconds));
 
-    ASSERT_TRUE(CaptureUntil(setup, [&]
+    ASSERT_TRUE(CaptureUntil(context.Get<Fixture>(), setup, [&]
         {
             const auto start = setup.trace.StartTick();
             const auto last = setup.trace.LastSampleTick();
-            return start && ((last && *last >= *start + window) || setup.trace.StopTick());
+            return start && ((last && *last >= *start + window) || setup.trace.StopTick() || RecorderFull(setup));
         }))
         << "Plant response did not reach " << milliseconds << " ms after enable";
 }
@@ -334,11 +346,11 @@ WHEN(R"(the response is captured for {int} ms after the last setpoint)", (int mi
     ASSERT_TRUE(setup.lastSetpoint.has_value()) << "No setpoint was applied";
     const auto window = TicksFromMilliseconds(setup, static_cast<float>(milliseconds));
 
-    ASSERT_TRUE(CaptureUntil(setup, [&]
+    ASSERT_TRUE(CaptureUntil(context.Get<Fixture>(), setup, [&]
         {
             const auto stamp = SetpointStampAfterEnable(setup);
             const auto last = setup.trace.LastSampleTick();
-            return stamp && ((last && *last >= *stamp + window) || setup.trace.StopTick());
+            return stamp && ((last && *last >= *stamp + window) || setup.trace.StopTick() || RecorderFull(setup));
         }))
         << "Plant response did not reach " << milliseconds << " ms after the last setpoint";
 }

@@ -774,6 +774,24 @@ TEST_F(ControlModeStateMachineExtTest, travel_limits_stored_later_reach_the_posi
     EXPECT_NEAR(subject->ActiveStateMachine().ObserveMotion().positionError.Value(), 0.5f, 1e-6f);
 }
 
+TEST_F(ControlModeStateMachineExtTest, the_winding_temperature_is_unknown_in_torque_mode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_FALSE(subject->WindingTemperature().has_value());
+}
+
+TEST_F(ControlModeStateMachineExtTest, the_winding_temperature_is_unknown_without_a_calibrated_resistance)
+{
+    GivenNvmAlwaysInvalid();
+    services::ConfigData config{};
+    config.defaultControlMode = static_cast<uint8_t>(state_machine::ControlMode::speed);
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_FALSE(subject->WindingTemperature().has_value());
+}
+
 TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position_Mode_Active)
 {
     GivenNvmAlwaysInvalid();

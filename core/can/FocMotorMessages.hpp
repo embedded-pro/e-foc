@@ -155,6 +155,8 @@ namespace can
         positionMinimum = 0x5B,
         positionMaximum = 0x5C,
         calibrationTemperature = 0x5D,
+        temperatureLimit = 0x5E,
+        temperatureMargin = 0x5F,
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,

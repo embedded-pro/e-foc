@@ -205,3 +205,13 @@
     value held once stored, refused with invalidPayload outside its range and read back unchanged
     after a restart, and the read-only parameter windingTemperature (0xC1) in degC, not a number
     while the temperature is unknown.
+
+- id: REQ-CAN-020
+  title: The temperature limit and its margin are settable over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.14 shall add, without changing any 2.13 message, the stored settings
+    temperatureLimit (0x5E) in degC, 40 to 200, and temperatureMargin (0x5F) in K, 1 to 50, each
+    writable in any state, answered with the value held once stored, refused with invalidPayload
+    outside its range and read back unchanged after a restart.

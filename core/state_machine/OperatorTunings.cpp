@@ -141,5 +141,7 @@ namespace state_machine
         stored.positionMinimum = WithinOrDefault(stored.positionMinimum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMinimum);
         stored.positionMaximum = WithinOrDefault(stored.positionMaximum, -CommandLimits::maxPositionLimit, CommandLimits::maxPositionLimit, defaults.positionMaximum);
         stored.calibrationTemperature = WithinOrDefault(stored.calibrationTemperature, CommandLimits::minCalibrationTemperature, CommandLimits::maxCalibrationTemperature, defaults.calibrationTemperature);
+        stored.temperatureLimit = WithinOrDefault(stored.temperatureLimit, CommandLimits::minTemperatureLimit, CommandLimits::maxTemperatureLimit, defaults.temperatureLimit);
+        stored.temperatureMargin = WithinOrDefault(stored.temperatureMargin, CommandLimits::minTemperatureMargin, CommandLimits::maxTemperatureMargin, defaults.temperatureMargin);
     }
 }

@@ -20,6 +20,7 @@ namespace tool
         void SetTargetWindowUnavailable(const QString& reason);
         void SetTravelLimitsUnavailable(const QString& reason);
         void SetThermalUnavailable(const QString& reason);
+        void SetOverTemperatureUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -40,5 +41,6 @@ namespace tool
         QString targetWindowReason;
         QString travelLimitsReason;
         QString thermalReason;
+        QString overTemperatureReason;
     };
 }

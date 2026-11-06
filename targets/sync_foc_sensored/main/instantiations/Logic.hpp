@@ -34,6 +34,7 @@
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "core/supervision/FollowingErrorMonitor.hpp"
 #include "core/supervision/MotorOverload.hpp"
+#include "core/supervision/OverTemperature.hpp"
 #include "core/supervision/OverspeedMonitor.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
 #include "core/supervision/PositionLimitMonitor.hpp"
@@ -57,6 +58,8 @@ namespace application
         static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
         static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
+
+        void ApplyCurrentLimit();
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
 
@@ -88,6 +91,9 @@ namespace application
         supervision::PositionLimitMonitor positionLimit;
         can::CanCommandTimeout commandTimeout;
         supervision::MotorOverload motorOverload;
+        supervision::OverTemperature overTemperature;
+        foc::Ampere overloadLimit;
+        foc::Ampere thermalLimit;
         services::BusVoltageMonitor busVoltage;
         services::ConfigData configData;
         foc::CurrentStream currentStream;

@@ -74,3 +74,15 @@
     with a default of 25 degC, and shall report it within 10 K of the winding's temperature once an
     excitation burst has run since the motor was enabled. In torque mode, or without a calibrated
     resistance, it shall report the temperature as unknown.
+
+- id: REQ-PRT-008
+  title: Current derated near the temperature limit and the drive faulted at it
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    While the winding temperature is known, the drive shall limit its current to the board limit
+    scaled linearly from 1 at the temperature limit minus the temperature margin to 0 at the
+    temperature limit, the lower of this and the overload model's limit applying, and shall enter
+    Fault with overtemperature when the temperature is at or above the limit while Enabled, not
+    sooner than 5 s after entering Enabled. The limit shall be settable from 40 to 200 degC with a
+    default of 120 degC and the margin from 1 to 50 K with a default of 15 K.

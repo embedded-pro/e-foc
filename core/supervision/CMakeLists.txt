@@ -24,6 +24,8 @@ target_sources(e_foc.supervision PRIVATE
     FollowingErrorMonitor.cpp
     MotorOverload.hpp
     MotorOverload.cpp
+    OverTemperature.hpp
+    OverTemperature.cpp
     OverspeedMonitor.hpp
     OverspeedMonitor.cpp
     PhaseLossMonitor.hpp

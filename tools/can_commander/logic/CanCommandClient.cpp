@@ -122,6 +122,11 @@ namespace tool
         return SupportsMinor(nodeId, thermalContractMinor);
     }
 
+    bool CanCommandClient::SupportsOverTemperature(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, overTemperatureContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -146,6 +151,8 @@ namespace tool
             return SupportsTravelLimits(nodeId);
         if (parameter == can::FocParameter::calibrationTemperature)
             return SupportsThermal(nodeId);
+        if (parameter == can::FocParameter::temperatureLimit || parameter == can::FocParameter::temperatureMargin)
+            return SupportsOverTemperature(nodeId);
 
         switch (can::GroupOf(parameter))
         {

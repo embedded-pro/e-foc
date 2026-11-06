@@ -2,7 +2,7 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: "supervision"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.6.0                    |
+| Version   | 0.7.0                    |
 | Component | supervision              |
 | Date      | 2026-11-05               |
 
@@ -43,7 +43,8 @@ date: 2026-11-05
 - Watching an enabled position drive for a rotor carried more than four encoder counts past the software
   position limits, and raising `positionLimit` (REQ-POS-016, Part J).
 - Inferring the winding's temperature from the online resistance estimate in speed and position mode
-  (REQ-PRT-002, Part K).
+  (REQ-PRT-002), derating the current limit as it nears the temperature limit and raising `overtemperature`
+  at the limit (REQ-PRT-008, Part K).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
@@ -164,6 +165,10 @@ same notifier. It looks for a current the drive demands but cannot make flow: an
 The span starts at the first evaluation that counts. When the evaluations have counted without a break for
 the span, the monitor raises the fault once and stays silent until the drive leaves `Enabled`. An evaluation
 that does not count ends the span; the next one that counts starts a new one.
+
+The demand is the torque current the drive asks its current loop for, after the current limit: what the overload
+model (Part I) or the over-temperature derating (Part K) holds back is not demanded, so a drive derated towards zero
+is not read as a missing phase.
 
 The span is 50 ms, or one current-loop time constant when the operator's current bandwidth makes that longer
 (1/ω_c: 1 s at the 1 rad/s minimum). A healthy first-order loop passes a fifth of a step after 0.22 time
@@ -417,6 +422,41 @@ Torque mode runs no electrical estimator: there the temperature is unknown, and 
 the drive's only thermal protection. Without a calibrated resistance the temperature is unknown as well. The
 estimate is the read-only parameter `windingTemperature` of contract 2.13 (`service-can.md`), not a number while
 it is unknown.
+
+**Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRT-008) and
+acts on it through a first-order filter with a 1 s time constant, started from the first known value. A winding cannot
+move noticeably within a second; an estimate that does is not heat. A cable pulled from a running drive is one: the open
+phase reads as a resistance 1.6 times the calibrated one at once, about 170 °C, and the phase-loss monitor (Part E)
+answers it within its 50 ms span, before the filter has carried the derating anywhere near it. While the filtered
+temperature T is known it derates the drive's current limit linearly over the temperature margin below the
+temperature limit T_max: the full board limit up to T_max − margin, falling to zero at T_max. The control mode takes
+the lower of this limit and the overload model's (Part I), and the cascades clamp their q-axis reference to it as for
+the overload model. At or above T_max, while the drive is `Enabled`, the monitor raises `overtemperature` once and
+stays silent until the drive leaves `Enabled`; the drive cuts its power stage and coasts, as for the board's own
+over-temperature trip.
+
+The trip waits 5 s after each entry to `Enabled`, one excitation burst and a margin: the estimate a stop left behind
+is the winding's temperature at the stop, and a motor that cooled since would otherwise be faulted again before the
+first burst had measured it. The derating applies from the first evaluation, on the estimate as it stands, which is
+the cautious side. Where the temperature is unknown — torque mode, or no calibrated resistance — the monitor neither
+derates nor trips.
+
+| Setting            | Default | Range       | Meaning                                                 |
+|--------------------|---------|-------------|---------------------------------------------------------|
+| Temperature limit  | 120 °C  | 40 – 200 °C | Winding temperature at which the drive faults           |
+| Temperature margin | 15 K    | 1 – 50 K    | Span below the limit over which the current limit falls |
+
+Both are drive-wide limits of the configuration record (`service-nvm.md`), read at every evaluation and settable over
+CAN (`service-can.md`, contract 2.14).
+
+```mermaid
+stateDiagram-v2
+    [*] --> FullLimit
+    FullLimit --> Derating : T above limit − margin
+    Derating --> FullLimit : T at or below limit − margin
+    Derating --> Reported : Enabled for 5 s and T at or above the limit, overtemperature raised
+    Reported --> FullLimit : drive leaves Enabled
+```
 
 ---
 

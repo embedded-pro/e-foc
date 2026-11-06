@@ -2,6 +2,7 @@
 #include "core/can/CanNodeAddress.hpp"
 #include "generated/Version.h"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include <algorithm>
 
 namespace application
 {
@@ -84,9 +85,20 @@ namespace application
             } }
         , motorOverload{ hardware.MaxCurrentSupported(), [this](foc::Ampere limit)
             {
-                this->hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
-                controlMode->LimitCurrent(limit);
+                overloadLimit = limit;
+                ApplyCurrentLimit();
             } }
+        , overTemperature{ hardware.MaxCurrentSupported(), [this](foc::Ampere limit)
+            {
+                thermalLimit = limit;
+                ApplyCurrentLimit();
+            },
+            [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
+        , overloadLimit{ hardware.MaxCurrentSupported() }
+        , thermalLimit{ hardware.MaxCurrentSupported() }
         , busVoltage{ [this]()
             {
                 return this->hardware.PowerSupplyVoltage();
@@ -153,6 +165,18 @@ namespace application
                 motorOverload.Enable([this]()
                     {
                         return supervision::OverloadRatingsFrom(controlMode->Config());
+                    });
+                overTemperature.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    },
+                    [this]()
+                    {
+                        return controlMode->WindingTemperature();
+                    });
+                overTemperature.Enable([this]()
+                    {
+                        return supervision::OverTemperatureSettingsFrom(controlMode->Config());
                     });
                 busVoltage.Start();
                 commandTimeout.Enable([this]()
@@ -232,5 +256,12 @@ namespace application
                             });
                     });
             });
+    }
+
+    void Logic::ApplyCurrentLimit()
+    {
+        const auto limit = foc::Ampere{ std::min(overloadLimit.Value(), thermalLimit.Value()) };
+        hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
+        controlMode->LimitCurrent(limit);
     }
 }

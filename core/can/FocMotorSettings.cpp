@@ -121,6 +121,8 @@ namespace can
             case FocParameter::positionMinimum:
             case FocParameter::positionMaximum:
             case FocParameter::calibrationTemperature:
+            case FocParameter::temperatureLimit:
+            case FocParameter::temperatureMargin:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -327,6 +329,10 @@ namespace can
                 return config.limits.positionMaximum;
             case FocParameter::calibrationTemperature:
                 return config.limits.calibrationTemperature;
+            case FocParameter::temperatureLimit:
+                return config.limits.temperatureLimit;
+            case FocParameter::temperatureMargin:
+                return config.limits.temperatureMargin;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -374,6 +380,12 @@ namespace can
                 break;
             case FocParameter::calibrationTemperature:
                 config.limits.calibrationTemperature = value;
+                break;
+            case FocParameter::temperatureLimit:
+                config.limits.temperatureLimit = value;
+                break;
+            case FocParameter::temperatureMargin:
+                config.limits.temperatureMargin = value;
                 break;
             default:
                 config.limits.overspeedLimit = value;

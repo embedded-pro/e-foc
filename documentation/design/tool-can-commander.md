@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.14.0
+version: 0.15.0
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.14.0               |
+| Version   | 0.15.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-05           |
 
@@ -262,7 +262,8 @@ flowchart LR
   the direct way between them. They are stored at once and in force from the next control period.
   Its **Thermal** group holds the calibration temperature of contract 2.13 (`fault-supervision.md` Part K): the
   winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
-  from. It is stored at once and in force at the next read of the estimate.
+  from; and the temperature limit and margin of contract 2.14, over which speed and position mode derate the current
+  and at which they fault. They are stored at once and in force within 100 ms.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -290,7 +291,8 @@ position window, its time or the target-reached reading, and the Target Window f
 reason. A node older than 2.11 has no travel limits: the commander does not ask it for them, and the
 Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*. A node
 older than 2.13 has no winding temperature: the commander does not ask it for the estimate or the calibration
-temperature, and the Thermal field is disabled with the reason.
+temperature, and the Thermal fields are disabled with the reason; a node of 2.13 has no temperature limit or
+margin, and those two fields are disabled with the reason.
 
 ### Part K — diagnostics
 
