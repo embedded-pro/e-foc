@@ -37,6 +37,16 @@
   status: verified
   verification: sil
   shall: >
-    The drive shall store a successful calibration, restore it at power-up and stay in Idle until
-    the rotor has been aligned again. While stopped, the operator shall be able to enter the
+    The drive shall store a successful calibration, restore it at power-up and, unless its encoder
+    has an index, stay in Idle until the rotor has been aligned again. While stopped, the operator shall be able to enter the
     motor's parameters by hand; the drive shall store them before it applies them.
+
+- id: REQ-CMS-005
+  title: A drive with an encoder index starts after a power cycle without aligning
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On a motor whose encoder has an index, the calibration shall record the index's position
+    relative to the rotor's electrical angle. After a power cycle the drive shall be Ready, and its
+    first Start shall turn the rotor at a bounded current, at most a revolution and a quarter, until
+    the index passes, then run without aligning; a Start that finds no index shall be refused.

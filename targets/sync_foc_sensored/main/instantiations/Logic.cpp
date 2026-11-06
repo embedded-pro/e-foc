@@ -28,6 +28,12 @@ namespace application
 
     namespace
     {
+        drivers::EncoderIndex& IndexChannelOr(PlatformFactory& hardware, drivers::EncoderIndex& none)
+        {
+            const auto channel = hardware.EncoderIndexChannel();
+            return channel ? channel->get() : none;
+        }
+
         can::FocFirmwareIdentity FirmwareIdentityOf(BoardKind boardKind)
         {
             return can::FocFirmwareIdentity{ e_foc::generated::VERSION_MAJOR, e_foc::generated::VERSION_MINOR, e_foc::generated::VERSION_PATCH, static_cast<uint8_t>(boardKind) };
@@ -53,6 +59,7 @@ namespace application
                 return this->hardware.PowerSupplyVoltage();
             } }
         , motorAlignment{ inverterCompensation, hardware }
+        , indexSearch{ inverterCompensation, hardware, IndexChannelOr(hardware, noEncoderIndex) }
         , rotorStandstill{ hardware }
         , platformFaultNotifier{ hardware }
         , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this](state_machine::FaultCode code)
@@ -140,7 +147,7 @@ namespace application
                     this->hardware.Tracer(),
                     MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

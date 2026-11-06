@@ -48,6 +48,7 @@ namespace application
 
     class PlatformFactoryImpl
         : public PlatformFactory
+        , public drivers::EncoderIndex
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -77,6 +78,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
+        std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -89,6 +91,10 @@ namespace application
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
+
+        bool HasIndex() const override;
+        void ArmIndex() override;
+        bool IndexSeen() override;
 
     private:
         static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
@@ -203,6 +209,7 @@ namespace application
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         EncoderZero encoderZero;
+        bool indexLatched{ false };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;

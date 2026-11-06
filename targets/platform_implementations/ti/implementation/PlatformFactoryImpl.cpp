@@ -399,6 +399,28 @@ namespace application
             encoderZero.SetZero(peripherals->encoder->Read());
     }
 
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return peripherals->encoder.has_value();
+    }
+
+    // The interface latches the index pulse in its raw interrupt status whether or not the interrupt is enabled
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        static_assert(Peripheral::QeiIndex == 0, "The index latch is read from QEI0");
+        QEI0->ISC = qeiIndexPulse;
+    }
+
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        return (QEI0->RIS & qeiIndexPulse) != 0;
+    }
+
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
     {
         return peripherals->eepromPeripheral;

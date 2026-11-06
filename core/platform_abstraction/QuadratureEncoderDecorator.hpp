@@ -28,6 +28,11 @@ namespace application
 
         foc::Radians Read() override;
 
+        Impl& Encoder()
+        {
+            return encoder;
+        }
+
     private:
         Impl encoder;
         float radiansPerCount;

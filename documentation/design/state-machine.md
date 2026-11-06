@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.10.0
+version: 0.11.0
 component: state-machine
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.10.0                     |
+| Version   | 0.11.0                     |
 | Component | state-machine              |
 | Date      | 2026-11-06                 |
 
@@ -31,8 +31,8 @@ date: 2026-11-06
 **Is responsible for:**
 - Owning the complete motor lifecycle: `Idle → Calibrating → Ready ⇄ Enabled`, and `Fault` as an escape state reachable from any active state
 - Enforcing all transition guards so that the FOC controller can only be enabled after a successful calibration, and calibration can only be started from `Idle` or `Ready`
-- Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
-- On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds
+- Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → index search when the encoder has an index → (mechanical parameter identification for speed/position modes) → NVM persistence
+- On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds. A record that carries an encoder index angle, on a drive with an index channel, boots to `Ready` instead, and the first `Enable` restores the reference from the index (see Referencing the Rotor from the Encoder Index)
 - Keeping an established rotor reference across a control-mode switch: a machine built by a switch out of an aligned `Ready` boots straight to `Ready` when the stored record is complete for its mode (see C4)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
@@ -50,13 +50,13 @@ date: 2026-11-06
 
 The state machine has five named states:
 
-| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                  |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and a rotor reference kept by a control-mode switch), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                          |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true; the first after power-up, a mode switch or a Fault re-measures the offsets), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)      |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                           |
+| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                                                                                                        |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and either a rotor reference kept by a control-mode switch or an index angle an index search can restore it from), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                   |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault)                                                                                       |
+| `Ready`       | Calibration data valid, rotor reference established or restorable from the encoder index; motor can be enabled                        | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true or the record's index angle can restore it; the first after power-up, a mode switch or a Fault re-measures the offsets, and one without a reference searches the index), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing) |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                                                                                                      |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                                                                                                                 |
 
 ### State Diagram
 
@@ -65,7 +65,7 @@ stateDiagram-v2
     [*] --> Idle
 
     Idle --> Calibrating : CmdCalibrate,\nCmdReAlign (if R/L loaded)\nor CmdReserveExternalCalibration
-    Idle --> Ready : boot load complete\n(rotor reference kept\nby a mode switch)
+    Idle --> Ready : boot load complete\n(rotor reference kept\nby a mode switch,\nor an index angle stored)
     Idle --> Idle : CmdClearCalibration
     Idle --> Fault : hardware fault
 
@@ -77,7 +77,7 @@ stateDiagram-v2
     Calibrating --> Ready : CmdReleaseExternalCalibration\n(calibration still valid)
     Calibrating --> Idle : CmdReleaseExternalCalibration\n(no valid calibration)
 
-    Ready --> Enabled : CmdEnable
+    Ready --> Enabled : CmdEnable\n(offsets refreshed and the\nindex searched first when due)
     Ready --> Calibrating : CmdCalibrate (re-calibrate),\nCmdReAlign\nor CmdReserveExternalCalibration
     Ready --> Idle : CmdClearCalibration
     Ready --> Fault : hardware fault\nor NVM invalidation failure
@@ -278,6 +278,7 @@ sequenceDiagram
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                                          |
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                                 |
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                                  |
+| 3b. Index search (encoder with an index)       | Index Search        | `encoderIndexAngle`; none when no index is found                     |
 | 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified              |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor            |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` (fixed 100 rad/s) |
@@ -820,13 +821,61 @@ configuration requirement.
 
 ### Boot-Time NVM Check
 
-On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, the electrical parameters (R, L, pole pairs, current-loop bandwidth) are applied to the FOC controller, but the machine **remains in `Idle`** — the rotor-reference (encoder zero offset) is RAM-only and is lost on every reset, so it must be re-established by a live alignment before the motor can be enabled. If the check fails or the data is absent, the machine starts in `Idle` with no parameters applied.
+On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, the electrical parameters (R, L, pole pairs, current-loop bandwidth) are applied to the FOC controller, but the machine **remains in `Idle`** unless the record carries an index angle (next section) — the rotor-reference (encoder zero offset) is RAM-only and is lost on every reset, so it must be re-established by a live alignment before the motor can be enabled. If the check fails or the data is absent, the machine starts in `Idle` with no parameters applied.
 
 The one exception is a machine built by a control-mode switch out of an aligned `Ready` (C4). It is told
 at construction that the rotor reference is kept; when the load succeeds and the record is complete for
 its mode, the load's completion moves it from `Idle` to `Ready` with the rotor reference valid, after
 applying the record exactly as above. A record that is incomplete for the new mode, or a load that fails,
 leaves it in `Idle` as at power-on.
+
+### Referencing the Rotor from the Encoder Index
+
+An encoder with an index channel lets the drive keep its rotor reference across a reset without
+aligning again (REQ-CMS-005, `service-index-search.md`). It works in two halves.
+
+**Commissioning.** Right after the alignment succeeds — in the full calibration, a re-alignment and
+an external calibration — the calibration searches the index in the frame the alignment has just
+set, and stores the reading at the pulse with the record as its index angle. The step
+stays `alignment` on CAN. A search that finds nothing, and a drive whose encoder has no index channel,
+store no index angle; neither fails the calibration. A mechanical retry that aligns again searches
+again, so the stored angle always belongs to the latest alignment. Editing the pole-pair count drops
+the index angle together with the cogging map.
+
+**Power-up.** A record that is complete for the mode and carries an index angle boots to `Ready`
+with `rotorReferenceValid` false, when the drive's encoder has an index channel; over CAN that is
+`ready`. The first `Enable` measures the current offsets as before (Refreshing the current offsets
+at enable), then runs one index search with the stored angle as its target, which sets the encoder
+so it reads that angle at the pulse. The search marks the rotor reference valid and the `Enable`
+completes into `Enabled`. A failed search refuses the `Enable` with `calibrationFailed` and leaves
+`Ready` without a reference, so the next `Enable` searches again; `Align` is always accepted and
+measures the index anew.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant SM as State machine (Ready, no reference)
+    participant CO as Current offsets
+    participant IS as Index search
+
+    C->>SM: Enable(onDone)
+    SM->>CO: refresh (when due)
+    CO-->>SM: OffsetsRefreshed(refreshed)
+    SM->>IS: Search(target = stored index angle)
+    IS-->>SM: IndexSearched(found)
+    alt index found
+        note over SM: rotor reference valid → Enabled
+        SM-->>C: ok
+    else not found
+        note over SM: stay Ready, no reference
+        SM-->>C: calibrationFailed
+    end
+```
+
+While the search runs, `HasPendingAsyncWork()` is true. `Disable` abandons it and refuses the `Enable`
+with `rejected`; an emergency stop or a fault aborts it, which stops the inverter and leaves the
+encoder untouched. Both the offset refresh and the search are internal transitions of `Ready`, decided
+by their completion events `OffsetsRefreshed` and `IndexSearched`.
 
 ### Alignment-Only Recovery
 
@@ -1069,18 +1118,19 @@ sequenceDiagram
 
 ### Required
 
-| Interface                                  | Purpose                                                                               | Contract                                                                                                                                        |
-|--------------------------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| `NonVolatileMemory`                        | Persists and retrieves calibration data across power cycles                           | Must remain valid for the lifetime of the state machine                                                                                         |
-| `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                              |
-| `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                                                               |
-| `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                               |
-| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`.           |
-| `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                          |
-| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself |
-| `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                          |
-| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering `Enabled`; updates run while FOC outer loop is active    |
-| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                                         |
+| Interface                                  | Purpose                                                                               | Contract                                                                                                                                                  |
+|--------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NonVolatileMemory`                        | Persists and retrieves calibration data across power cycles                           | Must remain valid for the lifetime of the state machine                                                                                                   |
+| `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                                        |
+| `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                                                                         |
+| `IndexSearch` (optional)                   | Finds the encoder index; re-references the encoder to a stored index angle            | Operation is asynchronous; result is optional (nullopt = not found); absent or unavailable without an index channel                                       |
+| `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                                         |
+| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`.                     |
+| `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                                    |
+| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step or the index      | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` and `Set()` by `IndexSearch`, never by the state machine itself |
+| `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                                    |
+| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering `Enabled`; updates run while FOC outer loop is active              |
+| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                                                   |
 
 ---
 
@@ -1092,6 +1142,7 @@ sequenceDiagram
 | `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                                                                         |
 | `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0       | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                                                                   |
 | `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration                                                            |
+| `CalibrationData` | `encoderIndexAngle`    | rad (float), mechanical        | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                                          |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                                                          |

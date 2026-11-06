@@ -34,7 +34,7 @@ namespace application
     void FocStateMachineCommon::ReleaseExternalResources()
     {
         calibration.Abort();
-        operation.AbortOffsetRefresh();
+        operation.AbortEnablePreparation();
         operation.UnregisterFaultHandler();
     }
 
@@ -57,7 +57,7 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || operation.IsRefreshingOffsets() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
+        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || operation.IsPreparingEnable() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const

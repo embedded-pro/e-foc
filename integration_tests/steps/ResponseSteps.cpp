@@ -451,6 +451,7 @@ THEN(R"(the d-axis current shall be above {int} mA RMS from {int} to {int} ms af
 
     const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
     ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
+    std::fprintf(stderr, "[METRIC] sil id_rms_ma from_ms=%d to_ms=%d value=%.2f limit=%d\n", fromMs, toMs, *rms, limitMa);
     EXPECT_GT(*rms, static_cast<float>(limitMa)) << "d-axis current " << *rms << " mA RMS between " << fromMs << " and " << toMs << " ms";
 }
 
@@ -461,6 +462,7 @@ THEN(R"(the d-axis current shall be below {int} mA RMS from {int} to {int} ms af
 
     const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
     ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
+    std::fprintf(stderr, "[METRIC] sil id_rms_ma from_ms=%d to_ms=%d value=%.2f limit=%d\n", fromMs, toMs, *rms, limitMa);
     EXPECT_LT(*rms, static_cast<float>(limitMa)) << "d-axis current " << *rms << " mA RMS between " << fromMs << " and " << toMs << " ms";
 }
 

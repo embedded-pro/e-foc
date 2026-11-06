@@ -2,12 +2,14 @@
 
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
+#include "core/platform_abstraction/NoEncoderIndex.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/bus_voltage/BusVoltageMonitor.hpp"
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/fault_history/FaultHistory.hpp"
+#include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
@@ -171,6 +173,8 @@ namespace mil
         services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
+        application::NoEncoderIndex noEncoderIndex;
+        infra::WithSharedAccess<services::IndexSearchImpl> indexSearch;
         services::RotorStandstillImpl rotorStandstill;
         state_machine::NoOpFaultNotifier faultNotifier;
         services::ConfigData configData;

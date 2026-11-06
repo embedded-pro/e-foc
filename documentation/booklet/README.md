@@ -72,6 +72,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Runtime Controller Selection](../design/controller-selection.md)                      | Heap-free variant storage, std::visit dispatch, state gating                           |
 | [Service: FOC State Machine](../design/state-machine.md)                               | States, transitions, guards, and the enable/disable lifecycle                          |
 | [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                              |
+| [Service: Encoder Index Search](../design/service-index-search.md)                     | Index angle at commissioning, rotor reference from the index at power-up               |
 | [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                              |
 | [Service: Rotor Standstill](../design/service-standstill.md)                           | Waits for the rotor to come to rest before the offsets are measured                    |
 | [Service: Bus Voltage](../design/service-bus-voltage.md)                               | Measures the bus every 10 ms so that the duties follow it                              |

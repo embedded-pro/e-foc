@@ -405,6 +405,7 @@ namespace application
 
         const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
         model.StepForTest(stepDuty);
+        indexLatched = indexLatched || model.EncoderIndexAsserted();
         shuntReadout.Applied(stepDuty);
         appliedDutyPhases = lastDutyPhases;
         responseRecorder.Capture(PlantSampleAt(tick));
@@ -573,5 +574,25 @@ namespace application
     void PlatformFactoryImpl::SetZero()
     {
         model.SetZero();
+    }
+
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return model.HasEncoderIndex();
+    }
+
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        indexLatched = false;
+    }
+
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        return indexLatched;
     }
 }

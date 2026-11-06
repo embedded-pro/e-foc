@@ -14,6 +14,15 @@ namespace drivers
         MOCK_METHOD(void, SetZero, (), (override));
     };
 
+    class EncoderIndexMock
+        : public EncoderIndex
+    {
+    public:
+        MOCK_METHOD(bool, HasIndex, (), (const, override));
+        MOCK_METHOD(void, ArmIndex, (), (override));
+        MOCK_METHOD(bool, IndexSeen, (), (override));
+    };
+
     class ThreePhasePowerStageMock
         : public ThreePhasePowerStage
     {

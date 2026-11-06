@@ -344,6 +344,60 @@ namespace
             measurementDone(offsets);
         }
 
+        StrictMock<services::IndexSearchMock> indexSearchMock;
+        infra::Function<void(std::optional<foc::Radians>)> searchDone;
+        services::IndexSearch::Config searchConfig;
+        infra::Execute setupIndexSearchExpectations{ [this]()
+            {
+                EXPECT_CALL(indexSearchMock, Available()).WillRepeatedly(Return(true));
+                EXPECT_CALL(indexSearchMock, IsRunning()).WillRepeatedly(Return(false));
+                EXPECT_CALL(indexSearchMock, Abort()).Times(AnyNumber());
+            } };
+
+        TestedStateMachine CreateStateMachineWithIndex()
+        {
+            return TestedStateMachine{
+                tracer,
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .indexSearch = indexSearchMock },
+                faultNotifierMock,
+                nvmActivity
+            };
+        }
+
+        TestedStateMachine CreateStateMachineWithIndexRefreshingOffsets()
+        {
+            EXPECT_CALL(offsetsMock, IsRunning()).WillRepeatedly(Return(false));
+            EXPECT_CALL(offsetsMock, Abort()).Times(AnyNumber());
+            EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
+
+            return TestedStateMachine{
+                tracer,
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .currentOffsets = offsetsMock, .standstill = standstillMock, .indexSearch = indexSearchMock },
+                faultNotifierMock,
+                nvmActivity
+            };
+        }
+
+        static services::CalibrationData RecordWithIndexAngle()
+        {
+            auto data = ValidRecord();
+            data.encoderIndexAngle = 2.5f;
+            return data;
+        }
+
+        void ExpectIndexSearch()
+        {
+            EXPECT_CALL(indexSearchMock, Search(_, _)).WillOnce(Invoke([this](const services::IndexSearch::Config& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone)
+                {
+                    searchConfig = config;
+                    searchDone = onDone;
+                }));
+        }
+
         template<class Service>
         void ExpectAbortNow(Service& mock, const std::function<void()>& action)
         {
@@ -2935,12 +2989,13 @@ TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_in_ready_requires_anot
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_drops_the_cogging_map)
+TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_drops_the_cogging_map_and_the_index_angle)
 {
     GivenFaultNotifierRegistered();
     auto record = ValidRecord();
     record.coggingTorqueScale = 0.01f;
     record.coggingTorque.fill(10);
+    record.encoderIndexAngle = 1.5f;
     GivenNvmHolds(record);
     auto sm = CreateStateMachine();
 
@@ -2949,6 +3004,7 @@ TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_drops_the_cogging_map)
             {
                 EXPECT_NEAR(data.coggingTorqueScale, 0.0f, 1e-9f);
                 EXPECT_EQ(data.coggingTorque, (std::array<int8_t, services::coggingMapBins>{}));
+                EXPECT_FALSE(services::EncoderIndexAngle(data).has_value());
                 onDone(services::NvmStatus::Ok);
             }));
 
@@ -3686,4 +3742,182 @@ TEST_F(FocStateMachineTorqueAutoTest, a_fault_after_a_clear_is_announced_again)
     faultNotifierMock.TriggerFault(state_machine::FaultCode::stall);
 
     EXPECT_THAT(announced, ElementsAre(state_machine::FaultCode::hardwareFault, state_machine::FaultCode::stall));
+}
+
+TEST_F(FocStateMachineTorqueTest, a_record_with_an_index_angle_boots_to_ready_without_a_rotor_reference)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_record_with_an_index_angle_boots_to_idle_without_an_index_channel)
+{
+    EXPECT_CALL(indexSearchMock, Available()).WillRepeatedly(Return(false));
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueTest, a_record_without_an_index_angle_boots_to_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachineWithIndex();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueTest, the_first_enable_searches_the_index_towards_the_stored_angle_and_enables)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+    EXPECT_FALSE(enableResult.has_value());
+    EXPECT_EQ(searchConfig.polePairs, 7u);
+    EXPECT_FLOAT_EQ(searchConfig.phaseResistance.Value(), 0.5f);
+    EXPECT_FLOAT_EQ(searchConfig.busVoltage.Value(), 24.0f);
+    ASSERT_TRUE(searchConfig.target.has_value());
+    EXPECT_FLOAT_EQ(searchConfig.target->Value(), 2.5f);
+
+    EXPECT_CALL(inverterMock, Start());
+    searchDone(foc::Radians{ -1.0f });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdDisable());
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdEnable());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueTest, an_index_search_that_finds_nothing_refuses_the_enable_and_the_next_enable_searches_again)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    searchDone(std::nullopt);
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    enableResult.reset();
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    EXPECT_CALL(inverterMock, Start());
+    searchDone(foc::Radians{ 0.0f });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_disable_during_the_index_search_abandons_it_and_refuses_the_enable)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+    ExpectIndexSearch();
+    EnableAsync(sm);
+
+    EXPECT_CALL(indexSearchMock, Abort()).Times(AtLeast(1));
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdDisable());
+    searchDone(foc::Radians{ 0.0f });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::rejected, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueTest, an_emergency_stop_during_the_index_search_aborts_it)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+    ExpectIndexSearch();
+    EnableAsync(sm);
+
+    EXPECT_CALL(indexSearchMock, Abort()).Times(AtLeast(1));
+    sm.CmdEmergencyStop();
+    searchDone(foc::Radians{ 0.0f });
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueTest, the_offsets_are_refreshed_before_the_index_is_searched)
+{
+    GivenFaultNotifierRegistered();
+    auto record = RecordWithIndexAngle();
+    record.currentOffsetA = 0.010f;
+    record.currentOffsetB = -0.020f;
+    record.currentOffsetC = 0.030f;
+    GivenNvmHolds(record);
+    EXPECT_CALL(offsetsMock, Apply(OffsetsNear(0.010f, -0.020f, 0.030f))).Times(AtLeast(1));
+    auto sm = CreateStateMachineWithIndexRefreshingOffsets();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    ExpectRefreshStarted();
+    EnableAsync(sm);
+
+    ExpectIndexSearch();
+    RefreshMeasures(foc::PhaseCurrents{ foc::Ampere{ 0.010f }, foc::Ampere{ -0.020f }, foc::Ampere{ 0.030f } });
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(enableResult.has_value());
+
+    EXPECT_CALL(inverterMock, Start());
+    searchDone(foc::Radians{ 0.0f });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_re_alignment_stores_the_index_angle_the_search_measured)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachineWithIndex();
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    ExpectIndexSearch();
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+    EXPECT_FALSE(searchConfig.target.has_value());
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                ASSERT_TRUE(services::EncoderIndexAngle(data).has_value());
+                EXPECT_FLOAT_EQ(*services::EncoderIndexAngle(data), -1.75f);
+                onDone(services::NvmStatus::Ok);
+            }));
+    searchDone(foc::Radians{ -1.75f });
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
 }

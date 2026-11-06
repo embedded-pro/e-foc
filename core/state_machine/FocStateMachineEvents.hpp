@@ -143,6 +143,12 @@ namespace state_machine
         OffsetRefreshOutcome outcome;
     };
 
+    struct IndexSearched
+    {
+        static constexpr const char* name{ "IndexSearched" };
+        bool found;
+    };
+
     struct Disable
     {
         static constexpr const char* name{ "Disable" };
@@ -228,5 +234,6 @@ namespace state_machine
         SetMotorParameter,
         MotorParameterSaved,
         BootValidityChecked,
-        BootCalibrationLoaded>;
+        BootCalibrationLoaded,
+        IndexSearched>;
 }

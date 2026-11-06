@@ -205,6 +205,7 @@ namespace mil
                 return drive.PowerSupplyVoltage();
             } }
         , motorAlignment{ inverterCompensation, drive }
+        , indexSearch{ inverterCompensation, drive, noEncoderIndex }
         , rotorStandstill{ drive }
     {
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
@@ -216,7 +217,7 @@ namespace mil
                     tracer,
                     application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
-                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
+                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
                     faultNotifier,
                     configData,
                     state_machine::ControlModeStateMachine::OuterLoopArgs{

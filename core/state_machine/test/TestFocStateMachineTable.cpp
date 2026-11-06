@@ -88,6 +88,7 @@ namespace
         NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::MotorParameterSaved>(), idleReadyAndFault },
         NonCommandEvent{ Event<state_machine::OffsetsRefreshed>(), onlyReady },
+        NonCommandEvent{ Event<state_machine::IndexSearched>(), onlyReady },
         NonCommandEvent{ Event<state_machine::FaultDetected>(), everywhere },
         NonCommandEvent{ Event<state_machine::EmergencyStop>(), everywhere },
     };

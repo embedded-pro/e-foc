@@ -8,6 +8,7 @@
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
+#include "core/services/index_search/IndexSearch.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "services/tracer/Tracer.hpp"
@@ -46,5 +47,6 @@ namespace application
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill{ std::nullopt };
         bool identifyFluxLinkage{ false };
         std::optional<std::reference_wrapper<services::FluxLinkageIdentification>> fluxIdentOverride{ std::nullopt };
+        std::optional<std::reference_wrapper<services::IndexSearch>> indexSearch{ std::nullopt };
     };
 }

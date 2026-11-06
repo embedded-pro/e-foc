@@ -7,6 +7,7 @@ namespace application
         : env(environment)
         , calibration(calibration)
         , offsetRefresh(services.currentOffsets, services.standstill, environment.tracer)
+        , index(services.indexSearch, environment.tracer)
     {}
 
     void OperationFlow::RegisterFaultHandler(state_machine::FaultNotifier& notifier)
@@ -52,25 +53,43 @@ namespace application
             return false;
         }
 
-        if (!ready.rotorReferenceValid)
+        const bool referenced = ready.rotorReferenceValid || env.context.IsRotorReferenceValid() || IsIndexSearchDue();
+
+        if (!referenced)
             env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
 
-        return ready.rotorReferenceValid;
+        return referenced;
     }
 
-    bool OperationFlow::IsOffsetRefreshDue() const
+    bool OperationFlow::IsEnablePreparationDue() const
     {
-        return offsetRefresh.IsDue();
+        return offsetRefresh.IsDue() || IsIndexSearchDue();
     }
 
-    bool OperationFlow::IsRefreshingOffsets() const
+    bool OperationFlow::IsIndexSearchDue() const
     {
-        return offsetRefresh.IsRunning();
+        return !env.context.IsRotorReferenceValid() && index.CanRestore(env.context.Data());
     }
 
-    void OperationFlow::BeginOffsetRefresh(const state_machine::Ready& ready, const state_machine::Enable& command)
+    bool OperationFlow::IsPreparingEnable() const
+    {
+        return offsetRefresh.IsRunning() || index.IsRunning();
+    }
+
+    const IndexReference& OperationFlow::Index() const
+    {
+        return index;
+    }
+
+    void OperationFlow::BeginEnablePreparation(const state_machine::Ready& ready, const state_machine::Enable& command)
     {
         env.pending.Accept(command.onDone);
+
+        if (!offsetRefresh.IsDue())
+        {
+            SearchIndex();
+            return;
+        }
 
         const auto& record = ready.loadedData;
         offsetRefresh.Start(foc::PhaseCurrents{ foc::Ampere{ record.currentOffsetA }, foc::Ampere{ record.currentOffsetB }, foc::Ampere{ record.currentOffsetC } },
@@ -80,30 +99,47 @@ namespace application
             });
     }
 
+    void OperationFlow::SearchIndex()
+    {
+        index.Start(env.context.Data(), env.context.BusVoltage(), [this](bool found)
+            {
+                if (found)
+                    env.context.SetRotorReferenceValid(true);
+
+                env.machine.Dispatch(state_machine::IndexSearched{ found });
+            });
+    }
+
     void OperationFlow::RefuseAfterOffsetRefresh(state_machine::OffsetRefreshOutcome outcome)
     {
         env.pending.Complete(outcome == state_machine::OffsetRefreshOutcome::refreshed ? state_machine::CommandResult::rejected : state_machine::CommandResult::calibrationFailed);
     }
 
-    void OperationFlow::AbandonOffsetRefresh()
+    void OperationFlow::RefuseAfterIndexSearch()
     {
-        env.tracer.Trace() << "[SM] Enable abandoned: disabled while measuring the current offsets";
-        offsetRefresh.Abort();
+        env.pending.Complete(state_machine::CommandResult::calibrationFailed);
+    }
+
+    void OperationFlow::AbandonEnablePreparation()
+    {
+        env.tracer.Trace() << "[SM] Enable abandoned: disabled while preparing to enable";
+        AbortEnablePreparation();
         env.pending.Complete(state_machine::CommandResult::rejected);
     }
 
-    void OperationFlow::AbortOffsetRefresh()
+    void OperationFlow::AbortEnablePreparation()
     {
         offsetRefresh.Abort();
+        index.Abort();
     }
 
     state_machine::Enabled OperationFlow::BuildEnabled(const state_machine::Enable& command)
     {
         env.pending.Accept(command.onDone);
-        return BuildEnabledAfterOffsetRefresh();
+        return BuildEnabledAfterPreparation();
     }
 
-    state_machine::Enabled OperationFlow::BuildEnabledAfterOffsetRefresh()
+    state_machine::Enabled OperationFlow::BuildEnabledAfterPreparation()
     {
         env.mode.PrepareForEnabled();
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
@@ -130,7 +166,7 @@ namespace application
         faultDispatched = false;
         faultController.EnterFault();
         faultController.SampleCondition();
-        offsetRefresh.Abort();
+        AbortEnablePreparation();
         offsetRefresh.MarkStale();
 
         if (wasActive)
@@ -196,7 +232,7 @@ namespace application
         env.tracer.Trace() << "[SM] Emergency stop";
         env.mode.GetFocControl().Stop();
         calibration.Abort();
-        offsetRefresh.Abort();
+        AbortEnablePreparation();
     }
 
     void OperationFlow::StopWithoutTransition()
