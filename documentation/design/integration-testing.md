@@ -218,14 +218,14 @@ Tier 1  product requirement   documentation/requirements/*.yaml    what the driv
 Tier 2  acceptance criteria   integration_tests/features/*.feature  how much, on which plant, how checked
 ```
 
-| Content                                                                                   | Lives in                                             |
-|-------------------------------------------------------------------------------------------|------------------------------------------------------|
-| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot   | `documentation/requirements/*.yaml`                  |
-| Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error    | The `Examples:` tables of the scenarios              |
-| Mechanisms and design constraints: storage, interrupt rules, ownership, class structure   | The component's design document and AGENTS.md        |
-| What each CAN contract version added                                                      | The contract changelog in `service-can.md`           |
-| How the suite commands the target and decides a verdict                                   | This document and `software-in-the-loop.md`          |
-| A guard against a defect that was fixed                                                   | The regression test that reproduces it               |
+| Content                                                                                 | Lives in                                      |
+|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/requirements/*.yaml`           |
+| Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error  | The `Examples:` tables of the scenarios       |
+| Mechanisms and design constraints: storage, interrupt rules, ownership, class structure | The component's design document and AGENTS.md |
+| What each CAN contract version added                                                    | The contract changelog in `service-can.md`    |
+| How the suite commands the target and decides a verdict                                 | This document and `software-in-the-loop.md`   |
+| A guard against a defect that was fixed                                                 | The regression test that reproduces it        |
 
 ### Writing a product requirement
 
@@ -255,43 +255,43 @@ Requirements written before the two tiers (`REQ-SM`, `REQ-CAL`, `REQ-CAN`, `REQ-
 others) were merged into the product requirements below. A former identifier in an old pull request
 or issue maps as follows; the checker refuses any of them as a tag.
 
-| New requirement | Former requirements |
-|---|---|
-| REQ-LCY-001 | REQ-SM-001, 002, 006, 007; REQ-INT-001, 002, 005 |
-| REQ-LCY-002 | REQ-SM-013, 014, 015; REQ-INT-006, 007 |
-| REQ-LCY-003 | REQ-SM-008, 009, 017, 018, 020, 021, 023 to 026; REQ-INT-003 |
-| REQ-LCY-004 | REQ-CM-001 to 005; REQ-SM-016, 029, 032 |
-| REQ-LCY-005 | REQ-CM-006; REQ-PRT-007 |
-| REQ-CMS-001 | REQ-CAL-012, 013, 015, 018, 020, 021; REQ-SM-003, 004, 005, 034; REQ-HIL-020, 021 |
-| REQ-CMS-002 | REQ-CAL-001, 005, 009, 010 |
-| REQ-CMS-003 | REQ-CAL-014, 016, 017, 019, 022 to 025 |
-| REQ-CMS-004 | REQ-SM-010, 011, 031 |
-| REQ-CTL-001 | REQ-TRQ-002, 007 to 012, 014; REQ-HIL-024 |
-| REQ-CTL-002 | REQ-SPD-008, 009, 010; REQ-HIL-022 |
-| REQ-CTL-003 | REQ-POS-009 to 012, 014; REQ-HIL-023, 025 |
-| REQ-CTL-004 | REQ-CTRL-014 |
-| REQ-CTL-005 | REQ-CTRL-001 to 003, 006, 008 to 010, 012, 013 |
-| REQ-CTL-006 | REQ-CTRL-015 to 017; REQ-SPD-003; REQ-POS-003, 007; REQ-TRQ-003 |
-| REQ-CTL-007 | REQ-POS-015, 016 |
-| REQ-PRO-001 | REQ-PRT-001; REQ-TRQ-006 |
-| REQ-PRO-002 | REQ-PRT-002, 008 |
-| REQ-PRO-003 | REQ-PRT-009; REQ-TRQ-013 |
-| REQ-PRO-004 | REQ-PRT-003, 004 |
-| REQ-PRO-005 | REQ-SM-028, 033; REQ-EH-015 |
-| REQ-PRO-006 | REQ-PRT-011 |
-| REQ-PLT-001 | REQ-EH-008, 009, 012; REQ-HIL-012 |
-| REQ-PLT-002 | REQ-EH-001 to 003, 006, 007; REQ-HIL-010 |
-| REQ-PLT-003 | REQ-EH-004, 005; REQ-HIL-008 |
-| REQ-PLT-004 | REQ-PERF-001, 002, 004 to 006, 008 |
-| REQ-COM-001 | REQ-CAN-001 to 003, 007 to 011, 013 to 021, 023 to 025; REQ-CM-007 |
-| REQ-COM-002 | REQ-INT-013, 014; REQ-CAN-012 |
-| REQ-COM-003 | REQ-CAN-006 |
-| REQ-FWU-001 | REQ-BOOT-001, 002, 003, 007 |
-| REQ-FWU-002 | REQ-UPD-002, 003, 005, 006, 011, 013, 014; REQ-BOOT-004, 005 |
-| REQ-FWU-003 | REQ-UPD-007 |
-| REQ-FWU-004 | REQ-UPD-009, 010, 012 |
-| REQ-FWU-005 | REQ-UPD-001, 004 |
-| REQ-HWT-001 | REQ-HIL-001, 004, 005, 006 |
+| New requirement       | Former requirements                                                                                                                                                                                                                                                                                         |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| REQ-LCY-001           | REQ-SM-001, 002, 006, 007; REQ-INT-001, 002, 005                                                                                                                                                                                                                                                            |
+| REQ-LCY-002           | REQ-SM-013, 014, 015; REQ-INT-006, 007                                                                                                                                                                                                                                                                      |
+| REQ-LCY-003           | REQ-SM-008, 009, 017, 018, 020, 021, 023 to 026; REQ-INT-003                                                                                                                                                                                                                                                |
+| REQ-LCY-004           | REQ-CM-001 to 005; REQ-SM-016, 029, 032                                                                                                                                                                                                                                                                     |
+| REQ-LCY-005           | REQ-CM-006; REQ-PRT-007                                                                                                                                                                                                                                                                                     |
+| REQ-CMS-001           | REQ-CAL-012, 013, 015, 018, 020, 021; REQ-SM-003, 004, 005, 034; REQ-HIL-020, 021                                                                                                                                                                                                                           |
+| REQ-CMS-002           | REQ-CAL-001, 005, 009, 010                                                                                                                                                                                                                                                                                  |
+| REQ-CMS-003           | REQ-CAL-014, 016, 017, 019, 022 to 025                                                                                                                                                                                                                                                                      |
+| REQ-CMS-004           | REQ-SM-010, 011, 031                                                                                                                                                                                                                                                                                        |
+| REQ-CTL-001           | REQ-TRQ-002, 007 to 012, 014; REQ-HIL-024                                                                                                                                                                                                                                                                   |
+| REQ-CTL-002           | REQ-SPD-008, 009, 010; REQ-HIL-022                                                                                                                                                                                                                                                                          |
+| REQ-CTL-003           | REQ-POS-009 to 012, 014; REQ-HIL-023, 025                                                                                                                                                                                                                                                                   |
+| REQ-CTL-004           | REQ-CTRL-014                                                                                                                                                                                                                                                                                                |
+| REQ-CTL-005           | REQ-CTRL-001 to 003, 006, 008 to 010, 012, 013                                                                                                                                                                                                                                                              |
+| REQ-CTL-006           | REQ-CTRL-015 to 017; REQ-SPD-003; REQ-POS-003, 007; REQ-TRQ-003                                                                                                                                                                                                                                             |
+| REQ-CTL-007           | REQ-POS-015, 016                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-001           | REQ-PRT-001; REQ-TRQ-006                                                                                                                                                                                                                                                                                    |
+| REQ-PRO-002           | REQ-PRT-002, 008                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-003           | REQ-PRT-009; REQ-TRQ-013                                                                                                                                                                                                                                                                                    |
+| REQ-PRO-004           | REQ-PRT-003, 004                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-005           | REQ-SM-028, 033; REQ-EH-015                                                                                                                                                                                                                                                                                 |
+| REQ-PRO-006           | REQ-PRT-011                                                                                                                                                                                                                                                                                                 |
+| REQ-PLT-001           | REQ-EH-008, 009, 012; REQ-HIL-012                                                                                                                                                                                                                                                                           |
+| REQ-PLT-002           | REQ-EH-001 to 003, 006, 007; REQ-HIL-010                                                                                                                                                                                                                                                                    |
+| REQ-PLT-003           | REQ-EH-004, 005; REQ-HIL-008                                                                                                                                                                                                                                                                                |
+| REQ-PLT-004           | REQ-PERF-001, 002, 004 to 006, 008                                                                                                                                                                                                                                                                          |
+| REQ-COM-001           | REQ-CAN-001 to 003, 007 to 011, 013 to 021, 023 to 025; REQ-CM-007                                                                                                                                                                                                                                          |
+| REQ-COM-002           | REQ-INT-013, 014; REQ-CAN-012                                                                                                                                                                                                                                                                               |
+| REQ-COM-003           | REQ-CAN-006                                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-001           | REQ-BOOT-001, 002, 003, 007                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-002           | REQ-UPD-002, 003, 005, 006, 011, 013, 014; REQ-BOOT-004, 005                                                                                                                                                                                                                                                |
+| REQ-FWU-003           | REQ-UPD-007                                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-004           | REQ-UPD-009, 010, 012                                                                                                                                                                                                                                                                                       |
+| REQ-FWU-005           | REQ-UPD-001, 004                                                                                                                                                                                                                                                                                            |
+| REQ-HWT-001           | REQ-HIL-001, 004, 005, 006                                                                                                                                                                                                                                                                                  |
 | moved out (see below) | REQ-TRQ-001, 004; REQ-SPD-001, 004, 005, 007; REQ-POS-001, 002, 004, 006, 008; REQ-SPD-002; REQ-CAL-002 to 004, 006 to 008, 011; REQ-SM-019, 022, 027, 030; REQ-CTRL-007, 011; REQ-INT-008 to 012, 015 to 017; REQ-CAN-004, 005; REQ-EH-013, 014; REQ-PERF-007; REQ-UPD-008, 015; REQ-BOOT-006; REQ-POS-013 |
 
 The former requirements moved out were design constraints (fixed-size law storage, cascade rates,

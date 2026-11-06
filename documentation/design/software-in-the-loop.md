@@ -193,7 +193,7 @@ flakiness rather than merely reducing it.
 ### Part B3 — Timing the control interrupt
 
 The platform measures every execution of the control callback and counts the ones that overrun
-the budget, miss the period or re-enter (REQ-PLT-004); the control-loop
+the budget, miss the period or re-enter (REQ-PLT-004 to REQ-PLT-004); the control-loop
 statistics parameters of contract 2.2 report them, and `ClearDiagnostics` restarts them. On hardware the duration comes from the DWT cycle counter. The emulator does not implement
 the DWT and its registers read zero, so every execution measured zero and the counters could not
 report an overrun however long the callback ran. The emulated platform reads a free-running timer
@@ -583,8 +583,7 @@ a fifth higher than anything those six had shown. Every bound still had more tha
 itself to spare, and a bound pinned to the measurement itself would have been red on all three,
 on the very run that was meant to confirm it.
 
-The two deadbeat scenarios on the bench plant with the duty acting a period late (REQ-CTL-001 and
-REQ-CTL-001) show what happens without it. Their tail bound was 7 percent, close to a single
+The two deadbeat scenarios on the bench plant with the duty acting a period late (REQ-CTL-001) show what happens without it. Their tail bound was 7 percent, close to a single
 measurement, and CI measured 7.38 and 7.86 percent on runs where the current loop had not changed
 (issue #528). Twenty local runs of each measured tail bands from 3.5 to 6.7 percent, and eleven
 CI measurements of the two from 4.0 to 7.86, so the bound sat inside the spread. The tail band
@@ -1219,18 +1218,18 @@ error code the bootloader recorded.
 
 **Scenarios** (`bootloader.feature`, `@sil`):
 
-| Scenario                                         | Staged                    | Slot                              | The scenario sees                                      | Requirements      |
-|--------------------------------------------------|---------------------------|-----------------------------------|--------------------------------------------------------|-------------------|
-| The application starts through the bootloader    | nothing                   | the application                   | the heartbeat                                          | REQ-FWU-001, 006 |
-| A staged pack is installed                       | a pack, *ready to deploy* | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-001, 003 |
-| An interrupted installation is repeated          | a pack, *deploy started*  | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-002      |
-| A downloaded pack waits for the apply            | a pack, *downloaded*      | the application                   | the heartbeat; the journal still reads *downloaded*    | REQ-FWU-001      |
-| A pack with a bad signature is refused           | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, signature error              | REQ-FWU-001      |
-| A pack for another product is refused            | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, product error                | REQ-FWU-001      |
-| A pack for another board is refused before erase | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-target error           | REQ-FWU-001      |
-| A pack for another destination is refused        | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-destination error      | REQ-FWU-001      |
-| A damaged application is not started             | nothing                   | the application, one byte changed | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001      |
-| An empty slot is not started                     | nothing                   | nothing                           | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001      |
+| Scenario                                         | Staged                    | Slot                              | The scenario sees                                      | Requirements |
+|--------------------------------------------------|---------------------------|-----------------------------------|--------------------------------------------------------|--------------|
+| The application starts through the bootloader    | nothing                   | the application                   | the heartbeat                                          | REQ-FWU-001  |
+| A staged pack is installed                       | a pack, *ready to deploy* | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-001  |
+| An interrupted installation is repeated          | a pack, *deploy started*  | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-002  |
+| A downloaded pack waits for the apply            | a pack, *downloaded*      | the application                   | the heartbeat; the journal still reads *downloaded*    | REQ-FWU-001  |
+| A pack with a bad signature is refused           | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, signature error              | REQ-FWU-001  |
+| A pack for another product is refused            | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, product error                | REQ-FWU-001  |
+| A pack for another board is refused before erase | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-target error           | REQ-FWU-001  |
+| A pack for another destination is refused        | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-destination error      | REQ-FWU-001  |
+| A damaged application is not started             | nothing                   | the application, one byte changed | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001  |
+| An empty slot is not started                     | nothing                   | nothing                           | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001  |
 
 A refused pack leaves the application in the slot, which the heartbeat after the refusal shows. The
 firmware-upgrade service's scenarios add the other half: the application downloading the pack into
@@ -1281,18 +1280,18 @@ the hardware-in-the-loop scenario downloads the whole application over the board
 
 **Scenarios** (`firmware_upgrade.feature`, `@sil`):
 
-| Scenario                                         | The scenario sees                                                                                                                                                                                                                              | Requirements               |
-|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------|
-| A pack is downloaded and staged over a stale one | staging holding a stale pack and the journal reading *deployed* before the boot; Begin answered with the page size; Verify ok; the journal holds the one entry *downloaded*; the slot holds the pack and is erased past it; the staged version | REQ-FWU-005, 004, 007, 013 |
-| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                                                                                                                               | REQ-FWU-002                |
-| A download is refused while the motor runs       | a stale pack staged before the boot; Begin answered Busy; the journal still reads *downloaded* and the stale pack is untouched                                                                                                                 | REQ-FWU-002                |
-| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                                                                                                                                   | REQ-FWU-002                |
-| Activate without a staged pack is refused        | Activate answered NotReady; the journal empty                                                                                                                                                                                                  | REQ-FWU-002                |
-| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                                                                                                                                | REQ-FWU-002, 006           |
-| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                                                                                                                                    | REQ-FWU-005, 006           |
-| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                                                                                                                                 | REQ-FWU-005, 006           |
-| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                                                                                                                                        | REQ-FWU-002                |
-| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* within 5 s of the answer (0.5 s to 0.6 s measured, printed as a `[METRIC]` line) and the heartbeat comes back; the staged version zero                               | REQ-FWU-002, 007, 011      |
+| Scenario                                         | The scenario sees                                                                                                                                                                                                                              | Requirements                          |
+|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------|
+| A pack is downloaded and staged over a stale one | staging holding a stale pack and the journal reading *deployed* before the boot; Begin answered with the page size; Verify ok; the journal holds the one entry *downloaded*; the slot holds the pack and is erased past it; the staged version | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005 |
+| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                                                                                                                               | REQ-FWU-002                           |
+| A download is refused while the motor runs       | a stale pack staged before the boot; Begin answered Busy; the journal still reads *downloaded* and the stale pack is untouched                                                                                                                 | REQ-FWU-002                           |
+| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                                                                                                                                   | REQ-FWU-002                           |
+| Activate without a staged pack is refused        | Activate answered NotReady; the journal empty                                                                                                                                                                                                  | REQ-FWU-002                           |
+| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                                                                                                                                | REQ-FWU-002                           |
+| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                                                                                                                                    | REQ-FWU-002, REQ-FWU-005              |
+| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                                                                                                                                 | REQ-FWU-002, REQ-FWU-005              |
+| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                                                                                                                                        | REQ-FWU-002                           |
+| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* within 5 s of the answer (0.5 s to 0.6 s measured, printed as a `[METRIC]` line) and the heartbeat comes back; the staged version zero                               | REQ-FWU-002, REQ-FWU-003              |
 
 **Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
 (`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.

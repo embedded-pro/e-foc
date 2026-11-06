@@ -536,17 +536,17 @@ disagrees with this contract. e-foc's definitions are authoritative for this pro
 documentation. Because every decode is length-exact, a frame built from the example is rejected with
 `invalidPayload` rather than misread — visibly, not silently.
 
-| Message / item                | e-foc                                       | can-lite example       | Why                                                                                          |
-|-------------------------------|---------------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
-| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | each loop derives its gains from its bandwidth (REQ-CTL-006), never from per-axis gains      |
-| `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                      |
-| `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                           |
-| `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
-| `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
-| category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
-| `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
-| `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
+| Message / item                | e-foc                                       | can-lite example       | Why                                                                                      |
+|-------------------------------|---------------------------------------------|------------------------|------------------------------------------------------------------------------------------|
+| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | each loop derives its gains from its bandwidth (REQ-CTL-006), never from per-axis gains  |
+| `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                  |
+| `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                       |
+| `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                            |
+| `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                           |
+| category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on    |
+| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                 |
+| `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale |
+| `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz          |
 
 ### Part B — FocMotorCategoryServer
 
