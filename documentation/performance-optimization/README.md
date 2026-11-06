@@ -433,13 +433,14 @@ clamp and a multiply on the q-axis setpoint each sample, about ten cycles, with 
 the interrupt as its reciprocal. It is defined beside `Calculate()` in the same translation unit and inlined
 into it, so the cycle gate measures it as part of `TorqueCascade::Calculate` without a new symbol.
 
-A quick stop (`state-machine.md`) adds one volatile load and a branch to `TorqueCascade::Calculate` each sample;
-while it brakes, the braking current — a multiply and a clamp — replaces the setpoint read, so the braking
-sample costs no more than an ordinary one. It is defined beside `Calculate()` and inlined into it, like the
-speed limiter. In the speed and position cascades the quick stop runs in the outer loop: each 1 kHz tick calls
-its step, which loads one flag and returns, and while it runs a ramp step replaces the speed ramp or the position
-law and the online estimators, so the tick costs less than an ordinary one. The step is a symbol of its own,
-listed in the outer-loop cycle configuration.
+A quick stop (`state-machine.md`) adds a volatile load and a branch to `TorqueCascade::Calculate` each sample,
+and while it brakes, a multiply and a clamp that compute the braking current in place of the setpoint. It is
+defined beside `Calculate()` and inlined into it, like the speed limiter. The cycle gate counts the braking
+branch, the longer one: `TorqueCascade::Calculate` rose from 2566 to 2601 cycles at worst, and the EK-TM4C1294XL
+inner loop from 4133 to 4168 of its 4500. In the speed and position cascades the quick stop runs in the outer
+loop: each 1 kHz tick calls its step, which loads one flag and returns, and while it runs a ramp step replaces the
+speed ramp or the position law and the online estimators. The step is a symbol of its own, listed in the
+outer-loop cycle configuration; the outer-loop stage measured 1286 cycles at worst, against 1336 before.
 
 The motor overload protection's current limit adds one volatile load and a clamp of the q-axis reference to each
 cascade's inner loop; in the speed and position cascades it replaces the constant bound of the clamp that was
