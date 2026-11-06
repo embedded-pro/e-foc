@@ -12,6 +12,7 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/state_machine/PositionStateMachine.hpp"
 #include "core/state_machine/Recalibration.hpp"
+#include "core/state_machine/RecalibrationStore.hpp"
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "infra/util/Function.hpp"
@@ -74,6 +75,11 @@ namespace state_machine
         std::optional<MotorModel> ModelInUse() const;
         uint16_t RecalibrationsApplied() const;
         uint16_t RecalibrationsRejected() const;
+        // Reads the stored inductance, inertia and friction once; until then nothing is stored.
+        void RestoreStoredModel();
+        // Refused unless stopped; onStored reports whether the empty learned model reached the record.
+        SettingResult CmdResetModel(const infra::Function<void(bool stored)>& onStored);
+        uint16_t RecalibrationsStored() const;
 
         TuningResult TrySetCurrentBandwidth(float bandwidth);
         TuningResult TrySetSpeedBandwidth(float bandwidth);
@@ -152,6 +158,9 @@ namespace state_machine
         void ApplyOperatorTunings();
         void ObserveOnlineEstimates();
         void RecalibrateOnReady();
+        void CommissionModel();
+        StoredModel StoredFor(const MotorModel& commissioned) const;
+        void Conclude(const Recalibration::Outcome& outcome);
         void ApplyModelInUse();
         void Report(const Recalibration::Outcome& outcome);
         MotorModel CommissionedModel() const;
@@ -183,7 +192,9 @@ namespace state_machine
         std::optional<foc::Volts> busVoltage;
         infra::Function<void(FaultCode)> faultEntered;
         Recalibration recalibration;
+        RecalibrationStore recalibrationStore;
         bool ranSinceStop{ false };
+        bool loopsRecalibrated{ false };
         infra::TimerRepeating recalibrationTimer;
 
         std::variant<std::monostate,

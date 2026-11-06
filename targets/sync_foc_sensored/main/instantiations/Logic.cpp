@@ -43,8 +43,9 @@ namespace application
         , terminalDiagnostics{ terminalWithStorage, hardware.Diagnostics(), hardware.Tracer() }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
+        , learnedModelRegion{ hardware.Eeprom(), learnedModelRegionOffset, learnedModelRegionSize }
         , faultHistoryRegion{ hardware.Eeprom(), faultHistoryRegionOffset, faultHistoryRegionSize }
-        , nvm{ calibrationRegion, configRegion, faultHistoryRegion }
+        , nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion }
         , inverter{ hardware }
         , inverterCompensation{ inverter, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
         , currentOffsets{ inverter, inverterCompensation }
@@ -147,6 +148,7 @@ namespace application
                         .maxCurrent = this->hardware.MaxCurrentSupported(),
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
+                controlMode->RestoreStoredModel();
                 faultHistory.emplace(nvm, [this]()
                     {
                         controlMode->HoldAsyncWork();

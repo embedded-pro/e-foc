@@ -14,7 +14,7 @@ namespace can
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, configureTelemetryRate, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
-            clearDiagnostics, queryFaultHistory, clearFaultHistory, recalibrate);
+            clearDiagnostics, queryFaultHistory, clearFaultHistory, recalibrate, resetModel);
     }
 
     FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
@@ -426,6 +426,25 @@ namespace can
                 observer.OnRecalibrate([this]()
                     {
                         SendCommandAck(focRecalibrateId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleResetModel(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focResetModelId))
+            return false;
+
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnResetModel([this](bool stored)
+                    {
+                        if (stored)
+                            SendCommandAck(focResetModelId, services::CanAckStatus::success);
+                        else
+                            SendCategoryError(focResetModelId, FocMotorCategoryError::persistenceFailed);
                     });
             });
 

@@ -2,6 +2,8 @@
 #include <chrono>
 #include <cstdio>
 #include <gtest/gtest.h>
+#include <optional>
+#include <vector>
 
 namespace
 {
@@ -87,4 +89,71 @@ TEST(TestOnlineRecalibration, the_recalibrated_drive_runs_again_on_the_new_model
 
     EXPECT_TRUE(mil.IsRunning());
     EXPECT_FALSE(mil.HasFault());
+}
+
+TEST(TestOnlineRecalibration, a_recalibrated_inertia_is_stored_once_and_in_use_after_a_restart)
+{
+    auto scenario = InertiaOffScenario(services::RecalibrationMode::automatic);
+    std::vector<uint8_t> image;
+    {
+        mil::ModelInTheLoop mil{ scenario };
+        RunAndStop(mil);
+        RunAndStop(mil);
+        RunAndStop(mil);
+
+        std::printf("[METRIC] mil recalibration stores=%u\n", static_cast<unsigned>(mil.ControlMode().RecalibrationsStored()));
+        EXPECT_EQ(1, mil.ControlMode().RecalibrationsStored());
+        image = mil.NvmImage();
+    }
+
+    mil::ModelInTheLoop restarted{ scenario.BootsFrom(image) };
+    ASSERT_TRUE(restarted.Align());
+
+    ExpectInertiaInUseWithin(restarted, 10.0f);
+    EXPECT_NEAR(1.5f * scenario.plant.rotorInertiaKgM2, restarted.CalibrationRecord().inertia, 1e-12f);
+
+    RunAndStop(restarted);
+    EXPECT_EQ(0, restarted.ControlMode().RecalibrationsApplied());
+    EXPECT_EQ(0, restarted.ControlMode().RecalibrationsStored());
+}
+
+TEST(TestOnlineRecalibration, turning_the_mode_off_returns_a_restored_drive_to_the_calibration_record_at_the_next_stop)
+{
+    auto scenario = InertiaOffScenario(services::RecalibrationMode::automatic);
+    std::vector<uint8_t> image;
+    {
+        mil::ModelInTheLoop mil{ scenario };
+        RunAndStop(mil);
+        image = mil.NvmImage();
+    }
+
+    mil::ModelInTheLoop restarted{ scenario.BootsFrom(image) };
+    restarted.ControlMode().Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::off);
+    ASSERT_TRUE(restarted.Align());
+
+    ASSERT_TRUE(restarted.ControlMode().ModelInUse().has_value());
+    EXPECT_NEAR(1.5f * scenario.plant.rotorInertiaKgM2, restarted.ControlMode().ModelInUse()->inertia.Value(), 1e-12f);
+}
+
+TEST(TestOnlineRecalibration, a_reset_model_returns_the_restarted_drive_to_the_calibration_record)
+{
+    auto scenario = InertiaOffScenario(services::RecalibrationMode::automatic);
+    std::vector<uint8_t> image;
+    {
+        mil::ModelInTheLoop mil{ scenario };
+        RunAndStop(mil);
+        image = mil.NvmImage();
+    }
+    mil::ModelInTheLoop restarted{ scenario.BootsFrom(image) };
+    std::optional<bool> stored;
+
+    EXPECT_EQ(state_machine::SettingResult::ok, restarted.ControlMode().CmdResetModel([&stored](bool result)
+                                                    {
+                                                        stored = result;
+                                                    }));
+    restarted.Run(std::chrono::milliseconds{ 10 });
+
+    EXPECT_EQ(true, stored);
+    ASSERT_TRUE(restarted.ControlMode().ModelInUse().has_value());
+    EXPECT_NEAR(1.5f * scenario.plant.rotorInertiaKgM2, restarted.ControlMode().ModelInUse()->inertia.Value(), 1e-12f);
 }

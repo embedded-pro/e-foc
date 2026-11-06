@@ -149,6 +149,11 @@ namespace tool
         return SupportsMinor(nodeId, recalibrationContractMinor);
     }
 
+    bool CanCommandClient::SupportsStoredRecalibration(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, storedRecalibrationContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -177,6 +182,8 @@ namespace tool
             return SupportsOverTemperature(nodeId);
         if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
             return SupportsBusVoltageLimits(nodeId);
+        if (parameter == can::FocParameter::recalibrationsStored)
+            return SupportsStoredRecalibration(nodeId);
         if (IsRecalibrationParameter(parameter))
             return SupportsRecalibration(nodeId);
 

@@ -299,5 +299,22 @@
     it shall redesign the current loop from the resistance and inductance in use and the speed
     and position loops from the inertia and friction in use, keep the loop bandwidths the operator
     or the calibration set, leave the calibration record and the online estimators' state
-    unchanged, and start every power-up from the calibration record. With the mode off, the
-    default, the loops shall be designed from the calibration record only.
+    unchanged, and start every power-up from the calibration record with the stored inductance,
+    inertia and friction of REQ-CAL-025. With the mode off, the default, the loops shall be
+    designed from the calibration record only.
+
+- id: REQ-CAL-025
+  title: A recalibrated inductance, inertia and friction are stored at a bounded rate
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    The drive shall store the inductance, inertia and viscous friction in use after a
+    recalibration that changes any of them, never the resistance, at most once every 15 minutes
+    of uptime, storing a change that had to wait at the first stop once the 15 minutes have
+    passed, and never with the mode off. At power-up with the mode on command or automatic it
+    shall design the loops from the stored values, each only within its plausibility band, while
+    the commissioned inductance, inertia and friction are those they were learned from. A Reset
+    Model command while stopped shall store an empty learned model at once and return the loops
+    to the calibration record. After a recalibration of an inertia stored 1.5 times the plant's
+    and a restart, the inertia in use shall be within 10 percent of the plant's, and two runs and
+    stops within 15 minutes shall store the learned model once.

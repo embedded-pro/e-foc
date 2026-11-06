@@ -42,11 +42,14 @@ namespace mil
         sil::SilPlantConfig plant{ sil::NominalPlant() };
         std::string plantName{ "nominal" };
         sil::NvmImageSpec nvm{ .includeCalibration = false, .includeConfig = false };
+        std::optional<std::vector<uint8_t>> nvmImage;
 
         Scenario& Plant(const std::string& preset);
         Scenario& Calibrated();
         Scenario& StoredCalibrationOffBy(const std::string& quantity, float factor);
         Scenario& BootsIn(state_machine::ControlMode mode);
+        // A power cycle: the image another run left in its EEPROM replaces the one built from nvm.
+        Scenario& BootsFrom(std::vector<uint8_t> image);
         Scenario& CurrentLoop(foc::CurrentAlgorithm algorithm);
         Scenario& SpeedLoop(foc::SpeedAlgorithm algorithm);
         Scenario& PositionLoop(foc::PositionAlgorithm algorithm);
@@ -95,6 +98,7 @@ namespace mil
         const services::CalibrationData& CalibrationRecord() const;
 
         const Scenario& Setup() const;
+        std::vector<uint8_t> NvmImage() const;
         SimulatedDrive& Drive();
         const integration::response::PlantTrace& Trace();
         std::optional<uint32_t> SetpointTick() const;
@@ -136,6 +140,7 @@ namespace mil
             void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override;
             void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override;
             void Erase(infra::Function<void()> onDone) override;
+            const std::vector<uint8_t>& Contents() const;
 
         private:
             std::vector<uint8_t> contents;
@@ -148,7 +153,8 @@ namespace mil
         void DrainRecords();
 
         static constexpr uint32_t calibrationRegionSize = 128;
-        static constexpr uint32_t configRegionSize = 256;
+        static constexpr uint32_t configRegionSize = 224;
+        static constexpr uint32_t learnedModelRegionSize = 32;
         static constexpr uint32_t faultHistoryRegionSize = 128;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
@@ -170,8 +176,9 @@ namespace mil
         const uint32_t ticksPerMillisecond;
         services::NvmEepromRegion calibrationRegion{ eeprom, sil::calibrationRegionOffset, calibrationRegionSize };
         services::NvmEepromRegion configRegion{ eeprom, sil::configRegionOffset, configRegionSize };
+        services::NvmEepromRegion learnedModelRegion{ eeprom, sil::learnedModelRegionOffset, learnedModelRegionSize };
         services::NvmEepromRegion faultHistoryRegion{ eeprom, sil::faultHistoryRegionOffset, faultHistoryRegionSize };
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
         services::InverterCompensation inverterCompensation;
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;

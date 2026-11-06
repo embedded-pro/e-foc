@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <utility>
 
 namespace mil
 {
@@ -83,6 +84,12 @@ namespace mil
     {
         nvm.includeConfig = true;
         nvm.config.defaultControlMode = static_cast<uint8_t>(mode);
+        return *this;
+    }
+
+    Scenario& Scenario::BootsFrom(std::vector<uint8_t> image)
+    {
+        nvmImage = std::move(image);
         return *this;
     }
 
@@ -185,11 +192,16 @@ namespace mil
         infra::EventDispatcher::Instance().Schedule(onDone);
     }
 
+    const std::vector<uint8_t>& ModelInTheLoop::MemoryEeprom::Contents() const
+    {
+        return contents;
+    }
+
     ModelInTheLoop::ModelInTheLoop(const Scenario& scenario)
         : scenario{ scenario }
         , drive{ scenario.plant }
         , inverter{ drive }
-        , eeprom{ scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage() }
+        , eeprom{ scenario.nvmImage.has_value() ? *scenario.nvmImage : (scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage()) }
         , vdc{ drive.PowerSupplyVoltage() }
         , tickPeriod{ std::chrono::nanoseconds{ 1000000000u / drive.BaseFrequency().Value() } }
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }
@@ -219,6 +231,7 @@ namespace mil
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
                         .lowPriorityInterrupt = lowPriorityInterrupt });
+                controlMode->RestoreStoredModel();
                 faultHistory.emplace(nvm, [this]()
                     {
                         controlMode->HoldAsyncWork();
@@ -552,6 +565,11 @@ namespace mil
     const Scenario& ModelInTheLoop::Setup() const
     {
         return scenario;
+    }
+
+    std::vector<uint8_t> ModelInTheLoop::NvmImage() const
+    {
+        return eeprom.Contents();
     }
 
     SimulatedDrive& ModelInTheLoop::Drive()

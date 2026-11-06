@@ -106,7 +106,8 @@ namespace
         NvmRegionStub calibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
         NvmRegionStub configRegion{ services::NonVolatileMemoryImpl::configRecordSize };
         NvmRegionStub faultHistoryRegion{ services::faultHistoryImageSize };
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
+        NvmRegionStub learnedModelRegion{ services::learnedModelImageSize };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
 
         services::CalibrationData MakeTestCalibration()
         {
@@ -208,7 +209,8 @@ namespace
         testing::StrictMock<NvmRegionMock> calibrationRegion;
         testing::StrictMock<NvmRegionMock> configRegion;
         testing::StrictMock<NvmRegionMock> faultHistoryRegion;
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
+        testing::StrictMock<NvmRegionMock> learnedModelRegion;
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
 
         infra::Function<void()> pendingRegionCallback;
         std::optional<services::NvmStatus> configStatus;
@@ -685,7 +687,7 @@ TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hard
     CorruptingRegion corruptCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
     NvmRegionStub corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
     NvmRegionStub faultHistoryRegionStub{ services::faultHistoryImageSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion, faultHistoryRegionStub };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion, faultHistoryRegionStub, learnedModelRegion };
 
     corruptCalibrationRegion.corruptOnRead = true;
 
@@ -742,7 +744,7 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_hardware_
     NvmRegionStub normalCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
     CorruptingRegion corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
     NvmRegionStub normalFaultHistoryRegion{ services::faultHistoryImageSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion, normalFaultHistoryRegion };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion, normalFaultHistoryRegion, learnedModelRegion };
 
     bool done = false;
     services::NvmStatus result{};
@@ -984,7 +986,7 @@ TEST_F(NonVolatileMemoryTest, a_fault_history_save_whose_read_back_differs_repor
     };
 
     ReadBackCorruptingRegion corruptFaultHistoryRegion{ services::faultHistoryImageSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ calibrationRegion, configRegion, corruptFaultHistoryRegion };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ calibrationRegion, configRegion, corruptFaultHistoryRegion, learnedModelRegion };
     std::optional<services::NvmStatus> status;
 
     nvmWithCorruption.SaveFaultHistory(services::FaultHistoryData{}, [&status](services::NvmStatus result)
@@ -1010,4 +1012,71 @@ TEST_F(NonVolatileMemoryTest, a_format_leaves_the_fault_history_alone)
     nvm.LoadFaultHistory(loaded, [](services::NvmStatus) {});
     ExecuteAllActions();
     EXPECT_EQ(history.records[0], loaded.records[0]);
+}
+
+TEST_F(NonVolatileMemoryTest, a_saved_learned_model_loads_back)
+{
+    const services::LearnedModelData model{ 0xCAFE0001u, 1.1f, std::nullopt, 2.0e-6f };
+    std::optional<services::NvmStatus> saved;
+    nvm.SaveLearnedModel(model, [&saved](services::NvmStatus status)
+        {
+            saved = status;
+        });
+    ExecuteAllActions();
+    ASSERT_EQ(services::NvmStatus::Ok, saved);
+
+    services::LearnedModelData loaded;
+    std::optional<services::NvmStatus> status;
+    nvm.LoadLearnedModel(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::Ok, status);
+    EXPECT_EQ(model, loaded);
+}
+
+TEST_F(NonVolatileMemoryTest, a_blank_learned_model_region_loads_as_invalid_and_empty)
+{
+    services::LearnedModelData loaded{ 7u, 1.0f, 1.0f, 1.0f };
+    std::optional<services::NvmStatus> status;
+
+    nvm.LoadLearnedModel(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::InvalidData, status);
+    EXPECT_EQ(services::LearnedModelData{}, loaded);
+}
+
+TEST_F(NonVolatileMemoryTest, a_learned_model_save_is_refused_while_a_config_save_runs)
+{
+    nvm.SaveConfig(services::ConfigData{}, [](services::NvmStatus) {});
+    std::optional<services::NvmStatus> status;
+
+    nvm.SaveLearnedModel(services::LearnedModelData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+
+    EXPECT_EQ(services::NvmStatus::Busy, status);
+    ExecuteAllActions();
+}
+
+TEST_F(NonVolatileMemoryTest, a_format_leaves_the_learned_model_alone)
+{
+    const services::LearnedModelData model{ 3u, std::nullopt, 5.0e-5f, std::nullopt };
+    nvm.SaveLearnedModel(model, [](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    nvm.Format([](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    services::LearnedModelData loaded;
+    nvm.LoadLearnedModel(loaded, [](services::NvmStatus) {});
+    ExecuteAllActions();
+    EXPECT_EQ(model, loaded);
 }

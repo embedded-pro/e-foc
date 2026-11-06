@@ -51,16 +51,67 @@ namespace state_machine
         {
             return static_cast<uint16_t>(std::min<uint32_t>(count + added, std::numeric_limits<uint16_t>::max()));
         }
+
+        template<class Quantity>
+        std::optional<float> ValueOf(const std::optional<Quantity>& quantity)
+        {
+            return quantity.has_value() ? std::optional<float>{ quantity->Value() } : std::nullopt;
+        }
+
+        std::array<std::optional<float>, Recalibration::quantities> QuantitiesOf(const StoredModel& stored)
+        {
+            return { std::nullopt, ValueOf(stored.inductance), ValueOf(stored.inertia), ValueOf(stored.viscousFriction) };
+        }
+
+        bool WithinBand(std::size_t quantity, float value, float reference)
+        {
+            const auto ratio = value / reference;
+            return ratio >= Recalibration::bands[quantity].minimum && ratio <= Recalibration::bands[quantity].maximum;
+        }
+
+        template<class Quantity>
+        std::optional<Quantity> IfChanged(Quantity inUse, Quantity commissioned)
+        {
+            return inUse != commissioned ? std::optional<Quantity>{ inUse } : std::nullopt;
+        }
     }
 
-    void Recalibration::Commission(const MotorModel& model)
+    bool Recalibration::Commission(const MotorModel& model, const StoredModel& stored)
     {
-        if (model == commissioned)
-            return;
+        if (model == commissioned && stored == restored)
+            return false;
 
         commissioned = model;
+        restored = stored;
         inUse = model;
         tracked = {};
+
+        const auto values = QuantitiesOf(stored);
+        for (std::size_t quantity = 0; quantity != quantities; ++quantity)
+        {
+            const auto reference = QuantityOf(commissioned, quantity);
+            if (values[quantity].has_value() && foc::IsFinitePositive(reference) && foc::IsFinitePositive(*values[quantity]) && WithinBand(quantity, *values[quantity], reference))
+                Adopt(inUse, quantity, *values[quantity]);
+        }
+
+        return true;
+    }
+
+    bool Recalibration::IsCommissionedFrom(const MotorModel& model, const StoredModel& stored) const
+    {
+        return model == commissioned && stored == restored;
+    }
+
+    void Recalibration::Revert()
+    {
+        restored = {};
+        inUse = commissioned;
+        tracked = {};
+    }
+
+    StoredModel Recalibration::Learned() const
+    {
+        return StoredModel{ IfChanged(inUse.inductance, commissioned.inductance), IfChanged(inUse.inertia, commissioned.inertia), IfChanged(inUse.viscousFriction, commissioned.viscousFriction) };
     }
 
     void Recalibration::Observe(const OnlineEstimates& estimates)
@@ -109,8 +160,7 @@ namespace state_machine
             return RecalibrationVerdict::unchanged;
 
         entry.differing = infra::Duration{};
-        const auto ratio = entry.reading / reference;
-        if (ratio < bands[quantity].minimum || ratio > bands[quantity].maximum)
+        if (!WithinBand(quantity, entry.reading, reference))
             return RecalibrationVerdict::rejected;
 
         Adopt(inUse, quantity, entry.reading);

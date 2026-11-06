@@ -34,10 +34,11 @@ namespace services
             "configRecordSize must match the packed record — check ConfigData for implicit padding");
     }
 
-    NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion)
+    NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion, NvmRegion& learnedModelRegion)
         : calibrationRegion(calibrationRegion)
         , configRegion(configRegion)
         , faultHistoryRegion(faultHistoryRegion)
+        , learnedModelRegion(learnedModelRegion)
     {
     }
 
@@ -130,6 +131,66 @@ namespace services
         const auto history = DeserializeFaultHistory(infra::MakeConstByteRange(faultHistoryReadBackBuffer));
         *pendingFaultHistoryOutput = history.value_or(FaultHistoryData{});
         CompleteFaultHistory(history.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
+    }
+
+    void NonVolatileMemoryImpl::CompleteLearnedModel(NvmStatus status)
+    {
+        busy = false;
+        onLearnedModelDone(status);
+    }
+
+    void NonVolatileMemoryImpl::SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
+    {
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
+            return;
+        }
+
+        busy = true;
+        SerializeLearnedModel(model, infra::MakeRange(learnedModelBuffer));
+        onLearnedModelDone = onDone;
+        learnedModelRegion.Write(infra::MakeConstByteRange(learnedModelBuffer), [this]
+            {
+                OnLearnedModelWritten();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnLearnedModelWritten()
+    {
+        learnedModelRegion.Read(infra::MakeRange(learnedModelReadBackBuffer), [this]
+            {
+                OnLearnedModelReadBack();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnLearnedModelReadBack()
+    {
+        CompleteLearnedModel(learnedModelBuffer == learnedModelReadBackBuffer ? NvmStatus::Ok : NvmStatus::HardwareFault);
+    }
+
+    void NonVolatileMemoryImpl::LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
+    {
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
+            return;
+        }
+
+        busy = true;
+        pendingLearnedModelOutput = &model;
+        onLearnedModelDone = onDone;
+        learnedModelRegion.Read(infra::MakeRange(learnedModelReadBackBuffer), [this]
+            {
+                OnLearnedModelReadForLoad();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnLearnedModelReadForLoad()
+    {
+        const auto model = DeserializeLearnedModel(infra::MakeConstByteRange(learnedModelReadBackBuffer));
+        *pendingLearnedModelOutput = model.value_or(LearnedModelData{});
+        CompleteLearnedModel(model.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
     }
 
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,

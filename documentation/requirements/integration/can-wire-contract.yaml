@@ -248,3 +248,13 @@
     modelResistance, modelInductance, modelInertia and modelViscousFriction (0x94 to 0x97), the
     model the loops are designed from, and recalibrationsApplied and recalibrationsRejected (0x98,
     0x99), counted since power-up.
+
+- id: REQ-CAN-025
+  title: A stored recalibration is reset and its stores are counted over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.18 shall add, without changing any 2.17 message, the command ResetModel
+    (0x1E), refused with invalidState while the drive is not stopped, acknowledged once the empty
+    learned model is stored and answered with persistenceFailed when the store fails; and the
+    read-only parameter recalibrationsStored (0x9A), the learned-model stores since power-up.

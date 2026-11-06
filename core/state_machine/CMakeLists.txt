@@ -34,6 +34,8 @@ target_sources(e_foc.state_machine PRIVATE
     OperatorTunings.cpp
     Recalibration.cpp
     Recalibration.hpp
+    RecalibrationStore.cpp
+    RecalibrationStore.hpp
     CalibrationContext.hpp
     CalibrationContext.cpp
     CalibrationOrchestrator.hpp

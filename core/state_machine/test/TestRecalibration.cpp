@@ -183,3 +183,81 @@ TEST_F(TestRecalibration, a_non_finite_estimate_is_ignored)
     EXPECT_EQ(0, outcome.applied);
     EXPECT_EQ(0, outcome.rejected);
 }
+
+TEST_F(TestRecalibration, a_stored_model_is_in_use_from_its_commissioning)
+{
+    state_machine::Recalibration restoredRecalibration;
+    const state_machine::StoredModel stored{ foc::MilliHenry{ 1.2f * inductance }, foc::NewtonMeterSecondSquared{ 2.0f * inertia }, std::nullopt };
+
+    EXPECT_TRUE(restoredRecalibration.Commission(Commissioned(), stored));
+
+    EXPECT_NEAR(resistance, restoredRecalibration.InUse().resistance.Value(), 1e-9f);
+    EXPECT_NEAR(1.2f * inductance, restoredRecalibration.InUse().inductance.Value(), 1e-9f);
+    EXPECT_NEAR(2.0f * inertia, restoredRecalibration.InUse().inertia.Value(), 1e-12f);
+    EXPECT_NEAR(friction, restoredRecalibration.InUse().viscousFriction.Value(), 1e-12f);
+    EXPECT_EQ(0, restoredRecalibration.Applied());
+}
+
+TEST_F(TestRecalibration, a_stored_quantity_outside_its_band_is_not_used)
+{
+    state_machine::Recalibration restoredRecalibration;
+    restoredRecalibration.Commission(Commissioned(), state_machine::StoredModel{ foc::MilliHenry{ 1.6f * inductance }, foc::NewtonMeterSecondSquared{ 6.0f * inertia }, foc::NewtonMeterSecondPerRadian{ -friction } });
+
+    EXPECT_EQ(Commissioned(), restoredRecalibration.InUse());
+}
+
+TEST_F(TestRecalibration, commissioning_again_with_the_same_models_keeps_the_recalibrated_one)
+{
+    Run(Estimates(1.4f, 1.0f, 1.5f, 1.0f), state_machine::Recalibration::dwell);
+    recalibration.Decide(state_machine::RecalibrationTrigger::automatic);
+
+    EXPECT_FALSE(recalibration.Commission(Commissioned()));
+
+    EXPECT_NEAR(1.4f * resistance, recalibration.InUse().resistance.Value(), 1e-6f);
+    EXPECT_NEAR(1.5f * inertia, InertiaInUse(), 1e-12f);
+}
+
+TEST_F(TestRecalibration, a_stored_model_that_is_discarded_returns_the_model_to_the_commissioned_one)
+{
+    state_machine::Recalibration restoredRecalibration;
+    restoredRecalibration.Commission(Commissioned(), state_machine::StoredModel{ std::nullopt, foc::NewtonMeterSecondSquared{ 2.0f * inertia }, std::nullopt });
+
+    EXPECT_TRUE(restoredRecalibration.Commission(Commissioned(), state_machine::StoredModel{}));
+
+    EXPECT_EQ(Commissioned(), restoredRecalibration.InUse());
+}
+
+TEST_F(TestRecalibration, the_learned_model_holds_the_inductance_inertia_and_friction_that_differ_from_the_commissioned_ones)
+{
+    EXPECT_EQ(state_machine::StoredModel{}, recalibration.Learned());
+
+    Run(Estimates(1.4f, 1.0f, 1.5f, 1.0f), state_machine::Recalibration::dwell);
+    recalibration.Decide(state_machine::RecalibrationTrigger::automatic);
+
+    const auto learned = recalibration.Learned();
+    EXPECT_FALSE(learned.inductance.has_value());
+    ASSERT_TRUE(learned.inertia.has_value());
+    EXPECT_NEAR(1.5f * inertia, learned.inertia->Value(), 1e-12f);
+    EXPECT_FALSE(learned.viscousFriction.has_value());
+}
+
+TEST_F(TestRecalibration, reverting_returns_the_model_in_use_to_the_commissioned_one)
+{
+    recalibration.Commission(Commissioned(), state_machine::StoredModel{ std::nullopt, foc::NewtonMeterSecondSquared{ 2.0f * inertia }, std::nullopt });
+    Run(Estimates(1.4f, 1.0f, 2.0f, 1.0f), state_machine::Recalibration::dwell);
+    recalibration.Decide(state_machine::RecalibrationTrigger::automatic);
+
+    recalibration.Revert();
+
+    EXPECT_EQ(Commissioned(), recalibration.InUse());
+    EXPECT_FALSE(recalibration.Commission(Commissioned()));
+}
+
+TEST_F(TestRecalibration, it_tells_whether_it_was_commissioned_from_a_record_and_a_stored_model)
+{
+    const state_machine::StoredModel stored{ std::nullopt, foc::NewtonMeterSecondSquared{ 2.0f * inertia }, std::nullopt };
+
+    EXPECT_TRUE(recalibration.IsCommissionedFrom(Commissioned(), {}));
+    EXPECT_FALSE(recalibration.IsCommissionedFrom(Commissioned(), stored));
+    EXPECT_FALSE(state_machine::Recalibration{}.IsCommissionedFrom(Commissioned(), {}));
+}

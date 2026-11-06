@@ -2781,6 +2781,8 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InSpeedMode_IsTheCalibra
     ExpectAnswered(0.0f, false);
     DispatchQueryParameter(can::FocParameter::recalibrationsRejected);
     ExpectAnswered(0.0f, false);
+    DispatchQueryParameter(can::FocParameter::recalibrationsStored);
+    ExpectAnswered(0.0f, false);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InTorqueMode_IsZero)
@@ -2828,4 +2830,51 @@ TEST_F(FocMotorCanBridgeTest, Recalibrate_OnCommandWhileStopped_IsAccepted)
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCanBridgeTest, ResetModel_WhileStopped_IsAcknowledgedOnceTheEmptyModelIsStored)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+    EXPECT_CALL(nvmMock, SaveLearnedModel(services::LearnedModelData{}, _)).WillOnce(Invoke([](const services::LearnedModelData&, const infra::Function<void(services::NvmStatus)>& onDone)
+        {
+            onDone(services::NvmStatus::Ok);
+        }));
+
+    DispatchCommand(can::focResetModelId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focResetModelId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+    DispatchQueryParameter(can::FocParameter::recalibrationsStored);
+    ExpectAnswered(1.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, ResetModel_WhileRunning_IsRefusedAsInvalidState)
+{
+    ConstructFixtureInReady();
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    DispatchCommand(can::focResetModelId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focResetModelId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::invalidState, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCanBridgeTest, ResetModel_ThatIsNotStored_IsAPersistenceFailure)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+    EXPECT_CALL(nvmMock, SaveLearnedModel(_, _)).WillOnce(Invoke([](const services::LearnedModelData&, const infra::Function<void(services::NvmStatus)>& onDone)
+        {
+            onDone(services::NvmStatus::WriteFailed);
+        }));
+
+    DispatchCommand(can::focResetModelId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(can::focResetModelId, lastCategoryErrorOriginCmd);
+    EXPECT_EQ(can::FocMotorCategoryError::persistenceFailed, lastCategoryError);
 }

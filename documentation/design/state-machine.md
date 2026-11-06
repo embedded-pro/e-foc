@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.9.0
+version: 0.10.0
 component: state-machine
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.9.0                      |
+| Version   | 0.10.0                     |
 | Component | state-machine              |
 | Date      | 2026-11-06                 |
 
@@ -891,7 +891,9 @@ current loop is redesigned from the resistance and inductance in use, the speed 
 in use with the bandwidth-based rule of `documentation/theory/speed-loop-pi.md` ("What the implementation uses"):
 $k_p = 2 J \omega_{bw} / K_t$, $k_i = k_p \max(B_f/J,\ \omega_{bw}/4)\, T_s$ with $T_s$ the outer-loop sample
 period and $K_t = \tfrac{3}{2} p \psi_f$ from the calibration record; the operator's loop settings are applied
-again afterwards, so the bandwidths do not change. The estimators are not seeded again.
+again afterwards, so the bandwidths do not change. The estimators are not seeded again. A stored recalibration
+(`online-recalibration.md`, Part F) is applied the same way on the first `Ready` after power-up, and the Reset Model
+command redesigns both loops from the calibration record again, in a stopped state only.
 
 **Runtime control commands (CLI policy, speed/position modes only):**
 
