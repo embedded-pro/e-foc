@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.16.0
+version: 0.16.1
 component: "tool-can-commander"
 date: 2026-11-05
 ---
@@ -750,7 +750,7 @@ sequenceDiagram
 | Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                             |
 | Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB |
 | Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                |
-| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version                                                                                 |
+| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version; the EK-TM4C1294XL takes about 10 s (`bootloader.md` Constraints)               |
 | Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                        |
 
 ---
