@@ -85,7 +85,7 @@ namespace tool
         static constexpr uint8_t thermalContractMinor{ 13 };
         static constexpr uint8_t overTemperatureContractMinor{ 14 };
         static constexpr uint8_t busVoltageLimitsContractMinor{ 15 };
-        static constexpr uint8_t recalibrationContractMinor{ 16 };
+        static constexpr uint8_t recalibrationContractMinor{ 17 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();

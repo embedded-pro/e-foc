@@ -226,12 +226,22 @@
     state, answered with the value held once stored, refused with invalidPayload outside its range
     and read back unchanged after a restart.
 
+- id: REQ-CAN-023
+  title: The fault history is read and cleared over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.16 shall add, without changing any 2.15 message, QueryFaultHistory
+    (0x1B) with an age from 0 the newest, answered with FaultRecordResponse (0x9B: age, fault
+    code, control mode, uptime in ms) and FaultConditionsResponse (0x9C: age, power-up count,
+    bus voltage and peak current at 0.01 resolution), the fault code none past the records
+    held; and ClearFaultHistory (0x1C), acknowledged once the empty history is stored.
 - id: REQ-CAN-024
   title: Online recalibration is selected, commanded and read over CAN
   status: verified
   verification: [sil, unit]
   shall: >
-    Contract version 2.16 shall add, without changing any 2.15 message, the command Recalibrate
+    Contract version 2.17 shall add, without changing any 2.16 message, the command Recalibrate
     (0x1D), refused with invalidState while the drive is not stopped or the mode is off and with
     modeMismatch in torque mode; the stored setting recalibrationMode (0x76), 0 off, 1 on command,
     2 automatic, read back unchanged after a restart; and the read-only parameters

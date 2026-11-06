@@ -43,7 +43,8 @@ namespace application
         , terminalDiagnostics{ terminalWithStorage, hardware.Diagnostics(), hardware.Tracer() }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
-        , nvm{ calibrationRegion, configRegion }
+        , faultHistoryRegion{ hardware.Eeprom(), faultHistoryRegionOffset, faultHistoryRegionSize }
+        , nvm{ calibrationRegion, configRegion, faultHistoryRegion }
         , inverter{ hardware }
         , inverterCompensation{ inverter, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
         , currentOffsets{ inverter, inverterCompensation }
@@ -109,6 +110,7 @@ namespace application
             },
             [this](foc::Volts measured)
             {
+                filteredBusVoltage = measured;
                 controlMode->TrackBusVoltage(measured);
                 busVoltageLimits.Evaluate(measured);
             } }
@@ -145,6 +147,23 @@ namespace application
                         .maxCurrent = this->hardware.MaxCurrentSupported(),
                         .baseFrequency = this->hardware.BaseFrequency(),
                         .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
+                faultHistory.emplace(nvm, [this]()
+                    {
+                        controlMode->HoldAsyncWork();
+                    },
+                    [this]()
+                    {
+                        controlMode->ReleaseAsyncWork();
+                    });
+                peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                controlMode->OnFaultEntered([this](state_machine::FaultCode code)
+                    {
+                        RecordFault(code);
+                    });
+                faultHistory->Start();
                 firmwareUpgradeInterlock.emplace(*controlMode);
                 firmwareUpgrade.emplace(*firmwareUpgradeServer, this->hardware.Staging(), *firmwareUpgradeInterlock, [this]()
                     {
@@ -152,7 +171,7 @@ namespace application
                     });
                 canBridge.emplace(*motorCanServer, *controlMode,
                     can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()), FirmwareIdentityOf(this->hardware.GetBoardKind()) },
-                    can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade },
+                    can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade, *faultHistory },
                     this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 canBridge->ObserveCommands([this]()
@@ -269,6 +288,12 @@ namespace application
                             });
                     });
             });
+    }
+
+    void Logic::RecordFault(state_machine::FaultCode code)
+    {
+        faultHistory->Record(static_cast<uint8_t>(can::FocMotorCanBridge::ToCanFaultCode(code)),
+            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Active())), filteredBusVoltage, peakCurrent.Peak() });
     }
 
     void Logic::ApplyCurrentLimit()

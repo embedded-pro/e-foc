@@ -14,7 +14,7 @@ namespace can
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, configureTelemetryRate, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
-            clearDiagnostics, recalibrate);
+            clearDiagnostics, queryFaultHistory, clearFaultHistory, recalibrate);
     }
 
     FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
@@ -125,6 +125,66 @@ namespace can
             });
 
         return true;
+    }
+
+    bool FocMotorCategoryServer::HandleQueryFaultHistory(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focQueryFaultHistoryId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto age = reader.ReadUInt8();
+
+        if (!reader.Valid())
+            return false;
+
+        NotifyObservers([this, age](auto& observer)
+            {
+                observer.OnQueryFaultHistory(age, [this](const FocFaultRecord& record)
+                    {
+                        SendFaultRecord(record);
+                        SendCommandAck(focQueryFaultHistoryId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleClearFaultHistory(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focClearFaultHistoryId))
+            return false;
+
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnClearFaultHistory([this](bool stored)
+                    {
+                        if (stored)
+                            SendCommandAck(focClearFaultHistoryId, services::CanAckStatus::success);
+                        else
+                            SendCategoryError(focClearFaultHistoryId, FocMotorCategoryError::persistenceFailed);
+                    });
+            });
+
+        return true;
+    }
+
+    void FocMotorCategoryServer::SendFaultRecord(const FocFaultRecord& record)
+    {
+        services::CanPayloadWriter identity;
+        identity.WriteUInt8(record.age);
+        identity.WriteUInt8(static_cast<uint8_t>(record.code));
+        identity.WriteUInt8(static_cast<uint8_t>(record.mode));
+        identity.WriteUInt32(record.uptimeMs);
+        SendResponse(focFaultRecordResponseId, identity);
+
+        services::CanPayloadWriter conditions;
+        conditions.WriteUInt8(record.age);
+        conditions.WriteInt16(record.powerUp);
+        conditions.WriteFixed16(record.busVoltage.Value(), focRecordedVoltageScale);
+        conditions.WriteFixed16(record.peakCurrent.Value(), focRecordedCurrentScale);
+        SendResponse(focFaultConditionsResponseId, conditions);
     }
 
     bool FocMotorCategoryServer::HandleSelectControlMode(const hal::Can::Message& data)

@@ -54,6 +54,7 @@ namespace application
         float AutomaticCurrentLoopBandwidth() const;
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
+        void RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered);
         const StateMachine& TransitionTable() const;
 
     protected:

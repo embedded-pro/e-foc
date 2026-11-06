@@ -219,6 +219,24 @@ namespace mil
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
                         .lowPriorityInterrupt = lowPriorityInterrupt });
+                faultHistory.emplace(nvm, [this]()
+                    {
+                        controlMode->HoldAsyncWork();
+                    },
+                    [this]()
+                    {
+                        controlMode->ReleaseAsyncWork();
+                    });
+                peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                controlMode->OnFaultEntered([this](state_machine::FaultCode code)
+                    {
+                        faultHistory->Record(static_cast<uint8_t>(can::FocMotorCanBridge::ToCanFaultCode(code)),
+                            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Active())), filteredBusVoltage, peakCurrent.Peak() });
+                    });
+                faultHistory->Start();
                 busVoltage.Start();
             });
 
@@ -229,6 +247,8 @@ namespace mil
     ModelInTheLoop::~ModelInTheLoop()
     {
         busVoltage.Stop();
+        clock.ExecuteAllActions();
+        faultHistory.reset();
         controlMode.reset();
         clock.ExecuteAllActions();
     }

@@ -66,6 +66,7 @@ namespace state_machine
         bool TrySetPosition(foc::Radians setpoint);
         void LimitCurrent(foc::Ampere limit);
         void TrackBusVoltage(foc::Volts measured);
+        void OnFaultEntered(const infra::Function<void(FaultCode)>& onFaultEntered);
 
         // Adopts the settled online estimates now; refused unless stopped, with the mode off and in torque mode.
         SettingResult CmdRecalibrate();
@@ -180,6 +181,7 @@ namespace state_machine
         uint8_t previousDefaultControlMode{ 0 };
         std::optional<foc::Ampere> currentLimit;
         std::optional<foc::Volts> busVoltage;
+        infra::Function<void(FaultCode)> faultEntered;
         Recalibration recalibration;
         bool ranSinceStop{ false };
         infra::TimerRepeating recalibrationTimer;

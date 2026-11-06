@@ -185,6 +185,11 @@ namespace application
         operation.RegisterReadyHandler(onReady);
     }
 
+    void FocStateMachineCommon::RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered)
+    {
+        operation.RegisterFaultEnteredHandler(onFaultEntered);
+    }
+
     void FocStateMachineCommon::MarkProvisionalControlApplied()
     {
         provisionalControlApplied = true;

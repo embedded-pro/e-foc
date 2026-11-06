@@ -95,7 +95,7 @@ whose commissioned value is not positive — a record without friction — is ne
 | Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                    |
 
 The mode is a drive-wide setting of the configuration record (`service-nvm.md`), read and written over CAN
-(`service-can.md`, contract 2.16).
+(`service-can.md`, contract 2.17).
 
 ```mermaid
 stateDiagram-v2

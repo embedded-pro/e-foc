@@ -11,6 +11,7 @@ target_link_libraries(e_foc.services.non_volatile_memory_test PUBLIC
 
 target_sources(e_foc.services.non_volatile_memory_test PRIVATE
     TestConfigData.cpp
+    TestFaultHistoryImage.cpp
     TestNonVolatileMemory.cpp
     TestNvmEepromRegion.cpp
 )

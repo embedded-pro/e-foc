@@ -2,9 +2,9 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: "supervision"
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.8.0                    |
+| Version   | 0.9.0                    |
 | Component | supervision              |
-| Date      | 2026-11-05               |
+| Date      | 2026-11-06               |
 
 ---
 
@@ -497,6 +497,14 @@ stateDiagram-v2
     Reported --> Watching : drive leaves Enabled
 ```
 
+### Part M — Peak current for the fault history
+
+A fault record carries the peak torque current of the last 10 ms (`service-fault-history.md`). A peak-current tracker
+reads the active drive's measured torque current every millisecond on the event loop and keeps the last ten readings;
+the peak is the reading of largest magnitude, with its sign. It raises nothing and has no settings: it only answers the
+fault history when the drive enters `Fault`. Because it samples the one-millisecond reading, the peak is not the largest
+phase-current sample of the control interrupt, which does no per-sample bookkeeping.
+
 ---
 
 ## Interfaces
@@ -516,5 +524,5 @@ stateDiagram-v2
 | Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
 | Settings         | The configuration record's supervision fields and limits                                   | Read every evaluation                                                        |
 | Bus voltage      | Filtered bus voltage (Part L)                                                              | Handed on every 10 ms from the event loop                                    |
-| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I)                                            | Runs on the event loop                                                       |
+| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I and M)                                      | Runs on the event loop                                                       |
 | Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

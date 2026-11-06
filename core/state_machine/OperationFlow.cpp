@@ -121,7 +121,8 @@ namespace application
     {
         env.tracer.Trace() << "[SM] Fault: " << state_machine::FaultCodeName(code);
 
-        if (!faultController.IsRecorded())
+        const bool newEpisode = !faultController.IsRecorded();
+        if (newEpisode)
             lastFaultCode = code;
         else
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
@@ -137,6 +138,10 @@ namespace application
 
         calibration.Abort();
         env.pending.CompleteAfterTransition(pendingResult);
+
+        if (newEpisode && faultEnteredHandler != nullptr)
+            faultEnteredHandler(code);
+
         return state_machine::Fault{ lastFaultCode };
     }
 
@@ -217,6 +222,11 @@ namespace application
     void OperationFlow::RegisterReadyHandler(const infra::Function<void()>& onReady)
     {
         readyHandler = onReady;
+    }
+
+    void OperationFlow::RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered)
+    {
+        faultEnteredHandler = onFaultEntered;
     }
 
     bool OperationFlow::StartUnlessFaulted()

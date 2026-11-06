@@ -34,9 +34,10 @@ namespace services
             "configRecordSize must match the packed record — check ConfigData for implicit padding");
     }
 
-    NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion)
+    NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion)
         : calibrationRegion(calibrationRegion)
         , configRegion(configRegion)
+        , faultHistoryRegion(faultHistoryRegion)
     {
     }
 
@@ -69,6 +70,66 @@ namespace services
     {
         busy = false;
         onIsCalibrationValidDone(valid);
+    }
+
+    void NonVolatileMemoryImpl::CompleteFaultHistory(NvmStatus status)
+    {
+        busy = false;
+        onFaultHistoryDone(status);
+    }
+
+    void NonVolatileMemoryImpl::SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
+    {
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
+            return;
+        }
+
+        busy = true;
+        SerializeFaultHistory(history, infra::MakeRange(faultHistoryBuffer));
+        onFaultHistoryDone = onDone;
+        faultHistoryRegion.Write(infra::MakeConstByteRange(faultHistoryBuffer), [this]
+            {
+                OnFaultHistoryWritten();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnFaultHistoryWritten()
+    {
+        faultHistoryRegion.Read(infra::MakeRange(faultHistoryReadBackBuffer), [this]
+            {
+                OnFaultHistoryReadBack();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnFaultHistoryReadBack()
+    {
+        CompleteFaultHistory(faultHistoryBuffer == faultHistoryReadBackBuffer ? NvmStatus::Ok : NvmStatus::HardwareFault);
+    }
+
+    void NonVolatileMemoryImpl::LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
+    {
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
+            return;
+        }
+
+        busy = true;
+        pendingFaultHistoryOutput = &history;
+        onFaultHistoryDone = onDone;
+        faultHistoryRegion.Read(infra::MakeRange(faultHistoryReadBackBuffer), [this]
+            {
+                OnFaultHistoryReadForLoad();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnFaultHistoryReadForLoad()
+    {
+        const auto history = DeserializeFaultHistory(infra::MakeConstByteRange(faultHistoryReadBackBuffer));
+        *pendingFaultHistoryOutput = history.value_or(FaultHistoryData{});
+        CompleteFaultHistory(history.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
     }
 
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,

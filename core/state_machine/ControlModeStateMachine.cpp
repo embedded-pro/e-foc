@@ -384,8 +384,19 @@ namespace state_machine
         ApplyLimits();
     }
 
+    void ControlModeStateMachine::OnFaultEntered(const infra::Function<void(FaultCode)>& onFaultEntered)
+    {
+        faultEntered = onFaultEntered;
+    }
+
     void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)
     {
+        stateMachine.RegisterFaultEnteredHandler([this](FaultCode code)
+            {
+                if (faultEntered != nullptr)
+                    faultEntered(code);
+            });
+
         stateMachine.RegisterReadyHandler([this]()
             {
                 algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());

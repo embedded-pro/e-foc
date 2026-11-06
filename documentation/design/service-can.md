@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.18.0
+version: 0.19.0
 component: can-service
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.18.0                   |
+| Version   | 0.19.0                   |
 | Component | can-service              |
 | Date      | 2026-11-06               |
 
@@ -433,9 +433,25 @@ fault code, as a trip of the board's comparators does.
 
 A client older than 2.15 asks for the new parameters only when the server reports 2.15 or newer.
 
-**Contract 2.16 — online recalibration.** Version 2.16 adds one command, one stored setting and six read-only
-parameters; nothing in 2.15 changes (`online-recalibration.md`). The command takes `0x1D`, leaving `0x1A`–`0x1C` to
-the quick stop and the fault history, which are numbered apart.
+**Contract 2.16 — fault history.** Version 2.16 adds two commands and two responses; nothing in 2.15 changes
+(`service-fault-history.md`).
+
+| ID     | Message                   | Direction | Fields                                                                                             | Answer                                                |
+|--------|---------------------------|-----------|----------------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| `0x1B` | `QueryFaultHistory`       | command   | age (uint8, 0 the newest)                                                                          | `FaultRecordResponse`, then `FaultConditionsResponse` |
+| `0x1C` | `ClearFaultHistory`       | command   | —                                                                                                  | acknowledge once the cleared history is stored        |
+| `0x9B` | `FaultRecordResponse`     | response  | age (uint8), fault code (uint8, `FocFaultCode`), mode (uint8, `FocMotorMode`), uptime (uint32, ms) | —                                                     |
+| `0x9C` | `FaultConditionsResponse` | response  | age (uint8), power-up (int16), bus voltage (int16, V), peak current (int16, A)                     | —                                                     |
+
+A query for an age past the records held is answered with the fault code `none` and zeros, so a client reads ages
+from 0 until it meets one. `QueryFaultHistory` is accepted in every state; `ClearFaultHistory` too, and it is
+answered once the empty history is stored, or with the category error `persistenceFailed` when the write fails.
+
+A client older than 2.16 does not ask for the history.
+
+**Contract 2.17 — online recalibration.** Version 2.17 adds one command, one stored setting and six read-only
+parameters; nothing in 2.16 changes (`online-recalibration.md`). The command takes `0x1D`; `0x1A` stays reserved for
+the quick stop.
 
 | ID     | Message       | Direction | Fields | Answer                                                                        |
 |--------|---------------|-----------|--------|-------------------------------------------------------------------------------|
@@ -459,7 +475,7 @@ nothing.
 | `0x99` | `recalibrationsRejected` | -        | Settled readings outside their plausibility band since power-up  | no        |
 
 The model parameters equal the calibration record until a recalibration; the motor parameters (`0x40`–`0x45`) keep
-reading the record. A client older than 2.16 asks for none of them.
+reading the record. A client older than 2.17 asks for none of them.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
@@ -474,6 +490,9 @@ saturate (`CanFrameCodec::FloatToFixed16`):
 | Inductance        | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire |
 | Streamed current  | int16     | 1000         | 0.512 A → 512 wire; saturates at ±32.767 A |
 | Streamed position | int16     | 10000        | −3.1416 rad → −31416 wire                  |
+| Recorded voltage  | int16     | 100          | 40.00 V → 4000 wire                        |
+| Recorded current  | int16     | 100          | 1.25 A → 125 wire                          |
+| Power-up count    | int16     | 1            | 12 → 12 wire                               |
 
 The reference-motor values come from `documentation/theory/foc-plant-models.md` "Reference motors". Inertia
 and friction, around 1e-6 and 1e-5 in SI units, travel only as `float32` parameters (`SetParameter`,
@@ -504,6 +523,7 @@ Inherits `CanCategoryServer` from `can-lite`. Registers one `CanMessageHandler` 
 
 The observer interface provides callbacks for:
 - `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop` — lifecycle commands with a `CanAckStatus` result callback.
+- `OnQueryFaultHistory`, `OnClearFaultHistory` — the fault history of contract 2.16, with a record or a status callback.
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
@@ -520,7 +540,7 @@ The observer interface provides callbacks for:
 - `OnCalibrate`, `OnClearCalibration` — commands without fields, with a `CanAckStatus` result callback that
   is called when the sequence or the invalidation ends.
 - `OnClearDiagnostics` — a command without fields, with a completion callback.
-- `OnRecalibrate` — the recalibration command of contract 2.16, with a `CanAckStatus` result callback.
+- `OnRecalibrate` — the recalibration command of contract 2.17, with a `CanAckStatus` result callback.
 
 The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
 one handler group of the server, so the server's own surface stays small as the contract grows.
@@ -545,6 +565,8 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
+- `OnQueryFaultHistory(age)` → the fault history's record of that age, answered with both responses.
+- `OnClearFaultHistory` → clears the fault history; the acknowledgement follows the store.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → the loop's stored settings with this bandwidth, through `Set*Tunings` on the state

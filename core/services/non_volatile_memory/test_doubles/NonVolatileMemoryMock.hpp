@@ -17,5 +17,7 @@ namespace services
         MOCK_METHOD(void, LoadConfig, (ConfigData & data, infra::Function<void(NvmStatus)> onDone), (override));
         MOCK_METHOD(void, ResetConfigToDefaults, (infra::Function<void(NvmStatus)> onDone), (override));
         MOCK_METHOD(void, Format, (infra::Function<void(NvmStatus)> onDone), (override));
+        MOCK_METHOD(void, SaveFaultHistory, (const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone), (override));
+        MOCK_METHOD(void, LoadFaultHistory, (FaultHistoryData & history, infra::Function<void(NvmStatus)> onDone), (override));
     };
 }

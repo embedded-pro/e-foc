@@ -1155,10 +1155,10 @@ TEST_F(TestCanCommandClient, a_2_14_node_is_not_asked_for_its_bus_voltage_limits
     EXPECT_FALSE(Queried(can::FocParameter::busVoltageMaximum));
 }
 
-TEST_F(TestCanCommandClient, a_2_15_node_is_read_for_every_parameter_but_the_recalibration_ones)
+TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_but_the_recalibration_ones)
 {
     RecordSends();
-    BringCompatible(1, 15);
+    BringCompatible(1, 16);
 
     AnswerAllReads();
 
@@ -1369,7 +1369,7 @@ TEST_F(TestCanCommandClient, a_firmware_upgrade_answer_names_the_node_it_came_fr
     EXPECT_EQ(3, client.FrameOrigin().SourceNodeId());
 }
 
-TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_once)
 {
     RecordSends();
     BringCompatible(1, CanCommandClient::recalibrationContractMinor);

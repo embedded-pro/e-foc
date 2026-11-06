@@ -3745,3 +3745,41 @@ TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_that_faults_as_the_b
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
 }
+
+TEST_F(FocStateMachineTorqueAutoTest, an_entry_into_fault_is_announced_with_its_code_once_per_episode)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    std::vector<state_machine::FaultCode> announced;
+    sm.RegisterFaultEnteredHandler([&announced](state_machine::FaultCode code)
+        {
+            announced.push_back(code);
+        });
+    EXPECT_CALL(inverterMock, Start());
+    sm.CmdEnable();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overvoltage);
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+    EXPECT_THAT(announced, ElementsAre(state_machine::FaultCode::overvoltage));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, a_fault_after_a_clear_is_announced_again)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    std::vector<state_machine::FaultCode> announced;
+    sm.RegisterFaultEnteredHandler([&announced](state_machine::FaultCode code)
+        {
+            announced.push_back(code);
+        });
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    sm.CmdClearFault();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::stall);
+
+    EXPECT_THAT(announced, ElementsAre(state_machine::FaultCode::hardwareFault, state_machine::FaultCode::stall));
+}
