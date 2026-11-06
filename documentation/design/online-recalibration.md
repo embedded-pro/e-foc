@@ -2,7 +2,7 @@
 title: "Online Recalibration"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: online-recalibration
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Online Recalibration |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.0                |
+| Version   | 0.2.0                |
 | Component | online-recalibration |
 | Date      | 2026-11-06           |
 
@@ -32,7 +32,8 @@ In speed and position mode the drive re-estimates its motor while it runs: the r
 small d-axis injection (`service-electrical-ident.md`, Excitation), the inertia and viscous friction from the speed
 and torque current (`service-mechanical-ident.md`). The loop gains are designed from the calibration record, so a
 load whose inertia differs from the commissioned one, or a winding whose resistance has risen, runs on a model that
-no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CAL-023, REQ-CAL-024).
+no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CAL-023, REQ-CAL-024),
+and keeps the inductance, inertia and friction it learned across power cycles (REQ-CAL-025).
 
 **Is responsible for:**
 - Deciding when an estimate may replace the model the loops are designed from: once its estimator reports it
@@ -42,14 +43,16 @@ no longer matches it. Online recalibration lets the gains follow the estimates, 
   loop bandwidths the operator or the calibration chose.
 - The operator's choice of when: never, on command, or on every stop.
 - Counting each recalibration applied and each estimate rejected, and showing the model in use.
+- Storing the recalibrated inductance, inertia and viscous friction, at most once every 15 minutes, restoring them at
+  power-up while they belong to the commissioned model, and discarding them on the operator's command.
 
 **Is NOT responsible for:**
 - Changing a gain while the drive is `Enabled`. The current and speed loop designs are not interrupt-safe; the drive
   waits for its next stop.
-- Storing the recalibrated model. The calibration record keeps the commissioned values, and every power-up starts
-  from them; storing the inductance, inertia and friction is a later step. The resistance is never stored: it tracks
-  the winding temperature, which is estimated from it against the commissioned resistance (`fault-supervision.md`,
-  Part K).
+- Changing the calibration record. It keeps the commissioned values; the learned ones are a record of their own.
+- Storing the resistance. It tracks the winding temperature, which is estimated from it against the commissioned
+  resistance (`fault-supervision.md`, Part K), so a hot resistance stored as the baseline would read as a cold winding
+  at the next power-up.
 - Torque mode, which runs no estimators.
 
 ---
@@ -60,7 +63,8 @@ no longer matches it. Online recalibration lets the gains follow the estimates, 
 
 The model in use holds the four quantities the loops are designed from: resistance, inductance, inertia and viscous
 friction. At power-up, and whenever the calibration record changes — a calibration, a motor parameter written over
-CAN, a cleared calibration — it is the commissioned model, the record's values. A recalibration replaces some of its
+CAN, a cleared calibration — it is the commissioned model, the record's values, with the stored inductance, inertia
+and friction in place of the record's while the mode is not off (Part F). A recalibration replaces some of its
 quantities; the record does not change. A control-mode switch keeps the model in use: the new mode's loops are
 designed from it once its machine is ready.
 
@@ -126,33 +130,71 @@ parameters over CAN; the motor parameters keep reading the calibration record. T
 
 ---
 
+### Part F — Storing the model
+
+A recalibration that changes the inductance, inertia or viscous friction in use stores the three of them in the
+learned-model record (`service-nvm.md`), with a check of the commissioned values they were learned from. The
+resistance is never stored.
+
+- **Rate.** At most one store every 15 minutes of uptime. The first change after power-up is stored at the stop that
+  made it. A change made sooner waits, and the first stop once the 15 minutes have passed stores the model then in
+  use, so only the latest of several waiting changes reaches the record. A store that finds the device busy is tried
+  again 10 ms later; one that fails waits for the next window.
+- **Mode off** never stores, and runs the commissioned model; the stored values are kept for when the mode is turned
+  on again.
+- **Power-up.** While the mode is on command or automatic, and the record's commissioned inductance, inertia and
+  friction still match the check, the stored values are in use from the first `Ready`, each only inside its
+  plausibility band (Part B). A new calibration or a changed motor parameter changes the check, so the stored values
+  are no longer used, and the next store replaces them.
+- **Reset Model.** A CAN command, accepted only while stopped, stores an empty learned model at once, outside the
+  15-minute rate, and returns the model in use to the commissioned one, the resistance included. It is acknowledged
+  once the record is stored.
+- **Count.** The stores since power-up are a read-only parameter over CAN, so a test can bound the writes.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Clean : power-up
+    Clean --> Stored : stop with L, J or B changed
+    Stored --> Waiting : change within 15 min of the last store
+    Waiting --> Waiting : another change, the latest kept
+    Waiting --> Stored : first stop after 15 min
+    Stored --> Stored : change after 15 min, stored at that stop
+    Clean --> Clean : Reset Model, empty record stored
+    Stored --> Clean : Reset Model
+    Waiting --> Clean : Reset Model
+```
+
 ## Interfaces
 
 ### Provided
 
-| Interface   | Purpose                               | Contract                                                          |
-|-------------|---------------------------------------|-------------------------------------------------------------------|
-| Mode        | Off, on command or automatic          | Stored in the configuration record; takes effect at the next stop |
-| Recalibrate | Adopt the settled estimates now       | Refused while running, in torque mode and with the mode off       |
-| Model       | The four quantities the loops use     | Read-only; equals the calibration record until a recalibration    |
-| Counters    | Applied quantities, rejected readings | Read-only; restart at power-up                                    |
+| Interface   | Purpose                               | Contract                                                            |
+|-------------|---------------------------------------|---------------------------------------------------------------------|
+| Mode        | Off, on command or automatic          | Stored in the configuration record; takes effect at the next stop   |
+| Recalibrate | Adopt the settled estimates now       | Refused while running, in torque mode and with the mode off         |
+| Model       | The four quantities the loops use     | Read-only; equals the calibration record until a recalibration      |
+| Counters    | Applied quantities, rejected readings | Read-only; restart at power-up                                      |
+| Reset Model | Discard the stored model              | Refused while running; acknowledged once the empty record is stored |
+| Stores      | Learned-model stores since power-up   | Read-only; at most one per 15 minutes of uptime                     |
 
 ### Required
 
-| Interface          | Purpose                                    | Contract                                                      |
-|--------------------|--------------------------------------------|---------------------------------------------------------------|
-| Online estimators  | Current estimates and whether they settled | Written by the low-priority interrupt; read on the event loop |
-| Calibration record | The commissioned model and the loop design | Flux linkage, pole pairs, bandwidths                          |
-| Lifecycle          | Entering `Ready` from `Enabled`            | Announced on the event loop                                   |
-| Timer              | The 100 ms observation                     | Runs on the event loop                                        |
+| Interface            | Purpose                                     | Contract                                                      |
+|----------------------|---------------------------------------------|---------------------------------------------------------------|
+| Online estimators    | Current estimates and whether they settled  | Written by the low-priority interrupt; read on the event loop |
+| Calibration record   | The commissioned model and the loop design  | Flux linkage, pole pairs, bandwidths                          |
+| Learned-model record | The stored inductance, inertia and friction | Loaded once at power-up; written whole and read back          |
+| Lifecycle            | Entering `Ready` from `Enabled`             | Announced on the event loop                                   |
+| Timer                | The 100 ms observation                      | Runs on the event loop                                        |
 
 ---
 
 ## Constraints & Limitations
 
-| Constraint     | Description                                                                 |
-|----------------|-----------------------------------------------------------------------------|
-| Stopped only   | A change during a long run waits for the next stop                          |
-| Not persisted  | Every power-up starts from the commissioned model                           |
-| Fixed criteria | The 10 % threshold, the 5 s dwell and the bands are constants, not settings |
-| Torque mode    | Runs no estimators; the mode has no effect and the command is refused       |
+| Constraint     | Description                                                                        |
+|----------------|------------------------------------------------------------------------------------|
+| Stopped only   | A change during a long run waits for the next stop                                 |
+| Resistance     | Never stored; every power-up starts from the commissioned resistance               |
+| Store rate     | At most one learned-model store per 15 minutes of uptime; the reset is not limited |
+| Fixed criteria | The 10 % threshold, the 5 s dwell and the bands are constants, not settings        |
+| Torque mode    | Runs no estimators; the mode has no effect and the command is refused              |

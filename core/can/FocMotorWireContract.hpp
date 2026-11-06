@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 17;
+    static constexpr uint8_t focContractVersionMinor = 18;
 
     enum class FieldType : uint8_t
     {
@@ -171,7 +171,7 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 27> focMotorMessages{ {
+    inline constexpr std::array<MessageDescriptor, 28> focMotorMessages{ {
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
         MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
@@ -199,6 +199,7 @@ namespace can
         MakeDescriptor(focQueryFaultHistoryId, "QueryFaultHistory", Direction::command, queryFaultHistoryFields),
         MakeDescriptor(focClearFaultHistoryId, "ClearFaultHistory", Direction::command),
         MakeDescriptor(focRecalibrateId, "Recalibrate", Direction::command),
+        MakeDescriptor(focResetModelId, "ResetModel", Direction::command),
     } };
 
     inline constexpr std::array<MessageDescriptor, 10> focMotorResponses{ {
@@ -266,7 +267,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 80> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 81> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -347,6 +348,7 @@ namespace can
         { FocParameter::modelViscousFriction, "modelViscousFriction", "Nm.s/rad", 0.0f, focMaxReading, false, false, true },
         { FocParameter::recalibrationsApplied, "recalibrationsApplied", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::recalibrationsRejected, "recalibrationsRejected", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::recalibrationsStored, "recalibrationsStored", "-", 0.0f, focMaxReading, true, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

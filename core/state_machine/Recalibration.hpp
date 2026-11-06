@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace state_machine
 {
@@ -18,6 +19,16 @@ namespace state_machine
         foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
 
         bool operator==(const MotorModel&) const = default;
+    };
+
+    // The resistance is never stored: it follows the winding temperature.
+    struct StoredModel
+    {
+        std::optional<foc::MilliHenry> inductance;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+        std::optional<foc::NewtonMeterSecondPerRadian> viscousFriction;
+
+        bool operator==(const StoredModel&) const = default;
     };
 
     enum class RecalibrationTrigger : uint8_t
@@ -58,12 +69,17 @@ namespace state_machine
             uint8_t rejected{ 0 };
         };
 
-        void Commission(const MotorModel& model);
+        // Returns whether the model in use was reset to the commissioned one with the stored quantities.
+        bool Commission(const MotorModel& model, const StoredModel& stored = {});
+        bool IsCommissionedFrom(const MotorModel& model, const StoredModel& stored) const;
+        // Back to the commissioned model, the resistance included, with nothing stored.
+        void Revert();
         void Observe(const OnlineEstimates& estimates);
         Outcome Decide(RecalibrationTrigger trigger);
 
         const MotorModel& Commissioned() const;
         const MotorModel& InUse() const;
+        StoredModel Learned() const;
         uint16_t Applied() const;
         uint16_t Rejected() const;
 
@@ -79,6 +95,7 @@ namespace state_machine
         RecalibrationVerdict Judge(std::size_t quantity, RecalibrationTrigger trigger);
 
         MotorModel commissioned;
+        StoredModel restored;
         MotorModel inUse;
         std::array<Tracked, quantities> tracked{};
         uint16_t applied{ 0 };

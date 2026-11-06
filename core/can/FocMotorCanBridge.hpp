@@ -83,6 +83,7 @@ namespace can
         void OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone) override;
         void OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone) override;
         void OnRecalibrate(const infra::Function<void()>& onAccepted) override;
+        void OnResetModel(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
         static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);

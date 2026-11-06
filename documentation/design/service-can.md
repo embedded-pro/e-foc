@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.19.0
+version: 0.20.0
 component: can-service
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.19.0                   |
+| Version   | 0.20.0                   |
 | Component | can-service              |
 | Date      | 2026-11-06               |
 
@@ -477,6 +477,24 @@ nothing.
 The model parameters equal the calibration record until a recalibration; the motor parameters (`0x40`–`0x45`) keep
 reading the record. A client older than 2.17 asks for none of them.
 
+**Contract 2.18 — stored recalibration.** Version 2.18 adds one command and one read-only parameter; nothing in
+2.17 changes (`online-recalibration.md`, Part F). From 2.18 the model parameters (`0x94`–`0x97`) also show the
+inductance, inertia and friction a recalibration stored, from power-up on.
+
+| ID     | Message      | Direction | Fields | Answer                                             |
+|--------|--------------|-----------|--------|----------------------------------------------------|
+| `0x1E` | `ResetModel` | command   | —      | acknowledge once the empty learned model is stored |
+
+`ResetModel` is refused with `invalidState` while the drive is not stopped. Accepted, it stores an empty learned
+model and returns the model in use to the calibration record; a write that fails is answered with the category
+error `persistenceFailed`. It is accepted in every control mode and whatever the recalibration mode.
+
+| ID     | Parameter              | Unit | Value                                                   | Automatic |
+|--------|------------------------|------|---------------------------------------------------------|-----------|
+| `0x9A` | `recalibrationsStored` | -    | Learned-model stores since power-up, the reset included | no        |
+
+A client older than 2.18 does not ask for it.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -541,6 +559,7 @@ The observer interface provides callbacks for:
   is called when the sequence or the invalidation ends.
 - `OnClearDiagnostics` — a command without fields, with a completion callback.
 - `OnRecalibrate` — the recalibration command of contract 2.17, with a `CanAckStatus` result callback.
+- `OnResetModel` — the reset of the stored recalibration of contract 2.18, with a status callback.
 
 The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
 one handler group of the server, so the server's own surface stays small as the contract grows.
@@ -617,6 +636,8 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   always succeeds.
 - `OnRecalibrate` → `ControlModeStateMachine::CmdRecalibrate()`; not stopped or the mode off answers
   `invalidState`, torque mode `modeMismatch`.
+- `OnResetModel` → `ControlModeStateMachine::CmdResetModel()`; not stopped answers `invalidState`, a store that
+  fails `persistenceFailed`.
 
 The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
 `OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and `OnClearDiagnostics` — are

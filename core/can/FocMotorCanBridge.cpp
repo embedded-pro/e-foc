@@ -279,6 +279,11 @@ namespace can
         settings.Recalibrate(onAccepted);
     }
 
+    void FocMotorCanBridge::OnResetModel(const infra::Function<void(bool stored)>& onDone)
+    {
+        settings.ResetModel(onDone);
+    }
+
     void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>& onDone)
     {
         const auto& state = controlMode.ActiveStateMachine().CurrentState();

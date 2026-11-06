@@ -3,6 +3,7 @@
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/FaultHistoryData.hpp"
+#include "core/services/non_volatile_memory/LearnedModelData.hpp"
 #include "infra/util/Function.hpp"
 
 namespace services
@@ -36,5 +37,8 @@ namespace services
 
         virtual void SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;
+
+        virtual void SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone) = 0;
+        virtual void LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone) = 0;
     };
 }

@@ -4,6 +4,8 @@ Feature: Online Recalibration
   on every stop of a running drive in automatic mode, or on a Recalibrate command in the
   on-command mode (REQ-CAL-023, REQ-CAL-024). The calibration record keeps the commissioned
   values; the model the loops use is read over CAN (REQ-CAN-024). The mode is off by default.
+  A recalibrated inductance, inertia and friction are stored, at most once every 15 minutes, and
+  in use again after a restart until a Reset Model command (REQ-CAL-025, REQ-CAN-025).
 
   Each scenario stores an inertia 1.5 times the plant's, which the online estimator corrects
   while the speed steps between two levels.
@@ -60,3 +62,47 @@ Feature: Online Recalibration
     And the recalibrationMode is set to 2 over CAN
     And the target restarts
     Then the recalibrationMode read over CAN shall be 2
+
+  @sil @REQ-CAL-025 @REQ-CAN-025
+  Scenario: An automatic recalibration is stored once and in use after a restart
+    Given a nominal motor plant
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia | 1.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the recalibrationMode is set to 2 over CAN
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 12000 ms
+    And the motor is disabled
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the motor is disabled
+    Then the recalibrationsStored read over CAN shall be 1
+    When the target restarts
+    And the rotor is aligned
+    And the model in use is read
+    Then the inertia in use shall be within 10 % of the plant
+
+  @sil @REQ-CAL-025 @REQ-CAN-025
+  Scenario: Reset Model returns a restarted drive to the calibration record
+    Given a nominal motor plant
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia | 1.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the recalibrationMode is set to 2 over CAN
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 12000 ms
+    And the motor is disabled
+    And the model is reset over CAN
+    Then the recalibrationsStored read over CAN shall be 2
+    When the target restarts
+    And the rotor is aligned
+    And the model in use is read
+    Then the inertia in use shall be within 0.01 % of the stored calibration

@@ -57,12 +57,16 @@ namespace application
         static constexpr uint32_t calibrationRegionOffset = 0;
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
-        static constexpr uint32_t configRegionSize = 256;
-        static constexpr uint32_t faultHistoryRegionOffset = configRegionOffset + configRegionSize;
+        static constexpr uint32_t configRegionSize = 224;
+        static constexpr uint32_t learnedModelRegionOffset = configRegionOffset + configRegionSize;
+        static constexpr uint32_t learnedModelRegionSize = 32;
+        static constexpr uint32_t faultHistoryRegionOffset = learnedModelRegionOffset + learnedModelRegionSize;
         static constexpr uint32_t faultHistoryRegionSize = 128;
         static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
         static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
+        static_assert(services::learnedModelImageSize <= learnedModelRegionSize);
         static_assert(services::faultHistoryImageSize <= faultHistoryRegionSize);
+        static_assert(faultHistoryRegionOffset == 384, "the fault history must not move");
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
 
         void ApplyCurrentLimit();
@@ -80,6 +84,7 @@ namespace application
         services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
+        services::NvmEepromRegion learnedModelRegion;
         services::NvmEepromRegion faultHistoryRegion;
         services::NonVolatileMemoryImpl nvm;
         application::DecimatingThreePhaseInverter inverter;

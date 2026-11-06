@@ -15,6 +15,8 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
     ConfigData.hpp
     FaultHistoryData.hpp
     FaultHistoryData.cpp
+    LearnedModelData.hpp
+    LearnedModelData.cpp
     NonVolatileMemory.hpp
     NvmRegion.hpp
     NvmEepromRegion.hpp

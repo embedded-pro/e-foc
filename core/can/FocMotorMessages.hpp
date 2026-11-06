@@ -36,6 +36,7 @@ namespace can
     static constexpr uint8_t focQueryFaultHistoryId = 0x1B;
     static constexpr uint8_t focClearFaultHistoryId = 0x1C;
     static constexpr uint8_t focRecalibrateId = 0x1D;
+    static constexpr uint8_t focResetModelId = 0x1E;
 
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
@@ -191,6 +192,7 @@ namespace can
         modelViscousFriction = 0x97,
         recalibrationsApplied = 0x98,
         recalibrationsRejected = 0x99,
+        recalibrationsStored = 0x9A,
         loopSamples = 0xA0,
         loopBudgetCycles = 0xA1,
         loopMinimumCycles = 0xA2,
@@ -233,7 +235,8 @@ namespace can
         calibrate = focCalibrateId,
         clearCalibration = focClearCalibrationId,
         clearDiagnostics = focClearDiagnosticsId,
-        recalibrate = focRecalibrateId
+        recalibrate = focRecalibrateId,
+        resetModel = focResetModelId
     };
 
     static constexpr uint8_t focParameterAutomaticFlag = 0x01;

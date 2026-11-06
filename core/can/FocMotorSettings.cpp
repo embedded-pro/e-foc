@@ -39,6 +39,7 @@ namespace can
                 case FocParameter::modelViscousFriction:
                 case FocParameter::recalibrationsApplied:
                 case FocParameter::recalibrationsRejected:
+                case FocParameter::recalibrationsStored:
                     return ParameterGroup::onlineEstimate;
                 case FocParameter::loopSamples:
                 case FocParameter::loopBudgetCycles:

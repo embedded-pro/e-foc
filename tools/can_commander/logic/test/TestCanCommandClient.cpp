@@ -189,8 +189,9 @@ namespace
         static constexpr std::size_t thermalParameterCount{ 2 };
         static constexpr std::size_t overTemperatureParameterCount{ 2 };
         static constexpr std::size_t busVoltageLimitParameterCount{ 2 };
-        static constexpr std::size_t recalibrationParameterCount{ 7 };
-        static constexpr std::size_t recalibrationReadingCount{ 6 };
+        static constexpr std::size_t recalibrationParameterCount{ 8 };
+        static constexpr std::size_t recalibrationReadingCount{ 7 };
+        static constexpr std::size_t storedRecalibrationParameterCount{ 1 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -1439,7 +1440,7 @@ TEST_F(TestCanCommandClient, an_accepted_clear_of_the_fault_history_reads_it_aga
     EXPECT_EQ(can::focFaultHistoryDepth, Count(can::focQueryFaultHistoryId));
 }
 
-TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_once)
+TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_but_the_store_count)
 {
     RecordSends();
     BringCompatible(1, CanCommandClient::recalibrationContractMinor);
@@ -1447,5 +1448,18 @@ TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsRecalibration(1));
+    EXPECT_FALSE(client.SupportsStoredRecalibration(1));
+    EXPECT_FALSE(Queried(can::FocParameter::recalibrationsStored));
+    EXPECT_EQ(can::focParameters.size() - storedRecalibrationParameterCount, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_18_node_is_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsStoredRecalibration(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }

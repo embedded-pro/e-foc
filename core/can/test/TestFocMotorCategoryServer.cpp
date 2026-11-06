@@ -72,6 +72,7 @@ namespace
         MOCK_METHOD(void, OnQueryFaultHistory, (uint8_t, (const infra::Function<void(const can::FocFaultRecord&)>&)), (override));
         MOCK_METHOD(void, OnClearFaultHistory, ((const infra::Function<void(bool)>&)), (override));
         MOCK_METHOD(void, OnRecalibrate, ((const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnResetModel, ((const infra::Function<void(bool)>&)), (override));
     };
 
     class FocMotorCategoryServerTest
@@ -755,4 +756,40 @@ TEST_F(FocMotorCategoryServerTest, HandleRecalibrate_AcknowledgesOnceAccepted)
 TEST_F(FocMotorCategoryServerTest, HandleRecalibrate_WithAPayload_IsRejected)
 {
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focRecalibrateId, MakeMessage({ 0x01, 0x00 })));
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleResetModel_AcknowledgesOnceStored)
+{
+    EXPECT_CALL(observer, OnResetModel(_))
+        .WillOnce(Invoke([](const infra::Function<void(bool)>& onDone)
+            {
+                onDone(true);
+            }));
+
+    server.HandleMessage(can::focResetModelId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focResetModelId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleResetModel_ThatIsNotStored_ReportsPersistenceFailed)
+{
+    EXPECT_CALL(observer, OnResetModel(_))
+        .WillOnce(Invoke([](const infra::Function<void(bool)>& onDone)
+            {
+                onDone(false);
+            }));
+
+    server.HandleMessage(can::focResetModelId, MakePayload(1));
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(can::focResetModelId, lastCategoryErrorOriginCmd);
+    EXPECT_EQ(can::FocMotorCategoryError::persistenceFailed, lastCategoryError);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleResetModel_WithAPayload_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focResetModelId, MakeMessage({ 0x01, 0x00 })));
 }

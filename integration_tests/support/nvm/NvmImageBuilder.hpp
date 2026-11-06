@@ -10,6 +10,7 @@ namespace sil
     static constexpr std::size_t nvmImageSize = 512;
     static constexpr uint32_t calibrationRegionOffset = 0;
     static constexpr uint32_t configRegionOffset = 128;
+    static constexpr uint32_t learnedModelRegionOffset = 352;
     static constexpr uint32_t faultHistoryRegionOffset = 384;
 
     enum class RecordDamage : uint8_t

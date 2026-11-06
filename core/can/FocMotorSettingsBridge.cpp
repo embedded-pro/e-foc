@@ -35,7 +35,7 @@ namespace can
         bool IsRecalibrationReading(FocParameter parameter)
         {
             const auto id = static_cast<uint8_t>(parameter);
-            return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsRejected);
+            return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsStored);
         }
 
         bool IsStoredSetting(FocParameter parameter)
@@ -291,6 +291,8 @@ namespace can
             return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsApplied()), false };
         if (parameter == FocParameter::recalibrationsRejected)
             return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsRejected()), false };
+        if (parameter == FocParameter::recalibrationsStored)
+            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsStored()), false };
 
         const auto model = controlMode.ModelInUse();
         if (!model.has_value())
@@ -316,6 +318,13 @@ namespace can
             onAccepted();
         else
             ReportSettingFailure(focRecalibrateId, result);
+    }
+
+    void FocMotorSettingsBridge::ResetModel(const infra::Function<void(bool stored)>& onDone)
+    {
+        const auto result = controlMode.CmdResetModel(onDone);
+        if (result != state_machine::SettingResult::ok)
+            ReportSettingFailure(focResetModelId, result);
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const

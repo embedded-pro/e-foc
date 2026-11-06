@@ -23,7 +23,7 @@ namespace services
         static constexpr std::size_t configRecordSize =
             sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(ConfigData);
 
-        NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion);
+        NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion, NvmRegion& learnedModelRegion);
 
         void SaveCalibration(const CalibrationData& data, infra::Function<void(NvmStatus)> onDone) override;
         void LoadCalibration(CalibrationData& data, infra::Function<void(NvmStatus)> onDone) override;
@@ -38,6 +38,9 @@ namespace services
 
         void SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) override;
         void LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) override;
+
+        void SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone) override;
+        void LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone) override;
 
     private:
         void OnCalibrationErased();
@@ -64,12 +67,17 @@ namespace services
         void OnFaultHistoryWritten();
         void OnFaultHistoryReadBack();
         void OnFaultHistoryReadForLoad();
+        void CompleteLearnedModel(NvmStatus status);
+        void OnLearnedModelWritten();
+        void OnLearnedModelReadBack();
+        void OnLearnedModelReadForLoad();
 
         static uint32_t ComputeCrc(infra::ConstByteRange bytes);
 
         NvmRegion& calibrationRegion;
         NvmRegion& configRegion;
         NvmRegion& faultHistoryRegion;
+        NvmRegion& learnedModelRegion;
 
         std::array<uint8_t, calibrationRecordSize> calibrationBuffer{};
         std::array<uint8_t, calibrationRecordSize> calibrationReadBackBuffer{};
@@ -77,16 +85,20 @@ namespace services
         std::array<uint8_t, configRecordSize> configReadBackBuffer{};
         std::array<uint8_t, faultHistoryImageSize> faultHistoryBuffer{};
         std::array<uint8_t, faultHistoryImageSize> faultHistoryReadBackBuffer{};
+        std::array<uint8_t, learnedModelImageSize> learnedModelBuffer{};
+        std::array<uint8_t, learnedModelImageSize> learnedModelReadBackBuffer{};
 
         infra::AutoResetFunction<void(NvmStatus)> onCalibrationDone;
         infra::AutoResetFunction<void(NvmStatus)> onConfigDone;
         infra::AutoResetFunction<void(NvmStatus)> onFormatDone;
         infra::AutoResetFunction<void(bool)> onIsCalibrationValidDone;
         infra::AutoResetFunction<void(NvmStatus)> onFaultHistoryDone;
+        infra::AutoResetFunction<void(NvmStatus)> onLearnedModelDone;
 
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
         FaultHistoryData* pendingFaultHistoryOutput = nullptr;
+        LearnedModelData* pendingLearnedModelOutput = nullptr;
 
         bool busy{ false };
     };

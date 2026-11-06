@@ -105,6 +105,19 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<float> StoredValue(const services::CalibrationData& record, const std::string& quantity)
+    {
+        if (quantity == "resistance")
+            return record.rPhase;
+        if (quantity == "inductance")
+            return record.lD;
+        if (quantity == "inertia")
+            return record.inertia;
+        if (quantity == "friction")
+            return record.frictionViscous;
+        return std::nullopt;
+    }
+
     void CompareWithPlant(const ScenarioSetup& setup, const IdentifiedParameters& parameters, const char* source, const std::string& quantity, float limitPercent, float windingCelsius)
     {
         const auto truth = PlantTruth(setup, quantity, windingCelsius);
@@ -245,6 +258,12 @@ WHEN(R"(the drive is recalibrated over CAN)")
         << "The target refused the Recalibrate command";
 }
 
+WHEN(R"(the model is reset over CAN)")
+{
+    ASSERT_TRUE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focResetModelId))
+        << "The target refused the Reset Model command";
+}
+
 THEN(R"(a recalibration over CAN shall be refused)")
 {
     EXPECT_FALSE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focRecalibrateId))
@@ -270,6 +289,21 @@ THEN(R"(the {word} in use shall be within {float} % of the plant)", (std::string
 {
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.inUse, "in use", quantity, limitPercent, kReferenceCelsius);
+}
+
+THEN(R"(the {word} in use shall be within {float} % of the stored calibration)", (std::string quantity, float limitPercent))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    const auto stored = StoredValue(setup.nvm.calibration, quantity);
+    ASSERT_TRUE(stored.has_value() && *stored != 0.0f) << "No stored calibration value for " << quantity;
+
+    const auto value = Estimate(setup.inUse, quantity);
+    ASSERT_TRUE(value.has_value()) << "No " << quantity << " in use was captured";
+
+    const float errorPercent = std::fabs(*value - *stored) / std::fabs(*stored) * 100.0f;
+    std::fprintf(stderr, "[METRIC] ident in use %s against the stored calibration %s stored=%.6g value=%.6g error_pct=%.2f\n",
+        quantity.c_str(), setup.plantName.c_str(), *stored, *value, errorPercent);
+    EXPECT_LE(errorPercent, limitPercent) << quantity << " in use is " << *value << " against a stored " << *stored;
 }
 
 THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::string quantity, float limitPercent))

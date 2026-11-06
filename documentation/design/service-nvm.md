@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.13.0
+version: 0.14.0
 component: service-nvm
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.13.0                       |
+| Version   | 0.14.0                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-06                   |
 
@@ -33,6 +33,8 @@ date: 2026-11-06
   configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
   settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
   target window, travel limits, temperature and bus voltage) across power cycles using MCU internal EEPROM
+- Persisting the fault history and the learned motor model, the inductance, inertia and friction online
+  recalibration adopted (`online-recalibration.md`, Part F)
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Detecting and signalling version mismatches when a stored record was written by a different firmware version
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
@@ -50,13 +52,14 @@ date: 2026-11-06
 
 ### Logical Regions
 
-The service manages three independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
+The service manages four independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 168 bytes |
 | Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
+| Learned model | `0x1EA4ED0D` | learned model     | 26 bytes  |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
@@ -96,6 +99,27 @@ A record whose check byte does not match, or whose code is none, is an empty slo
 all-0xFF. A wrong magic or version reads as a history to be reset: no records, power-up count 0. A write stores the
 whole image without erasing it first, then reads it back and compares, as the other regions do; an unchanged part
 is rewritten with the same bytes, so a power loss can damage only the record or the count that changed.
+
+### Learned Model Region
+
+The learned model of online recalibration (`online-recalibration.md`, Part F) is rewritten in the field, at most
+once every 15 minutes of uptime, so it is stored as the fault history is: one image, written whole without an erase
+and read back, with a check that a write cut short fails.
+
+| Field            | Size    | Description                                                                                      |
+|------------------|---------|--------------------------------------------------------------------------------------------------|
+| Magic            | 4 bytes | `0x1EA4ED0D`                                                                                     |
+| Version          | 1 byte  | Layout version of the learned model, 1                                                           |
+| Commissioning    | 4 bytes | CRC-32 of the commissioned inductance, inertia and viscous friction the values were learned from |
+| Inductance       | 4 bytes | mH, IEEE-754 single precision                                                                    |
+| Inertia          | 4 bytes | kg·m², IEEE-754 single precision                                                                 |
+| Viscous friction | 4 bytes | N·m·s/rad, IEEE-754 single precision                                                             |
+| Present          | 1 byte  | Bit 0 the inductance, bit 1 the inertia, bit 2 the viscous friction                              |
+| CRC              | 4 bytes | CRC-32 of the 22 bytes before it                                                                 |
+
+A wrong magic, version or CRC reads as an empty learned model, one with no quantity present, and so does the image
+a Reset Model command stores. The commissioning check is compared by online recalibration, not here: the record
+does not know the calibration it belongs to.
 
 ### On-Media Record Format
 
@@ -168,7 +192,8 @@ The two NVM regions occupy fixed, non-overlapping address ranges within the MCU 
 | Region        | Base address | Size      | Content                  |
 |---------------|--------------|-----------|--------------------------|
 | Calibration   | 0            | 128 B     | One calibration record   |
-| Configuration | 128          | 256 B     | One configuration record |
+| Configuration | 128          | 224 B     | One configuration record |
+| Learned model | 352          | 32 B      | The learned model image  |
 | Fault history | 384          | 128 B     | The fault history image  |
 | Reserved      | 512+         | remainder | Unused; not accessed     |
 
@@ -176,7 +201,8 @@ The regions fit within the 2048-byte EEPROM available on the TM4C1294 target, an
 E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM); the fault history therefore holds eight
 records, the number its 128 bytes take. The configuration region grew
 from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the 24LC04;
-the driver splits a write at the block boundary. The NUCLEO-H563ZI and host targets use an in-memory stub of
+the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
+177-byte record of layout 13 fits in the 224 that remain, and no stored record moves. The NUCLEO-H563ZI and host targets use an in-memory stub of
 identical layout for regression testing.
 
 ### Power-Loss Mitigation
@@ -328,18 +354,20 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                           | Purpose                                                                       | Contract                                                                                          |
-|-------------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)`     | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
-| `LoadCalibration(onDone)`           | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
-| `InvalidateCalibration(onDone)`     | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once                           |
-| `IsCalibrationValid(onDone)`        | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied                              |
-| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
-| `LoadConfig(onDone)`                | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
-| `ResetConfigToDefaults(onDone)`     | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`                                      |
-| `Format(onDone)`                    | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased; the fault history is left alone    |
-| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part                            | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history |
-| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
+| Interface                           | Purpose                                                                       | Contract                                                                                                              |
+|-------------------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)`     | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| `LoadCalibration(onDone)`           | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| `InvalidateCalibration(onDone)`     | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once                                               |
+| `IsCalibrationValid(onDone)`        | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied                                                  |
+| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| `LoadConfig(onDone)`                | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| `ResetConfigToDefaults(onDone)`     | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`                                                          |
+| `Format(onDone)`                    | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased; the fault history and the learned model are left alone |
+| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part                            | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history                     |
+| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                                   | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model                  |
+| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
 
 ### Required
 
@@ -347,3 +375,5 @@ byte is corrected to match what is actually running.
 |--------------------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
 | `NvmRegion` (calibration instance)   | Abstracts raw EEPROM write and read for the calibration address range   | Must be backed by a dedicated EEPROM address range; must not be shared with any other user |
 | `NvmRegion` (configuration instance) | Abstracts raw EEPROM write and read for the configuration address range | Must be backed by a dedicated EEPROM address range separate from the calibration range     |
+| `NvmRegion` (fault history instance) | Abstracts raw EEPROM write and read for the fault history address range | A dedicated address range of at least the image's 112 bytes                                |
+| `NvmRegion` (learned model instance) | Abstracts raw EEPROM write and read for the learned model address range | A dedicated address range of at least the image's 26 bytes                                 |

@@ -29,6 +29,7 @@ namespace can
         FocParameterValue HeldValue(FocParameter parameter) const;
         void ClearDiagnostics();
         void Recalibrate(const infra::Function<void()>& onAccepted);
+        void ResetModel(const infra::Function<void(bool stored)>& onDone);
         void ReportTargetReached(const infra::Function<bool()>& isReached);
 
     private:
