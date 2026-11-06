@@ -2,7 +2,7 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.4
+version: 0.6.5
 component: "bootloader"
 date: 2026-11-05
 ---
@@ -74,7 +74,7 @@ bytes of the application slot are the image descriptor (Part E).
 
 | Board         | Flash, erase unit       | Bootloader          | Application slot              | Staging slot                                 | Journal                 | Image today  |
 |---------------|-------------------------|---------------------|-------------------------------|----------------------------------------------|-------------------------|--------------|
-| EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 320 KB          | internal, `0x00058000`, 320 KB               | `0x000A8000`, 16 KB     | 246 KB       |
+| EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 320 KB          | internal, `0x00080000`, 320 KB, upper half   | `0x000D0000`, 16 KB     | 246 KB       |
 | NUCLEO-H563ZI | 2 MB in two banks, 8 KB | `0x08000000`, 32 KB | `0x08008000`, 320 KB (bank 1) | internal, `0x08100000`, 320 KB (bank 2)      | `0x08150000`, 8 KB      | not measured |
 | NUCLEO-G474RE | 512 KB, 2 KB pages      | `0x08000000`, 32 KB | `0x08008000`, 320 KB          | external SPI NOR, from its address 0, 320 KB | the NOR sector after it | 259 KB       |
 | Emulated      | 4 MB of code RAM        | `0x00000000`, 32 KB | `0x00008000`, 320 KB          | semihosting file `staging.bin`, 320 KB       | file `journal.bin`      | 242 KB       |
@@ -94,22 +94,35 @@ On the EK-TM4C1294XL:
            |   ...                    |
 0x00057FC0 |   image descriptor 64 B  |
 0x00058000 +--------------------------+
-           | staging slot     320 KB  |  pack received over CAN
-0x000A8000 +--------------------------+
+           | unused           160 KB  |
+0x00080000 +==========================+  half boundary: banks 0 and 1 below, banks 2 and 3 above
+           | staging slot     320 KB  |  pack received over CAN, erased while the application runs
+0x000D0000 +--------------------------+
            | status journal    16 KB  |
-0x000AC000 +--------------------------+
-           | unused           336 KB  |
+0x000D4000 +--------------------------+
+           | unused           176 KB  |
 0x00100000 +--------------------------+
 ```
+
+- The flash is two independent 512 KB halves, banks 0 and 1 below `0x00080000` and banks 2 and 3 above it.
+  A sector erase stalls every read of its own half until it completes, instruction fetches and the
+  watchdog's early-warning handler included, while the other half reads normally (datasheet 8.2.3.3, flash
+  mirror mode: software runs from the lower banks while updating the upper). The application executes from
+  the lower half and erases the staging slot and the journal while it runs, so both lie entirely in the upper
+  half and no erase it performs can block the core or the watchdog; the linker script asserts it. A 16 KB
+  erase takes about 17 ms on the bench and up to 40 ms with wear, against the 25 ms the watchdog hardware
+  allows an unserviced early warning (`watchdog.md`), so a staging slot that crossed the boundary reset the
+  board whenever an erase ran long. The bootloader's own erases of the application slot run with no watchdog.
 
 - The application is linked at the start of its slot. It moves the vector table to the slot before it enables
   any interrupt, because neither the TI startup nor the ST system initialisation does: the TI startup leaves the
   table at address 0 and the H5 system initialisation sets it to the start of flash.
-- On the NUCLEO-H563ZI the staging slot will be the second bank, so the application programs it while running
-  from the first bank without stalling. Bank swapping stays off: the bootloader copies the image instead.
+- On the NUCLEO-H563ZI the staging slot will be the second bank for the same reason, so the application
+  programs it while running from the first bank without stalling. Bank swapping stays off: the bootloader
+  copies the image instead.
 - On the NUCLEO-G474RE the application slot will span both banks, and the staging slot an SPI NOR device on the
   motor board (Open Question 1).
-- A pack may be as large as the staging slot, 262 144 bytes, which is below the 393 216 bytes a `can-lite`
+- A pack may be as large as the staging slot, 327 680 bytes, which is below the 393 216 bytes a `can-lite`
   firmware-upgrade transfer can address. The image it carries may fill the application slot less its
   descriptor, and the pack's header, signature and image framing less than that: an update installs only an
   image whose pack fits the staging slot.

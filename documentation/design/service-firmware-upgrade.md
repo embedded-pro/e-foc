@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.9
+version: 0.3.10
 component: "service-firmware-upgrade"
 date: 2026-11-05
 ---
@@ -219,10 +219,14 @@ them as the NVM design describes (`service-nvm.md`, version check).
   the configuration record: start-up settings, telemetry rate and fault supervision settings. On the
   EK-TM4C1294XL the EEPROM and the flash share one controller, so a flash program and an EEPROM write must
   never overlap; on the ST boards the rule costs nothing and keeps the behaviour the same.
-- **Watchdog.** A sector erase stalls every access to the flash being erased, and on the TI board every
-  access to flash at all, interrupts included. The service erases the staging slot one sector per event-loop
-  turn, and programs one page at a time, so each stall stays far below the 100 ms watchdog expiry
-  (`watchdog.md`), and the node keeps sending its heartbeat while Begin waits for the erase.
+- **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes, on the TI
+  board the instruction fetches and the watchdog's early-warning handler included, and the hardware resets
+  25 ms after a warning its handler has not cleared. A 16 KB erase takes about 17 ms on the bench and up to
+  40 ms with wear, so an erase in the half the application executes from cannot be made safe by splitting
+  it. The staging slot and the journal therefore lie entirely in the other half (`bootloader.md` Part A),
+  where their erases run while the core keeps executing. The service still erases one sector per event-loop
+  turn and programs one page at a time, so the node keeps sending its heartbeat while Begin waits for the
+  erase.
 - **Real time.** The drive is stopped while a pack is received, so no PWM depends on the control interrupt
   during a stall. No code is added to the control interrupt or the outer loop.
 
