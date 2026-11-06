@@ -1,0 +1,11 @@
+- id: REQ-HWT-001
+  title: The hardware-test application exercises the board's peripherals
+  status: verified
+  verification: hil
+  shall: >
+    The hardware-test application shall read the three phase currents, write and read back a data
+    block in non-volatile memory byte for byte, answer a serial command within 100 ms and answer a
+    CAN command within 10 ms on the target board.
+  rationale: >
+    The hardware-test application is the bring-up fixture for a new board, not the motor product;
+    this one requirement keeps its scenarios traced.

@@ -141,7 +141,7 @@ do not, and fails without an agreeing pair, so a single disturbed window is neve
 back-to-back calibration once read one phase 52 mA low in one window, which the second window now catches
 (`documentation/design/service-current-offsets.md`). The first Enable after power-up, a control-mode switch or a
 Fault measures them again at rest and uses the new values when each phase is within 50 mA of the stored one, which
-holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-TRQ-014); drift that
+holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-CTL-001); drift that
 builds up while the drive runs is not tracked. The hardware-characterisation plan measures each
 condition cold and after ten minutes of PWM to separate it from noise.
 

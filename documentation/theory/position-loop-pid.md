@@ -225,7 +225,7 @@ $$
   speed, 18.8 rad/s position) the loop's 0.046 N·m/rad is half the cogging's 0.096, and the
   rotor steps between the neighbouring detents instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
   map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
-  with it every position law holds 3.0 rad (REQ-POS-012).
+  with it every position law holds 3.0 rad (REQ-CTL-003).
 - No disturbance rejection beyond what the speed loop provides.
 - Encoder noise enters the position estimate. A state observer upstream improves robustness.
 

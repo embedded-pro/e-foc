@@ -290,8 +290,8 @@ the calibration with `[SM] The rotor did not come to rest`. The offset step hold
 50 % duty, which shorts the windings, so a turning rotor drives current through the sensors. A rotor
 that slows to a stop inside the averaging window leaves part of that current in the stored offsets. In
 simulation, a calibration started 25 ms after disabling the bench motor at 500 rpm stored offsets 5 to
-15 mA off in five runs out of five, against the 5 mA REQ-CAL-015 allows, and 4 to 9 mA off from 100 rpm
-(REQ-CAL-020). The wait is measured from the window's start rather than from poll to poll, so a slow
+15 mA off in five runs out of five, against the 5 mA REQ-CMS-001 allows, and 4 to 9 mA off from 100 rpm
+(REQ-CMS-001). The wait is measured from the window's start rather than from poll to poll, so a slow
 creep cannot pass one encoder count at a time. A rotor already at rest costs the 100 ms window.
 
 The offsets apply as soon as they are measured, so the identification and alignment steps after
@@ -316,7 +316,7 @@ The calibration record line is what an external observer, the software-in-the-lo
 
 The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/interfaces/MotorModel.hpp`), the factor the plant model itself applies.
 
-A motor whose flux linkage is set as the motor parameter `fluxLinkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
+A motor whose flux linkage is set as the motor parameter `fluxLinkage` therefore gets a consistent torque constant without a second number to keep in step.
 
 ### Editing motor parameters
 
@@ -324,7 +324,7 @@ The six motor parameters of the record — phase resistance, inductance (written
 pairs, flux linkage, inertia and viscous friction — can also be entered, one at a time, with
 `SetMotorParameter`, from CAN (`service-can.md`). The command is accepted in `Idle` and `Ready` with no work outstanding, for a
 value inside the parameter's range; a record need not exist yet, so a motor can be commissioned
-from its datasheet (REQ-SM-031).
+from its datasheet (REQ-CMS-004).
 
 ```mermaid
 stateDiagram-v2
@@ -388,7 +388,7 @@ The step runs once per calibration: a mechanical run that aligns again for a sec
 spin it a second time. A re-alignment and an electrical identification over CAN do not run it, since
 neither may move the rotor beyond the alignment. The step is traced as `[SM] Identifying flux linkage`
 and then `[SM] Flux linkage: psi_mWb=… c_mV=… n=… se_pct=…`, or `[SM] Flux linkage not identified (…),
-keeping psi_mWb=…` (REQ-CAL-021).
+keeping psi_mWb=…` (REQ-CMS-001).
 
 ### Making the loops live before mechanical identification
 
@@ -485,7 +485,7 @@ The two-command split ensures the FSM enters `Calibrating` before any open-loop 
 
 The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
 
-The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` covers the electrical steps only (REQ-INT-011), so it must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` covers the electrical steps only, so it must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Refreshing the current offsets at enable
 
@@ -550,7 +550,7 @@ releases the latch, so a `ClearFault` that is queued and then refused does not s
 platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or
 tracing. The `FaultDetected` event, its trace output and any pending-command completion are posted to the event
 dispatcher and execute on the next dispatcher turn. This ensures no multi-word state write, tracing call or
-non-volatile-memory access runs from an interrupt context (see REQ-SM-021).
+non-volatile-memory access runs from an interrupt context (see REQ-LCY-003).
 
 Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
 bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its
@@ -591,7 +591,7 @@ that follow it, re-arming the bridge on hardware that has just faulted. `Enable(
 once it is set. A stop landing after the last check needs no unwinding: it runs after every write the
 sequence makes. The flag is written from the faulting context as well as the mainline, so it
 is set and cleared outright rather than counted — a read-modify-write shared with an interrupt is exactly what
-REQ-SM-021 excludes.
+REQ-LCY-003 excludes.
 
 #### Announcing a Fault
 
@@ -633,7 +633,7 @@ PWM-triggered ADC, which stops converting once the bridge is stopped, so the com
 faulted. TI and the NUCLEO-G474RE therefore answer from their latched trips and a fresh bus-voltage reading
 (`core/platform_abstraction/BoardProtection.hpp`, `documentation/design/error-handling.md`), QEMU from its
 simulated protection, and only the NUCLEO-H563ZI and a platform with no protection report
-`unknown`. See REQ-EH-013.
+`unknown`.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
 have happened without an intervening clean run, further clears are refused and a reset is required. Two
@@ -970,7 +970,7 @@ record, keeping `NvmActivity` raised and reusing the completion captured at the 
 `CalibrationSaved` is only dispatched with the status of a write that actually ran. An abort while a
 retry is waiting cancels it and releases `NvmActivity`. An abort while a write is in flight drops the
 completion; when that write answers, `OnSaved` releases `NvmActivity` and stops — a `Busy` answer is not
-retried — so an aborted run is not persisted (REQ-SM-030).
+retried — so an aborted run is not persisted.
 
 #### C3 — Deferred Apply and Re-check Before Activate
 
@@ -1091,12 +1091,12 @@ sequenceDiagram
 | `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255     | Number of electrical pole pairs                                                                                                                                                                                         |
 | `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                                                                         |
 | `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0       | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                                                                   |
-| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019)                                           |
+| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration                                                             |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                                                          |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                                               |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTRL-017                                                 |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTL-006                                                 |
 | `FaultCode`       | —                      | enum (uint8)                   | 14 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout`, `positionLimit` |
 
 A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware

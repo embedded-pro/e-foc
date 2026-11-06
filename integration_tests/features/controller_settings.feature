@@ -3,7 +3,7 @@ Feature: Controllers and Settings Over CAN
   runs, writes the tuning settings and the motor parameters, and reads back what the drive holds.
   What it writes is stored, so it is still in force after the drive restarts.
 
-  @sil @REQ-CTRL-013 @REQ-CAN-007
+  @sil @REQ-CTL-005 @REQ-COM-001
   Scenario: A controller chosen over CAN is reported and runs
     Given a nominal motor plant
     And the motor is already calibrated
@@ -14,7 +14,7 @@ Feature: Controllers and Settings Over CAN
     When the rotor is aligned
     Then the speed loop shall be running the adrc algorithm
 
-  @sil @REQ-CTRL-015 @REQ-CAN-007 @REQ-CAN-008
+  @sil @REQ-CTL-006 @REQ-COM-001
   Scenario: A bandwidth set over CAN holds across a restart until it is set back to automatic
     Given a nominal motor plant
     And the motor is already calibrated
@@ -27,7 +27,7 @@ Feature: Controllers and Settings Over CAN
     When the speedBandwidth is set to automatic over CAN
     Then the speedBandwidth read over CAN shall be automatic
 
-  @sil @REQ-CTRL-016
+  @sil @REQ-CTL-006
   Scenario: A switching gain at the boundary layer is refused over CAN and changes nothing
     Given a nominal motor plant
     And the motor is already calibrated
@@ -35,7 +35,7 @@ Feature: Controllers and Settings Over CAN
     Then setting the currentSwitchingGain to 0.5 over CAN shall be refused as a design that cannot be made
     And the currentSwitchingGain read over CAN shall be 0.2
 
-  @sil @REQ-SM-031 @REQ-CAN-007
+  @sil @REQ-CMS-004 @REQ-COM-001
   Scenario: A motor parameter set over CAN is stored and read back after a restart
     Given a nominal motor plant
     And the motor is already calibrated

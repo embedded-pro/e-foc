@@ -36,7 +36,7 @@ date: 2026-11-05
 - Converting the resulting voltage demands back to three-phase PWM duty cycles via inverse Park and SVM
 - Accepting a combined (Id, Iq) setpoint from an outer control loop or directly from an application
 - Providing Enable and Disable transitions that safely reset internal PID state
-- Folding a torque current that would drive the rotor past the overspeed limit back to zero (REQ-PRT-003)
+- Folding a torque current that would drive the rotor past the overspeed limit back to zero (REQ-PRO-004)
 
 **Is NOT responsible for:**
 - Reading phase current values from the ADC hardware — currents are passed in as arguments
@@ -113,7 +113,7 @@ gives the winding the voltage the law asked for, and the law limits its output t
 largest voltage the measured bus can make, which keeps its anti-windup honest. r is held within 0.5 to 2 so
 that a failed measurement cannot multiply the duties, and it is 1 until a bus voltage is tracked. The event
 loop writes r and 1/r; the control interrupt reads them, so a period that sees one updated and not the other
-is off by one measurement's change for one period (REQ-TRQ-013).
+is off by one measurement's change for one period (REQ-PRO-003).
 
 ### Enable and Disable
 
@@ -260,7 +260,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through `Configure()` first. |
 | No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
 | Current envelope                | Vector magnitude bounded to the inverter's `MaxCurrentSupported()` at `SetPoint`; it is not a regulator.              |
-| Speed limiter                   | Folds, never brakes: an outside torque beyond the limit is left to the overspeed fault (REQ-PRT-003).                 |
+| Speed limiter                   | Folds, never brakes: an outside torque beyond the limit is left to the overspeed fault (REQ-PRO-004).                 |
 | PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                                |
 
 ---

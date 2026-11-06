@@ -24,7 +24,7 @@ Feature: Parameter Identification Against a Known Plant
   its identification services against the same plant model with the same
   limits.
 
-  @sil @REQ-CAL-015
+  @sil @REQ-CMS-001
   Scenario: The full calibration measures the offsets through the bench's current-sense chain
     Given a bench motor plant
     And the plant reads its currents through the bench's current-sense chain
@@ -34,7 +34,7 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
 
-  @sil @REQ-CAL-015
+  @sil @REQ-CMS-001
   Scenario: An electrical identification over CAN measures the offsets through the bench's current-sense chain
     Given a bench motor plant
     And the plant reads its currents through the bench's current-sense chain
@@ -45,7 +45,7 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
 
-  @sil @REQ-CAL-020
+  @sil @REQ-CMS-001
   Scenario: A calibration started while the rotor coasts measures the offsets once it is at rest
     Given a bench motor plant
     And a motor plant with:
@@ -66,7 +66,7 @@ Feature: Parameter Identification Against a Known Plant
     And the identified resistance shall be within 5 % of the plant
     And the identified pole pairs shall match the plant
 
-  @sil @REQ-CAL-014
+  @sil @REQ-CMS-003
   Scenario: The online estimators converge through the bench's current-sense chain
     Given a bench motor plant
     And the plant reads its currents through the bench's current-sense chain
@@ -88,7 +88,7 @@ Feature: Parameter Identification Against a Known Plant
     And the online resistance estimate shall be within 5 % of the plant
     And the online inductance estimate shall be within 10 % of the plant
 
-  @sil @REQ-CAL-016
+  @sil @REQ-CMS-003
   Scenario: The online friction estimate is not misled by a dry friction that turns with the rotor
     Given a bench motor plant
     And a motor plant with:
@@ -108,7 +108,7 @@ Feature: Parameter Identification Against a Known Plant
     Then the online friction estimate shall be within 10 % of the plant
     And the online inertia estimate shall be within 2 % of the plant
 
-  @sil @REQ-CAL-017
+  @sil @REQ-CMS-003
   Scenario Outline: The online electrical estimates hold under the <current> current law when each duty acts a period late
     Given a bench motor plant
     And the plant applies each duty a period late, as the board does
@@ -130,7 +130,7 @@ Feature: Parameter Identification Against a Known Plant
       | current   |
       | pid       |
 
-  @sil @REQ-CAL-019
+  @sil @REQ-CMS-003
   Scenario: The d-axis test current runs in a burst after enable and then pauses
     Given a bench motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples
@@ -144,7 +144,7 @@ Feature: Parameter Identification Against a Known Plant
     Then the d-axis current shall be above 60 mA RMS from 200 to 3800 ms after enable
     And the d-axis current shall be below 10 mA RMS from 4200 to 9000 ms after enable
 
-  @sil @REQ-CAL-018
+  @sil @REQ-CMS-001
   Scenario: The full calibration maps the bench's cogging torque
     Given a bench motor plant
     And the plant's shaft has the bench's dry friction and cogging
@@ -154,7 +154,7 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified cogging shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
 
-  @sil @REQ-CAL-021
+  @sil @REQ-CMS-001
   Scenario: The full calibration identifies the flux linkage through the bench's current-sense chain
     Given a bench motor plant
     And a motor plant with:
@@ -166,7 +166,7 @@ Feature: Parameter Identification Against a Known Plant
     And the full calibration is run
     Then the identified fluxLinkage shall be within 5 % of the plant
 
-  @sil @REQ-CAL-021
+  @sil @REQ-CMS-001
   Scenario: The mechanical identification reads the inertia through the identified flux linkage
     Given a bench motor plant
     And a motor plant with:

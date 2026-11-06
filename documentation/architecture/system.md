@@ -182,7 +182,7 @@ whose highest, is still above its limit is scaled down, along its own direction.
 readable the circle the modulator can trace shrank to 70 % of the hexagon's inner circle; now only the directions
 where two phases share the highest duty are held to the limit. The bench motor in simulation, which stopped near
 356 rad/s, reaches 420 rad/s with the same current ripple as at 340 rad/s and holds 460 rad/s within 1 rad/s
-(REQ-TRQ-009). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
+(REQ-CTL-001). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
 whatever its shunt shows outside the pulse.
 
 The window also has to hold every phase's conversion. The TI converter reads the three phases one after another in

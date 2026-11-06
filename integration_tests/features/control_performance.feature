@@ -73,9 +73,9 @@ Feature: FOC Control Performance
   The torque-accuracy outline holds the rotor 90 electrical degrees from its aligned position,
   where a phase-A sensor offset lands on the q axis, drifts that sensor 20 mA after the
   calibration and measures the current the winding carries, which the offset refresh of the
-  first Start keeps within 1 % plus 5 mA of the command (REQ-TRQ-014).
+  first Start keeps within 1 % plus 5 mA of the command (REQ-CTL-001).
 
-  @REQ-SPD-008
+  @REQ-CTL-002
   Scenario Outline: The <algorithm> speed loop steps from rest to 20 rad/s
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -101,7 +101,7 @@ Feature: FOC Control Performance
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 10       | 60        | 15            | 20      | 6        | 0.5   |
 
-  @REQ-SPD-008
+  @REQ-CTL-002
   Scenario Outline: The <algorithm> speed loop follows a setpoint change to <target> rad/s while running
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 2000 samples
@@ -127,7 +127,7 @@ Feature: FOC Control Performance
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 40     | 10       | 60        | 15            | 25      | 5        | 0.5   |
 
-  @sil @REQ-POS-009
+  @sil @REQ-CTL-003
   Scenario Outline: The <algorithm> position loop steps from rest to 1.5 rad
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -152,7 +152,7 @@ Feature: FOC Control Performance
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 10       | 200       | 15            | 185     | 8        | 0.1   |
 
-  @sil @REQ-POS-009
+  @sil @REQ-CTL-003
   Scenario Outline: The <algorithm> position loop follows a setpoint change to <target> rad while holding
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 2000 samples
@@ -177,7 +177,7 @@ Feature: FOC Control Performance
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | -1.5   | 10       | 200       | 15            | 195     | 6        | 0.15  |
 
-  @REQ-TRQ-007
+  @REQ-CTL-001
   Scenario Outline: The <algorithm> current loop steps from rest to 0.5 A
     Given a nominal motor plant
     And the plant response is recorded at 20000 Hz for up to 400 samples
@@ -203,7 +203,7 @@ Feature: FOC Control Performance
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | 25       | 3         | 30            | 15      | 35       | 0.12  |
 
-  @REQ-TRQ-007
+  @REQ-CTL-001
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running
     Given a nominal motor plant
     And the plant response is recorded at 5000 Hz for up to 10000 samples
@@ -229,7 +229,7 @@ Feature: FOC Control Performance
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | -0.5   | 40       | 12        | 30            | 6       | 65       | 0.2   |
 
-  @sil @REQ-TRQ-010
+  @sil @REQ-CTL-001
   Scenario: The deadbeat current loop steps from rest to 0.5 A when each duty acts a period late
     Given a bench motor plant
     And the plant applies each duty a period late, as the board does
@@ -249,7 +249,7 @@ Feature: FOC Control Performance
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
-  @sil @REQ-TRQ-011
+  @sil @REQ-CTL-001
   Scenario: The deadbeat current loop holds 0 A at speed when the stored flux linkage is half again too large
     Given a bench motor plant
     And the plant applies each duty a period late, as the board does
@@ -272,7 +272,7 @@ Feature: FOC Control Performance
     And the steady-state current error shall be below 0.02 A
     And the response shall have no dropped samples
 
-  @sil @REQ-TRQ-009
+  @sil @REQ-CTL-001
   Scenario: The bench motor reaches 400 rad/s with two of its three phases readable
     Given a bench motor plant
     And the plant reads its currents through the bench's current-sense chain
@@ -286,7 +286,7 @@ Feature: FOC Control Performance
     And the response is captured for 1500 ms after enable
     Then the steady-state speed error shall be below 0.5 rad/s
 
-  @sil @REQ-TRQ-014
+  @sil @REQ-CTL-001
   Scenario Outline: A held rotor carries the commanded current within 1 % and 5 mA after a 20 mA sensor drift
     Given a bench motor plant
     And the plant response is recorded at 1000 Hz for up to 2000 samples

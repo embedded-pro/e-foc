@@ -564,7 +564,7 @@ stateDiagram-v2
 | Interface                 | Purpose                                                      | Contract                                                                                             |
 |---------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
 | CAN adapter driver        | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)             |
-| Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
+| Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-COM-001, per server) |
 | CAN service client        | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
 | Release feed              | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
 | Firmware packs            | Firmware update                                              | Release assets named as in `service-firmware-upgrade.md` Part J, each with the digest GitHub records |

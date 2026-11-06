@@ -1,7 +1,7 @@
 Feature: Bus-Voltage Limits
   The board's comparators trip at the bus voltages the power stage survives. An operator whose
   motor or supply is rated lower sets a bus-voltage minimum and maximum inside them
-  (REQ-PRT-009): a running drive whose bus, read every 10 ms and filtered with a 50 ms time
+  (REQ-PRO-003): a running drive whose bus, read every 10 ms and filtered with a 50 ms time
   constant, leaves them faults with undervoltage or overvoltage, the codes a comparator trip
   reports. A stopped drive is not watched, so a supply switched off while the drive waits is no
   fault. Each limit is off at 0, its default.
@@ -9,7 +9,7 @@ Feature: Bus-Voltage Limits
   The nominal plant runs from a 40 V bus, so a 45 V minimum and a 35 V maximum each put it
   outside.
 
-  @sil @REQ-PRT-009
+  @sil @REQ-PRO-003
   Scenario Outline: A bus outside the <limit> faults the motor that starts on it
     Given a nominal motor plant
     And the motor is already calibrated
@@ -26,7 +26,7 @@ Feature: Bus-Voltage Limits
       | busVoltageMinimum | 45.0  | undervoltage |
       | busVoltageMaximum | 35.0  | overvoltage  |
 
-  @sil @REQ-PRT-009
+  @sil @REQ-PRO-003
   Scenario: A stopped motor on a bus below the minimum is not faulted
     Given a nominal motor plant
     And the motor is already calibrated
@@ -40,7 +40,7 @@ Feature: Bus-Voltage Limits
     And a torque setpoint of 0.5 A is applied
     Then the state machine shall be in the running state
 
-  @sil @REQ-PRT-009
+  @sil @REQ-PRO-003
   Scenario: A supply that sags below the minimum faults the running motor
     Given a nominal motor plant
     And the supply steps to 0.6 of its voltage 1000 ms after enable
@@ -53,7 +53,7 @@ Feature: Bus-Voltage Limits
     And a speed setpoint of 30 rad/s is applied
     Then the state machine shall report an undervoltage fault
 
-  @sil @REQ-CAN-021
+  @sil @REQ-COM-001
   Scenario: The bus-voltage limits are stored and read back after a restart
     Given a nominal motor plant
     When the target boots

@@ -79,7 +79,7 @@ applied at the time.
 The same samples give the sensors' noise: the RMS over the three phases of each sample's distance from
 its phase's offset. The calibration record stores it in whole milliamperes, and the automatic
 current-loop bandwidth is held where its proportional gain keeps that noise out of earshot
-(`controller-selection.md`, *Automatic bandwidth*; REQ-CTRL-017).
+(`controller-selection.md`, *Automatic bandwidth*; REQ-CTL-006).
 
 One such average is a window. A measurement takes two windows and keeps their mean, offsets and noise
 alike, when every phase agrees within 10 mA. With 35 mA of sample noise two undisturbed windows differ
@@ -198,19 +198,19 @@ sequenceDiagram
 
 Against plants whose phases are biased by +27, −18 and +54 mA with 35 mA of noise, the full
 calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor,
-and an electrical identification over CAN stores them within the same 5 mA (REQ-CAL-015,
+and an electrical identification over CAN stores them within the same 5 mA (REQ-CMS-001,
 `parameter_identification.feature`).
 
 With a phase sensor 20 mA from the offset its calibration record stores, the first Start enables the
-drive; with it 100 mA away the Start is refused and the drive stays Ready (REQ-CAL-022,
+drive; with it 100 mA away the Start is refused and the drive stays Ready (REQ-CMS-003,
 `motor_control.feature`).
 
 The refresh is what keeps the torque current right after a sensor drifts. On the bench current-sense chain, with
 phase A 20 mA from its calibration and the rotor held 90 electrical degrees from its aligned position, where an
 uncorrected phase-A offset lands on the q axis as two thirds of itself, the winding's mean q-axis current over
-1.5 s is within 0.1 mA of a 0, 0.1, 1.0 and 3.0 A command against a limit of 1 % plus 5 mA (REQ-TRQ-014,
+1.5 s is within 0.1 mA of a 0, 0.1, 1.0 and 3.0 A command against a limit of 1 % plus 5 mA (REQ-CTL-001,
 `control_performance.feature`).
 
 In the model in the loop, phase B read 52 mA low for the first 105 ms of the measurement, which covers
 most of the first window. Without the confirmation the stored phase B offset was 49 mA off; with it,
-the first window is outvoted and all three offsets are within 5 mA of the biases (REQ-CAL-015).
+the first window is outvoted and all three offsets are within 5 mA of the biases (REQ-CMS-001).

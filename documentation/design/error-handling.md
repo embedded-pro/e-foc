@@ -76,7 +76,7 @@ definition is empty, and says so: that target does not drive a bridge yet, so th
 
 `PlatformFactory::BoardProtectionStatus()` answers `asserted`, `clear` or `unknown` for the board-protection
 condition, and is what lets the state machine refuse to re-arm a drive whose hardware is still faulted
-(REQ-SM-025, REQ-SM-026). It is a dispatcher-context query — an implementation may read a peripheral status
+(REQ-LCY-003). It is a dispatcher-context query — an implementation may read a peripheral status
 register, but nothing calls it from an interrupt, so it need not be interrupt-safe.
 
 `unknown` is a first-class answer, not a failure. A platform reports it whenever it cannot observe the
@@ -107,7 +107,7 @@ outside the board's overvoltage and undervoltage thresholds (a reading that is n
   on E-FOC-HARDWARE: its shunt returns the low-side current of all three legs, and the sequence converts at the
   counter's zero, where the low sides conduct and that current sums to zero. The phase currents are converted
   at that same instant, where each winding's current crosses its own shunt, so the conversion interrupt checks
-  each of them against the same 6.6 A before handing them on (REQ-EH-014). A sample beyond it cuts the outputs
+  each of them against the same 6.6 A before handing them on. A sample beyond it cuts the outputs
   at once, the way the watchdog's early warning does, and from then on the platform withholds the samples and
   refuses every duty command and start until the bridge is stopped, as the hardware fault latch would. It
   reports the over-current from the event loop, because the state machine's response stops the control loop,
@@ -140,7 +140,7 @@ response to a board-protection fault through the QEMU board protection. The trip
 by review only, and no automated test is planned for them (#487): the TI comparators driving the PWM fault inputs,
 the TI per-sample over-current cut and the NUCLEO-G474RE software checks. Exercising them takes a dedicated rig that
 is out of scope here: a programmable supply driven above 58 V and below 18 V, a way to force a phase current above
-6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (REQ-INT-016) has.
+6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (`integration-testing.md`, *Commands and Verdicts over CAN Only*) has.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
@@ -169,7 +169,7 @@ The fault handler's file therefore defines `abort()` on TI and ST, replacing the
 
 The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
 
-The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-EH-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
+The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-PLT-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
 
 ### Fault history
 
@@ -205,7 +205,7 @@ to and exit from the application callback that executes inside the control inter
 is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
 own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
 control law and PWM write — the work the cycle budget applies to. Hardware ISR entry/exit overhead
-is excluded; REQ-PERF-001 reserves 25% of the control period for that overhead. The measurement is
+is excluded; REQ-PLT-004 reserves 25% of the control period for that overhead. The measurement is
 taken in the platform layer so it is consistent across targets. The emulated target has no cycle
 counter and reads a free-running timer of its instruction-counted clock instead
 ([software-in-the-loop.md](software-in-the-loop.md), Part B3).

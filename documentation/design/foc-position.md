@@ -127,7 +127,7 @@ stateDiagram-v2
 
 A host that sequences moves needs to know when one is done. The drive reports the target reached once the
 position error — the wrapped difference between the setpoint and θm that the loop works on — has stayed
-within the position window for the position-window time (REQ-POS-014). An evaluation on the event loop every
+within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
 1 ms keeps that count, and the error is read again when a host asks: a setpoint the drive has accepted is
 never answered with the previous move's flag, because a target outside the window clears it at once, and the
 count starts over when the rotor arrives.
@@ -149,7 +149,7 @@ stateDiagram-v2
 
 ### Software Position Limits
 
-Machines rely on software travel limits to protect their mechanics (REQ-POS-015). Two stored drive-wide
+Machines rely on software travel limits to protect their mechanics (REQ-CTL-007). Two stored drive-wide
 limits, the position minimum and maximum, bound the travel in the frame the position is measured in: the
 mechanical angle from the alignment zero, in [−π, π). They are off while the minimum is not below the
 maximum, as both are 0 by default. A homing reference, once the drive has one, makes the same limits absolute.
@@ -207,7 +207,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
 | SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
 | Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
-| ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed and position error, for REQ-SM-028. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.       |
+| ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed and position error, for REQ-PRO-005. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.       |
 | Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                 |
 
 ### Required
@@ -223,7 +223,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | Entity              | Field               | Type / Unit              | Range                                    | Notes                                                                            |
 |---------------------|---------------------|--------------------------|------------------------------------------|----------------------------------------------------------------------------------|
 | Position setpoint   | θ_sp                | Radians (float)          | ±2π over CAN                             | Not wrapped, but taken modulo 2π: θ_sp and θ_sp ± 2π are the same target         |
-| Actual position     | θm                  | Radians (float)          | [−π, π)                                  | Mechanical angle from the alignment zero, wrapped by the platform (REQ-POS-013)  |
+| Actual position     | θm                  | Radians (float)          | [−π, π)                                  | Mechanical angle from the alignment zero, wrapped by the platform (REQ-CTL-003)  |
 | Position PID output | ω_sp                | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s                     | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
 | Estimated speed     | ω                   | RadiansPerSecond (float) | computed from Δθ/Δt                      | Finite difference with ±π wrap correction                                        |
 | Speed PID output    | Iq_sp               | Ampere (float)           | ± maxCurrent                             | Written to inner loop                                                            |

@@ -113,7 +113,7 @@ $$
 
 The inner loop may use 4500 of them (75 %); the outer loop 20 000 per millisecond. The rest is for the outer
 loop, the communication interrupts and the event loop, which run only in the time the control interrupt leaves
-(`documentation/requirements/performance/real-time-requirements.yaml`).
+(REQ-PLT-004, `documentation/requirements/platform.yaml`).
 
 The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
 counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a

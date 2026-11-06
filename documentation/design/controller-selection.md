@@ -335,7 +335,7 @@ later bus changes.
 | $I_{q,max}$                   |     For output clamp     |     For output clamp     |        For clamp         | For switching gain sizing |
 
 Deadbeat requires the tightest RLS convergence. Its back-EMF feedforward uses $\psi_f$ when it is
-known, and the voltage it leaves wrong is estimated and removed at the loop's bandwidth (REQ-TRQ-011).
+known, and the voltage it leaves wrong is estimated and removed at the loop's bandwidth (REQ-CTL-001).
 
 Sliding-mode applies the same decoupling feedforward as Decoupled PID, and for the same reason: its
 sliding surface is designed on the decoupled per-axis RL plant, so the cross-coupling and the
@@ -416,7 +416,7 @@ deriving it — the current loop from the PWM rate (a fifteenth of the switching
 loop at 100 rad/s, the position loop at 2π·3 rad/s. The automatic current loop is also held below the
 bandwidth at which its proportional gain, L·ω, turns the current-sensor noise the calibration measured
 into 0.08 V RMS of commanded voltage, and not below 1885 rad/s, ten times the 2π·30 Hz speed bandwidth
-of the tuning record's defaults and so 19 times the automatic speed loop (REQ-CTRL-017). On
+of the tuning record's defaults and so 19 times the automatic speed loop (REQ-CTL-006). On
 the bench board the sense chain carries 38.5 mA RMS of noise; at the PWM-derived 8378 rad/s that
 became 0.40 V of voltage noise and an audible hiss, which was gone at 0.08 V. A record that holds no
 noise measurement keeps the PWM-derived value.
