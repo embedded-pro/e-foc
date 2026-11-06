@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.10
+version: 0.3.11
 component: "service-firmware-upgrade"
 date: 2026-11-05
 ---
@@ -224,9 +224,13 @@ them as the NVM design describes (`service-nvm.md`, version check).
   25 ms after a warning its handler has not cleared. A 16 KB erase takes about 17 ms on the bench and up to
   40 ms with wear, so an erase in the half the application executes from cannot be made safe by splitting
   it. The staging slot and the journal therefore lie entirely in the other half (`bootloader.md` Part A),
-  where their erases run while the core keeps executing. The service still erases one sector per event-loop
-  turn and programs one page at a time, so the node keeps sending its heartbeat while Begin waits for the
-  erase.
+  where their erases run while the core keeps executing. The service erases one sector per event-loop turn
+  and programs one page at a time, so the watchdog's own 100 ms expiry is never approached. Those turns
+  follow each other with nothing else scheduled between them, so from an accepted Begin to its answer the
+  node sends nothing, its heartbeat included: 0.68 s on the EK-TM4C1294XL for the 21 sectors with their
+  read-back. REQ-UPD-015 bounds that silence at 1 s, one heartbeat interval and a third of the 3 s after
+  which a client reports the node offline, and the hardware apply scenario's `[METRIC]` line, Begin to
+  answer, measures it.
 - **Real time.** The drive is stopped while a pack is received, so no PWM depends on the control interrupt
   during a stall. No code is added to the control interrupt or the outer loop.
 
@@ -420,20 +424,20 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint          | Value / Description                                                                                                              |
-|---------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                            |
-| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                            |
-| Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                               |
-| Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                     |
-| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                            |
-| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                         |
-| Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                                        |
-| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download |
-| NVM writes          | refused with `busy` while a pack is received                                                                                     |
-| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                 |
-| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                              |
-| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                 |
+| Constraint          | Value / Description                                                                                                                                              |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                                                            |
+| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                                                            |
+| Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                                                               |
+| Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                                                     |
+| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                                                            |
+| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                                                         |
+| Flash stall         | one sector erase or one page program per event-loop turn; from Begin to its answer the node is silent, 0.68 s on the EK-TM4C1294XL and at most 1 s (REQ-UPD-015) |
+| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download                                 |
+| NVM writes          | refused with `busy` while a pack is received                                                                                                                     |
+| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                                                 |
+| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                                                              |
+| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                                                 |
 
 ---
 

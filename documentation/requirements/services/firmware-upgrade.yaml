@@ -134,3 +134,13 @@
     Verify is answered, as Abort does: the status journal shall stay empty, the interlock of
     REQ-UPD-003 shall be released, and a Begin Upgrade or Verify still unanswered shall be
     answered InvalidState. A staged pack shall stay staged.
+
+- id: REQ-UPD-015
+  title: An accepted Begin Upgrade is answered within one second
+  status: verified
+  verification: [hil]
+  shall: >
+    The motor controller shall answer an accepted Begin Upgrade within 1 s of receiving it, and
+    may send nothing until that answer, its heartbeat included: the erase of the status journal
+    and the staging slot runs to completion first. A client therefore sees a silence of at most
+    one heartbeat interval, a third of the 3 s after which it reports the node offline.
