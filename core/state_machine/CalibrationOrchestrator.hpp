@@ -64,6 +64,7 @@ namespace application
         state_machine::FaultCode lastFailure{ state_machine::FaultCode::calibrationFailed };
 
         services::CalibrationData* pendingData{ nullptr };
+        foc::Radians alignedAt{ 0.0f };
         infra::Function<void(state_machine::CalibrationStep)> onStepChanged;
         infra::AutoResetFunction<void(foc::Radians)> onAlignmentDone;
         infra::AutoResetFunction<void()> onFailed;

@@ -390,7 +390,8 @@
     Enable with calibrationFailed and leave the drive Ready without a rotor reference, so that the
     next Enable searches again; a Disable, an emergency stop or a fault during the search shall
     abandon it, stop the inverter and refuse the Enable. A record without an index angle, or a
-    drive without an index channel, shall boot to Idle as REQ-SM-010 describes. On the bench plant
-    with its encoder reading 1 rad ahead of the rotor at power-up, the first Start in torque mode
-    shall enter Enabled after one search, and the rotor reference it sets shall be within one
-    encoder count of the one the alignment set.
+    drive without an index channel, shall boot to Idle as REQ-SM-010 describes. On the bench plant,
+    with its encoder reading 1 rad ahead of the rotor at power-up and its index one count wide,
+    the first Start in torque mode shall enter Enabled after one search, and with 0.1 A commanded
+    on the q axis the plant's d-axis current shall stay below 10 mA RMS from 100 to 300 ms after
+    enable, where the uncorrected frame drives the rotor backwards.

@@ -331,11 +331,13 @@
     complete the calibration without an index angle, and so shall a drive without an index
     channel, which shall not search. An index angle shall be dropped with the cogging map when the
     pole-pair count is edited. On the bench plant with an index 2.5 rad from the electrical zero
-    the alignment holds, the stored angle shall be within one encoder count of 2.5 rad.
+    and an encoder reading 1 rad ahead of the rotor at power-up, a full calibration in torque mode
+    followed by a restart shall be Ready, and its first Start, which searches the index instead of
+    aligning, shall turn the rotor forward past 20 rad/s within 3 s with 0.1 A on the q axis.
 
 - id: REQ-CAL-027
   title: The index search turns the field at a bounded current
-  status: verified
+  status: implemented
   verification: unit
   shall: >
     The index search shall drive an open-loop voltage vector whose amplitude is computed from

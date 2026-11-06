@@ -232,8 +232,9 @@ namespace application
         config.phaseResistance = foc::Ohm{ pendingData->rPhase };
         config.busVoltage = busVoltage;
 
+        alignedAt = alignedAngle;
         const auto token = runToken;
-        indexSearch->get().Search(config, [this, token, alignedAngle](std::optional<foc::Radians> reading)
+        indexSearch->get().Search(config, [this, token](std::optional<foc::Radians> reading)
             {
                 if (aborted || token != runToken)
                     return;
@@ -246,7 +247,7 @@ namespace application
                 else
                     tracer.Trace() << "[SM] No encoder index found; the rotor must be aligned after every power-up";
 
-                FinishAlignment(alignedAngle);
+                FinishAlignment(alignedAt);
             });
     }
 

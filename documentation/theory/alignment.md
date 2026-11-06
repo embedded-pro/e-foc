@@ -236,14 +236,14 @@ stateDiagram-v2
 
 ## Numerical Properties
 
-| Property            | Value / Condition                                                                       |
-|---------------------|-----------------------------------------------------------------------------------------|
-| Field application   | Single fixed stator field at $\theta_e^{field} = 0$ (§3); no stepping                   |
-| Detection threshold | Position change $< \epsilon_{threshold}$ per check                                      |
-| Consecutive checks  | $M$ samples below threshold before declaring settled                                    |
-| Offset precision    | Limited by encoder resolution (e.g. ±0.5 count)                                         |
-| Torque cost         | The d-axis field produces the synchronising torque of §2; no $i_q$ is commanded         |
-| Worst-case duration | `AlignmentConfig::timeout` (default 2 s), or `maxSamples` samples if that elapses first |
+| Property            | Value / Condition                                                                        |
+|---------------------|------------------------------------------------------------------------------------------|
+| Field application   | Single fixed stator field at $\theta_e^{field} = 0$ (§3); no stepping                    |
+| Detection threshold | Position change $< \epsilon_{threshold}$ per check                                       |
+| Consecutive checks  | $M$ samples below threshold before declaring settled                                     |
+| Offset precision    | Limited by encoder resolution (e.g. ±0.5 count)                                          |
+| Torque cost         | The d-axis field produces the synchronising torque of §2; no $i_q$ is commanded          |
+| Worst-case duration | `AlignmentConfig::timeout` (default 2 s), or `maxSamples` samples if that elapses first  |
 | Index reference     | Index angle $\theta_{idx}$ stored once; restored by one forward pass over the index (§7) |
 
 ---

@@ -31,6 +31,16 @@ WHEN(R"(the motor is enabled)")
         << "Motor did not reach running state after enable";
 }
 
+WHEN(R"(the motor is started from the encoder index)")
+{
+    auto& fixture = context.Get<Fixture>();
+    // The Start is acknowledged once the offsets are measured and the index search has passed the index
+    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId, {}, std::chrono::seconds{ 30 }))
+        << "Start refused: the index search did not restore the rotor reference";
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))
+        << "Motor did not reach running state after the index search";
+}
+
 WHEN(R"(the motor is disabled)")
 {
     auto& fixture = context.Get<Fixture>();
