@@ -232,7 +232,8 @@ namespace can
     {
         calibrate = focCalibrateId,
         clearCalibration = focClearCalibrationId,
-        clearDiagnostics = focClearDiagnosticsId
+        clearDiagnostics = focClearDiagnosticsId,
+        recalibrate = focRecalibrateId
     };
 
     static constexpr uint8_t focParameterAutomaticFlag = 0x01;

@@ -100,7 +100,6 @@ namespace can
         bool SendMaintenanceCommand(uint16_t targetNodeId, FocMaintenanceCommand command);
         bool SendQueryFaultHistory(uint16_t targetNodeId, uint8_t age);
         bool SendClearFaultHistory(uint16_t targetNodeId);
-        bool SendRecalibrate(uint16_t targetNodeId);
 
         ContractCompatibility Compatibility(uint16_t nodeId) const;
 

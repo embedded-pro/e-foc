@@ -227,14 +227,6 @@ namespace can
         return SendCommand(targetNodeId, focClearFaultHistoryId);
     }
 
-    bool FocMotorCategoryClient::SendRecalibrate(uint16_t targetNodeId)
-    {
-        if (contracts.Incompatible(targetNodeId))
-            return false;
-
-        return SendCommand(targetNodeId, focRecalibrateId);
-    }
-
     ContractCompatibility NodeContracts::Of(uint16_t nodeId) const
     {
         for (const auto& contract : contracts)

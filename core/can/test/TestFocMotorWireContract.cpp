@@ -341,7 +341,7 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
     DeliverToServer();
 
     EXPECT_CALL(serverObserver, OnRecalibrate(_));
-    client.SendRecalibrate(1);
+    client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::recalibrate);
     DeliverToServer();
 
     EXPECT_CALL(serverObserver, OnSelectAlgorithm(can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof), _));
@@ -516,6 +516,7 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::calibrate));
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearCalibration));
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearDiagnostics));
+    EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::recalibrate));
 }
 
 TEST_F(FocMotorWireContractTest, an_incompatible_node_does_not_refuse_commands_to_other_nodes)
