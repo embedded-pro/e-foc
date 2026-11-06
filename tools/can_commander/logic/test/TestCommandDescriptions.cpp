@@ -48,6 +48,8 @@ TEST_F(TestCommandDescriptions, names_commissioning_and_settings_commands)
     EXPECT_EQ("Calibrate", CommandDisplayName(can::focMotorCategoryId, can::focCalibrateId));
     EXPECT_EQ("Clear Calibration", CommandDisplayName(can::focMotorCategoryId, can::focClearCalibrationId));
     EXPECT_EQ("Clear Diagnostics", CommandDisplayName(can::focMotorCategoryId, can::focClearDiagnosticsId));
+    EXPECT_EQ("Fault History Query", CommandDisplayName(can::focMotorCategoryId, can::focQueryFaultHistoryId));
+    EXPECT_EQ("Clear Fault History", CommandDisplayName(can::focMotorCategoryId, can::focClearFaultHistoryId));
 }
 
 TEST_F(TestCommandDescriptions, explains_a_design_that_cannot_be_made)

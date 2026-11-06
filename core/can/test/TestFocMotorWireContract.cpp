@@ -86,6 +86,8 @@ namespace
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t, const can::FocAlgorithms&), (override));
         MOCK_METHOD(void, OnParameterResponse, (uint16_t, can::FocParameter, can::FocParameterValue), (override));
+        MOCK_METHOD(void, OnFaultRecordResponse, (uint16_t, uint8_t, can::FocFaultCode, can::FocMotorMode, uint32_t), (override));
+        MOCK_METHOD(void, OnFaultConditionsResponse, (uint16_t, uint8_t, int16_t, foc::Volts, foc::Ampere), (override));
     };
 
     struct FrameOriginStub
@@ -328,6 +330,14 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
 
     EXPECT_CALL(serverObserver, OnEmergencyStop(_));
     client.SendEmergencyStop(1);
+    DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnQueryFaultHistory(3, _));
+    client.SendQueryFaultHistory(1, 3);
+    DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnClearFaultHistory(_));
+    client.SendClearFaultHistory(1);
     DeliverToServer();
 
     EXPECT_CALL(serverObserver, OnRecalibrate(_));
@@ -720,6 +730,16 @@ TEST_F(FocMotorWireContractTest, every_response_golden_vector_reaches_the_client
 
     EXPECT_CALL(clientObserver, OnParameterResponse(1, can::FocParameter::resistance, (can::FocParameterValue{ 0.36f, false })));
     client.HandleMessage(can::focParameterResponseId, Bytes({ 0x40, 0x00, 0x3E, 0xB8, 0x51, 0xEC }));
+
+    EXPECT_CALL(clientObserver, OnFaultRecordResponse(1, 2, can::FocFaultCode::overVoltage, can::FocMotorMode::speed, 1500u));
+    client.HandleMessage(can::focFaultRecordResponseId, Bytes({ 0x02, 0x02, 0x01, 0x00, 0x00, 0x05, 0xDC }));
+
+    EXPECT_CALL(clientObserver, OnFaultConditionsResponse(1, 2, 12, _, _)).WillOnce(Invoke([](uint16_t, uint8_t, int16_t, foc::Volts busVoltage, foc::Ampere peakCurrent)
+        {
+            EXPECT_NEAR(41.23f, busVoltage.Value(), 1e-4f);
+            EXPECT_NEAR(-2.5f, peakCurrent.Value(), 1e-4f);
+        }));
+    client.HandleMessage(can::focFaultConditionsResponseId, Bytes({ 0x02, 0x00, 0x0C, 0x10, 0x1B, 0xFF, 0x06 }));
 }
 
 TEST_F(FocMotorWireContractTest, an_algorithms_response_naming_no_algorithm_is_dropped)

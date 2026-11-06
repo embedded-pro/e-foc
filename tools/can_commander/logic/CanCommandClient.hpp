@@ -60,6 +60,7 @@ namespace tool
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
         virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
         virtual void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) = 0;
+        virtual void OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record) = 0;
     };
 
     class CanCommandClient
@@ -85,6 +86,7 @@ namespace tool
         static constexpr uint8_t thermalContractMinor{ 13 };
         static constexpr uint8_t overTemperatureContractMinor{ 14 };
         static constexpr uint8_t busVoltageLimitsContractMinor{ 15 };
+        static constexpr uint8_t faultHistoryContractMinor{ 16 };
         static constexpr uint8_t recalibrationContractMinor{ 17 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
@@ -104,6 +106,7 @@ namespace tool
         bool SupportsThermal(uint16_t nodeId) const;
         bool SupportsOverTemperature(uint16_t nodeId) const;
         bool SupportsBusVoltageLimits(uint16_t nodeId) const;
+        bool SupportsFaultHistory(uint16_t nodeId) const;
         bool SupportsRecalibration(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
@@ -125,6 +128,7 @@ namespace tool
         bool SendCalibrate(uint16_t nodeId);
         bool SendClearCalibration(uint16_t nodeId);
         bool SendClearDiagnostics(uint16_t nodeId);
+        bool SendClearFaultHistory(uint16_t nodeId);
         bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
         bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);
@@ -134,6 +138,7 @@ namespace tool
         void RequestReadings(uint16_t nodeId);
         void RequestStatus(uint16_t nodeId);
         void RequestFirmwareIdentity(uint16_t nodeId);
+        void RequestFaultHistory(uint16_t nodeId);
 
         services::FirmwareUpgradeCategoryClient& FirmwareUpgrade();
         const can::CanFrameOrigin& FrameOrigin() const;
@@ -150,6 +155,7 @@ namespace tool
         {
             uint8_t commandType{ 0 };
             can::FocParameter parameter{ can::FocParameter::currentBandwidth };
+            uint8_t age{ 0 };
         };
 
         struct NodeReads
@@ -203,6 +209,8 @@ namespace tool
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
+        void OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs) override;
+        void OnFaultConditionsResponse(uint16_t nodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent) override;
 
         // services::CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) override;
@@ -218,6 +226,7 @@ namespace tool
         std::map<uint16_t, NodeReads> reads;
         std::map<uint16_t, uint8_t> contractMinors;
         std::map<uint16_t, PartialIdentity> identities;
+        std::map<uint16_t, can::FocFaultRecord> faultRecords;
         std::set<uint16_t> onlineNodes;
         infra::TimerRepeating statusRefresh;
     };

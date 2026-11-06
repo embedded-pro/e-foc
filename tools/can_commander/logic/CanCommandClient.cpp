@@ -139,6 +139,11 @@ namespace tool
         return SupportsMinor(nodeId, busVoltageLimitsContractMinor);
     }
 
+    bool CanCommandClient::SupportsFaultHistory(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, faultHistoryContractMinor);
+    }
+
     bool CanCommandClient::SupportsRecalibration(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, recalibrationContractMinor);
@@ -380,6 +385,14 @@ namespace tool
             });
     }
 
+    bool CanCommandClient::SendClearFaultHistory(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focClearFaultHistoryId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendClearFaultHistory(nodeId);
+            });
+    }
+
     bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
     {
         return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
@@ -428,6 +441,15 @@ namespace tool
         for (const auto& descriptor : can::focParameters)
             if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && SupportsSetting(nodeId, descriptor.id))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+    }
+
+    void CanCommandClient::RequestFaultHistory(uint16_t nodeId)
+    {
+        if (!SupportsFaultHistory(nodeId))
+            return;
+
+        for (uint8_t age = 0; age != can::focFaultHistoryDepth; ++age)
+            QueueRead(nodeId, Read{ .commandType = can::focQueryFaultHistoryId, .age = age });
     }
 
     void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
@@ -515,7 +537,7 @@ namespace tool
         auto& node = reads[nodeId];
         const auto queued = std::ranges::any_of(node.queued, [&read](const Read& other)
             {
-                return other.commandType == read.commandType && other.parameter == read.parameter;
+                return other.commandType == read.commandType && other.parameter == read.parameter && other.age == read.age;
             });
 
         if (!queued)
@@ -555,6 +577,8 @@ namespace tool
                 return category.SendQueryAlgorithms(nodeId);
             case can::focQueryParameterId:
                 return category.SendQueryParameter(nodeId, read.parameter);
+            case can::focQueryFaultHistoryId:
+                return category.SendQueryFaultHistory(nodeId, read.age);
             default:
                 return category.SendRequestTelemetry(nodeId);
         }
@@ -575,6 +599,7 @@ namespace tool
     {
         const auto node = reads.find(nodeId);
         identities.erase(nodeId);
+        faultRecords.erase(nodeId);
         if (node == reads.end())
             return;
 
@@ -585,7 +610,8 @@ namespace tool
 
     bool CanCommandClient::IsRead(uint8_t commandType)
     {
-        return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId;
+        return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId ||
+               commandType == can::focQueryFaultHistoryId;
     }
 
     void CanCommandClient::OnAccepted(uint16_t nodeId, uint8_t commandType)
@@ -605,6 +631,9 @@ namespace tool
                 break;
             case can::focClearDiagnosticsId:
                 RequestReadings(nodeId);
+                break;
+            case can::focClearFaultHistoryId:
+                RequestFaultHistory(nodeId);
                 break;
             default:
                 break;
@@ -706,6 +735,7 @@ namespace tool
 
         RequestSettings(nodeId);
         RequestReadings(nodeId);
+        RequestFaultHistory(nodeId);
         RequestFirmwareIdentity(nodeId);
         RequestStatus(nodeId);
     }
@@ -733,6 +763,28 @@ namespace tool
                 observer.OnParameterReceived(nodeId, parameter, value);
             });
         CollectIdentity(nodeId, parameter, value.value);
+    }
+
+    void CanCommandClient::OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs)
+    {
+        faultRecords[nodeId] = can::FocFaultRecord{ .age = age, .code = code, .mode = mode, .uptimeMs = uptimeMs };
+    }
+
+    void CanCommandClient::OnFaultConditionsResponse(uint16_t nodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent)
+    {
+        const auto partial = faultRecords.find(nodeId);
+        if (partial == faultRecords.end() || partial->second.age != age)
+            return;
+
+        auto record = partial->second;
+        faultRecords.erase(partial);
+        record.powerUp = powerUp;
+        record.busVoltage = busVoltage;
+        record.peakCurrent = peakCurrent;
+        NotifyObservers([nodeId, &record](auto& observer)
+            {
+                observer.OnFaultRecordReceived(nodeId, record);
+            });
     }
 
     void CanCommandClient::DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const

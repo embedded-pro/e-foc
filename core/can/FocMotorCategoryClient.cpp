@@ -11,7 +11,7 @@ namespace can
         , origin(origin)
     {
         AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryCurrents, contractVersionResponse,
-            electricalParamsResponse, algorithmsResponse, parameterResponse);
+            electricalParamsResponse, algorithmsResponse, parameterResponse, faultRecordResponse, faultConditionsResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -209,6 +209,24 @@ namespace can
         return SendCommand(targetNodeId, focQueryParameterId, payload);
     }
 
+    bool FocMotorCategoryClient::SendQueryFaultHistory(uint16_t targetNodeId, uint8_t age)
+    {
+        if (contracts.Incompatible(targetNodeId))
+            return false;
+
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(age);
+        return SendCommand(targetNodeId, focQueryFaultHistoryId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendClearFaultHistory(uint16_t targetNodeId)
+    {
+        if (contracts.Incompatible(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focClearFaultHistoryId);
+    }
+
     bool FocMotorCategoryClient::SendRecalibrate(uint16_t targetNodeId)
     {
         if (contracts.Incompatible(targetNodeId))
@@ -402,6 +420,47 @@ namespace can
         NotifyObservers([source = origin.SourceNodeId(), parameter = descriptor->id, held](auto& observer)
             {
                 observer.OnParameterResponse(source, parameter, held);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleFaultRecordResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focFaultRecordResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto age = reader.ReadUInt8();
+        const auto code = static_cast<FocFaultCode>(reader.ReadUInt8());
+        const auto mode = reader.ReadUInt8();
+        const auto uptimeMs = reader.ReadUInt32();
+
+        if (mode > static_cast<uint8_t>(FocMotorMode::position))
+            return false;
+
+        NotifyObservers([source = origin.SourceNodeId(), age, code, mode = static_cast<FocMotorMode>(mode), uptimeMs](auto& observer)
+            {
+                observer.OnFaultRecordResponse(source, age, code, mode, uptimeMs);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleFaultConditionsResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focFaultConditionsResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto age = reader.ReadUInt8();
+        const auto powerUp = reader.ReadInt16();
+        const foc::Volts busVoltage{ reader.ReadFixed16(focRecordedVoltageScale) };
+        const foc::Ampere peakCurrent{ reader.ReadFixed16(focRecordedCurrentScale) };
+
+        NotifyObservers([source = origin.SourceNodeId(), age, powerUp, busVoltage, peakCurrent](auto& observer)
+            {
+                observer.OnFaultConditionsResponse(source, age, powerUp, busVoltage, peakCurrent);
             });
 
         return true;

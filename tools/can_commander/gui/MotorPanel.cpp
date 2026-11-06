@@ -290,13 +290,32 @@ namespace tool
             });
     }
 
+    void MotorPanel::ConfirmClearFaultHistory()
+    {
+        QMessageBox box(QMessageBox::Warning, "Clear Fault History",
+            QString("Delete every fault recorded in %1? The records cannot be read back afterwards.").arg(Title()),
+            QMessageBox::Cancel, this);
+        const auto* clear = box.addButton("Clear Fault History", QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != clear)
+            return;
+
+        Send("Clear Fault History", can::focClearFaultHistoryId, [this]()
+            {
+                return client.SendClearFaultHistory(nodeId);
+            });
+    }
+
     void MotorPanel::ConnectDiagnostics()
     {
         auto& tab = commandPanel->Diagnostics();
         connect(&tab, &DiagnosticsTab::RefreshRequested, this, [this]()
             {
                 client.RequestReadings(nodeId);
+                client.RequestFaultHistory(nodeId);
             });
+        connect(&tab, &DiagnosticsTab::ClearFaultHistoryRequested, this, &MotorPanel::ConfirmClearFaultHistory);
         connect(&tab, &DiagnosticsTab::ClearStatisticsRequested, this, [this]()
             {
                 Send("Clear Diagnostics", can::focClearDiagnosticsId, [this]()
@@ -559,6 +578,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::FaultHistoryUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsFaultHistory(nodeId))
+            return QString("Needs firmware contract 2.16 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -567,6 +593,7 @@ namespace tool
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
+        commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason.isEmpty() ? FaultHistoryUnavailableReason() : commandsReason);
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
@@ -743,7 +770,10 @@ namespace tool
         if (lastFault != fault)
         {
             if (fault != FocFaultCode::none)
+            {
                 Report(IssueSeverity::error, QString("fault: %1").arg(TelemetryPanel::FaultCodeName(fault)));
+                client.RequestFaultHistory(nodeId);
+            }
             else if (lastFault.has_value())
                 Report(IssueSeverity::info, "fault cleared");
         }
@@ -788,6 +818,11 @@ namespace tool
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
         if (parameter == can::FocParameter::windingTemperature)
             telemetryPanel->OnWindingTemperature(value.value);
+    }
+
+    void MotorPanel::OnFaultRecord(const can::FocFaultRecord& record)
+    {
+        commandPanel->Diagnostics().ShowFaultRecord(record);
     }
 
     void MotorPanel::OfferRecovery(uint8_t commandType, Refusal refusal)

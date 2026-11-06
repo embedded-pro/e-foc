@@ -64,6 +64,7 @@ namespace tool
         void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
         void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) override;
+        void OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record) override;
 
         void OnTransferProgress(uint16_t nodeId, const TransferProgress& progress) override;
         void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) override;

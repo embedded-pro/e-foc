@@ -47,6 +47,8 @@ namespace can
     static constexpr uint8_t focFaultRecordResponseId = 0x9B;
     static constexpr uint8_t focFaultConditionsResponseId = 0x9C;
 
+    static constexpr uint8_t focFaultHistoryDepth = 8;
+
     enum class FocMotorMode : uint8_t
     {
         torque = 0,
