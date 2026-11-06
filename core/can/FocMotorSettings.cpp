@@ -1,4 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
+#include <cmath>
 #include <optional>
 
 namespace can
@@ -32,6 +33,12 @@ namespace can
                 case FocParameter::estimatedInductance:
                 case FocParameter::estimatedInertia:
                 case FocParameter::estimatedViscousFriction:
+                case FocParameter::modelResistance:
+                case FocParameter::modelInductance:
+                case FocParameter::modelInertia:
+                case FocParameter::modelViscousFriction:
+                case FocParameter::recalibrationsApplied:
+                case FocParameter::recalibrationsRejected:
                     return ParameterGroup::onlineEstimate;
                 case FocParameter::loopSamples:
                 case FocParameter::loopBudgetCycles:
@@ -106,6 +113,7 @@ namespace can
             case FocParameter::supervisionPositionError:
             case FocParameter::supervisionStillExcursion:
             case FocParameter::stallDetection:
+            case FocParameter::recalibrationMode:
                 return ParameterGroup::supervision;
             case FocParameter::overspeedLimit:
             case FocParameter::followingErrorWindow:
@@ -271,6 +279,8 @@ namespace can
                 return config.supervision.stillExcursion;
             case FocParameter::stallDetection:
                 return config.stallDetection != 0 ? 1.0f : 0.0f;
+            case FocParameter::recalibrationMode:
+                return static_cast<float>(config.recalibrationMode);
             default:
                 return config.supervision.window;
         }
@@ -294,6 +304,9 @@ namespace can
                 break;
             case FocParameter::stallDetection:
                 config.stallDetection = value != 0.0f ? 1 : 0;
+                break;
+            case FocParameter::recalibrationMode:
+                config.recalibrationMode = static_cast<uint8_t>(std::lround(value));
                 break;
             default:
                 config.supervision.window = value;

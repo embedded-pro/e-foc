@@ -8,6 +8,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "core/state_machine/Recalibration.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include <optional>
 
@@ -28,7 +29,8 @@ namespace application
         ~OuterLoopStateMachine() = default;
 
     public:
-        state_machine::AppliedEstimates ApplyOnlineEstimates() override;
+        // Redesigns the current and speed loops from the model; refused unless the drive is stopped.
+        bool ApplyModel(const state_machine::MotorModel& model);
         std::optional<state_machine::OnlineEstimates> CurrentOnlineEstimates() override;
         void TraceOnlineEstimates();
         float AutomaticSpeedLoopBandwidth() const;

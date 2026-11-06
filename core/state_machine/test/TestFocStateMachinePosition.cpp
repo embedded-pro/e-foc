@@ -2065,49 +2065,6 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_failure_callback_af
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_does_not_change_state_when_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithPositionGains();
-    auto sm = CreatePositionStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_is_ignored_when_not_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithPositionGains();
-    auto sm = CreatePositionStateMachine();
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachinePositionAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithPositionGains();
-    auto sm = CreatePositionAutoStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
 namespace
 {
     // Position mode shares the outer-loop calibration path with speed mode; this double proves the shared

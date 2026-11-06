@@ -71,6 +71,7 @@ namespace
         MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnQueryFaultHistory, (uint8_t, (const infra::Function<void(const can::FocFaultRecord&)>&)), (override));
         MOCK_METHOD(void, OnClearFaultHistory, ((const infra::Function<void(bool)>&)), (override));
+        MOCK_METHOD(void, OnRecalibrate, ((const infra::Function<void()>&)), (override));
     };
 
     class FocMotorCategoryServerTest
@@ -734,4 +735,24 @@ TEST_F(FocMotorCategoryServerTest, HandleClearFaultHistory_ThatIsNotStored_Repor
     EXPECT_EQ(can::FocMotorCategoryError::persistenceFailed, lastCategoryError);
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(services::CanAckStatus::categoryError, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleRecalibrate_AcknowledgesOnceAccepted)
+{
+    EXPECT_CALL(observer, OnRecalibrate(_))
+        .WillOnce(Invoke([](const infra::Function<void()>& onAccepted)
+            {
+                onAccepted();
+            }));
+
+    server.HandleMessage(can::focRecalibrateId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(can::focRecalibrateId, ackSpy.last->commandType);
+    EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleRecalibrate_WithAPayload_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focRecalibrateId, MakeMessage({ 0x01, 0x00 })));
 }

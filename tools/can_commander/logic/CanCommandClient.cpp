@@ -14,6 +14,13 @@ namespace tool
 
     namespace
     {
+        bool IsRecalibrationParameter(can::FocParameter parameter)
+        {
+            const auto id = static_cast<uint8_t>(parameter);
+            return parameter == can::FocParameter::recalibrationMode ||
+                   (id >= static_cast<uint8_t>(can::FocParameter::modelResistance) && id <= static_cast<uint8_t>(can::FocParameter::recalibrationsRejected));
+        }
+
         constexpr std::array<can::FocParameter, 7> identityParameters{
             can::FocParameter::firmwareVersionMajor,
             can::FocParameter::firmwareVersionMinor,
@@ -137,6 +144,11 @@ namespace tool
         return SupportsMinor(nodeId, faultHistoryContractMinor);
     }
 
+    bool CanCommandClient::SupportsRecalibration(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, recalibrationContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -165,6 +177,8 @@ namespace tool
             return SupportsOverTemperature(nodeId);
         if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
             return SupportsBusVoltageLimits(nodeId);
+        if (IsRecalibrationParameter(parameter))
+            return SupportsRecalibration(nodeId);
 
         switch (can::GroupOf(parameter))
         {
@@ -425,7 +439,7 @@ namespace tool
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature)
+            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && SupportsSetting(nodeId, descriptor.id))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 

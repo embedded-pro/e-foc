@@ -2,9 +2,9 @@
 title: "Runtime Controller Selection"
 type: design
 status: accepted
-version: 0.4.2
+version: 0.5.0
 component: "controller-selection"
-date: 2026-10-30
+date: 2026-11-06
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
 | Status    | accepted                     |
-| Version   | 0.4.2                        |
+| Version   | 0.5.0                        |
 | Component | controller-selection         |
-| Date      | 2026-10-30                   |
+| Date      | 2026-11-06                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -451,7 +451,8 @@ were never touched therefore runs exactly the loops it ran before the settings e
 the configuration record (`service-nvm.md`) and restored at boot. They are written into the
 running controllers whenever the active mode reaches `Ready` — after the selection restore of
 Part I — and whenever a setting or a motor parameter changes while it is stopped, because applying
-a motor model re-derives the tunings from it. Calibration in progress keeps the bandwidths its own
+a motor model re-derives the tunings from it. An online recalibration (`online-recalibration.md`) applies a motor
+model the same way and writes them again after it, so the bandwidths it keeps are the operator's. Calibration in progress keeps the bandwidths its own
 identification steps need; the operator's record returns with the `Ready` that ends it. A setting
 is validated against the active algorithm before it is stored: a position LQR or LQI design that
 does not converge, or a switching gain at or above the boundary layer, is refused and leaves the

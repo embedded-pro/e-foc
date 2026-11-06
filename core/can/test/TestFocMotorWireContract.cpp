@@ -69,6 +69,7 @@ namespace
         MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnQueryFaultHistory, (uint8_t, (const infra::Function<void(const can::FocFaultRecord&)>&)), (override));
         MOCK_METHOD(void, OnClearFaultHistory, ((const infra::Function<void(bool)>&)), (override));
+        MOCK_METHOD(void, OnRecalibrate, ((const infra::Function<void()>&)), (override));
     };
 
     class ContractClientObserver
@@ -339,6 +340,10 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
     client.SendClearFaultHistory(1);
     DeliverToServer();
 
+    EXPECT_CALL(serverObserver, OnRecalibrate(_));
+    client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::recalibrate);
+    DeliverToServer();
+
     EXPECT_CALL(serverObserver, OnSelectAlgorithm(can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof), _));
     client.SendSelectAlgorithm(1, can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof));
     DeliverToServer();
@@ -411,10 +416,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_16)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_17)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(16, can::focContractVersionMinor);
+    EXPECT_EQ(17, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
@@ -511,6 +516,7 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::calibrate));
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearCalibration));
     EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::clearDiagnostics));
+    EXPECT_FALSE(client.SendMaintenanceCommand(1, can::FocMaintenanceCommand::recalibrate));
 }
 
 TEST_F(FocMotorWireContractTest, an_incompatible_node_does_not_refuse_commands_to_other_nodes)
@@ -605,6 +611,7 @@ namespace
             { can::focClearDiagnosticsId, { 0x00 } },
             { can::focQueryFaultHistoryId, { 0x00, 0x02 } },
             { can::focClearFaultHistoryId, { 0x00 } },
+            { can::focRecalibrateId, { 0x00 } },
 
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
@@ -685,6 +692,7 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnClearDiagnostics(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnQueryFaultHistory(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnClearFaultHistory(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnRecalibrate(_)).Times(AnyNumber());
 
     for (const auto& descriptor : can::focMotorMessages)
     {

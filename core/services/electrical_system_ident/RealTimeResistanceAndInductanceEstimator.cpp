@@ -75,6 +75,12 @@ namespace services
 
         currentResistance = foc::Ohm{ resistance };
         currentInductance = foc::MilliHenry{ inductance };
+        settled = true;
+    }
+
+    bool RealTimeResistanceAndInductanceEstimator::HasSettled() const
+    {
+        return settled;
     }
 
     void RealTimeResistanceAndInductanceEstimator::Seed(foc::Ohm resistance, foc::MilliHenry inductance)
@@ -88,6 +94,7 @@ namespace services
 
         primed = false;
         following = true;
+        settled = false;
         updates = 0;
     }
 

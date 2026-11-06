@@ -64,6 +64,7 @@ namespace integration
         response::PlantTrace trace;
         IdentifiedParameters identified;
         IdentifiedParameters online;
+        IdentifiedParameters inUse;
         std::vector<StreamedCurrent> streamedCurrents;
         FirmwareDownload download;
     };

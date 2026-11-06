@@ -106,42 +106,22 @@ namespace application
             GetOnlineElecEstimator().CurrentResistance(),
             GetOnlineElecEstimator().CurrentInductance(),
             GetOnlineMechEstimator().CurrentInertia(),
-            GetOnlineMechEstimator().CurrentFriction()
+            GetOnlineMechEstimator().CurrentFriction(),
+            GetOnlineElecEstimator().HasSettled(),
+            GetOnlineMechEstimator().HasSettled()
         };
     }
 
-    state_machine::AppliedEstimates OuterLoopStateMachine::ApplyOnlineEstimates()
+    bool OuterLoopStateMachine::ApplyModel(const state_machine::MotorModel& model)
     {
-        state_machine::AppliedEstimates applied;
-        if (!std::holds_alternative<state_machine::Enabled>(CurrentState()))
-            return applied;
+        if (!state_machine::IsStopped(CurrentState()))
+            return false;
 
-        const auto inertia = GetOnlineMechEstimator().CurrentInertia();
-        const auto friction = GetOnlineMechEstimator().CurrentFriction();
-
-        if (!std::isfinite(inertia.Value()) || inertia.Value() <= 0.0f ||
-            !std::isfinite(friction.Value()) || friction.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping mechanical estimates: non-physical values (J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value()) << ")";
-        else
-        {
-            GetTracer().Trace() << "[SM] Applying mechanical estimates: J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value());
-            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec, TorqueConstantFor(GetCalibration()));
-            applied.mechanics = true;
-        }
-
-        const auto resistance = GetOnlineElecEstimator().CurrentResistance();
-        const auto inductance = GetOnlineElecEstimator().CurrentInductance();
-        if (!std::isfinite(resistance.Value()) || resistance.Value() <= 0.0f ||
-            !std::isfinite(inductance.Value()) || inductance.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping electrical estimates: non-physical values (R=" << resistance.Value() << " L_mH=" << inductance.Value() << ")";
-        else
-        {
-            GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L_mH=" << inductance.Value();
-            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()), foc::Ampere{ services::CurrentNoiseAmpere(GetCalibration().currentNoiseMilliAmpere) });
-            applied.electrical = true;
-        }
-
-        return applied;
+        const auto& calibration = GetCalibration();
+        ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, TorqueConstantFor(calibration));
+        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, calibration.currentLoopBandwidth, EffectiveFluxLinkage(calibration),
+            foc::Ampere{ services::CurrentNoiseAmpere(calibration.currentNoiseMilliAmpere) });
+        return true;
     }
 
     void OuterLoopStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)

@@ -234,7 +234,7 @@ TEST(FocMotorSettings, every_supervision_setting_reads_back_what_was_written)
     }
 }
 
-TEST(FocMotorSettings, the_six_supervision_settings_form_their_own_group)
+TEST(FocMotorSettings, the_seven_drive_wide_supervision_settings_form_their_own_group)
 {
     std::size_t supervision{ 0 };
     for (const auto& descriptor : can::focParameters)
@@ -245,7 +245,7 @@ TEST(FocMotorSettings, the_six_supervision_settings_form_their_own_group)
             EXPECT_FALSE(descriptor.readOnly) << descriptor.name;
         }
 
-    EXPECT_EQ(supervision, 6u);
+    EXPECT_EQ(supervision, 7u);
 }
 
 TEST(FocMotorSettings, only_the_three_bandwidths_are_bandwidths)

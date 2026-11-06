@@ -352,3 +352,28 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_direction_held_only_where_the_
     EXPECT_GT(production.CurrentFriction().Value(), 0.5f * rotor.friction);
     EXPECT_LT(production.CurrentFriction().Value(), 1.05f * rotor.friction);
 }
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, an_estimate_is_settled_once_published_and_no_longer_after_a_new_seed)
+{
+    const ReferenceRotor rotor;
+    estimator.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+    EXPECT_FALSE(estimator.HasSettled());
+
+    WindowedRotorRun{ rotor, estimator }.Run(26.0f, 52.0f, 250, 6000);
+    EXPECT_TRUE(estimator.HasSettled());
+
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ rotor.inertia }, foc::NewtonMeterSecondPerRadian{ rotor.friction });
+    EXPECT_FALSE(estimator.HasSettled());
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_leaves_the_estimate_unsettled)
+{
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 5000; ++sample)
+        estimator.Update(SteadyWindow(0.5f, speed.Value(), sample == 0));
+
+    EXPECT_FALSE(estimator.HasSettled());
+}

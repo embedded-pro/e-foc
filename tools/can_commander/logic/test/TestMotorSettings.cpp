@@ -111,7 +111,9 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(BusVoltageSettings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(StatusReadings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + LimitSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + Readings().size() + StatusReadings().size());
+    EXPECT_TRUE(std::ranges::none_of(RecalibrationSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::all_of(RecalibrationReadings(), readOnly));
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + LimitSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + Readings().size() + StatusReadings().size() + RecalibrationSettings().size() + RecalibrationReadings().size());
 }
 
 TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)

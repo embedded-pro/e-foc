@@ -2,9 +2,9 @@
 title: "Service: Command-Line Interface (CLI)"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-cli
-date: 2026-04-07
+date: 2026-11-06
 ---
 
 | Field     | Value                                 |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Command-Line Interface (CLI) |
 | Type      | design                                |
 | Status    | draft                                 |
-| Version   | 0.1.0                                 |
+| Version   | 0.2.0                                 |
 | Component | service-cli                           |
-| Date      | 2026-04-07                            |
+| Date      | 2026-11-06                            |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -70,16 +70,16 @@ classDiagram
 
 #### Lifecycle Commands
 
-| Command           | Alias | Arguments | Action                                         |
-|-------------------|-------|-----------|------------------------------------------------|
-| `calibrate`       | `cal` | —         | Runs the calibration sequence                  |
-| `enable`          | `en`  | —         | Enables the motor; rejected outside `Ready`    |
-| `disable`         | `dis` | —         | Disables the motor                             |
-| `clear_fault`     | `cf`  | —         | Clears a latched fault                         |
-| `clear_cal`       | `cc`  | —         | Invalidates stored calibration                 |
-| `active_mode`     | `am`  | —         | Prints the active control mode                 |
-| `apply_estimates` | `ae`  | —         | Applies the online estimates to the loop gains |
-| `estimate_status` | `es`  | —         | Prints the current online estimates            |
+| Command           | Alias | Arguments | Action                                                 |
+|-------------------|-------|-----------|--------------------------------------------------------|
+| `calibrate`       | `cal` | —         | Runs the calibration sequence                          |
+| `enable`          | `en`  | —         | Enables the motor; rejected outside `Ready`            |
+| `disable`         | `dis` | —         | Disables the motor                                     |
+| `clear_fault`     | `cf`  | —         | Clears a latched fault                                 |
+| `clear_cal`       | `cc`  | —         | Invalidates stored calibration                         |
+| `active_mode`     | `am`  | —         | Prints the active control mode                         |
+| `apply_estimates` | `ae`  | —         | Recalibrates while stopped (`online-recalibration.md`) |
+| `estimate_status` | `es`  | —         | Prints the current online estimates                    |
 
 #### Algorithm Selection
 

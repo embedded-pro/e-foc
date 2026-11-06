@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 73> presentations{ {
+        constexpr std::array<SettingPresentation, 80> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -133,6 +133,13 @@ namespace tool
             { FocParameter::windingTemperature, "Winding temperature", "Winding temperature:", " \xC2\xB0"
                                                                                                "C",
                 "Winding temperature inferred from the online resistance estimate in speed and position mode; unknown in torque mode and without a calibration. Read with every status, from firmware contract 2.13.", {} },
+            { FocParameter::recalibrationMode, "Online recalibration", "Recalibration:", {}, "When settled online estimates may replace the model the loops are designed from: 0 never, 1 on a Recalibrate command, 2 at every stop. From firmware contract 2.17.", {} },
+            { FocParameter::modelResistance, "Resistance in use", "Resistance:", ohm, "Resistance the current loop is designed from; the calibration record's until a recalibration.", {} },
+            { FocParameter::modelInductance, "Inductance in use", "Inductance:", " mH", "Inductance the current loop is designed from; the calibration record's until a recalibration.", {} },
+            { FocParameter::modelInertia, "Inertia in use", "Inertia:", kilogramSquareMetre, "Inertia the speed loop is designed from; the calibration record's until a recalibration.", {} },
+            { FocParameter::modelViscousFriction, "Viscous friction in use", "Viscous friction:", frictionUnit, "Viscous friction the speed loop is designed from; the calibration record's until a recalibration.", {} },
+            { FocParameter::recalibrationsApplied, "Recalibrations applied", "Applied:", {}, "Quantities recalibrated since power-up.", {} },
+            { FocParameter::recalibrationsRejected, "Recalibrations rejected", "Rejected:", {}, "Settled readings outside their plausibility band since power-up.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -344,6 +351,16 @@ namespace tool
     std::span<const SettingPresentation> StatusReadings()
     {
         return Slice(71, 2);
+    }
+
+    std::span<const SettingPresentation> RecalibrationSettings()
+    {
+        return Slice(73, 1);
+    }
+
+    std::span<const SettingPresentation> RecalibrationReadings()
+    {
+        return Slice(74, 6);
     }
 
     namespace

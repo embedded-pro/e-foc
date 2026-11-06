@@ -1054,50 +1054,29 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_failure_callback_after_
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state_when_enabled)
+TEST_F(FocStateMachineSpeedCliTest, a_model_is_refused_while_the_drive_runs)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
     AlignAfterBoot(sm);
-
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 
-    const auto applied = sm.ApplyOnlineEstimates();
-
+    EXPECT_FALSE(sm.ApplyModel(state_machine::MotorModel{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::NewtonMeterSecondSquared{ 2.0e-5f }, foc::NewtonMeterSecondPerRadian{ 1.0e-5f } }));
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-    EXPECT_TRUE(applied.electrical);
-    EXPECT_FALSE(applied.mechanics);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_is_ignored_when_not_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedStateMachine();
-
-    const auto applied = sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-    EXPECT_FALSE(applied.mechanics);
-    EXPECT_FALSE(applied.electrical);
-}
-
-TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enabled)
+TEST_F(FocStateMachineSpeedCliTest, a_model_is_applied_while_the_drive_is_stopped)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
     AlignAfterBoot(sm);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    communication.dataReceived(infra::MakeStringByteRange("ae\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_TRUE(sm.ApplyModel(state_machine::MotorModel{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::NewtonMeterSecondSquared{ 2.0e-5f }, foc::NewtonMeterSecondPerRadian{ 1.0e-5f } }));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 namespace
@@ -2192,38 +2171,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_physical_values)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGainsAndInertia();
-    auto sm = CreateSpeedStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_crash_when_called_while_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
 TEST_F(FocStateMachineSpeedCliTest, nvm_zero_resistance_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
@@ -2433,22 +2380,6 @@ TEST_F(FocStateMachineSpeedCliTest, reserve_external_calibration_is_rejected_whi
 
     EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
     EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::rejected);
-}
-
-TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedAutoStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_mech_ident_is_running)

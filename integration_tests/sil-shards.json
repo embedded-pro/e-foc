@@ -18,6 +18,7 @@
       "integration_tests/features/identification_robustness.feature",
       "integration_tests/features/motor_disconnected.feature",
       "integration_tests/features/nvm_integrity.feature",
+      "integration_tests/features/online_recalibration.feature",
       "integration_tests/features/plant_characteristics.feature",
       "integration_tests/features/position_travel.feature",
       "integration_tests/features/supply_limits.feature"

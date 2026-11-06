@@ -73,6 +73,8 @@ namespace tool
     std::span<const SettingPresentation> BusVoltageSettings();
     std::span<const SettingPresentation> Readings();
     std::span<const SettingPresentation> StatusReadings();
+    std::span<const SettingPresentation> RecalibrationSettings();
+    std::span<const SettingPresentation> RecalibrationReadings();
     std::string_view ResetCauseName(float cause);
     std::string_view BoardKindName(float kind);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);

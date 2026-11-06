@@ -39,6 +39,7 @@ namespace services
     {
         currentInertia = inertia;
         currentFriction = friction;
+        settled = false;
         ReseedOnline();
     }
 
@@ -126,6 +127,12 @@ namespace services
 
         currentInertia = foc::NewtonMeterSecondSquared{ inertia };
         currentFriction = foc::NewtonMeterSecondPerRadian{ friction };
+        settled = true;
+    }
+
+    bool RealTimeFrictionAndInertiaEstimator::HasSettled() const
+    {
+        return settled;
     }
 
     // Viscous friction is the same both ways, so the slope is pooled over both directions' runs.

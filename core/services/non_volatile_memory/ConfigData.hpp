@@ -63,6 +63,13 @@ namespace services
         float busVoltageMaximum = 0.0f;
     };
 
+    enum class RecalibrationMode : uint8_t
+    {
+        off = 0,
+        onCommand = 1,
+        automatic = 2
+    };
+
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
     {
@@ -81,7 +88,8 @@ namespace services
         uint8_t positionAlgorithm = 0;
         uint8_t currentTwoStepDeadbeat = 0;
         uint8_t stallDetection = 1;
-        std::array<uint8_t, 2> reserved{};
+        uint8_t recalibrationMode = 0;
+        std::array<uint8_t, 1> reserved{};
     };
 
     static_assert(sizeof(ConfigData) == 168, "ConfigData layout must be free of implicit padding");

@@ -113,13 +113,6 @@ TEST_F(TestFaultNotifier, a_fault_code_outside_the_enumeration_traces_as_unknown
     EXPECT_STREQ("unknown", state_machine::FaultCodeName(static_cast<state_machine::FaultCode>(0xff)));
 }
 
-TEST_F(TestFocStateMachineBase, apply_online_estimates_default_implementation_does_not_crash)
-{
-    MinimalStateMachine sm;
-    sm.ApplyOnlineEstimates();
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
 TEST_F(TestFocStateMachineBase, state_variants_are_constructible)
 {
     [[maybe_unused]] state_machine::Idle idle{};

@@ -236,3 +236,15 @@
     code, control mode, uptime in ms) and FaultConditionsResponse (0x9C: age, power-up count,
     bus voltage and peak current at 0.01 resolution), the fault code none past the records
     held; and ClearFaultHistory (0x1C), acknowledged once the empty history is stored.
+- id: REQ-CAN-024
+  title: Online recalibration is selected, commanded and read over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.17 shall add, without changing any 2.16 message, the command Recalibrate
+    (0x1D), refused with invalidState while the drive is not stopped or the mode is off and with
+    modeMismatch in torque mode; the stored setting recalibrationMode (0x76), 0 off, 1 on command,
+    2 automatic, read back unchanged after a restart; and the read-only parameters
+    modelResistance, modelInductance, modelInertia and modelViscousFriction (0x94 to 0x97), the
+    model the loops are designed from, and recalibrationsApplied and recalibrationsRejected (0x98,
+    0x99), counted since power-up.

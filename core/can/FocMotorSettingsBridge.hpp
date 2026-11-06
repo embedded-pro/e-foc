@@ -28,6 +28,7 @@ namespace can
         FocAlgorithms ActiveAlgorithms() const;
         FocParameterValue HeldValue(FocParameter parameter) const;
         void ClearDiagnostics();
+        void Recalibrate(const infra::Function<void()>& onAccepted);
         void ReportTargetReached(const infra::Function<bool()>& isReached);
 
     private:
@@ -45,6 +46,7 @@ namespace can
         FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
         FocParameterValue HeldPlatformReading(FocParameter parameter) const;
         FocParameterValue HeldWindingTemperature() const;
+        FocParameterValue HeldRecalibrationReading(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;

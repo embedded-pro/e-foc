@@ -52,6 +52,7 @@ namespace can
 
         virtual void OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone) = 0;
         virtual void OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone) = 0;
+        virtual void OnRecalibrate(const infra::Function<void()>& onAccepted) = 0;
     };
 
     class FocMotorCategoryServer
@@ -101,6 +102,7 @@ namespace can
         bool HandleClearDiagnostics(const hal::Can::Message& data);
         bool HandleQueryFaultHistory(const hal::Can::Message& data);
         bool HandleClearFaultHistory(const hal::Can::Message& data);
+        bool HandleRecalibrate(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };
@@ -152,5 +154,6 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> clearDiagnostics{ focClearDiagnosticsId, *this, &FocMotorCategoryServer::HandleClearDiagnostics };
         services::CanMessageHandler<FocMotorCategoryServer> queryFaultHistory{ focQueryFaultHistoryId, *this, &FocMotorCategoryServer::HandleQueryFaultHistory };
         services::CanMessageHandler<FocMotorCategoryServer> clearFaultHistory{ focClearFaultHistoryId, *this, &FocMotorCategoryServer::HandleClearFaultHistory };
+        services::CanMessageHandler<FocMotorCategoryServer> recalibrate{ focRecalibrateId, *this, &FocMotorCategoryServer::HandleRecalibrate };
     };
 }
