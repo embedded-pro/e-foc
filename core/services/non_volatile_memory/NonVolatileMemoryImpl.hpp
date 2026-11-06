@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/services/non_volatile_memory/NvmImage.hpp"
 #include "core/services/non_volatile_memory/NvmRegion.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include <array>
@@ -63,42 +64,29 @@ namespace services
         void CompleteConfig(NvmStatus status);
         void CompleteFormat(NvmStatus status);
         void CompleteIsCalibrationValid(bool valid);
-        void CompleteFaultHistory(NvmStatus status);
-        void OnFaultHistoryWritten();
-        void OnFaultHistoryReadBack();
-        void OnFaultHistoryReadForLoad();
-        void CompleteLearnedModel(NvmStatus status);
-        void OnLearnedModelWritten();
-        void OnLearnedModelReadBack();
-        void OnLearnedModelReadForLoad();
+        bool Admit(const infra::Function<void(NvmStatus)>& onDone);
+        void CompleteImage(NvmStatus status);
 
         static uint32_t ComputeCrc(infra::ConstByteRange bytes);
 
         NvmRegion& calibrationRegion;
         NvmRegion& configRegion;
-        NvmRegion& faultHistoryRegion;
-        NvmRegion& learnedModelRegion;
+        NvmImage<faultHistoryImageSize> faultHistory;
+        NvmImage<learnedModelImageSize> learnedModel;
 
         std::array<uint8_t, calibrationRecordSize> calibrationBuffer{};
         std::array<uint8_t, calibrationRecordSize> calibrationReadBackBuffer{};
         std::array<uint8_t, configRecordSize> configBuffer{};
         std::array<uint8_t, configRecordSize> configReadBackBuffer{};
-        std::array<uint8_t, faultHistoryImageSize> faultHistoryBuffer{};
-        std::array<uint8_t, faultHistoryImageSize> faultHistoryReadBackBuffer{};
-        std::array<uint8_t, learnedModelImageSize> learnedModelBuffer{};
-        std::array<uint8_t, learnedModelImageSize> learnedModelReadBackBuffer{};
 
         infra::AutoResetFunction<void(NvmStatus)> onCalibrationDone;
         infra::AutoResetFunction<void(NvmStatus)> onConfigDone;
         infra::AutoResetFunction<void(NvmStatus)> onFormatDone;
         infra::AutoResetFunction<void(bool)> onIsCalibrationValidDone;
-        infra::AutoResetFunction<void(NvmStatus)> onFaultHistoryDone;
-        infra::AutoResetFunction<void(NvmStatus)> onLearnedModelDone;
+        infra::AutoResetFunction<void(NvmStatus)> onImageDone;
 
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
-        FaultHistoryData* pendingFaultHistoryOutput = nullptr;
-        LearnedModelData* pendingLearnedModelOutput = nullptr;
 
         bool busy{ false };
     };

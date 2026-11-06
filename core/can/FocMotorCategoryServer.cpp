@@ -13,8 +13,7 @@ namespace can
             setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, configureTelemetryRate, queryContractVersion,
-            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
-            clearDiagnostics, queryFaultHistory, clearFaultHistory, recalibrate, resetModel);
+            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter);
     }
 
     FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
@@ -25,6 +24,17 @@ namespace can
         , clearCalibration{ focClearCalibrationId, *this, &CommissioningMessages::HandleClearCalibration }
     {
         server.AddMessageTypes(align, identifyElectrical, calibrate, clearCalibration);
+    }
+
+    FocMotorCategoryServer::MaintenanceMessages::MaintenanceMessages(FocMotorCategoryServer& server)
+        : server(server)
+        , clearDiagnostics{ focClearDiagnosticsId, *this, &MaintenanceMessages::HandleClearDiagnostics }
+        , queryFaultHistory{ focQueryFaultHistoryId, *this, &MaintenanceMessages::HandleQueryFaultHistory }
+        , clearFaultHistory{ focClearFaultHistoryId, *this, &MaintenanceMessages::HandleClearFaultHistory }
+        , recalibrate{ focRecalibrateId, *this, &MaintenanceMessages::HandleRecalibrate }
+        , resetModel{ focResetModelId, *this, &MaintenanceMessages::HandleResetModel }
+    {
+        server.AddMessageTypes(clearDiagnostics, queryFaultHistory, clearFaultHistory, recalibrate, resetModel);
     }
 
     FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
@@ -121,49 +131,6 @@ namespace can
                 observer.OnEmergencyStop([this](services::CanAckStatus status)
                     {
                         SendCommandAck(focEmergencyStopId, status);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleQueryFaultHistory(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focQueryFaultHistoryId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto age = reader.ReadUInt8();
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, age](auto& observer)
-            {
-                observer.OnQueryFaultHistory(age, [this](const FocFaultRecord& record)
-                    {
-                        SendFaultRecord(record);
-                        SendCommandAck(focQueryFaultHistoryId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleClearFaultHistory(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focClearFaultHistoryId))
-            return false;
-
-        NotifyObservers([this](auto& observer)
-            {
-                observer.OnClearFaultHistory([this](bool stored)
-                    {
-                        if (stored)
-                            SendCommandAck(focClearFaultHistoryId, services::CanAckStatus::success);
-                        else
-                            SendCategoryError(focClearFaultHistoryId, FocMotorCategoryError::persistenceFailed);
                     });
             });
 
@@ -416,57 +383,6 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryServer::HandleRecalibrate(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focRecalibrateId))
-            return false;
-
-        NotifyObservers([this](auto& observer)
-            {
-                observer.OnRecalibrate([this]()
-                    {
-                        SendCommandAck(focRecalibrateId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleResetModel(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focResetModelId))
-            return false;
-
-        NotifyObservers([this](auto& observer)
-            {
-                observer.OnResetModel([this](bool stored)
-                    {
-                        if (stored)
-                            SendCommandAck(focResetModelId, services::CanAckStatus::success);
-                        else
-                            SendCategoryError(focResetModelId, FocMotorCategoryError::persistenceFailed);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleClearDiagnostics(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focClearDiagnosticsId))
-            return false;
-
-        NotifyObservers([this](auto& observer)
-            {
-                observer.OnClearDiagnostics([this]()
-                    {
-                        SendCommandAck(focClearDiagnosticsId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
     bool FocMotorCategoryServer::HandleRequestTelemetry(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focRequestTelemetryId))
@@ -686,5 +602,101 @@ namespace can
         payload.WriteFixed16(inductance.Value(), focInductanceScale);
         payload.WriteUInt8(static_cast<uint8_t>(polePairs));
         SendResponse(focElectricalParamsResponseId, payload);
+    }
+
+    bool FocMotorCategoryServer::MaintenanceMessages::HandleClearDiagnostics(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focClearDiagnosticsId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnClearDiagnostics([this]()
+                    {
+                        server.SendCommandAck(focClearDiagnosticsId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::MaintenanceMessages::HandleQueryFaultHistory(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focQueryFaultHistoryId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto age = reader.ReadUInt8();
+
+        if (!reader.Valid())
+            return false;
+
+        server.NotifyObservers([this, age](auto& observer)
+            {
+                observer.OnQueryFaultHistory(age, [this](const FocFaultRecord& record)
+                    {
+                        server.SendFaultRecord(record);
+                        server.SendCommandAck(focQueryFaultHistoryId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::MaintenanceMessages::HandleClearFaultHistory(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focClearFaultHistoryId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnClearFaultHistory([this](bool stored)
+                    {
+                        AcknowledgeStored(focClearFaultHistoryId, stored);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::MaintenanceMessages::HandleRecalibrate(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focRecalibrateId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnRecalibrate([this]()
+                    {
+                        server.SendCommandAck(focRecalibrateId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::MaintenanceMessages::HandleResetModel(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focResetModelId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnResetModel([this](bool stored)
+                    {
+                        AcknowledgeStored(focResetModelId, stored);
+                    });
+            });
+
+        return true;
+    }
+
+    void FocMotorCategoryServer::MaintenanceMessages::AcknowledgeStored(uint8_t commandId, bool stored)
+    {
+        if (stored)
+            server.SendCommandAck(commandId, services::CanAckStatus::success);
+        else
+            server.SendCategoryError(commandId, FocMotorCategoryError::persistenceFailed);
     }
 }
