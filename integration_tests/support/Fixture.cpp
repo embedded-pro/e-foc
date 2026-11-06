@@ -14,6 +14,7 @@ namespace
     }
 
     constexpr auto kHeartbeatSlice = std::chrono::milliseconds{ 50 };
+    constexpr auto kStatusRequestInterval = std::chrono::seconds{ 1 };
     constexpr auto kCapturePollSlice = std::chrono::milliseconds{ 50 };
 
     bool IsServerHeartbeat(uint32_t rawId)
@@ -42,7 +43,12 @@ namespace integration
             if (remaining <= std::chrono::milliseconds{ 0 })
                 return false;
 
-            RequestStatus();
+            const auto now = std::chrono::steady_clock::now();
+            if (now - lastStatusRequest >= kStatusRequestInterval)
+            {
+                RequestStatus();
+                lastStatusRequest = now;
+            }
 
             const auto candidate = serverNodeId.value_or(kAssumedServerNodeId);
             const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
