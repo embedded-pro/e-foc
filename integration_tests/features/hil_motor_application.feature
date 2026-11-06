@@ -116,7 +116,7 @@ Feature: Motor controller application on the connected motor
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
-  @hil_motor @REQ-UPD-005 @REQ-UPD-007
+  @hil_motor @REQ-UPD-005 @REQ-UPD-007 @REQ-UPD-015
   Scenario: A downloaded pack waits while the motor runs and is applied once it stops
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected

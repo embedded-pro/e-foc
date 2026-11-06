@@ -32,6 +32,7 @@ namespace
     constexpr std::size_t staleImageSize = 4096;
     constexpr auto installTimeout = std::chrono::seconds{ 60 };
     constexpr auto activateToDeployedBound = std::chrono::duration<double>{ 5.0 };
+    constexpr auto beginAnswerBound = std::chrono::duration<double>{ 1.0 };
     constexpr auto silenceTimeout = std::chrono::seconds{ 10 };
     constexpr auto silence = std::chrono::milliseconds{ 1500 };
     constexpr auto journalPollInterval = std::chrono::milliseconds{ 100 };
@@ -93,8 +94,12 @@ namespace
 
     void Begin(Fixture& fixture, FirmwareDownload& download)
     {
+        const auto sent = std::chrono::steady_clock::now();
         const auto answer = FirmwareUpgradeClient{ fixture }.Begin(static_cast<uint32_t>(download.pack.size()));
+        const auto answered = std::chrono::duration<double>{ std::chrono::steady_clock::now() - sent }.count();
         ASSERT_TRUE(answer.has_value()) << "Begin Upgrade was not answered";
+        std::printf("[METRIC] firmware upgrade begin_to_answer_s=%.2f\n", answered);
+        EXPECT_LE(answered, beginAnswerBound.count()) << "Begin Upgrade kept the controller silent for too long";
         download.beginAnswer = static_cast<uint8_t>(answer->error);
         download.pageSize = answer->pageSize;
     }
