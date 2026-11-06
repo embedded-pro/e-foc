@@ -43,6 +43,14 @@ namespace can
         return SendCommand(targetNodeId, focClearFaultId);
     }
 
+    bool FocMotorCategoryClient::SendQuickStop(uint16_t targetNodeId)
+    {
+        if (contracts.Incompatible(targetNodeId))
+            return false;
+
+        return SendCommand(targetNodeId, focQuickStopId);
+    }
+
     bool FocMotorCategoryClient::SendEmergencyStop(uint16_t targetNodeId)
     {
         if (contracts.Incompatible(targetNodeId))

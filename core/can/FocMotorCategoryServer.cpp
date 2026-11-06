@@ -14,7 +14,7 @@ namespace can
             setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
             setEncoderResolution, configureTelemetryRate, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter,
-            clearDiagnostics);
+            clearDiagnostics, quickStop);
     }
 
     FocMotorCategoryServer::CommissioningMessages::CommissioningMessages(FocMotorCategoryServer& server)
@@ -121,6 +121,22 @@ namespace can
                 observer.OnEmergencyStop([this](services::CanAckStatus status)
                     {
                         SendCommandAck(focEmergencyStopId, status);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::HandleQuickStop(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focQuickStopId))
+            return false;
+
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnQuickStop([this](services::CanAckStatus status)
+                    {
+                        SendCommandAck(focQuickStopId, status);
                     });
             });
 

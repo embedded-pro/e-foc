@@ -85,6 +85,7 @@ namespace tool
         static constexpr uint8_t thermalContractMinor{ 13 };
         static constexpr uint8_t overTemperatureContractMinor{ 14 };
         static constexpr uint8_t busVoltageLimitsContractMinor{ 15 };
+        static constexpr uint8_t quickStopContractMinor{ 16 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -103,11 +104,13 @@ namespace tool
         bool SupportsThermal(uint16_t nodeId) const;
         bool SupportsOverTemperature(uint16_t nodeId) const;
         bool SupportsBusVoltageLimits(uint16_t nodeId) const;
+        bool SupportsQuickStop(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
         bool SendStopMotor(uint16_t nodeId);
         bool SendEmergencyStop(uint16_t nodeId);
+        bool SendQuickStop(uint16_t nodeId);
         bool SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode);
         bool SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent);
         bool SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec);

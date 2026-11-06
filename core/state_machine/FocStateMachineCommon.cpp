@@ -139,6 +139,21 @@ namespace application
         return state_machine::CommandResult::ok;
     }
 
+    state_machine::CommandResult FocStateMachineCommon::CmdQuickStop()
+    {
+        return ToCommandResult(Dispatch(state_machine::QuickStop{}));
+    }
+
+    void FocStateMachineCommon::SetQuickStopDeceleration(foc::RadiansPerSecondSquared deceleration)
+    {
+        quickStopDeceleration = deceleration;
+    }
+
+    foc::RadiansPerSecondSquared FocStateMachineCommon::QuickStopDeceleration() const
+    {
+        return quickStopDeceleration;
+    }
+
     void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
         Dispatch(state_machine::ReAlign{ state_machine::CommandCallback{ onDone } });

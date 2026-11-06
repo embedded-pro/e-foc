@@ -120,6 +120,12 @@ TEST_F(FocMotorCategoryClientTest, SendClearFault_TransmitsClearFaultCommand)
     EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
 }
 
+TEST_F(FocMotorCategoryClientTest, SendQuickStop_TransmitsQuickStopCommand)
+{
+    client.SendQuickStop(1);
+    EXPECT_EQ(lastSentMsgType, can::focQuickStopId);
+}
+
 TEST_F(FocMotorCategoryClientTest, SendEmergencyStop_TransmitsEmergencyStopCommand)
 {
     client.SendEmergencyStop(1);

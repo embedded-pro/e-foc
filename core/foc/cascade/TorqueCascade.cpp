@@ -13,6 +13,8 @@ namespace foc
     {
         constexpr float speedFilterTimeConstant = 0.001f;
         constexpr float speedFoldGain = 10.0f;
+        // Damps the loop the speed filter closes around the inertia at 1 / (2 √(k τ)) = 0.71.
+        constexpr float brakingRate = 1.0f / (2.0f * speedFilterTimeConstant);
 
         float FoldedQuadrature(float quadrature, float electricalSpeed, float inverseElectricalSpeedLimit)
         {
@@ -32,6 +34,7 @@ namespace foc
 
     void TorqueCascade::Enable()
     {
+        braking.active = false;
         voltageWindow.Close();
         currentLoop.Reset();
         enabled = true;
@@ -46,6 +49,7 @@ namespace foc
 
     void TorqueCascade::Disable()
     {
+        braking.active = false;
         enabled = false;
         currentCommandActive = false;
         voltageWindow.Close();
@@ -111,7 +115,7 @@ namespace foc
     {
         const auto mechanicalSpeed = polePairs > 0.0f ? lastElectricalSpeed / polePairs : 0.0f;
 
-        const auto demanded = LimitedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed, 0.0f);
+        const auto demanded = LimitedQuadrature(RequestedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed), lastElectricalSpeed, 0.0f);
 
         return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f }, Ampere{ demanded } };
     }
@@ -136,6 +140,23 @@ namespace foc
     {
         const float limit = limits.current;
         return std::clamp(FoldedQuadrature(quadrature, electricalSpeed, limits.inverseElectricalSpeed) + feedForward, -limit, limit);
+    }
+
+    void TorqueCascade::Brake(RadiansPerSecondSquared deceleration, float inertiaOverTorqueConstant)
+    {
+        const auto ratio = std::max(0.0f, inertiaOverTorqueConstant);
+        braking.gain = polePairs > 0.0f ? ratio * brakingRate / polePairs : 0.0f;
+        braking.current = deceleration.Value() > 0.0f ? ratio * deceleration.Value() : maxCurrent.Value();
+        braking.active = true;
+    }
+
+    float TorqueCascade::RequestedQuadrature(float setPoint, float electricalSpeed) const
+    {
+        if (!braking.active)
+            return setPoint;
+
+        const float cap = braking.current;
+        return std::clamp(-braking.gain * electricalSpeed, -cap, cap);
     }
 
     void TorqueCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
@@ -202,7 +223,7 @@ namespace foc
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& setPoint = setPointBuffer.Acquire();
         const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);
-        const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
+        const auto quadrature = LimitedQuadrature(RequestedQuadrature(setPoint.second.Value(), electricalSpeed), electricalSpeed, coggingCurrent);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
         voltageWindow.Accumulate(voltage.q);
         return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());

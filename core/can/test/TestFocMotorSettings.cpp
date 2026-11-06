@@ -209,6 +209,17 @@ TEST(FocMotorSettings, the_bus_voltage_limits_are_limits)
     EXPECT_EQ(can::GroupOf(can::FocParameter::busVoltageMaximum), can::ParameterGroup::limits);
 }
 
+TEST(FocMotorSettings, the_quick_stop_deceleration_is_a_limit)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::quickStopDeceleration, 500.0f);
+
+    EXPECT_NEAR(config.limits.quickStopDeceleration, 500.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::quickStopDeceleration), 500.0f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::quickStopDeceleration), can::ParameterGroup::limits);
+}
+
 TEST(FocMotorSettings, the_target_reached_flag_is_a_motion_reading)
 {
     EXPECT_EQ(can::GroupOf(can::FocParameter::targetReached), can::ParameterGroup::motion);

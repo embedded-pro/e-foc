@@ -2,7 +2,7 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: foc-position
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.4.0                |
+| Version   | 0.5.0                |
 | Component | foc-position         |
 | Date      | 2026-11-05           |
 
@@ -110,11 +110,18 @@ through the mode the speed cascade provides (see the speed-control design). The 
 the q-axis reference to the commanded current and runs neither loop. Enable, Disable and a speed
 command end it.
 
+### Quick Stop
+
+A quick stop suspends the position law and runs the speed loop alone, on a reference the outer loop ramps from
+the measured speed to zero at the quick-stop deceleration, exactly as in speed mode (`foc-speed.md`, Quick Stop).
+The position setpoint is kept for the next Enable, which resumes the law from it; the travel limits do not act
+during the stop, which ends within a second and leaves the remaining speed to coast out.
+
 ### Enable and Disable
 
-**Enable**: resets and arms all four PID controllers in cascade order (position, speed, d-axis, q-axis). The last position setpoint is preserved.
+**Enable**: ends a quick stop, resets and arms all four PID controllers in cascade order (position, speed, d-axis, q-axis). The last position setpoint is preserved.
 
-**Disable**: disarms all four PIDs. `Calculate()` returns zero duty cycles until re-enabled.
+**Disable**: ends a quick stop and disarms all four PIDs. `Calculate()` returns zero duty cycles until re-enabled.
 
 ```mermaid
 stateDiagram-v2

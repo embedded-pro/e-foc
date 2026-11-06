@@ -15,6 +15,7 @@ TEST_F(TestCommandDescriptions, names_motor_commands_like_the_gui)
 {
     EXPECT_EQ("Start Motor", CommandDisplayName(can::focMotorCategoryId, can::focStartId));
     EXPECT_EQ("Emergency Stop", CommandDisplayName(can::focMotorCategoryId, can::focEmergencyStopId));
+    EXPECT_EQ("Quick Stop", CommandDisplayName(can::focMotorCategoryId, can::focQuickStopId));
     EXPECT_EQ("Torque Setpoint", CommandDisplayName(can::focMotorCategoryId, can::focSetTorqueSetpointId));
     EXPECT_EQ("Position Loop Bandwidth", CommandDisplayName(can::focMotorCategoryId, can::focSetPidPositionId));
 }

@@ -72,18 +72,31 @@ namespace
         return done();
     }
 
-    std::optional<uint32_t> SetpointStampAfterEnable(const ScenarioSetup& setup)
+    std::optional<uint32_t> CommandStampAfterEnable(const ScenarioSetup& setup, const std::optional<Setpoint>& command)
     {
-        if (!setup.lastSetpoint || !setup.trace.StartTick())
+        if (!command || !setup.trace.StartTick())
             return std::nullopt;
 
         const auto& commands = setup.trace.Commands();
-        const auto rawId = CommandRawId(*setup.lastSetpoint);
+        const auto rawId = CommandRawId(*command);
 
-        for (auto index = commands.size(); index > setup.lastSetpoint->commandsBefore; --index)
+        for (auto index = commands.size(); index > command->commandsBefore; --index)
             if (commands[index - 1].rawId == rawId)
                 return commands[index - 1].tick >= *setup.trace.StartTick() ? std::optional{ commands[index - 1].tick } : std::nullopt;
 
+        return std::nullopt;
+    }
+
+    std::optional<uint32_t> SetpointStampAfterEnable(const ScenarioSetup& setup)
+    {
+        return CommandStampAfterEnable(setup, setup.lastSetpoint);
+    }
+
+    std::optional<uint32_t> FirstTickBelow(const ScenarioSetup& setup, uint32_t from, float speed)
+    {
+        for (const auto& sample : setup.trace.Samples())
+            if (sample.tick >= from && std::abs(sample.omegaMech) < speed)
+                return sample.tick;
         return std::nullopt;
     }
 
@@ -510,6 +523,40 @@ THEN(R"(the rotor shall travel less than {float} rad after the last setpoint)", 
     ASSERT_TRUE(travel.has_value()) << "No plant samples after the last setpoint";
     std::fprintf(stderr, "[METRIC] sil travel_rad value=%.3f\n", *travel);
     EXPECT_LT(*travel, maximum) << "The rotor travelled " << *travel << " rad";
+}
+
+WHEN(R"(a quick stop is issued over CAN)")
+{
+    auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+    const auto commandsBefore = setup.trace.Commands().size();
+    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focQuickStopId)) << "Quick stop refused";
+    setup.quickStop = Setpoint{ can::focQuickStopId, 0.0f, fixture.ServerNodeId(), commandsBefore };
+}
+
+THEN(R"(the rotor speed shall fall below {float} rad\/s between {float} and {float} ms after the quick stop)", (float speed, float fromMs, float toMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(setup.quickStop.has_value()) << "No quick stop was issued";
+    const auto window = TicksFromMilliseconds(setup, 2.0f * toMs);
+
+    CaptureUntil(context.Get<Fixture>(), setup, [&]
+        {
+            const auto stamp = CommandStampAfterEnable(setup, setup.quickStop);
+            const auto last = setup.trace.LastSampleTick();
+            return stamp && (FirstTickBelow(setup, *stamp, speed) || (last && *last >= *stamp + window) || RecorderFull(setup));
+        });
+
+    const auto stamp = CommandStampAfterEnable(setup, setup.quickStop);
+    ASSERT_TRUE(stamp.has_value()) << "The plant record holds no quick stop after the enable";
+    const auto below = FirstTickBelow(setup, *stamp, speed);
+    ASSERT_TRUE(below.has_value()) << "The rotor did not fall below " << speed << " rad/s";
+
+    const auto elapsedMs = static_cast<float>(*below - *stamp) * kMilliPerSecond / static_cast<float>(setup.plant.baseFrequencyHz);
+    std::fprintf(stderr, "[METRIC] sil quick_stop_below_%g_ms value=%.1f\n", static_cast<double>(speed), static_cast<double>(elapsedMs));
+    EXPECT_GE(elapsedMs, fromMs);
+    EXPECT_LE(elapsedMs, toMs);
 }
 
 THEN(R"(the response shall have no dropped samples)")

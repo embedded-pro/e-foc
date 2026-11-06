@@ -145,5 +145,6 @@ namespace state_machine
         stored.temperatureMargin = WithinOrDefault(stored.temperatureMargin, CommandLimits::minTemperatureMargin, CommandLimits::maxTemperatureMargin, defaults.temperatureMargin);
         stored.busVoltageMinimum = WithinOrDefault(stored.busVoltageMinimum, 0.0f, CommandLimits::maxBusVoltageLimit, defaults.busVoltageMinimum);
         stored.busVoltageMaximum = WithinOrDefault(stored.busVoltageMaximum, 0.0f, CommandLimits::maxBusVoltageLimit, defaults.busVoltageMaximum);
+        stored.quickStopDeceleration = WithinOrDefault(stored.quickStopDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.quickStopDeceleration);
     }
 }

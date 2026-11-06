@@ -806,9 +806,13 @@ namespace state_machine
         const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
         const foc::Radians positionMinimum{ configData.limits.positionMinimum };
         const foc::Radians positionMaximum{ configData.limits.positionMaximum };
+        const foc::RadiansPerSecondSquared quickStopDeceleration{ configData.limits.quickStopDeceleration };
 
         std::visit([&]<class Machine>(Machine& sm)
             {
+                if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.SetQuickStopDeceleration(quickStopDeceleration);
+
                 if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
                     sm.SpeedLimiter().LimitSpeed(overspeedLimit);
                 else if constexpr (!std::is_same_v<Machine, std::monostate>)

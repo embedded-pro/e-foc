@@ -27,6 +27,7 @@ namespace tool
         BuildTravelLimitsGroup();
         BuildThermalGroup();
         BuildSupplyLimitsGroup();
+        BuildQuickStopGroup();
         Content().addStretch();
 
         Refresh();
@@ -131,6 +132,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildQuickStopGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Quick Stop", group);
+        AddEditors(form, QuickStopSettings());
+
+        auto* note = new QLabel("Quick Stop decelerates a running motor at this rate and stops it once it is below 2 rad/s, at most a "
+                                "second later; 0 brakes at the current limit. Torque mode without a calibrated inertia stops at once. "
+                                "Stored at once and used by the next quick stop.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -189,6 +203,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetQuickStopUnavailable(const QString& reason)
+    {
+        if (reason == quickStopReason)
+            return;
+
+        quickStopReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
     {
         if (reason == travelLimitsReason)
@@ -234,6 +258,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
             else if (IsIn(BusVoltageSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
+            else if (IsIn(QuickStopSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? quickStopReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

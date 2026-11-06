@@ -80,6 +80,15 @@ TEST_F(TestRecoveryAdvice, clear_fault_refused_in_fault_asks_to_remove_the_cause
     EXPECT_THAT(advice->text, HasSubstr("restart the controller"));
 }
 
+TEST_F(TestRecoveryAdvice, commands_refused_while_stopping_ask_to_wait_until_ready)
+{
+    const auto advice = Refuse(can::focStartId, FocMotorState::stopping);
+
+    ASSERT_TRUE(advice.has_value());
+    EXPECT_EQ(RecoveryAction::none, advice->action);
+    EXPECT_THAT(advice->text, HasSubstr("Wait until it is Ready"));
+}
+
 TEST_F(TestRecoveryAdvice, commands_refused_while_calibrating_ask_to_wait)
 {
     const auto advice = Refuse(can::focStartId, FocMotorState::calibrating);

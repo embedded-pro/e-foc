@@ -64,6 +64,11 @@ namespace
             return state_machine::CommandResult::ok;
         }
 
+        state_machine::CommandResult CmdQuickStop() override
+        {
+            return state_machine::CommandResult::ok;
+        }
+
     private:
         state_machine::State state{ state_machine::Idle{} };
     };

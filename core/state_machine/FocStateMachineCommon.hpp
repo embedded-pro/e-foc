@@ -43,6 +43,8 @@ namespace application
         state_machine::CommandResult CmdClearFault() override;
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEmergencyStop() override;
+        state_machine::CommandResult CmdQuickStop() override;
+        void SetQuickStopDeceleration(foc::RadiansPerSecondSquared deceleration);
 
         void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
         state_machine::CommandResult CmdReserveExternalCalibration();
@@ -95,6 +97,7 @@ namespace application
 
         services::Tracer& GetTracer();
         const services::CalibrationData& GetCalibration() const;
+        foc::RadiansPerSecondSquared QuickStopDeceleration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage, foc::Ampere currentNoise);
 
@@ -117,5 +120,6 @@ namespace application
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
         CommandRejections commandRejections;
         bool provisionalControlApplied{ false };
+        foc::RadiansPerSecondSquared quickStopDeceleration{ 0.0f };
     };
 }

@@ -1961,13 +1961,15 @@ namespace
                     }));
         }
 
-        void GivenNvmValid()
+        void GivenNvmValid(float inertia = 0.0f)
         {
             services::CalibrationData data{};
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
+            data.inertia = inertia;
+            data.fluxLinkage = inertia > 0.0f ? 0.01f : 0.0f;
             data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
@@ -3787,4 +3789,115 @@ TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_that_faults_as_the_b
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
+}
+
+namespace
+{
+    class FocStateMachineTorqueQuickStopTest
+        : public FocStateMachineTorqueAutoTest
+    {
+    public:
+        AutoStateMachine& EnabledStateMachine(float inertia)
+        {
+            GivenFaultNotifierRegistered();
+            GivenNvmValid(inertia);
+            machine.emplace(application::TerminalAndTracer{ terminal, tracer }, application::MotorHardware{ inverterMock, encoderMock, vdc }, nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, state_machine::TransitionPolicy::Auto, nvmActivity);
+            AlignAfterBoot(*machine);
+            EXPECT_CALL(inverterMock, Start());
+            machine->CmdEnable();
+            return *machine;
+        }
+
+        std::optional<AutoStateMachine> machine;
+    };
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, a_quick_stop_brakes_with_the_power_stage_on_until_the_rotor_is_below_2_rad_per_s)
+{
+    auto& sm = EnabledStateMachine(0.0001f);
+    sm.SetQuickStopDeceleration(foc::RadiansPerSecondSquared{ 500.0f });
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdQuickStop());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Stopping>(sm.CurrentState()));
+
+    ForwardTime(application::OperationFlow::quickStopCheckPeriod);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, without_a_calibrated_inertia_a_quick_stop_cuts_the_power_stage_and_enters_ready_at_once)
+{
+    auto& sm = EnabledStateMachine(0.0f);
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdQuickStop());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, a_quick_stop_while_stopped_is_accepted_and_changes_nothing)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdQuickStop());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, a_quick_stop_while_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    ASSERT_EQ(state_machine::CommandResult::ok, sm.CmdReserveExternalCalibration());
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdQuickStop());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, disable_during_a_quick_stop_cuts_the_power_stage_and_enters_ready)
+{
+    auto& sm = EnabledStateMachine(0.0001f);
+    sm.CmdQuickStop();
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdDisable());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, an_emergency_stop_during_a_quick_stop_enters_ready)
+{
+    auto& sm = EnabledStateMachine(0.0001f);
+    sm.CmdQuickStop();
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdEmergencyStop());
+    ForwardTime(std::chrono::milliseconds(10));
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, a_fault_during_a_quick_stop_enters_fault)
+{
+    auto& sm = EnabledStateMachine(0.0001f);
+    sm.CmdQuickStop();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ForwardTime(std::chrono::milliseconds(10));
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::FaultCode::overcurrent, sm.LastFaultCode());
+}
+
+TEST_F(FocStateMachineTorqueQuickStopTest, a_quick_stop_during_a_quick_stop_changes_nothing)
+{
+    auto& sm = EnabledStateMachine(0.0001f);
+    sm.CmdQuickStop();
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdQuickStop());
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Stopping>(sm.CurrentState()));
 }

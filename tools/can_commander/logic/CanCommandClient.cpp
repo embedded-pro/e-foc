@@ -132,6 +132,11 @@ namespace tool
         return SupportsMinor(nodeId, busVoltageLimitsContractMinor);
     }
 
+    bool CanCommandClient::SupportsQuickStop(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, quickStopContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -160,6 +165,8 @@ namespace tool
             return SupportsOverTemperature(nodeId);
         if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
             return SupportsBusVoltageLimits(nodeId);
+        if (parameter == can::FocParameter::quickStopDeceleration)
+            return SupportsQuickStop(nodeId);
 
         switch (can::GroupOf(parameter))
         {
@@ -259,6 +266,17 @@ namespace tool
         return Tracked(nodeId, can::focEmergencyStopId, [&]()
             {
                 return focClient.CategoryClient().SendEmergencyStop(nodeId);
+            });
+    }
+
+    bool CanCommandClient::SendQuickStop(uint16_t nodeId)
+    {
+        if (!SupportsQuickStop(nodeId))
+            return false;
+
+        return Tracked(nodeId, can::focQuickStopId, [&]()
+            {
+                return focClient.CategoryClient().SendQuickStop(nodeId);
             });
     }
 

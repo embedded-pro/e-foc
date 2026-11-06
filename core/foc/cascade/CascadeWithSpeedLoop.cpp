@@ -62,6 +62,7 @@ namespace foc
 
     void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
+        quickStopping = false;
         currentCommandActive = false;
         voltageWindow.Close();
         currentLoop.Reset();
@@ -83,6 +84,7 @@ namespace foc
 
     void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
+        quickStopping = false;
         enabled = false;
         currentCommandActive = false;
         voltageWindow.Close();
@@ -183,6 +185,32 @@ namespace foc
     void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
     {
         lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ speedReference } }).Value();
+    }
+
+    void CascadeWithSpeedLoop::BeginQuickStop(RadiansPerSecondSquared deceleration)
+    {
+        quickStopStep = deceleration.Value() / static_cast<float>(outerLoopFrequency.Value());
+        quickStopReference = lastMechanicalSpeed;
+        quickStopping = true;
+    }
+
+    bool CascadeWithSpeedLoop::IsQuickStopping() const
+    {
+        return quickStopping;
+    }
+
+    bool CascadeWithSpeedLoop::RunQuickStop(float mechanicalSpeed)
+    {
+        if (!quickStopping)
+            return false;
+
+        const float reference = quickStopReference;
+        const float step = quickStopStep;
+        const float next = step > 0.0f ? std::clamp(0.0f, reference - step, reference + step) : 0.0f;
+        quickStopReference = next;
+        speedReference = next;
+        RunSpeedLoop(mechanicalSpeed);
+        return true;
     }
 
     void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)

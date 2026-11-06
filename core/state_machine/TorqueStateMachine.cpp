@@ -60,6 +60,18 @@ namespace application
         return focController.ObserveMotion();
     }
 
+    bool TorqueStateMachine::BeginQuickStop()
+    {
+        const auto& data = GetCalibration();
+        const auto torqueConstant = 1.5f * static_cast<float>(data.polePairs) * EffectiveFluxLinkage(data).Value();
+
+        if (!foc::IsFiniteValue(data.inertia) || data.inertia <= 0.0f || !foc::IsFiniteValue(torqueConstant) || torqueConstant <= 0.0f)
+            return false;
+
+        focController.Brake(QuickStopDeceleration(), data.inertia / torqueConstant);
+        return true;
+    }
+
     foc::FocBase& TorqueStateMachine::GetFoc()
     {
         return focController;

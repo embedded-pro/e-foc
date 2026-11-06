@@ -51,8 +51,13 @@ namespace foc
         lastSpeedSetPoint = point;
         target = point.Value();
 
-        if (!IsRamped())
+        if (!IsRamped() && !IsQuickStopping())
             ApplyReference(point.Value());
+    }
+
+    void SpeedCascade::QuickStop(RadiansPerSecondSquared deceleration)
+    {
+        BeginQuickStop(deceleration);
     }
 
     void SpeedCascade::RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration)
@@ -61,7 +66,7 @@ namespace foc
         accelerationStep = std::max(0.0f, acceleration.Value()) / frequency;
         decelerationStep = std::max(0.0f, deceleration.Value()) / frequency;
 
-        if (!IsRamped())
+        if (!IsRamped() && !IsQuickStopping())
             ApplyReference(target);
     }
 
@@ -140,7 +145,7 @@ namespace foc
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
 
-        if (HoldCommandedCurrent())
+        if (HoldCommandedCurrent() || RunQuickStop(mechanicalSpeed))
             return;
 
         RampReference();

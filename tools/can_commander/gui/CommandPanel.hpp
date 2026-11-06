@@ -43,6 +43,7 @@ namespace tool
     signals:
         void StartMotorRequested();
         void StopMotorRequested();
+        void QuickStopRequested();
         void ClearFaultRequested();
         void SetControlModeRequested(can::FocMotorMode mode);
         void SetpointRequested(can::FocMotorMode mode, int32_t counts);
@@ -52,6 +53,7 @@ namespace tool
     public slots:
         void SetCommandsAvailable(const QString& unavailableReason, bool explained);
         void SetSettingsAvailable(const QString& unavailableReason);
+        void SetQuickStopAvailable(const QString& unavailableReason);
         void ShowRequestedControlMode(can::FocMotorMode mode);
         void SetActiveControlMode(can::FocMotorMode mode);
         void ClearActiveControlMode();
@@ -84,6 +86,7 @@ namespace tool
         void RefreshSetpointStatus(SetpointControls& controls);
 
         QLabel* hintLabel;
+        QPushButton* quickStopButton{ nullptr };
         QTabWidget* tabs;
         QStackedWidget* setpointStack;
         QLabel* modeLabel;

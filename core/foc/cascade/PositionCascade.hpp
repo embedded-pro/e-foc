@@ -15,6 +15,7 @@ namespace foc
         , public CurrentLimitable
         , public BusVoltageTrackable
         , public PositionLimitable
+        , public QuickStoppable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -42,6 +43,7 @@ namespace foc
         void EnableSpeedCommand() override;
         void DisableSpeedCommand() override;
         void CommandSpeed(RadiansPerSecond speed) override;
+        void QuickStop(RadiansPerSecondSquared deceleration) override;
         hal::Hertz SpeedCommandFrequency() const override;
 
         void EnableCurrentCommand() override;
