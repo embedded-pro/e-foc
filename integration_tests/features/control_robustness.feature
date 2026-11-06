@@ -34,7 +34,7 @@ Feature: Control Robustness Against Off-Nominal Plants
   away and overshot, and the cycle repeated about every one and a half seconds.
   The same calibration that the rig runs gives the loops the gains that showed it.
 
-  @sil @REQ-CTRL-014 @REQ-SPD-008
+  @sil @REQ-CTL-004 @REQ-CTL-002
   Scenario Outline: The speed loop holds its envelope on a <label> plant
     Given a <preset> motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -55,7 +55,7 @@ Feature: Control Robustness Against Off-Nominal Plants
       | label             | preset    | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | noisy             | noisy     | 300       | 60            | 20      | 10       | 2.0   |
 
-  @sil @REQ-CTRL-014 @REQ-POS-009
+  @sil @REQ-CTL-004 @REQ-CTL-003
   Scenario Outline: The position loop holds its envelope on a <label> plant
     Given a <preset> motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -76,7 +76,7 @@ Feature: Control Robustness Against Off-Nominal Plants
       | label             | preset    | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | noisy             | noisy     | 400       | 60            | 190     | 8        | 0.3   |
 
-  @sil @REQ-POS-011 @REQ-POS-012
+  @sil @REQ-CTL-003
   Scenario Outline: The <algorithm> position law settles and holds against the bench's cogging and dry friction, on a cogging hill top too
     Given a bench motor plant
     And the plant's shaft has the bench's dry friction and cogging

@@ -397,7 +397,7 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
   rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
   much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
-  laws. The emulated board applying each duty a period late reproduces it (REQ-CAL-017).
+  laws. The emulated board applying each duty a period late reproduces it (REQ-CMS-003).
 - The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
   in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,
@@ -438,9 +438,9 @@ up, as large as the torque current at light load. The cascades therefore run it 
 each enable, then the first 4 s of every 60 s, with the reference at zero in between. The 50 mA threshold above
 makes the estimator skip every window of a pause, so it neither updates nor forgets, and its estimates hold
 until the next burst. A burst holds two memories of the estimator, which converges within it from the wrong
-seeds of REQ-CAL-014; a winding that warms over minutes is still followed, a minute at a time. In simulation
+seeds of REQ-CMS-003; a winding that warms over minutes is still followed, a minute at a time. In simulation
 the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA RMS in the pause after it,
-while the speed reference steps between 30 and 50 rad/s (REQ-CAL-019).
+while the speed reference steps between 30 and 50 rad/s (REQ-CMS-003).
 
 The estimator reports itself settled once it has published, after the 200 updates it needs from its seed. Online
 recalibration (`online-recalibration.md`) adopts an estimate only once it has settled, and only while the drive is

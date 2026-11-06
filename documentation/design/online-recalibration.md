@@ -32,8 +32,8 @@ In speed and position mode the drive re-estimates its motor while it runs: the r
 small d-axis injection (`service-electrical-ident.md`, Excitation), the inertia and viscous friction from the speed
 and torque current (`service-mechanical-ident.md`). The loop gains are designed from the calibration record, so a
 load whose inertia differs from the commissioned one, or a winding whose resistance has risen, runs on a model that
-no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CAL-023, REQ-CAL-024),
-and keeps the inductance, inertia and friction it learned across power cycles (REQ-CAL-025).
+no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CMS-003),
+and keeps the inductance, inertia and friction it learned across power cycles (REQ-CMS-003).
 
 **Is responsible for:**
 - Deciding when an estimate may replace the model the loops are designed from: once its estimator reports it

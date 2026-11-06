@@ -1,0 +1,73 @@
+- id: REQ-CTL-001
+  title: Torque mode delivers the commanded current
+  status: verified
+  verification: [sil, mil, hil, unit]
+  shall: >
+    In torque mode the drive shall regulate the d- and q-axis currents to the operator's setpoints
+    with every selectable current law, settling a step within the envelope its acceptance criteria
+    give, and shall hold the q-axis current within 1 % of the command plus 5 mA in steady state,
+    including on boards with dead-time loss, low-side shunts or a duty applied a period late. With
+    a cogging map stored it shall cancel the cogging torque while reporting the operator's demand.
+  rationale: >
+    The per-law settling, overshoot, rise-time and tail limits are acceptance criteria and live in
+    the Examples tables of the scenarios that cite this requirement.
+
+- id: REQ-CTL-002
+  title: Speed mode holds the commanded speed
+  status: verified
+  verification: [sil, mil, hil]
+  shall: >
+    In speed mode the drive shall bring the rotor to the operator's speed setpoint and hold it with
+    every selectable speed law, within the step and disturbance envelopes its acceptance criteria
+    give for either sign of load, recovering once a saturated demand fits the current limit again.
+    It shall limit the reference to the operator's acceleration and deceleration ramps.
+
+- id: REQ-CTL-003
+  title: Position mode reaches and holds the commanded position
+  status: verified
+  verification: [sil, mil, hil, unit]
+  shall: >
+    In position mode the drive shall move the rotor to the operator's position setpoint and hold
+    it with every selectable position law, within the step and disturbance envelopes its
+    acceptance criteria give, also against cogging and dry friction. It shall report the target
+    reached once the error has stayed within the position window for the position-window time, and
+    shall report the position in the setpoint's own turn.
+
+- id: REQ-CTL-004
+  title: The control laws stay stable on motors other than the nominal one
+  status: verified
+  verification: [sil, mil]
+  shall: >
+    The speed and position laws shall settle and stay near their setpoints with a noisy encoder
+    and current measurement, a winding near its thermal limit, a loaded shaft and on the second
+    reference motor, within the envelopes their acceptance criteria give.
+
+- id: REQ-CTL-005
+  title: Each loop's control law is selectable at runtime
+  status: verified
+  verification: sil
+  shall: >
+    The operator shall select the control law of the current, speed and position loop over CAN
+    from a fixed set, without a firmware update or restart, and query the law each loop runs. The
+    drive shall refuse a selection while Enabled or one whose law needs a mechanical model it does
+    not yet hold, and shall persist an accepted selection across power cycles.
+
+- id: REQ-CTL-006
+  title: Each loop is tuned by its bandwidth
+  status: verified
+  verification: sil
+  shall: >
+    Each loop shall derive its gains from the identified motor model and a bandwidth, which the
+    operator may set or leave automatic, together with its law's own settings. The drive shall
+    store and restore these settings, and shall refuse without effect a setting that is out of
+    range, given while the drive is not stopped, or one the active law cannot be designed for.
+
+- id: REQ-CTL-007
+  title: Position travel stays within the software limits
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    With software position limits set, position mode shall refuse a setpoint outside them, move
+    between two points inside them without crossing the excluded arc, and enter Fault with
+    positionLimit within 2 ms of the rotor being carried more than four encoder counts outside
+    them.

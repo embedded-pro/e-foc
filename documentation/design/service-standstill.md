@@ -33,7 +33,7 @@ The full calibration starts by measuring the current sensors' offsets with all t
 drives its back-EMF current through the sensors, and the offset step would store that current as sensor
 bias. In simulation, a calibration started 25 ms after disabling the bench motor at 500 rpm stored
 offsets 5 to 15 mA off in five runs out of five (`state-machine.md`, Calibration Sequence). This
-service holds the calibration back until the rotor is at rest (REQ-CAL-020).
+service holds the calibration back until the rotor is at rest (REQ-CMS-001).
 
 **Is responsible for:**
 - Reporting, once, whether the encoder came to rest within the allotted time
@@ -151,4 +151,4 @@ sequenceDiagram
 | Timeout      | 10 s from the request                                                                                                   |
 | Speed bound  | 0.02 rad/s at rest                                                                                                      |
 | Encoder      | A coarse encoder reads a slow creep as rest until it moves a count; the band is below one count of a 2000-count encoder |
-| Verification | REQ-CAL-020: offsets within 5 mA of the plant's biases when calibration starts 25 ms after disabling at 52 rad/s        |
+| Verification | REQ-CMS-001: offsets within 5 mA of the plant's biases when calibration starts 25 ms after disabling at 52 rad/s        |

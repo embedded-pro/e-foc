@@ -3,7 +3,7 @@ Feature: Motor controller application on the connected motor
   with a 1000 line quadrature encoder and a free shaft carrying a light disk. Every scenario starts from a reset
   target, keeps the commanded current within the board limit, and ends with the motor disabled.
 
-  @hil_motor @REQ-HIL-020
+  @hil_motor @REQ-CMS-001
   Scenario: Electrical identification measures the connected motor
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected
@@ -13,7 +13,7 @@ Feature: Motor controller application on the connected motor
     And the identified resistance shall be between 0.8 and 1.4 ohm
     And the identified inductance shall be between 0.7 and 1.5 mH
 
-  @hil_motor @REQ-HIL-021
+  @hil_motor @REQ-CMS-001
   Scenario: Speed calibration identifies the rotor inertia
     Given the speed motor system is initialised with no valid calibration data
     When the speed control mode is selected
@@ -23,7 +23,7 @@ Feature: Motor controller application on the connected motor
     And the identified resistance shall be between 0.8 and 1.4 ohm
     And the identified inertia shall be between 8 and 25 uNms2
 
-  @hil_motor @REQ-HIL-024
+  @hil_motor @REQ-CTL-001
   Scenario Outline: Torque mode accelerates the rotor in the commanded direction
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected
@@ -40,7 +40,7 @@ Feature: Motor controller application on the connected motor
       | 0.3    | 20    |
       | -0.3   | -20   |
 
-  @hil_motor @REQ-HIL-022
+  @hil_motor @REQ-CTL-002
   Scenario Outline: Speed loop tracks its setpoint with the <current> current loop and the <speed> speed loop
     Given the speed motor system is initialised with no valid calibration data
     When the speed control mode is selected
@@ -77,7 +77,7 @@ Feature: Motor controller application on the connected motor
       | sliding   | adrc   |
       | sliding   | twodof |
 
-  @hil_motor @REQ-HIL-023
+  @hil_motor @REQ-CTL-003
   Scenario Outline: Position loop holds its setpoint with the <position> position loop
     Given the position motor system is initialised with no valid calibration data
     When the position control mode is selected
@@ -100,7 +100,7 @@ Feature: Motor controller application on the connected motor
       | lqi      |
       | twodof   |
 
-  @hil_motor @REQ-HIL-025 @REQ-POS-013
+  @hil_motor @REQ-CTL-003
   Scenario: Position telemetry reads the setpoint's own turn near the encoder seam
     Given the position motor system is initialised with no valid calibration data
     When the position control mode is selected
@@ -116,7 +116,7 @@ Feature: Motor controller application on the connected motor
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
-  @hil_motor @REQ-UPD-005 @REQ-UPD-007 @REQ-UPD-015
+  @hil_motor @REQ-FWU-002 @REQ-FWU-003
   Scenario: A downloaded pack waits while the motor runs and is applied once it stops
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected

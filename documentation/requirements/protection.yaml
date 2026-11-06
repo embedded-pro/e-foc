@@ -1,0 +1,59 @@
+- id: REQ-PRO-001
+  title: The motor current stays within the inverter and motor ratings
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall bound the commanded current vector to the inverter's maximum current, keeping
+    the ratio between its axes. With the operator's continuous and peak current ratings set, it
+    shall model the motor's heating from the measured current and limit the current so the motor
+    carries its peak rating for at most the peak time and its continuous rating indefinitely.
+
+- id: REQ-PRO-002
+  title: The winding is protected from overheating
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    In speed and position mode the drive shall estimate the winding temperature from the online
+    resistance, within 10 K, and report it. It shall derate the current linearly to zero over the
+    operator's temperature margin below the temperature limit, and enter Fault with
+    overtemperature at the limit while Enabled.
+
+- id: REQ-PRO-003
+  title: The drive tolerates and supervises the supply voltage
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall measure the bus voltage while it runs and scale its commanded voltages so that
+    the current loop behaves the same across the supply range. While Enabled it shall enter Fault
+    with undervoltage or overvoltage when the filtered bus voltage leaves the operator's limits,
+    leaving the board's own trips in force.
+
+- id: REQ-PRO-004
+  title: Overspeed and following error are supervised
+  status: verified
+  verification: [sil, mil]
+  shall: >
+    The drive shall limit torque and speed demands towards the operator's overspeed limit and
+    enter Fault with overspeed when the speed exceeds it by 10 %. In position mode, with a
+    following-error window set, it shall enter Fault with followingError when the position error
+    stays beyond the window for the following-error time.
+
+- id: REQ-PRO-005
+  title: A lost encoder, a stalled rotor and a missing phase are reported
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall enter Fault with encoderLoss when the encoder stops reporting a rotor the drive
+    is moving, with stall when an outside force holds or reverses the rotor against the drive, and
+    with phaseMissing when a motor phase does not carry the drive's current, at alignment or while
+    Enabled. The thresholds of this supervision shall be operator settings, stored and in force at
+    once, and shall not report a rotor holding a load.
+
+- id: REQ-PRO-006
+  title: The recent faults survive a power cycle
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    The drive shall record, for each new fault, its code, the power-up count, the time since
+    power-up, the control mode, the bus voltage and the peak torque current, keep the eight newest
+    records across power cycles until the operator clears them, and make them readable over CAN.

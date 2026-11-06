@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.20.2
+version: 0.20.3
 component: can-service
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.20.2                   |
+| Version   | 0.20.3                   |
 | Component | can-service              |
 | Date      | 2026-11-06               |
 
@@ -233,7 +233,7 @@ identification as part of the calibration sequence. Their IDs stay reserved and 
 that still sends either command gets no acknowledgement and times out; every other message is unchanged.
 
 **Contract 2.4 — fault supervision.** Version 2.4 adds six parameters and one fault code; nothing in 2.3
-changes. The parameters are the drive-wide supervision settings of `fault-supervision.md` (REQ-SM-033),
+changes. The parameters are the drive-wide supervision settings of `fault-supervision.md` (REQ-PRO-005),
 kept in the configuration record. Like a start-up setting they can be written in any state and are
 answered once stored, and a write that cannot be stored is taken back; unlike one, they take effect at the
 supervisor's next evaluation, within 10 ms. A position error above π is never reached, because the error is
@@ -516,6 +516,19 @@ The reference-motor values come from `documentation/theory/foc-plant-models.md` 
 and friction, around 1e-6 and 1e-5 in SI units, travel only as `float32` parameters (`SetParameter`,
 `QueryParameter`).
 
+### One definition, verified byte for byte
+
+The identifiers, enumerations, scale factors and field layouts of category `0x02` are defined once, in
+`core/can`; the server, the client, the CAN Commander and the integration fixtures reference that definition
+and restate none of it, and every decode takes its exact payload length from it. Encoding and decoding are
+written by hand against the definition rather than generated from it, so the definition alone cannot catch
+a field order or width that has drifted. Two kinds of test do:
+
+- every command and every response is checked against literal expected bytes, written independently of the
+  helpers that encode and decode it, so a descriptor edit that changes a length fails them;
+- the client and the server are tested against each other, not only against their own test doubles, so a
+  layout both sides state wrongly in the same way is still caught.
+
 ### Deviations from the can-lite reference example
 
 `infra/can-lite` (pinned at `ea80b3e`) ships `examples/foc_motor`, which also claims category `0x02` and
@@ -523,17 +536,17 @@ disagrees with this contract. e-foc's definitions are authoritative for this pro
 documentation. Because every decode is length-exact, a frame built from the example is rejected with
 `invalidPayload` rather than misread — visibly, not silently.
 
-| Message / item                | e-foc                                       | can-lite example       | Why                                                                                          |
-|-------------------------------|---------------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
-| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
-| `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                      |
-| `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                           |
-| `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
-| `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
-| category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
-| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
-| `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale     |
-| `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz              |
+| Message / item                | e-foc                                       | can-lite example       | Why                                                                                      |
+|-------------------------------|---------------------------------------------|------------------------|------------------------------------------------------------------------------------------|
+| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | each loop derives its gains from its bandwidth (REQ-CTL-006), never from per-axis gains  |
+| `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                  |
+| `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                       |
+| `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                            |
+| `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                           |
+| category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on    |
+| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                 |
+| `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale |
+| `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz          |
 
 ### Part B — FocMotorCategoryServer
 
@@ -545,8 +558,8 @@ The observer interface provides callbacks for:
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
-- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CAL-015); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
-- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-POS-013); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
+- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CMS-001); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
+- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-CTL-003); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-COM-002).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
   The telemetry rate is the current stream's rate (Part J), 0–1000 Hz.
 - `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
@@ -672,7 +685,7 @@ It is composed in the instantiation layer alongside the CAN bridge, so the bridg
 
 **Command timeout.** Liveness alone does not catch a client whose application hangs while its CAN stack
 keeps running: the heartbeat goes on, the client never goes offline, and the drive keeps executing its last
-setpoint. `CanCommandTimeout` watches what the client asks for instead (REQ-PRT-007). The bridge tells it
+setpoint. `CanCommandTimeout` watches what the client asks for instead (REQ-LCY-005). The bridge tells it
 of every accepted Start and every accepted torque, speed or position setpoint; nothing else counts, the
 heartbeat included. Every 1 ms on the event loop, while the drive is `Enabled` and the command timeout of the
 configuration record is above zero, it compares the time since the later of the latest such command and the

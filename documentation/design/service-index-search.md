@@ -30,11 +30,11 @@ date: 2026-11-06
 
 **Is responsible for:**
 - Turning the rotor slowly, with an open-loop voltage vector sized for a bounded current, until the encoder's
-  index pulse passes, and reporting the encoder reading at that pulse (REQ-CAL-027)
+  index pulse passes, and reporting the encoder reading at that pulse
 - At commissioning, measuring that reading in the frame the alignment has just set: the **index angle**, the
-  mechanical angle of the index from the electrical zero (REQ-CAL-026)
+  mechanical angle of the index from the electrical zero
 - At power-up, re-referencing the encoder so that it reads the stored index angle at the pulse, which restores
-  the frame the alignment set without aligning again (REQ-SM-035)
+  the frame the alignment set without aligning again (REQ-CMS-005)
 - Failing safely: stopping the inverter on a run-out of travel, an over-current or a timeout, and dropping its
   completion on an abort
 

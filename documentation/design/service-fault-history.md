@@ -31,7 +31,7 @@ date: 2026-11-06
 The last fault code lives only while the drive is in `Fault` (`state-machine.md`): a clear or a reset loses
 it, so an intermittent fault — an overvoltage on a deceleration, an over-current burst, a command timeout — leaves
 nothing to diagnose afterwards. The fault history keeps the last eight entries into `Fault` across power cycles
-(REQ-PRT-011).
+(REQ-PRO-006).
 
 **Is responsible for:**
 - Recording every entry into `Fault`: the fault code, the power-up it happened in, the time since that power-up,
@@ -68,7 +68,7 @@ nothing to diagnose afterwards. The fault history keeps the last eight entries i
 
 The peak current is sampled from the active drive every millisecond on the event loop, so it is the largest of
 the ten one-millisecond torque-current values the drive reported before the fault, not the largest phase-current
-sample: the 20 kHz loop does no per-sample bookkeeping (REQ-PERF-003), and an over-current trip is cut by the
+sample: the 20 kHz loop does no per-sample bookkeeping (REQ-PLT-004), and an over-current trip is cut by the
 board before any sample reaches the event loop.
 
 ### Part B — Capturing an entry into Fault

@@ -1,16 +1,16 @@
 Feature: Starting from the encoder index
   An incremental encoder loses its reference at every reset, so a drive without an index has to
   align the rotor again after each power-up. With an index channel the calibration measures the
-  angle of the index in the frame the alignment set and stores it with the record (REQ-CAL-026).
+  angle of the index in the frame the alignment set and stores it with the record.
   After a power-up the drive is Ready, and the first Start turns the rotor slowly with a bounded
   current until the index passes, sets the encoder so the index reads the stored angle, and runs
-  without aligning (REQ-SM-035).
+  without aligning (REQ-CMS-005).
 
   The plant's encoder reads 1 rad ahead of the rotor at power-up, a frame four electrical radians
   wrong on the bench motor: a drive that ran in it would push the rotor backwards. Its index sits
   2.5 rad from the electrical zero and is one count wide.
 
-  @sil @REQ-SM-035
+  @sil @REQ-CMS-005
   Scenario: A stored index angle restores the rotor reference at the first Start
     Given a bench motor plant
     And a motor plant with:
@@ -29,7 +29,7 @@ Feature: Starting from the encoder index
     And the q-axis current shall average between 0.08 and 0.12 A from 100 to 300 ms after enable
     And the d-axis current shall be below 10 mA RMS from 100 to 300 ms after enable
 
-  @sil @REQ-CAL-026
+  @sil @REQ-CMS-005
   Scenario: The calibration stores the index angle, and a restart starts from it
     Given a bench motor plant
     And a motor plant with:

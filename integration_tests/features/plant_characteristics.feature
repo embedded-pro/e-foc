@@ -5,7 +5,7 @@ Feature: Motor Plant Characteristics
   is measured in control_robustness.feature; these scenarios cover the conditions
   that decide whether the drive aligns and runs at all.
 
-  @sil @REQ-SM-004
+  @sil @REQ-CMS-001
   Scenario: Encoder noise above the alignment settle threshold prevents alignment
     Given a motor plant with:
       | encoder_noise_sigma_radians | 0.01 |
@@ -15,7 +15,7 @@ Feature: Motor Plant Characteristics
     And the rotor alignment is attempted
     Then the motor shall refuse to enable
 
-  @sil @REQ-SM-005
+  @sil @REQ-CMS-001
   Scenario: Heavy current measurement noise does not stop torque control
     Given a motor plant with:
       | adc_noise_sigma_ampere      | 0.2    |

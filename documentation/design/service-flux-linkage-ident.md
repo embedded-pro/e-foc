@@ -179,7 +179,7 @@ In the model-in-the-loop, calibrating against plants whose flux linkage differs 
 both reference motors, in torque and in speed mode. With the bench's 38.5 mA of current noise and each
 duty a period late, it is within 1 % under every current law, at the noise-bound automatic bandwidth.
 The mechanical identification that follows reads the inertia within 0.1 % on a 1000-count encoder
-(REQ-CAL-021, `parameter_identification.feature`).
+(REQ-CMS-001, `parameter_identification.feature`).
 
 On the bench, three torque-mode calibrations under sliding mode stored 4.54 to 4.63 mWb, and the
 calibrations in the hardware regression 4.55 to 4.67 mWb. The inertia was a factor 1.51 below the one
