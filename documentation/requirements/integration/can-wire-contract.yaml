@@ -225,3 +225,14 @@
     busVoltageMinimum (0x30) and busVoltageMaximum (0x31) in V, 0 to 100, each writable in any
     state, answered with the value held once stored, refused with invalidPayload outside its range
     and read back unchanged after a restart.
+
+- id: REQ-CAN-023
+  title: The fault history is read and cleared over CAN
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Contract version 2.16 shall add, without changing any 2.15 message, QueryFaultHistory
+    (0x1B) with an age from 0 the newest, answered with FaultRecordResponse (0x9B: age, fault
+    code, control mode, uptime in ms) and FaultConditionsResponse (0x9C: age, power-up count,
+    bus voltage and peak current at 0.01 resolution), the fault code none past the records
+    held; and ClearFaultHistory (0x1C), acknowledged once the empty history is stored.

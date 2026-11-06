@@ -105,7 +105,8 @@ namespace
     protected:
         NvmRegionStub calibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
         NvmRegionStub configRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+        NvmRegionStub faultHistoryRegion{ services::faultHistoryImageSize };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
 
         services::CalibrationData MakeTestCalibration()
         {
@@ -206,7 +207,8 @@ namespace
 
         testing::StrictMock<NvmRegionMock> calibrationRegion;
         testing::StrictMock<NvmRegionMock> configRegion;
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+        testing::StrictMock<NvmRegionMock> faultHistoryRegion;
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion };
 
         infra::Function<void()> pendingRegionCallback;
         std::optional<services::NvmStatus> configStatus;
@@ -682,7 +684,8 @@ TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hard
 
     CorruptingRegion corruptCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
     NvmRegionStub corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion };
+    NvmRegionStub faultHistoryRegionStub{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion, faultHistoryRegionStub };
 
     corruptCalibrationRegion.corruptOnRead = true;
 
@@ -738,7 +741,8 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_hardware_
 
     NvmRegionStub normalCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
     CorruptingRegion corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion };
+    NvmRegionStub normalFaultHistoryRegion{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion, normalFaultHistoryRegion };
 
     bool done = false;
     services::NvmStatus result{};
@@ -904,4 +908,106 @@ TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_
 
     ASSERT_TRUE(calibrationStatus.has_value());
     EXPECT_EQ(*calibrationStatus, services::NvmStatus::Ok);
+}
+
+TEST_F(NonVolatileMemoryTest, a_saved_fault_history_loads_back)
+{
+    services::FaultHistoryData history;
+    history.powerUps = 4;
+    history.records[2] = services::FaultRecord{ 2, 1, 4, 1500, 4000, 120 };
+    std::optional<services::NvmStatus> saved;
+    nvm.SaveFaultHistory(history, [&saved](services::NvmStatus status)
+        {
+            saved = status;
+        });
+    ExecuteAllActions();
+    ASSERT_EQ(services::NvmStatus::Ok, saved);
+
+    services::FaultHistoryData loaded;
+    std::optional<services::NvmStatus> status;
+    nvm.LoadFaultHistory(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::Ok, status);
+    EXPECT_EQ(4, loaded.powerUps);
+    EXPECT_EQ(history.records, loaded.records);
+}
+
+TEST_F(NonVolatileMemoryTest, a_blank_fault_history_region_loads_as_invalid_and_empty)
+{
+    services::FaultHistoryData loaded;
+    loaded.powerUps = 9;
+    loaded.records[0] = services::FaultRecord{ 2, 1, 1, 1, 1, 1 };
+    std::optional<services::NvmStatus> status;
+
+    nvm.LoadFaultHistory(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::InvalidData, status);
+    EXPECT_EQ(0, loaded.powerUps);
+    EXPECT_FALSE(loaded.records[0].has_value());
+}
+
+TEST_F(NonVolatileMemoryTest, a_fault_history_save_is_refused_while_a_config_save_runs)
+{
+    nvm.SaveConfig(services::ConfigData{}, [](services::NvmStatus) {});
+    std::optional<services::NvmStatus> status;
+
+    nvm.SaveFaultHistory(services::FaultHistoryData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+
+    EXPECT_EQ(services::NvmStatus::Busy, status);
+    ExecuteAllActions();
+}
+
+TEST_F(NonVolatileMemoryTest, a_fault_history_save_whose_read_back_differs_reports_a_hardware_fault)
+{
+    struct ReadBackCorruptingRegion
+        : NvmRegionStub
+    {
+        using NvmRegionStub::NvmRegionStub;
+
+        void Read(infra::ByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(storage.begin(), storage.begin() + data.size(), data.begin());
+            data[0] ^= 0xFF;
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+    };
+
+    ReadBackCorruptingRegion corruptFaultHistoryRegion{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ calibrationRegion, configRegion, corruptFaultHistoryRegion };
+    std::optional<services::NvmStatus> status;
+
+    nvmWithCorruption.SaveFaultHistory(services::FaultHistoryData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::HardwareFault, status);
+}
+
+TEST_F(NonVolatileMemoryTest, a_format_leaves_the_fault_history_alone)
+{
+    services::FaultHistoryData history;
+    history.records[0] = services::FaultRecord{ 2, 1, 1, 10, 0, 0 };
+    nvm.SaveFaultHistory(history, [](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    nvm.Format([](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    services::FaultHistoryData loaded;
+    nvm.LoadFaultHistory(loaded, [](services::NvmStatus) {});
+    ExecuteAllActions();
+    EXPECT_EQ(history.records[0], loaded.records[0]);
 }

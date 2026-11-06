@@ -30,6 +30,8 @@ target_sources(e_foc.supervision PRIVATE
     OverTemperature.cpp
     OverspeedMonitor.hpp
     OverspeedMonitor.cpp
+    PeakCurrent.hpp
+    PeakCurrent.cpp
     PhaseLossMonitor.hpp
     PhaseLossMonitor.cpp
     PositionLimitMonitor.hpp

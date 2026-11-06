@@ -23,7 +23,7 @@ namespace services
         static constexpr std::size_t configRecordSize =
             sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(ConfigData);
 
-        NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion);
+        NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion);
 
         void SaveCalibration(const CalibrationData& data, infra::Function<void(NvmStatus)> onDone) override;
         void LoadCalibration(CalibrationData& data, infra::Function<void(NvmStatus)> onDone) override;
@@ -35,6 +35,9 @@ namespace services
         void ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone) override;
 
         void Format(infra::Function<void(NvmStatus)> onDone) override;
+
+        void SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) override;
+        void LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) override;
 
     private:
         void OnCalibrationErased();
@@ -57,24 +60,33 @@ namespace services
         void CompleteConfig(NvmStatus status);
         void CompleteFormat(NvmStatus status);
         void CompleteIsCalibrationValid(bool valid);
+        void CompleteFaultHistory(NvmStatus status);
+        void OnFaultHistoryWritten();
+        void OnFaultHistoryReadBack();
+        void OnFaultHistoryReadForLoad();
 
         static uint32_t ComputeCrc(infra::ConstByteRange bytes);
 
         NvmRegion& calibrationRegion;
         NvmRegion& configRegion;
+        NvmRegion& faultHistoryRegion;
 
         std::array<uint8_t, calibrationRecordSize> calibrationBuffer{};
         std::array<uint8_t, calibrationRecordSize> calibrationReadBackBuffer{};
         std::array<uint8_t, configRecordSize> configBuffer{};
         std::array<uint8_t, configRecordSize> configReadBackBuffer{};
+        std::array<uint8_t, faultHistoryImageSize> faultHistoryBuffer{};
+        std::array<uint8_t, faultHistoryImageSize> faultHistoryReadBackBuffer{};
 
         infra::AutoResetFunction<void(NvmStatus)> onCalibrationDone;
         infra::AutoResetFunction<void(NvmStatus)> onConfigDone;
         infra::AutoResetFunction<void(NvmStatus)> onFormatDone;
         infra::AutoResetFunction<void(bool)> onIsCalibrationValidDone;
+        infra::AutoResetFunction<void(NvmStatus)> onFaultHistoryDone;
 
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
+        FaultHistoryData* pendingFaultHistoryOutput = nullptr;
 
         bool busy{ false };
     };

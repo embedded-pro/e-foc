@@ -12,6 +12,7 @@ target_link_libraries(e_foc.can_test PUBLIC
     e_foc.services.alignment_mock
     e_foc.services.current_offsets_mock
     e_foc.services.electrical_system_ident_mock
+    e_foc.services.fault_history_mock
     e_foc.services.firmware_upgrade_mock
     e_foc.services.mechanical_system_ident_mock
     e_foc.services.non_volatile_memory_mock

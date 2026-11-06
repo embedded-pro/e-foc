@@ -2,6 +2,7 @@
 
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "core/services/non_volatile_memory/FaultHistoryData.hpp"
 #include "infra/util/Function.hpp"
 
 namespace services
@@ -32,5 +33,8 @@ namespace services
         virtual void ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone) = 0;
 
         virtual void Format(infra::Function<void(NvmStatus)> onDone) = 0;
+
+        virtual void SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;
+        virtual void LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;
     };
 }

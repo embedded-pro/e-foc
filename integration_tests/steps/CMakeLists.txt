@@ -7,6 +7,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     ControllerSettingsSteps.cpp
     CurrentStreamSteps.cpp
     EepromSteps.cpp
+    FaultHistorySteps.cpp
     FaultSteps.cpp
     FirmwareIdentitySteps.cpp
     FirmwareUpgradeSteps.cpp

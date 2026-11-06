@@ -44,6 +44,7 @@ namespace application
         state_machine::Ready StopToReady();
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
+        void RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered);
         void StateEntered(StateId state);
 
     private:
@@ -59,5 +60,6 @@ namespace application
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         bool faultDispatched{ false };
         infra::Function<void()> readyHandler;
+        infra::Function<void(state_machine::FaultCode)> faultEnteredHandler;
     };
 }
