@@ -1,4 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
+#include <array>
 #include <cmath>
 #include <optional>
 
@@ -20,52 +21,33 @@ namespace can
 
     namespace
     {
+        struct ReadingRange
+        {
+            FocParameter first;
+            FocParameter last;
+            ParameterGroup group;
+        };
+
+        // Each group of readings takes a contiguous block of identifiers.
+        constexpr std::array<ReadingRange, 4> readingRanges{ {
+            { FocParameter::currentOffsetA, FocParameter::coggingPeak, ParameterGroup::calibrationRecord },
+            { FocParameter::estimatedResistance, FocParameter::recalibrationsStored, ParameterGroup::onlineEstimate },
+            { FocParameter::loopSamples, FocParameter::loopReentries, ParameterGroup::loopStatistics },
+            { FocParameter::resetCause, FocParameter::stagedVersionPatch, ParameterGroup::platform },
+        } };
+
         std::optional<ParameterGroup> ReadingGroupOf(FocParameter parameter)
         {
-            switch (parameter)
-            {
-                case FocParameter::currentOffsetA:
-                case FocParameter::currentOffsetB:
-                case FocParameter::currentOffsetC:
-                case FocParameter::coggingPeak:
-                    return ParameterGroup::calibrationRecord;
-                case FocParameter::estimatedResistance:
-                case FocParameter::estimatedInductance:
-                case FocParameter::estimatedInertia:
-                case FocParameter::estimatedViscousFriction:
-                case FocParameter::modelResistance:
-                case FocParameter::modelInductance:
-                case FocParameter::modelInertia:
-                case FocParameter::modelViscousFriction:
-                case FocParameter::recalibrationsApplied:
-                case FocParameter::recalibrationsRejected:
-                case FocParameter::recalibrationsStored:
-                    return ParameterGroup::onlineEstimate;
-                case FocParameter::loopSamples:
-                case FocParameter::loopBudgetCycles:
-                case FocParameter::loopMinimumCycles:
-                case FocParameter::loopAverageCycles:
-                case FocParameter::loopMaximumCycles:
-                case FocParameter::loopOverruns:
-                case FocParameter::loopDeadlineMisses:
-                case FocParameter::loopReentries:
-                    return ParameterGroup::loopStatistics;
-                case FocParameter::resetCause:
-                case FocParameter::firmwareVersionMajor:
-                case FocParameter::firmwareVersionMinor:
-                case FocParameter::firmwareVersionPatch:
-                case FocParameter::boardKind:
-                case FocParameter::stagedVersionMajor:
-                case FocParameter::stagedVersionMinor:
-                case FocParameter::stagedVersionPatch:
-                    return ParameterGroup::platform;
-                case FocParameter::targetReached:
-                    return ParameterGroup::motion;
-                case FocParameter::windingTemperature:
-                    return ParameterGroup::thermal;
-                default:
-                    return std::nullopt;
-            }
+            const auto id = static_cast<uint8_t>(parameter);
+            for (const auto& range : readingRanges)
+                if (id >= static_cast<uint8_t>(range.first) && id <= static_cast<uint8_t>(range.last))
+                    return range.group;
+
+            if (parameter == FocParameter::targetReached)
+                return ParameterGroup::motion;
+            if (parameter == FocParameter::windingTemperature)
+                return ParameterGroup::thermal;
+            return std::nullopt;
         }
 
         std::optional<ParameterGroup> LoopGroupOf(FocParameter parameter)

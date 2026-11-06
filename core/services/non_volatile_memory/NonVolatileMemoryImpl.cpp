@@ -37,8 +37,8 @@ namespace services
     NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion, NvmRegion& learnedModelRegion)
         : calibrationRegion(calibrationRegion)
         , configRegion(configRegion)
-        , faultHistoryRegion(faultHistoryRegion)
-        , learnedModelRegion(learnedModelRegion)
+        , faultHistory(faultHistoryRegion)
+        , learnedModel(learnedModelRegion)
     {
     }
 
@@ -73,124 +73,73 @@ namespace services
         onIsCalibrationValidDone(valid);
     }
 
-    void NonVolatileMemoryImpl::CompleteFaultHistory(NvmStatus status)
+    bool NonVolatileMemoryImpl::Admit(const infra::Function<void(NvmStatus)>& onDone)
+    {
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
+            return false;
+        }
+
+        busy = true;
+        onImageDone = onDone;
+        return true;
+    }
+
+    void NonVolatileMemoryImpl::CompleteImage(NvmStatus status)
     {
         busy = false;
-        onFaultHistoryDone(status);
+        onImageDone(status);
     }
 
     void NonVolatileMemoryImpl::SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-        SerializeFaultHistory(history, infra::MakeRange(faultHistoryBuffer));
-        onFaultHistoryDone = onDone;
-        faultHistoryRegion.Write(infra::MakeConstByteRange(faultHistoryBuffer), [this]
+        SerializeFaultHistory(history, faultHistory.Contents());
+        faultHistory.Write([this](NvmStatus status)
             {
-                OnFaultHistoryWritten();
+                CompleteImage(status);
             });
-    }
-
-    void NonVolatileMemoryImpl::OnFaultHistoryWritten()
-    {
-        faultHistoryRegion.Read(infra::MakeRange(faultHistoryReadBackBuffer), [this]
-            {
-                OnFaultHistoryReadBack();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnFaultHistoryReadBack()
-    {
-        CompleteFaultHistory(faultHistoryBuffer == faultHistoryReadBackBuffer ? NvmStatus::Ok : NvmStatus::HardwareFault);
     }
 
     void NonVolatileMemoryImpl::LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-        pendingFaultHistoryOutput = &history;
-        onFaultHistoryDone = onDone;
-        faultHistoryRegion.Read(infra::MakeRange(faultHistoryReadBackBuffer), [this]
+        faultHistory.Read([this, &history](infra::ConstByteRange image)
             {
-                OnFaultHistoryReadForLoad();
+                const auto read = DeserializeFaultHistory(image);
+                history = read.value_or(FaultHistoryData{});
+                CompleteImage(read.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
             });
-    }
-
-    void NonVolatileMemoryImpl::OnFaultHistoryReadForLoad()
-    {
-        const auto history = DeserializeFaultHistory(infra::MakeConstByteRange(faultHistoryReadBackBuffer));
-        *pendingFaultHistoryOutput = history.value_or(FaultHistoryData{});
-        CompleteFaultHistory(history.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
-    }
-
-    void NonVolatileMemoryImpl::CompleteLearnedModel(NvmStatus status)
-    {
-        busy = false;
-        onLearnedModelDone(status);
     }
 
     void NonVolatileMemoryImpl::SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-        SerializeLearnedModel(model, infra::MakeRange(learnedModelBuffer));
-        onLearnedModelDone = onDone;
-        learnedModelRegion.Write(infra::MakeConstByteRange(learnedModelBuffer), [this]
+        SerializeLearnedModel(model, learnedModel.Contents());
+        learnedModel.Write([this](NvmStatus status)
             {
-                OnLearnedModelWritten();
+                CompleteImage(status);
             });
-    }
-
-    void NonVolatileMemoryImpl::OnLearnedModelWritten()
-    {
-        learnedModelRegion.Read(infra::MakeRange(learnedModelReadBackBuffer), [this]
-            {
-                OnLearnedModelReadBack();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnLearnedModelReadBack()
-    {
-        CompleteLearnedModel(learnedModelBuffer == learnedModelReadBackBuffer ? NvmStatus::Ok : NvmStatus::HardwareFault);
     }
 
     void NonVolatileMemoryImpl::LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-        pendingLearnedModelOutput = &model;
-        onLearnedModelDone = onDone;
-        learnedModelRegion.Read(infra::MakeRange(learnedModelReadBackBuffer), [this]
+        learnedModel.Read([this, &model](infra::ConstByteRange image)
             {
-                OnLearnedModelReadForLoad();
+                const auto read = DeserializeLearnedModel(image);
+                model = read.value_or(LearnedModelData{});
+                CompleteImage(read.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
             });
-    }
-
-    void NonVolatileMemoryImpl::OnLearnedModelReadForLoad()
-    {
-        const auto model = DeserializeLearnedModel(infra::MakeConstByteRange(learnedModelReadBackBuffer));
-        *pendingLearnedModelOutput = model.value_or(LearnedModelData{});
-        CompleteLearnedModel(model.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
     }
 
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,

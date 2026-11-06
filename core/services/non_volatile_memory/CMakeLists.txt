@@ -18,6 +18,7 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
     LearnedModelData.hpp
     LearnedModelData.cpp
     NonVolatileMemory.hpp
+    NvmImage.hpp
     NvmRegion.hpp
     NvmEepromRegion.hpp
     NvmEepromRegion.cpp
