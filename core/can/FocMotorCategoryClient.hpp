@@ -34,6 +34,8 @@ namespace can
         virtual void OnElectricalParamsResponse(uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) = 0;
         virtual void OnAlgorithmsResponse(uint16_t sourceNodeId, const FocAlgorithms& algorithms) = 0;
         virtual void OnParameterResponse(uint16_t sourceNodeId, FocParameter parameter, FocParameterValue value) = 0;
+        virtual void OnFaultRecordResponse(uint16_t sourceNodeId, uint8_t age, FocFaultCode code, FocMotorMode mode, uint32_t uptimeMs) = 0;
+        virtual void OnFaultConditionsResponse(uint16_t sourceNodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent) = 0;
     };
 
     enum class ContractCompatibility : uint8_t
@@ -97,6 +99,8 @@ namespace can
         bool SendSetParameter(uint16_t targetNodeId, FocParameter parameter, float value);
         bool SendQueryParameter(uint16_t targetNodeId, FocParameter parameter);
         bool SendMaintenanceCommand(uint16_t targetNodeId, FocMaintenanceCommand command);
+        bool SendQueryFaultHistory(uint16_t targetNodeId, uint8_t age);
+        bool SendClearFaultHistory(uint16_t targetNodeId);
 
         ContractCompatibility Compatibility(uint16_t nodeId) const;
 
@@ -109,6 +113,8 @@ namespace can
         bool HandleElectricalParamsResponse(const hal::Can::Message& data);
         bool HandleAlgorithmsResponse(const hal::Can::Message& data);
         bool HandleParameterResponse(const hal::Can::Message& data);
+        bool HandleFaultRecordResponse(const hal::Can::Message& data);
+        bool HandleFaultConditionsResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };
@@ -118,6 +124,8 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> electricalParamsResponse{ focElectricalParamsResponseId, *this, &FocMotorCategoryClient::HandleElectricalParamsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> algorithmsResponse{ focAlgorithmsResponseId, *this, &FocMotorCategoryClient::HandleAlgorithmsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> parameterResponse{ focParameterResponseId, *this, &FocMotorCategoryClient::HandleParameterResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> faultRecordResponse{ focFaultRecordResponseId, *this, &FocMotorCategoryClient::HandleFaultRecordResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> faultConditionsResponse{ focFaultConditionsResponseId, *this, &FocMotorCategoryClient::HandleFaultConditionsResponse };
 
         const CanFrameOrigin& origin;
         NodeContracts contracts;

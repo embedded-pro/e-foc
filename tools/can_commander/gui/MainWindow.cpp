@@ -823,6 +823,12 @@ namespace tool
             motor->OnParameter(parameter, value);
     }
 
+    void MainWindow::OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnFaultRecord(record);
+    }
+
     void MainWindow::OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity)
     {
         if (auto* motor = Motor(nodeId))

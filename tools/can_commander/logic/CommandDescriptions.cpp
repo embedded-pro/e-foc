@@ -60,6 +60,10 @@ namespace tool
                 return "Clear Calibration";
             case can::focClearDiagnosticsId:
                 return "Clear Diagnostics";
+            case can::focQueryFaultHistoryId:
+                return "Fault History Query";
+            case can::focClearFaultHistoryId:
+                return "Clear Fault History";
             default:
                 return {};
         }

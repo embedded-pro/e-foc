@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.17.0
+version: 0.18.0
 component: "tool-can-commander"
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.17.0               |
+| Version   | 0.18.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-05           |
+| Date      | 2026-11-06           |
 
 ---
 
@@ -321,6 +321,15 @@ parameters of contract 2.2, read one at a time like the settings when the node i
 calibration and on Refresh; each shows "—" until it is read, and the values are dropped when the node leaves
 the bus. Clear Statistics sends `ClearDiagnostics`, which restarts the control-loop and CAN error statistics,
 and reads them again once the controller accepts it.
+
+Its **Fault History** group lists the controller's last eight faults, newest first (`service-fault-history.md`):
+the fault, the control mode, the power-up it happened in, the time from that power-up, the bus voltage and the
+peak torque current. The commander asks for every age (contract 2.17) when the node is found compatible, on
+Refresh, when the motor reports a fault and after a clear, and pairs each age's two responses into one row. The
+group shows "—" until the newest age is answered, "No faults recorded." when the controller holds none, and
+forgets the rows when the node leaves the bus. Clear Fault History asks for confirmation, sends
+`ClearFaultHistory` and reads the history again once the controller has stored it. On firmware older than 2.17
+the group says which contract it needs and its button is disabled.
 
 ### Part E — issue log
 

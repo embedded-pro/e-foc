@@ -48,6 +48,8 @@ namespace
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t sourceNodeId, const can::FocAlgorithms& algorithms), (override));
         MOCK_METHOD(void, OnParameterResponse, (uint16_t sourceNodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
+        MOCK_METHOD(void, OnFaultRecordResponse, (uint16_t sourceNodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs), (override));
+        MOCK_METHOD(void, OnFaultConditionsResponse, (uint16_t sourceNodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent), (override));
     };
 
     struct FrameOriginStub
@@ -344,4 +346,44 @@ TEST_F(FocMotorCategoryClientTest, OnTelemetryCurrents_WrongLength_IsRejected)
 TEST_F(FocMotorCategoryClientTest, the_retired_electrical_telemetry_frame_is_not_handled)
 {
     EXPECT_EQ(services::CanDispatchResult::unknownMessageType, client.HandleMessage(0x88, MakeMessage({ 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 })));
+}
+
+TEST_F(FocMotorCategoryClientTest, SendQueryFaultHistory_CarriesTheAge)
+{
+    client.SendQueryFaultHistory(1, 5);
+
+    EXPECT_EQ(lastSentMsgType, can::focQueryFaultHistoryId);
+    ASSERT_EQ(lastSentMsg.size(), 2u);
+    EXPECT_EQ(lastSentMsg[1], 5);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendClearFaultHistory_TransmitsTheCommand)
+{
+    client.SendClearFaultHistory(1);
+
+    EXPECT_EQ(lastSentMsgType, can::focClearFaultHistoryId);
+    EXPECT_EQ(lastSentMsg.size(), 1u);
+}
+
+TEST_F(FocMotorCategoryClientTest, OnFaultRecordResponse_DecodesTheRecordOfThatAge)
+{
+    EXPECT_CALL(observer, OnFaultRecordResponse(3, 1, can::FocFaultCode::stall, can::FocMotorMode::position, 70000u));
+
+    client.HandleMessage(can::focFaultRecordResponseId, MakeMessage({ 0x01, 0x06, 0x02, 0x00, 0x01, 0x11, 0x70 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnFaultRecordResponse_NamingNoMode_IsDropped)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focFaultRecordResponseId, MakeMessage({ 0x01, 0x06, 0x03, 0x00, 0x01, 0x11, 0x70 })));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnFaultConditionsResponse_DecodesHundredths)
+{
+    EXPECT_CALL(observer, OnFaultConditionsResponse(3, 0, 7, _, _)).WillOnce(Invoke([](uint16_t, uint8_t, int16_t, foc::Volts busVoltage, foc::Ampere peakCurrent)
+        {
+            EXPECT_NEAR(24.0f, busVoltage.Value(), 1e-4f);
+            EXPECT_NEAR(3.5f, peakCurrent.Value(), 1e-4f);
+        }));
+
+    client.HandleMessage(can::focFaultConditionsResponseId, MakeMessage({ 0x00, 0x00, 0x07, 0x09, 0x60, 0x01, 0x5E }));
 }

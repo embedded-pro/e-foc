@@ -11,5 +11,6 @@ target_link_libraries(e_foc.tool.can_commander.gui_test PUBLIC
 
 target_sources(e_foc.tool.can_commander.gui_test PRIVATE
     Main.cpp
+    TestDiagnosticsTab.cpp
     TestMotorFirmware.cpp
 )

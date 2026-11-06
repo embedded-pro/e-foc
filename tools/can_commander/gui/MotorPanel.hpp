@@ -52,6 +52,7 @@ namespace tool
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnAlgorithms(const can::FocAlgorithms& algorithms);
         void OnParameter(can::FocParameter parameter, can::FocParameterValue value);
+        void OnFaultRecord(const can::FocFaultRecord& record);
         void OnFirmwareIdentity(const FirmwareIdentity& identity);
         void SetLatestRelease(const ReleaseInfo& release);
         MotorFirmware& Firmware();
@@ -77,6 +78,7 @@ namespace tool
         void ConnectCommissioning();
         void ConnectDiagnostics();
         void ConfirmClearCalibration();
+        void ConfirmClearFaultHistory();
         void ConnectSettings();
         bool Send(const QString& command, uint8_t commandType, const std::function<bool()>& send);
         void Report(IssueSeverity severity, const QString& message) const;
@@ -92,6 +94,7 @@ namespace tool
         QString OverTemperatureUnavailableReason() const;
         QString BusVoltageLimitsUnavailableReason() const;
         QString QuickStopUnavailableReason() const;
+        QString FaultHistoryUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 

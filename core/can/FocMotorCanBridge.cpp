@@ -259,6 +259,8 @@ namespace can
         onDone();
     }
 
+    static_assert(services::FaultHistoryData::capacity == focFaultHistoryDepth);
+
     void FocMotorCanBridge::OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone)
     {
         FocFaultRecord answer{ .age = age };
