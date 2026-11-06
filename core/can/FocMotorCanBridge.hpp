@@ -7,6 +7,7 @@
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "core/services/fault_history/FaultLog.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
@@ -36,6 +37,7 @@ namespace can
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
             std::optional<std::reference_wrapper<services::RotorStandstill>> standstill;
             FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
+            std::optional<std::reference_wrapper<services::FaultLog>> faultHistory{};
         };
 
         FocMotorCanBridge(
@@ -47,6 +49,8 @@ namespace can
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };
+
+        static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
 
         void BroadcastFault(state_machine::FaultCode code);
         void ObserveCommands(const infra::Function<void()>& onAccepted);
@@ -77,9 +81,10 @@ namespace can
         void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearDiagnostics(const infra::Function<void()>& onDone) override;
+        void OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone) override;
+        void OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
-        static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
         static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);
 
         void ReportSelectFailure(state_machine::SelectResult result);
@@ -94,6 +99,7 @@ namespace can
         FocMotorCommissioningBridge commissioning;
         FocMotorSettingsBridge settings;
         FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
+        std::optional<std::reference_wrapper<services::FaultLog>> faultHistory;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
         infra::Function<void(services::CanAckStatus)> pendingStartCallback;

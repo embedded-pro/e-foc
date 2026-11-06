@@ -50,6 +50,9 @@ namespace can
         virtual void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnClearDiagnostics(const infra::Function<void()>& onDone) = 0;
+
+        virtual void OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone) = 0;
+        virtual void OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone) = 0;
     };
 
     class FocMotorCategoryServer
@@ -73,6 +76,7 @@ namespace can
             const infra::Function<void(bool sent)>& onDone);
         void SendAlgorithmsResponse(const FocAlgorithms& algorithms);
         void SendParameterResponse(FocParameter parameter, FocParameterValue value);
+        void SendFaultRecord(const FocFaultRecord& record);
 
     private:
         bool HandleStart(const hal::Can::Message& data);
@@ -97,6 +101,8 @@ namespace can
         bool HandleSetParameter(const hal::Can::Message& data);
         bool HandleQueryParameter(const hal::Can::Message& data);
         bool HandleClearDiagnostics(const hal::Can::Message& data);
+        bool HandleQueryFaultHistory(const hal::Can::Message& data);
+        bool HandleClearFaultHistory(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };
@@ -147,5 +153,7 @@ namespace can
         CommissioningMessages commissioningMessages{ *this };
         services::CanMessageHandler<FocMotorCategoryServer> clearDiagnostics{ focClearDiagnosticsId, *this, &FocMotorCategoryServer::HandleClearDiagnostics };
         services::CanMessageHandler<FocMotorCategoryServer> quickStop{ focQuickStopId, *this, &FocMotorCategoryServer::HandleQuickStop };
+        services::CanMessageHandler<FocMotorCategoryServer> queryFaultHistory{ focQueryFaultHistoryId, *this, &FocMotorCategoryServer::HandleQueryFaultHistory };
+        services::CanMessageHandler<FocMotorCategoryServer> clearFaultHistory{ focClearFaultHistoryId, *this, &FocMotorCategoryServer::HandleClearFaultHistory };
     };
 }

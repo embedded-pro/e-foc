@@ -133,6 +133,9 @@ TEST(WireContractDocumentation, the_scale_table_matches_the_contract)
     EXPECT_EQ(can::focInductanceScale, documented.at("Inductance"));
     EXPECT_EQ(can::focStreamCurrentScale, documented.at("Streamed current"));
     EXPECT_EQ(can::focStreamPositionScale, documented.at("Streamed position"));
+    EXPECT_EQ(can::focRecordedVoltageScale, documented.at("Recorded voltage"));
+    EXPECT_EQ(can::focRecordedCurrentScale, documented.at("Recorded current"));
+    EXPECT_EQ(can::focPowerUpScale, documented.at("Power-up count"));
 }
 
 TEST(WireContractDocumentation, every_scale_the_contract_uses_is_documented)
@@ -197,6 +200,6 @@ TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documen
 {
     const auto document = DesignDocument();
 
-    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents" })
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents", "QueryFaultHistory", "ClearFaultHistory", "FaultRecordResponse", "FaultConditionsResponse" })
         EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

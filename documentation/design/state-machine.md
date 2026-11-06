@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: state-machine
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.8.0                      |
+| Version   | 0.9.0                      |
 | Component | state-machine              |
 | Date      | 2026-11-05                 |
 
@@ -641,6 +641,13 @@ once it is set. A stop landing after the last check needs no unwinding: it runs 
 sequence makes. The flag is written from the faulting context as well as the mainline, so it
 is set and cleared outright rather than counted — a read-modify-write shared with an interrupt is exactly what
 REQ-SM-021 excludes.
+
+#### Announcing a Fault
+
+Each entry into `Fault` that starts an episode — from any state but `Fault`, with the code the machine keeps — is
+announced to an observer the control-mode state machine registers for every mode it activates, so the observer
+survives a mode switch. A further fault of the same episode is not announced. The application hands the
+announcement to the fault history (`service-fault-history.md`), which records it.
 
 #### Fault Latching
 

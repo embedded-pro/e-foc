@@ -23,6 +23,7 @@
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/fault_history/FaultHistory.hpp"
 #include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
@@ -37,6 +38,7 @@
 #include "core/supervision/MotorOverload.hpp"
 #include "core/supervision/OverTemperature.hpp"
 #include "core/supervision/OverspeedMonitor.hpp"
+#include "core/supervision/PeakCurrent.hpp"
 #include "core/supervision/PhaseLossMonitor.hpp"
 #include "core/supervision/PositionLimitMonitor.hpp"
 #include "core/supervision/TargetReachedMonitor.hpp"
@@ -56,11 +58,15 @@ namespace application
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
         static constexpr uint32_t configRegionSize = 256;
+        static constexpr uint32_t faultHistoryRegionOffset = configRegionOffset + configRegionSize;
+        static constexpr uint32_t faultHistoryRegionSize = 128;
         static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
         static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
+        static_assert(services::faultHistoryImageSize <= faultHistoryRegionSize);
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
 
         void ApplyCurrentLimit();
+        void RecordFault(state_machine::FaultCode code);
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
 
@@ -74,6 +80,7 @@ namespace application
         services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
+        services::NvmEepromRegion faultHistoryRegion;
         services::NonVolatileMemoryImpl nvm;
         application::DecimatingThreePhaseInverter inverter;
         services::InverterCompensation inverterCompensation;
@@ -96,6 +103,8 @@ namespace application
         foc::Ampere overloadLimit;
         foc::Ampere thermalLimit;
         supervision::BusVoltageLimitMonitor busVoltageLimits;
+        supervision::PeakCurrent peakCurrent;
+        foc::Volts filteredBusVoltage{ 0.0f };
         services::BusVoltageMonitor busVoltage;
         services::ConfigData configData;
         foc::CurrentStream currentStream;
@@ -107,6 +116,7 @@ namespace application
         std::optional<can::FocMotorCategoryServer> motorCanServer;
         std::optional<services::FirmwareUpgradeCategoryServer> firmwareUpgradeServer;
         std::optional<ControlMode> controlMode;
+        std::optional<services::FaultHistory> faultHistory;
         std::optional<can::FirmwareUpgradeInterlock> firmwareUpgradeInterlock;
         std::optional<services::FirmwareUpgrade> firmwareUpgrade;
         std::optional<can::FocMotorCanBridge> canBridge;

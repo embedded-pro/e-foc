@@ -111,3 +111,14 @@
     stage and enter Ready once the speed is below 2 rad/s or 1 s after the quick stop. From
     100 rad/s at 500 rad/s2 in speed mode the speed shall fall below 2 rad/s within
     196 ms +/- 10 %.
+
+- id: REQ-PRT-011
+  title: The last eight entries into Fault survive a power cycle
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On each entry into Fault that starts a fault episode the drive shall record the fault code,
+    the power-up count, the time since power-up in ms, the control mode, the filtered bus
+    voltage and the peak measured torque current of the last 10 ms, keep the eight newest
+    records in non-volatile memory, written from the event loop at most once a second, and
+    keep them across a power cycle until an explicit clear.

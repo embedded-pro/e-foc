@@ -22,6 +22,7 @@ namespace can
         , commissioning(server, controlMode, motorServices.electricalIdent, motorServices.currentOffsets, motorServices.standstill)
         , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware, motorServices.firmwareUpgrade)
         , firmwareUpgrade(motorServices.firmwareUpgrade)
+        , faultHistory(motorServices.faultHistory)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -256,6 +257,26 @@ namespace can
     {
         settings.ClearDiagnostics();
         onDone();
+    }
+
+    void FocMotorCanBridge::OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone)
+    {
+        FocFaultRecord answer{ .age = age };
+        const auto record = faultHistory.has_value() ? faultHistory->get().OfAge(age) : std::nullopt;
+
+        if (record.has_value())
+            answer = FocFaultRecord{ age, static_cast<FocFaultCode>(record->code), static_cast<FocMotorMode>(record->mode), record->uptimeMs,
+                static_cast<int16_t>(record->powerUp), foc::Volts{ record->busVoltageCentivolts / 100.0f }, foc::Ampere{ record->peakCurrentCentiamperes / 100.0f } };
+
+        onDone(answer);
+    }
+
+    void FocMotorCanBridge::OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone)
+    {
+        if (faultHistory.has_value())
+            faultHistory->get().Clear(onDone);
+        else
+            onDone(true);
     }
 
     void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>& onDone)

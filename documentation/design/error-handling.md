@@ -2,7 +2,7 @@
 title: "Error Handling Design"
 type: design
 status: stable
-version: 1.0.1
+version: 1.1.0
 component: "error-handling"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Error Handling Design |
 | Type      | design                |
 | Status    | stable                |
-| Version   | 1.0.1                 |
+| Version   | 1.1.0                 |
 | Component | error-handling        |
 | Date      | 2026-11-05            |
 
@@ -170,6 +170,13 @@ The fault handler's file therefore defines `abort()` on TI and ST, replacing the
 The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
 
 The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-EH-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
+
+### Fault history
+
+The persistent fault region keeps one HardFault snapshot, in RAM, until the next cold start. Faults the drive
+handles — a board protection trip, a supervision fault, a failed calibration — are kept apart in the non-volatile
+fault history: the last eight entries into `Fault`, with their power-up, uptime, control mode, bus voltage and
+peak current, readable over CAN (`service-fault-history.md`).
 
 ### Reset cause detection
 

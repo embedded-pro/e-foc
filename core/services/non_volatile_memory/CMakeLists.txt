@@ -13,6 +13,8 @@ target_link_libraries(e_foc.services.non_volatile_memory PUBLIC
 target_sources(e_foc.services.non_volatile_memory PRIVATE
     CalibrationData.hpp
     ConfigData.hpp
+    FaultHistoryData.hpp
+    FaultHistoryData.cpp
     NonVolatileMemory.hpp
     NvmRegion.hpp
     NvmEepromRegion.hpp

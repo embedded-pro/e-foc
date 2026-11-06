@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.12.0
+version: 0.13.0
 component: service-nvm
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.12.0                       |
+| Version   | 0.13.0                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-05                   |
 
@@ -51,12 +51,13 @@ date: 2026-11-05
 
 ### Logical Regions
 
-The service manages two independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
+The service manages three independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 172 bytes |
+| Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
@@ -74,7 +75,27 @@ the start-up settings, the tuning settings, the default control mode, the algori
 settings and the limits return to their defaults and are stored again by the next change. The calibration
 record is untouched by any of these bumps.
 
-The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
+The regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on one region has no effect on the others.
+
+### Fault History Region
+
+The fault history (`service-fault-history.md`) is stored differently from the two records above, because it is
+rewritten in the field, on every fault, where a power loss during a write is to be expected. It has no CRC-32 over
+the whole image: a write cut short would invalidate all of it. Each part carries its own check byte instead, so a
+cut write loses only the part it was writing.
+
+| Field      | Size    | Description                                                                                            |
+|------------|---------|--------------------------------------------------------------------------------------------------------|
+| Magic      | 4 bytes | `0xFA17C0DE`                                                                                           |
+| Version    | 1 byte  | Layout version of the fault history, 1                                                                 |
+| Power-ups  | 2 bytes | Power-up count, saturating at 32767                                                                    |
+| Check byte | 1 byte  | CRC-8 of the power-up count                                                                            |
+| Records    | 8 × 13  | Code, mode, power-up (2), uptime in ms (4), bus voltage and peak current in hundredths (2 each), CRC-8 |
+
+A record whose check byte does not match, or whose code is none, is an empty slot; an empty slot is written as
+all-0xFF. A wrong magic or version reads as a history to be reset: no records, power-up count 0. A write stores the
+whole image without erasing it first, then reads it back and compares, as the other regions do; an unchanged part
+is rewritten with the same bytes, so a power loss can damage only the record or the count that changed.
 
 ### On-Media Record Format
 
@@ -148,10 +169,12 @@ The two NVM regions occupy fixed, non-overlapping address ranges within the MCU 
 |---------------|--------------|-----------|--------------------------|
 | Calibration   | 0            | 128 B     | One calibration record   |
 | Configuration | 128          | 256 B     | One configuration record |
-| Reserved      | 384+         | remainder | Unused; not accessed     |
+| Fault history | 384          | 128 B     | The fault history image  |
+| Reserved      | 512+         | remainder | Unused; not accessed     |
 
-Both regions fit comfortably within the 2048-byte EEPROM available on the TM4C1294 target, and within the 512-byte
-24LC04 on E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM). The configuration region grew
+The regions fit within the 2048-byte EEPROM available on the TM4C1294 target, and fill the 512-byte 24LC04 on
+E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM); the fault history therefore holds eight
+records, the number its 128 bytes take. The configuration region grew
 from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the 24LC04;
 the driver splits a write at the block boundary. The NUCLEO-H563ZI and host targets use an in-memory stub of
 identical layout for regression testing.
@@ -181,7 +204,7 @@ Both logical regions are backed by a single EEPROM device, and that device drive
 it accepts exactly one erase, program, or read at a time and treats a second concurrent request as a
 programming error. Admission control is therefore **device-wide, not per region**: while any
 operation is in flight, every entry point — calibration save, load, invalidate, validity check,
-configuration save, load, reset-to-defaults, and format — is refused. No refused request ever reaches
+configuration save, load, reset-to-defaults, format, and fault-history load and save — is refused. No refused request ever reaches
 a region.
 
 A refused request never silently disappears. Its callback is invoked immediately with `Busy`; the
@@ -305,16 +328,18 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                       | Purpose                                                                       | Contract                                                                 |
-|---------------------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once  |
-| `IsCalibrationValid(onDone)`    | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied     |
-| `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`             |
-| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased            |
+| Interface                           | Purpose                                                                       | Contract                                                                                          |
+|-------------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)`     | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
+| `LoadCalibration(onDone)`           | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
+| `InvalidateCalibration(onDone)`     | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once                           |
+| `IsCalibrationValid(onDone)`        | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied                              |
+| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
+| `LoadConfig(onDone)`                | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
+| `ResetConfigToDefaults(onDone)`     | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`                                      |
+| `Format(onDone)`                    | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased; the fault history is left alone    |
+| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part                            | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history |
+| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                          |
 
 ### Required
 

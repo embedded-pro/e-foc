@@ -65,6 +65,7 @@ namespace state_machine
         bool TrySetPosition(foc::Radians setpoint);
         void LimitCurrent(foc::Ampere limit);
         void TrackBusVoltage(foc::Volts measured);
+        void OnFaultEntered(const infra::Function<void(FaultCode)>& onFaultEntered);
 
         void ApplyOnlineEstimates();
 
@@ -168,6 +169,7 @@ namespace state_machine
         uint8_t previousDefaultControlMode{ 0 };
         std::optional<foc::Ampere> currentLimit;
         std::optional<foc::Volts> busVoltage;
+        infra::Function<void(FaultCode)> faultEntered;
 
         std::variant<std::monostate,
             application::TorqueStateMachine,
