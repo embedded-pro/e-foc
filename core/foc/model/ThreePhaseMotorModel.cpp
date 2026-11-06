@@ -239,7 +239,10 @@ namespace foc
         running = true;
         counter = maxIterations;
         electrical.Reset();
-        mechanical.Reset();
+
+        // An encoder with its own reference reads a rotor that keeps its angle across an enable
+        if (!encoder.HasIndex())
+            mechanical.Reset();
         ResetTemperature();
         selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(49), hal::DutyCycle::FromPercent(51) };
 
@@ -281,14 +284,36 @@ namespace foc
         return encoder.Read(mechanical.Angle());
     }
 
+    // Without an index the encoder has no reference of its own, and zeroing it places the rotor at its zero
     void ThreePhaseMotorModel::Set(foc::Radians value)
     {
-        mechanical.Set(value);
+        if (encoder.HasIndex())
+            encoder.Set(value, mechanical.Angle());
+        else
+            mechanical.Set(value);
     }
 
     void ThreePhaseMotorModel::SetZero()
     {
-        mechanical.SetZero();
+        if (encoder.HasIndex())
+            encoder.SetZero(mechanical.Angle());
+        else
+            mechanical.SetZero();
+    }
+
+    void ThreePhaseMotorModel::SetEncoderIndex(std::optional<foc::Radians> angle, uint32_t widthCounts)
+    {
+        encoder.SetIndex(angle, widthCounts);
+    }
+
+    bool ThreePhaseMotorModel::HasEncoderIndex() const
+    {
+        return encoder.HasIndex();
+    }
+
+    bool ThreePhaseMotorModel::EncoderIndexAsserted() const
+    {
+        return encoder.IndexAsserted(mechanical.Angle());
     }
 
     void ThreePhaseMotorModel::SetPowerStage(const PowerStageConfig& config)

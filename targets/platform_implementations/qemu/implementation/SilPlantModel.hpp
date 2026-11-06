@@ -3,6 +3,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
 #include <cstdint>
+#include <optional>
 
 namespace sil
 {
@@ -80,6 +81,7 @@ namespace sil
         model.SetCoulombFriction(foc::NewtonMeter{ config.coulombFrictionNm });
         model.SetCogging(foc::NewtonMeter{ config.coggingTorqueNm }, config.coggingCyclesPerRevolution);
         model.SetEncoderResolution(config.encoderCountsPerRevolution);
+        model.SetEncoderIndex(config.encoderIndexWidthCounts != 0 ? std::make_optional(foc::Radians{ config.encoderIndexRadians }) : std::nullopt, config.encoderIndexWidthCounts);
         model.ResetTemperature();
 
         if (config.loadTorqueNm != 0.0f)

@@ -63,6 +63,19 @@ namespace application
         return calibration.ReadyState();
     }
 
+    bool BootSequence::ResumesFromIndex(services::NvmStatus status, const IndexReference& index) const
+    {
+        return status == services::NvmStatus::Ok && calibration.HasValidCalibration() && index.CanRestore(env.context.Data());
+    }
+
+    state_machine::Ready BootSequence::FinishFromIndex()
+    {
+        env.context.SetRotorReferenceValid(false);
+        env.tracer.Trace() << "[SM] Electrical parameters restored; the first enable restores the rotor reference from the encoder index";
+        ApplyRecord();
+        return calibration.ReadyState();
+    }
+
     void BootSequence::ApplyRecord()
     {
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());

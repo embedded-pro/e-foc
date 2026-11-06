@@ -140,6 +140,8 @@ namespace sil
             .cableDisconnectDelayMs = 0u,
             .supplyStepScale = 0.0f,
             .supplyStepDelayMs = 0u,
+            .encoderIndexRadians = 0.0f,
+            .encoderIndexWidthCounts = 0u,
 
             .polePairs = 0u,
             .faultFlags = 0u,

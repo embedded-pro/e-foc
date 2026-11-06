@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.13.5
+version: 1.14.0
 component: "software-in-the-loop"
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.13.4                      |
+| Version   | 1.14.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-05                  |
+| Date      | 2026-11-06                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -88,7 +88,7 @@ The description covers everything the plant needs:
 |-------------------|----------------------------------------------------------------------------------------------------------------------|
 | Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping                                        |
 | Drive             | Supply voltage, control frequency, peak current, load torque                                                         |
-| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                                         |
+| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias, encoder index angle and width          |
 | Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                                            |
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                                                 |
 | Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling, an event-loop stall and when it begins |
@@ -351,6 +351,17 @@ The supply can step as well: a set time after enable its open-circuit voltage ch
 configured one and stays there, so a scenario can sag or raise the bus under a running drive. The step is two
 fields of the plant description, the fraction and the delay, which took the record to layout version 12; a
 fraction of zero means the supply never steps.
+
+The encoder can carry an index channel: a pulse at a set mechanical angle of the rotor, as wide as a set
+number of counts, which the emulated board reports through its encoder index port and latches between
+two polls, as the EK-TM4C1294XL's quadrature interface does (`service-index-search.md`). The angle and the
+width are two fields of the plant description, which took the record to layout version 13; a width of zero
+means no index channel, and nothing searches. An encoder with an index also keeps its own reference, as a
+real one does: zeroing or setting it moves the zero the readings are taken from, not the rotor, and an
+enable no longer returns the rotor to angle zero at rest. Together with the encoder bias, which offsets
+the reading at power-up from the rotor, that lets a scenario restart the target into a reference that is
+wrong until the drive restores it. Plants without an index keep the simpler encoder every other scenario
+was pinned against, whose zeroing places the rotor at the zero it reads.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen

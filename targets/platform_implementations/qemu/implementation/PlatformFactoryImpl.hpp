@@ -39,6 +39,7 @@ namespace application
 {
     class PlatformFactoryImpl
         : public PlatformFactory
+        , public drivers::EncoderIndex
     {
     public:
         explicit PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -70,6 +71,7 @@ namespace application
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
         std::optional<FirmwareStaging> Staging() override;
+        std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -82,6 +84,10 @@ namespace application
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
+
+        bool HasIndex() const override;
+        void ArmIndex() override;
+        bool IndexSeen() override;
 
     private:
         class GpioPinStub
@@ -211,6 +217,8 @@ namespace application
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;
+        // Latched by the control tick, as the TI interface latches it, and read from the same interrupt
+        bool indexLatched{ false };
         foc::OneShotDelay cableDisconnect;
         foc::OneShotDelay supplyStep;
         foc::OneShotDelay shaftGrip;

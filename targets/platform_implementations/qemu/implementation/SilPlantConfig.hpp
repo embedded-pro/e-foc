@@ -89,6 +89,9 @@ namespace sil
         // Zero means the supply never steps; otherwise the open-circuit voltage it steps to, as a fraction.
         float supplyStepScale;
         uint32_t supplyStepDelayMs;
+        float encoderIndexRadians;
+        // Zero means no index channel
+        uint32_t encoderIndexWidthCounts;
 
         uint8_t polePairs;
         uint8_t faultFlags;
@@ -97,10 +100,10 @@ namespace sil
         uint8_t dutyDelayPeriods;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 248, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 256, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 12;
+    static constexpr uint8_t plantConfigLayoutVersion = 13;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

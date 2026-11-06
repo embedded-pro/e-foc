@@ -13,6 +13,7 @@
 #include "services/util/Terminal.hpp"
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace application
@@ -108,6 +109,11 @@ namespace application
         virtual infra::BoundedConstString FaultStatus() const = 0;
 
         virtual std::optional<FirmwareStaging> Staging()
+        {
+            return std::nullopt;
+        }
+
+        virtual std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel()
         {
             return std::nullopt;
         }

@@ -83,6 +83,7 @@ namespace
         EXPECT_EQ(actual.currentLoopBandwidth, expected.currentLoopBandwidth);
         EXPECT_EQ(actual.speedLoopBandwidth, expected.speedLoopBandwidth);
         EXPECT_EQ(actual.coggingTorqueScale, expected.coggingTorqueScale);
+        EXPECT_EQ(services::EncoderIndexAngle(actual), services::EncoderIndexAngle(expected));
         EXPECT_EQ(actual.encoderDirection, expected.encoderDirection);
         EXPECT_EQ(actual.polePairs, expected.polePairs);
         EXPECT_EQ(actual.coggingTorque, expected.coggingTorque);
@@ -128,6 +129,7 @@ namespace
             d.currentLoopBandwidth = 8377.6f;
             d.speedLoopBandwidth = 50.0f;
             d.coggingTorqueScale = 3.0e-5f;
+            d.encoderIndexAngle = -2.25f;
             for (std::size_t bin = 0; bin != d.coggingTorque.size(); ++bin)
                 d.coggingTorque[bin] = static_cast<int8_t>(static_cast<int>(bin * 5) % 255 - 127);
             return d;

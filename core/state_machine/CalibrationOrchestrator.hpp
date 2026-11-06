@@ -4,6 +4,7 @@
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "core/services/index_search/IndexSearch.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
@@ -21,7 +22,8 @@ namespace application
         CalibrationOrchestrator(services::ElectricalParametersIdentification& electricalIdent, services::MotorAlignment& motorAlignment, services::Tracer& tracer,
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt,
             std::optional<std::reference_wrapper<services::RotorStandstill>> standstill = std::nullopt,
-            foc::Volts busVoltage = foc::Volts{ 0.0f });
+            foc::Volts busVoltage = foc::Volts{ 0.0f },
+            std::optional<std::reference_wrapper<services::IndexSearch>> indexSearch = std::nullopt);
 
         void Start(
             services::CalibrationData& pendingData,
@@ -47,6 +49,8 @@ namespace application
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
+        void RunIndexStep(foc::Radians alignedAngle);
+        void FinishAlignment(foc::Radians alignedAngle);
         static state_machine::FaultCode FaultFor(services::MotorAlignment::Failure failure);
         void Fail(state_machine::FaultCode code = state_machine::FaultCode::calibrationFailed);
 
@@ -56,6 +60,7 @@ namespace application
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill;
         foc::Volts busVoltage;
+        std::optional<std::reference_wrapper<services::IndexSearch>> indexSearch;
         state_machine::FaultCode lastFailure{ state_machine::FaultCode::calibrationFailed };
 
         services::CalibrationData* pendingData{ nullptr };

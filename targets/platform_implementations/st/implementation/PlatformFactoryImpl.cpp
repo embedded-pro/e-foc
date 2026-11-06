@@ -473,6 +473,33 @@ namespace application
             encoderZero.SetZero(peripherals->encoder->Read());
     }
 
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return peripherals->encoder.has_value();
+    }
+
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        indexLatched = false;
+
+        if (peripherals->encoder)
+            peripherals->encoder->Encoder().EnableIndex();
+    }
+
+    // The index pin is a level, not a latch: polled every control period it holds for several at the search speed
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        if (peripherals->encoder && peripherals->encoder->Encoder().IndexAsserted())
+            indexLatched = true;
+
+        return indexLatched;
+    }
+
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
     {
         return peripherals->eeprom;

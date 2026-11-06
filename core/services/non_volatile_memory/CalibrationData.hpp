@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <numbers>
+#include <optional>
 
 namespace services
 {
@@ -32,6 +36,8 @@ namespace services
         float currentLoopBandwidth = 0.0f;
         float speedLoopBandwidth = 0.0f;
         float coggingTorqueScale = 0.0f;
+        // Mechanical angle of the encoder index in the aligned frame; NaN when none was found
+        float encoderIndexAngle = std::numeric_limits<float>::quiet_NaN();
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
         CalibrationStage stage = CalibrationStage::none;
@@ -39,7 +45,22 @@ namespace services
         std::array<int8_t, coggingMapBins> coggingTorque{};
     };
 
-    static_assert(sizeof(CalibrationData) == 108, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 112, "CalibrationData layout must be free of implicit padding");
+
+    inline std::optional<float> EncoderIndexAngle(const CalibrationData& data)
+    {
+        constexpr float pi = std::numbers::pi_v<float>;
+
+        if (!std::isfinite(data.encoderIndexAngle) || data.encoderIndexAngle < -pi || data.encoderIndexAngle > pi)
+            return std::nullopt;
+
+        return data.encoderIndexAngle;
+    }
+
+    inline void ForgetEncoderIndexAngle(CalibrationData& data)
+    {
+        data.encoderIndexAngle = std::numeric_limits<float>::quiet_NaN();
+    }
 
     inline uint8_t CurrentNoiseMilliAmpere(float noiseAmpere)
     {

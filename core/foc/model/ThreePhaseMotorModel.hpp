@@ -91,6 +91,9 @@ namespace foc
         void SetCoulombFriction(foc::NewtonMeter friction);
         void SetCogging(foc::NewtonMeter amplitude, uint32_t cyclesPerRevolution);
         void SetEncoderResolution(uint32_t countsPerRevolution);
+        void SetEncoderIndex(std::optional<foc::Radians> angle, uint32_t widthCounts);
+        bool HasEncoderIndex() const;
+        bool EncoderIndexAsserted() const;
         void SetRandomSeed(uint32_t seed);
         void ResetTemperature();
         float WindingTemperatureCelsius() const;

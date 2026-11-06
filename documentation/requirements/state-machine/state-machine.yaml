@@ -89,7 +89,9 @@
     inductance, pole pairs) but shall remain in the Idle state. The motor shall
     not be enabled until a live alignment re-establishes the rotor reference,
     because the encoder zero-offset is volatile and is lost on every reset. Over CAN the drive
-    reports Idle as idle (or partialCalibration) and never as ready (REQ-CAN-014).
+    reports Idle as idle (or partialCalibration) and never as ready (REQ-CAN-014). A record
+    that carries an encoder index angle, on a drive whose encoder has an index channel, is the
+    one exception: it boots to Ready as REQ-SM-035 describes.
   rationale: >
     The corrupt-calibration scenario asserts the CAN motor state idle and a refused enable
     (integration_tests/steps/StateMachineSteps.cpp), which tells Idle from Ready.
@@ -164,8 +166,10 @@
     The state machine shall not write a stored encoder zero offset back to the encoder,
     neither when loading calibration data at boot nor when completing a calibration
     sequence. The offset a running encoder reports shall be established only by the
-    alignment step itself, so that an offset measured against a rotor position the
-    encoder no longer holds cannot orient the field.
+    alignment step itself, or by an index search that sees the index pulse while it runs
+    (REQ-SM-035), so that an offset measured against a rotor position the encoder no longer
+    holds cannot orient the field. The stored index angle is measured against the index, a
+    mark on the encoder disc that survives a reset, and is applied only at a live index pulse.
 
 - id: REQ-SM-020
   title: A fault releases the calibration services
@@ -371,3 +375,22 @@
     half times a quarter turn divided by the pole pairs. A missing phase found by REQ-EH-015 is
     reported in preference to it. A rotor mechanically locked at power-up shall be reported
     the same way, since the drive cannot tell it from an encoder that does not report.
+
+- id: REQ-SM-035
+  title: A stored index angle lets the first Enable start without aligning
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On power-on with a complete calibration record that carries an encoder index angle
+    (REQ-CAL-026), on a drive whose encoder has an index channel, the state machine shall enter
+    Ready without a rotor reference, and over CAN the drive shall report ready. The first Enable
+    shall, after measuring the current offsets as REQ-CAL-022 does, run one index search
+    (REQ-CAL-027), set the encoder so that it reads the stored index angle at the index pulse, and
+    enter Enabled; it shall not run the alignment. A search that finds no index shall refuse the
+    Enable with calibrationFailed and leave the drive Ready without a rotor reference, so that the
+    next Enable searches again; a Disable, an emergency stop or a fault during the search shall
+    abandon it, stop the inverter and refuse the Enable. A record without an index angle, or a
+    drive without an index channel, shall boot to Idle as REQ-SM-010 describes. On the bench plant
+    with its encoder reading 1 rad ahead of the rotor at power-up, the first Start in torque mode
+    shall enter Enabled after one search, and the rotor reference it sets shall be within one
+    encoder count of the one the alignment set.

@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.14.0
+version: 0.15.0
 component: service-nvm
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.14.0                       |
+| Version   | 0.15.0                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-06                   |
 
@@ -56,12 +56,12 @@ The service manages four independent EEPROM regions. Each region holds exactly o
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 112 bytes |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 168 bytes |
 | Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
 | Learned model | `0x1EA4ED0D` | learned model     | 26 bytes  |
 
-The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
+The calibration record's layout is at version 5. The encoder index angle (`service-index-search.md`) took its data from 108 to 112 bytes, as version 4's cogging map (`service-cogging-compensation.md`) had taken it from 56 to 108, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again. A record without an index angle holds a NaN there; the 121-byte record still fits the 128-byte calibration region.
 
 The configuration record's layout is at version 13. The recalibration mode (`online-recalibration.md`) took one of
 the two reserved bytes, so a record written at version 12 reads as a version mismatch and the configuration returns to

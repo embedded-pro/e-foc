@@ -2,9 +2,9 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: service-alignment
-date: 2026-10-30
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.1                    |
+| Version   | 0.4.0                    |
 | Component | service-alignment        |
-| Date      | 2026-10-30               |
+| Date      | 2026-11-06               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -40,6 +40,7 @@ date: 2026-10-30
 
 **Is NOT responsible for:**
 - Persisting the returned encoder offset to NVM — that is the caller's decision
+- Finding the encoder's index — the index search does that once the alignment has set the frame (`service-index-search.md`)
 - Running during normal FOC operation — the FOC loop must be stopped by the caller before alignment begins
 - Measuring or interpreting motor electrical parameters (R, L, pole pairs)
 - Providing any feedback during the alignment beyond the single completion callback
@@ -135,8 +136,11 @@ The service applies the offset itself, by calling `Encoder::SetZero()` once the 
 the rotor is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
 rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
 read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
-loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
-calibration must be re-run to orient the field.
+loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot. What
+survives a reset is the angle of the encoder's index in the frame the alignment sets, which the calibration
+measures right after the alignment with an index search (`service-index-search.md`); a drive whose record
+holds one restores the frame from the index at its first Enable instead of aligning again. Without an index,
+the alignment must be re-run after every power-up to orient the field.
 
 ### Phase Continuity Check
 

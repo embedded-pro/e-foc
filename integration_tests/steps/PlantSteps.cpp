@@ -1,4 +1,5 @@
 #include "core/can/FocMotorMessages.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
@@ -146,6 +147,10 @@ namespace
             plant.supplyCurrentLimitAmpere = value;
         else if (key == "duty_delay_periods")
             plant.dutyDelayPeriods = static_cast<uint8_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "encoder_index_radians")
+            plant.encoderIndexRadians = value;
+        else if (key == "encoder_index_width_counts")
+            plant.encoderIndexWidthCounts = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "encoder_counts_per_revolution")
             plant.encoderCountsPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "random_seed")
@@ -249,6 +254,10 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.calibration.currentOffsetA = setup.plant.noiseBiasAmpereA;
     setup.nvm.calibration.currentOffsetB = setup.plant.noiseBiasAmpereB;
     setup.nvm.calibration.currentOffsetC = setup.plant.noiseBiasAmpereC;
+
+    // The plant's electrical zero is at rotor angle zero, so the aligned frame reads the rotor angle
+    if (setup.plant.encoderIndexWidthCounts != 0)
+        setup.nvm.calibration.encoderIndexAngle = foc::detail::PositionWithWrapAround(setup.plant.encoderIndexRadians);
 }
 
 GIVEN(R"(the stored calibration is off by:)")

@@ -31,6 +31,7 @@ target_sources(e_foc.platform_abstraction PRIVATE
     DecimatingThreePhaseInverter.hpp
     DecimatingThreePhaseInverter.cpp
     EncoderZero.hpp
+    NoEncoderIndex.hpp
     LowSideShuntWindow.hpp
     FirmwareStaging.hpp
     PlatformDiagnostics.hpp
