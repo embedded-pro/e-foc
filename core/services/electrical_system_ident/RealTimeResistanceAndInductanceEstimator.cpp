@@ -34,7 +34,14 @@ namespace services
             return;
         }
 
-        if (std::abs(reference) < minimumDirectCurrent || std::abs(idAtEnd) < minimumFollowedFraction * std::abs(reference))
+        if (std::abs(reference) < minimumDirectCurrent)
+            return;
+
+        // A step of the reference lies inside its window, so the window's mean says nothing of whether the current follows.
+        if (std::abs(referenceChange) < minimumDirectCurrent)
+            following = std::abs(window.meanId.Value()) >= minimumFollowedFraction * std::abs(reference);
+
+        if (!following)
             return;
 
         Estimator::InputMatrix regressor;
@@ -80,6 +87,7 @@ namespace services
         estimator->SetCoefficients(initial);
 
         primed = false;
+        following = true;
         updates = 0;
     }
 

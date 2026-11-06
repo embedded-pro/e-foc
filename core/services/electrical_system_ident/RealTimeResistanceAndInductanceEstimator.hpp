@@ -41,6 +41,7 @@ namespace services
         float previousIdAtEnd{ 0.0f };
         float previousReference{ 0.0f };
         bool primed{ false };
+        bool following{ true };
         uint16_t updates{ 0 };
 
         foc::Ohm currentResistance{ 0.0f };

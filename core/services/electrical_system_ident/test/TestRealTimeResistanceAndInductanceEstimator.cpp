@@ -175,3 +175,30 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, a_current_that_does_not_fol
     EXPECT_NEAR(estimator.CurrentResistance().Value(), winding.resistance, 1e-6f);
     EXPECT_NEAR(estimator.CurrentInductance().Value(), winding.inductance * 1000.0f, 1e-6f);
 }
+
+TEST_F(TestRealTimeResistanceAndInductanceEstimator, a_winding_that_opens_after_converging_keeps_its_estimate)
+{
+    const Winding winding;
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+    WindowedWindingRun{ winding, estimator }.Run(0.5f, 3000);
+    const auto converged = estimator.CurrentResistance().Value();
+
+    for (int window = 0; window != 3000; ++window)
+    {
+        const float reference = (window / 50) % 2 == 0 ? -0.5f : 0.5f;
+        estimator.Update(foc::ElectricalWindow{ foc::Volts{ reference > 0.0f ? 12.0f : -12.0f }, foc::Ampere{ 0.001f }, foc::Ampere{ 0.001f }, 0.0f, foc::Ampere{ reference } });
+    }
+
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), converged, 1e-6f);
+}
+
+TEST_F(TestRealTimeResistanceAndInductanceEstimator, sensor_noise_on_a_small_square_wave_leaves_the_resistance_unbiased)
+{
+    Winding winding;
+    winding.currentNoise = 0.035f;
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+
+    WindowedWindingRun{ winding, estimator }.Run(0.071f, 4000);
+
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), winding.resistance, 0.03f * winding.resistance);
+}
