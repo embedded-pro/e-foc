@@ -193,7 +193,7 @@ flakiness rather than merely reducing it.
 ### Part B3 — Timing the control interrupt
 
 The platform measures every execution of the control callback and counts the ones that overrun
-the budget, miss the period or re-enter (REQ-PERF-004 to REQ-PERF-006); the control-loop
+the budget, miss the period or re-enter (REQ-PLT-004 to REQ-PLT-004); the control-loop
 statistics parameters of contract 2.2 report them, and `ClearDiagnostics` restarts them. On hardware the duration comes from the DWT cycle counter. The emulator does not implement
 the DWT and its registers read zero, so every execution measured zero and the counters could not
 report an overrun however long the callback ran. The emulated platform reads a free-running timer
@@ -206,7 +206,7 @@ cycle.
 What it measures is the instruction count of the callback, not the cycles a real core would take,
 so it is a regression signal and the static cycle-budget gate remains the authority on hardware
 cycles. The plant step the same interrupt carries before the callback is outside the window, as
-REQ-PERF-004 requires.
+REQ-PLT-004 requires.
 
 The mode scenarios boot calibrated and clear the counters before the rotor is aligned on command,
 so the window covers alignment as well as closed-loop running, and run every current law in torque
@@ -311,7 +311,7 @@ Two results are worth recording because they are not obvious:
   value satisfies that on the first run it sees, more convincingly than a real rotor ever
   does. The drive therefore takes its reference from a reading that means nothing and enables
   on it. What exposes it is the first request for motion: the loop pushes torque current and
-  the reading does not move. The encoder plausibility monitor (REQ-SM-028) watches for exactly
+  the reading does not move. The encoder plausibility monitor (REQ-PRO-005) watches for exactly
   that from the event loop — measured torque current above a fraction of the limit, a demanded
   speed or an unclosed position error, and a reading still inside a small excursion for a
   whole window — and raises the sensor fault the wire already carried but nothing used to
@@ -320,13 +320,13 @@ Two results are worth recording because they are not obvious:
   moved is indistinguishable and is reported the same way. A rotor that an outside force pushed
   against the drive and then held is not: the encoder saw it pushed, which a dead encoder cannot
   show, so the monitor raises a stall instead (`fault-supervision.md` Part C), and the operator can
-  turn stall reporting off without losing the sensor fault (REQ-SM-033).
+  turn stall reporting off without losing the sensor fault (REQ-PRO-005).
 - **A position held against a load was reported after a calibration, under LQR and LQI.** These
   laws command the current, so nothing updated the speed reference, which kept the −10 rad/s the
   cogging mapping last asked for. The monitor read it as a demanded speed, and a held shaft load of
   0.01 N·m, 0.24 A, raised the sensor fault within the window; the rig saw the same in its LQI
   row with the shaft free. The position cascade now reports no demanded speed while its law
-  commands the current, so the position error alone stands for the demand (REQ-SM-028).
+  commands the current, so the position error alone stands for the demand (REQ-PRO-005).
 
 An encoder can also be told to freeze a set time after the motor is enabled rather than to have
 been dead all along, scheduled the same way as the shaft torque of Part H and on the same
@@ -583,8 +583,7 @@ a fifth higher than anything those six had shown. Every bound still had more tha
 itself to spare, and a bound pinned to the measurement itself would have been red on all three,
 on the very run that was meant to confirm it.
 
-The two deadbeat scenarios on the bench plant with the duty acting a period late (REQ-TRQ-010 and
-REQ-TRQ-011) show what happens without it. Their tail bound was 7 percent, close to a single
+The two deadbeat scenarios on the bench plant with the duty acting a period late (REQ-CTL-001) show what happens without it. Their tail bound was 7 percent, close to a single
 measurement, and CI measured 7.38 and 7.86 percent on runs where the current loop had not changed
 (issue #528). Twenty local runs of each measured tail bands from 3.5 to 6.7 percent, and eleven
 CI measurements of the two from 4.0 to 7.86, so the bound sat inside the spread. The tail band
@@ -656,7 +655,7 @@ What the first characterisation found, in the order it was found:
 - **The torque constant was a per-target constant of 0.1 N·m/A**, two and a half to three times
   the true value of either reference motor, used by the mechanical identification, the online
   inertia estimator and the speed-loop gain design alike. It is now derived from the calibration
-  record (REQ-SM-027).
+  record.
 - **Small mechanical values did not survive the product's own outputs.** The mechanical
   parameters response on the wire carries inertia and friction as fixed-point with a resolution
   of 1e-4, so the rotors here (5e-6 to 7e-6 kg·m², 1e-5 N·m·s/rad) encode as zero; that
@@ -742,7 +741,7 @@ What the first characterisation found, in the order it was found:
   Störmer–Verlet integration, and the friction identifies within 0.35 % on both motors.
 
 Every identification scenario, offline and online, runs in the default set on both motors
-(REQ-CAL-012 to REQ-CAL-014).
+(REQ-CMS-001 to REQ-CMS-003).
 
 Timing the control interrupt (Part B3) found three more, all inside the measured window, and the
 timing scenarios fail on each when it is put back:
@@ -752,7 +751,7 @@ timing scenarios fail on each when it is put back:
   stores calibration data and changes state: one execution of 27 000 to 34 000 cycles, over a
   millisecond against a 50 µs period, an overrun and a missed deadline on every alignment. The
   service now stops the inverter and zeroes the encoder in the interrupt and delivers the outcome
-  from the event loop (`service-alignment.md`, REQ-PERF-008).
+  from the event loop (`service-alignment.md`, REQ-PLT-004).
 - **The plant drew encoder noise inside the measured window — fixed.** Every encoder read drew a
   normal deviate, even with the noise switched off, so about one read in five hundred refilled the
   generator's state inside the callback: 1650 to 1700 cycles, an overrun and a missed deadline
@@ -766,7 +765,7 @@ timing scenarios fail on each when it is put back:
   its trace and the start of the alignment — in the interrupt as well: one execution of 6709
   cycles, more than five control periods, an overrun and a missed deadline on every calibration.
   Identification over CAN peaked at 506. Each procedure now stops the injection in the interrupt
-  and delivers its outcome from the event loop (`service-electrical-ident.md`, REQ-PERF-008); a
+  and delivers its outcome from the event loop (`service-electrical-ident.md`, REQ-PLT-004); a
   full calibration then peaks at 236 cycles and identification over CAN at 114.
 
 ---
@@ -847,22 +846,22 @@ What the plant has shown so far:
 - **Dry friction does not disturb the identification**; the estimator models it.
 - **The bench's cogging and dry friction made the PID and two-DOF position laws hunt**, ±0.17 rad
   every 1.5 s at 1 rad on the rig and in the plant alike, while Cascade P, LQR and LQI held
-  (`documentation/theory/position-loop-pid.md`, *A rotor that stands still*; REQ-POS-011).
+  (`documentation/theory/position-loop-pid.md`, *A rotor that stands still*; REQ-CTL-003).
 - **The same cogging left the PID, two-DOF and Cascade P laws unable to hold a setpoint on a hill top**,
   3.0 rad, where they stopped at 3.02 to 3.13 rad. The calibration's cogging map, which read the plant's
   4 mN·m within 4 %, lets every law hold it (`documentation/design/service-cogging-compensation.md`;
-  REQ-CAL-018, REQ-POS-012).
+  REQ-CMS-001, REQ-CTL-003).
 - **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
   inductance three times too high** while the estimator paired each current change with the previous
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's
   2–6×. The platform now states the delay and the estimator pairs accordingly
-  (`documentation/design/service-electrical-ident.md`; REQ-CAL-017).
+  (`documentation/design/service-electrical-ident.md`; REQ-CMS-003).
 - **The same late duty put the deadbeat law into a 3.4 kHz limit cycle on the rig**, swinging to the
   voltage limit with the rotor at rest. Inverting the plant on the measured current leaves the pole
   pair $z^2 - A_d z + A_d = 0$; on the bench motor with the duty a period late the model showed the
   same thing as a 102 % overshoot that took 12.8 ms to settle. The law now acts on the current it
   predicts for when its duty lands, which settles in 0.1 ms with 5 % overshoot
-  (`documentation/theory/current-loop-deadbeat.md`; REQ-TRQ-010).
+  (`documentation/theory/current-loop-deadbeat.md`; REQ-CTL-001).
 - **On the rig the deadbeat law then drove the rotor at a 0 A setpoint.** The stored flux linkage
   was 7.0 mWb against the motor's 4.6 mWb, so the back-EMF fed forward was half again too large, and
   with no integral action the law settled at +0.23 A by 275 rad/s, which kept the rotor accelerating.
@@ -870,7 +869,7 @@ What the plant has shown so far:
   offset. The model showed it with a stored flux linkage 1.5 times the plant's: after 120 ms at
   0.5 A the current stayed near 0.39 A at a 0 A setpoint. The law now estimates the voltage it does
   not model from what it mispredicts and subtracts it, which holds the setpoint within 0.5 mA
-  (`documentation/theory/current-loop-deadbeat.md`; REQ-TRQ-011).
+  (`documentation/theory/current-loop-deadbeat.md`; REQ-CTL-001).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.
@@ -1036,7 +1035,7 @@ What the plant showed through the bench chain:
   356 rad/s, 24 rad/s short of 380. Keeping the two lowest duties readable and rebuilding the
   highest phase from them, the motor reaches 420 rad/s with the q- and d-axis current ripple it
   has at 340 rad/s, and holds 460 rad/s within 1 rad/s, where the modulator leaves its circle
-  (REQ-TRQ-009).
+  (REQ-CTL-001).
 - **The electrical identification is immune at its duties.** It runs near 50 % duty, inside every
   window, and reads the resistance within 2 % through the chain with either sample-and-hold.
 - **The offsets hide the friction until the calibration removes them.** The bench rotor's viscous
@@ -1219,18 +1218,18 @@ error code the bootloader recorded.
 
 **Scenarios** (`bootloader.feature`, `@sil`):
 
-| Scenario                                         | Staged                    | Slot                              | The scenario sees                                      | Requirements      |
-|--------------------------------------------------|---------------------------|-----------------------------------|--------------------------------------------------------|-------------------|
-| The application starts through the bootloader    | nothing                   | the application                   | the heartbeat                                          | REQ-BOOT-001, 006 |
-| A staged pack is installed                       | a pack, *ready to deploy* | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-BOOT-002, 003 |
-| An interrupted installation is repeated          | a pack, *deploy started*  | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-BOOT-004      |
-| A downloaded pack waits for the apply            | a pack, *downloaded*      | the application                   | the heartbeat; the journal still reads *downloaded*    | REQ-BOOT-002      |
-| A pack with a bad signature is refused           | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, signature error              | REQ-BOOT-002      |
-| A pack for another product is refused            | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, product error                | REQ-BOOT-002      |
-| A pack for another board is refused before erase | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-target error           | REQ-BOOT-007      |
-| A pack for another destination is refused        | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-destination error      | REQ-BOOT-003      |
-| A damaged application is not started             | nothing                   | the application, one byte changed | no heartbeat; the debug log says the bootloader halted | REQ-BOOT-001      |
-| An empty slot is not started                     | nothing                   | nothing                           | no heartbeat; the debug log says the bootloader halted | REQ-BOOT-001      |
+| Scenario                                         | Staged                    | Slot                              | The scenario sees                                      | Requirements |
+|--------------------------------------------------|---------------------------|-----------------------------------|--------------------------------------------------------|--------------|
+| The application starts through the bootloader    | nothing                   | the application                   | the heartbeat                                          | REQ-FWU-001  |
+| A staged pack is installed                       | a pack, *ready to deploy* | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-001  |
+| An interrupted installation is repeated          | a pack, *deploy started*  | nothing                           | the heartbeat; the journal reads *deployed*            | REQ-FWU-002  |
+| A downloaded pack waits for the apply            | a pack, *downloaded*      | the application                   | the heartbeat; the journal still reads *downloaded*    | REQ-FWU-001  |
+| A pack with a bad signature is refused           | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, signature error              | REQ-FWU-001  |
+| A pack for another product is refused            | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, product error                | REQ-FWU-001  |
+| A pack for another board is refused before erase | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-target error           | REQ-FWU-001  |
+| A pack for another destination is refused        | a pack, *ready to deploy* | the application                   | the heartbeat; *invalid*, wrong-destination error      | REQ-FWU-001  |
+| A damaged application is not started             | nothing                   | the application, one byte changed | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001  |
+| An empty slot is not started                     | nothing                   | nothing                           | no heartbeat; the debug log says the bootloader halted | REQ-FWU-001  |
 
 A refused pack leaves the application in the slot, which the heartbeat after the refusal shows. The
 firmware-upgrade service's scenarios add the other half: the application downloading the pack into
@@ -1281,18 +1280,18 @@ the hardware-in-the-loop scenario downloads the whole application over the board
 
 **Scenarios** (`firmware_upgrade.feature`, `@sil`):
 
-| Scenario                                         | The scenario sees                                                                                                                                                                                                                              | Requirements               |
-|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------|
-| A pack is downloaded and staged over a stale one | staging holding a stale pack and the journal reading *deployed* before the boot; Begin answered with the page size; Verify ok; the journal holds the one entry *downloaded*; the slot holds the pack and is erased past it; the staged version | REQ-UPD-001, 004, 007, 013 |
-| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                                                                                                                               | REQ-UPD-011                |
-| A download is refused while the motor runs       | a stale pack staged before the boot; Begin answered Busy; the journal still reads *downloaded* and the stale pack is untouched                                                                                                                 | REQ-UPD-002                |
-| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                                                                                                                                   | REQ-UPD-005                |
-| Activate without a staged pack is refused        | Activate answered NotReady; the journal empty                                                                                                                                                                                                  | REQ-UPD-005                |
-| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                                                                                                                                | REQ-UPD-003, 006           |
-| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                                                                                                                                    | REQ-UPD-004, 006           |
-| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                                                                                                                                 | REQ-UPD-004, 006           |
-| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                                                                                                                                        | REQ-UPD-014                |
-| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* within 5 s of the answer (0.5 s to 0.6 s measured, printed as a `[METRIC]` line) and the heartbeat comes back; the staged version zero                               | REQ-UPD-005, 007, 011      |
+| Scenario                                         | The scenario sees                                                                                                                                                                                                                              | Requirements                          |
+|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------|
+| A pack is downloaded and staged over a stale one | staging holding a stale pack and the journal reading *deployed* before the boot; Begin answered with the page size; Verify ok; the journal holds the one entry *downloaded*; the slot holds the pack and is erased past it; the staged version | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005 |
+| A staged pack waits across runs and restarts     | the motor runs and stops; after a restart the staged version and the journal still read the pack                                                                                                                                               | REQ-FWU-002                           |
+| A download is refused while the motor runs       | a stale pack staged before the boot; Begin answered Busy; the journal still reads *downloaded* and the stale pack is untouched                                                                                                                 | REQ-FWU-002                           |
+| The apply is refused while the motor runs        | Activate answered Busy; the journal still reads *downloaded*                                                                                                                                                                                   | REQ-FWU-002                           |
+| Activate without a staged pack is refused        | Activate answered NotReady; the journal empty                                                                                                                                                                                                  | REQ-FWU-002                           |
+| The drive stays stopped while a pack is received | Enable refused; a telemetry-rate write answered busy; both accepted after Abort                                                                                                                                                                | REQ-FWU-002                           |
+| A pack for another board is refused              | Verify answered NotReady; the journal empty                                                                                                                                                                                                    | REQ-FWU-002, REQ-FWU-005              |
+| A pack with a wrong CRC is refused               | Verify answered CrcMismatch; the journal empty                                                                                                                                                                                                 | REQ-FWU-002, REQ-FWU-005              |
+| The emergency stop ends a download               | the next block answered InvalidState; the journal empty                                                                                                                                                                                        | REQ-FWU-002                           |
+| The apply installs the staged pack               | the staged version at start-up; Activate ok; the journal reads *deployed* within 5 s of the answer (0.5 s to 0.6 s measured, printed as a `[METRIC]` line) and the heartbeat comes back; the staged version zero                               | REQ-FWU-002, REQ-FWU-003              |
 
 **Continuous integration.** `firmware_upgrade.feature` goes into the shard that keeps the three balanced
 (`integration_tests/sil-shards.json`). It needs nothing beyond what Part P already gives the shards.

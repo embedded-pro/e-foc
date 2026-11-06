@@ -1,0 +1,47 @@
+- id: REQ-FWU-001
+  title: Only an authentic, intact image for this board ever runs
+  status: verified
+  verification: sil
+  shall: >
+    The bootloader shall install only a pack signed with the release key built into it, naming
+    this board and microcontroller, and shall decrypt its image while it installs it. It shall
+    start the application only when the installed image is intact and built for this board and
+    chip, and shall never write an image meant for another microcontroller.
+
+- id: REQ-FWU-002
+  title: A firmware update happens only while stopped, only on the user's action, and survives interruption
+  status: verified
+  verification: [sil, hil, unit, inspection]
+  shall: >
+    The drive shall accept a download and an apply only while stopped, stay stopped while it
+    receives a pack, and install a staged pack only after the user's explicit apply. An abort, an
+    emergency stop, an inactivity timeout or a failed verification shall install nothing. A reset
+    or power loss during installation shall make the next boot verify the pack again and repeat
+    the installation.
+
+- id: REQ-FWU-003
+  title: The drive reports its firmware, its board and the staged version
+  status: verified
+  verification: [sil, hil, unit]
+  shall: >
+    On every board the drive shall report over CAN the version of the firmware it runs, the kind
+    of board it runs on and the version of the staged pack, zero when none is staged.
+
+- id: REQ-FWU-004
+  title: The CAN Commander updates a motor only with a checked pack and confirms the result
+  status: implemented
+  verification: unit
+  shall: >
+    The CAN Commander shall offer a pack only once its size and digest match the release and its
+    board and microcontroller match the motor, start the download and the apply only on separate
+    user confirmations, keep the emergency stop available throughout, and report success only
+    when the controller comes back reporting the staged version.
+
+- id: REQ-FWU-005
+  title: The drive receives firmware over the can-lite firmware-upgrade category
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On every board with a staging slot the drive shall receive a pack over the can-lite
+    firmware-upgrade category as its specification defines, and verify its transfer checksum,
+    board, microcontroller and format before it can be applied.

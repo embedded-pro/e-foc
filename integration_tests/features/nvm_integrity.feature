@@ -7,7 +7,7 @@ Feature: Non-Volatile Memory Integrity
   covered by the NonVolatileMemoryImpl unit tests; here one damaged calibration
   record and one damaged configuration record check what the target does with them.
 
-  @sil @REQ-SM-010 @REQ-CAN-014
+  @sil @REQ-CMS-004 @REQ-COM-001
   Scenario Outline: A calibration record with a <damage> checksum is not trusted
     Given a nominal motor plant
     And the stored calibration has a <damage>
@@ -19,7 +19,7 @@ Feature: Non-Volatile Memory Integrity
       | damage  |
       | corrupt |
 
-  @sil @REQ-SM-010 @REQ-CAN-014
+  @sil @REQ-CMS-004 @REQ-COM-001
   Scenario Outline: A configuration record with a <damage> checksum falls back to defaults
     Given a nominal motor plant
     And the motor is already calibrated

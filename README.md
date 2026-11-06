@@ -329,11 +329,18 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Requirements
 
-| Document                                                                                                       | Description                                        |
-|----------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
-| [State Machine Requirements](documentation/requirements/state-machine/state-machine.yaml)                      | Lifecycle state transitions and NVM boot behaviour |
-| [FOC Torque Controller Requirements](documentation/requirements/foc/torque-controller.yaml)                    | Torque control loop functional requirements        |
-| [CAN-to-State-Machine Integration Requirements](documentation/requirements/integration/can-state-machine.yaml) | CAN command to state machine mapping requirements  |
+| Document                                                                        | Description                                          |
+|---------------------------------------------------------------------------------|------------------------------------------------------|
+| [Lifecycle Requirements](documentation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
+| [Commissioning Requirements](documentation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
+| [Control Requirements](documentation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
+| [Protection Requirements](documentation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
+| [Platform Requirements](documentation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
+| [Communication Requirements](documentation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
+| [Firmware Update Requirements](documentation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
+| [Hardware Test Requirements](documentation/requirements/hardware-test.yaml)     | Board bring-up application                           |
+
+How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/design/integration-testing.md), *Feature-to-Requirements Mapping*.
 
 ### Theory
 

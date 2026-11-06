@@ -290,7 +290,7 @@ A legitimate action must finish well inside *N·P*. Long work is already split a
   (`bootloader.md` Part A), so their sector erases, about 17 ms each and up to 40 ms with wear, never
   hold the early-warning handler. Each erase with its read-back is one action of about 30 ms, and the
   21 of a Begin Upgrade run back to back with nothing else between them, so the loop serves nothing
-  else for about 0.7 s, bounded at 1 s (`service-firmware-upgrade.md`, REQ-UPD-015). An erase in the
+  else for about 0.7 s, bounded at 1 s (`service-firmware-upgrade.md`). An erase in the
   application's own half would hold the handler itself and reset the target at the next period,
   whatever the action split.
 

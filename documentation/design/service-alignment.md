@@ -33,8 +33,8 @@ date: 2026-10-30
 - Applying an open-loop DC voltage vector at electrical angle 0° via the three-phase inverter to force the rotor to a known magnetic position
 - Detecting rotor settlement by monitoring encoder position change over consecutive samples
 - Reporting the calibrated encoder offset (in radians) via a single completion callback on success, or reporting failure if the rotor does not settle within the allowed time
-- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-EH-015): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
-- Refusing to align when the encoder does not follow the field (REQ-SM-034): the vector is held a quarter electrical turn ahead first, and the encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
+- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-PRO-005): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
+- Refusing to align when the encoder does not follow the field (REQ-CMS-001): the vector is held a quarter electrical turn ahead first, and the encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
@@ -142,7 +142,7 @@ calibration must be re-run to orient the field.
 
 A rotor held at electrical zero by a vector the windings do not carry looks exactly like an aligned rotor:
 its reading stops changing at once. So when the rotor is declared settled, before the encoder is zeroed, the
-service compares the phase currents of the settled run with the ones the vector must drive (REQ-EH-015).
+service compares the phase currents of the settled run with the ones the vector must drive (REQ-PRO-005).
 
 The vector puts `d·Vdc/2` across phase a and `−d·Vdc/4` across phases b and c, with `d` the test voltage as a
 fraction of the bus. With the rotor at rest there is no back-EMF, so the currents settle at
@@ -193,7 +193,7 @@ so the caller can enter `phaseMissing` instead of a generic calibration failure.
 
 An encoder that has stopped reporting — stuck from boot, unplugged, or with a broken channel — reads as a rotor
 that settled at once, so the alignment would zero it and the drive would enable against a reading that means
-nothing (REQ-SM-034). With a non-zero follow step the service therefore aligns in two holds:
+nothing (REQ-CMS-001). With a non-zero follow step the service therefore aligns in two holds:
 
 1. **First hold.** The vector is applied at the follow step, a quarter electrical turn ahead of the alignment
    angle, and settlement is detected as above. The settled reading is recorded; nothing is zeroed.

@@ -16,7 +16,7 @@ Feature: Board Protection Faults
   through the weak-pointer event dispatcher, which the emulated platform did not
   register; see Part E of documentation/design/software-in-the-loop.md.
 
-  @sil @REQ-SM-008
+  @sil @REQ-LCY-003
   Scenario Outline: A <fault> trip faults the running motor
     Given a nominal motor plant
     And a motor plant with:
@@ -38,7 +38,7 @@ Feature: Board Protection Faults
       | overtemperature | over_temperature_trip_celsius | 20.0  | 1.0   |
       | overcurrent     | over_current_trip_ampere      | 0.5   | 1.0   |
 
-  @sil @REQ-SM-008
+  @sil @REQ-LCY-003
   Scenario: A healthy plant within its protection limits keeps running
     Given a nominal motor plant
     And a motor plant with:

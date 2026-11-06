@@ -11,7 +11,7 @@
   },
   "items": {
     "type": "object",
-    "required": ["id", "title", "shall"],
+    "required": ["id", "title", "shall", "status", "verification"],
     "additionalProperties": false,
     "properties": {
       "id": {

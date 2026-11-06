@@ -146,7 +146,7 @@ after the speed limiter (`foc-torque.md`), so the limiter folds the operator's t
 and holds the sum within the current limit. The compensation is added, not part of the command: the demand the
 cascade reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step,
 such as the flux-linkage identification's, is not compensated, and a new calibration clears the map before it
-identifies the motor, as in the other modes (REQ-TRQ-012).
+identifies the motor, as in the other modes (REQ-CTL-001).
 
 The online mechanical estimator regresses the current without the compensation's share. The
 compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
@@ -237,14 +237,14 @@ sequenceDiagram
   - The torque cascade adds the cogging current to the operator's setpoint, within the current
     limit, not to a calibration's current command, and reports the operator's demand.
 - **MIL and SIL.** On the bench plant, with the map a speed-mode calibration measured, a 0.12 A
-  torque command turns the rotor; without a map it stays in a detent (REQ-TRQ-012). The SIL
+  torque command turns the rotor; without a map it stays in a detent (REQ-CTL-001). The SIL
   scenario read 61.8 rad of travel in 2 s with the map and 0.010 rad without.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
-  - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
+  - the full calibration measures the cogging's peak within 10 % (REQ-CMS-001); it read 3.83 to
     3.90 mN·m against 4.0 across runs;
   - a cogging a quarter as deep, with the dry friction, is mapped within 30 % (it read 14.5 % high,
     the noise adding to a small map's peak), and with the dry friction and no cogging no map is
-    stored (REQ-CAL-018);
+    stored (REQ-CMS-001);
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
-    within 4 s and holds it for 2 s, and then 1.0 rad (REQ-POS-012). Without the map the PID,
+    within 4 s and holds it for 2 s, and then 1.0 rad (REQ-CTL-003). Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.

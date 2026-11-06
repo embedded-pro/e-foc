@@ -2,9 +2,9 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.6.1
+version: 1.7.0
 component: integration-testing
-date: 2026-10-27
+date: 2026-11-06
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.6.0                      |
+| Version   | 1.7.0                      |
 | Component | integration-testing        |
-| Date      | 2026-10-27                 |
+| Date      | 2026-11-06                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are
 > structured*. It expands on the architecture by specifying component responsibilities, data flows,
@@ -201,8 +201,104 @@ No test-only command is added to the product to make the suite work.
 ## Feature-to-Requirements Mapping
 
 Each scenario carries the requirement identifiers it verifies as tags alongside its runner tag.
-The traceability matrix is generated from those tags during release, reading the feature directory
-directly, so the mapping lives with the scenarios rather than in this document where it would rot.
+`documentation/tools/check-requirements-traceability.py`, which `requirements-validation.yml` runs on
+every pull request, reads the tags straight from the feature directory, so the mapping lives with the
+scenarios rather than in this document where it would rot.
+
+### Two tiers
+
+A requirement states what the drive promises; a scenario states how much and how it is checked. The
+two used to be one layer: requirements carried the scenarios' limit tables word for word, so every
+retuned limit was edited twice, and a requirement turned "verified" by restating the test that
+verified it. They are now kept apart.
+
+```
+Tier 1  product requirement   documentation/requirements/*.yaml    what the drive promises
+          ^ @REQ tag
+Tier 2  acceptance criteria   integration_tests/features/*.feature  how much, on which plant, how checked
+```
+
+| Content                                                                                 | Lives in                                      |
+|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/requirements/*.yaml`           |
+| Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error  | The `Examples:` tables of the scenarios       |
+| Mechanisms and design constraints: storage, interrupt rules, ownership, class structure | The component's design document and AGENTS.md |
+| What each CAN contract version added                                                    | The contract changelog in `service-can.md`    |
+| How the suite commands the target and decides a verdict                                 | This document and `software-in-the-loop.md`   |
+| A guard against a defect that was fixed                                                 | The regression test that reproduces it        |
+
+### Writing a product requirement
+
+- **Solution-free.** No class, method, file or message name, no contract version number, no
+  interrupt or storage mechanism. If it cannot be observed from outside the drive, it is design.
+- **One promise.** A `shall` holds one promise and the few bounds that are the product's own
+  (fault reaction time, identification accuracy, loop period). It stays under about 60 words; the
+  checker refuses one over 90.
+- **No cross-references.** A `shall` never names another requirement; the checker refuses one that
+  does.
+- **No limit tables.** A per-law or per-plant envelope is an acceptance criterion: the requirement
+  says the envelope holds, and the scenario's `Examples:` table says what it is. A limit pinned from
+  a `[METRIC]` line goes in the scenario only.
+- **Area prefixes, not method prefixes.** `LCY` lifecycle, `CMS` commissioning, `CTL` control,
+  `PRO` protection, `PLT` platform, `COM` communication, `FWU` firmware update, `HWT` hardware-test
+  application. How a requirement is verified is its `verification` field.
+- **Status and verification are mandatory.** `verified` needs at least one citing scenario;
+  `implemented` is met by code checked through unit tests or inspection only.
+
+A broad requirement cited by many scenarios is verified only as far as its scenarios reach: the
+checker's listing prints the number of scenarios per requirement, and a review of a new requirement
+asks which scenario covers each promise it makes.
+
+### Former requirement identifiers
+
+Requirements written before the two tiers (`REQ-SM`, `REQ-CAL`, `REQ-CAN`, `REQ-HIL` and the
+others) were merged into the product requirements below. A former identifier in an old pull request
+or issue maps as follows; the checker refuses any of them as a tag.
+
+| New requirement       | Former requirements                                                                                                                                                                                                                                                                                         |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| REQ-LCY-001           | REQ-SM-001, 002, 006, 007; REQ-INT-001, 002, 005                                                                                                                                                                                                                                                            |
+| REQ-LCY-002           | REQ-SM-013, 014, 015; REQ-INT-006, 007                                                                                                                                                                                                                                                                      |
+| REQ-LCY-003           | REQ-SM-008, 009, 017, 018, 020, 021, 023 to 026; REQ-INT-003                                                                                                                                                                                                                                                |
+| REQ-LCY-004           | REQ-CM-001 to 005; REQ-SM-016, 029, 032                                                                                                                                                                                                                                                                     |
+| REQ-LCY-005           | REQ-CM-006; REQ-PRT-007                                                                                                                                                                                                                                                                                     |
+| REQ-CMS-001           | REQ-CAL-012, 013, 015, 018, 020, 021; REQ-SM-003, 004, 005, 034; REQ-HIL-020, 021                                                                                                                                                                                                                           |
+| REQ-CMS-002           | REQ-CAL-001, 005, 009, 010                                                                                                                                                                                                                                                                                  |
+| REQ-CMS-003           | REQ-CAL-014, 016, 017, 019, 022 to 025                                                                                                                                                                                                                                                                      |
+| REQ-CMS-004           | REQ-SM-010, 011, 031                                                                                                                                                                                                                                                                                        |
+| REQ-CTL-001           | REQ-TRQ-002, 007 to 012, 014; REQ-HIL-024                                                                                                                                                                                                                                                                   |
+| REQ-CTL-002           | REQ-SPD-008, 009, 010; REQ-HIL-022                                                                                                                                                                                                                                                                          |
+| REQ-CTL-003           | REQ-POS-009 to 012, 014; REQ-HIL-023, 025                                                                                                                                                                                                                                                                   |
+| REQ-CTL-004           | REQ-CTRL-014                                                                                                                                                                                                                                                                                                |
+| REQ-CTL-005           | REQ-CTRL-001 to 003, 006, 008 to 010, 012, 013                                                                                                                                                                                                                                                              |
+| REQ-CTL-006           | REQ-CTRL-015 to 017; REQ-SPD-003; REQ-POS-003, 007; REQ-TRQ-003                                                                                                                                                                                                                                             |
+| REQ-CTL-007           | REQ-POS-015, 016                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-001           | REQ-PRT-001; REQ-TRQ-006                                                                                                                                                                                                                                                                                    |
+| REQ-PRO-002           | REQ-PRT-002, 008                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-003           | REQ-PRT-009; REQ-TRQ-013                                                                                                                                                                                                                                                                                    |
+| REQ-PRO-004           | REQ-PRT-003, 004                                                                                                                                                                                                                                                                                            |
+| REQ-PRO-005           | REQ-SM-028, 033; REQ-EH-015                                                                                                                                                                                                                                                                                 |
+| REQ-PRO-006           | REQ-PRT-011                                                                                                                                                                                                                                                                                                 |
+| REQ-PLT-001           | REQ-EH-008, 009, 012; REQ-HIL-012                                                                                                                                                                                                                                                                           |
+| REQ-PLT-002           | REQ-EH-001 to 003, 006, 007; REQ-HIL-010                                                                                                                                                                                                                                                                    |
+| REQ-PLT-003           | REQ-EH-004, 005; REQ-HIL-008                                                                                                                                                                                                                                                                                |
+| REQ-PLT-004           | REQ-PERF-001, 002, 004 to 006, 008                                                                                                                                                                                                                                                                          |
+| REQ-COM-001           | REQ-CAN-001 to 003, 007 to 011, 013 to 021, 023 to 025; REQ-CM-007                                                                                                                                                                                                                                          |
+| REQ-COM-002           | REQ-INT-013, 014; REQ-CAN-012                                                                                                                                                                                                                                                                               |
+| REQ-COM-003           | REQ-CAN-006                                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-001           | REQ-BOOT-001, 002, 003, 007                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-002           | REQ-UPD-002, 003, 005, 006, 011, 013, 014; REQ-BOOT-004, 005                                                                                                                                                                                                                                                |
+| REQ-FWU-003           | REQ-UPD-007                                                                                                                                                                                                                                                                                                 |
+| REQ-FWU-004           | REQ-UPD-009, 010, 012                                                                                                                                                                                                                                                                                       |
+| REQ-FWU-005           | REQ-UPD-001, 004                                                                                                                                                                                                                                                                                            |
+| REQ-HWT-001           | REQ-HIL-001, 004, 005, 006                                                                                                                                                                                                                                                                                  |
+| moved out (see below) | REQ-TRQ-001, 004; REQ-SPD-001, 004, 005, 007; REQ-POS-001, 002, 004, 006, 008; REQ-SPD-002; REQ-CAL-002 to 004, 006 to 008, 011; REQ-SM-019, 022, 027, 030; REQ-CTRL-007, 011; REQ-INT-008 to 012, 015 to 017; REQ-CAN-004, 005; REQ-EH-013, 014; REQ-PERF-007; REQ-UPD-008, 015; REQ-BOOT-006; REQ-POS-013 |
+
+The former requirements moved out were design constraints (fixed-size law storage, cascade rates,
+callback ownership, the torque-constant derivation, NVM writer ordering, the CAN client API and its
+tracing), rules of this test suite (CAN-only commands and verdicts, no test-only messages), wire
+contract test rules, and guards against fixed defects; each is stated in the design document of its
+component.
 
 ---
 
@@ -219,7 +315,7 @@ Every scenario of the motor controller application, on the emulator and on hardw
 every command as a CAN frame and decides pass or fail only from the CAN frames the target sends and,
 on the emulator, from what the simulated plant records about itself. The serial port is a debug
 channel: the suite records everything the target prints and attaches it to a failed scenario, but
-never writes to it and never parses it for a verdict (REQ-INT-015, REQ-INT-016).
+never writes to it and never parses it for a verdict.
 
 - **CAN is the product's control surface.** A deployed controller is commanded over the bus, by the
   CAN Commander or a host. A scenario that goes through the terminal proves a path no deployed system
@@ -276,7 +372,7 @@ The runner's own `[METRIC]` lines are its report on standard error, not target o
 
 Every new message is a product diagnostic that the CAN Commander shows as well: a commissioning
 engineer needs the estimates, the loop statistics and the reset cause as much as a test does, so no
-message exists only for testing (REQ-INT-017). Stalling the event loop is the one injected fault, and
+message exists only for testing. Stalling the event loop is the one injected fault, and
 it is not a command: it is part of the simulated world and exists only on the emulator.
 
 ### Out of scope: the bring-up image

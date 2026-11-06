@@ -131,7 +131,7 @@ it.
 Without a ramp a setpoint step reaches the speed loop as a step, so the only bound on the acceleration is the
 current clamp: every step accelerates at the current limit, the loop saturates, and a deceleration at the limit
 returns the most energy to the supply. The operator can bound both from the configuration record
-(REQ-SPD-010):
+(REQ-CTL-002):
 
 | Setting            | Default      | Range              | Meaning                                                 |
 |--------------------|--------------|--------------------|---------------------------------------------------------|
@@ -204,7 +204,7 @@ stateDiagram-v2
 | SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                                                         | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
 | SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                                                         | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |
 | SetCurrentStream             | Attaches the current stream whose window the inner loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                                                                                                                              |
-| ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.                                             | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-INT-014) and the encoder plausibility monitor (REQ-SM-028).                                                                                                 |
+| ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.                                             | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-COM-002) and the encoder plausibility monitor (REQ-PRO-005).                                                                                                |
 | Current command              | Bypasses the speed loop and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies.         | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts, and zero outside the command.                                                                                     |
 
 ### Required

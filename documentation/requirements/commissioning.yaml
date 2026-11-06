@@ -1,0 +1,42 @@
+- id: REQ-CMS-001
+  title: One calibration command commissions an unknown motor
+  status: verified
+  verification: [sil, hil]
+  shall: >
+    A single calibration command shall, on a motor at rest, measure the current sensors' offsets,
+    identify the pole-pair count exactly, the phase resistance within 5 %, the phase inductance
+    within 20 % and the flux linkage, align the encoder and, in speed and position mode, identify
+    the inertia within 5 % and the viscous friction within 10 % and map the cogging torque. It
+    shall store the result and enter Ready, or enter Fault with calibrationFailed when a step
+    fails, including an encoder that does not follow the field.
+
+- id: REQ-CMS-002
+  title: Calibration stays inside its current, speed and time envelope
+  status: implemented
+  verification: unit
+  shall: >
+    Every calibration step shall stop driving the motor and fail on the first sample beyond the
+    inverter's maximum current or beyond its own current or speed envelope, and shall end within a
+    bounded time. An aborted or failed calibration shall leave the motor model the drive held
+    before it, and shall never store or report a provisional model as a calibration result.
+
+- id: REQ-CMS-003
+  title: The motor model follows the motor while it runs
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    In speed and position mode the drive shall estimate the resistance, inductance, inertia and
+    viscous friction online, converging on the motor from a wrong calibration. It shall re-measure
+    the current offsets on the first Enable after power-up, a mode switch or a fault. When the
+    operator enables recalibration it shall adopt a settled estimate only within its plausibility
+    band and only while stopped, keep the loop bandwidths, and store the learned model at most
+    once every 15 minutes.
+
+- id: REQ-CMS-004
+  title: A calibration survives a power cycle and can be entered by hand
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall store a successful calibration, restore it at power-up and stay in Idle until
+    the rotor has been aligned again. While stopped, the operator shall be able to enter the
+    motor's parameters by hand; the drive shall store them before it applies them.

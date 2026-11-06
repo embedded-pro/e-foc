@@ -54,9 +54,9 @@ Feature: Disturbance Rejection
   The bus can sag as well. A supply that steps to 0.6 of its voltage scales the voltage every
   per-unit command makes, which a law with an integrator absorbs but the sliding-mode law does not;
   the drive measures the bus every 10 ms and scales its duties back, so that law stays at its
-  command (REQ-TRQ-013).
+  command (REQ-PRO-003).
 
-  @REQ-SPD-009
+  @REQ-CTL-002
   Scenario Outline: The <algorithm> speed loop rejects a <torque> Nm torque step while holding 20 rad/s
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1200 samples
@@ -79,7 +79,7 @@ Feature: Disturbance Rejection
       | algorithm | torque | deviation | band | recovery_ms |
       | pid       | 0.002  | 4.0       | 2.0  | 50          |
 
-  @sil @REQ-POS-010
+  @sil @REQ-CTL-003
   Scenario Outline: The <algorithm> position loop holds 1.5 rad against a <torque> Nm torque step
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1400 samples
@@ -101,7 +101,7 @@ Feature: Disturbance Rejection
       | algorithm | torque | deviation | band | recovery_ms |
       | pid       | 0.002  | 0.1       | 0.08 | 50          |
 
-  @REQ-SPD-009
+  @REQ-CTL-002
   Scenario Outline: The <algorithm> speed loop recovers through a saturated current command
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1200 samples
@@ -124,7 +124,7 @@ Feature: Disturbance Rejection
       | algorithm |
       | pid       |
 
-  @sil @REQ-TRQ-013
+  @sil @REQ-PRO-003
   Scenario: A supply that sags to 0.6 of its voltage leaves the sliding-mode current law at its command
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 2000 samples
