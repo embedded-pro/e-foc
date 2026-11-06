@@ -327,12 +327,12 @@ later bus changes.
 
 **Current loop:**
 
-| Parameter                     | PID                      | Decoupled PID            | Deadbeat                 | Sliding-mode              |
+| Parameter                     |           PID            |      Decoupled PID       |         Deadbeat         |       Sliding-mode        |
 |-------------------------------|:------------------------:|:------------------------:|:------------------------:|:-------------------------:|
-| $R_s$, $L_s$ (electrical RLS) | Required                 | Required                 | Required (tight)         | Required                  |
-| $\psi_f$ (datasheet)          | Not required             | Required — back-EMF FF   | Optional — back-EMF FF   | Required — back-EMF FF    |
+| $R_s$, $L_s$ (electrical RLS) |         Required         |         Required         |     Required (tight)     |         Required          |
+| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |  Optional — back-EMF FF  |  Required — back-EMF FF   |
 | $V_{dc}$                      | Required — normalisation | Required — normalisation | Required — normalisation | Required — normalisation  |
-| $I_{q,max}$                   | For output clamp         | For output clamp         | For clamp                | For switching gain sizing |
+| $I_{q,max}$                   |     For output clamp     |     For output clamp     |        For clamp         | For switching gain sizing |
 
 Deadbeat requires the tightest RLS convergence. Its back-EMF feedforward uses $\psi_f$ when it is
 known, and the voltage it leaves wrong is estimated and removed at the loop's bandwidth (REQ-TRQ-011).
@@ -347,22 +347,22 @@ it is sized for.
 
 **Speed loop:**
 
-| Parameter                   | PID          | LQI                   | ADRC                   | Two-DOF      |
+| Parameter                   |     PID      |          LQI          |          ADRC          |   Two-DOF    |
 |-----------------------------|:------------:|:---------------------:|:----------------------:|:------------:|
 | $J$, $B_f$ (mechanical RLS) | Not required | Required — DARE plant | Required — $b_0=K_t/J$ | Not required |
-| $K_t$ (derived)             | Not required | Required              | Required               | Not required |
-| $I_{q,max}$                 | For clamp    | Required — R weight   | For clamp              | For clamp    |
+| $K_t$ (derived)             | Not required |       Required        |        Required        | Not required |
+| $I_{q,max}$                 |  For clamp   |  Required — R weight  |       For clamp        |  For clamp   |
 
 ADRC is the most forgiving: $b_0$ tolerates ±50% error. Two-DOF and PID require no mechanical
 RLS and are available as soon as electrical calibration completes.
 
 **Position loop:**
 
-| Parameter                   | PID          | Cascade P       | LQR                 | LQI                 | Two-DOF      |
+| Parameter                   |     PID      |    Cascade P    |         LQR         |         LQI         |   Two-DOF    |
 |-----------------------------|:------------:|:---------------:|:-------------------:|:-------------------:|:------------:|
-| $J$, $B_f$ (mechanical RLS) | Not required | Not required    | Required            | Required            | Not required |
-| $K_t$ (derived)             | Not required | Not required    | Required            | Required            | Not required |
-| $I_{q,max}$                 | For clamp    | Speed-loop dep. | Required — R weight | Required — R weight | For clamp    |
+| $J$, $B_f$ (mechanical RLS) | Not required |  Not required   |      Required       |      Required       | Not required |
+| $K_t$ (derived)             | Not required |  Not required   |      Required       |      Required       | Not required |
+| $I_{q,max}$                 |  For clamp   | Speed-loop dep. | Required — R weight | Required — R weight |  For clamp   |
 
 #### Tuning Knobs (design choices, not estimated)
 

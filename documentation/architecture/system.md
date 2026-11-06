@@ -36,7 +36,8 @@ date: 2026-11-05
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
 - **Assumption**: Rotor position is measured by a quadrature encoder.
 - **Assumption**: All motor electrical and mechanical parameters (resistance, inductance, pole pairs, inertia, friction) can be identified at startup or loaded from non-volatile storage.
-- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle. The `SelectControlMode` response and the telemetry status report the active mode. No mode switch is permitted while the motor is enabled.
+- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle.
+  The `SelectControlMode` response and the telemetry status report the active mode. No mode switch is permitted while the motor is enabled.
 
 ---
 
