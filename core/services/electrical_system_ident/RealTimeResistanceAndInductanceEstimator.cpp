@@ -37,6 +37,13 @@ namespace services
         if (std::abs(reference) < minimumDirectCurrent)
             return;
 
+        // A step of the reference lies inside its window, so the window's mean says nothing of whether the current follows.
+        if (std::abs(referenceChange) < minimumDirectCurrent)
+            following = std::abs(window.meanId.Value()) >= minimumFollowedFraction * std::abs(reference);
+
+        if (!following)
+            return;
+
         Estimator::InputMatrix regressor;
         regressor.at(0, 0) = window.meanId.Value();
         regressor.at(1, 0) = (idChange * samplingFrequency - window.meanElectricalSpeedTimesIq) / milliPerUnit;
@@ -80,6 +87,7 @@ namespace services
         estimator->SetCoefficients(initial);
 
         primed = false;
+        following = true;
         updates = 0;
     }
 
