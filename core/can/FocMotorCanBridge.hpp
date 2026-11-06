@@ -86,11 +86,7 @@ namespace can
         void OnResetModel(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
-        static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);
-
-        void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
-        bool SetpointAllowedInCurrentState() const;
         void NotifyCommandAccepted();
 
         FocMotorCategoryServer& server;

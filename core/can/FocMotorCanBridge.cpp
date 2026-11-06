@@ -8,6 +8,37 @@
 
 namespace can
 {
+    namespace
+    {
+        FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration)
+        {
+            if (std::holds_alternative<state_machine::Fault>(state))
+                return FocMotorState::fault;
+            if (std::holds_alternative<state_machine::Calibrating>(state))
+                return FocMotorState::calibrating;
+            if (std::holds_alternative<state_machine::Enabled>(state))
+                return FocMotorState::running;
+            if (std::holds_alternative<state_machine::Ready>(state))
+                return FocMotorState::ready;
+            if (hasPartialCalibration)
+                return FocMotorState::partialCalibration;
+            return FocMotorState::idle;
+        }
+
+        void ReportSelectFailure(FocMotorCategoryServer& server, state_machine::SelectResult result)
+        {
+            if (result == state_machine::SelectResult::invalidMode)
+                server.SendCommandAck(can::focSelectControlModeId, services::CanAckStatus::invalidPayload);
+            else
+                server.SendCategoryError(can::focSelectControlModeId, state_machine::ToCategoryError(result));
+        }
+
+        bool SetpointAllowed(const state_machine::State& state)
+        {
+            return std::holds_alternative<state_machine::Ready>(state) || std::holds_alternative<state_machine::Enabled>(state);
+        }
+    }
+
     FocMotorCanBridge::FocMotorCanBridge(
         FocMotorCategoryServer& server,
         state_machine::ControlModeStateMachine& controlMode,
@@ -67,21 +98,6 @@ namespace can
         }
 
         return FocFaultCode::none;
-    }
-
-    FocMotorState FocMotorCanBridge::ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration)
-    {
-        if (std::holds_alternative<state_machine::Fault>(state))
-            return FocMotorState::fault;
-        if (std::holds_alternative<state_machine::Calibrating>(state))
-            return FocMotorState::calibrating;
-        if (std::holds_alternative<state_machine::Enabled>(state))
-            return FocMotorState::running;
-        if (std::holds_alternative<state_machine::Ready>(state))
-            return FocMotorState::ready;
-        if (hasPartialCalibration)
-            return FocMotorState::partialCalibration;
-        return FocMotorState::idle;
     }
 
     void FocMotorCanBridge::ObserveCommands(const infra::Function<void()>& onAccepted)
@@ -161,7 +177,7 @@ namespace can
                 if (result == state_machine::SelectResult::ok)
                     callback(state_machine::ToCanMode(controlMode.Active()));
                 else
-                    ReportSelectFailure(result);
+                    ReportSelectFailure(server, result);
             });
     }
 
@@ -329,14 +345,6 @@ namespace can
         onDone(settings.HeldValue(parameter));
     }
 
-    void FocMotorCanBridge::ReportSelectFailure(state_machine::SelectResult result)
-    {
-        if (result == state_machine::SelectResult::invalidMode)
-            server.SendCommandAck(can::focSelectControlModeId, services::CanAckStatus::invalidPayload);
-        else
-            server.SendCategoryError(can::focSelectControlModeId, state_machine::ToCategoryError(result));
-    }
-
     bool FocMotorCanBridge::SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode,
         bool withinRange)
     {
@@ -352,19 +360,12 @@ namespace can
             return true;
         }
 
-        if (!SetpointAllowedInCurrentState())
+        if (!SetpointAllowed(controlMode.ActiveStateMachine().CurrentState()))
         {
             server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
             return true;
         }
 
         return false;
-    }
-
-    bool FocMotorCanBridge::SetpointAllowedInCurrentState() const
-    {
-        const auto& state = controlMode.ActiveStateMachine().CurrentState();
-        return std::holds_alternative<state_machine::Ready>(state) ||
-               std::holds_alternative<state_machine::Enabled>(state);
     }
 }
