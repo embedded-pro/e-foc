@@ -29,17 +29,21 @@ namespace state_machine
         , configData(configData)
         , configWriter(nvm, this->configData, tracer, nvmActivity)
         , algorithmPersistence(configWriter, this->configData, tracer)
-        , recalibrationStore(nvm, nvmActivity)
+        , recalibration(nvm, nvmActivity)
     {
         SanitizeTunings(this->configData);
         SanitizeSupervision(this->configData);
         SanitizeLimits(this->configData);
         Activate(ControlModeFromRaw(configData.defaultControlMode));
-        recalibrationTimer.Start(Recalibration::observationPeriod, [this]()
+        recalibration.timer.Start(Recalibration::observationPeriod, [this]()
             {
                 ObserveOnlineEstimates();
             });
     }
+
+    ControlModeStateMachine::RecalibrationState::RecalibrationState(services::NonVolatileMemory& nvm, application::NvmActivity& nvmActivity)
+        : store(nvm, nvmActivity)
+    {}
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
     {
@@ -173,14 +177,14 @@ namespace state_machine
             return gate;
 
         CommissionModel();
-        Conclude(recalibration.Decide(RecalibrationTrigger::command));
+        Conclude(recalibration.model.Decide(RecalibrationTrigger::command));
         ApplyModelInUse();
         return SettingResult::ok;
     }
 
     void ControlModeStateMachine::RestoreStoredModel()
     {
-        recalibrationStore.Start([this]()
+        recalibration.store.Start([this]()
             {
                 if (!std::holds_alternative<std::monostate>(activeSm) && std::holds_alternative<Ready>(ActiveStateMachine().CurrentState()))
                     RecalibrateOnReady();
@@ -192,15 +196,15 @@ namespace state_machine
         if (const auto gate = SettingGate(); gate != SettingResult::ok)
             return gate;
 
-        recalibrationStore.Reset(onStored);
-        recalibration.Revert();
+        recalibration.store.Reset(onStored);
+        recalibration.model.Revert();
         ApplyModelInUse();
         return SettingResult::ok;
     }
 
     uint16_t ControlModeStateMachine::RecalibrationsStored() const
     {
-        return recalibrationStore.Stores();
+        return recalibration.store.Stores();
     }
 
     std::optional<MotorModel> ControlModeStateMachine::ModelInUse() const
@@ -210,8 +214,8 @@ namespace state_machine
 
         const auto commissioned = CommissionedModel();
         const auto stored = StoredFor(commissioned);
-        if (recalibration.IsCommissionedFrom(commissioned, stored))
-            return recalibration.InUse();
+        if (recalibration.model.IsCommissionedFrom(commissioned, stored))
+            return recalibration.model.InUse();
 
         // Not yet commissioned since power-up or a new record: report what the next Ready designs the loops from.
         Recalibration next;
@@ -221,12 +225,12 @@ namespace state_machine
 
     uint16_t ControlModeStateMachine::RecalibrationsApplied() const
     {
-        return recalibration.Applied();
+        return recalibration.model.Applied();
     }
 
     uint16_t ControlModeStateMachine::RecalibrationsRejected() const
     {
-        return recalibration.Rejected();
+        return recalibration.model.Rejected();
     }
 
     void ControlModeStateMachine::ObserveOnlineEstimates()
@@ -238,8 +242,8 @@ namespace state_machine
         if (!estimates.has_value())
             return;
 
-        ranSinceStop = true;
-        recalibration.Observe(*estimates);
+        recalibration.ranSinceStop = true;
+        recalibration.model.Observe(*estimates);
     }
 
     void ControlModeStateMachine::RecalibrateOnReady()
@@ -248,12 +252,12 @@ namespace state_machine
             return;
 
         CommissionModel();
-        if (ranSinceStop && RecalibrationModeSetting() == services::RecalibrationMode::automatic)
-            Conclude(recalibration.Decide(RecalibrationTrigger::automatic));
+        if (recalibration.ranSinceStop && RecalibrationModeSetting() == services::RecalibrationMode::automatic)
+            Conclude(recalibration.model.Decide(RecalibrationTrigger::automatic));
 
-        ranSinceStop = false;
+        recalibration.ranSinceStop = false;
         if (RecalibrationModeSetting() != services::RecalibrationMode::off)
-            recalibrationStore.StoreIfDue();
+            recalibration.store.StoreIfDue();
         ApplyModelInUse();
     }
 
@@ -261,15 +265,15 @@ namespace state_machine
     {
         const auto commissioned = CommissionedModel();
         // A changed record has already redesigned the loops from itself.
-        if (commissioned != recalibration.Commissioned())
-            loopsRecalibrated = false;
+        if (commissioned != recalibration.model.Commissioned())
+            recalibration.loopsRecalibrated = false;
 
-        recalibration.Commission(commissioned, StoredFor(commissioned));
+        recalibration.model.Commission(commissioned, StoredFor(commissioned));
     }
 
     StoredModel ControlModeStateMachine::StoredFor(const MotorModel& commissioned) const
     {
-        return RecalibrationModeSetting() != services::RecalibrationMode::off ? recalibrationStore.Restored(commissioned) : StoredModel{};
+        return RecalibrationModeSetting() != services::RecalibrationMode::off ? recalibration.store.Restored(commissioned) : StoredModel{};
     }
 
     void ControlModeStateMachine::Conclude(const Recalibration::Outcome& outcome)
@@ -278,19 +282,19 @@ namespace state_machine
 
         const bool mechanicsOrInductance = outcome.verdicts[1] == RecalibrationVerdict::applied || outcome.verdicts[2] == RecalibrationVerdict::applied || outcome.verdicts[3] == RecalibrationVerdict::applied;
         if (mechanicsOrInductance)
-            recalibrationStore.Store(recalibration.Learned(), recalibration.Commissioned());
+            recalibration.store.Store(recalibration.model.Learned(), recalibration.model.Commissioned());
     }
 
     void ControlModeStateMachine::ApplyModelInUse()
     {
         auto* outerLoop = ActiveOuterLoop();
-        const bool commissioned = recalibration.InUse() == recalibration.Commissioned();
-        if (outerLoop == nullptr || (commissioned && !loopsRecalibrated))
+        const bool commissioned = recalibration.model.InUse() == recalibration.model.Commissioned();
+        if (outerLoop == nullptr || (commissioned && !recalibration.loopsRecalibrated))
             return;
 
-        if (outerLoop->ApplyModel(recalibration.InUse()))
+        if (outerLoop->ApplyModel(recalibration.model.InUse()))
         {
-            loopsRecalibrated = !commissioned;
+            recalibration.loopsRecalibrated = !commissioned;
             ApplyOperatorTunings();
         }
     }
@@ -298,7 +302,7 @@ namespace state_machine
     void ControlModeStateMachine::Report(const Recalibration::Outcome& outcome)
     {
         constexpr std::array<const char*, Recalibration::quantities> names{ "resistance", "inductance", "inertia", "viscous friction" };
-        const auto& commissioned = recalibration.Commissioned();
+        const auto& commissioned = recalibration.model.Commissioned();
         const std::array<float, Recalibration::quantities> references{ commissioned.resistance.Value(), commissioned.inductance.Value(), commissioned.inertia.Value(), commissioned.viscousFriction.Value() };
 
         for (std::size_t quantity = 0; quantity != Recalibration::quantities; ++quantity)
@@ -407,8 +411,8 @@ namespace state_machine
         const auto rotorReference = RotorReferenceToKeep();
         if (!std::holds_alternative<std::monostate>(activeSm))
             ActiveStateMachine().CmdEmergencyStop();
-        ranSinceStop = false;
-        loopsRecalibrated = false;
+        recalibration.ranSinceStop = false;
+        recalibration.loopsRecalibrated = false;
 
         if (mode == ControlMode::speed)
             AttachAlgorithmRestore(activeSm.emplace<application::SpeedStateMachine>(

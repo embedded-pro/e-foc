@@ -190,11 +190,19 @@ namespace state_machine
         std::optional<foc::Ampere> currentLimit;
         std::optional<foc::Volts> busVoltage;
         infra::Function<void(FaultCode)> faultEntered;
-        Recalibration recalibration;
-        RecalibrationStore recalibrationStore;
-        bool ranSinceStop{ false };
-        bool loopsRecalibrated{ false };
-        infra::TimerRepeating recalibrationTimer;
+
+        struct RecalibrationState
+        {
+            RecalibrationState(services::NonVolatileMemory& nvm, application::NvmActivity& nvmActivity);
+
+            Recalibration model;
+            RecalibrationStore store;
+            bool ranSinceStop{ false };
+            bool loopsRecalibrated{ false };
+            infra::TimerRepeating timer;
+        };
+
+        RecalibrationState recalibration;
 
         std::variant<std::monostate,
             application::TorqueStateMachine,

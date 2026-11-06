@@ -3,6 +3,7 @@
 #include "infra/util/ReallyAssert.hpp"
 #include <array>
 #include <bit>
+#include <cstddef>
 
 namespace services
 {
@@ -26,6 +27,11 @@ namespace services
             for (std::size_t byte = 0; byte != sizeof(uint32_t); ++byte)
                 value |= static_cast<uint32_t>(image[offset + byte]) << (8 * byte);
             return value;
+        }
+
+        std::byte PresenceBit(std::size_t quantity)
+        {
+            return std::byte{ 1 } << quantity;
         }
 
         uint32_t Crc(infra::ConstByteRange bytes)
@@ -54,16 +60,16 @@ namespace services
         image[versionOffset] = LearnedModelLayoutVersion;
         Put(image, commissioningOffset, model.commissioning);
 
-        uint8_t present{ 0 };
+        std::byte present{ 0 };
         const auto quantities = QuantitiesOf(model);
         for (std::size_t quantity = 0; quantity != quantities.size(); ++quantity)
         {
             Put(image, quantitiesOffset + quantity * sizeof(float), std::bit_cast<uint32_t>(quantities[quantity]->value_or(0.0f)));
             if (quantities[quantity]->has_value())
-                present |= static_cast<uint8_t>(1u << quantity);
+                present |= PresenceBit(quantity);
         }
 
-        image[presentOffset] = present;
+        image[presentOffset] = std::to_integer<uint8_t>(present);
         Put(image, crcOffset, Crc(infra::Head(infra::ConstByteRange{ image }, crcOffset)));
     }
 
@@ -77,8 +83,9 @@ namespace services
         LearnedModelData model;
         model.commissioning = Get(image, commissioningOffset);
         const auto quantities = QuantitiesOf(model);
+        const auto present = std::byte{ image[presentOffset] };
         for (std::size_t quantity = 0; quantity != quantities.size(); ++quantity)
-            if ((image[presentOffset] & (1u << quantity)) != 0)
+            if ((present & PresenceBit(quantity)) != std::byte{ 0 })
                 *quantities[quantity] = std::bit_cast<float>(Get(image, quantitiesOffset + quantity * sizeof(float)));
 
         return model;

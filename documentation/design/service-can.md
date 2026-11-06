@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.20.1
+version: 0.20.2
 component: can-service
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.20.1                   |
+| Version   | 0.20.2                   |
 | Component | can-service              |
 | Date      | 2026-11-06               |
 
@@ -562,7 +562,8 @@ The observer interface provides callbacks for:
 - `OnResetModel` — the reset of the stored recalibration of contract 2.18, with a status callback.
 
 The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
-one handler group of the server, so the server's own surface stays small as the contract grows.
+one handler group of the server, and the maintenance handlers — `ClearDiagnostics`, the fault history,
+`Recalibrate` and `ResetModel` — in another, so the server's own surface stays small as the contract grows.
 
 ### Part C — FocMotorCategoryClient
 
