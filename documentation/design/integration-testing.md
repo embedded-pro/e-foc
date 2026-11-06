@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.6.0
+version: 1.6.1
 component: integration-testing
 date: 2026-10-27
 ---
@@ -179,9 +179,11 @@ enabled drive whose client falls silent (see the CAN service design).
 The transport addresses the node whose heartbeat it waits for at the start of a scenario. A board
 answers as its configured base plus the board ID read from its jumpers, so the suite takes the node
 ID from the first server heartbeat it sees rather than assuming node 1; the emulated target, with
-no jumpers, is node 1. While it waits it broadcasts a status request every 50 ms, which a server
-answers with a heartbeat at once, so a target is found as soon as its CAN server is up rather than
-a heartbeat period later.
+no jumpers, is node 1. While it waits it broadcasts a status request, which a server answers with a
+heartbeat at once, so a target is found as soon as its CAN server is up rather than a heartbeat period
+later. It sends one at most once a second: a request a silent target cannot acknowledge stays in the
+bus adapter and is delivered in a burst when the target comes back, and a burst of them filled the
+target's send queue ahead of the first command's acknowledgement.
 
 ### Required from the system under test
 
