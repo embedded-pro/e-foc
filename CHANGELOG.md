@@ -1,5 +1,105 @@
 # Changelog
 
+## [2.0.0](https://github.com/embedded-pro/e-foc/compare/v1.6.0...v2.0.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **state-machine:** an EK-TM4C1294XL running a bootloader built for the 256 KB layout cannot take this firmware over CAN. Program it once with a debugger, bootloader and application together. EK-TM4C123GXL firmware is no longer built or released.
+* **supervision:** an EK-TM4C1294XL running a bootloader built for the 256 KB layout cannot take this firmware over CAN. Program it once with a debugger, bootloader and application together. EK-TM4C123GXL firmware is no longer built or released.
+* **bootloader:** an EK-TM4C1294XL running a bootloader built for the 256 KB layout cannot take this firmware over CAN. Program it once with a debugger, bootloader and application together. EK-TM4C123GXL firmware is no longer built or released.
+
+### Features
+
+* **bootloader:** 320 KB application and staging slots; drop the EK-TM4C123GXL ([#607](https://github.com/embedded-pro/e-foc/issues/607)) ([10e5529](https://github.com/embedded-pro/e-foc/commit/10e552918185ec31d75f6e69723a944580c650b5))
+* **bootloader:** Application header, image descriptor and the start check ([#523](https://github.com/embedded-pro/e-foc/issues/523)) ([baca131](https://github.com/embedded-pro/e-foc/commit/baca1310c6fc2a1a70ce335472c868c08b2a5f30))
+* **bootloader:** EK-TM4C1294XL application behind the bootloader ([#526](https://github.com/embedded-pro/e-foc/issues/526)) ([cfae276](https://github.com/embedded-pro/e-foc/commit/cfae27699d3c0677fab518d2dbe678c76089fa8c))
+* **bootloader:** EK-TM4C1294XL flash layout and the bootloader ([#525](https://github.com/embedded-pro/e-foc/issues/525)) ([9f6033d](https://github.com/embedded-pro/e-foc/commit/9f6033df75386d8c6fcd2f9e5810347dbcc8ff85))
+* **bootloader:** Run at the application's clock on the EK-TM4C1294XL ([#620](https://github.com/embedded-pro/e-foc/issues/620)) ([705bc30](https://github.com/embedded-pro/e-foc/commit/705bc307f17471f3240704557beff3dc7d73c12d))
+* **bootloader:** Status journal ([#522](https://github.com/embedded-pro/e-foc/issues/522)) ([d5b3200](https://github.com/embedded-pro/e-foc/commit/d5b320040d10080024734d64469e766c103e135b))
+* **can-commander:** Download a firmware pack to a motor controller ([#576](https://github.com/embedded-pro/e-foc/issues/576)) ([74d741c](https://github.com/embedded-pro/e-foc/commit/74d741c46208dd6f6f915a1901431da88e8e14bb))
+* **can-commander:** Firmware identity and pack inspection ([#575](https://github.com/embedded-pro/e-foc/issues/575)) ([652b7f6](https://github.com/embedded-pro/e-foc/commit/652b7f6102c1c3d34433c32c29323980a2cabb02))
+* **can-commander:** Firmware tab ([#578](https://github.com/embedded-pro/e-foc/issues/578)) ([ca73964](https://github.com/embedded-pro/e-foc/commit/ca739642c27c3748f85b8d56347a61d232c5844c))
+* **can-commander:** Resume a stalled download, apply a staged pack and find the release's pack ([#577](https://github.com/embedded-pro/e-foc/issues/577)) ([2ec1e0f](https://github.com/embedded-pro/e-foc/commit/2ec1e0fdfc9ea6cb54fe94a1c0ad490c26eeec50))
+* **can-commander:** Show and clear the controller's fault history ([#633](https://github.com/embedded-pro/e-foc/issues/633)) ([3cad446](https://github.com/embedded-pro/e-foc/commit/3cad446c2845be60ecc1f144f95c2d69f0a2c2a3))
+* **can:** Report firmware version and board kind, and print the build's version in the banner ([#536](https://github.com/embedded-pro/e-foc/issues/536)) ([fca7c8f](https://github.com/embedded-pro/e-foc/commit/fca7c8f2744d4e0694c6f28a8851aab8b5dbe06e))
+* **can:** Wire the firmware-upgrade service beside the FOC motor category ([#572](https://github.com/embedded-pro/e-foc/issues/572)) ([b9e61f9](https://github.com/embedded-pro/e-foc/commit/b9e61f967f714d14255549763f53165b2dde13a0))
+* **firmware-upgrade:** Apply a staged pack, on the board's staging flash and status journal ([#571](https://github.com/embedded-pro/e-foc/issues/571)) ([87e7429](https://github.com/embedded-pro/e-foc/commit/87e74290725e6a5f0b79d785200e6f1806a3a09e))
+* **firmware-upgrade:** Check an upgrade pack's header ([#569](https://github.com/embedded-pro/e-foc/issues/569)) ([952b23e](https://github.com/embedded-pro/e-foc/commit/952b23e2a45ea918f95d9d41330b7ae86e1796fd))
+* **firmware-upgrade:** Download and stage an upgrade pack ([#570](https://github.com/embedded-pro/e-foc/issues/570)) ([9fe653a](https://github.com/embedded-pro/e-foc/commit/9fe653a5be0512fe88415afdadf7df05c797ae03))
+* **foc:** Keep position travel within software position limits ([#615](https://github.com/embedded-pro/e-foc/issues/615)) ([a1919c1](https://github.com/embedded-pro/e-foc/commit/a1919c1c6c2e9e528d0263bb7f408e4e50112b61))
+* **foc:** Let the duties follow a measured bus voltage ([#610](https://github.com/embedded-pro/e-foc/issues/610)) ([6bb3a3d](https://github.com/embedded-pro/e-foc/commit/6bb3a3dfea2cd2d0e809049f4bacce67e00ea53b))
+* **services:** Keep the last eight faults across power cycles and read them over CAN ([#632](https://github.com/embedded-pro/e-foc/issues/632)) ([4f23368](https://github.com/embedded-pro/e-foc/commit/4f23368649c9868d7144de0c263dde6267500913))
+* **services:** Measure the bus every 10 ms so the duties follow it ([#612](https://github.com/embedded-pro/e-foc/issues/612)) ([f62f921](https://github.com/embedded-pro/e-foc/commit/f62f92178a8fe5ec2af7771103335a70b234fbba))
+* **state-machine:** Re-measure the current offsets at the first Enable ([#609](https://github.com/embedded-pro/e-foc/issues/609)) ([2f93dd7](https://github.com/embedded-pro/e-foc/commit/2f93dd76f8b1c769c95eebc475b91b72e17b94a7))
+* **state-machine:** Recalibrate the loops from settled online estimates while stopped ([#637](https://github.com/embedded-pro/e-foc/issues/637)) ([4f021f4](https://github.com/embedded-pro/e-foc/commit/4f021f4e86f207436df1bd7e77a73f2398d3c673))
+* **state-machine:** Start from a stored encoder index angle instead of re-aligning ([#643](https://github.com/embedded-pro/e-foc/issues/643)) ([bbb36b4](https://github.com/embedded-pro/e-foc/commit/bbb36b46d618a1a0f7e8568d0164bd874e861bc6))
+* **state-machine:** Store the recalibrated inductance, inertia and friction ([#638](https://github.com/embedded-pro/e-foc/issues/638)) ([6b02a0e](https://github.com/embedded-pro/e-foc/commit/6b02a0e1bc923de513d22e9cc38573d602d94ea8))
+* **supervision:** Derate the current near the temperature limit and trip at it ([#621](https://github.com/embedded-pro/e-foc/issues/621)) ([53c2cf7](https://github.com/embedded-pro/e-foc/commit/53c2cf7f5136e3f32409ad227801aee82d09a9ae))
+* **supervision:** Detect a frozen encoder in every mode, and refuse an alignment the encoder does not follow ([#518](https://github.com/embedded-pro/e-foc/issues/518)) ([df89c14](https://github.com/embedded-pro/e-foc/commit/df89c14032261c94a6ea22285a0aca672c42ff23))
+* **supervision:** Drive limits, motor overload protection and torque-mode cogging compensation ([#608](https://github.com/embedded-pro/e-foc/issues/608)) ([be8aacf](https://github.com/embedded-pro/e-foc/commit/be8aacfb2041bdcf44088d07457f2714b001b98e))
+* **supervision:** Fault a rotor carried past the software position limits ([#616](https://github.com/embedded-pro/e-foc/issues/616)) ([0717f22](https://github.com/embedded-pro/e-foc/commit/0717f2281de46ad9d27d1dc4399c5f2dd3db03e6))
+* **supervision:** Fault a running drive whose bus leaves the operator's voltage limits ([#622](https://github.com/embedded-pro/e-foc/issues/622)) ([00409a7](https://github.com/embedded-pro/e-foc/commit/00409a7d40e101395a68ee6147a2042e9b7df1f6))
+* **supervision:** Infer the winding temperature from the online resistance ([#618](https://github.com/embedded-pro/e-foc/issues/618)) ([e94e628](https://github.com/embedded-pro/e-foc/commit/e94e628f4427314be640f6c09c472b5f66f5ec5f))
+* **supervision:** Report a disconnected motor or an open phase as a missing phase ([#517](https://github.com/embedded-pro/e-foc/issues/517)) ([e2ef4cf](https://github.com/embedded-pro/e-foc/commit/e2ef4cfe042e75b92b1440df44afa6c9431ddc05))
+* **supervision:** Report the target reached in position mode ([#614](https://github.com/embedded-pro/e-foc/issues/614)) ([30004df](https://github.com/embedded-pro/e-foc/commit/30004dfe55bfb26d6cfa9f0f24431e1555788b7d))
+
+
+### Bug Fixes
+
+* **bootloader:** Keep the staging slot and the journal in the upper flash half ([#623](https://github.com/embedded-pro/e-foc/issues/623)) ([30d1556](https://github.com/embedded-pro/e-foc/commit/30d15561537d19de34d168662f31b8149dbc22c8))
+* **can-commander:** An emergency stop ends the motor's firmware download ([#592](https://github.com/embedded-pro/e-foc/issues/592)) ([27edb84](https://github.com/embedded-pro/e-foc/commit/27edb84a0c1ac18f2f744144822c3c68a40cb43d))
+* **can-commander:** Name the step a firmware refusal answers ([#590](https://github.com/embedded-pro/e-foc/issues/590)) ([46f66ae](https://github.com/embedded-pro/e-foc/commit/46f66aec5cd386f0761bbf4d8c34653480aa162d))
+* **can-commander:** Say what goes on when a transfer is abandoned during an apply ([#594](https://github.com/embedded-pro/e-foc/issues/594)) ([f411964](https://github.com/embedded-pro/e-foc/commit/f41196439c53b6e80f1ee8f8ba5326e14f39c8c8))
+* **can-commander:** Send a block or Verify again when the controller answers Busy ([#591](https://github.com/embedded-pro/e-foc/issues/591)) ([753e4c6](https://github.com/embedded-pro/e-foc/commit/753e4c64321199bb6e5f5342b4a6894598e8c41d))
+* **can-commander:** Show the firmware step in the status line while the bar is busy ([#595](https://github.com/embedded-pro/e-foc/issues/595)) ([6121f8e](https://github.com/embedded-pro/e-foc/commit/6121f8e16edf8f42be169433685d6e1d2d900d3e))
+* **can-commander:** Try Again asks the download's confirmation, after a failed download only ([#593](https://github.com/embedded-pro/e-foc/issues/593)) ([9daa4ed](https://github.com/embedded-pro/e-foc/commit/9daa4ed785478bc826d2d48a5c05704923fb2de1))
+* **can:** Report every fault code and Ready distinctly (contract 2.8) ([#541](https://github.com/embedded-pro/e-foc/issues/541)) ([ae52acb](https://github.com/embedded-pro/e-foc/commit/ae52acb74975980336964f2c1ef75d2fb946f417))
+* **foc:** The PID position law no longer drops the part of a step its clamp holds back ([#617](https://github.com/embedded-pro/e-foc/issues/617)) ([07881b8](https://github.com/embedded-pro/e-foc/commit/07881b8415b22e2698024c7c7a8ad897c29f2c74))
+* **platform:** Count a control interrupt requested again before it returns ([#542](https://github.com/embedded-pro/e-foc/issues/542)) ([bb74c38](https://github.com/embedded-pro/e-foc/commit/bb74c38450ffbca3e2b00d0c3c1dbd9642b350a6))
+* **platform:** Rebuild a hidden low-side shunt phase so its offset comes out right ([#539](https://github.com/embedded-pro/e-foc/issues/539)) ([dcbbba5](https://github.com/embedded-pro/e-foc/commit/dcbbba5e4f3510eaa864b381f246f5a6731196e7))
+* **platform:** Report a real board protection status on TI and ST ([#535](https://github.com/embedded-pro/e-foc/issues/535)) ([40a6e81](https://github.com/embedded-pro/e-foc/commit/40a6e81004760ec75bb66dee1724a8b9522dc840))
+* **qemu:** The emulated flash files are written in place and a failed call stops the firmware ([#603](https://github.com/embedded-pro/e-foc/issues/603)) ([7fc083e](https://github.com/embedded-pro/e-foc/commit/7fc083ea2d4a487c3115711109753bcb54bc2d3b))
+* **services:** Hold the online R and L while the current does not follow its reference ([#634](https://github.com/embedded-pro/e-foc/issues/634)) ([ffd0f9f](https://github.com/embedded-pro/e-foc/commit/ffd0f9fd70d5b3a1200f42539160a5e00da31fa7))
+* **services:** Identify resistance and inductance with the live bus voltage ([#613](https://github.com/embedded-pro/e-foc/issues/613)) ([7b94902](https://github.com/embedded-pro/e-foc/commit/7b94902e28c8e3d95d25f3fdff5371106f829588))
+* **state_machine:** Raise the calibrated speed-loop bandwidth to 100 rad/s ([#550](https://github.com/embedded-pro/e-foc/issues/550)) ([3b2f617](https://github.com/embedded-pro/e-foc/commit/3b2f6171b08640a7e0c2cdf7d3095af675769566)), closes [#467](https://github.com/embedded-pro/e-foc/issues/467)
+
+
+### Performance Improvements
+
+* **platform:** Take EmIL's inline interrupt and cycle-count reads ([#555](https://github.com/embedded-pro/e-foc/issues/555)) ([e53b7bb](https://github.com/embedded-pro/e-foc/commit/e53b7bbdac62d5e4adc420f530af6dcf1ff9a940))
+
+
+### Documentation
+
+* **bootloader:** Record the install and boot times at the application's clock ([#626](https://github.com/embedded-pro/e-foc/issues/626)) ([fbb9c53](https://github.com/embedded-pro/e-foc/commit/fbb9c53cae061ab1854792f4ef6f4921770bda78))
+* **bootloader:** The hardware_test image replaces the bootloader ([#582](https://github.com/embedded-pro/e-foc/issues/582)) ([6a5aa16](https://github.com/embedded-pro/e-foc/commit/6a5aa162aaf02bf03b5d6f455c299b686cdf6807))
+* **bootloader:** The ST boards have no bootloader yet ([#581](https://github.com/embedded-pro/e-foc/issues/581)) ([a962fe6](https://github.com/embedded-pro/e-foc/commit/a962fe6208de31fdc3aa47e38e3878b772a15271))
+* **can-commander:** The SHA-256 is the digest GitHub records for the asset ([#583](https://github.com/embedded-pro/e-foc/issues/583)) ([1871c61](https://github.com/embedded-pro/e-foc/commit/1871c61c9ceb4d3b8cf30be40ba70e7b64641cae))
+* Design the bootloader and firmware update over CAN ([#519](https://github.com/embedded-pro/e-foc/issues/519)) ([fb30697](https://github.com/embedded-pro/e-foc/commit/fb3069758c79371568b0d6cf703838192af5fff8))
+* **error-handling:** Record why the board trip paths have no automated test ([#556](https://github.com/embedded-pro/e-foc/issues/556)) ([646265e](https://github.com/embedded-pro/e-foc/commit/646265efcb4c7d60f7d078f981411046b8ef9c26)), closes [#487](https://github.com/embedded-pro/e-foc/issues/487)
+* **firmware-upgrade:** The apply scenario starts from a staged pack ([#586](https://github.com/embedded-pro/e-foc/issues/586)) ([79f9323](https://github.com/embedded-pro/e-foc/commit/79f93234282a3921a2161852246bb2119cb32166))
+* **firmware-upgrade:** The read-back of erased sectors and programmed pages ([#584](https://github.com/embedded-pro/e-foc/issues/584)) ([9eab3e3](https://github.com/embedded-pro/e-foc/commit/9eab3e3f229f4cc2196e08107b287e3cde1cbc0b))
+* **power-stage:** Record why sub-dead-band pulses at the bottom are left unhandled ([#537](https://github.com/embedded-pro/e-foc/issues/537)) ([3af9862](https://github.com/embedded-pro/e-foc/commit/3af98628a2ab0cc8e5e9a4670f0542f27c71f82d))
+* **requirements:** Split product requirements from acceptance criteria ([#642](https://github.com/embedded-pro/e-foc/issues/642)) ([a3982cb](https://github.com/embedded-pro/e-foc/commit/a3982cb01cfd6eeec78c6eeac0a810d0cb9a4021))
+* **requirements:** Status and verification for the bootloader requirements ([#585](https://github.com/embedded-pro/e-foc/issues/585)) ([6963d29](https://github.com/embedded-pro/e-foc/commit/6963d29975397018c7d26e72f87eb64c6e00f4f8))
+* **requirements:** Trace requirements to scenarios, fix contradictions, quantify criteria ([#533](https://github.com/embedded-pro/e-foc/issues/533)) ([cf14ea6](https://github.com/embedded-pro/e-foc/commit/cf14ea6fc7e4dbdc317790f1eb1367b6f06e07a4))
+* **watchdog:** Record the unsupervised control interrupt as an accepted risk ([#531](https://github.com/embedded-pro/e-foc/issues/531)) ([213ddb9](https://github.com/embedded-pro/e-foc/commit/213ddb9dd0a666e2ecf065863206ef6c12b57567))
+
+
+### Build System
+
+* **bootloader:** Reserve the bootloader's stack and check it at the link ([#601](https://github.com/embedded-pro/e-foc/issues/601)) ([9b858ae](https://github.com/embedded-pro/e-foc/commit/9b858aea2b884f3b509f1a2c8b2a409fa1a50521))
+* **bootloader:** The pack script refuses a value that does not fit its field ([#587](https://github.com/embedded-pro/e-foc/issues/587)) ([aad5e30](https://github.com/embedded-pro/e-foc/commit/aad5e305b558636db4a14f3cb0fcbe7302638e3e))
+* Bring can-lite with one pending heartbeat and priority admission to the send queue ([#628](https://github.com/embedded-pro/e-foc/issues/628)) ([6ec1a43](https://github.com/embedded-pro/e-foc/commit/6ec1a435352ba57beebeb04c4c78a5e30e1d0f26))
+* **deps:** Can-lite 1.0.0 and the submodules the bootloader needs ([#521](https://github.com/embedded-pro/e-foc/issues/521)) ([dbbaea6](https://github.com/embedded-pro/e-foc/commit/dbbaea601c51ca47b9cbc94989d8282c165730f5))
+* One generated version header ([#599](https://github.com/embedded-pro/e-foc/issues/599)) ([b579104](https://github.com/embedded-pro/e-foc/commit/b5791047cf8f4e4304015ea3c24bf980a774c60f))
+
+
+### Continuous Integration
+
+* **release:** Publish the signed upgrade pack of each board with a bootloader ([#574](https://github.com/embedded-pro/e-foc/issues/574)) ([cc4f1ad](https://github.com/embedded-pro/e-foc/commit/cc4f1ad326dc14ff79505a7f7a122c3110277886))
+
 ## [1.6.0](https://github.com/embedded-pro/e-foc/compare/v1.5.0...v1.6.0) (2026-10-30)
 
 
