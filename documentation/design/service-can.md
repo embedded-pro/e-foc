@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.18.0
+version: 0.18.1
 component: can-service
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.18.0                   |
+| Version   | 0.18.1                   |
 | Component | can-service              |
-| Date      | 2026-11-05               |
+| Date      | 2026-11-06               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -525,6 +525,11 @@ one send method that takes the command; like every other send it is refused for 
 version differs.
 
 Registers response handlers for the server-to-client response message types. Response handlers decode the payload and invoke the corresponding observer callbacks, each naming the node that sent the response.
+
+The fault history of 2.16 answers each age with two responses, and the client reports each on its own callback
+with the age it carries, so a caller pairs them; it keeps no state of its own. A `FaultRecordResponse` naming no
+control mode is dropped; a fault code the client does not know is passed on, so a newer firmware's code reads as
+unknown rather than being lost.
 
 `can-lite` hands a category the payload of a frame but not its sender. The client therefore takes a frame-origin source: a thin decorator between the bus and the protocol client records the node of each received frame just before the frame is dispatched, and the category reads it while handling that frame. Per-node contract compatibility (see the wire contract above) and per-node response attribution both rest on it.
 
