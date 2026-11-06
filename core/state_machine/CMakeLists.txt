@@ -41,8 +41,6 @@ target_sources(e_foc.state_machine PRIVATE
     CalibrationOrchestrator.hpp
     CalibrationOrchestrator.cpp
     ControlMode.hpp
-    ControlModeCliCommands.hpp
-    ControlModeCliCommands.cpp
     ControlModeStateMachine.hpp
     ControlModeStateMachine.cpp
     FaultController.hpp
@@ -63,7 +61,6 @@ target_sources(e_foc.state_machine PRIVATE
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
     FocStateMachineDependencies.hpp
-    LifecycleCliCommands.hpp
     LifecycleContext.hpp
     MaintenanceFlow.hpp
     MotorParameterLimits.hpp
@@ -84,7 +81,6 @@ target_sources(e_foc.state_machine PRIVATE
     SpeedStateMachine.hpp
     TorqueStateMachine.hpp
     TorqueStateMachine.cpp
-    TransitionPolicies.hpp
 )
 
 add_subdirectory(test)

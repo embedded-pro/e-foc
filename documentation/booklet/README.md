@@ -82,7 +82,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step      |
 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                                  |
 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                          |
-| [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                          |
+| [Service: Command-Line Interface](../design/service-cli.md)                            | Bring-up command line of `hardware_test` and the startup banner                        |
 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                        |
 | [Service: Firmware Upgrade](../design/service-firmware-upgrade.md)                     | Receiving a firmware pack over CAN, checking it and restarting into the bootloader     |
 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                            |

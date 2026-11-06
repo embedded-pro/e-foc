@@ -6,7 +6,6 @@
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
-#include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
@@ -30,7 +29,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -40,10 +38,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
         application::DecimatingThreePhaseInverter inverter{ platformFactory };
@@ -108,12 +103,11 @@ namespace
         application::TorqueStateMachine CreateStateMachine()
         {
             return application::TorqueStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverter, platformFactory, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 *faultNotifier,
-                state_machine::TransitionPolicy::Cli,
                 nvmActivity
             };
         }

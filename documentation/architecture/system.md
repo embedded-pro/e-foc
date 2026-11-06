@@ -2,7 +2,7 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.2.3
+version: 0.3.0
 component: system
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.2.3                     |
+| Version   | 0.3.0                     |
 | Component | system                    |
 | Date      | 2026-11-05                |
 
@@ -36,7 +36,7 @@ date: 2026-11-05
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
 - **Assumption**: Rotor position is measured by a quadrature encoder.
 - **Assumption**: All motor electrical and mechanical parameters (resistance, inductance, pole pairs, inertia, friction) can be identified at startup or loaded from non-volatile storage.
-- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle. The CLI command `active_mode` reports the currently active mode. No mode switch is permitted while the motor is enabled.
+- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle. The `SelectControlMode` response and the telemetry status report the active mode. No mode switch is permitted while the motor is enabled.
 
 ---
 
@@ -212,7 +212,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                                           |
 | Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                                              |
 | Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                                             |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                                                                   |
+| CLI                              | The bring-up command line of `hardware_test` and the startup banner; the motor application is commanded over CAN only.                                                                                                                                                                                                                      |
 | Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                                  |
 | Fault History                    | Records every entry into `Fault` (code, power-up, uptime, control mode, filtered bus voltage, peak torque current of the last 10 ms) and keeps the eight newest across power cycles in a region of its own; read by age and cleared over CAN ([design](../design/service-fault-history.md)).                                                |
 | Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
@@ -273,7 +273,7 @@ it should change the reason, not just the number:
 | CAN receive buffer (`canReceiveBufferSize`)       | 16 frames | A client's transport queues at most 8 frames; an overflow is counted as `messageLost`, not lost silently.                                                                                                                                                                                 |
 | Fault status (`faultStatusSize`)                  | 448 B     | `PersistentFaultData::kMaxFormattedSize` (444), enforced by a `static_assert`, so the boot fault dump is never truncated.                                                                                                                                                                 |
 
-`sync_foc_sensored` sizes its CLI command table to the 24 commands it registers. The TI linker script places `.bss`
+`sync_foc_sensored` has no command table: it registers no terminal commands. The TI linker script places `.bss`
 first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
 instead of forcing up to 1 KiB of padding after `.data`. The hal-ti `Gpio` driver keeps pin-interrupt handlers in a
 pool sized by the CMake cache variable `HAL_TI_GPIO_MAX_INTERRUPT_PINS` (default 8, 72 bytes each) and registers a
@@ -309,7 +309,7 @@ identification for speed/position modes), and responds to hardware fault notific
 the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be
 enabled.
 
-In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. It registers the setpoint, bandwidth and algorithm-selection commands on the same terminal and dispatches them to the active control mode.
+`ControlModeStateMachine` is driven from CAN alone: the motor application registers no terminal commands (`service-cli.md`, Part A).
 
 ### 5. Tools (was §4)
 
@@ -451,14 +451,14 @@ The commissioning data flow (run once at startup or on command):
 
 ```mermaid
 sequenceDiagram
-    participant CLI as CLI Terminal
+    participant Client as CAN client
     participant SM as Application Controller
     participant ELEC as Electrical Identification
     participant MECH as Mechanical Identification
     participant NVM as NonVolatileMemory
     participant PID as PID Auto-Tuner
 
-    CLI->>SM: identify electrical params
+    Client->>SM: Calibrate
     SM->>ELEC: EstimateResistanceAndInductance(config)
     ELEC-->>SM: (R, L) callback
     SM->>ELEC: EstimatePolePairs(config)
@@ -467,7 +467,7 @@ sequenceDiagram
     SM->>NVM: SaveCalibration(data)
     NVM-->>SM: Ok callback
 
-    CLI->>SM: identify mechanical params
+    Client->>SM: (same Calibrate, speed and position modes)
     SM->>MECH: EstimateFrictionAndInertia(torqueConst, polePairs, config)
     MECH-->>SM: (friction, inertia) callback
     SM->>NVM: SaveCalibration(updatedData)

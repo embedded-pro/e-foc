@@ -143,7 +143,7 @@
     5 % and an inductance within 10 % of the plant's, for each reference motor and for the bench
     motor seen through its 4000-count encoder and 10 mA of current noise. With a constant shaft torque of 0.01 N·m applied during the excitation
     they shall hold the inertia within 2 % and the viscous friction within 15 %. The estimates
-    shall be readable through the product's own terminal command.
+    shall be readable over CAN.
 
 - id: REQ-CAL-015
   title: Calibration measures and removes the current sensors' offsets

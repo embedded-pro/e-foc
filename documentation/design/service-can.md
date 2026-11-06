@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.20.0
+version: 0.20.1
 component: can-service
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.20.0                   |
+| Version   | 0.20.1                   |
 | Component | can-service              |
 | Date      | 2026-11-06               |
 
@@ -661,7 +661,7 @@ A self-contained client object for use in host tools and SIL tests. Internally c
 `CanLivenessWatchdog` is a `CanProtocolServerObserver` that closes the loop. On `Offline()` it checks whether
 the active state machine is in `Enabled`, or in `Calibrating` under a CAN client's reservation (an
 identification the client started, which may be spinning the motor); if so it traces and issues
-`CmdEmergencyStop`, which stops the inverter. A calibration started from the CLI is left alone. When the drive
+`CmdEmergencyStop`, which stops the inverter. A calibration the drive runs itself, started with `Calibrate`, is left alone. When the drive
 is otherwise not running the notification is ignored — a bus that goes quiet while the motor is
 stopped is not a hazard, and faulting there would obstruct commissioning. An identification acknowledges only
 when it ends, so a client waiting on one keeps sending frames; `CanProtocolClient` heartbeats every

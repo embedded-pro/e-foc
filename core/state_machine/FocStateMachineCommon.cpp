@@ -1,18 +1,16 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/FocLifecycleTable.hpp"
-#include "core/state_machine/LifecycleCliCommands.hpp"
 
 namespace application
 {
     FocStateMachineCommon::FocStateMachineCommon(
-        const TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         NvmActivity& nvmActivity)
-        : terminal(terminalAndTracer.terminal)
-        , tracer(terminalAndTracer.tracer)
+        : tracer(tracer)
         , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage, calibServices.currentOffsets, hardware.dutyUpdateDelayPeriods)
         , nvmActivity(nvmActivity)
         , environment{ stateMachine, calibrationContext, nvm, nvmActivity, pendingCommand, *this, tracer }
@@ -38,18 +36,6 @@ namespace application
         calibration.Abort();
         operation.AbortOffsetRefresh();
         operation.UnregisterFaultHandler();
-    }
-
-    void FocStateMachineCommon::RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy)
-    {
-        if (transitionPolicy != state_machine::TransitionPolicy::Cli)
-            return;
-
-        RegisterLifecycleCliCommands(terminal, [this]() -> FocStateMachineCommon&
-            {
-                return *this;
-            });
-        RegisterModeSpecificCli(terminal);
     }
 
     void FocStateMachineCommon::Boot(RotorReference rotorReference)
@@ -269,9 +255,6 @@ namespace application
     {
         return false;
     }
-
-    void FocStateMachineCommon::RegisterModeSpecificCli(services::TerminalWithStorage& /*terminal*/)
-    {}
 
     void FocStateMachineCommon::SaveCalibration(state_machine::Calibrating& calibrating)
     {

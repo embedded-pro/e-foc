@@ -2,7 +2,7 @@
 title: "Error Handling Design"
 type: design
 status: stable
-version: 1.1.0
+version: 1.2.0
 component: "error-handling"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Error Handling Design |
 | Type      | design                |
 | Status    | stable                |
-| Version   | 1.1.0                 |
+| Version   | 1.2.0                 |
 | Component | error-handling        |
 | Date      | 2026-11-05            |
 
@@ -25,7 +25,7 @@ date: 2026-11-05
 - Cutting the power stage and resetting when an assertion fails.
 - Persisting that diagnostic snapshot in a memory region that is not cleared on reset, so it survives the subsequent boot.
 - Reporting the cause of the most recent reset (power-up, brown-out, software, hardware, or watchdog) to the application layer via `PlatformFactory`.
-- Exposing the formatted fault snapshot and reset cause to the CLI at boot time.
+- Reporting the formatted fault snapshot and the reset cause in the startup banner at boot.
 - Providing a platform-initiated software reset via `PlatformFactory::Reset()`.
 
 **Is NOT responsible for:**
@@ -182,20 +182,22 @@ peak current, readable over CAN (`service-fault-history.md`).
 
 Each platform's `PlatformFactoryImpl` reads the hardware-specific reset status register during construction, before anything else modifies it. It converts the raw vendor bits to the platform-agnostic `ResetCause` enumeration and clears the register so that subsequent resets are not misreported. The `ResetCause` value is then accessible for the lifetime of the application via `PlatformFactory::GetResetCause()`.
 
-### Boot-time CLI reporting
+### Boot-time reporting
 
-The CLI banner reads both the reset cause and any pending fault snapshot from `PlatformFactory` during
-construction. If a valid snapshot exists, it is formatted into a human-readable string and the validity
-sentinel is cleared immediately after formatting, so the snapshot is consumed at most once. The formatted
-string is retained for the lifetime of the application for later `fault_status` CLI queries. The banner prints
-the reset cause unconditionally and surrounds fault data with visible delimiters.
+The startup banner (`service-cli.md`, Part B), which both applications trace as they start, reads the
+reset cause and any pending fault snapshot from `PlatformFactory`. If a valid snapshot exists, the
+platform formats it into a human-readable string during construction and clears the validity sentinel
+immediately after formatting, so the snapshot is consumed at most once. The banner prints the reset
+cause unconditionally and surrounds fault data with visible delimiters. The motor application also
+reports the reset cause over CAN (`resetCause`, `0xB0`).
 
 ---
 
 ### Control-loop and bus statistics
 
-Alongside the post-mortem fault record, the platform keeps two live sets of counters, both readable
-from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
+Alongside the post-mortem fault record, the platform keeps two live sets of counters. The loop
+statistics are read over CAN (`0xA0`–`0xA7`), and `ClearDiagnostics` resets both sets
+(`service-can.md`); no interface of the motor application reads the CAN error counters.
 
 **Control-interrupt execution.** The Cortex-M cycle counter (EmIL's
 `hal::cortex::DataWatchpointAndTrace`, started once when the platform is built) is left free-running and read on entry

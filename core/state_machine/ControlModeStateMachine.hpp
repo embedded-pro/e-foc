@@ -48,7 +48,7 @@ namespace state_machine
         using OuterLoopArgs = application::OuterLoopArgs;
 
         ControlModeStateMachine(
-            const application::TerminalAndTracer& terminalAndTracer,
+            services::Tracer& tracer,
             const application::MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const application::CalibrationServices& calibServices,
@@ -149,7 +149,6 @@ namespace state_machine
         const foc::CurrentLoopSelectable* CurrentSelectable() const;
         const foc::SpeedLoopSelectable* SpeedSelectable() const;
         const foc::PositionLoopSelectable* PositionSelectable() const;
-        void RegisterCliCommands();
         TuningResult CheckRedesignPreconditions() const;
         void OnSaveConfigDone(services::NvmStatus status);
         void OnRollbackSaveConfigDone(services::NvmStatus status);
@@ -173,7 +172,7 @@ namespace state_machine
         static SettingResult ToSettingResult(foc::SelectResult result);
         static SettingResult ToSettingResult(CommandResult result);
 
-        const application::TerminalAndTracer terminalAndTracer;
+        services::Tracer& tracer;
         const application::MotorHardware hardware;
         services::NonVolatileMemory& nvm;
         const application::CalibrationServices calibServices;

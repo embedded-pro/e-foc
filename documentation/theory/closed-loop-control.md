@@ -2,7 +2,7 @@
 title: "Closed-Loop Control of a PMSM"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "closed-loop-control"
 date: 2026-10-30
 ---
@@ -12,7 +12,7 @@ date: 2026-10-30
 | Title     | Closed-Loop Control of a PMSM |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 0.2.0                         |
+| Version   | 0.2.1                         |
 | Component | closed-loop-control           |
 | Date      | 2026-10-30                    |
 
@@ -345,7 +345,7 @@ None of these is identified from the motor; the identified inductance and the me
 current loop. The calibration record has a current-loop and a speed-loop bandwidth field, and a value in
 range there replaces the automatic one, but calibration measures neither: it carries the current-loop
 field over from the record it replaces, zero on a first calibration, and writes a fixed 100 rad/s into the
-speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN or the CLI, inside the
+speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN, inside the
 bounds above; 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
 are the subject of the [controller chapter](advanced-controllers.md).
 

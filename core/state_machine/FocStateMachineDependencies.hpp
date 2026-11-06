@@ -11,19 +11,12 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 #include <cstdint>
 #include <functional>
 #include <optional>
 
 namespace application
 {
-    struct TerminalAndTracer
-    {
-        services::TerminalWithStorage& terminal;
-        services::Tracer& tracer;
-    };
-
     struct MotorHardware
     {
         drivers::ThreePhaseInverter& inverter;

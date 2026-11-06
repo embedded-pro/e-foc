@@ -4,27 +4,16 @@
 #include "core/foc/math/ParameterValidation.hpp"
 #include <cmath>
 
-namespace
-{
-    // Mechanical quantities are traced in micro-units: the tracer prints only three decimals.
-    constexpr float microPerUnit = 1.0e6f;
-
-    float Micro(float value)
-    {
-        return value * microPerUnit;
-    }
-}
-
 namespace application
 {
     OuterLoopStateMachine::OuterLoopStateMachine(
-        const TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         foc::Ampere driveCurrentLimit,
         NvmActivity& nvmActivity)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
+        : FocStateMachineCommon(tracer, hardware, nvm, calibServices, nvmActivity)
         , driveCurrentLimit(driveCurrentLimit)
     {}
 
@@ -83,21 +72,6 @@ namespace application
     void OuterLoopStateMachine::PrepareForEnabled()
     {
         GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(GetCalibration()));
-    }
-
-    void OuterLoopStateMachine::RegisterModeSpecificCli(services::TerminalWithStorage& terminal)
-    {
-        terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
-            [this](const infra::BoundedConstString&)
-            {
-                TraceOnlineEstimates();
-            } });
-    }
-
-    void OuterLoopStateMachine::TraceOnlineEstimates()
-    {
-        GetTracer().Trace() << "[EST] Mech: J_uNms2=" << Micro(GetOnlineMechEstimator().CurrentInertia().Value()) << " B_uNms=" << Micro(GetOnlineMechEstimator().CurrentFriction().Value());
-        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
     std::optional<state_machine::OnlineEstimates> OuterLoopStateMachine::CurrentOnlineEstimates()

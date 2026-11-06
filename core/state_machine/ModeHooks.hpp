@@ -5,7 +5,6 @@
 #include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 
 namespace application
 {
@@ -32,6 +31,5 @@ namespace application
         virtual void PrepareForEnabled() = 0;
         virtual void AbortModeSpecificServices() = 0;
         virtual bool HasModeSpecificWorkPending() const = 0;
-        virtual void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) = 0;
     };
 }

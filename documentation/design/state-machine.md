@@ -34,7 +34,6 @@ date: 2026-11-06
 - Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
 - On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds
 - Keeping an established rotor reference across a control-mode switch: a machine built by a switch out of an aligned `Ready` boots straight to `Ready` when the stored record is complete for its mode (see C4)
-- Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `align`, `enable`, `disable`, `clear_fault`, `clear_cal`)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
 **Is NOT responsible for:**
@@ -317,14 +316,13 @@ The calibration record line is what an external observer, the software-in-the-lo
 
 The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/interfaces/MotorModel.hpp`), the factor the plant model itself applies.
 
-A motor whose flux linkage is set with `set_flux_linkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
+A motor whose flux linkage is set as the motor parameter `fluxLinkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
 
 ### Editing motor parameters
 
 The six motor parameters of the record — phase resistance, inductance (written to both axes), pole
 pairs, flux linkage, inertia and viscous friction — can also be entered, one at a time, with
-`SetMotorParameter`: from the CLI for the flux linkage (`set_flux_linkage`) and from CAN for all six
-(`service-can.md`). The command is accepted in `Idle` and `Ready` with no work outstanding, for a
+`SetMotorParameter`, from CAN (`service-can.md`). The command is accepted in `Idle` and `Ready` with no work outstanding, for a
 value inside the parameter's range; a record need not exist yet, so a motor can be commissioned
 from its datasheet (REQ-SM-031).
 
@@ -483,7 +481,7 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
-3. **`CmdReleaseExternalCalibration()`** — synchronous. Gives up a reservation whose estimation failed, or whose completion was rejected, so the node does not stay in `Calibrating` until an emergency stop. It returns to `Ready` when a valid calibration is held and to `Idle` otherwise, and is accepted only while the reservation came from `CmdReserveExternalCalibration` (`Calibrating::externalReservation`), no command is pending and no run is in flight — a CLI calibration cannot be released from CAN, and a completion that is already aligning finishes first.
+3. **`CmdReleaseExternalCalibration()`** — synchronous. Gives up a reservation whose estimation failed, or whose completion was rejected, so the node does not stay in `Calibrating` until an emergency stop. It returns to `Ready` when a valid calibration is held and to `Idle` otherwise, and is accepted only while the reservation came from `CmdReserveExternalCalibration` (`Calibrating::externalReservation`), no command is pending and no run is in flight — a calibration started with `Calibrate` cannot be released this way, and a completion that is already aligning finishes first.
 
 The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
 
@@ -528,8 +526,8 @@ sequenceDiagram
   mode switch or a maintenance command is rejected. `Disable` abandons the refresh and refuses the
   `Enable` with `rejected`; an emergency stop or a fault abandons it with `abortedByFault`. The
   stored offsets stay in force in every refusal.
-- `CmdEnable()` returns as soon as the `Enable` is accepted, with `ok`, for the terminal and the
-  model in the loop, which watch the state. `CmdEnableAsync(onDone)` reports the outcome when the
+- `CmdEnable()` returns as soon as the `Enable` is accepted, with `ok`, for the model in the loop,
+  which watches the state. `CmdEnableAsync(onDone)` reports the outcome when the
   `Enable` is decided, and the CAN bridge acknowledges `Start` from it (`service-can.md` Part D), so
   a client sees the acknowledgement once the drive is running or has refused.
 
@@ -660,7 +658,7 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 
 `PlatformFaultNotifier`'s primary path runs in the PWM fault interrupt (board protection) or the CAN interrupt
 (bus-off). Neither is a context in which the transition itself can be taken: the transition to `Fault` traces,
-writes a multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending
+writes a multi-word `std::variant` that the CAN bridge reads concurrently, and completes a pending
 command that reaches non-volatile memory.
 
 The split is therefore: **latch and cut the bridge in the interrupt, record the fault in the dispatcher.** The
@@ -804,20 +802,11 @@ sequenceDiagram
     note over SM: State remains Fault ✓
 ```
 
-### Transition Policies
+### Driving the Transitions
 
-Each state machine instance is constructed with a transition policy that only decides
-whether the lifecycle commands appear on the terminal:
-
-- **CLI policy**: the commands `calibrate`, `align`, `enable`, `disable`, `clear_fault`
-  and `clear_cal` are registered on the connected terminal. Used by the state machine unit
-  tests and for commissioning over a serial console.
-- **Automatic policy**: no terminal commands are registered. The caller drives transitions
-  programmatically, for example from CAN message handlers. This is the policy the
-  `ControlModeStateMachine` uses for the torque, speed and position machines it owns.
-
-Both policies share the same transition table; they differ only in whether lifecycle
-commands appear on the terminal.
+The state machines register no terminal commands. Their owner drives the transitions
+programmatically: the `ControlModeStateMachine` for the torque, speed and position machines it owns,
+from the CAN message handlers, and the unit tests directly (`service-cli.md`, Part A).
 
 ### Mechanical Identification and Control Mode
 
@@ -852,7 +841,7 @@ A re-alignment does not wait for the rotor to come to rest. The alignment holds 
 position settles, and in simulation a re-alignment issued 30 ms after disabling at 500 rpm aligned and
 ran every reference motor and the bench motor.
 
-The CLI command is `align` (short form `aln`). Because the same completion path is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
+Over CAN a re-alignment is the `Align` command. Because the same completion path is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
 
 ### Online Parameter Estimation (Speed/Position Modes)
 
@@ -895,12 +884,8 @@ again afterwards, so the bandwidths do not change. The estimators are not seeded
 (`online-recalibration.md`, Part F) is applied the same way on the first `Ready` after power-up, and the Reset Model
 command redesigns both loops from the calibration record again, in a stopped state only.
 
-**Runtime control commands (CLI policy, speed/position modes only):**
-
-| Command           | Short | Description                                                   |
-|-------------------|-------|---------------------------------------------------------------|
-| `apply_estimates` | `ae`  | Recalibrate: adopt the settled online estimates while stopped |
-| `estimate_status` | `es`  | Print current J, B (micro-units), R, Ld to the tracer         |
+The online estimates are read over CAN (`0x90`–`0x93`) and adopted with the `Recalibrate` command
+(`online-recalibration.md`).
 
 ### Control Mode Selection (`ControlModeStateMachine`)
 
@@ -1093,7 +1078,6 @@ sequenceDiagram
 | `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`.           |
 | `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                          |
 | `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself |
-| `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                                     |
 | `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                          |
 | `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering `Enabled`; updates run while FOC outer loop is active    |
 | `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                                         |

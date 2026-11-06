@@ -22,7 +22,7 @@ namespace
         return std::bit_cast<float>(static_cast<uint32_t>(opaque));
     }
 
-    class FocStateMachineTorqueCliTest
+    class FocStateMachineTorqueTest
         : public ::testing::Test
         , public infra::ClockFixture
     {
@@ -32,7 +32,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -42,10 +41,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -227,12 +223,11 @@ namespace
         TestedStateMachine CreateStateMachine()
         {
             return TestedStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 nvmActivity
             };
         }
@@ -243,12 +238,11 @@ namespace
             EXPECT_CALL(fluxIdentMock, Abort()).Times(AnyNumber());
 
             return TestedStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .fluxLinkage = configuredFluxLinkage, .fluxIdentOverride = fluxIdentMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 nvmActivity
             };
         }
@@ -300,12 +294,11 @@ namespace
             EXPECT_CALL(standstillMock, Abort()).Times(AnyNumber());
 
             return TestedStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .currentOffsets = offsetsMock, .standstill = standstillMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 nvmActivity
             };
         }
@@ -362,7 +355,7 @@ namespace
     };
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_invalid_on_boot_remains_in_idle)
+TEST_F(FocStateMachineTorqueTest, nvm_invalid_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -371,7 +364,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_invalid_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
+TEST_F(FocStateMachineTorqueTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -380,7 +373,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_valid_on_boot_remains_in_idle_pending_a
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_boot_with_valid_nvm_is_rejected_without_alignment)
+TEST_F(FocStateMachineTorqueTest, enable_from_boot_with_valid_nvm_is_rejected_without_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -390,7 +383,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_from_boot_with_valid_nvm_is_rejected
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_sets_rotor_reference_valid_in_ready)
+TEST_F(FocStateMachineTorqueTest, realign_from_idle_sets_rotor_reference_valid_in_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -414,7 +407,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_sets_rotor_reference_vali
     EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_succeeds_after_realign)
+TEST_F(FocStateMachineTorqueTest, enable_succeeds_after_realign)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -426,7 +419,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_succeeds_after_realign)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_alignment_failure_enters_fault)
+TEST_F(FocStateMachineTorqueTest, realign_alignment_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -445,7 +438,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_alignment_failure_enters_fault)
     EXPECT_EQ(state_machine::FaultCode::calibrationFailed, std::get<state_machine::Fault>(sm.CurrentState()).code);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_that_finds_a_missing_phase_enters_fault_with_phase_missing)
+TEST_F(FocStateMachineTorqueTest, realign_that_finds_a_missing_phase_enters_fault_with_phase_missing)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -465,7 +458,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_that_finds_a_missing_phase_enters_f
     EXPECT_EQ(state_machine::FaultCode::phaseMissing, sm.LastFaultCode());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_nvm_failure_enters_fault)
+TEST_F(FocStateMachineTorqueTest, realign_nvm_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -488,7 +481,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_nvm_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_clears_stale_rotor_reference_before_starting)
+TEST_F(FocStateMachineTorqueTest, realign_clears_stale_rotor_reference_before_starting)
 {
     EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
@@ -508,7 +501,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_clears_stale_rotor_reference_before
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, rotor_reference_preserved_after_disable_and_re_enable)
+TEST_F(FocStateMachineTorqueTest, rotor_reference_preserved_after_disable_and_re_enable)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -522,7 +515,7 @@ TEST_F(FocStateMachineTorqueCliTest, rotor_reference_preserved_after_disable_and
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_without_valid_calibration_is_rejected)
+TEST_F(FocStateMachineTorqueTest, realign_from_idle_without_valid_calibration_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -538,7 +531,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_without_valid_calibration
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_load_failure_on_boot_remains_in_idle)
+TEST_F(FocStateMachineTorqueTest, nvm_load_failure_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     EXPECT_CALL(nvmMock, IsCalibrationValid(_))
@@ -557,7 +550,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_load_failure_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_complete_stage_without_pole_pairs_remains_in_idle)
+TEST_F(FocStateMachineTorqueTest, nvm_complete_stage_without_pole_pairs_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmHolds(0, 0.5f, services::CalibrationStage::complete);
@@ -568,7 +561,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_complete_stage_without_pole_pairs_remai
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, incomplete_record_without_pole_pairs_still_reports_partial_calibration)
+TEST_F(FocStateMachineTorqueTest, incomplete_record_without_pole_pairs_still_reports_partial_calibration)
 {
     GivenFaultNotifierRegistered();
     GivenNvmHolds(0, 0.5f, services::CalibrationStage::none);
@@ -578,7 +571,7 @@ TEST_F(FocStateMachineTorqueCliTest, incomplete_record_without_pole_pairs_still_
     EXPECT_TRUE(sm.HasPartialCalibration());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, empty_record_on_boot_is_not_reported_as_partial_calibration)
+TEST_F(FocStateMachineTorqueTest, empty_record_on_boot_is_not_reported_as_partial_calibration)
 {
     GivenFaultNotifierRegistered();
     GivenNvmHolds(0, 0.0f, services::CalibrationStage::none);
@@ -588,7 +581,7 @@ TEST_F(FocStateMachineTorqueCliTest, empty_record_on_boot_is_not_reported_as_par
     EXPECT_FALSE(sm.HasPartialCalibration());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_incomplete_stage_on_boot_remains_in_idle)
+TEST_F(FocStateMachineTorqueTest, nvm_incomplete_stage_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     services::CalibrationData incompleteData{};
@@ -614,7 +607,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_incomplete_stage_on_boot_remains_in_idl
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_runs_alignment_before_entering_ready)
+TEST_F(FocStateMachineTorqueTest, accept_external_calibration_runs_alignment_before_entering_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -653,7 +646,7 @@ TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_runs_alignment_
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, external_calibration_carrying_a_non_finite_value_is_rejected_before_alignment)
+TEST_F(FocStateMachineTorqueTest, external_calibration_carrying_a_non_finite_value_is_rejected_before_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -675,7 +668,7 @@ TEST_F(FocStateMachineTorqueCliTest, external_calibration_carrying_a_non_finite_
     EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_persisted_record_with_a_non_finite_resistance_does_not_reach_ready)
+TEST_F(FocStateMachineTorqueTest, a_persisted_record_with_a_non_finite_resistance_does_not_reach_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmHolds(7, NonFiniteFloat(0x7F800000u), services::CalibrationStage::complete);
@@ -685,7 +678,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_persisted_record_with_a_non_finite_resist
     EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_cannot_enable_before_alignment_completes)
+TEST_F(FocStateMachineTorqueTest, accept_external_calibration_cannot_enable_before_alignment_completes)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -710,7 +703,7 @@ TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_cannot_enable_b
     EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_second_external_calibration_is_rejected_while_the_first_is_still_aligning)
+TEST_F(FocStateMachineTorqueTest, a_second_external_calibration_is_rejected_while_the_first_is_still_aligning)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -748,7 +741,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_second_external_calibration_is_rejected_w
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_command_issued_from_a_completion_callback_is_completed_when_the_table_refuses_it)
+TEST_F(FocStateMachineTorqueTest, a_command_issued_from_a_completion_callback_is_completed_when_the_table_refuses_it)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -773,7 +766,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_command_issued_from_a_completion_callback
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, async_work_stays_pending_while_a_save_is_outstanding_after_an_emergency_stop)
+TEST_F(FocStateMachineTorqueTest, async_work_stays_pending_while_a_save_is_outstanding_after_an_emergency_stop)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -819,7 +812,7 @@ TEST_F(FocStateMachineTorqueCliTest, async_work_stays_pending_while_a_save_is_ou
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_busy_answer_to_the_save_of_an_aborted_run_is_not_retried)
+TEST_F(FocStateMachineTorqueTest, a_busy_answer_to_the_save_of_an_aborted_run_is_not_retried)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -857,7 +850,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_busy_answer_to_the_save_of_an_aborted_run
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_is_rejected_while_the_save_of_an_aborted_run_is_still_outstanding)
+TEST_F(FocStateMachineTorqueTest, calibrate_is_rejected_while_the_save_of_an_aborted_run_is_still_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -906,7 +899,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_is_rejected_while_the_save_of_an_
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_is_rejected_while_the_save_of_an_aborted_command_is_still_outstanding)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_is_rejected_while_the_save_of_an_aborted_command_is_still_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -939,7 +932,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_is_rejected_while_the_save
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_from_idle_runs_full_sequence_and_reaches_ready)
+TEST_F(FocStateMachineTorqueTest, calibrate_from_idle_runs_full_sequence_and_reaches_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -951,7 +944,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_from_idle_runs_full_sequence_and_
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_from_ready_re_runs_and_reaches_ready)
+TEST_F(FocStateMachineTorqueTest, calibrate_from_ready_re_runs_and_reaches_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -963,7 +956,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_from_ready_re_runs_and_reaches_re
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_records_pole_pairs_in_ready_state)
+TEST_F(FocStateMachineTorqueTest, calibrate_records_pole_pairs_in_ready_state)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -976,7 +969,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_records_pole_pairs_in_ready_state
     EXPECT_EQ(ready.loadedData.polePairs, uint8_t{ 7 });
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_records_resistance_in_ready_state)
+TEST_F(FocStateMachineTorqueTest, calibrate_records_resistance_in_ready_state)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -989,7 +982,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_records_resistance_in_ready_state
     EXPECT_NEAR(ready.loadedData.rPhase, 0.5f, 1e-5f);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_identifies_the_flux_linkage_after_alignment_and_records_it)
+TEST_F(FocStateMachineTorqueTest, calibrate_identifies_the_flux_linkage_after_alignment_and_records_it)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1003,7 +996,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_identifies_the_flux_linkage_after
     EXPECT_NEAR(ready.loadedData.fluxLinkage, 0.0046f, 1e-7f);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_flux_linkage_that_is_not_identified_keeps_the_configured_one)
+TEST_F(FocStateMachineTorqueTest, a_flux_linkage_that_is_not_identified_keeps_the_configured_one)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1017,7 +1010,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_flux_linkage_that_is_not_identified_keeps
     EXPECT_NEAR(ready.loadedData.fluxLinkage, configuredFluxLinkage.Value(), 1e-7f);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_overspeed_during_flux_linkage_identification_fails_the_calibration)
+TEST_F(FocStateMachineTorqueTest, an_overspeed_during_flux_linkage_identification_fails_the_calibration)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1044,7 +1037,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_overspeed_during_flux_linkage_identifica
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, realign_does_not_identify_the_flux_linkage)
+TEST_F(FocStateMachineTorqueTest, realign_does_not_identify_the_flux_linkage)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1055,7 +1048,7 @@ TEST_F(FocStateMachineTorqueCliTest, realign_does_not_identify_the_flux_linkage)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_from_enabled_is_rejected)
+TEST_F(FocStateMachineTorqueTest, calibrate_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1071,7 +1064,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, pole_pairs_nullopt_enters_fault)
+TEST_F(FocStateMachineTorqueTest, pole_pairs_nullopt_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1085,7 +1078,7 @@ TEST_F(FocStateMachineTorqueCliTest, pole_pairs_nullopt_enters_fault)
         state_machine::FaultCode::calibrationFailed);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, resistance_inductance_nullopt_enters_fault)
+TEST_F(FocStateMachineTorqueTest, resistance_inductance_nullopt_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1097,7 +1090,7 @@ TEST_F(FocStateMachineTorqueCliTest, resistance_inductance_nullopt_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, alignment_nullopt_enters_fault)
+TEST_F(FocStateMachineTorqueTest, alignment_nullopt_enters_fault)
 {
     EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
@@ -1110,7 +1103,7 @@ TEST_F(FocStateMachineTorqueCliTest, alignment_nullopt_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_save_failure_after_full_calibration_enters_fault)
+TEST_F(FocStateMachineTorqueTest, nvm_save_failure_after_full_calibration_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1122,7 +1115,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_save_failure_after_full_calibration_ent
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, nvm_save_busy_after_full_calibration_is_retried_and_reaches_ready)
+TEST_F(FocStateMachineTorqueTest, nvm_save_busy_after_full_calibration_is_retried_and_reaches_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1168,7 +1161,7 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_save_busy_after_full_calibration_is_ret
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, emergency_stop_while_a_busy_calibration_save_waits_cancels_the_retry)
+TEST_F(FocStateMachineTorqueTest, emergency_stop_while_a_busy_calibration_save_waits_cancels_the_retry)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1211,7 +1204,7 @@ TEST_F(FocStateMachineTorqueCliTest, emergency_stop_while_a_busy_calibration_sav
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_ready_starts_foc_and_enters_enabled)
+TEST_F(FocStateMachineTorqueTest, enable_from_ready_starts_foc_and_enters_enabled)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1224,7 +1217,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_from_ready_starts_foc_and_enters_ena
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, disable_from_enabled_stops_foc_and_enters_ready)
+TEST_F(FocStateMachineTorqueTest, disable_from_enabled_stops_foc_and_enters_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1239,7 +1232,7 @@ TEST_F(FocStateMachineTorqueCliTest, disable_from_enabled_stops_foc_and_enters_r
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_idle_is_rejected)
+TEST_F(FocStateMachineTorqueTest, enable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1250,7 +1243,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, disable_from_ready_is_rejected)
+TEST_F(FocStateMachineTorqueTest, disable_from_ready_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1261,7 +1254,7 @@ TEST_F(FocStateMachineTorqueCliTest, disable_from_ready_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_enabled_with_valid_calibration_returns_to_ready)
+TEST_F(FocStateMachineTorqueTest, emergency_stop_from_enabled_with_valid_calibration_returns_to_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1279,7 +1272,7 @@ TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_enabled_with_valid_cali
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_without_valid_calibration_returns_to_idle)
+TEST_F(FocStateMachineTorqueTest, emergency_stop_during_calibration_without_valid_calibration_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1301,7 +1294,7 @@ TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_without_v
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_keeps_previously_valid_calibration)
+TEST_F(FocStateMachineTorqueTest, emergency_stop_during_calibration_keeps_previously_valid_calibration)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1319,7 +1312,7 @@ TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_keeps_pre
     EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.polePairs, 7);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_idle_with_loaded_calibration_keeps_idle)
+TEST_F(FocStateMachineTorqueTest, emergency_stop_from_idle_with_loaded_calibration_keeps_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1330,7 +1323,7 @@ TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_idle_with_loaded_calibr
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, fault_from_enabled_stops_pwm_and_enters_fault)
+TEST_F(FocStateMachineTorqueTest, fault_from_enabled_stops_pwm_and_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1345,7 +1338,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_from_enabled_stops_pwm_and_enters_fau
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, fault_from_idle_enters_fault)
+TEST_F(FocStateMachineTorqueTest, fault_from_idle_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1356,7 +1349,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_from_idle_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, fault_from_idle_with_loaded_calibration_enters_fault)
+TEST_F(FocStateMachineTorqueTest, fault_from_idle_with_loaded_calibration_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1367,7 +1360,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_from_idle_with_loaded_calibration_ent
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, fault_code_is_recorded)
+TEST_F(FocStateMachineTorqueTest, fault_code_is_recorded)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1381,7 +1374,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_code_is_recorded)
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_without_calibration_returns_to_idle)
+TEST_F(FocStateMachineTorqueTest, clear_fault_from_fault_without_calibration_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1393,7 +1386,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_without_calibration_
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
+TEST_F(FocStateMachineTorqueTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1405,7 +1398,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibrati
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_fault_raised_while_starting_leaves_the_drive_in_fault_rather_than_enabled)
+TEST_F(FocStateMachineTorqueTest, a_fault_raised_while_starting_leaves_the_drive_in_fault_rather_than_enabled)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1422,7 +1415,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_fault_raised_while_starting_leaves_the_dr
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_latched_fault_refuses_a_new_enable_until_it_is_cleared)
+TEST_F(FocStateMachineTorqueTest, a_latched_fault_refuses_a_new_enable_until_it_is_cleared)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1440,7 +1433,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_latched_fault_refuses_a_new_enable_until_
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_condition_that_keeps_re_faulting_is_refused_after_the_retry_limit)
+TEST_F(FocStateMachineTorqueTest, a_condition_that_keeps_re_faulting_is_refused_after_the_retry_limit)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1460,7 +1453,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_condition_that_keeps_re_faulting_is_refus
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_clean_enable_and_disable_cycle_resets_the_fault_retry_budget)
+TEST_F(FocStateMachineTorqueTest, a_clean_enable_and_disable_cycle_resets_the_fault_retry_budget)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1484,7 +1477,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_clean_enable_and_disable_cycle_resets_the
     EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_clean_run_while_enabled_resets_the_fault_retry_budget)
+TEST_F(FocStateMachineTorqueTest, a_clean_run_while_enabled_resets_the_fault_retry_budget)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1507,7 +1500,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_clean_run_while_enabled_resets_the_fault_
     EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_run_shorter_than_the_clean_run_keeps_the_fault_retry_budget_spent)
+TEST_F(FocStateMachineTorqueTest, a_run_shorter_than_the_clean_run_keeps_the_fault_retry_budget_spent)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1531,7 +1524,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_run_shorter_than_the_clean_run_keeps_the_
     EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_enabled_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_fault_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1545,7 +1538,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_ready_invalidates_nvm_and_returns_to_idle)
+TEST_F(FocStateMachineTorqueTest, clear_cal_from_ready_invalidates_nvm_and_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1561,7 +1554,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_ready_invalidates_nvm_and_re
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_idle_calls_invalidate)
+TEST_F(FocStateMachineTorqueTest, clear_cal_from_idle_calls_invalidate)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1577,7 +1570,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_idle_calls_invalidate)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_while_nvm_is_busy_completes_with_rejected_and_keeps_the_record)
+TEST_F(FocStateMachineTorqueTest, clear_cal_while_nvm_is_busy_completes_with_rejected_and_keeps_the_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1599,7 +1592,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_while_nvm_is_busy_completes_with_
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_enabled_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_cal_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1613,7 +1606,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, fault_during_calibration_stops_inverter_and_enters_fault)
+TEST_F(FocStateMachineTorqueTest, fault_during_calibration_stops_inverter_and_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1629,91 +1622,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_during_calibration_stops_inverter_and
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, cli_start_command_does_not_bypass_idle_guard)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreateStateMachine();
-
-    communication.dataReceived(infra::MakeStringByteRange("start\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, cli_cal_command_triggers_calibration)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    ExpectCalibrationSequence();
-    auto sm = CreateStateMachine();
-
-    communication.dataReceived(infra::MakeStringByteRange("cal\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, cli_en_command_enables_foc)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    communication.dataReceived(infra::MakeStringByteRange("en\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, cli_dis_command_disables_foc)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    communication.dataReceived(infra::MakeStringByteRange("dis\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, cli_cf_command_clears_fault)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreateStateMachine();
-
-    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-    communication.dataReceived(infra::MakeStringByteRange("cf\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, cli_cc_command_clears_calibration)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValid();
-    auto sm = CreateStateMachine();
-
-    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
-        .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
-            {
-                onDone(services::NvmStatus::Ok);
-            }));
-    communication.dataReceived(infra::MakeStringByteRange("cc\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineTorqueCliTest, late_pole_pairs_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueTest, late_pole_pairs_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1734,7 +1643,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_pole_pairs_callback_after_fault_is_ign
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, late_resistance_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueTest, late_resistance_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1761,7 +1670,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_resistance_callback_after_fault_is_ign
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, late_alignment_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueTest, late_alignment_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1794,7 +1703,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_alignment_callback_after_fault_is_igno
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, late_nvm_save_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueTest, late_nvm_save_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1833,7 +1742,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_nvm_save_callback_after_fault_is_ignor
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_is_rejected_until_the_boot_check_has_completed)
+TEST_F(FocStateMachineTorqueTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
     infra::Function<void(bool)> bootCb;
@@ -1858,7 +1767,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_is_rejected_until_the_boot_check_
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_during_calibrating_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_cal_during_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1873,7 +1782,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_during_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_nvm_failure_enters_fault)
+TEST_F(FocStateMachineTorqueTest, clear_cal_nvm_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -1902,7 +1811,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -1912,10 +1820,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -2064,12 +1969,11 @@ namespace
         AutoStateMachine CreateStateMachine()
         {
             return AutoStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Auto,
                 nvmActivity
             };
         }
@@ -2356,7 +2260,7 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_cal_nvm_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
+TEST_F(FocStateMachineTorqueTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2384,7 +2288,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_is_rejected_while_a_clear_calibratio
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
+TEST_F(FocStateMachineTorqueTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2414,7 +2318,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_a_fault_drops_t
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
+TEST_F(FocStateMachineTorqueTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2639,7 +2543,7 @@ TEST_F(FocStateMachineTorqueAutoTest, calibrate_is_rejected_until_the_boot_check
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_from_calibrating_is_rejected)
+TEST_F(FocStateMachineTorqueTest, calibrate_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2654,7 +2558,7 @@ TEST_F(FocStateMachineTorqueCliTest, calibrate_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, calibrate_from_fault_is_rejected)
+TEST_F(FocStateMachineTorqueTest, calibrate_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2695,7 +2599,7 @@ TEST_F(FocStateMachineTorqueAutoTest, calibrate_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_calibrating_is_rejected)
+TEST_F(FocStateMachineTorqueTest, enable_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2710,7 +2614,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_fault_is_rejected)
+TEST_F(FocStateMachineTorqueTest, enable_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2723,7 +2627,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, enable_from_enabled_does_not_call_start_again)
+TEST_F(FocStateMachineTorqueTest, enable_from_enabled_does_not_call_start_again)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2783,7 +2687,7 @@ TEST_F(FocStateMachineTorqueAutoTest, enable_from_enabled_does_not_call_start_ag
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, disable_from_idle_is_rejected)
+TEST_F(FocStateMachineTorqueTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2794,7 +2698,7 @@ TEST_F(FocStateMachineTorqueCliTest, disable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, disable_from_calibrating_is_rejected)
+TEST_F(FocStateMachineTorqueTest, disable_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2809,7 +2713,7 @@ TEST_F(FocStateMachineTorqueCliTest, disable_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, disable_from_fault_is_rejected)
+TEST_F(FocStateMachineTorqueTest, disable_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2861,7 +2765,7 @@ TEST_F(FocStateMachineTorqueAutoTest, disable_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_idle_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_fault_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2872,7 +2776,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_calibrating_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_fault_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2925,7 +2829,7 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_fault_from_ready_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_fault_is_rejected)
+TEST_F(FocStateMachineTorqueTest, clear_cal_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2951,7 +2855,7 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_cal_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_returns_ok)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_in_ready_persists_and_returns_ok)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2974,7 +2878,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_retu
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_to_zero_returns_to_the_configured_default)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_to_zero_returns_to_the_configured_default)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2999,7 +2903,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_to_zero_returns_to_the_con
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_in_ready_requires_another_alignment)
+TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_in_ready_requires_another_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3031,7 +2935,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_in_ready_requires_a
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_drops_the_cogging_map)
+TEST_F(FocStateMachineTorqueTest, changing_the_pole_pairs_drops_the_cogging_map)
 {
     GivenFaultNotifierRegistered();
     auto record = ValidRecord();
@@ -3051,7 +2955,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_drops_the_cogging_m
     sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 5.0f, [](state_machine::CommandResult) {});
 }
 
-TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_keeps_the_cogging_map)
+TEST_F(FocStateMachineTorqueTest, changing_the_resistance_keeps_the_cogging_map)
 {
     GivenFaultNotifierRegistered();
     auto record = ValidRecord();
@@ -3071,7 +2975,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_keeps_the_cogging_m
     sm.CmdSetMotorParameter(services::MotorParameter::resistance, 0.36f, [](state_machine::CommandResult) {});
 }
 
-TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_rotor_reference)
+TEST_F(FocStateMachineTorqueTest, changing_the_resistance_in_ready_keeps_the_rotor_reference)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3094,7 +2998,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_inductance_is_written_to_both_axes)
+TEST_F(FocStateMachineTorqueTest, an_inductance_is_written_to_both_axes)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3113,7 +3017,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_inductance_is_written_to_both_axes)
     EXPECT_NEAR(sm.CalibrationRecord().lD, 0.2f, 1e-6f);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_datasheet_record_entered_from_scratch_becomes_complete_and_can_be_aligned)
+TEST_F(FocStateMachineTorqueTest, a_datasheet_record_entered_from_scratch_becomes_complete_and_can_be_aligned)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3139,7 +3043,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_datasheet_record_entered_from_scratch_bec
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rejected)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_with_negative_value_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3154,7 +3058,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rej
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_without_a_calibration_is_stored_for_the_next_one)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_without_a_calibration_is_stored_for_the_next_one)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3180,7 +3084,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_without_a_calibration_is_s
     EXPECT_FALSE(sm.HasPartialCalibration());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_enabled_is_rejected)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3201,7 +3105,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_busy_returns_rejected)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_nvm_busy_returns_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3223,7 +3127,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_busy_returns_rejected)
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_write_failed_returns_nvmFailed)
+TEST_F(FocStateMachineTorqueTest, set_flux_linkage_nvm_write_failed_returns_nvmFailed)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3245,7 +3149,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_write_failed_returns_n
     EXPECT_EQ(result, state_machine::CommandResult::nvmFailed);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_during_nvm_boot_check)
+TEST_F(FocStateMachineTorqueTest, has_pending_async_work_true_during_nvm_boot_check)
 {
     GivenFaultNotifierRegistered();
     infra::Function<void(bool)> bootCb;
@@ -3262,7 +3166,7 @@ TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_during_nvm_boot
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_false_after_nvm_loaded)
+TEST_F(FocStateMachineTorqueTest, has_pending_async_work_false_after_nvm_loaded)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3271,7 +3175,7 @@ TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_false_after_nvm_load
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_when_electrical_ident_is_running)
+TEST_F(FocStateMachineTorqueTest, has_pending_async_work_true_when_electrical_ident_is_running)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3281,7 +3185,7 @@ TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_when_electrical
     EXPECT_TRUE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_enters_ready)
+TEST_F(FocStateMachineTorqueTest, register_ready_handler_called_when_state_enters_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3300,7 +3204,7 @@ TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_en
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, flux_linkage_stored_after_a_fault_is_still_applied_to_the_record)
+TEST_F(FocStateMachineTorqueTest, flux_linkage_stored_after_a_fault_is_still_applied_to_the_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3330,7 +3234,7 @@ TEST_F(FocStateMachineTorqueCliTest, flux_linkage_stored_after_a_fault_is_still_
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_the_fault_was_cleared_returns_the_machine_to_idle)
+TEST_F(FocStateMachineTorqueTest, clear_cal_invalidated_after_the_fault_was_cleared_returns_the_machine_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3355,7 +3259,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_the_fault_was_c
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_an_emergency_stop_drops_the_record)
+TEST_F(FocStateMachineTorqueTest, clear_cal_invalidated_after_an_emergency_stop_drops_the_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3385,7 +3289,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_an_emergency_st
 
 namespace
 {
-    TEST_F(FocStateMachineTorqueCliTest, a_fault_during_calibration_aborts_the_identification_services)
+    TEST_F(FocStateMachineTorqueTest, a_fault_during_calibration_aborts_the_identification_services)
     {
         GivenFaultNotifierRegistered();
         GivenNvmInvalid();
@@ -3404,7 +3308,7 @@ namespace
         ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_calibration_aborts_the_identification_services)
+    TEST_F(FocStateMachineTorqueTest, an_emergency_stop_during_calibration_aborts_the_identification_services)
     {
         GivenFaultNotifierRegistered();
         GivenNvmInvalid();
@@ -3423,7 +3327,7 @@ namespace
         EXPECT_FALSE(sm.HasPendingAsyncWork());
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, a_further_fault_while_faulted_keeps_the_first_fault_code)
+    TEST_F(FocStateMachineTorqueTest, a_further_fault_while_faulted_keeps_the_first_fault_code)
     {
         GivenFaultNotifierRegistered();
         GivenNvmInvalid();
@@ -3437,7 +3341,7 @@ namespace
         EXPECT_EQ(state_machine::FaultCode::overcurrent, sm.LastFaultCode());
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, the_first_fault_code_survives_a_clear_and_a_new_fault_records_the_new_one)
+    TEST_F(FocStateMachineTorqueTest, the_first_fault_code_survives_a_clear_and_a_new_fault_records_the_new_one)
     {
         GivenFaultNotifierRegistered();
         GivenNvmInvalid();
@@ -3453,7 +3357,7 @@ namespace
         EXPECT_EQ(state_machine::FaultCode::overtemperature, sm.LastFaultCode());
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, a_synchronous_command_issued_from_a_completion_callback_reports_queued_not_ok)
+    TEST_F(FocStateMachineTorqueTest, a_synchronous_command_issued_from_a_completion_callback_reports_queued_not_ok)
     {
         GivenFaultNotifierRegistered();
         GivenNvmValid();
@@ -3475,7 +3379,7 @@ namespace
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, a_second_external_completion_without_a_callback_is_still_refused_while_aligning)
+    TEST_F(FocStateMachineTorqueTest, a_second_external_completion_without_a_callback_is_still_refused_while_aligning)
     {
         GivenFaultNotifierRegistered();
         GivenNvmInvalid();
@@ -3504,7 +3408,7 @@ namespace
         EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
     }
 
-    TEST_F(FocStateMachineTorqueCliTest, destruction_releases_the_fault_registration_and_the_services)
+    TEST_F(FocStateMachineTorqueTest, destruction_releases_the_fault_registration_and_the_services)
     {
         GivenFaultNotifierRegistered();
         GivenNvmValid();
@@ -3527,7 +3431,7 @@ namespace
     }
 }
 
-TEST_F(FocStateMachineTorqueCliTest, the_first_enable_measures_the_offsets_at_rest_while_ready)
+TEST_F(FocStateMachineTorqueTest, the_first_enable_measures_the_offsets_at_rest_while_ready)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3541,7 +3445,7 @@ TEST_F(FocStateMachineTorqueCliTest, the_first_enable_measures_the_offsets_at_re
     EXPECT_FALSE(enableResult.has_value());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, offsets_within_50_mA_of_the_record_are_applied_and_the_drive_enables)
+TEST_F(FocStateMachineTorqueTest, offsets_within_50_mA_of_the_record_are_applied_and_the_drive_enables)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3557,7 +3461,7 @@ TEST_F(FocStateMachineTorqueCliTest, offsets_within_50_mA_of_the_record_are_appl
     EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_offset_more_than_50_mA_from_the_record_refuses_the_enable)
+TEST_F(FocStateMachineTorqueTest, an_offset_more_than_50_mA_from_the_record_refuses_the_enable)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3572,7 +3476,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_offset_more_than_50_mA_from_the_record_r
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_rotor_that_does_not_come_to_rest_refuses_the_enable)
+TEST_F(FocStateMachineTorqueTest, a_rotor_that_does_not_come_to_rest_refuses_the_enable)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3586,7 +3490,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_rotor_that_does_not_come_to_rest_refuses_
     EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_failed_offset_measurement_refuses_the_enable)
+TEST_F(FocStateMachineTorqueTest, a_failed_offset_measurement_refuses_the_enable)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3601,7 +3505,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_failed_offset_measurement_refuses_the_ena
     EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_later_enable_does_not_measure_the_offsets_again)
+TEST_F(FocStateMachineTorqueTest, a_later_enable_does_not_measure_the_offsets_again)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3620,7 +3524,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_later_enable_does_not_measure_the_offsets
     EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_fault_makes_the_next_enable_measure_the_offsets_again)
+TEST_F(FocStateMachineTorqueTest, a_fault_makes_the_next_enable_measure_the_offsets_again)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3642,7 +3546,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_fault_makes_the_next_enable_measure_the_o
     EXPECT_FALSE(enableResult.has_value());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, a_disable_during_the_offset_refresh_abandons_it_and_refuses_the_enable)
+TEST_F(FocStateMachineTorqueTest, a_disable_during_the_offset_refresh_abandons_it_and_refuses_the_enable)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3662,7 +3566,7 @@ TEST_F(FocStateMachineTorqueCliTest, a_disable_during_the_offset_refresh_abandon
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_the_offset_refresh_abandons_it)
+TEST_F(FocStateMachineTorqueTest, an_emergency_stop_during_the_offset_refresh_abandons_it)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3678,7 +3582,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_the_offset_refresh
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, the_synchronous_enable_is_accepted_while_the_offsets_are_refreshed)
+TEST_F(FocStateMachineTorqueTest, the_synchronous_enable_is_accepted_while_the_offsets_are_refreshed)
 {
     GivenStoredOffsets();
     auto sm = CreateStateMachineRefreshingOffsets();
@@ -3694,7 +3598,7 @@ TEST_F(FocStateMachineTorqueCliTest, the_synchronous_enable_is_accepted_while_th
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_enable_refused_without_a_callback_reports_rejected)
+TEST_F(FocStateMachineTorqueTest, an_enable_refused_without_a_callback_reports_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3703,7 +3607,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_enable_refused_without_a_callback_report
     EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_refused_in_idle_reports_rejected)
+TEST_F(FocStateMachineTorqueTest, an_asynchronous_enable_refused_in_idle_reports_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -3714,7 +3618,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_refused_in_idle_repo
     EXPECT_EQ(state_machine::CommandResult::rejected, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_without_an_offset_measurement_enables_at_once)
+TEST_F(FocStateMachineTorqueTest, an_asynchronous_enable_without_an_offset_measurement_enables_at_once)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -3728,7 +3632,7 @@ TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_without_an_offset_me
     EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, an_asynchronous_enable_that_faults_as_the_bridge_starts_reports_aborted_by_fault)
+TEST_F(FocStateMachineTorqueTest, an_asynchronous_enable_that_faults_as_the_bridge_starts_reports_aborted_by_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();

@@ -8,8 +8,8 @@
   verification: sil
   shall: >
     The system shall allow selection of the active control algorithm for each FOC
-    loop (current, speed, and position) at runtime via the CLI and via the CAN
-    SelectAlgorithm command, without requiring a firmware update or restart.
+    loop (current, speed, and position) at runtime with the CAN SelectAlgorithm
+    command, without requiring a firmware update or restart.
 
 - id: REQ-CTRL-002
   title: Algorithm selection permitted only when motor is stopped
@@ -24,11 +24,9 @@
   title: NACK response on rejected algorithm selection
   shall: >
     When an algorithm selection request is rejected because the motor is not stopped,
-    the system shall respond with a negative acknowledgment on the interface
-    through which the request was received. A CLI select command shall print an
-    error indicating the motor must be stopped before changing the algorithm. The
-    response shall be delivered before any subsequent command is processed on that
-    interface.
+    the system shall answer the CAN SelectAlgorithm command with a negative
+    acknowledgment stating that the drive is not stopped. The answer shall be
+    delivered before any subsequent command is processed on that interface.
 
 - id: REQ-CTRL-006
   title: NVM algorithm persistence
@@ -99,9 +97,8 @@
   verification: sil
   shall: >
     The system shall provide a query interface to read the currently active
-    algorithm identifier for each control loop. This query shall be available
-    via the CLI (active_algorithms command) and the CAN QueryAlgorithms command, and
-    shall reflect the algorithm that is currently dispatched in the ISR, not the
+    algorithm identifier for each control loop. This query shall be the CAN
+    QueryAlgorithms command, and shall reflect the algorithm that is currently dispatched in the ISR, not the
     value most recently requested or persisted.
 
 - id: REQ-CTRL-014

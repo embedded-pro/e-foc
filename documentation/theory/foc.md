@@ -2,7 +2,7 @@
 title: "Field-Oriented Control (FOC)"
 type: theory
 status: approved
-version: 1.1.0
+version: 1.1.1
 component: "foc"
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | Field-Oriented Control (FOC) |
 | Type      | theory                       |
 | Status    | approved                     |
-| Version   | 1.1.0                        |
+| Version   | 1.1.1                        |
 | Component | foc                          |
 | Date      | 2026-10-29                   |
 
@@ -347,7 +347,7 @@ $$d_A = \mathrm{clamp}\!\left(\frac{0.589}{\sqrt{3}} + 0.5,\ 0,\ 1\right) = 0.84
 ## Controller Slots
 
 Each of the three control loops exposes a runtime-selectable controller slot. The active algorithm
-is configured via CLI or CAN without a firmware rebuild, and persists across power cycles via NVM.
+is configured over CAN without a firmware rebuild, and persists across power cycles via NVM.
 
 - **Current loop** — regulates $i_d$ and $i_q$ at 20 kHz.
 - **Speed loop** — regulates $\omega$ at 1 kHz, produces $i_q^*$ for the current loop.
@@ -361,7 +361,7 @@ Plant models (current, speed, position) and discretisation are in
 `documentation/theory/foc-plant-models.md`.
 
 The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
-NVM persistence, and CLI/CAN interface — is documented in `documentation/design/controller-selection.md`.
+NVM persistence, and CAN interface — is documented in `documentation/design/controller-selection.md`.
 
 ---
 

@@ -8,7 +8,7 @@ namespace
 {
     using namespace testing;
 
-    class FocStateMachineSpeedCliTest
+    class FocStateMachineSpeedTest
         : public ::testing::Test
         , public infra::ClockFixture
     {
@@ -18,7 +18,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -28,10 +27,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -227,12 +223,11 @@ namespace
         SpeedStateMachine CreateSpeedStateMachine()
         {
             return SpeedStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
@@ -364,7 +359,7 @@ namespace
     };
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_invalid_on_boot_remains_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_invalid_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -373,7 +368,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_invalid_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
+TEST_F(FocStateMachineSpeedTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -382,7 +377,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_valid_on_boot_remains_in_idle_pending_al
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_load_failure_on_boot_remains_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_load_failure_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
     EXPECT_CALL(nvmMock, IsCalibrationValid(_))
@@ -401,7 +396,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_load_failure_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibration_calls_mech_ident_after_alignment)
+TEST_F(FocStateMachineSpeedTest, calibration_calls_mech_ident_after_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -413,7 +408,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibration_calls_mech_ident_after_alignment
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibration_populates_inertia_and_velocity_gains)
+TEST_F(FocStateMachineSpeedTest, calibration_populates_inertia_and_velocity_gains)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -429,7 +424,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibration_populates_inertia_and_velocity_g
     EXPECT_GT(data.speedLoopBandwidth, 0.0f);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibrate_from_ready_re_runs_and_reaches_ready)
+TEST_F(FocStateMachineSpeedTest, calibrate_from_ready_re_runs_and_reaches_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -441,7 +436,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_from_ready_re_runs_and_reaches_rea
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibrate_from_enabled_is_rejected)
+TEST_F(FocStateMachineSpeedTest, calibrate_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -456,7 +451,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, pole_pairs_nullopt_enters_fault)
+TEST_F(FocStateMachineSpeedTest, pole_pairs_nullopt_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -468,7 +463,7 @@ TEST_F(FocStateMachineSpeedCliTest, pole_pairs_nullopt_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, resistance_inductance_nullopt_enters_fault)
+TEST_F(FocStateMachineSpeedTest, resistance_inductance_nullopt_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -480,7 +475,7 @@ TEST_F(FocStateMachineSpeedCliTest, resistance_inductance_nullopt_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, alignment_nullopt_enters_fault)
+TEST_F(FocStateMachineSpeedTest, alignment_nullopt_enters_fault)
 {
     EXPECT_CALL(alignmentMock, LastFailure()).WillRepeatedly(Return(services::MotorAlignment::Failure::none));
     GivenFaultNotifierRegistered();
@@ -493,7 +488,7 @@ TEST_F(FocStateMachineSpeedCliTest, alignment_nullopt_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, mech_ident_failure_enters_fault)
+TEST_F(FocStateMachineSpeedTest, mech_ident_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -507,7 +502,7 @@ TEST_F(FocStateMachineSpeedCliTest, mech_ident_failure_enters_fault)
         state_machine::FaultCode::calibrationFailed);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_save_failure_enters_fault)
+TEST_F(FocStateMachineSpeedTest, nvm_save_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -519,7 +514,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_save_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_from_ready_enters_enabled)
+TEST_F(FocStateMachineSpeedTest, enable_from_ready_enters_enabled)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -532,7 +527,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_ready_enters_enabled)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, disable_from_enabled_returns_to_ready)
+TEST_F(FocStateMachineSpeedTest, disable_from_enabled_returns_to_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -546,7 +541,7 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_enabled_returns_to_ready)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_from_idle_is_rejected)
+TEST_F(FocStateMachineSpeedTest, enable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -557,7 +552,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, disable_from_idle_is_rejected)
+TEST_F(FocStateMachineSpeedTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -568,7 +563,7 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, fault_from_enabled_enters_fault)
+TEST_F(FocStateMachineSpeedTest, fault_from_enabled_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -583,7 +578,7 @@ TEST_F(FocStateMachineSpeedCliTest, fault_from_enabled_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, fault_from_idle_enters_fault)
+TEST_F(FocStateMachineSpeedTest, fault_from_idle_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -594,7 +589,7 @@ TEST_F(FocStateMachineSpeedCliTest, fault_from_idle_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, fault_code_is_recorded)
+TEST_F(FocStateMachineSpeedTest, fault_code_is_recorded)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -605,7 +600,7 @@ TEST_F(FocStateMachineSpeedCliTest, fault_code_is_recorded)
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_fault_returns_to_idle)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -617,7 +612,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_fault_returns_to_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -629,7 +624,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_fault_with_valid_calibratio
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_non_fault_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_non_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -640,7 +635,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_non_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_ready_returns_to_idle)
+TEST_F(FocStateMachineSpeedTest, clear_cal_from_ready_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -656,7 +651,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_ready_returns_to_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_enabled_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_cal_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -670,79 +665,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, cli_cal_command_triggers_calibration)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    ExpectSpeedCalibrationSequence();
-    auto sm = CreateSpeedStateMachine();
-
-    communication.dataReceived(infra::MakeStringByteRange("cal\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, cli_en_command_enables_foc)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    communication.dataReceived(infra::MakeStringByteRange("en\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, cli_dis_command_disables_foc)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedStateMachine();
-    AlignAfterBoot(sm);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    communication.dataReceived(infra::MakeStringByteRange("dis\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, cli_cf_command_clears_fault)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreateSpeedStateMachine();
-
-    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-    communication.dataReceived(infra::MakeStringByteRange("cf\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, cli_cc_command_clears_calibration)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmValidWithSpeedGains();
-    auto sm = CreateSpeedStateMachine();
-
-    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
-        .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
-            {
-                onDone(services::NvmStatus::Ok);
-            }));
-    communication.dataReceived(infra::MakeStringByteRange("cc\r"));
-    ExecuteAllActions();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, late_pole_pairs_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedTest, late_pole_pairs_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -763,7 +686,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_pole_pairs_callback_after_fault_is_igno
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, late_alignment_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedTest, late_alignment_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -796,7 +719,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_alignment_callback_after_fault_is_ignor
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, late_mech_ident_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedTest, late_mech_ident_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -841,7 +764,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_mech_ident_callback_after_fault_is_igno
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_during_calibrating_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_cal_during_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -856,7 +779,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_during_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_nvm_failure_enters_fault)
+TEST_F(FocStateMachineSpeedTest, clear_cal_nvm_failure_enters_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -872,7 +795,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_nvm_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, late_resistance_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedTest, late_resistance_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -899,7 +822,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_resistance_callback_after_fault_is_igno
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, late_nvm_save_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedTest, late_nvm_save_callback_after_fault_is_ignored)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -948,7 +871,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_nvm_save_callback_after_fault_is_ignore
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibrate_is_rejected_until_the_boot_check_has_completed)
+TEST_F(FocStateMachineSpeedTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
     infra::Function<void(bool)> bootCb;
@@ -973,7 +896,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_is_rejected_until_the_boot_check_h
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
+TEST_F(FocStateMachineSpeedTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1001,7 +924,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_is_rejected_while_a_clear_calibration
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
+TEST_F(FocStateMachineSpeedTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1031,7 +954,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidated_after_a_fault_drops_th
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
+TEST_F(FocStateMachineSpeedTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1054,7 +977,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_failure_callback_after_
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, a_model_is_refused_while_the_drive_runs)
+TEST_F(FocStateMachineSpeedTest, a_model_is_refused_while_the_drive_runs)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1067,7 +990,7 @@ TEST_F(FocStateMachineSpeedCliTest, a_model_is_refused_while_the_drive_runs)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, a_model_is_applied_while_the_drive_is_stopped)
+TEST_F(FocStateMachineSpeedTest, a_model_is_applied_while_the_drive_is_stopped)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1091,7 +1014,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -1101,10 +1023,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -1296,12 +1215,11 @@ namespace
         SpeedAutoStateMachine CreateSpeedAutoStateMachine()
         {
             return SpeedAutoStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Auto,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
@@ -1861,7 +1779,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_failure_callback_after
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibrate_from_calibrating_is_rejected)
+TEST_F(FocStateMachineSpeedTest, calibrate_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1876,7 +1794,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, calibrate_from_fault_is_rejected)
+TEST_F(FocStateMachineSpeedTest, calibrate_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1917,7 +1835,7 @@ TEST_F(FocStateMachineSpeedAutoTest, calibrate_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_from_calibrating_is_rejected)
+TEST_F(FocStateMachineSpeedTest, enable_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1932,7 +1850,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_from_fault_is_rejected)
+TEST_F(FocStateMachineSpeedTest, enable_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -1945,7 +1863,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, enable_from_enabled_does_not_call_start_again)
+TEST_F(FocStateMachineSpeedTest, enable_from_enabled_does_not_call_start_again)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -2005,7 +1923,7 @@ TEST_F(FocStateMachineSpeedAutoTest, enable_from_enabled_does_not_call_start_aga
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, disable_from_calibrating_is_rejected)
+TEST_F(FocStateMachineSpeedTest, disable_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2020,7 +1938,7 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, disable_from_fault_is_rejected)
+TEST_F(FocStateMachineSpeedTest, disable_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2061,7 +1979,7 @@ TEST_F(FocStateMachineSpeedAutoTest, disable_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_idle_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2072,7 +1990,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_calibrating_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2087,7 +2005,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_calibrating_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_enabled_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_fault_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -2145,7 +2063,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_fault_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_fault_is_rejected)
+TEST_F(FocStateMachineSpeedTest, clear_cal_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2171,7 +2089,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_fault_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_zero_resistance_fails_validation_and_stays_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_zero_resistance_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithZeroResistance();
@@ -2181,7 +2099,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_zero_resistance_fails_validation_and_sta
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_zero_inertia_fails_validation_and_stays_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_zero_inertia_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.0f, 0.01f);
@@ -2191,7 +2109,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_zero_inertia_fails_validation_and_stays_
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_inertia_fails_validation_and_stays_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_non_finite_inertia_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(std::numeric_limits<float>::quiet_NaN(), 0.01f);
@@ -2201,7 +2119,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_inertia_fails_validation_and_
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_negative_friction_fails_validation_and_stays_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_negative_friction_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, -0.01f);
@@ -2211,7 +2129,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_negative_friction_fails_validation_and_s
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_friction_fails_validation_and_stays_in_idle)
+TEST_F(FocStateMachineSpeedTest, nvm_non_finite_friction_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, std::numeric_limits<float>::infinity());
@@ -2221,7 +2139,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_friction_fails_validation_and
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_zero_friction_is_valid_and_transitions_to_ready)
+TEST_F(FocStateMachineSpeedTest, nvm_zero_friction_is_valid_and_transitions_to_ready)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, 0.0f);
@@ -2231,7 +2149,7 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_zero_friction_is_valid_and_transitions_t
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, external_calibration_without_mechanics_stays_idle_with_partial_record)
+TEST_F(FocStateMachineSpeedTest, external_calibration_without_mechanics_stays_idle_with_partial_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2253,7 +2171,7 @@ TEST_F(FocStateMachineSpeedCliTest, external_calibration_without_mechanics_stays
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, entering_the_inertia_completes_an_electrical_only_record)
+TEST_F(FocStateMachineSpeedTest, entering_the_inertia_completes_an_electrical_only_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2286,7 +2204,7 @@ TEST_F(FocStateMachineSpeedCliTest, entering_the_inertia_completes_an_electrical
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, an_electrical_identification_keeps_the_mechanics_of_the_record)
+TEST_F(FocStateMachineSpeedTest, an_electrical_identification_keeps_the_mechanics_of_the_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, 0.001f);
@@ -2313,7 +2231,7 @@ TEST_F(FocStateMachineSpeedCliTest, an_electrical_identification_keeps_the_mecha
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, a_motor_parameter_that_cannot_be_stored_leaves_the_record_unchanged)
+TEST_F(FocStateMachineSpeedTest, a_motor_parameter_that_cannot_be_stored_leaves_the_record_unchanged)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, 0.001f);
@@ -2335,7 +2253,7 @@ TEST_F(FocStateMachineSpeedCliTest, a_motor_parameter_that_cannot_be_stored_leav
     EXPECT_NEAR(sm.CalibrationRecord().inertia, 0.005f, 1e-8f);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, a_non_physical_motor_parameter_is_rejected_without_a_write)
+TEST_F(FocStateMachineSpeedTest, a_non_physical_motor_parameter_is_rejected_without_a_write)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithMechanics(0.005f, 0.001f);
@@ -2355,7 +2273,7 @@ TEST_F(FocStateMachineSpeedCliTest, a_non_physical_motor_parameter_is_rejected_w
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, complete_external_calibration_without_reserve_is_rejected)
+TEST_F(FocStateMachineSpeedTest, complete_external_calibration_without_reserve_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2372,7 +2290,7 @@ TEST_F(FocStateMachineSpeedCliTest, complete_external_calibration_without_reserv
     EXPECT_FALSE(sm.HasPartialCalibration());
 }
 
-TEST_F(FocStateMachineSpeedCliTest, reserve_external_calibration_is_rejected_while_calibrating)
+TEST_F(FocStateMachineSpeedTest, reserve_external_calibration_is_rejected_while_calibrating)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2382,7 +2300,7 @@ TEST_F(FocStateMachineSpeedCliTest, reserve_external_calibration_is_rejected_whi
     EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_mech_ident_is_running)
+TEST_F(FocStateMachineSpeedTest, has_pending_async_work_true_when_mech_ident_is_running)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2393,7 +2311,7 @@ TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_mech_ident_
     EXPECT_TRUE(base.HasPendingAsyncWork());
 }
 
-TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_electrical_ident_is_running)
+TEST_F(FocStateMachineSpeedTest, has_pending_async_work_true_when_electrical_ident_is_running)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -2456,7 +2374,7 @@ namespace
     using RefusingSpeedController = foc::FocController<RefusingSpeedCascade>;
 
     class FocStateMachineSpeedIdentificationTest
-        : public FocStateMachineSpeedCliTest
+        : public FocStateMachineSpeedTest
     {
     public:
         using RecordingStateMachine = application::OuterLoopStateMachineFor<RecordingSpeedController, RecordingSpeedController>;
@@ -2468,12 +2386,11 @@ namespace
         RefusingStateMachine CreateRefusingStateMachine()
         {
             return RefusingStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
@@ -2482,12 +2399,11 @@ namespace
         RecordingStateMachine CreateRecordingStateMachine()
         {
             return RecordingStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
@@ -2496,12 +2412,11 @@ namespace
         RecordingStateMachine CreateStateMachineRequiringAgreement()
         {
             return RecordingStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage, 2 },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
@@ -2852,7 +2767,7 @@ TEST_F(FocStateMachineSpeedIdentificationTest, a_refused_electrical_model_still_
 namespace
 {
     class FocStateMachineSpeedCoggingTest
-        : public FocStateMachineSpeedCliTest
+        : public FocStateMachineSpeedTest
     {
     public:
         StrictMock<services::CoggingMappingMock> coggingMock;
@@ -2873,12 +2788,11 @@ namespace
             services.coggingMappingOverride = std::ref(coggingMock);
 
             return SpeedStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 services,
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
                 nvmActivity
             };
