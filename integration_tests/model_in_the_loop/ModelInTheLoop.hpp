@@ -26,8 +26,6 @@
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/Terminal.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -122,14 +120,6 @@ namespace mil
             bool pending{ false };
         };
 
-        class SilentSerial
-            : public hal::SerialCommunication
-        {
-        public:
-            void SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion) override;
-            void ReceiveData(infra::Function<void(infra::ConstByteRange data)> dataReceived) override;
-        };
-
         class MemoryEeprom
             : public hal::Eeprom
         {
@@ -164,9 +154,6 @@ namespace mil
         infra::ClockFixture clock;
         infra::StdStringOutputStream::WithStorage tracerStream;
         services::TracerToStream tracer{ tracerStream };
-        SilentSerial serial;
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<32, 4> terminalWithCommands{ serial, tracer };
-        services::TerminalWithStorage::WithMaxSize<24> terminal{ terminalWithCommands, tracer };
         SimulatedDrive drive;
         application::DecimatingThreePhaseInverter inverter;
         DeferredLowPriorityInterrupt lowPriorityInterrupt;

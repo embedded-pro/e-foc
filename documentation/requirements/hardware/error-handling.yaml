@@ -46,12 +46,12 @@
     reported as Software.
 
 - id: REQ-EH-006
-  title: CLI banner reports reset cause and fault status
+  title: The startup banner reports reset cause and fault status
   shall: >
-    After the CLI startup banner is printed, the terminal shall display the
-    reset cause. If fault data from a previous failure is available, the
-    terminal shall display the complete formatted fault information surrounded
-    by clearly visible delimiters, before accepting commands.
+    The startup banner each application traces as it starts shall include the
+    reset cause. If fault data from a previous failure is available, the banner
+    shall include the complete formatted fault information surrounded by clearly
+    visible delimiters.
 
 - id: REQ-HIL-008
   title: Software reset cause captured correctly

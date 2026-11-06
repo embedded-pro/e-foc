@@ -19,11 +19,9 @@
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
-#include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/Terminal.hpp"
 #include <bit>
 #include <cmath>
 #include <gtest/gtest.h>
@@ -66,7 +64,6 @@ namespace
     {
     public:
         StrictMock<infra::StreamWriterMock> streamWriterMock;
-        StrictMock<hal::SerialCommunicationMock> serialCommunicationMock;
 
         infra::Execute setupStreamExpectations{ [this]()
             {
@@ -77,13 +74,10 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(serialCommunicationMock, SendDataMock(_)).Times(AnyNumber());
             } };
 
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ serialCommunicationMock, tracer };
-        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         FocMotorCanBridgeTest()
         {
@@ -232,7 +226,7 @@ namespace
                 calibrationServices.standstill = standstillMock;
             }
             coordinator.emplace(
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
                 calibrationServices,
@@ -1840,7 +1834,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
 
     services::ConfigData config{};
     coordinator.emplace(
-        application::TerminalAndTracer{ terminal, tracer },
+        tracer,
         application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },

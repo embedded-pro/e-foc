@@ -155,14 +155,6 @@ namespace mil
             handler();
     }
 
-    void ModelInTheLoop::SilentSerial::SendData(infra::ConstByteRange, infra::Function<void()> actionOnCompletion)
-    {
-        infra::EventDispatcher::Instance().Schedule(actionOnCompletion);
-    }
-
-    void ModelInTheLoop::SilentSerial::ReceiveData(infra::Function<void(infra::ConstByteRange data)>)
-    {}
-
     ModelInTheLoop::MemoryEeprom::MemoryEeprom(std::vector<uint8_t> contents)
         : contents{ std::move(contents) }
     {}
@@ -221,7 +213,7 @@ namespace mil
                     configData = services::MakeDefaultConfigData();
 
                 controlMode.emplace(
-                    application::TerminalAndTracer{ terminal, tracer },
+                    tracer,
                     application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },

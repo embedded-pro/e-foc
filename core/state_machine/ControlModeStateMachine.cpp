@@ -1,7 +1,6 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/WindingTemperature.hpp"
-#include "core/state_machine/ControlModeCliCommands.hpp"
 #include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
 #include "infra/util/ReallyAssert.hpp"
@@ -14,28 +13,27 @@
 namespace state_machine
 {
     ControlModeStateMachine::ControlModeStateMachine(
-        const application::TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const application::MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const application::CalibrationServices& calibServices,
         FaultNotifier& faultNotifier,
         const services::ConfigData& configData,
         OuterLoopArgs outerLoopArgs)
-        : terminalAndTracer(terminalAndTracer)
+        : tracer(tracer)
         , hardware(hardware)
         , nvm(nvm)
         , calibServices(calibServices)
         , faultNotifier(faultNotifier)
         , outerLoopArgs(outerLoopArgs)
         , configData(configData)
-        , configWriter(nvm, this->configData, terminalAndTracer.tracer, nvmActivity)
-        , algorithmPersistence(configWriter, this->configData, terminalAndTracer.tracer)
+        , configWriter(nvm, this->configData, tracer, nvmActivity)
+        , algorithmPersistence(configWriter, this->configData, tracer)
         , recalibration(nvm, nvmActivity)
     {
         SanitizeTunings(this->configData);
         SanitizeSupervision(this->configData);
         SanitizeLimits(this->configData);
-        RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
         recalibration.timer.Start(Recalibration::observationPeriod, [this]()
             {
@@ -310,9 +308,9 @@ namespace state_machine
         for (std::size_t quantity = 0; quantity != Recalibration::quantities; ++quantity)
         {
             if (outcome.verdicts[quantity] == RecalibrationVerdict::applied)
-                terminalAndTracer.tracer.Trace() << "[SM] Recalibrated " << names[quantity] << ": " << outcome.readings[quantity] << " (commissioned " << references[quantity] << ")";
+                tracer.Trace() << "[SM] Recalibrated " << names[quantity] << ": " << outcome.readings[quantity] << " (commissioned " << references[quantity] << ")";
             else if (outcome.verdicts[quantity] == RecalibrationVerdict::rejected)
-                terminalAndTracer.tracer.Trace() << "[SM] Rejected " << names[quantity] << " reading " << outcome.readings[quantity] << ": outside its band around " << references[quantity];
+                tracer.Trace() << "[SM] Rejected " << names[quantity] << " reading " << outcome.readings[quantity] << ": outside its band around " << references[quantity];
         }
     }
 
@@ -418,34 +416,31 @@ namespace state_machine
 
         if (mode == ControlMode::speed)
             AttachAlgorithmRestore(activeSm.emplace<application::SpeedStateMachine>(
-                terminalAndTracer,
+                tracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
-                TransitionPolicy::Auto,
                 outerLoopArgs,
                 nvmActivity,
                 rotorReference));
         else if (mode == ControlMode::position)
             AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
-                terminalAndTracer,
+                tracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
-                TransitionPolicy::Auto,
                 outerLoopArgs,
                 nvmActivity,
                 rotorReference));
         else
             AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
-                terminalAndTracer,
+                tracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
-                TransitionPolicy::Auto,
                 nvmActivity,
                 rotorReference));
 
@@ -606,11 +601,6 @@ namespace state_machine
         return algorithmPersistence.ActivePositionAlgorithm(PositionSelectable());
     }
 
-    void ControlModeStateMachine::RegisterCliCommands()
-    {
-        RegisterControlModeCliCommands(terminalAndTracer.terminal, *this, terminalAndTracer.tracer);
-    }
-
     application::OuterLoopStateMachine* ControlModeStateMachine::ActiveOuterLoop()
     {
         if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
@@ -735,10 +725,10 @@ namespace state_machine
             tunable->SetCurrentTunings(EffectiveCurrentTunings());
 
         if (auto* tunable = SpeedTunable(); tunable != nullptr && tunable->SetSpeedTunings(*EffectiveSpeedTunings()) != foc::SelectResult::ok)
-            terminalAndTracer.tracer.Trace() << "[SM] Speed settings not applied: the active law cannot be designed with them";
+            tracer.Trace() << "[SM] Speed settings not applied: the active law cannot be designed with them";
 
         if (auto* tunable = PositionTunable(); tunable != nullptr && tunable->SetPositionTunings(*EffectivePositionTunings()) != foc::SelectResult::ok)
-            terminalAndTracer.tracer.Trace() << "[SM] Position settings not applied: the active law cannot be designed with them";
+            tracer.Trace() << "[SM] Position settings not applied: the active law cannot be designed with them";
     }
 
     void ControlModeStateMachine::StoreAndPersist(const OnSetting& onDone)

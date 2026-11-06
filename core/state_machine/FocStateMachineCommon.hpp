@@ -15,7 +15,6 @@
 #include "core/state_machine/NvmActivity.hpp"
 #include "core/state_machine/OperationFlow.hpp"
 #include "core/state_machine/PendingCommand.hpp"
-#include "core/state_machine/TransitionPolicies.hpp"
 #include "services/fsm/StateMachineTracer.hpp"
 
 namespace application
@@ -58,7 +57,7 @@ namespace application
         const StateMachine& TransitionTable() const;
 
     protected:
-        FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
+        FocStateMachineCommon(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
@@ -67,7 +66,6 @@ namespace application
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void ReleaseExternalResources();
-        void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
         void Boot(RotorReference rotorReference);
 
         void ProvisionalControlSuperseded() override;
@@ -89,7 +87,6 @@ namespace application
         void PrepareForEnabled() override;
         void AbortModeSpecificServices() override;
         bool HasModeSpecificWorkPending() const override;
-        void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
 
         void SaveCalibration(state_machine::Calibrating& calibrating);
         services::DispatchResult Dispatch(const state_machine::Event& event);
@@ -103,7 +100,6 @@ namespace application
         static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
 
     private:
-        services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         CalibrationContext calibrationContext;
         NvmActivity& nvmActivity;

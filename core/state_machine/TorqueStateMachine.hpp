@@ -9,12 +9,11 @@ namespace application
         : public FocStateMachineCommon
     {
     public:
-        TorqueStateMachine(const TerminalAndTracer& terminalAndTracer,
+        TorqueStateMachine(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
-            state_machine::TransitionPolicy transitionPolicy,
             NvmActivity& nvmActivity,
             RotorReference rotorReference = RotorReference::lost);
         ~TorqueStateMachine();

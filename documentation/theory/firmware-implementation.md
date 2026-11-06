@@ -2,7 +2,7 @@
 title: "From Equations to Firmware — Practical Implementation"
 type: theory
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: "firmware-implementation"
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | From Equations to Firmware — Practical Implementation |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.1                                                 |
+| Version   | 0.1.2                                                 |
 | Component | firmware-implementation                               |
 | Date      | 2026-11-05                                            |
 
@@ -67,7 +67,7 @@ Three execution contexts share the CPU, by priority:
 | PWM fault interrupt (highest)   | On a comparator trip | ADC digital comparators through the PWM fault input       | Fault latch                                                |
 | Outer loop, PendSV (lowest)     | 1 kHz                | Every 20th control interrupt                              | Speed estimate, speed or position loop, online estimators  |
 | Watchdog early warning (lowest) | 25 ms                | Watchdog timer                                            | Power-stage cut before the reset                           |
-| Event loop (`main`)             | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, CLI, NVM         |
+| Event loop (`main`)             | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, NVM              |
 
 Sources: `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp` (priorities),
 `documentation/architecture/system.md`. CAN and UART interrupts sit in between, at normal and low priority.

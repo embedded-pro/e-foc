@@ -2,7 +2,7 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.4.1
+version: 0.4.2
 component: foc-torque
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.4.1              |
+| Version   | 0.4.2              |
 | Component | foc-torque         |
 | Date      | 2026-11-05         |
 
@@ -141,7 +141,7 @@ sample. Disable ends the command and closes the window.
 ### Current Envelope
 
 The speed and position cascades bound the current reference their outer loop produces. Torque mode
-has no outer loop — the reference arrives from the operator, over CAN or the CLI — so the cascade
+has no outer loop — the reference arrives from the operator, over CAN — so the cascade
 applies the bound itself, at `SetPoint`, before the reference reaches the current loop.
 
 The bound is on the **magnitude of the current vector**, not on either axis separately: the plant

@@ -2,7 +2,7 @@
 title: "Runtime Controller Selection"
 type: design
 status: accepted
-version: 0.5.0
+version: 0.6.0
 component: "controller-selection"
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
 | Status    | accepted                     |
-| Version   | 0.5.0                        |
+| Version   | 0.6.0                        |
 | Component | controller-selection         |
 | Date      | 2026-11-06                   |
 
@@ -41,7 +41,7 @@ date: 2026-11-06
 - Persisting the active algorithm identifier for each loop to non-volatile memory upon each selection
 - Restoring the persisted algorithm identifiers at boot and re-configuring the controllers from NVM
   before the first Enable command
-- Exposing algorithm selection to the CLI terminal and to the CAN interface
+- Exposing algorithm selection to the CAN interface
 - Holding the operator's tuning settings for every loop, validating them, applying them to the running
   controllers and persisting them
 
@@ -274,24 +274,11 @@ flowchart LR
 
 ---
 
-### Part F — CLI Interface
+### Part F — Command Line
 
-`ControlModeStateMachine` registers the selection commands on the terminal.
-
-| Command                           | Alias | Effect                                    |
-|-----------------------------------|-------|-------------------------------------------|
-| `select_current_algorithm <alg>`  | `sca` | Selects the current-loop algorithm        |
-| `select_speed_algorithm <alg>`    | `ssa` | Selects the speed-loop algorithm          |
-| `select_position_algorithm <alg>` | `spa` | Selects the position-loop algorithm       |
-| `active_algorithms`               | `aa`  | Prints the active algorithm for each loop |
-
-Valid `<alg>` tokens are the lower-case algorithm names: `pid`, `decoupled`, `deadbeat` and
-`sliding` for the current loop; `pid`, `lqi`, `adrc` and `twodof` for the speed loop; and `pid`,
-`cascadep`, `lqr`, `lqi` and `twodof` for the position loop. Unknown tokens produce a usage
-error without altering state.
-
-The commands enforce the motor-enabled guard described in Part D and report the `SelectResult`
-verbatim, so an operator always learns why a selection was refused.
+The motor application has no command line (`service-cli.md`, Part A): algorithms are selected and
+queried over CAN alone (Part G). A refused selection reports its `SelectResult` in the CAN answer,
+so a client always learns why it was refused.
 
 ---
 
@@ -299,15 +286,14 @@ verbatim, so an operator always learns why a selection was refused.
 
 From contract 2.1 the FOC motor category carries algorithm selection and the tuning settings
 (`service-can.md`, Part A). `SelectAlgorithm` names a loop and an algorithm of that loop and is
-held to the same rules as the CLI command: refused with `invalidState` unless the active mode is
+refused with `invalidState` unless the active mode is
 stopped (`Idle` or `Ready`), with `busy` while work is outstanding (Part D), with `modeMismatch` when
 the active mode does not run that loop, and with `invalidParameters` when the algorithm cannot be
 designed from the motor model it would run on (Part H). `QueryAlgorithms` reports the algorithm in force for every
 loop; a loop the active mode does not run reports the identifier stored for it.
 
 Over CAN a selection is acknowledged once its identifier has been stored, so a client never reads
-"accepted" for a choice the next power cycle would lose. The CLI keeps its immediate answer and
-stores in the background.
+"accepted" for a choice the next power cycle would lose.
 
 Each tuning setting is a numbered parameter that `SetParameter` writes and `QueryParameter` reads.
 The settings follow the same gate as a selection and are kept per loop, not per algorithm: the
@@ -593,12 +579,12 @@ The sequence on a successful algorithm selection:
 
 ```mermaid
 sequenceDiagram
-    participant CLI
+    participant Client as CAN client
     participant Selector as ControllerSelector
     participant StateMachine as FocStateMachine
     participant NVM
 
-    CLI->>Selector: SelectSpeedAlgorithm(lqi)
+    Client->>Selector: SelectSpeedAlgorithm(lqi)
     Selector->>StateMachine: IsMotorEnabled()
     StateMachine-->>Selector: false
     Selector->>Selector: ConstructInPlace<LqiSpeedController>
@@ -606,21 +592,21 @@ sequenceDiagram
     Selector->>Selector: Reset()
     Selector->>NVM: Write(speedAlgorithm = lqi)
     NVM-->>Selector: ok
-    Selector-->>CLI: SelectResult::ok
+    Selector-->>Client: SelectResult::ok
 ```
 
 The sequence on a rejected selection (motor enabled):
 
 ```mermaid
 sequenceDiagram
-    participant CLI
+    participant Client as CAN client
     participant Selector as ControllerSelector
     participant StateMachine as FocStateMachine
 
-    CLI->>Selector: SelectSpeedAlgorithm(adrc)
+    Client->>Selector: SelectSpeedAlgorithm(adrc)
     Selector->>StateMachine: IsMotorEnabled()
     StateMachine-->>Selector: true
-    Selector-->>CLI: SelectResult::busy
+    Selector-->>Client: SelectResult::busy
 ```
 
 Boot restoration sequence:
@@ -653,8 +639,7 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    CLI["CLI\nTerminalController"] -->|SelectAlgorithm| SEL["ControllerSelector\n(per loop)"]
-    CAN["CAN\nFocMotorCanBridge"] -->|SetControllerAlgorithm| SEL
+    CAN["CAN\nFocMotorCanBridge"] -->|SelectAlgorithm| SEL["ControllerSelector\n(per loop)"]
     NVM["NVM\nConfigData"] <-->|persist / restore| SEL
     ELEC["Electrical RLS"] -->|Rs, Ls, ψf| SEL
     MECH["Mechanical RLS"] -->|J, Bf, Kt| SEL
@@ -688,5 +673,4 @@ graph TD
 | # | Question                                                                                                                                                                                             | Options                                                              | Status |
 |---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|--------|
 | 1 | Should the CAN `SetControllerAlgorithm` frame be acknowledged synchronously (blocking until NVM write completes) or asynchronously (NVM write deferred)?                                             | Acknowledged once stored (Part G), as every persisted CAN setting is | closed |
-| 2 | Should `ReconfigureFromCurrentParameters` be exposed on the CLI, or only as a CAN command?                                                                                                           | CLI only / CAN only / both                                           | open   |
-| 3 | When the motor transitions from Speed mode to Position mode, should the position-loop LQR gains be recomputed from the speed-mode ADRC's parameter snapshot, or should they be stored independently? | Independent storage (current design) vs. shared parameter snapshot   | open   |
+| 2 | When the motor transitions from Speed mode to Position mode, should the position-loop LQR gains be recomputed from the speed-mode ADRC's parameter snapshot, or should they be stored independently? | Independent storage (current design) vs. shared parameter snapshot   | open   |

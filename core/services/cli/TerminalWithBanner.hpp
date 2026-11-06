@@ -1,15 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
-#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
-#include "infra/util/BoundedString.hpp"
+#include "core/services/cli/StartupBanner.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include <cstdint>
-
-namespace application
-{
-    enum class ResetCause : uint8_t;
-}
 
 namespace services
 {
@@ -20,16 +12,7 @@ namespace services
         template<std::size_t Max>
         using WithMaxSize = infra::WithStorage<TerminalWithBanner, infra::BoundedVector<Command>::WithMaxSize<Max>>;
 
-        struct Banner
-        {
-            infra::BoundedConstString::WithStorage<32> targetName;
-            foc::Volts vdc;
-            hal::Hertz systemClock;
-            application::ResetCause resetCause{};
-            infra::BoundedConstString faultStatus;
-            infra::BoundedConstString version;
-            infra::BoundedConstString revision;
-        };
+        using Banner = StartupBanner;
 
         TerminalWithBanner(infra::BoundedVector<Command>& storage, services::TerminalWithCommands& terminal, services::Tracer& tracer, const Banner& banner);
     };

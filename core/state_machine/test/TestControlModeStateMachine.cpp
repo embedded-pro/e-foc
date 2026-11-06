@@ -11,11 +11,9 @@
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
-#include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/Terminal.hpp"
 #include <bit>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -54,7 +52,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -64,10 +61,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -154,7 +148,7 @@ namespace
         void ConstructSubjectWithConfig(const services::ConfigData& config)
         {
             subject.emplace(
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
@@ -566,41 +560,15 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            InvokeCliCommand("aln");
-        }
-
-        void InvokeCliCommand(const char* shortName)
-        {
-            std::string cmd{ shortName };
-            cmd += '\r';
-            communication.dataReceived(infra::MakeStringByteRange(cmd));
+            subject->CmdReAlign([](state_machine::CommandResult) {});
             ExecuteAllActions();
-        }
-
-        std::string capturedOutput;
-
-        void CaptureTerminalOutput()
-        {
-            EXPECT_CALL(streamWriterMock, Insert(_, _))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
-                    {
-                        capturedOutput.append(reinterpret_cast<const char*>(range.begin()), range.size());
-                    }));
-        }
-
-        std::string OutputOf(const char* command)
-        {
-            capturedOutput.clear();
-            InvokeCliCommand(command);
-            return capturedOutput;
         }
 
         void ConstructSubjectWithFluxLinkage(foc::Weber fluxLinkage)
         {
             services::ConfigData config{};
             subject.emplace(
-                application::TerminalAndTracer{ terminal, tracer },
+                tracer,
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
@@ -657,35 +625,6 @@ TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfigure
     ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
 
     EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.02f, 1e-6f);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_PersistsTheValueAndMakesDecoupledPidSelectable)
-{
-    GivenNvmValid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.0f });
-
-    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
-        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
-            {
-                EXPECT_NEAR(data.fluxLinkage, 0.009f, 1e-6f);
-                onDone(services::NvmStatus::Ok);
-            }));
-
-    InvokeCliCommand("sfl 0.009");
-
-    EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.009f, 1e-6f);
-    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_RejectsNonPositiveValue)
-{
-    GivenNvmValid();
-    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
-
-    InvokeCliCommand("sfl 0");
-
-    EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.007f, 1e-6f);
 }
 
 TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)
@@ -920,123 +859,6 @@ TEST_F(ControlModeStateMachineExtTest, A_Mode_Left_Idle_By_A_Switch_Has_No_Rotor
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(subject->ActiveStateMachine().CurrentState()));
     EXPECT_FALSE(IsReadyWithRotorReference());
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_Enable_Is_NoOp_In_Idle)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("en");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-        subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_Disable_Is_NoOp_In_Idle)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("dis");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-        subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ClearFault_Is_NoOp_In_Idle)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("cf");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-        subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_Calibrate_In_Idle_Starts_Calibration)
-{
-    GivenNvmAlwaysInvalid();
-    infra::Function<void(std::optional<std::size_t>)> capturedCb;
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-        .WillOnce(Invoke([&capturedCb](const auto&,
-                             const infra::Function<void(std::optional<std::size_t>)>& cb)
-            {
-                capturedCb = cb;
-            }));
-    ConstructSubject();
-
-    InvokeCliCommand("cal");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
-        subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCalibration)
-{
-    GivenNvmAlwaysInvalid();
-    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
-        .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
-            {
-                onDone(services::NvmStatus::Ok);
-            }));
-    ConstructSubject();
-
-    InvokeCliCommand("cc");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-        subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_Refused_In_Torque_Mode)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("ae");
-
-    EXPECT_EQ(state_machine::SettingResult::wrongMode, subject->CmdRecalibrate());
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not_Crash)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-    InvokeCliCommand("ae");
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(subject->ActiveStateMachine().CurrentState()));
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Torque)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("am");
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Speed)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-    InvokeCliCommand("am");
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Position)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-    InvokeCliCommand("am");
 }
 
 namespace
@@ -1656,113 +1478,12 @@ TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedWithoutMecha
     EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
 }
 
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_AcceptsEveryName)
-{
-    GivenNvmValid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-
-    for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
-        InvokeCliCommand(name);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_RejectsUnknownName)
-{
-    GivenNvmAlwaysInvalid();
-    ConstructSubject();
-
-    InvokeCliCommand("sca nonsense");
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_AcceptsEveryName)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-    for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
-        InvokeCliCommand(name);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_RejectsUnknownName)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-    InvokeCliCommand("ssa nonsense");
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_AcceptsEveryName)
-{
-    GivenNvmAlwaysValid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-    for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
-        InvokeCliCommand(name);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectsUnknownName)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-    InvokeCliCommand("spa nonsense");
-}
-
 TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectedOutsidePositionMode)
 {
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
     EXPECT_EQ(subject->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryCurrentAlgorithm)
-{
-    GivenNvmValid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-
-    for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
-    {
-        InvokeCliCommand(name);
-        InvokeCliCommand("aa");
-    }
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEverySpeedAlgorithm)
-{
-    GivenNvmAlwaysInvalid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-    for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
-    {
-        InvokeCliCommand(name);
-        InvokeCliCommand("aa");
-    }
-}
-
-TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryPositionAlgorithm)
-{
-    GivenNvmAlwaysValid();
-    GivenNvmSaveConfigAlwaysSucceeds();
-    ConstructSubject();
-    subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-    for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
-    {
-        InvokeCliCommand(name);
-        InvokeCliCommand("aa");
-    }
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMode)
@@ -2027,269 +1748,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, PersistedSpeedAlgorithmIsAppliedOnc
     CompleteCalibration_WithMechIdent();
 
     EXPECT_EQ(subject->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
-}
-
-namespace
-{
-    class ControlModeStateMachineCliTest
-        : public ControlModeStateMachineLifecycleTest
-    {
-    public:
-        void GivenTorqueModeReady()
-        {
-            GivenNvmAlwaysInvalid();
-            SetUpTorqueCalibrationCaptures();
-            ConstructSubject(static_cast<uint8_t>(state_machine::ControlMode::torque));
-            subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-            CompleteCalibration_Torque();
-            CaptureTerminalOutput();
-        }
-
-        void GivenOuterLoopModeReady(state_machine::ControlMode mode)
-        {
-            GivenNvmAlwaysInvalid();
-            GivenNvmSaveConfigAlwaysSucceeds();
-            SetUpMechIdentCalibrationCaptures();
-            ConstructSubject(static_cast<uint8_t>(mode));
-            subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-            CompleteCalibration_WithMechIdent();
-            CaptureTerminalOutput();
-        }
-
-        void GivenTorqueModeIdle()
-        {
-            GivenNvmAlwaysInvalid();
-            ConstructSubject(static_cast<uint8_t>(state_machine::ControlMode::torque));
-            CaptureTerminalOutput();
-        }
-    };
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetTorque_Is_Accepted_In_Torque_Mode_When_Ready)
-{
-    GivenTorqueModeReady();
-
-    const auto output = OutputOf("st 2.5");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeed_Is_Accepted_In_Speed_Mode_When_Enabled)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    subject->ActiveStateMachine().CmdEnable();
-
-    const auto output = OutputOf("ss 20.0");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetPosition_Is_Accepted_In_Position_Mode_When_Ready)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::position);
-
-    const auto output = OutputOf("sp 3.14");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeed_Is_Rejected_With_Mode_Message_In_Torque_Mode)
-{
-    GivenTorqueModeReady();
-
-    const auto output = OutputOf("ss 20.0");
-
-    EXPECT_THAT(output, HasSubstr("ERROR"));
-    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetPosition_Is_Rejected_With_Mode_Message_In_Speed_Mode)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    const auto output = OutputOf("sp 1.0");
-
-    EXPECT_THAT(output, HasSubstr("ERROR"));
-    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetTorque_Is_Rejected_When_Lifecycle_State_Is_Idle)
-{
-    GivenTorqueModeIdle();
-
-    const auto output = OutputOf("st 2.5");
-
-    EXPECT_THAT(output, HasSubstr("ERROR"));
-    EXPECT_THAT(output, HasSubstr("rejected: setpoints are only accepted in Ready or Enabled."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_Wrong_Argument_Count)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("st 1.0 2.0"), HasSubstr("invalid number of arguments."));
-    EXPECT_THAT(OutputOf("st"), HasSubstr("invalid number of arguments."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_NonNumeric_Argument)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("st abc"), HasSubstr("invalid value. It should be a float."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeed_Rejects_NonNumeric_Argument_Before_Mode_Check)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    EXPECT_THAT(OutputOf("ss abc"), HasSubstr("invalid value. It should be a float."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_A_Setpoint_Beyond_The_Command_Limit)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("st 10000.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeed_Rejects_A_Setpoint_Beyond_The_Command_Limit)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    EXPECT_THAT(OutputOf("ss 100000.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetPosition_Rejects_A_Setpoint_Beyond_One_Turn)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::position);
-
-    EXPECT_THAT(OutputOf("sp 100.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Negative_Bandwidth)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("scbw -5000.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_Zero)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("scbw 0.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Rejects_A_Negative_Bandwidth)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    EXPECT_THAT(OutputOf("ssbw -1.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Is_Accepted_In_Torque_Mode)
-{
-    GivenTorqueModeReady();
-    EXPECT_CALL(nvmMock, SaveConfig(_, _))
-        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
-            {
-                onDone(services::NvmStatus::Ok);
-            }));
-
-    const auto output = OutputOf("scbw 6283.2");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Non_Numeric_Argument)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("scbw nan"), HasSubstr("ERROR"));
-    EXPECT_THAT(OutputOf("scbw inf"), HasSubstr("ERROR"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Value_Above_The_Shared_Limit)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("scbw 20001.0"), HasSubstr("out of range"));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_Wrong_Argument_Count)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("scbw 100.0 200.0"), HasSubstr("invalid number of arguments."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Is_Rejected_In_Torque_Mode)
-{
-    GivenTorqueModeReady();
-
-    const auto output = OutputOf("ssbw 188.5");
-
-    EXPECT_THAT(output, HasSubstr("ERROR"));
-    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Is_Accepted_In_Speed_Mode)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    const auto output = OutputOf("ssbw 188.5");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetPositionBandwidth_Is_Rejected_In_Speed_Mode)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    const auto output = OutputOf("spbw 18.8");
-
-    EXPECT_THAT(output, HasSubstr("ERROR"));
-    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
-}
-
-TEST_F(ControlModeStateMachineCliTest, SetPositionBandwidth_Reaches_The_Position_Cascade)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::position);
-
-    const auto output = OutputOf("spbw 18.8");
-
-    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
-    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
-    EXPECT_THAT(output, HasSubstr("> "));
-}
-
-TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Prints_The_Active_Mode_Estimates)
-{
-    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
-
-    const auto output = OutputOf("es");
-
-    EXPECT_THAT(output, HasSubstr("[EST] Mech: J_uNms2="));
-    EXPECT_THAT(output, HasSubstr("[EST] Elec: R="));
-}
-
-TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Reports_That_Torque_Mode_Has_No_Estimators)
-{
-    GivenTorqueModeReady();
-
-    EXPECT_THAT(OutputOf("es"), HasSubstr("online estimates are not available in torque mode"));
 }
 
 TEST_F(ControlModeStateMachineTest, IsStoppedAndIdle_While_Idle_With_Nothing_Outstanding)

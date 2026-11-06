@@ -15,16 +15,15 @@ namespace application
         : public OuterLoopStateMachine
     {
     public:
-        OuterLoopStateMachineFor(const TerminalAndTracer& terminalAndTracer,
+        OuterLoopStateMachineFor(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
-            state_machine::TransitionPolicy transitionPolicy,
             const OuterLoopArgs& outerLoopArgs,
             NvmActivity& nvmActivity,
             RotorReference rotorReference = RotorReference::lost)
-            : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
+            : OuterLoopStateMachine(tracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
@@ -37,7 +36,6 @@ namespace application
             if (hardware.currentStream != nullptr)
                 focController.SetCurrentStream(*hardware.currentStream);
             RegisterFaultHandler(faultNotifier);
-            RegisterCliIfNeeded(transitionPolicy);
             Boot(rotorReference);
         }
 

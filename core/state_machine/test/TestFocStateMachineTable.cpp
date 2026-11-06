@@ -105,15 +105,11 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Available()).Times(AnyNumber()).WillRepeatedly(Return(1000));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -138,12 +134,11 @@ namespace
             } };
 
         application::TorqueStateMachine stateMachine{
-            application::TerminalAndTracer{ terminal, tracer },
+            tracer,
             application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
             nvmMock,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
             faultNotifierMock,
-            state_machine::TransitionPolicy::Auto,
             nvmActivity
         };
     };

@@ -32,11 +32,10 @@ namespace application
         // Redesigns the current and speed loops from the model; refused unless the drive is stopped.
         bool ApplyModel(const state_machine::MotorModel& model);
         std::optional<state_machine::OnlineEstimates> CurrentOnlineEstimates() override;
-        void TraceOnlineEstimates();
         float AutomaticSpeedLoopBandwidth() const;
 
     protected:
-        OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,
+        OuterLoopStateMachine(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
@@ -47,7 +46,6 @@ namespace application
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
-        void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;

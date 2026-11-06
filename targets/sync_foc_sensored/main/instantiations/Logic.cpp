@@ -39,8 +39,6 @@ namespace application
         , boardId{ hardware.BoardId() }
         , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
-        , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus(), e_foc::generated::VERSION, e_foc::generated::VERSION_GIT_SHA } }
-        , terminalDiagnostics{ terminalWithStorage, hardware.Diagnostics(), hardware.Tracer() }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , learnedModelRegion{ hardware.Eeprom(), learnedModelRegionOffset, learnedModelRegionSize }
@@ -116,6 +114,7 @@ namespace application
                 busVoltageLimits.Evaluate(measured);
             } }
     {
+        services::TraceStartupBanner(hardware.Tracer(), services::StartupBanner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus(), e_foc::generated::VERSION, e_foc::generated::VERSION_GIT_SHA });
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
@@ -138,7 +137,7 @@ namespace application
                 canServer->RegisterCategory(*firmwareUpgradeServer);
 
                 controlMode.emplace(
-                    TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
+                    this->hardware.Tracer(),
                     MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods(), &currentStream },
                     nvm,
                     CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },

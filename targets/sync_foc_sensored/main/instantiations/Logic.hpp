@@ -18,8 +18,7 @@
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/bus_voltage/BusVoltageMonitor.hpp"
-#include "core/services/cli/TerminalDiagnostics.hpp"
-#include "core/services/cli/TerminalWithBanner.hpp"
+#include "core/services/cli/StartupBanner.hpp"
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -80,8 +79,6 @@ namespace application
         uint8_t boardId;
         services::DebugLed debugLed;
         foc::Volts vdc;
-        services::TerminalWithBanner::WithMaxSize<24> terminalWithStorage;
-        services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
         services::NvmEepromRegion learnedModelRegion;

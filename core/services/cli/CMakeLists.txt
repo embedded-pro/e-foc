@@ -16,8 +16,8 @@ target_link_libraries(e_foc.services.cli PUBLIC
 target_sources(e_foc.services.cli PRIVATE
     SerialCommunicationMirror.cpp
     SerialCommunicationMirror.hpp
-    TerminalDiagnostics.cpp
-    TerminalDiagnostics.hpp
+    StartupBanner.cpp
+    StartupBanner.hpp
     DecimalToken.hpp
     TerminalHelper.hpp
     TerminalWithBanner.cpp

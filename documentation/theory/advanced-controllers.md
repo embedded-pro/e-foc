@@ -2,7 +2,7 @@
 title: "FOC Controllers — Map and Trade-offs"
 type: theory
 status: draft
-version: 0.4.1
+version: 0.4.2
 component: "foc-controllers"
 date: 2026-10-29
 ---
@@ -12,7 +12,7 @@ date: 2026-10-29
 | Title     | FOC Controllers — Map and Trade-offs |
 | Type      | theory                               |
 | Status    | draft                                |
-| Version   | 0.4.1                                |
+| Version   | 0.4.2                                |
 | Component | foc-controllers                      |
 | Date      | 2026-10-29                           |
 
@@ -22,7 +22,7 @@ date: 2026-10-29
 
 This chapter covers the controller algorithms available for the three nested FOC loops: what each one
 assumes, what it gains, what it costs, and what happens when its assumptions fail. Each loop exposes a
-runtime-selectable controller slot configured via CLI or CAN without a firmware rebuild. Per-algorithm
+runtime-selectable controller slot configured over CAN without a firmware rebuild. Per-algorithm
 chapters contain the full mathematical foundation and design equations.
 
 The loop structure, the $S + T = 1$ trade, the bandwidth limits that delay and sampling impose, and
@@ -31,7 +31,7 @@ limits. The shared plant models (dq current, mechanical speed, position) and dis
 `documentation/theory/foc-plant-models.md`.
 
 The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
-NVM persistence, and CLI/CAN interface — is in `documentation/design/controller-selection.md`.
+NVM persistence, and CAN interface — is in `documentation/design/controller-selection.md`.
 
 ---
 

@@ -1,6 +1,7 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
+#include "infra/util/BoundedVector.hpp"
 #include <numbers>
 
 namespace
