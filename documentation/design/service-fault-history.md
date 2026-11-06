@@ -122,13 +122,13 @@ answered once stored. The history is read and cleared over CAN (`service-can.md`
 
 ### Required
 
-| Interface              | Purpose                                                     | Contract                                           |
-|------------------------|-------------------------------------------------------------|----------------------------------------------------|
-| Non-volatile memory    | Load and store the history image                            | One operation at a time; `Busy` while another runs |
-| Asynchronous work hold | Keep the control mode from starting NVM work meanwhile      | Held for the duration of each load and store       |
-| Active drive           | Measured torque current                                     | Read every 1 ms on the event loop                  |
-| Bus voltage            | Latest filtered bus voltage                                 | Handed on every 10 ms                              |
-| Timer                  | Pace the stores and the current sampling                    | Runs on the event loop                             |
+| Interface              | Purpose                                                | Contract                                           |
+|------------------------|--------------------------------------------------------|----------------------------------------------------|
+| Non-volatile memory    | Load and store the history image                       | One operation at a time; `Busy` while another runs |
+| Asynchronous work hold | Keep the control mode from starting NVM work meanwhile | Held for the duration of each load and store       |
+| Active drive           | Measured torque current                                | Read every 1 ms on the event loop                  |
+| Bus voltage            | Latest filtered bus voltage                            | Handed on every 10 ms                              |
+| Timer                  | Pace the stores and the current sampling               | Runs on the event loop                             |
 
 ---
 
