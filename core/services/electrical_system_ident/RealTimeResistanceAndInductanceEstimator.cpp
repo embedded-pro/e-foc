@@ -34,7 +34,7 @@ namespace services
             return;
         }
 
-        if (std::abs(reference) < minimumDirectCurrent)
+        if (std::abs(reference) < minimumDirectCurrent || std::abs(idAtEnd) < minimumFollowedFraction * std::abs(reference))
             return;
 
         Estimator::InputMatrix regressor;

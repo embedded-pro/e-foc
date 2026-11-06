@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: service-electrical-ident
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.6.0                                         |
+| Version   | 0.7.0                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-11-05                                    |
+| Date      | 2026-11-06                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -411,6 +411,16 @@ one. The speed and position cascades therefore add a d-axis square wave to the c
 estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 50 Hz. It produces no torque on a
 non-salient machine and a copper loss proportional to its square. An update is taken only while the
 reference exceeds 50 mA, so an amplitude of zero switches both the injection and resistance tracking off.
+
+An update is also skipped when the current at the end of the window has not reached half of the reference.
+An open phase, or a loop held at its voltage limit, leaves the current behind while the loop applies its full
+voltage. Such a window has a regressor near zero, and the recursion has no information to take from it: without
+this check its gain grows by the forgetting factor at every window: a current held at 1 mA against a ±0.5 A
+reference drove the resistance to 26 MΩ within 3000 windows. In the motor-disconnected scenario the winding
+temperature read from such a resistance tripped the drive with an over-temperature, on slower runners, before the
+phase-loss monitor could report the missing phase (`fault-supervision.md`, Part E). The end of a window is taken rather than its mean because a step of the square
+wave lies inside one window: its mean current is near zero, but by its end the current has settled at the new
+reference, and these are the windows that tell the inductance.
 
 Only the steps of the square wave tell the inductance: between them the current is held, and its change over a
 window is the sensor's noise alone. Each step is read through two single samples, so the estimate's scatter falls

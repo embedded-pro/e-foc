@@ -14,6 +14,8 @@ namespace services
     public:
         static constexpr float defaultForgettingFactor = 0.9995f;
         static constexpr float minimumDirectCurrent = 0.05f;
+        // An open phase or a saturated loop leaves the current behind its reference, and such a window carries no information.
+        static constexpr float minimumFollowedFraction = 0.5f;
         static constexpr uint16_t minimumUpdates = 200;
 
         explicit RealTimeResistanceAndInductanceEstimator(float forgettingFactor, hal::Hertz samplingFrequency);

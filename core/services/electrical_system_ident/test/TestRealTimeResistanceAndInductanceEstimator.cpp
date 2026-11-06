@@ -160,3 +160,18 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, under_sensor_noise_the_sett
 
     EXPECT_LT(worst, 0.02f);
 }
+
+TEST_F(TestRealTimeResistanceAndInductanceEstimator, a_current_that_does_not_follow_the_reference_leaves_the_estimate_alone)
+{
+    const Winding winding;
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+
+    for (int window = 0; window != 3000; ++window)
+    {
+        const float reference = (window / 50) % 2 == 0 ? 0.5f : -0.5f;
+        estimator.Update(foc::ElectricalWindow{ foc::Volts{ reference > 0.0f ? 12.0f : -12.0f }, foc::Ampere{ 0.001f }, foc::Ampere{ 0.001f }, 0.0f, foc::Ampere{ reference } });
+    }
+
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), winding.resistance, 1e-6f);
+    EXPECT_NEAR(estimator.CurrentInductance().Value(), winding.inductance * 1000.0f, 1e-6f);
+}
