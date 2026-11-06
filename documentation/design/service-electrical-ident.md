@@ -2,7 +2,7 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.7.0
+version: 0.8.0
 component: service-electrical-ident
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.7.0                                         |
+| Version   | 0.8.0                                         |
 | Component | service-electrical-ident                      |
 | Date      | 2026-11-06                                    |
 

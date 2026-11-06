@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.12.0
+version: 0.13.0
 component: service-nvm
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.12.0                       |
+| Version   | 0.13.0                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-06                   |
 

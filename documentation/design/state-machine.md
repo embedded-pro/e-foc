@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: state-machine
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.8.0                      |
+| Version   | 0.9.0                      |
 | Component | state-machine              |
 | Date      | 2026-11-06                 |
 
