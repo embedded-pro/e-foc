@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 73> presentations{ {
+        constexpr std::array<SettingPresentation, 74> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -105,6 +105,7 @@ namespace tool
             { FocParameter::temperatureMargin, "Temperature margin", "Derating margin:", " K", "Span below the temperature limit over which the current limit falls linearly to zero.", {} },
             { FocParameter::busVoltageMinimum, "Bus voltage minimum", "Bus minimum:", " V", "Bus voltage below which a running motor faults with undervoltage; 0 turns the check off.", {} },
             { FocParameter::busVoltageMaximum, "Bus voltage maximum", "Bus maximum:", " V", "Bus voltage above which a running motor faults with overvoltage, as when braking feeds the supply; 0 turns the check off.", {} },
+            { FocParameter::quickStopDeceleration, "Quick-stop deceleration", "Deceleration:", radPerSecondSquared, "Rate at which Quick Stop slows the motor down before it stops it; 0 brakes at the current limit. Torque mode needs the calibrated inertia to brake.", {} },
             { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
             { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
             { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
@@ -336,14 +337,19 @@ namespace tool
         return Slice(45, 2);
     }
 
+    std::span<const SettingPresentation> QuickStopSettings()
+    {
+        return Slice(47, 1);
+    }
+
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(47, 24);
+        return Slice(48, 24);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(71, 2);
+        return Slice(72, 2);
     }
 
     namespace

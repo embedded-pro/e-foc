@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <gtest/gtest.h>
 #include <numbers>
+#include <variant>
 
 namespace
 {
@@ -197,4 +198,117 @@ TEST(TestDriveLimits, without_a_cogging_map_the_same_torque_stays_in_a_detent)
     std::fprintf(stderr, "[METRIC] mil limits torque_cogging uncompensated travel_rad=%.3f\n", travel);
 
     EXPECT_LT(travel, 2.0f * std::numbers::pi_v<float> / 24.0f);
+}
+
+namespace
+{
+    constexpr float stoppedSpeed{ 2.0f };
+
+    mil::Scenario QuickStopScenario(state_machine::ControlMode mode, float deceleration)
+    {
+        auto scenario = mil::Scenario{}.Calibrated().BootsIn(mode);
+        scenario.nvm.config.limits.quickStopDeceleration = deceleration;
+        scenario.nvm.config.limits.overspeedLimit = 105.0f;
+        return scenario;
+    }
+
+    float PlantSpeed(mil::ModelInTheLoop& mil)
+    {
+        return mil.Drive().Model().MechanicalSpeed().Value();
+    }
+
+    float MillisecondsSince(mil::ModelInTheLoop& mil, uint32_t tick)
+    {
+        return static_cast<float>(mil.Drive().Tick() - tick) / static_cast<float>(mil.TicksFromMilliseconds(1.0f));
+    }
+
+    struct QuickStopResponse
+    {
+        float belowStoppedMs;
+        float readyMs;
+        bool stoppingWhileBraking;
+    };
+
+    std::optional<QuickStopResponse> QuickStop(mil::ModelInTheLoop& mil)
+    {
+        const auto start = mil.Drive().Tick();
+        if (mil.ControlMode().ActiveStateMachine().CmdQuickStop() != state_machine::CommandResult::ok)
+            return std::nullopt;
+
+        const bool stopping = std::holds_alternative<state_machine::Stopping>(mil.ControlMode().ActiveStateMachine().CurrentState());
+        if (!mil.RunUntil([&mil]()
+                {
+                    return std::abs(PlantSpeed(mil)) < stoppedSpeed || mil.IsReady();
+                },
+                std::chrono::seconds(2)))
+            return std::nullopt;
+
+        const auto belowStopped = MillisecondsSince(mil, start);
+        if (!mil.RunUntil([&mil]()
+                {
+                    return mil.IsReady();
+                },
+                std::chrono::seconds(2)))
+            return std::nullopt;
+
+        return QuickStopResponse{ belowStopped, MillisecondsSince(mil, start), stopping };
+    }
+}
+
+TEST(TestDriveLimits, a_quick_stop_at_500_rad_per_s2_brings_a_speed_mode_rotor_from_100_rad_per_s_below_2_rad_per_s_in_196_ms)
+{
+    mil::ModelInTheLoop mil{ QuickStopScenario(state_machine::ControlMode::speed, 500.0f) };
+    ASSERT_TRUE(mil.Align());
+    ASSERT_TRUE(mil.Enable());
+    ASSERT_TRUE(mil.HoldSpeed(100.0f, std::chrono::milliseconds(1000)));
+
+    const auto response = QuickStop(mil);
+    ASSERT_TRUE(response.has_value());
+    std::fprintf(stderr, "[METRIC] mil limits quick_stop_speed below=%.1f ready=%.1f\n", response->belowStoppedMs, response->readyMs);
+
+    EXPECT_TRUE(response->stoppingWhileBraking);
+    EXPECT_NEAR(response->belowStoppedMs, 196.0f, 19.6f);
+    EXPECT_LE(response->readyMs, response->belowStoppedMs + 5.0f);
+    EXPECT_FALSE(mil.HasFault());
+}
+
+TEST(TestDriveLimits, a_quick_stop_that_would_take_longer_than_a_second_cuts_the_power_stage_after_one)
+{
+    mil::ModelInTheLoop mil{ QuickStopScenario(state_machine::ControlMode::speed, 50.0f) };
+    ASSERT_TRUE(mil.Align());
+    ASSERT_TRUE(mil.Enable());
+    ASSERT_TRUE(mil.HoldSpeed(100.0f, std::chrono::milliseconds(1000)));
+
+    const auto start = mil.Drive().Tick();
+    ASSERT_EQ(state_machine::CommandResult::ok, mil.ControlMode().ActiveStateMachine().CmdQuickStop());
+    ASSERT_TRUE(mil.RunUntil([&mil]()
+        {
+            return mil.IsReady();
+        },
+        std::chrono::seconds(2)));
+    const auto readyMs = MillisecondsSince(mil, start);
+    std::fprintf(stderr, "[METRIC] mil limits quick_stop_timeout ready=%.1f speed=%.2f\n", readyMs, PlantSpeed(mil));
+
+    EXPECT_NEAR(readyMs, 1000.0f, 5.0f);
+    EXPECT_GT(PlantSpeed(mil), stoppedSpeed);
+}
+
+TEST(TestDriveLimits, a_quick_stop_brakes_a_torque_mode_rotor_against_its_speed)
+{
+    mil::ModelInTheLoop mil{ QuickStopScenario(state_machine::ControlMode::torque, 500.0f) };
+    ASSERT_TRUE(mil.Align());
+    ASSERT_TRUE(mil.Enable());
+    ASSERT_TRUE(mil.SetTorque(1.0f));
+    mil.Run(std::chrono::milliseconds(500));
+    const auto before = PlantSpeed(mil);
+
+    const auto response = QuickStop(mil);
+    ASSERT_TRUE(response.has_value());
+    std::fprintf(stderr, "[METRIC] mil limits quick_stop_torque from=%.1f below=%.1f ready=%.1f\n", before, response->belowStoppedMs, response->readyMs);
+
+    EXPECT_GT(before, 90.0f);
+    EXPECT_TRUE(response->stoppingWhileBraking);
+    EXPECT_LE(response->belowStoppedMs, (before - stoppedSpeed) / 500.0f * 1000.0f * 1.1f);
+    EXPECT_LE(response->readyMs, response->belowStoppedMs + 5.0f);
+    EXPECT_FALSE(mil.HasFault());
 }

@@ -84,6 +84,17 @@ namespace application
         }
 
     protected:
+        bool BeginQuickStop() override
+        {
+            if constexpr (std::is_base_of_v<foc::QuickStoppable, Cascade>)
+            {
+                focController.QuickStop(QuickStopDeceleration());
+                return true;
+            }
+            else
+                return false;
+        }
+
         foc::FocBase& GetFoc() override
         {
             return focController;

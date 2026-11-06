@@ -13,7 +13,7 @@ namespace application
     {
         bool WasActive(const state_machine::State& state)
         {
-            return std::holds_alternative<state_machine::Enabled>(state) || std::holds_alternative<state_machine::Calibrating>(state);
+            return std::holds_alternative<state_machine::Enabled>(state) || std::holds_alternative<state_machine::Stopping>(state) || std::holds_alternative<state_machine::Calibrating>(state);
         }
     }
 
@@ -218,6 +218,31 @@ namespace application
         };
     }
 
+    constexpr std::array<FocLifecycleTable::Transition, 7> FocLifecycleTable::QuickStopRows()
+    {
+        return {
+            Machine::Row<state_machine::Enabled, state_machine::QuickStop, state_machine::Stopping>(nullptr,
+                [](LifecycleContext& context, state_machine::Enabled&, const state_machine::QuickStop&)
+                {
+                    return context.operation.BeginQuickStop();
+                }),
+            Machine::Row<state_machine::Stopping, state_machine::StopCompleted, state_machine::Ready>(nullptr,
+                [](LifecycleContext& context, state_machine::Stopping&, const state_machine::StopCompleted&)
+                {
+                    return context.operation.CompleteQuickStop();
+                }),
+            Machine::Row<state_machine::Stopping, state_machine::Disable, state_machine::Ready>(nullptr,
+                [](LifecycleContext& context, state_machine::Stopping&, const state_machine::Disable&)
+                {
+                    return context.operation.DisableToReady();
+                }),
+            Machine::InternalRow<state_machine::Stopping, state_machine::QuickStop>(),
+            Machine::InternalRow<state_machine::Idle, state_machine::QuickStop>(),
+            Machine::InternalRow<state_machine::Ready, state_machine::QuickStop>(),
+            Machine::InternalRow<state_machine::Fault, state_machine::QuickStop>(),
+        };
+    }
+
     template<class Active>
     constexpr std::array<FocLifecycleTable::Transition, 2> FocLifecycleTable::EmergencyStopRows()
     {
@@ -248,7 +273,7 @@ namespace application
             });
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 10> FocLifecycleTable::SafetyRows()
+    constexpr std::array<FocLifecycleTable::Transition, 12> FocLifecycleTable::SafetyRows()
     {
         return services::JoinRows(
             std::array{
@@ -277,6 +302,7 @@ namespace application
                     }),
             },
             EmergencyStopRows<state_machine::Enabled>(),
+            EmergencyStopRows<state_machine::Stopping>(),
             EmergencyStopRows<state_machine::Calibrating>(),
             std::array{
                 EmergencyStopInternalRow<state_machine::Idle>(),
@@ -400,9 +426,9 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 54> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 63> FocLifecycleTable::Rows()
     {
-        return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
+        return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), QuickStopRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }
 
     constexpr LifecycleMachine::Rules FocLifecycleTable::Rules()
@@ -411,7 +437,8 @@ namespace application
             .Allow<state_machine::Idle, state_machine::Calibrating, state_machine::Idle, state_machine::Ready>()
             .Allow<state_machine::Ready, state_machine::Calibrating, state_machine::Enabled, state_machine::Idle>()
             .Allow<state_machine::Calibrating, state_machine::Ready, state_machine::Idle>()
-            .Allow<state_machine::Enabled, state_machine::Ready, state_machine::Idle>()
+            .Allow<state_machine::Enabled, state_machine::Stopping, state_machine::Ready, state_machine::Idle>()
+            .Allow<state_machine::Stopping, state_machine::Ready, state_machine::Idle>()
             .Allow<state_machine::Fault, state_machine::Ready, state_machine::Idle>()
             .AllowFromAny<state_machine::Fault>()
             .Forbid<state_machine::Idle, state_machine::Enabled>()
@@ -439,6 +466,7 @@ namespace application
         RegisterEnteredHook<state_machine::Calibrating>(machine);
         RegisterEnteredHook<state_machine::Ready>(machine);
         RegisterEnteredHook<state_machine::Enabled>(machine);
+        RegisterEnteredHook<state_machine::Stopping>(machine);
         RegisterEnteredHook<state_machine::Fault>(machine);
     }
 }

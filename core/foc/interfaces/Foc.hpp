@@ -172,6 +172,16 @@ namespace foc
         virtual void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) = 0;
     };
 
+    class QuickStoppable
+    {
+    protected:
+        ~QuickStoppable() = default;
+
+    public:
+        // Decelerates the rotor to a standstill until the next Enable or Disable; zero steps the speed reference to zero.
+        virtual void QuickStop(RadiansPerSecondSquared deceleration) = 0;
+    };
+
     class SpeedCommandable
     {
     protected:

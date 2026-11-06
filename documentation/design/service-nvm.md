@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: service-nvm
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.11.0                       |
+| Version   | 0.12.0                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-05                   |
 
@@ -32,7 +32,8 @@ date: 2026-11-05
 - Persisting motor calibration data (R, L, pole pairs, encoder offset, PID gains, inertia, friction) and system
   configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
   settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
-  target window, travel limits, temperature and bus voltage) across power cycles using MCU internal EEPROM
+  target window, travel limits, temperature, bus voltage and quick-stop deceleration) across power cycles using MCU
+  internal EEPROM
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Detecting and signalling version mismatches when a stored record was written by a different firmware version
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
@@ -55,12 +56,13 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 168 bytes |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 172 bytes |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
-The configuration record's layout is at version 12. The bus-voltage minimum and maximum (`fault-supervision.md`
-Part L) took its data from 160 to 168 bytes, as version 11 had taken it from 152 to 160 bytes for the temperature limit
+The configuration record's layout is at version 13. The quick-stop deceleration (`state-machine.md`, Quick Stop)
+took its data from 168 to 172 bytes, as version 12 had taken it from 160 to 168 bytes for the bus-voltage minimum
+and maximum (`fault-supervision.md` Part L) and version 11 from 152 to 160 bytes for the temperature limit
 and margin (Part K), version 10 from 148 to 152 bytes for the calibration temperature and version 9 from 140 to 148 bytes for the software position
 limits (`foc-position.md` Software Position Limits) and version 8 from 132 to 140 bytes for the
 position window and its time (`foc-position.md` Target Reached) and version 7 from 96 to 132 bytes for the drive-wide
@@ -252,7 +254,7 @@ stateDiagram-v2
 zero there, which reads as not measured and keeps the automatic current-loop bandwidth an earlier
 firmware derived, so the layout stays at version 4 and no stored calibration is invalidated.
 
-**ConfigData** (168 bytes total):
+**ConfigData** (172 bytes total):
 
 | Field                  | Physical unit                   | Description                                                                                                    |
 |------------------------|---------------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -281,8 +283,9 @@ position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000
 0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, −3.2–3.2 rad,
 both 0 (off) by default (`foc-position.md` Software Position Limits); the calibration temperature,
 −40–100 °C, default 25; and the temperature limit, 40–200 °C, default 120, with its margin, 1–50 K, default 15
-(`fault-supervision.md` Part K); and the bus-voltage minimum and maximum, 0–100 V, both 0 (off) by default
-(`fault-supervision.md` Part L).
+(`fault-supervision.md` Part K); the bus-voltage minimum and maximum, 0–100 V, both 0 (off) by default
+(`fault-supervision.md` Part L); and the quick-stop deceleration, 0–100 000 rad/s², 0 (the current limit) by
+default (`state-machine.md`, Quick Stop).
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible

@@ -155,6 +155,11 @@ namespace foc
         speedCommand = speed;
     }
 
+    void PositionCascade::QuickStop(RadiansPerSecondSquared deceleration)
+    {
+        BeginQuickStop(deceleration);
+    }
+
     hal::Hertz PositionCascade::SpeedCommandFrequency() const
     {
         return outerLoopFrequency;
@@ -180,6 +185,12 @@ namespace foc
         if (HoldCommandedCurrent())
         {
             commandsCurrent = true;
+            return;
+        }
+
+        if (RunQuickStop(mechanicalSpeed))
+        {
+            commandsCurrent = false;
             return;
         }
 

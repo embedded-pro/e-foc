@@ -107,9 +107,12 @@ namespace tool
 
         auto* startButton = new QPushButton("&Start Motor");
         auto* stopButton = new QPushButton("S&top Motor");
+        quickStopButton = new QPushButton("&Quick Stop");
+        quickStopButton->setAccessibleName("Quick stop: decelerate the motor, then stop it");
         auto* clearFaultButton = new QPushButton("Clear F&ault");
         layout->addWidget(startButton);
         layout->addWidget(stopButton);
+        layout->addWidget(quickStopButton);
         layout->addWidget(clearFaultButton);
 
         commandWidgets.push_back(startButton);
@@ -117,6 +120,7 @@ namespace tool
         commandWidgets.push_back(clearFaultButton);
         connect(startButton, &QPushButton::clicked, this, &CommandPanel::StartMotorRequested);
         connect(stopButton, &QPushButton::clicked, this, &CommandPanel::StopMotorRequested);
+        connect(quickStopButton, &QPushButton::clicked, this, &CommandPanel::QuickStopRequested);
         connect(clearFaultButton, &QPushButton::clicked, this, &CommandPanel::ClearFaultRequested);
         return group;
     }
@@ -293,6 +297,13 @@ namespace tool
 
         motorParameters->SetActionsAvailable(unavailableReason);
         configuration->SetUnavailable(unavailableReason);
+    }
+
+    void CommandPanel::SetQuickStopAvailable(const QString& unavailableReason)
+    {
+        const bool available = unavailableReason.isEmpty();
+        quickStopButton->setEnabled(available);
+        quickStopButton->setToolTip(available ? QString("Decelerate the motor at its quick-stop deceleration, then stop it; Stop Motor cuts the power at once.") : unavailableReason);
     }
 
     void CommandPanel::SetSettingsAvailable(const QString& unavailableReason)

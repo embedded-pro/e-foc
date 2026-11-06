@@ -97,3 +97,17 @@
     overvoltage when it is above the bus-voltage maximum, and shall not fault for either while
     Idle or Ready. Each limit shall be settable from 0 to 100 V, 0 turning it off, with a default
     of 0, and shall leave the board's own over- and under-voltage trips in force.
+
+- id: REQ-PRT-010
+  title: A quick stop decelerates the rotor under control and leaves the drive Ready
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On a quick stop while Enabled the drive shall keep the power stage on and decelerate the
+    rotor at the stored quick-stop deceleration, settable from 0 to 100000 rad/s2 with a default
+    of 0 braking at the current limit: speed and position mode ramping the speed reference from
+    the measured speed to zero, torque mode braking with a current against the measured speed
+    capped at the inertia times the deceleration over the torque constant. It shall cut the power
+    stage and enter Ready once the speed is below 2 rad/s or 1 s after the quick stop. From
+    100 rad/s at 500 rad/s2 in speed mode the speed shall fall below 2 rad/s within
+    196 ms +/- 10 %.

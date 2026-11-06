@@ -179,6 +179,8 @@ namespace simulator
                     return QStringLiteral("Ready");
                 else if constexpr (std::is_same_v<T, state_machine::Enabled>)
                     return QStringLiteral("Running");
+                else if constexpr (std::is_same_v<T, state_machine::Stopping>)
+                    return QStringLiteral("Stopping\xe2\x80\xa6");
                 else if constexpr (std::is_same_v<T, state_machine::Fault>)
                     return QStringLiteral("Fault");
                 else
@@ -196,7 +198,7 @@ namespace simulator
                 using T = std::decay_t<decltype(s)>;
                 if constexpr (std::is_same_v<T, state_machine::Calibrating>)
                     controlPanel->SetMode(ControlPanel::Mode::Calibrating);
-                else if constexpr (std::is_same_v<T, state_machine::Enabled>)
+                else if constexpr (std::is_same_v<T, state_machine::Enabled> || std::is_same_v<T, state_machine::Stopping>)
                     controlPanel->SetMode(ControlPanel::Mode::Running);
                 else
                     controlPanel->SetMode(ControlPanel::Mode::Idle);

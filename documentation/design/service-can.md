@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.17.0
+version: 0.18.0
 component: can-service
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.17.0                   |
+| Version   | 0.18.0                   |
 | Component | can-service              |
 | Date      | 2026-11-05               |
 
@@ -433,6 +433,28 @@ fault code, as a trip of the board's comparators does.
 
 A client older than 2.15 asks for the new parameters only when the server reports 2.15 or newer.
 
+**Contract 2.16 — quick stop.** Version 2.16 adds one command, one motor state and one stored setting; nothing in
+2.15 changes (`state-machine.md`, Quick Stop).
+
+| ID     | Message     | Direction | Fields | Answer                                                                    |
+|--------|-------------|-----------|--------|---------------------------------------------------------------------------|
+| `0x1A` | `QuickStop` | command   | —      | acknowledge once the drive decelerates, or at once when it is not enabled |
+
+`QuickStop` decelerates a running drive under control and leaves it in `Ready`; unlike `EmergencyStop` it is not
+always accepted: it is refused with `invalidState` while the drive calibrates, whose stop is `EmergencyStop`. It
+is acknowledged when the deceleration starts, not when it ends, and the telemetry status reports the stop:
+
+| `FocMotorState` | Value | Lifecycle state (`state-machine.md`)                           |
+|-----------------|-------|----------------------------------------------------------------|
+| `stopping`      | 6     | `Stopping`: decelerating to a standstill, at most for a second |
+
+| ID     | Parameter               | Unit   | Range                       | Automatic | Takes effect           |
+|--------|-------------------------|--------|-----------------------------|-----------|------------------------|
+| `0x32` | `quickStopDeceleration` | rad/s2 | 0 – 100000, 0 current limit | no        | at the next quick stop |
+
+A client older than 2.16 shows the `stopping` state as an unknown state and asks for the new parameter only when
+the server reports 2.16 or newer.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -475,7 +497,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 Inherits `CanCategoryServer` from `can-lite`. Registers one `CanMessageHandler` per command type; each handler decodes the payload using `CanPayloadReader`, skips the sequence byte (required for server categories), converts wire values to physical units, and calls the corresponding observer method.
 
 The observer interface provides callbacks for:
-- `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop` — lifecycle commands with a `CanAckStatus` result callback.
+- `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop`, `OnQuickStop` — lifecycle commands with a `CanAckStatus` result callback.
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
@@ -516,6 +538,7 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
+- `OnQuickStop` → `CmdQuickStop()`; a refusal in `Calibrating` answers `invalidState`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → the loop's stored settings with this bandwidth, through `Set*Tunings` on the state
@@ -524,7 +547,7 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
 - `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds.
-  `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
+  `ToCanMotorState` maps `Stopping` to `FocMotorState::stopping`, `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
   The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
   record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection that

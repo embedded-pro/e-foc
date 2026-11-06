@@ -13,6 +13,7 @@ namespace foc
         , public CurrentLimitable
         , public BusVoltageTrackable
         , public SpeedRampable
+        , public QuickStoppable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -52,6 +53,7 @@ namespace foc
         using CascadeWithSpeedLoop::SetCurrentStream;
 
         void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) override;
+        void QuickStop(RadiansPerSecondSquared deceleration) override;
 
     private:
         void LowPriorityHandler();

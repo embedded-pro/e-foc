@@ -65,6 +65,7 @@ namespace tool
         void ConnectCommands();
         void ConnectSetpoints();
         void SendStopMotor();
+        void SendQuickStop();
         void SendClearFault();
         void SendAlign();
         void SendSetpoint(can::FocMotorMode mode, int32_t counts);
@@ -90,6 +91,7 @@ namespace tool
         QString ThermalUnavailableReason() const;
         QString OverTemperatureUnavailableReason() const;
         QString BusVoltageLimitsUnavailableReason() const;
+        QString QuickStopUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 

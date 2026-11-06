@@ -16,6 +16,8 @@ namespace tool
                 return "Stop Motor";
             case can::focEmergencyStopId:
                 return "Emergency Stop";
+            case can::focQuickStopId:
+                return "Quick Stop";
             case can::focClearFaultId:
                 return "Clear Fault";
             case can::focSelectControlModeId:

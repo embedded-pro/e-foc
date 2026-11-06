@@ -78,6 +78,7 @@ namespace can
         bool SendStop(uint16_t targetNodeId);
         bool SendClearFault(uint16_t targetNodeId);
         bool SendEmergencyStop(uint16_t targetNodeId);
+        bool SendQuickStop(uint16_t targetNodeId);
         bool SendSelectControlMode(uint16_t targetNodeId, FocMotorMode mode);
         bool SendSetTorqueSetpoint(uint16_t targetNodeId, foc::Ampere value);
         bool SendSetSpeedSetpoint(uint16_t targetNodeId, foc::RadiansPerSecond value);

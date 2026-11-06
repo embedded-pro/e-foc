@@ -40,6 +40,9 @@ namespace foc
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
+        void BeginQuickStop(RadiansPerSecondSquared deceleration);
+        bool IsQuickStopping() const;
+        bool RunQuickStop(float mechanicalSpeed);
 
         void SetDirectCurrentReference(float current);
         float MeasureMechanicalSpeed();
@@ -83,6 +86,10 @@ namespace foc
         // Written by the event loop, read by the control interrupt; never above maxCurrent.
         volatile float quadratureLimit;
         volatile bool currentCommandActive{ false };
+        // Written by the event loop before quickStopping is set, then owned by the outer loop; mechanical rad/s per outer-loop period.
+        volatile float quickStopStep{ 0.0f };
+        volatile float quickStopReference{ 0.0f };
+        volatile bool quickStopping{ false };
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };

@@ -2,7 +2,7 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.4.1
+version: 0.5.0
 component: foc-torque
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.4.1              |
+| Version   | 0.5.0              |
 | Component | foc-torque         |
 | Date      | 2026-11-05         |
 
@@ -117,9 +117,9 @@ is off by one measurement's change for one period (REQ-TRQ-013).
 
 ### Enable and Disable
 
-**Enable**: arms both the d-axis and the q-axis PID controllers and resets their internal integrator state to zero. The most recently stored setpoints (Id_setpoint, Iq_setpoint) are re-applied immediately — there is no rollback to zero. This allows seamless re-engagement after a brief disable event without a step change in the setpoint.
+**Enable**: ends a quick stop, arms both the d-axis and the q-axis PID controllers and resets their internal integrator state to zero. The most recently stored setpoints (Id_setpoint, Iq_setpoint) are re-applied immediately — there is no rollback to zero. This allows seamless re-engagement after a brief disable event without a step change in the setpoint.
 
-**Disable**: disarms both PIDs. While disarmed, the `Calculate()` method returns zero duty cycles regardless of the current error. PID state is frozen and will be fully reset on the next Enable call.
+**Disable**: ends a quick stop and disarms both PIDs. While disarmed, the `Calculate()` method returns zero duty cycles regardless of the current error. PID state is frozen and will be fully reset on the next Enable call.
 
 The two states are the only run-time states of this component:
 
@@ -200,6 +200,30 @@ flowchart LR
     W["filtered speed ω"] --> S
     W --> F
 ```
+
+### Quick Stop
+
+Torque mode has no speed loop to decelerate the rotor, so a quick stop (`state-machine.md`, Quick Stop) makes the
+cascade brake by itself until the next Enable or Disable. Each sample it replaces the q-axis setpoint with a
+current against the filtered mechanical speed ω:
+
+  i_q = −clamp(k · (J / K_t) · ω, −i_b, i_b),  k = 1 / (2 τ) = 500 s⁻¹
+
+where J is the calibrated inertia, K_t = 3/2 · p · ψ_f the torque constant and τ the speed filter's 1 ms time
+constant. The braking cap i_b = J · a / K_t decelerates the bare inertia at the quick-stop deceleration a; at
+a = 0 it is the current limit, which the current envelope applies to the braking current as to any setpoint.
+
+The braking current is proportional to the speed below the cap, so it fades out as the rotor comes to rest
+instead of driving it backwards through zero. The gain is set by the filter, not by the deceleration: the
+loop the filter closes around the inertia is a second-order one with damping 1 / (2 √(k τ)) = 0.71 at
+k τ = 0.5, so a light rotor braked at the current limit, which would reverse within a single event-loop
+period, does not overshoot zero. From 100 rad/s at 500 rad/s² the cap holds until the speed is a / k = 1 rad/s,
+and the speed falls below 2 rad/s after 196 ms on the bare inertia; friction and load decelerate the rotor
+faster than a. The braking current opposes the speed, so the speed limiter never folds it.
+
+The state machine passes the deceleration and J / K_t from the calibration record; a record without an inertia
+leaves torque mode unable to brake, and the quick stop cuts the power stage at once. The inner loop pays one
+branch per sample outside a quick stop.
 
 ### Pole-Pair Configuration
 

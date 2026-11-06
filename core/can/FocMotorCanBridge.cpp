@@ -76,6 +76,8 @@ namespace can
             return FocMotorState::calibrating;
         if (std::holds_alternative<state_machine::Enabled>(state))
             return FocMotorState::running;
+        if (std::holds_alternative<state_machine::Stopping>(state))
+            return FocMotorState::stopping;
         if (std::holds_alternative<state_machine::Ready>(state))
             return FocMotorState::ready;
         if (hasPartialCalibration)
@@ -134,6 +136,11 @@ namespace can
             firmwareUpgrade->get().EmergencyStop();
 
         ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
+    }
+
+    void FocMotorCanBridge::OnQuickStop(const infra::Function<void(services::CanAckStatus)>& onDone)
+    {
+        ReportCommandOutcome(server, can::focQuickStopId, controlMode.ActiveStateMachine().CmdQuickStop(), onDone);
     }
 
     void FocMotorCanBridge::OnSelectControlMode(FocMotorMode mode,

@@ -184,6 +184,7 @@ namespace tool
                     });
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, this, &MotorPanel::SendStopMotor);
+        connect(commandPanel, &CommandPanel::QuickStopRequested, this, &MotorPanel::SendQuickStop);
         connect(commandPanel, &CommandPanel::ClearFaultRequested, this, &MotorPanel::SendClearFault);
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
             {
@@ -204,6 +205,14 @@ namespace tool
         Send("Stop Motor", can::focStopId, [this]()
             {
                 return client.SendStopMotor(nodeId);
+            });
+    }
+
+    void MotorPanel::SendQuickStop()
+    {
+        Send("Quick Stop", can::focQuickStopId, [this]()
+            {
+                return client.SendQuickStop(nodeId);
             });
     }
 
@@ -559,11 +568,19 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::QuickStopUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsQuickStop(nodeId))
+            return QString("Needs firmware contract 2.16 or newer: this controller has %1. Stop Motor cuts the power at once.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
         const auto diagnosticsReason = DiagnosticsUnavailableReason();
         commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
+        commandPanel->SetQuickStopAvailable(commandsReason.isEmpty() ? QuickStopUnavailableReason() : commandsReason);
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
@@ -574,6 +591,7 @@ namespace tool
         commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
         commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
         commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
+        commandPanel->Configuration().SetQuickStopUnavailable(QuickStopUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();

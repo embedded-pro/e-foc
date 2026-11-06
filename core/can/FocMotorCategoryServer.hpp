@@ -27,6 +27,7 @@ namespace can
         virtual void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
+        virtual void OnQuickStop(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnSelectControlMode(FocMotorMode mode, const infra::Function<void(FocMotorMode)>& onActivated) = 0;
         virtual void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) = 0;
@@ -78,6 +79,7 @@ namespace can
         bool HandleStop(const hal::Can::Message& data);
         bool HandleClearFault(const hal::Can::Message& data);
         bool HandleEmergencyStop(const hal::Can::Message& data);
+        bool HandleQuickStop(const hal::Can::Message& data);
         bool HandleSelectControlMode(const hal::Can::Message& data);
         bool HandleSetTorqueSetpoint(const hal::Can::Message& data);
         bool HandleSetSpeedSetpoint(const hal::Can::Message& data);
@@ -144,5 +146,6 @@ namespace can
 
         CommissioningMessages commissioningMessages{ *this };
         services::CanMessageHandler<FocMotorCategoryServer> clearDiagnostics{ focClearDiagnosticsId, *this, &FocMotorCategoryServer::HandleClearDiagnostics };
+        services::CanMessageHandler<FocMotorCategoryServer> quickStop{ focQuickStopId, *this, &FocMotorCategoryServer::HandleQuickStop };
     };
 }
