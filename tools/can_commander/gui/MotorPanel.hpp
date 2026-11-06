@@ -89,6 +89,7 @@ namespace tool
         QString TravelLimitsUnavailableReason() const;
         QString ThermalUnavailableReason() const;
         QString OverTemperatureUnavailableReason() const;
+        QString BusVoltageLimitsUnavailableReason() const;
         void Refresh();
         void RefreshHeader();
 

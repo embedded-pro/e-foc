@@ -99,6 +99,10 @@ namespace application
             } }
         , overloadLimit{ hardware.MaxCurrentSupported() }
         , thermalLimit{ hardware.MaxCurrentSupported() }
+        , busVoltageLimits{ [this](state_machine::FaultCode code)
+            {
+                platformFaultNotifier->Raise(code);
+            } }
         , busVoltage{ [this]()
             {
                 return this->hardware.PowerSupplyVoltage();
@@ -106,6 +110,7 @@ namespace application
             [this](foc::Volts measured)
             {
                 controlMode->TrackBusVoltage(measured);
+                busVoltageLimits.Evaluate(measured);
             } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
@@ -177,6 +182,14 @@ namespace application
                 overTemperature.Enable([this]()
                     {
                         return supervision::OverTemperatureSettingsFrom(controlMode->Config());
+                    });
+                busVoltageLimits.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                busVoltageLimits.Enable([this]()
+                    {
+                        return supervision::BusVoltageLimitSettingsFrom(controlMode->Config());
                     });
                 busVoltage.Start();
                 commandTimeout.Enable([this]()

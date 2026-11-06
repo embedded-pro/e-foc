@@ -70,6 +70,7 @@ namespace tool
     std::span<const SettingPresentation> TravelLimitSettings();
     std::span<const SettingPresentation> ThermalSettings();
     std::span<const SettingPresentation> OverTemperatureSettings();
+    std::span<const SettingPresentation> BusVoltageSettings();
     std::span<const SettingPresentation> Readings();
     std::span<const SettingPresentation> StatusReadings();
     std::string_view ResetCauseName(float cause);

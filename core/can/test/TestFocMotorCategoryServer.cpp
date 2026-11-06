@@ -568,7 +568,7 @@ TEST_F(FocMotorCategoryServerTest, HandleQueryParameter_AnswersWithTheValueAndTh
 
 TEST_F(FocMotorCategoryServerTest, HandleQueryParameter_UnknownParameter_IsRejected)
 {
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focQueryParameterId, MakeMessage({ 0x01, 0x30 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focQueryParameterId, MakeMessage({ 0x01, 0x3F })));
     EXPECT_FALSE(ackSpy.last.has_value());
 }
 

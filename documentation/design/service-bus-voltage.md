@@ -2,7 +2,7 @@
 title: "Service: Bus Voltage"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: service-bus-voltage
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: Bus Voltage |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.0                |
+| Version   | 0.3.0                |
 | Component | service-bus-voltage  |
 | Date      | 2026-11-05           |
 
@@ -36,11 +36,13 @@ scale its duties by the measured over the configured voltage (`foc-torque.md`, B
 **Is responsible for:**
 - Reading the platform's bus voltage every 10 ms from the event loop
 - Filtering the readings with a 50 ms time constant, starting from the first reading
-- Handing every filtered value to the control mode, which passes it to the active cascade
+- Handing every filtered value to the control mode, which passes it to the active cascade, and to the
+  bus-voltage limit monitor (`fault-supervision.md` Part L)
 
 **Is NOT responsible for:**
 - Scaling the duties, which the cascade does
-- Bus over- and under-voltage protection, which the board's comparators and the fault path handle
+- Bus over- and under-voltage protection: the board's comparators trip at the board's limits, and the
+  bus-voltage limit monitor faults an enabled drive at the operator's (`fault-supervision.md` Part L)
 - The bus voltage the resistance and inductance identification use, which they read from the platform
   themselves at the start and the end of each measurement (`service-electrical-ident.md`)
 
@@ -81,11 +83,12 @@ new motor model returns to the configured bus until the next value, at most 10 m
 
 ### Required
 
-| Interface            | Purpose                         | Contract                                         |
-|----------------------|---------------------------------|--------------------------------------------------|
-| Platform bus voltage | Read the bus                    | Called from the event loop; may block for 134 µs |
-| Control mode         | Receive each filtered bus value | Called from the event loop                       |
-| Timer                | Pace the readings               | —                                                |
+| Interface            | Purpose                         | Contract                                           |
+|----------------------|---------------------------------|----------------------------------------------------|
+| Platform bus voltage | Read the bus                    | Called from the event loop; may block for 134 µs   |
+| Control mode         | Receive each filtered bus value | Called from the event loop                         |
+| Bus-voltage limits   | Receive each filtered bus value | Called from the event loop, after the control mode |
+| Timer                | Pace the readings               | —                                                  |
 
 ---
 

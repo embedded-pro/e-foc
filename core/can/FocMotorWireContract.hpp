@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 14;
+    static constexpr uint8_t focContractVersionMinor = 15;
 
     enum class FieldType : uint8_t
     {
@@ -245,7 +245,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 71> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 73> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -291,6 +291,8 @@ namespace can
         { FocParameter::calibrationTemperature, "calibrationTemperature", "degC", foc::CommandLimits::minCalibrationTemperature, foc::CommandLimits::maxCalibrationTemperature, false, false },
         { FocParameter::temperatureLimit, "temperatureLimit", "degC", foc::CommandLimits::minTemperatureLimit, foc::CommandLimits::maxTemperatureLimit, false, false },
         { FocParameter::temperatureMargin, "temperatureMargin", "K", foc::CommandLimits::minTemperatureMargin, foc::CommandLimits::maxTemperatureMargin, false, false },
+        { FocParameter::busVoltageMinimum, "busVoltageMinimum", "V", 0.0f, foc::CommandLimits::maxBusVoltageLimit, false, false },
+        { FocParameter::busVoltageMaximum, "busVoltageMaximum", "V", 0.0f, foc::CommandLimits::maxBusVoltageLimit, false, false },
         { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
         { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },

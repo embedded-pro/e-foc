@@ -59,6 +59,8 @@ namespace services
         float calibrationTemperature = 25.0f;
         float temperatureLimit = 120.0f;
         float temperatureMargin = 15.0f;
+        float busVoltageMinimum = 0.0f;
+        float busVoltageMaximum = 0.0f;
     };
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
@@ -82,7 +84,7 @@ namespace services
         std::array<uint8_t, 2> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 160, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 168, "ConfigData layout must be free of implicit padding");
 
     inline ConfigData MakeDefaultConfigData()
     {

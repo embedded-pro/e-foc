@@ -16,6 +16,8 @@ target_link_libraries(e_foc.supervision PUBLIC
 )
 
 target_sources(e_foc.supervision PRIVATE
+    BusVoltageLimitMonitor.hpp
+    BusVoltageLimitMonitor.cpp
     EncoderFreezeMonitor.hpp
     EncoderFreezeMonitor.cpp
     EncoderPlausibilityMonitor.hpp

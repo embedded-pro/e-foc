@@ -86,3 +86,14 @@
     Fault with overtemperature when the temperature is at or above the limit while Enabled, not
     sooner than 5 s after entering Enabled. The limit shall be settable from 40 to 200 degC with a
     default of 120 degC and the margin from 1 to 50 K with a default of 15 K.
+
+- id: REQ-PRT-009
+  title: The drive faults when the bus leaves the operator's voltage limits
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    While Enabled, the drive shall enter Fault with undervoltage when the bus voltage, read every
+    10 ms and filtered with a 50 ms time constant, is below the bus-voltage minimum, and with
+    overvoltage when it is above the bus-voltage maximum, and shall not fault for either while
+    Idle or Ready. Each limit shall be settable from 0 to 100 V, 0 turning it off, with a default
+    of 0, and shall leave the board's own over- and under-voltage trips in force.

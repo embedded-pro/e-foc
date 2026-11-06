@@ -26,6 +26,7 @@ namespace tool
         BuildTargetWindowGroup();
         BuildTravelLimitsGroup();
         BuildThermalGroup();
+        BuildSupplyLimitsGroup();
         Content().addStretch();
 
         Refresh();
@@ -117,6 +118,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildSupplyLimitsGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Supply Limits", group);
+        AddEditors(form, BusVoltageSettings());
+
+        auto* note = new QLabel("Each limit is off at 0. A running motor whose bus voltage, filtered over 50 ms, leaves them faults "
+                                "with undervoltage or overvoltage and coasts; a stopped motor is not watched. The board's own "
+                                "voltage trips stay in force. Stored at once and in force within 10 ms.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -165,6 +179,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetBusVoltageLimitsUnavailable(const QString& reason)
+    {
+        if (reason == busVoltageLimitsReason)
+            return;
+
+        busVoltageLimitsReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
     {
         if (reason == travelLimitsReason)
@@ -208,6 +232,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? thermalReason : legacyReason);
             else if (IsIn(OverTemperatureSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
+            else if (IsIn(BusVoltageSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

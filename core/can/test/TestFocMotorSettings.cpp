@@ -194,6 +194,21 @@ TEST(FocMotorSettings, the_temperature_limit_and_margin_are_limits)
     EXPECT_EQ(can::GroupOf(can::FocParameter::temperatureMargin), can::ParameterGroup::limits);
 }
 
+TEST(FocMotorSettings, the_bus_voltage_limits_are_limits)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::busVoltageMinimum, 18.0f);
+    can::WriteLimitSetting(config, can::FocParameter::busVoltageMaximum, 32.0f);
+
+    EXPECT_NEAR(config.limits.busVoltageMinimum, 18.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.busVoltageMaximum, 32.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::busVoltageMinimum), 18.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::busVoltageMaximum), 32.0f, 1e-6f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::busVoltageMinimum), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::busVoltageMaximum), can::ParameterGroup::limits);
+}
+
 TEST(FocMotorSettings, the_target_reached_flag_is_a_motion_reading)
 {
     EXPECT_EQ(can::GroupOf(can::FocParameter::targetReached), can::ParameterGroup::motion);

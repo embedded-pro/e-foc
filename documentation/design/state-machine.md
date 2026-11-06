@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.7.0
+version: 0.7.1
 component: state-machine
 date: 2026-11-05
 ---
@@ -12,7 +12,7 @@ date: 2026-11-05
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.7.0                      |
+| Version   | 0.7.1                      |
 | Component | state-machine              |
 | Date      | 2026-11-05                 |
 
@@ -704,7 +704,8 @@ Hardware protection events reach the state machine through `PlatformFaultNotifie
 | `underVoltage`          | `undervoltage`    |
 | `overTemperature`       | `overtemperature` |
 
-The fault supervisor (`fault-supervision.md`) raises `encoderLoss`, `stall`, `phaseMissing`, `overspeed` and `followingError` through the same notifier,
+The fault supervisor (`fault-supervision.md`) raises `encoderLoss`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `positionLimit` and
+`overtemperature`, and `overvoltage` and `undervoltage` at the operator's bus-voltage limits (Part L), through the same notifier,
 as the CAN command timeout (`service-can.md` Part F) raises `commandTimeout`,
 from the event loop, so the state machine handles them as it handles a board protection trip.
 
