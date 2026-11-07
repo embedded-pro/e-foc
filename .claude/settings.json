@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)"
+      "Bash(*)",
+      "Write(*)",
+      "Read(*)",
+      "Edit(*)"
     ]
   }
 }
