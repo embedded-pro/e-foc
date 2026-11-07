@@ -394,6 +394,8 @@ jobs:
           name: sil-test-report-${{ matrix.shard }}
           path: sil-test-report-${{ matrix.shard }}.xml
           if-no-files-found: ignore
+          # A re-run shard replaces its earlier report, or the gather job publishes the stale one.
+          overwrite: true
   software_in_the_loop_tests:
     name: Software-in-the-Loop Tests
     runs-on: ubuntu-latest

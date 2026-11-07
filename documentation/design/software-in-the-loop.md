@@ -144,6 +144,14 @@ once waited out a two-second deadline before killing it, at the boot that applie
 plant and again after the scenario, which was four of the five and a half seconds a typical
 scenario took.
 
+Every scenario starts an emulator before its first step, so a scenario that never boots explicitly
+still has a target. The boot step stops that emulator before it writes the memory image, not after:
+the firmware stores a fresh fault history the moment it finds none, which on the emulator rewrites
+`eeprom.bin`, and a store that landed after the host had written the image replaced the staged
+calibration and configuration with erased storage. The drive then booted in torque mode, and a full
+calibration saved a record without a mechanical identification. The staging slot and the status
+journal (Part P) are written the same way.
+
 ```mermaid
 sequenceDiagram
     participant S as Scenario
@@ -152,6 +160,7 @@ sequenceDiagram
     S->>H: describe the plant
     S->>H: describe the stored calibration and configuration
     S->>H: boot
+    H->>T: stop the emulator started with the scenario
     H->>H: write both images into the scenario directory
     H->>T: start the emulator there
     T->>T: read the plant, restore the configuration
