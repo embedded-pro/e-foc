@@ -152,7 +152,7 @@ warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubun
 stays release-only. The `software_in_the_loop_shard` jobs (three, run at once) run in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, download those artifacts, and
 run behavioral tests — never recompile. Do not add cmake build steps to them. Each runs the features `integration_tests/sil-shards.json` assigns it, after `integration_tests/sil-shard.py` checks the plan lists
 every feature with an `@sil` scenario exactly once; a new feature goes into the shard that keeps the three balanced. `software_in_the_loop_tests` gathers the shards' reports into the one
-`Software-in-the-Loop Test Results` check and fails unless every shard passed.
+`Software-in-the-Loop Test Results` check and fails unless every shard passed; a re-run shard replaces its report, so the check follows the latest attempt.
 
 Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `static-analysis.yml` (SonarCloud), `requirements-validation.yml` and
 `submodule-check.yml` (submodules point to `main`), plus `documentation-validation.yml` and `build-booklet.yml` when `documentation/` changes.
