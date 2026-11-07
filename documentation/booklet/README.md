@@ -95,8 +95,9 @@ files. The builder numbers the chapters in the order the tables below list them.
 
 ## Building the booklet
 
-Install the dependencies used by CI (mermaid-cli, Pandoc, and a XeLaTeX toolchain), then build
-both outputs:
+CI builds the booklet in the [`embedded-devcontainer-documentation`](https://hub.docker.com/r/gabrielfrasantos/embedded-devcontainer-documentation) container image, which contains all
+dependencies (mermaid-cli, Pandoc, and a XeLaTeX toolchain). Use that image, or install the same
+tools, then build both outputs:
 
 ```
 python documentation/tools/build-foc-booklet.py --format all

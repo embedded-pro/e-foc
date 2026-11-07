@@ -26,6 +26,8 @@ jobs:
   build:
     name: Build Booklet (PDF + Site)
     runs-on: ubuntu-latest
+    # Pandoc, the XeLaTeX tool chain, mermaid-cli and pdf2svg come with the container image.
+    container: gabrielfrasantos/embedded-devcontainer-documentation:v7.4.0@sha256:0537b16931e116f98fd62e0bad454af5bcd102ec6501ccdef2b270aa83fd281e
     permissions:
       contents: read
     steps:
@@ -34,36 +36,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "22"
-
-      - name: Install Pandoc and the TeX toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            pandoc \
-            texlive-xetex \
-            texlive-latex-extra \
-            texlive-pictures \
-            texlive-fonts-recommended \
-            lmodern \
-            fonts-dejavu-core \
-            librsvg2-bin \
-            pdf2svg
-
-      - name: Install diagram tooling
-        run: npm install -g @mermaid-js/mermaid-cli
+      # The checkout belongs to the runner user, while the container runs as root.
+      - name: Mark the workspace as a safe Git directory
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
       - name: Check animations are up to date
-        run: python documentation/tools/generate-animations.py --check
+        run: python3 documentation/tools/generate-animations.py --check
 
       - name: Build booklet (PDF + site)
-        run: python documentation/tools/build-foc-booklet.py --format all
+        run: python3 documentation/tools/build-foc-booklet.py --format all
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
