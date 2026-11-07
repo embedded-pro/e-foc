@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/embedded-pro/e-foc/compare/v2.0.0...v2.0.1) (2026-11-07)
+
+
+### Continuous Integration
+
+* Build release and requirements documents in the documentation container ([#646](https://github.com/embedded-pro/e-foc/issues/646)) ([5f90e8b](https://github.com/embedded-pro/e-foc/commit/5f90e8ba330c828137fc24c497bc03259bb0e18a))
+* Build the booklet in the embedded-devcontainer-documentation container ([#644](https://github.com/embedded-pro/e-foc/issues/644)) ([c09447d](https://github.com/embedded-pro/e-foc/commit/c09447dd19159f1c29b0ca5c5599e9d3d1175fc2))
+
 ## [2.0.0](https://github.com/embedded-pro/e-foc/compare/v1.6.0...v2.0.0) (2026-11-06)
 
 
