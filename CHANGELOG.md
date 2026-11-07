@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.1](https://github.com/embedded-pro/e-foc/compare/v2.0.0...v2.0.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **can-commander:** Connect slcan adapters whose firmware never acknowledges commands ([#648](https://github.com/embedded-pro/e-foc/issues/648)) ([bdd666d](https://github.com/embedded-pro/e-foc/commit/bdd666da86fed264ced651513e6aeafd1626eeaf))
+* **sil:** Stage the NVM image only once the scenario's first emulator is stopped ([#649](https://github.com/embedded-pro/e-foc/issues/649)) ([98911b7](https://github.com/embedded-pro/e-foc/commit/98911b71fa695a9001e17def3ea74015914395c6))
+
+
+### Continuous Integration
+
+* Build release and requirements documents in the documentation container ([#646](https://github.com/embedded-pro/e-foc/issues/646)) ([5f90e8b](https://github.com/embedded-pro/e-foc/commit/5f90e8ba330c828137fc24c497bc03259bb0e18a))
+* Build the booklet in the embedded-devcontainer-documentation container ([#644](https://github.com/embedded-pro/e-foc/issues/644)) ([c09447d](https://github.com/embedded-pro/e-foc/commit/c09447dd19159f1c29b0ca5c5599e9d3d1175fc2))
+
 ## [2.0.0](https://github.com/embedded-pro/e-foc/compare/v1.6.0...v2.0.0) (2026-11-06)
 
 
