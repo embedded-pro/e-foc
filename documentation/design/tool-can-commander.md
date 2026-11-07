@@ -434,10 +434,11 @@ loaded when needed, so the tool installs and starts on a machine without them.
   bitrate, missing vendor library) goes to the log, followed by a next step chosen from the name's prefix.
 - **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
   dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
-- **Connecting** — an adapter that accepts the request but has not yet reported the connection (slcan
-  waits up to 1 s for the device to acknowledge the bitrate and the open command) shows *Connecting…*:
-  the fields and Connect are disabled and Disconnect cancels. A failed handshake logs the adapter's reason,
-  not a disconnect.
+- **Connecting** — an adapter that accepts the request but has not yet reported the connection shows
+  *Connecting…*: the fields and Connect are disabled and Disconnect cancels. slcan reports the connection
+  once the device has acknowledged the bitrate and the open command, or after 250 ms without a rejection,
+  because CANable and CANtact firmware never acknowledge a command. A rejected bitrate or open command
+  logs the adapter's reason, not a disconnect.
 - **Polling** — on Linux the tool waits on the adapter's descriptor; on Windows it polls the adapter every
   millisecond. Reading starts as soon as the adapter accepts the request, so the slcan handshake replies
   are read before the connection is reported.
