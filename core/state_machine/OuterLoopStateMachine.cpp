@@ -1,7 +1,7 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace application
@@ -24,7 +24,6 @@ namespace application
 
     bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant)
     {
-        // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
         const bool configured = SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
             inertia,
             friction,
@@ -81,7 +80,7 @@ namespace application
 
     bool OuterLoopStateMachine::HasValidModeSpecificCalibration(const services::CalibrationData& data) const
     {
-        return foc::IsFiniteValue(data.inertia) && data.inertia > 0.0f && foc::IsFiniteValue(data.frictionViscous) && data.frictionViscous >= 0.0f;
+        return math::IsFinite(data.inertia) && data.inertia > 0.0f && math::IsFinite(data.frictionViscous) && data.frictionViscous >= 0.0f;
     }
 
     void OuterLoopStateMachine::PrepareForEnabled()
@@ -199,15 +198,13 @@ namespace application
         return &**ownCoggingMapping;
     }
 
-    // Inert current gains or a zero speed envelope never move the rotor, so both are applied first.
     bool OuterLoopStateMachine::ApplyIdentificationControl(const services::CalibrationData& pending)
     {
         const auto torqueConstant = TorqueConstantFor(pending);
 
-        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
+        if (!foc::IsFinitePositive(pending.rPhase) || !math::IsFinite(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
             return false;
 
-        // Marked first: the electrical model sets the current tunings even when the plant is refused.
         MarkProvisionalControlApplied();
 
         if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))

@@ -31,7 +31,7 @@
         "PidIncrementalSynchronous.*::SetPoint",
         "OuterSamplePeriod",
         "WrappedPositionError",
-        "PositionWithWrapAround",
+        "math::WrapToPi",
         "LimitToCurrentEnvelope"
       ]
     },
@@ -50,7 +50,7 @@
         "MechanicalExcitation::Count",
         "IsMechanicallyObservable",
         "IsPlausibleMechanics",
-        "IsFiniteValue"
+        "math::IsFinite"
       ]
     },
     {

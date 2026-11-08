@@ -8,7 +8,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 - `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
-- `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)
+- `core/foc/math/` — `FastTrigonometry.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); angle wrapping and finiteness come from the toolbox (`math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `EncoderModel` and `PhaseCurrentSensor`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
@@ -39,7 +39,7 @@ Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `FastTrig
 
 Also forbidden: per-sample validation — no plausibility check on the phase currents and no finiteness check on
 currents or duty cycles in the 20 kHz path. Sensor and power-stage failures belong to the hardware protection path.
-`foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
+`math::IsFinite` (`numerical/math/Math.hpp`) is for configuration-time and outer-loop checks only
 (`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
 
 Never give a function optimisation options of its own: no `#pragma GCC optimize`, no `optimize` attribute. GCC does not

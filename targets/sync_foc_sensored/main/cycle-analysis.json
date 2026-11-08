@@ -70,7 +70,7 @@
         "PidCurrentController::Propose",
         "AntiWindupPi::CommitRealized",
         "AntiWindupPi::Propose",
-        "PositionWithWrapAround",
+        "math::WrapToPi",
         "LowPriorityInterrupt::Trigger",
         "FocLowPriorityInterruptAdapter::Trigger",
         "std::array<float.*>::operator\\[\\]",

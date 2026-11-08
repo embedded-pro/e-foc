@@ -1,7 +1,7 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -123,8 +123,6 @@ TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
     ExpectValidDuty(result);
 }
 
-// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
-// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
 TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 {
     const foc::PhaseCurrents currents{ foc::Ampere{ 0.4f }, foc::Ampere{ -0.1f }, foc::Ampere{ -0.3f } };
@@ -267,7 +265,6 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
     focTorque->Enable();
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    // Torque mode has no outer loop, so the cascade must derive speed from the angle it is handed
     constexpr float mechanicalStepPerSample = 0.01f;
     float angle = 0.0f;
     foc::PhasePwmDutyCycles result{ hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0) };
@@ -276,7 +273,7 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
     {
         foc::Radians position{ angle };
         result = focTorque->Calculate(ZeroCurrents(), position);
-        angle = foc::detail::PositionWithWrapAround(angle + mechanicalStepPerSample);
+        angle = math::WrapToPi(angle + mechanicalStepPerSample);
     }
 
     const bool anyOffCentre = IsOffCentre(result);
@@ -291,7 +288,6 @@ TEST_F(TestTorqueCascade, the_speed_estimate_does_not_spike_on_the_first_sample_
     focTorque->Enable();
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    // A rotor parked far from zero must not read as a huge step on the first sample
     foc::Radians position{ 3.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
@@ -550,7 +546,7 @@ namespace
             {
                 foc::Radians position{ angle };
                 result = cascade.Calculate(ZeroCurrents(), position);
-                angle = foc::detail::PositionWithWrapAround(angle + step);
+                angle = math::WrapToPi(angle + step);
             }
 
             return result;
@@ -625,7 +621,7 @@ TEST_F(TestTorqueCascadeSpeedLimit, beyond_the_limit_no_current_pushes_the_rotor
         foc::Radians referencePosition{ angle };
         limited = focTorque->Calculate(ZeroCurrents(), position);
         unlimited = reference.Calculate(ZeroCurrents(), referencePosition);
-        angle = foc::detail::PositionWithWrapAround(angle + step);
+        angle = math::WrapToPi(angle + step);
     }
 
     ExpectSameDuty(limited, unlimited);
@@ -828,8 +824,6 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_
     EXPECT_NEAR(DutyPercent(halved.c), DutyPercent(expected.c), 0.1f);
 }
 
-// A duty one period later than another acts one electrical step further on, so the voltage must be
-// rotated one more step: (n = 1, sampled at θ) lands where (n = 0, sampled one step later) does.
 TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
 {
     constexpr float step = 0.005f;

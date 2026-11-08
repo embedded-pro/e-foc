@@ -1,12 +1,12 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <gmock/gmock.h>
@@ -36,9 +36,6 @@ namespace
         return config;
     }
 
-    // Builds the phase currents whose q component, after the service's own Clarke/Park at this rotor
-    // position, is exactly the one the requested torque needs. The unit round trip removes the gain the
-    // lookup-table trigonometry introduces, so the observation the estimator sees is the intended one.
     foc::PhaseCurrents CurrentsProducing(float torque, float position)
     {
         const auto electricalAngle = position * polePairs;
@@ -181,7 +178,7 @@ namespace
             {
                 ++sample;
                 const auto position = Position().Value();
-                const auto speed = foc::detail::PositionWithWrapAround(position - previousPosition) / samplingPeriod;
+                const auto speed = math::WrapToPi(position - previousPosition) / samplingPeriod;
                 const auto acceleration = (speed - previousSpeed) / samplingPeriod;
                 previousPosition = position;
                 previousSpeed = speed;
@@ -510,7 +507,6 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
             {
                 const std::size_t index = (callIndex == 0) ? 0u : (callIndex + 1) / 2;
                 ++callIndex;
-                // Gentle enough that the ramp stays inside the run's default speed limit for the whole loop.
                 const float pos = static_cast<float>(index) * static_cast<float>(index) * 1e-7f;
                 return foc::Radians{ pos };
             }));

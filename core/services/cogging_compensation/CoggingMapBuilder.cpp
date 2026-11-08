@@ -1,6 +1,6 @@
 #include "core/services/cogging_compensation/CoggingMapBuilder.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 
 namespace services
@@ -33,7 +33,7 @@ namespace services
 
     std::optional<CoggingMap> CoggingMapBuilder::Build(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, float samplePeriod) const
     {
-        if (polePairs == 0 || !foc::IsFiniteValue(torqueConstant.Value()) || torqueConstant.Value() <= 0.0f || samplePeriod <= 0.0f)
+        if (polePairs == 0 || !math::IsFinite(torqueConstant.Value()) || torqueConstant.Value() <= 0.0f || samplePeriod <= 0.0f)
             return std::nullopt;
 
         const auto binWidth = 2.0f * std::numbers::pi_v<float> / static_cast<float>(bins * polePairs);
@@ -63,7 +63,7 @@ namespace services
             largestBin = std::max(largestBin, std::abs(torque));
         }
 
-        if (!foc::IsFiniteValue(largestBin) || largestBin <= 0.0f)
+        if (!math::IsFinite(largestBin) || largestBin <= 0.0f)
             return std::nullopt;
 
         CoggingMap map{};
@@ -78,7 +78,7 @@ namespace services
 
     std::optional<foc::NewtonMeter> CoggingMapBuilder::FrictionCoulomb(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, float samplePeriod) const
     {
-        if (polePairs == 0 || !foc::IsFiniteValue(torqueConstant.Value()) || torqueConstant.Value() <= 0.0f || samplePeriod <= 0.0f || !foc::IsFiniteValue(viscousFriction.Value()) || viscousFriction.Value() < 0.0f)
+        if (polePairs == 0 || !math::IsFinite(torqueConstant.Value()) || torqueConstant.Value() <= 0.0f || samplePeriod <= 0.0f || !math::IsFinite(viscousFriction.Value()) || viscousFriction.Value() < 0.0f)
             return std::nullopt;
 
         const auto binWidth = 2.0f * std::numbers::pi_v<float> / static_cast<float>(bins * polePairs);
@@ -92,7 +92,7 @@ namespace services
         const auto meanSpeed = 0.5f * (forward->meanSpeed + backward->meanSpeed);
         const auto dryFriction = meanDifference - viscousFriction.Value() * meanSpeed;
 
-        if (!foc::IsFiniteValue(dryFriction) || dryFriction < 0.0f)
+        if (!math::IsFinite(dryFriction) || dryFriction < 0.0f)
             return std::nullopt;
 
         return foc::NewtonMeter{ dryFriction };
@@ -129,7 +129,7 @@ namespace services
             differing += difference * difference;
         }
 
-        if (!foc::IsFiniteValue(shared) || !foc::IsFiniteValue(differing) || shared <= 0.0f)
+        if (!math::IsFinite(shared) || !math::IsFinite(differing) || shared <= 0.0f)
             return 0.0f;
 
         constexpr float largestAgreementSquared{ 1.0e6f };

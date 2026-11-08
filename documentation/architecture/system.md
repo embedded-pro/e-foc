@@ -197,7 +197,7 @@ then read within 2.5 % up to 69 % duty, and the standard deviation of a zero-cur
 per phase to 31 to 39 mA. Dropping the averaging instead read the phases as cleanly but raised that noise by 15 to
 25 %.
 
-`foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
+`math::IsFinite` from the numerical toolbox survives for the places where validation is affordable and worth having —
 `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
 applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
 calling `std::isnan`, which `-ffinite-math-only` licenses the compiler to fold to a constant; the embedded builds

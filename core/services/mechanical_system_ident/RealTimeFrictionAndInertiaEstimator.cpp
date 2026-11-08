@@ -1,6 +1,5 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -117,7 +116,6 @@ namespace services
         if (!HasOnlineEstimateSettled(fit))
             return;
 
-        // Friction comes from the constant-speed runs; the full fit's viscous term takes transients too.
         const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
         const auto steadyFriction = SteadyFriction();
         const auto friction = steadyFriction.has_value() ? SettledFriction(*steadyFriction / parameterScale) : currentFriction.Value();
@@ -135,7 +133,6 @@ namespace services
         return settled;
     }
 
-    // Viscous friction is the same both ways, so the slope is pooled over both directions' runs.
     std::optional<float> RealTimeFrictionAndInertiaEstimator::SteadyFriction() const
     {
         auto variance = 0.0f;

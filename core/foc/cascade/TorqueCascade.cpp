@@ -1,8 +1,8 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/DelayCompensation.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -220,7 +220,7 @@ namespace foc
             return 0.0f;
         }
 
-        const auto sampled = detail::PositionWithWrapAround(mechanicalAngle - speedMeasurement.previousMechanicalAngle) * speedMeasurement.scale;
+        const auto sampled = math::WrapToPi(mechanicalAngle - speedMeasurement.previousMechanicalAngle) * speedMeasurement.scale;
         speedMeasurement.previousMechanicalAngle = mechanicalAngle;
         return speedMeasurement.filter.Filter(sampled);
     }

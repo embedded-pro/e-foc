@@ -1,9 +1,9 @@
 #include "core/services/index_search/IndexSearchImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -98,7 +98,6 @@ namespace services
             Turn();
     }
 
-    // A rotor snapping to the held vector may pass the index from the wrong side, so the index is armed only after it
     void IndexSearchImpl::Hold()
     {
         if (++samples < holdSamples)
@@ -133,7 +132,7 @@ namespace services
         }
 
         ++samples;
-        electricalAngle = foc::detail::PositionWithWrapAround(electricalAngle + stepPerSample);
+        electricalAngle = math::WrapToPi(electricalAngle + stepPerSample);
         OutputVector();
     }
 
@@ -157,11 +156,10 @@ namespace services
             WeakFromThis());
     }
 
-    // The vector still holds the rotor, and the shift is taken from a reading made just before the encoder is set
     void IndexSearchImpl::Reference()
     {
         if (target)
-            encoder.Set(foc::Radians{ foc::detail::PositionWithWrapAround(encoder.Read().Value() - readingAtIndex.Value() + target->Value()) });
+            encoder.Set(foc::Radians{ math::WrapToPi(encoder.Read().Value() - readingAtIndex.Value() + target->Value()) });
 
         Conclude(readingAtIndex);
     }

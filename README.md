@@ -71,7 +71,7 @@ e-foc/
 ├── core/                            # FOC library code (no application entry points)
 │   ├── foc/                         # Field-Oriented Control
 │   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, MotorModel.hpp, LoopTunings.hpp, Execution.hpp, Units.hpp)
-│   │   ├── math/                    # Generic numerics (FastTrigonometry.hpp, AngleWrap.hpp)
+│   │   ├── math/                    # Generic numerics (FastTrigonometry.hpp, ParameterValidation.hpp)
 │   │   ├── transforms/              # Clarke/Park transforms and Space Vector Modulation
 │   │   ├── selection/               # Heap-free runtime controller selection
 │   │   ├── current_loop/            # PID/decoupled-PID/deadbeat/sliding-mode current regulators

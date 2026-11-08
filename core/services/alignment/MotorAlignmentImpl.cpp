@@ -1,9 +1,9 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -83,7 +83,7 @@ namespace services
     void MotorAlignmentImpl::ProcessPosition(const foc::PhaseCurrents& currents)
     {
         auto currentPosition = encoder.Read();
-        auto positionChange = std::abs(foc::detail::PositionWithWrapAround((currentPosition - previousPosition).Value()));
+        auto positionChange = std::abs(math::WrapToPi((currentPosition - previousPosition).Value()));
         previousPosition = currentPosition;
         ++samplesInHold;
 
@@ -164,7 +164,7 @@ namespace services
 
     bool MotorAlignmentImpl::FollowedField() const
     {
-        const auto travel = foc::detail::PositionWithWrapAround((previousPosition - firstHoldPosition).Value());
+        const auto travel = math::WrapToPi((previousPosition - firstHoldPosition).Value());
         const auto expected = -alignmentConfig.followStep->Value() / static_cast<float>(std::max<std::size_t>(polePairs, 1));
         const auto ratio = travel / expected;
 

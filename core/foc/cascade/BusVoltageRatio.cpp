@@ -1,5 +1,5 @@
 #include "core/foc/cascade/BusVoltageRatio.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 
 namespace foc
@@ -19,7 +19,7 @@ namespace foc
 
     void BusVoltageRatio::Track(Volts measured)
     {
-        if (configured <= 0.0f || !IsFiniteValue(measured.Value()))
+        if (configured <= 0.0f || !math::IsFinite(measured.Value()))
             return;
 
         const auto tracked = std::clamp(measured.Value() / configured, lowestRatio, highestRatio);

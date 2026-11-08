@@ -1,5 +1,5 @@
 #include "core/foc/cascade/SpeedDifferentiator.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 
 namespace foc
 {
@@ -18,7 +18,6 @@ namespace foc
 
     float SpeedDifferentiator::Measure()
     {
-        // The window interrupt preempts this reader, so a changed index means the angle may belong to a newer window
         uint32_t index{};
         float angle{};
         do
@@ -39,7 +38,7 @@ namespace foc
         if (windows == 0)
             return lastSpeed;
 
-        lastSpeed = detail::PositionWithWrapAround(angle - previousAngle) / (static_cast<float>(windows) * samplePeriod);
+        lastSpeed = math::WrapToPi(angle - previousAngle) / (static_cast<float>(windows) * samplePeriod);
         previousAngle = angle;
         previousIndex = index;
         return lastSpeed;

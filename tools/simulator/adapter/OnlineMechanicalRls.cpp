@@ -1,6 +1,6 @@
 #include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 
 namespace simulator
 {
@@ -26,11 +26,11 @@ namespace simulator
         primed = false;
     }
 
-    void OnlineMechanicalRls::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond /*omegaMech*/)
+    void OnlineMechanicalRls::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond)
     {
         const float thetaElec = static_cast<float>(polePairs) * thetaMech.Value();
         const auto idq = park.Forward(clarke.Forward({ currents.a.Value(), currents.b.Value(), currents.c.Value() }), foc::FastTrigonometry::Cosine(thetaElec), foc::FastTrigonometry::Sine(thetaElec));
-        window.Accumulate(idq.q, primed ? foc::detail::PositionWithWrapAround(thetaMech.Value() - previousAngle) : 0.0f);
+        window.Accumulate(idq.q, primed ? math::WrapToPi(thetaMech.Value() - previousAngle) : 0.0f);
         previousAngle = thetaMech.Value();
         primed = true;
 
@@ -42,7 +42,7 @@ namespace simulator
         emit mechanicalEstimatesChanged(estimator.CurrentFriction().Value(), estimator.CurrentInertia().Value());
     }
 
-    void OnlineMechanicalRls::StatorVoltages(foc::ThreePhase /*phaseVoltages*/, foc::TwoPhase /*alphaBeta*/)
+    void OnlineMechanicalRls::StatorVoltages(foc::ThreePhase, foc::TwoPhase)
     {}
 
     void OnlineMechanicalRls::Finished()

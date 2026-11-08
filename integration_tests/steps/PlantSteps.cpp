@@ -1,9 +1,9 @@
 #include "core/can/FocMotorMessages.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/plant/PlantConfigWriter.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <string>
@@ -243,7 +243,6 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
     setup.nvm.calibration.polePairs = setup.plant.polePairs;
     setup.nvm.calibration.rPhase = setup.plant.statorResistanceOhm;
-    // The calibration record carries inductance in millihenry; the plant record in henry.
     setup.nvm.calibration.lD = setup.plant.dAxisInductanceHenry * kMilliPerUnit;
     setup.nvm.calibration.fluxLinkage = setup.plant.fluxLinkageWeber;
     setup.nvm.calibration.inertia = setup.plant.rotorInertiaKgM2;
@@ -252,9 +251,8 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.calibration.currentOffsetB = setup.plant.noiseBiasAmpereB;
     setup.nvm.calibration.currentOffsetC = setup.plant.noiseBiasAmpereC;
 
-    // The plant's electrical zero is at rotor angle zero, so the aligned frame reads the rotor angle
     if (setup.plant.encoderIndexWidthCounts != 0)
-        setup.nvm.calibration.encoderIndexAngle = foc::detail::PositionWithWrapAround(setup.plant.encoderIndexRadians);
+        setup.nvm.calibration.encoderIndexAngle = math::WrapToPi(setup.plant.encoderIndexRadians);
 }
 
 GIVEN(R"(the stored calibration is off by:)")

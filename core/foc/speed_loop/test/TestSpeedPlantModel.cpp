@@ -1,5 +1,5 @@
-#include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
+#include "numerical/math/Math.hpp"
 #include <bit>
 #include <cstdint>
 #include <gmock/gmock.h>
@@ -14,8 +14,6 @@ namespace
     constexpr uint32_t samplingFrequency = 1000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
 
-    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
-    // rather than folded away against a compile-time constant
     float NonFinite(uint32_t bits)
     {
         volatile uint32_t opaque = bits;
@@ -156,7 +154,7 @@ TEST_F(TestSpeedPlantModel, a_current_beyond_the_envelope_is_clamped_on_both_sid
 
 TEST_F(TestSpeedPlantModel, an_infinite_mechanical_parameter_is_rejected_rather_than_passing_the_positive_test)
 {
-    ASSERT_FALSE(foc::IsFiniteValue(Infinity()));
+    ASSERT_FALSE(math::IsFinite(Infinity()));
 
     auto inertiaParameters = ValidParameters();
     inertiaParameters.inertia = foc::NewtonMeterSecondSquared{ Infinity() };

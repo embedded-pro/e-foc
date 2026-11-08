@@ -1,5 +1,5 @@
 #include "core/foc/model/EncoderModel.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -41,7 +41,6 @@ namespace foc
         return indexAngle.has_value();
     }
 
-    // The pulse spans the counts that follow the index angle, read off the rotor, never off a stuck reading
     bool EncoderModel::IndexAsserted(foc::Radians rotorAngle) const
     {
         if (!indexAngle)
@@ -55,7 +54,7 @@ namespace foc
 
     void EncoderModel::Set(foc::Radians value, foc::Radians rotorAngle)
     {
-        zero = detail::PositionWithWrapAround(RawReading(rotorAngle) - value.Value());
+        zero = math::WrapToPi(RawReading(rotorAngle) - value.Value());
     }
 
     void EncoderModel::SetZero(foc::Radians rotorAngle)
@@ -76,7 +75,7 @@ namespace foc
 
     foc::Radians EncoderModel::Read(foc::Radians rotorAngle) const
     {
-        return foc::Radians{ detail::PositionWithWrapAround(RawReading(rotorAngle) - zero) };
+        return foc::Radians{ math::WrapToPi(RawReading(rotorAngle) - zero) };
     }
 
     float EncoderModel::RawReading(foc::Radians rotorAngle) const
@@ -90,6 +89,6 @@ namespace foc
             measured = std::floor(measured / step) * step;
         }
 
-        return detail::PositionWithWrapAround(measured);
+        return math::WrapToPi(measured);
     }
 }

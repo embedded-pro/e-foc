@@ -1,9 +1,9 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -209,7 +209,6 @@ namespace services
             onDone(friction, inertia);
     }
 
-    // The interrupt only records the outcome and posts the window; the tick fits from the event loop.
     void MechanicalParametersIdentificationImpl::Tick()
     {
         StepSpeedCommand();
@@ -272,9 +271,9 @@ namespace services
         torqueRise += sampleTorque * 0.5f * weight * weight;
         torquePeak += sampleTorque * (0.5f + weight * (1.0f - weight));
         torqueFall += sampleTorque * 0.5f * (1.0f - weight) * (1.0f - weight);
-        positionSum += foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition);
+        positionSum += math::WrapToPi(mechanicalPos - previousPosition);
 
-        const auto signedStep = foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition);
+        const auto signedStep = math::WrapToPi(mechanicalPos - lastSamplePosition);
         const auto step = std::abs(signedStep);
         lastSamplePosition = mechanicalPos;
 
@@ -318,7 +317,7 @@ namespace services
         const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
         const auto centredTorque = centred ? (earlierTorqueRise + previousTorquePeak + windowFall) / static_cast<float>(windowSamples) : windowTorque;
 
-        previousMeanToEnd = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) - meanOffset;
+        previousMeanToEnd = math::WrapToPi(mechanicalPos - previousPosition) - meanOffset;
         previousPosition = mechanicalPos;
         previousSpeed = speed;
         hasPreviousSpeed = hadMean;
@@ -378,7 +377,6 @@ namespace services
         observations[posted % observationCapacity] = observation;
         observationsPosted = posted + 1;
 
-        // Windows shorter than the tick arrive faster than it fits them, so half a ring asks the event loop at once
         if (pending + 1 == observationCapacity / 2)
             ScheduleFit();
     }
@@ -405,7 +403,6 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::Fit(const Observation& observation)
     {
-        // The interrupt finishes on the first window it sees past the boundary, which can be later than this fit set it
         if (finishAtSample != 0 && observation.sample >= finishAtSample)
             return;
 
@@ -419,7 +416,6 @@ namespace services
         if (finishAtSample != 0 || observation.sample < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(observation.windowSamples) / coveredWindowSamples)))
             return;
 
-        // An angle-dependent torque cancels only over whole turns, so a converged fit keeps every dwell it started whole
         finishAtSample = (observation.sample / dwellSamples + 1) * dwellSamples;
     }
 }
