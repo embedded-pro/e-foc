@@ -346,7 +346,7 @@ namespace tool
 
     void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
     {
-        if (!IsCompatible(nodeId) || IsIdentityQueued(nodeId))
+        if (Compatibility(nodeId) == can::ContractCompatibility::unknown || IsIdentityQueued(nodeId))
             return;
 
         identities.erase(nodeId);

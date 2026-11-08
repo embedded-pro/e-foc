@@ -149,7 +149,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendQueryParameter(uint16_t targetNodeId, FocParameter parameter)
     {
-        if (contracts.Incompatible(targetNodeId))
+        if (contracts.Incompatible(targetNodeId) && !IsFirmwareIdentity(parameter))
             return false;
 
         services::CanPayloadWriter payload;

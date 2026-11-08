@@ -361,6 +361,12 @@ namespace can
         return std::nullopt;
     }
 
+    // Numbered alike since contract 2.6, so a client can offer a firmware update to a node of any other version.
+    constexpr bool IsFirmwareIdentity(FocParameter parameter)
+    {
+        return parameter >= FocParameter::firmwareVersionMajor && parameter <= FocParameter::stagedVersionPatch;
+    }
+
     constexpr std::optional<ParameterDescriptor> FindParameter(FocParameter parameter)
     {
         return FindParameter(static_cast<uint8_t>(parameter));

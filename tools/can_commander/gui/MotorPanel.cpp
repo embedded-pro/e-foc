@@ -59,7 +59,7 @@ namespace tool
             },
             [this]()
             {
-                return CommandsUnavailableReason();
+                return FirmwareUnavailableReason();
             },
             this);
         connect(firmware, &MotorFirmware::StatusChanged, this, &MotorPanel::StatusChanged);
@@ -484,6 +484,13 @@ namespace tool
             page->ForgetValues();
         commandPanel->Diagnostics().ForgetValues();
         firmware->ForgetNodeState();
+    }
+
+    QString MotorPanel::FirmwareUnavailableReason() const
+    {
+        if (busConnected && nodeOnline == true && client.Compatibility(nodeId) == can::ContractCompatibility::incompatible)
+            return {};
+        return CommandsUnavailableReason();
     }
 
     QString MotorPanel::CommandsUnavailableReason() const

@@ -83,6 +83,7 @@ namespace tool
         void Report(IssueSeverity severity, const QString& message) const;
         void ForgetNodeState();
         QString CommandsUnavailableReason() const;
+        QString FirmwareUnavailableReason() const;
         QString SettingsUnavailableReason() const;
         QString RecalibrateUnavailableReason() const;
         QString ResetModelUnavailableReason() const;

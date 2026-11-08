@@ -629,6 +629,20 @@ TEST_F(FocMotorWireContractTest, compatibility_of_the_oldest_node_is_forgotten_b
     EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(can::FocMotorCategoryClient::maxTrackedNodes + 1));
 }
 
+TEST_F(FocMotorWireContractTest, the_firmware_identity_can_be_read_from_a_node_of_another_version)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));
+    client.HandleMessage(can::focContractVersionResponseId, Bytes({ 2, 21 }));
+
+    for (const auto parameter : { can::FocParameter::firmwareVersionMajor, can::FocParameter::firmwareVersionMinor, can::FocParameter::firmwareVersionPatch,
+             can::FocParameter::boardKind, can::FocParameter::stagedVersionMajor, can::FocParameter::stagedVersionMinor, can::FocParameter::stagedVersionPatch })
+        EXPECT_TRUE(client.SendQueryParameter(1, parameter)) << static_cast<int>(parameter);
+
+    EXPECT_FALSE(client.SendQueryParameter(1, can::FocParameter::resetCause));
+    EXPECT_FALSE(client.SendQueryParameter(1, can::FocParameter::resistance));
+    EXPECT_FALSE(client.SendSetParameter(1, can::FocParameter::firmwareVersionMajor, 3.0f));
+}
+
 TEST_F(FocMotorWireContractTest, the_version_query_itself_survives_an_incompatible_major)
 {
     EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));

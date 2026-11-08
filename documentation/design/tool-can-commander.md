@@ -301,7 +301,9 @@ reason, while the last status says the motor runs or calibrates. Start-up settin
 
 A node is compatible only when its contract version equals the tool's (`service-can.md` Part A), so every
 setting, reading and command in this part is offered on every compatible node; the tool keeps no path for older
-firmware. A node on another version is marked incompatible and sent no motor commands.
+firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
+firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot
+read from it: the controller's own interlock refuses the transfer while its motor runs.
 
 ### Part K — diagnostics
 

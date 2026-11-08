@@ -469,7 +469,8 @@ namespace tool
             return QString("Motor %1 is busy with its firmware; one firmware transfer at a time on the bus.").arg(*transfer.ActiveNode());
         if (fetching)
             return "Downloading the release pack…";
-        if (!IsStopped(motorState))
+        // A motor on another contract version reports no state this tool can read; its own interlock refuses the transfer while it runs.
+        if (client.Compatibility(nodeId) != can::ContractCompatibility::incompatible && !IsStopped(motorState))
             return "Stop the motor first: firmware is downloaded and applied only while it is idle or ready. A motor in fault is cleared first.";
         return {};
     }

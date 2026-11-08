@@ -83,7 +83,9 @@ which is what surfaces the encode or decode change that has to accompany it.
 compatible only when both numbers are equal: the CAN Commander, the integration suite and the firmware are
 built and released together, and no client keeps a path for an older or newer server. A client whose version
 differs from the server's shall report the mismatch and send no further category-`0x02` commands to that
-node. Adding a message is a minor bump; removing one, changing any field layout, or changing the meaning of
+node, with one exception: it may still query the firmware-identity parameters (`0xB1`–`0xB7`, contract 2.6),
+which every version since 2.6 numbers and encodes alike, so it can offer that node a firmware update
+(`service-firmware-upgrade.md`). Adding a message is a minor bump; removing one, changing any field layout, or changing the meaning of
 any enumerator, is a major bump. The client keeps the verdict per server node, because one client commands
 several drives on a bus: an incompatible node silences commands to itself only, and a node that answers again
 (after a firmware update) is judged afresh. The client remembers the eight most recent nodes, the number of
@@ -548,9 +550,9 @@ limits, stored at once and in force at the next Start.
 |--------|------------------|------|-------------------|-----------|-------------------|
 | `0x63` | `homingRequired` | -    | 0 off, 1 required | no        | at the next Start |
 
-| ID     | Parameter | Unit | Value                                                                           | Automatic |
-|--------|-----------|------|---------------------------------------------------------------------------------|-----------|
-| `0xC2` | `homed`   | -    | `1` once the position zero is the commissioned one, `0` otherwise, in any mode  | no        |
+| ID     | Parameter | Unit | Value                                                                          | Automatic |
+|--------|-----------|------|--------------------------------------------------------------------------------|-----------|
+| `0xC2` | `homed`   | -    | `1` once the position zero is the commissioned one, `0` otherwise, in any mode | no        |
 
 With `homingRequired` set to `1`, a `Start` in position mode is refused with the acknowledgement `rejected` unless
 the drive is homed or the Start restores the reference from the encoder index; speed and torque mode ignore the

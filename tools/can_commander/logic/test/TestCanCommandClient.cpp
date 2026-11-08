@@ -777,7 +777,7 @@ TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_every_parameter_once_
     EXPECT_TRUE(Queried(can::FocParameter::telemetryRate));
 }
 
-TEST_F(TestCanCommandClient, an_incompatible_node_is_not_read)
+TEST_F(TestCanCommandClient, an_incompatible_node_is_read_for_its_firmware_identity_only)
 {
     BringOnline(1);
     RecordSends();
@@ -786,7 +786,11 @@ TEST_F(TestCanCommandClient, an_incompatible_node_is_not_read)
 
     ForwardTime(CanCommandClient::statusRefreshInterval);
 
-    EXPECT_TRUE(sent.empty());
+    ASSERT_FALSE(sent.empty());
+    EXPECT_TRUE(Queried(can::FocParameter::firmwareVersionMajor));
+    EXPECT_EQ(sent.size(), Count(can::focQueryParameterId));
+    for (const auto& frame : sent)
+        EXPECT_TRUE(can::IsFirmwareIdentity(static_cast<can::FocParameter>(frame.payload[1]))) << static_cast<int>(frame.payload[1]);
 }
 
 TEST_F(TestCanCommandClient, an_unanswered_read_gives_way_to_the_next_after_the_read_timeout)
