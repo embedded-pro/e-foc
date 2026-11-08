@@ -13,9 +13,9 @@ namespace foc
     };
 
     // Largest advance the series below are held to: cosine error δ⁴/24 = 6.3e-4, sine error δ⁵/120 = 4.4e-5
-    inline constexpr float maxDelayAdvance{ 0.35f };
+    constexpr float maxDelayAdvance{ 0.35f };
 
-    inline constexpr float DutyDelay(uint32_t dutyUpdateDelayPeriods, float samplingFrequency)
+    constexpr float DutyDelay(uint32_t dutyUpdateDelayPeriods, float samplingFrequency)
     {
         return samplingFrequency > 0.0f ? (static_cast<float>(dutyUpdateDelayPeriods) + 0.5f) / samplingFrequency : 0.0f;
     }
