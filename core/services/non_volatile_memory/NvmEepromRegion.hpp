@@ -18,7 +18,6 @@ namespace services
         void Write(infra::ConstByteRange data, infra::Function<void()> onDone) override;
         void Read(infra::ByteRange data, infra::Function<void()> onDone) override;
         void Erase(infra::Function<void()> onDone) override;
-        std::size_t Size() const override;
 
     private:
         static const std::array<uint8_t, maxRegionSize> erasePattern;

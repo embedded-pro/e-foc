@@ -191,8 +191,3 @@ TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_before_it)
     EXPECT_EQ(readback[1], 0x66);
     EXPECT_EQ(readback[2], 0x77);
 }
-
-TEST_F(NvmEepromRegionTest, size_returns_configured_region_size)
-{
-    EXPECT_EQ(region.Size(), 128u);
-}

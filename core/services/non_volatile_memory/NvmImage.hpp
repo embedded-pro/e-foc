@@ -10,7 +10,6 @@
 
 namespace services
 {
-    // An image rewritten in the field: written whole without an erase, then read back and compared.
     template<std::size_t Size>
     class NvmImage
     {
@@ -39,13 +38,27 @@ namespace services
         void Read(const infra::Function<void(infra::ConstByteRange image)>& onDone)
         {
             onRead = onDone;
+            ReadBack();
+        }
+
+        void Erase(const infra::Function<void(infra::ConstByteRange image)>& onDone)
+        {
+            onRead = onDone;
+            region.Erase([this]
+                {
+                    ReadBack();
+                });
+        }
+
+    private:
+        void ReadBack()
+        {
             region.Read(infra::MakeRange(readBack), [this]
                 {
                     onRead(infra::MakeConstByteRange(readBack));
                 });
         }
 
-    private:
         NvmRegion& region;
         std::array<uint8_t, Size> written{};
         std::array<uint8_t, Size> readBack{};

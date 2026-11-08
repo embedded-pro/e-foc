@@ -1,47 +1,32 @@
 #include "integration_tests/support/nvm/NvmImageBuilder.hpp"
-#include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
+#include "core/services/non_volatile_memory/NvmRecord.hpp"
 #include "infra/util/ByteRange.hpp"
-#include "infra/util/Crc.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
-#include <cstring>
 
 namespace
 {
     constexpr float kMilliPerUnit = 1000.0f;
 
-    void WriteUint32(std::vector<uint8_t>& image, std::size_t offset, uint32_t value)
+    template<class Record, class Data>
+    void WriteRecord(std::vector<uint8_t>& image, std::size_t offset, const Data& data, sil::RecordDamage damage)
     {
-        std::memcpy(image.data() + offset, &value, sizeof(value));
-    }
-
-    template<class Data>
-    void WriteRecord(std::vector<uint8_t>& image, std::size_t offset, uint32_t magic,
-        uint8_t version, const Data& data, sil::RecordDamage damage)
-    {
-        infra::Crc32 crc;
-        crc.Update(infra::MakeConstByteRange(data));
-        uint32_t checksum = crc.Result();
+        const auto record = infra::ByteRange{ image.data() + offset, image.data() + offset + Record::size };
+        Record::Serialize(data, record);
 
         switch (damage)
         {
             case sil::RecordDamage::badMagic:
-                magic = ~magic;
+                record[0] = static_cast<uint8_t>(~record[0]);
                 break;
             case sil::RecordDamage::staleVersion:
-                version = static_cast<uint8_t>(version - 1u);
+                record[Record::versionOffset] = static_cast<uint8_t>(record[Record::versionOffset] - 1u);
                 break;
             case sil::RecordDamage::corruptCrc:
-                checksum = ~checksum;
+                record[Record::crcOffset] = static_cast<uint8_t>(~record[Record::crcOffset]);
                 break;
             case sil::RecordDamage::none:
                 break;
         }
-
-        WriteUint32(image, offset, magic);
-        image[offset + sizeof(uint32_t)] = version;
-        WriteUint32(image, offset + sizeof(uint32_t) + sizeof(uint8_t), checksum);
-        std::memcpy(image.data() + offset + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t),
-            &data, sizeof(data));
     }
 }
 
@@ -54,15 +39,11 @@ namespace sil
         services::CalibrationData data{};
         data.rPhase = motor.R.Value();
         data.lD = motor.Ld.Value() * kMilliPerUnit;
-        data.lQ = motor.Lq.Value() * kMilliPerUnit;
         data.fluxLinkage = motor.psi_f.Value();
         data.inertia = motor.J.Value();
         data.frictionViscous = motor.B.Value();
         data.frictionCoulomb = 0.0f;
-        data.currentLoopBandwidth = 2000.0f;
         data.speedLoopBandwidth = 100.0f;
-        data.encoderZeroOffset = 0;
-        data.encoderDirection = 0;
         data.polePairs = motor.p;
         data.stage = services::CalibrationStage::complete;
         return data;
@@ -78,12 +59,10 @@ namespace sil
         auto image = BlankNvmImage();
 
         if (spec.includeCalibration)
-            WriteRecord(image, calibrationRegionOffset, services::CalibrationMagic,
-                services::CalibrationLayoutVersion, spec.calibration, spec.calibrationDamage);
+            WriteRecord<services::CalibrationRecord>(image, calibrationRegionOffset, spec.calibration, spec.calibrationDamage);
 
         if (spec.includeConfig)
-            WriteRecord(image, configRegionOffset, services::ConfigMagic,
-                services::ConfigLayoutVersion, spec.config, spec.configDamage);
+            WriteRecord<services::ConfigRecord>(image, configRegionOffset, spec.config, spec.configDamage);
 
         return image;
     }

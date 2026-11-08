@@ -4,7 +4,6 @@
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <algorithm>
-#include <bit>
 #include <cstdint>
 
 namespace
@@ -79,7 +78,6 @@ namespace application
         calibrating.pendingData.inertia = held.inertia;
         calibrating.pendingData.frictionViscous = held.frictionViscous;
         calibrating.pendingData.frictionCoulomb = held.frictionCoulomb;
-        calibrating.pendingData.currentLoopBandwidth = held.currentLoopBandwidth;
         calibrating.pendingData.speedLoopBandwidth = held.speedLoopBandwidth;
         RunAlignmentOnly(calibrating);
     }
@@ -92,9 +90,9 @@ namespace application
             {
                 env.machine.Dispatch(state_machine::CalibrationStepChanged{ step });
             },
-            [this](foc::Radians angle)
+            [this](foc::Radians)
             {
-                env.machine.Dispatch(state_machine::AlignmentSucceeded{ angle });
+                env.machine.Dispatch(state_machine::AlignmentSucceeded{});
             },
             [this]
             {
@@ -110,9 +108,9 @@ namespace application
             {
                 env.machine.Dispatch(state_machine::CalibrationStepChanged{ step });
             },
-            [this](foc::Radians angle)
+            [this](foc::Radians)
             {
-                env.machine.Dispatch(state_machine::AlignmentSucceeded{ angle });
+                env.machine.Dispatch(state_machine::AlignmentSucceeded{});
             },
             [this]
             {
@@ -120,9 +118,8 @@ namespace application
             });
     }
 
-    void CalibrationFlow::OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle)
+    void CalibrationFlow::OnAlignmentSucceeded(state_machine::Calibrating& calibrating)
     {
-        calibrating.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
         env.context.SetRotorReferenceValid(true);
         env.context.SetHomed(false);
 

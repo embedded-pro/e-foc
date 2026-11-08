@@ -12,7 +12,6 @@ namespace services
     {
         Ok,
         InvalidData,
-        VersionMismatch,
         WriteFailed,
         HardwareFault,
         Busy
@@ -27,13 +26,9 @@ namespace services
         virtual void SaveCalibration(const CalibrationData& data, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void LoadCalibration(CalibrationData& data, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void InvalidateCalibration(infra::Function<void(NvmStatus)> onDone) = 0;
-        virtual void IsCalibrationValid(infra::Function<void(bool)> onDone) = 0;
 
         virtual void SaveConfig(const ConfigData& data, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void LoadConfig(ConfigData& data, infra::Function<void(NvmStatus)> onDone) = 0;
-        virtual void ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone) = 0;
-
-        virtual void Format(infra::Function<void(NvmStatus)> onDone) = 0;
 
         virtual void SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone) = 0;

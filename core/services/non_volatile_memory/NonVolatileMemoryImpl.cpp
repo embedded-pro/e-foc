@@ -1,473 +1,109 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
-#include "infra/util/Crc.hpp"
-#include <cassert>
-#include <cstring>
 
 namespace services
 {
-    namespace
-    {
-        // Packed so the CRC covers exactly the stored bytes; record layout in service-nvm.md.
-#pragma pack(push, 1)
-
-        struct CalibrationStorageRecord
-        {
-            uint32_t magic;
-            uint8_t version;
-            uint32_t crc32;
-            CalibrationData data;
-        };
-
-        struct ConfigStorageRecord
-        {
-            uint32_t magic;
-            uint8_t version;
-            uint32_t crc32;
-            ConfigData data;
-        };
-
-#pragma pack(pop)
-
-        static_assert(sizeof(CalibrationStorageRecord) == NonVolatileMemoryImpl::calibrationRecordSize,
-            "calibrationRecordSize must match the packed record — check CalibrationData for implicit padding");
-        static_assert(sizeof(ConfigStorageRecord) == NonVolatileMemoryImpl::configRecordSize,
-            "configRecordSize must match the packed record — check ConfigData for implicit padding");
-    }
-
     NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion, NvmRegion& faultHistoryRegion, NvmRegion& learnedModelRegion)
-        : calibrationRegion(calibrationRegion)
-        , configRegion(configRegion)
+        : calibration(calibrationRegion)
+        , config(configRegion)
         , faultHistory(faultHistoryRegion)
         , learnedModel(learnedModelRegion)
+    {}
+
+    void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data, infra::Function<void(NvmStatus)> onDone)
     {
+        Store<&CalibrationRecord::Serialize>(calibration, data, onDone);
     }
 
-    uint32_t NonVolatileMemoryImpl::ComputeCrc(infra::ConstByteRange bytes)
+    void NonVolatileMemoryImpl::LoadCalibration(CalibrationData& data, infra::Function<void(NvmStatus)> onDone)
     {
-        infra::Crc32 crc;
-        crc.Update(bytes);
-        return crc.Result();
-    }
-
-    void NonVolatileMemoryImpl::CompleteCalibration(NvmStatus status)
-    {
-        busy = false;
-        onCalibrationDone(status);
-    }
-
-    void NonVolatileMemoryImpl::CompleteConfig(NvmStatus status)
-    {
-        busy = false;
-        onConfigDone(status);
-    }
-
-    void NonVolatileMemoryImpl::CompleteFormat(NvmStatus status)
-    {
-        busy = false;
-        onFormatDone(status);
-    }
-
-    void NonVolatileMemoryImpl::CompleteIsCalibrationValid(bool valid)
-    {
-        busy = false;
-        onIsCalibrationValidDone(valid);
-    }
-
-    bool NonVolatileMemoryImpl::Admit(const infra::Function<void(NvmStatus)>& onDone)
-    {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
-            return false;
-        }
-
-        busy = true;
-        onImageDone = onDone;
-        return true;
-    }
-
-    void NonVolatileMemoryImpl::CompleteImage(NvmStatus status)
-    {
-        busy = false;
-        onImageDone(status);
-    }
-
-    void NonVolatileMemoryImpl::SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
-    {
-        if (!Admit(onDone))
-            return;
-
-        SerializeFaultHistory(history, faultHistory.Contents());
-        faultHistory.Write([this](NvmStatus status)
-            {
-                CompleteImage(status);
-            });
-    }
-
-    void NonVolatileMemoryImpl::LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
-    {
-        if (!Admit(onDone))
-            return;
-
-        faultHistory.Read([this, &history](infra::ConstByteRange image)
-            {
-                const auto read = DeserializeFaultHistory(image);
-                history = read.value_or(FaultHistoryData{});
-                CompleteImage(read.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
-            });
-    }
-
-    void NonVolatileMemoryImpl::SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
-    {
-        if (!Admit(onDone))
-            return;
-
-        SerializeLearnedModel(model, learnedModel.Contents());
-        learnedModel.Write([this](NvmStatus status)
-            {
-                CompleteImage(status);
-            });
-    }
-
-    void NonVolatileMemoryImpl::LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
-    {
-        if (!Admit(onDone))
-            return;
-
-        learnedModel.Read([this, &model](infra::ConstByteRange image)
-            {
-                const auto read = DeserializeLearnedModel(image);
-                model = read.value_or(LearnedModelData{});
-                CompleteImage(read.has_value() ? NvmStatus::Ok : NvmStatus::InvalidData);
-            });
-    }
-
-    void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,
-        infra::Function<void(NvmStatus)> onDone)
-    {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
-            return;
-        }
-
-        busy = true;
-
-        CalibrationStorageRecord record{};
-        record.magic = CalibrationMagic;
-        record.version = CalibrationLayoutVersion;
-        record.data = data;
-        record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
-        std::memcpy(calibrationBuffer.data(), &record, sizeof(record));
-
-        onCalibrationDone = onDone;
-        calibrationRegion.Erase([this]
-            {
-                OnCalibrationErased();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationErased()
-    {
-        calibrationRegion.Write(
-            infra::ConstByteRange(calibrationBuffer),
-            [this]
-            {
-                OnCalibrationWritten();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationWritten()
-    {
-        calibrationRegion.Read(
-            infra::ByteRange(calibrationReadBackBuffer),
-            [this]
-            {
-                OnCalibrationReadBack();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationReadBack()
-    {
-        if (calibrationBuffer == calibrationReadBackBuffer)
-            CompleteCalibration(NvmStatus::Ok);
-        else
-            CompleteCalibration(NvmStatus::HardwareFault);
-    }
-
-    void NonVolatileMemoryImpl::LoadCalibration(CalibrationData& data,
-        infra::Function<void(NvmStatus)> onDone)
-    {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
-            return;
-        }
-
-        busy = true;
-
-        pendingCalibrationOutput = &data;
-        onCalibrationDone = onDone;
-
-        calibrationRegion.Read(
-            infra::ByteRange(calibrationReadBackBuffer),
-            [this]
-            {
-                OnCalibrationReadForLoad();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationReadForLoad()
-    {
-        CalibrationStorageRecord record{};
-        std::memcpy(&record, calibrationReadBackBuffer.data(), sizeof(record));
-
-        if (record.magic != CalibrationMagic)
-        {
-            *pendingCalibrationOutput = CalibrationData{};
-            CompleteCalibration(NvmStatus::InvalidData);
-            return;
-        }
-
-        if (record.version != CalibrationLayoutVersion)
-        {
-            *pendingCalibrationOutput = CalibrationData{};
-            CompleteCalibration(NvmStatus::VersionMismatch);
-            return;
-        }
-
-        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-        if (computed != record.crc32)
-        {
-            *pendingCalibrationOutput = CalibrationData{};
-            CompleteCalibration(NvmStatus::InvalidData);
-            return;
-        }
-
-        *pendingCalibrationOutput = record.data;
-        CompleteCalibration(NvmStatus::Ok);
+        Fetch<&CalibrationRecord::Deserialize>(calibration, data, NvmStatus::InvalidData, onDone);
     }
 
     void NonVolatileMemoryImpl::InvalidateCalibration(infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-
-        onCalibrationDone = onDone;
-        calibrationRegion.Erase([this]
+        calibration.Erase([this](infra::ConstByteRange image)
             {
-                calibrationRegion.Read(
-                    infra::ByteRange(calibrationReadBackBuffer),
-                    [this]
-                    {
-                        OnCalibrationInvalidationVerified();
-                    });
+                Complete(CalibrationRecord::Deserialize(image).has_value() ? NvmStatus::WriteFailed : NvmStatus::Ok);
             });
     }
 
-    void NonVolatileMemoryImpl::IsCalibrationValid(infra::Function<void(bool)> onDone)
+    void NonVolatileMemoryImpl::SaveConfig(const ConfigData& data, infra::Function<void(NvmStatus)> onDone)
     {
-        if (busy)
-        {
-            onDone(false);
+        Store<&ConfigRecord::Serialize>(config, data, onDone);
+    }
+
+    void NonVolatileMemoryImpl::LoadConfig(ConfigData& data, infra::Function<void(NvmStatus)> onDone)
+    {
+        Fetch<&ConfigRecord::Deserialize>(config, data, NvmStatus::Ok, onDone);
+    }
+
+    void NonVolatileMemoryImpl::SaveFaultHistory(const FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
+    {
+        Store<&SerializeFaultHistory>(faultHistory, history, onDone);
+    }
+
+    void NonVolatileMemoryImpl::LoadFaultHistory(FaultHistoryData& history, infra::Function<void(NvmStatus)> onDone)
+    {
+        Fetch<&DeserializeFaultHistory>(faultHistory, history, NvmStatus::InvalidData, onDone);
+    }
+
+    void NonVolatileMemoryImpl::SaveLearnedModel(const LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
+    {
+        Store<&SerializeLearnedModel>(learnedModel, model, onDone);
+    }
+
+    void NonVolatileMemoryImpl::LoadLearnedModel(LearnedModelData& model, infra::Function<void(NvmStatus)> onDone)
+    {
+        Fetch<&DeserializeLearnedModel>(learnedModel, model, NvmStatus::InvalidData, onDone);
+    }
+
+    template<auto Serialize, std::size_t Size, class Data>
+    void NonVolatileMemoryImpl::Store(NvmImage<Size>& image, const Data& data, const infra::Function<void(NvmStatus)>& onDone)
+    {
+        if (!Admit(onDone))
             return;
-        }
 
-        busy = true;
-
-        onIsCalibrationValidDone = onDone;
-
-        calibrationRegion.Read(
-            infra::ByteRange(calibrationReadBackBuffer),
-            [this]
+        Serialize(data, image.Contents());
+        image.Write([this](NvmStatus status)
             {
-                OnCalibrationReadForIsValid();
+                Complete(status);
             });
     }
 
-    void NonVolatileMemoryImpl::OnCalibrationReadForIsValid()
+    template<auto Deserialize, std::size_t Size, class Data>
+    void NonVolatileMemoryImpl::Fetch(NvmImage<Size>& image, Data& data, NvmStatus statusWhenInvalid, const infra::Function<void(NvmStatus)>& onDone)
     {
-        CalibrationStorageRecord record{};
-        std::memcpy(&record, calibrationReadBackBuffer.data(), sizeof(record));
-
-        if (record.magic != CalibrationMagic || record.version != CalibrationLayoutVersion)
-        {
-            CompleteIsCalibrationValid(false);
+        if (!Admit(onDone))
             return;
-        }
 
-        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-        CompleteIsCalibrationValid(computed == record.crc32);
-    }
-
-    void NonVolatileMemoryImpl::SaveConfig(const ConfigData& data,
-        infra::Function<void(NvmStatus)> onDone)
-    {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
-            return;
-        }
-
-        busy = true;
-
-        ConfigStorageRecord record{};
-        record.magic = ConfigMagic;
-        record.version = ConfigLayoutVersion;
-        record.data = data;
-        record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
-        std::memcpy(configBuffer.data(), &record, sizeof(record));
-
-        onConfigDone = onDone;
-        configRegion.Erase([this]
+        whenInvalid = statusWhenInvalid;
+        image.Read([this, &data](infra::ConstByteRange bytes)
             {
-                OnConfigErased();
+                const auto read = Deserialize(bytes);
+                data = read.value_or(Data{});
+                Complete(read.has_value() ? NvmStatus::Ok : whenInvalid);
             });
     }
 
-    void NonVolatileMemoryImpl::OnConfigErased()
-    {
-        configRegion.Write(
-            infra::ConstByteRange(configBuffer),
-            [this]
-            {
-                OnConfigWritten();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnConfigWritten()
-    {
-        configRegion.Read(
-            infra::ByteRange(configReadBackBuffer),
-            [this]
-            {
-                OnConfigReadBack();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnConfigReadBack()
-    {
-        if (configBuffer == configReadBackBuffer)
-            CompleteConfig(NvmStatus::Ok);
-        else
-            CompleteConfig(NvmStatus::HardwareFault);
-    }
-
-    void NonVolatileMemoryImpl::LoadConfig(ConfigData& data,
-        infra::Function<void(NvmStatus)> onDone)
+    bool NonVolatileMemoryImpl::Admit(const infra::Function<void(NvmStatus)>& onRequestDone)
     {
         if (busy)
         {
-            onDone(NvmStatus::Busy);
-            return;
+            onRequestDone(NvmStatus::Busy);
+            return false;
         }
 
         busy = true;
-
-        pendingConfigOutput = &data;
-        onConfigDone = onDone;
-
-        configRegion.Read(
-            infra::ByteRange(configReadBackBuffer),
-            [this]
-            {
-                OnConfigReadForLoad();
-            });
+        onDone = onRequestDone;
+        return true;
     }
 
-    void NonVolatileMemoryImpl::OnConfigReadForLoad()
+    void NonVolatileMemoryImpl::Complete(NvmStatus status)
     {
-        ConfigStorageRecord record{};
-        std::memcpy(&record, configReadBackBuffer.data(), sizeof(record));
-
-        if (record.magic != ConfigMagic || record.version != ConfigLayoutVersion)
-        {
-            *pendingConfigOutput = MakeDefaultConfigData();
-            CompleteConfig(NvmStatus::Ok);
-            return;
-        }
-
-        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-        if (computed != record.crc32)
-        {
-            *pendingConfigOutput = MakeDefaultConfigData();
-            CompleteConfig(NvmStatus::Ok);
-            return;
-        }
-
-        *pendingConfigOutput = record.data;
-        CompleteConfig(NvmStatus::Ok);
-    }
-
-    void NonVolatileMemoryImpl::ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone)
-    {
-        SaveConfig(MakeDefaultConfigData(), onDone);
-    }
-
-    void NonVolatileMemoryImpl::Format(infra::Function<void(NvmStatus)> onDone)
-    {
-        if (busy)
-        {
-            onDone(NvmStatus::Busy);
-            return;
-        }
-
-        busy = true;
-
-        onFormatDone = onDone;
-        calibrationRegion.Erase([this]
-            {
-                OnCalibrationSectorFormattedDuringFormat();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationInvalidationVerified()
-    {
-        uint32_t magic{};
-        std::memcpy(&magic, calibrationReadBackBuffer.data(), sizeof(magic));
-        CompleteCalibration(magic == CalibrationMagic ? NvmStatus::WriteFailed : NvmStatus::Ok);
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationSectorFormattedDuringFormat()
-    {
-        calibrationRegion.Read(
-            infra::ByteRange(calibrationReadBackBuffer),
-            [this]
-            {
-                OnCalibrationFormatVerified();
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnCalibrationFormatVerified()
-    {
-        uint32_t magic{};
-        std::memcpy(&magic, calibrationReadBackBuffer.data(), sizeof(magic));
-        if (magic == CalibrationMagic)
-        {
-            CompleteFormat(NvmStatus::WriteFailed);
-            return;
-        }
-
-        configRegion.Erase([this]
-            {
-                configRegion.Read(
-                    infra::ByteRange(configReadBackBuffer),
-                    [this]
-                    {
-                        OnConfigSectorFormattedDuringFormat();
-                    });
-            });
-    }
-
-    void NonVolatileMemoryImpl::OnConfigSectorFormattedDuringFormat()
-    {
-        uint32_t magic{};
-        std::memcpy(&magic, configReadBackBuffer.data(), sizeof(magic));
-        CompleteFormat(magic == ConfigMagic ? NvmStatus::WriteFailed : NvmStatus::Ok);
+        busy = false;
+        onDone(status);
     }
 }

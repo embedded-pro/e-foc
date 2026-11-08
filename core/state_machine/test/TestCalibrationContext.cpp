@@ -14,7 +14,6 @@ namespace
         d.rPhase = 0.5f;
         d.lD = 1.0f;
         d.fluxLinkage = 0.007f;
-        d.currentLoopBandwidth = 1000.0f;
         return d;
     }
 
@@ -234,7 +233,6 @@ TEST_F(CalibrationContextTest, apply_bounds_the_automatic_current_bandwidth_with
 {
     auto data = CompleteData();
     data.lD = 1.094f;
-    data.currentLoopBandwidth = 0.0f;
     data.currentNoiseMilliAmpere = 30;
     context.SetData(data);
     StrictMock<foc::FocTorqueMock> foc;

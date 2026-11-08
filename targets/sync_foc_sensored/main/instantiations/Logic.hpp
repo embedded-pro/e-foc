@@ -64,8 +64,8 @@ namespace application
         static constexpr uint32_t learnedModelRegionSize = 32;
         static constexpr uint32_t faultHistoryRegionOffset = learnedModelRegionOffset + learnedModelRegionSize;
         static constexpr uint32_t faultHistoryRegionSize = 128;
-        static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
-        static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
+        static_assert(services::CalibrationRecord::size <= calibrationRegionSize);
+        static_assert(services::ConfigRecord::size <= configRegionSize);
         static_assert(services::learnedModelImageSize <= learnedModelRegionSize);
         static_assert(services::faultHistoryImageSize <= faultHistoryRegionSize);
         static_assert(faultHistoryRegionOffset == 384, "the fault history must not move");
