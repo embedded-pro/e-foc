@@ -1,0 +1,29 @@
+- id: REQ-UI-001
+  title: The status LEDs show whether the drive is powered, alive and running
+  status: implemented
+  verification: unit
+  shall: >
+    The drive shall keep its green status LED off while it has no power, flash it briefly and
+    rarely while the firmware runs without driving the motor, light it steadily while the drive
+    is enabled, and keep it off while the drive is in Fault.
+
+- id: REQ-UI-002
+  title: A latched fault is shown on the red LED with a code per fault class
+  status: implemented
+  verification: unit
+  shall: >
+    While the drive is in Fault the red status LED shall never stay off for longer than a pause
+    between two code groups, and shall repeat a group of flashes whose count identifies the
+    fault: two for over-current, three for over-voltage, four for over-temperature, five for
+    loss of the position sensor, six for under-voltage, seven for a motion supervision fault and
+    eight for a command timeout. A fault without a code of its own shall light the LED
+    steadily. The LED shall be off when there is no fault.
+
+- id: REQ-UI-003
+  title: The warning LED shows commissioning activity and a missing calibration
+  status: implemented
+  verification: unit
+  shall: >
+    The drive shall light the amber status LED steadily while it calibrates, because the rotor
+    may then move on its own, blink it slowly while the drive holds no valid calibration, and
+    keep it off in every other state.

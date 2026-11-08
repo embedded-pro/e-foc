@@ -2,9 +2,9 @@
 title: "Error Handling Design"
 type: design
 status: stable
-version: 1.2.0
+version: 1.3.0
 component: "error-handling"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                 |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Error Handling Design |
 | Type      | design                |
 | Status    | stable                |
-| Version   | 1.2.0                 |
+| Version   | 1.3.0                 |
 | Component | error-handling        |
-| Date      | 2026-11-05            |
+| Date      | 2026-11-08            |
 
 ---
 
@@ -230,6 +230,13 @@ omit it. This is what separates a bus with marginal termination from one that is
 
 Both sets saturate rather than wrap. The cost on the control path is a pair of register reads and
 about two dozen inlined instructions, under one percent of the 20 kHz period.
+
+### Fault indication on the LEDs
+
+A drive in Fault shows its fault on the red board LED as a repeating group of flashes, two for over-current up to
+eight for a command timeout, or steadily for a fault without a code of its own. The green LED goes out. The
+indication is driven from the event loop by the status LEDs service and reads the same state and fault code the CAN
+telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 
 ---
 

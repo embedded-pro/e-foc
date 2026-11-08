@@ -43,7 +43,8 @@ namespace application
     Logic::Logic(application::PlatformFactory& hardware)
         : hardware{ hardware }
         , boardId{ hardware.BoardId() }
-        , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
+        , ledStatus{ controlMode }
+        , statusLeds{ hardware.OperationalLed(), hardware.WarningLed(), hardware.FailureLed(), ledStatus }
         , vdc{ hardware.PowerSupplyVoltage() }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }

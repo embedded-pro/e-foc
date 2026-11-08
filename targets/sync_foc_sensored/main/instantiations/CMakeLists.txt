@@ -23,6 +23,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
     e_foc.services.bus_voltage
+    e_foc.services.leds
     numerical.controllers.implementations
     services.peripheral
 )
@@ -30,6 +31,8 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
 add_version_header_dependency(e_foc.sync_foc_sensored.main.inst e_foc.version_header)
 
 target_sources(e_foc.sync_foc_sensored.main.inst PRIVATE
+    ControlModeLedStatus.cpp
+    ControlModeLedStatus.hpp
     Logic.cpp
     Logic.hpp
 )

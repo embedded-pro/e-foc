@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: system
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.3.0                     |
+| Version   | 0.3.1                     |
 | Component | system                    |
-| Date      | 2026-11-05                |
+| Date      | 2026-11-08                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -216,6 +216,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | CLI                              | The bring-up command line of `hardware_test` and the startup banner; the motor application is commanded over CAN only.                                                                                                                                                                                                                      |
 | Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                                  |
 | Fault History                    | Records every entry into `Fault` (code, power-up, uptime, control mode, filtered bus voltage, peak torque current of the last 10 ms) and keeps the eight newest across power cycles in a region of its own; read by age and cleared over CAN ([design](../design/service-fault-history.md)).                                                |
+| Status LEDs                      | Shows on three board LEDs whether the firmware runs, whether the motor is driven, commissioning activity and, in `Fault`, a flash code per fault class; event loop only ([design](../design/service-leds.md)).                                                                                                                              |
 | Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
 
 ### 3. CAN Service
