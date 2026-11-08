@@ -90,7 +90,7 @@ namespace tool
         return firmwareUpgrade;
     }
 
-    const can::CanFrameOrigin& CanCommandClient::FrameOrigin() const
+    const services::CanFrameOrigin& CanCommandClient::FrameOrigin() const
     {
         return focClient.Origin();
     }
@@ -576,7 +576,7 @@ namespace tool
         MarkOffline(nodeId);
     }
 
-    void CanCommandClient::OnCommandAckTimeout(uint16_t /*nodeId*/, uint8_t /*category*/, uint8_t /*messageType*/)
+    void CanCommandClient::OnCommandAckTimeout(uint16_t, uint8_t, uint8_t)
     {}
 
     void CanCommandClient::OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode)

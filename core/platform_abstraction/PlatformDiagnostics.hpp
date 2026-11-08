@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/ControlLoopMetrics.hpp"
 
 namespace application
@@ -10,14 +10,14 @@ namespace application
     public:
         explicit PlatformDiagnostics(ControlLoopMetrics& metrics);
 
-        void AttachCanBus(CanBusAdapter& bus);
+        void AttachCanBus(services::MonitoredCan& bus);
 
         ControlLoopMetrics::Snapshot ControlLoopStatistics() const;
-        const CanBusAdapter::ErrorCounters& CanStatistics() const;
+        const services::CanBusErrorCounters& CanStatistics() const;
         void Reset();
 
     private:
         ControlLoopMetrics& metrics;
-        CanBusAdapter* canBus{ nullptr };
+        services::MonitoredCan* canBus{ nullptr };
     };
 }

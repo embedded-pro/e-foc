@@ -4,8 +4,8 @@
 #include <type_traits>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
@@ -48,7 +48,6 @@ namespace application
         static constexpr auto pwmFault{ hal::cortex::InterruptPriority::highest };
         static constexpr auto can{ hal::cortex::InterruptPriority::normal };
         static constexpr auto uart{ hal::cortex::InterruptPriority::low };
-        // No higher than any interrupt that could hang, so a hung handler starves the refresh and the hardware resets
         static constexpr auto watchdogEarlyWarning{ hal::cortex::InterruptPriority::lowest };
     };
 
@@ -64,7 +63,7 @@ namespace application
         uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -107,8 +106,6 @@ namespace application
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
 
-        // The UART hands the terminal a whole DMA half-buffer in one call from the ISR, and
-        // QueueForOneReaderOneIrqWriter copies the range without checking that it fits.
         static_assert(Resources::terminalQueueSize >= Resources::uartReceiveBufferSize / 2,
             "terminal queue must absorb a whole DMA half-buffer");
         static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
@@ -177,7 +174,6 @@ namespace application
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
-            // Steps 0-2 fill the ADC FIFO; steps 3-5 feed digital comparators 0-2 and trip PWM FLTSRC1.
             static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
                 {},
                 {},
@@ -230,7 +226,6 @@ namespace application
         void OnPwmFault(hal::tiva::Pwm::FaultEvent event);
         void TripOverCurrent();
 
-        // Condition must depend on Config: a discarded if constexpr branch is still type-checked otherwise.
         template<typename Config>
         void EmplacePwm(Config& config)
         {
@@ -251,32 +246,32 @@ namespace application
                     config.pwmConfig);
         }
 
-        static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
+        static services::CanBusError ToAdapterError(hal::tiva::Can::Error error)
         {
             switch (error)
             {
                 case hal::tiva::Can::Error::busOff:
-                    return CanBusAdapter::CanError::busOff;
+                    return services::CanBusError::busOff;
                 case hal::tiva::Can::Error::errorPassive:
-                    return CanBusAdapter::CanError::errorPassive;
+                    return services::CanBusError::errorPassive;
                 case hal::tiva::Can::Error::errorWarning:
-                    return CanBusAdapter::CanError::errorWarning;
+                    return services::CanBusError::errorWarning;
                 case hal::tiva::Can::Error::messageLost:
-                    return CanBusAdapter::CanError::messageLost;
+                    return services::CanBusError::messageLost;
                 case hal::tiva::Can::Error::ackError:
-                    return CanBusAdapter::CanError::ackError;
+                    return services::CanBusError::ackError;
                 case hal::tiva::Can::Error::stuffError:
-                    return CanBusAdapter::CanError::stuffError;
+                    return services::CanBusError::stuffError;
                 case hal::tiva::Can::Error::formError:
-                    return CanBusAdapter::CanError::formError;
+                    return services::CanBusError::formError;
                 case hal::tiva::Can::Error::crcError:
-                    return CanBusAdapter::CanError::crcError;
+                    return services::CanBusError::crcError;
                 case hal::tiva::Can::Error::bit0Error:
-                    return CanBusAdapter::CanError::bit0Error;
+                    return services::CanBusError::bit0Error;
                 case hal::tiva::Can::Error::bit1Error:
-                    return CanBusAdapter::CanError::bit1Error;
+                    return services::CanBusError::bit1Error;
                 default:
-                    return CanBusAdapter::CanError::other;
+                    return services::CanBusError::other;
             }
         }
 
@@ -296,7 +291,7 @@ namespace application
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
-            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
+            std::optional<services::MonitoredCanImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
         };
 
         template<typename Fn>

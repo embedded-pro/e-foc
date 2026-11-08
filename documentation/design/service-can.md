@@ -830,8 +830,8 @@ All tracing is applied via `can-lite`'s decorator classes:
 
 These are composed in the instantiation layer (`Logic.hpp`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
 
-`UntracedStreamCan` sits between the protocol server and `TracingCan` and sends `TelemetryCurrents` frames
-straight to the bus. One traced frame is a line of about 120 characters, so a 1 kHz stream alone would need
+can-lite's `TracingBypassCan` sits between the protocol server and `TracingCan`. Its predicate is
+`FocMotorCurrentStreamer::IsStreamFrame`, so it sends `TelemetryCurrents` frames straight to the bus. One traced frame is a line of about 120 characters, so a 1 kHz stream alone would need
 about 120 kB/s of trace output, more than the 921 600 bit/s trace port carries; every other frame, and every
 received frame, is still traced.
 
@@ -845,7 +845,8 @@ jumpers differ.
 The jumpers are sampled once, during platform start-up, after their pull-ups have had time to
 settle; moving a jumper takes effect at the next reset. Node 0 is the broadcast address, so a base
 of 0, or a base whose sum with the board ID exceeds the 12-bit node field (4095), is replaced by the
-default base. The resolved node and both of its parts are traced at start-up.
+default base. This is can-lite's `MakeCanNodeId` (its REQ-CAN-005.1). The resolved node and both of its
+parts are traced at start-up.
 
 ```mermaid
 flowchart LR
@@ -1079,7 +1080,7 @@ lifecycle instead; the response carries the value the calibration record now hol
 graph LR
     subgraph "Server Path (embedded target)"
         HAL_CAN_S["hal::Can"] --> TC["TracingCan"]
-        TC --> USC["UntracedStreamCan"]
+        TC --> USC["TracingBypassCan"]
         HAL_CAN_S -. "TelemetryCurrents only" .-> USC
         USC --> CPS["CanProtocolServer"]
         CPS --> CPSO["TracingCanProtocolServerObserver"]

@@ -70,7 +70,6 @@ namespace tool
     {
     public:
         static constexpr infra::Duration commandTimeout{ std::chrono::seconds(2) };
-        // The first Start after power-up waits up to 10 s for the rotor to rest before measuring the current offsets.
         static constexpr infra::Duration startCommandTimeout{ std::chrono::seconds(12) };
         static constexpr infra::Duration motionCommandTimeout{ std::chrono::minutes(2) };
         static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
@@ -114,7 +113,7 @@ namespace tool
         void RequestFaultHistory(uint16_t nodeId);
 
         services::FirmwareUpgradeCategoryClient& FirmwareUpgrade();
-        const can::CanFrameOrigin& FrameOrigin() const;
+        const services::CanFrameOrigin& FrameOrigin() const;
 
     private:
         struct NodeCommand
@@ -168,12 +167,10 @@ namespace tool
         template<class Send>
         bool Tracked(uint16_t nodeId, uint8_t commandType, Send send);
 
-        // CanProtocolClientObserver
         void OnServerOnline(uint16_t nodeId) override;
         void OnServerOffline(uint16_t nodeId) override;
         void OnCommandAckTimeout(uint16_t nodeId, uint8_t category, uint8_t messageType) override;
 
-        // FocMotorCategoryClientObserver
         void OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
         void OnTelemetryStatus(uint16_t nodeId, can::FocMotorState state, can::FocFaultCode fault) override;
@@ -185,7 +182,6 @@ namespace tool
         void OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs) override;
         void OnFaultConditionsResponse(uint16_t nodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent) override;
 
-        // services::CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) override;
         void OnError(infra::BoundedConstString message) override;
         void OnConnectionChanged(bool connected) override;

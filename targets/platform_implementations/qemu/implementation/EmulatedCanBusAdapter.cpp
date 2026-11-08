@@ -16,7 +16,7 @@ namespace application
         can.ReceiveData(receivedAction);
     }
 
-    void EmulatedCanBusAdapter::SetOnError(const infra::Function<void(CanError)>& /*handler*/)
+    void EmulatedCanBusAdapter::SetOnError(const infra::Function<void(services::CanBusError)>&)
     {}
 
     std::optional<sil::EmulatedCan::Frame> EmulatedCanBusAdapter::PollIncoming()

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/foc/interfaces/Execution.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/FirmwareStaging.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
@@ -84,7 +84,7 @@ namespace application
 
         virtual void SetEncoderResolution(uint32_t resolution) = 0;
         virtual void ConfigureCanBus(uint32_t bitRate, bool testMode) = 0;
-        virtual CanBusAdapter& CanBus() = 0;
+        virtual services::MonitoredCan& CanBus() = 0;
 
         virtual void Run() = 0;
         virtual services::Tracer& Tracer() = 0;

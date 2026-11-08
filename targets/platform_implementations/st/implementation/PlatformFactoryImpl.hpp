@@ -4,8 +4,8 @@
 #include <optional>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
@@ -58,7 +58,7 @@ namespace application
         uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -149,7 +149,7 @@ namespace application
         void MonitorBoard(hal::AdcMultiChannel::Samples samples);
         void TripProtection(BoardProtectionReason reason);
 
-        static CanBusAdapter::CanError ToAdapterError(hal::FdCanStm::Error error);
+        static services::CanBusError ToAdapterError(hal::FdCanStm::Error error);
 
         void OnWatchdogExpired();
 
@@ -187,7 +187,7 @@ namespace application
             std::optional<AdcPhaseCurrentMeasurementImpl<PhaseCurrentAdc>> phaseCurrentAdc;
             std::optional<hal::PwmStm> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::SynchronousQuadratureEncoderStm>> encoder;
-            std::optional<CanBusAdapterImpl<hal::FdCanStm::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
+            std::optional<services::MonitoredCanImpl<hal::FdCanStm::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
         };
 
     private:

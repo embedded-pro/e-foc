@@ -82,7 +82,6 @@ e-foc/
 │   │   ├── interfaces/              # Hardware ports in namespace drivers (ThreePhaseInverter, Encoder)
 │   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
 │   │   ├── AdcPhaseCurrentMeasurement.hpp
-│   │   ├── CanBusAdapter.hpp
 │   │   └── QuadratureEncoderDecorator.hpp
 │   ├── services/                    # Application-level services
 │   │   ├── alignment/               # Motor alignment and offset detection

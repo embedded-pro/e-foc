@@ -341,32 +341,32 @@ namespace application
         peripherals->encoder.emplace(resolution, Peripheral::EncoderTimerIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, config);
     }
 
-    CanBusAdapter::CanError PlatformFactoryImpl::ToAdapterError(hal::FdCanStm::Error error)
+    services::CanBusError PlatformFactoryImpl::ToAdapterError(hal::FdCanStm::Error error)
     {
         switch (error)
         {
             case hal::FdCanStm::Error::busOff:
-                return CanBusAdapter::CanError::busOff;
+                return services::CanBusError::busOff;
             case hal::FdCanStm::Error::errorPassive:
-                return CanBusAdapter::CanError::errorPassive;
+                return services::CanBusError::errorPassive;
             case hal::FdCanStm::Error::errorWarning:
-                return CanBusAdapter::CanError::errorWarning;
+                return services::CanBusError::errorWarning;
             case hal::FdCanStm::Error::messageLost:
-                return CanBusAdapter::CanError::messageLost;
+                return services::CanBusError::messageLost;
             case hal::FdCanStm::Error::ackError:
-                return CanBusAdapter::CanError::ackError;
+                return services::CanBusError::ackError;
             case hal::FdCanStm::Error::stuffError:
-                return CanBusAdapter::CanError::stuffError;
+                return services::CanBusError::stuffError;
             case hal::FdCanStm::Error::formError:
-                return CanBusAdapter::CanError::formError;
+                return services::CanBusError::formError;
             case hal::FdCanStm::Error::crcError:
-                return CanBusAdapter::CanError::crcError;
+                return services::CanBusError::crcError;
             case hal::FdCanStm::Error::bit0Error:
-                return CanBusAdapter::CanError::bit0Error;
+                return services::CanBusError::bit0Error;
             case hal::FdCanStm::Error::bit1Error:
-                return CanBusAdapter::CanError::bit1Error;
+                return services::CanBusError::bit1Error;
             default:
-                return CanBusAdapter::CanError::other;
+                return services::CanBusError::other;
         }
     }
 
@@ -391,7 +391,7 @@ namespace application
         diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *peripherals->canBus;
     }
@@ -491,7 +491,6 @@ namespace application
             peripherals->encoder->Encoder().EnableIndex();
     }
 
-    // The index pin is a level, not a latch: polled every control period it holds for several at the search speed
     bool PlatformFactoryImpl::IndexSeen()
     {
         if (peripherals->encoder && peripherals->encoder->Encoder().IndexAsserted())

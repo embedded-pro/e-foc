@@ -9,6 +9,7 @@ target_include_directories(e_foc.platform_abstraction PUBLIC
 )
 
 target_link_libraries(e_foc.platform_abstraction PUBLIC
+    can_lite.core
     services.util
     hal.interfaces
     hal.synchronous_interfaces
@@ -24,8 +25,6 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
 target_sources(e_foc.platform_abstraction PRIVATE
     AdcPhaseCurrentMeasurement.hpp
     BoardProtection.hpp
-    CanBusAdapter.hpp
-    CanBusAdapter.cpp
     ControlLoopMetrics.hpp
     ControlLoopMetrics.cpp
     DecimatingThreePhaseInverter.hpp

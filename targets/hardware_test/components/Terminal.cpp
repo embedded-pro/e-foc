@@ -341,7 +341,7 @@ namespace application
         hardware.ConfigureCanBus(*bitRate, testMode);
         canStarted = true;
 
-        hardware.CanBus().SetOnError([this](CanBusAdapter::CanError error)
+        hardware.CanBus().SetOnError([this](services::CanBusError error)
             {
                 tracer.Trace() << "  CAN Error: " << error;
             });
@@ -540,7 +540,7 @@ namespace application
     {
         tracer.Trace() << "Triggering HardFault...";
         void (*nullFunc)() = nullptr;
-        nullFunc(); // NOSONAR — intentional null dereference to trigger HardFault for error handler validation
+        nullFunc(); // NOSONAR
         return { services::TerminalWithStorage::Status::success };
     }
 
@@ -552,7 +552,6 @@ namespace application
                 volatile bool stalled{ true };
                 while (stalled)
                 {
-                    // Never returns, so the dispatcher stops making progress
                 }
             });
         return { success };

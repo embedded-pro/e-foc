@@ -20,10 +20,6 @@ target_link_libraries(e_foc.can PUBLIC
 )
 
 target_sources(e_foc.can PRIVATE
-    CanFrameOrigin.hpp
-    CanFrameOrigin.cpp
-    CanNodeAddress.hpp
-    CanNodeAddress.cpp
     FocMotorMessages.hpp
     FocMotorWireContract.hpp
     FocMotorSettings.hpp
@@ -49,8 +45,6 @@ target_sources(e_foc.can PRIVATE
     CanCommandTimeout.cpp
     CanLivenessWatchdog.hpp
     CanLivenessWatchdog.cpp
-    UntracedStreamCan.hpp
-    UntracedStreamCan.cpp
 )
 
 add_subdirectory(test)

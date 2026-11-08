@@ -1,4 +1,6 @@
 #include "core/can/FocMotorCurrentStreamer.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <chrono>
@@ -8,6 +10,12 @@ namespace can
     namespace
     {
         constexpr auto tickInterval{ std::chrono::milliseconds(1) };
+    }
+
+    bool FocMotorCurrentStreamer::IsStreamFrame(hal::Can::Id id)
+    {
+        return id.Is29BitId() && services::ExtractCanCategory(id.Get29BitId()) == focMotorCategoryId &&
+               services::ExtractCanMessageType(id.Get29BitId()) == focTelemetryCurrentsId;
     }
 
     FocMotorCurrentStreamer::FocMotorCurrentStreamer(services::CanProtocolServer& protocolServer, FocMotorCategoryServer& server,

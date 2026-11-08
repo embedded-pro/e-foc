@@ -1,5 +1,5 @@
+#include "can-lite/core/test/MonitoredCanMock.hpp"
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
-#include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "core/platform_abstraction/test_doubles/PlatformFactoryMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
@@ -42,8 +42,8 @@ namespace
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
         application::DecimatingThreePhaseInverter inverter{ platformFactory };
-        StrictMock<application::CanBusAdapterMock> canBusMock;
-        infra::Function<void(application::CanBusAdapter::CanError)> storedCanErrorHandler;
+        StrictMock<services::MonitoredCanMock> canBusMock;
+        infra::Function<void(services::CanBusError)> storedCanErrorHandler;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -380,7 +380,7 @@ TEST_F(TestPlatformFaultNotifier, can_bus_off_error_raises_hardware_fault)
     auto sm = CreateStateMachine();
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
-    storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+    storedCanErrorHandler(services::CanBusError::busOff);
     ExecuteAllActions();
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -392,7 +392,7 @@ TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
     GivenCalibrationInNvm();
     auto sm = CreateStateMachine();
 
-    storedCanErrorHandler(application::CanBusAdapter::CanError::messageLost);
+    storedCanErrorHandler(services::CanBusError::messageLost);
     ExecuteAllActions();
 
     EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -400,9 +400,8 @@ TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
 
 TEST_F(TestPlatformFaultNotifier, can_error_before_registration_does_not_crash)
 {
-    // storedCanErrorHandler is empty before CreateStateMachine() calls Register()
     if (storedCanErrorHandler)
-        storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+        storedCanErrorHandler(services::CanBusError::busOff);
     SUCCEED();
 }
 
