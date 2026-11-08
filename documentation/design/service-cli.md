@@ -130,10 +130,10 @@ held in a fixed-size table in `TerminalWithStorage` — no dynamic registration 
 
 ### Provided
 
-| Interface            | Purpose                                                            | Contract                                                                 |
-|----------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------|
-| Startup banner       | Traces the banner of Part B                                        | Traced once, as the application starts                                   |
-| `TerminalWithBanner` | The `hardware_test` terminal, tracing the banner when built        | Transparent to the underlying terminal after the banner has been printed |
+| Interface            | Purpose                                                     | Contract                                                                 |
+|----------------------|-------------------------------------------------------------|--------------------------------------------------------------------------|
+| Startup banner       | Traces the banner of Part B                                 | Traced once, as the application starts                                   |
+| `TerminalWithBanner` | The `hardware_test` terminal, tracing the banner when built | Transparent to the underlying terminal after the banner has been printed |
 
 ### Required
 
