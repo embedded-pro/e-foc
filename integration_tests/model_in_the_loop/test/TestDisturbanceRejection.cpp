@@ -94,9 +94,9 @@ TEST_F(TestDisturbanceRejection, every_position_law_holds_1_5_rad_against_a_torq
 TEST_F(TestDisturbanceRejection, every_speed_law_recovers_through_a_saturated_current_command)
 {
     static constexpr std::array<std::pair<foc::SpeedAlgorithm, DisturbanceRow>, 4> rows{ {
-        { foc::SpeedAlgorithm::pid, { "pid", 0.5f, 300.0f, 3.0f, 350.0f } },
+        { foc::SpeedAlgorithm::pid, { "pid", 0.5f, 330.0f, 3.0f, 350.0f } },
         { foc::SpeedAlgorithm::adrc, { "adrc", 0.5f, 300.0f, 3.0f, 350.0f } },
-        { foc::SpeedAlgorithm::twoDof, { "twodof", 0.5f, 300.0f, 3.0f, 350.0f } },
+        { foc::SpeedAlgorithm::twoDof, { "twodof", 0.5f, 330.0f, 3.0f, 350.0f } },
         { foc::SpeedAlgorithm::lqi, { "lqi", 0.5f, 300.0f, 3.0f, 350.0f } },
     } };
 

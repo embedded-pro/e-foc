@@ -82,3 +82,14 @@
     fading it out as the reference nears zero so that it does not chatter about
     standstill, and shall keep the total demand within the current limit. Torque mode shall add
     none, and a slow start from rest shall meet less speed error than it does without it.
+
+- id: REQ-CTL-009
+  title: Speed mode does not turn the encoder's resolution into torque noise
+  status: implemented
+  verification: [mil, unit]
+  shall: >
+    In speed mode on a 4000-count encoder, with the rotor turning at a constant speed, the drive
+    shall keep the torque current it demands within a ripple well below the one the encoder's
+    single-count speed steps would cause if they reached the speed law unsmoothed, with every
+    selectable speed law, without giving up the step and disturbance envelopes of the speed
+    requirement.

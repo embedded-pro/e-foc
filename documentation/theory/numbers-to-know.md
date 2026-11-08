@@ -2,9 +2,9 @@
 title: "The Numbers That Matter"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "numbers-to-know"
-date: 2026-10-29
+date: 2026-11-08
 ---
 
 | Field     | Value                   |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | The Numbers That Matter |
 | Type      | theory                  |
 | Status    | draft                   |
-| Version   | 0.1.0                   |
+| Version   | 0.2.0                   |
 | Component | numbers-to-know         |
-| Date      | 2026-10-29              |
+| Date      | 2026-11-08              |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -187,6 +187,7 @@ accordingly, computed at $m = 0.808$:
 | Encoder angle                     | $2\pi/N_{enc}$                            | 1.57 mrad = 0.09° mechanical; 0.36° electrical ($p = 4$)              |
 | Speed quantum                     | $2\pi/(N_{enc}\, T_s^o)$                  | 1.57 rad/s = 15 rpm per count per 1 ms window                         |
 | … relative, at 1000 rpm / 100 rpm | quantum / speed                           | 1.5 % / 15 %                                                          |
+| Speed filter time constant        | $1/(8\,\omega_{bw})$, at most 5 ms       | 1.25 ms at 100 rad/s; 4.6° lag, 0.46 × the quantisation noise         |
 | Sine table                        | 512 entries, interpolated                 | amplitude error $1.9 \times 10^{-5}$                                  |
 | `float` resolution                | $2^{-23}$ relative                        | $1.2 \times 10^{-7}$; one ulp at $\pm\pi$ is $2.4 \times 10^{-7}$ rad |
 

@@ -1,5 +1,7 @@
 #include "core/foc/cascade/SpeedDifferentiator.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "infra/util/ReallyAssert.hpp"
+#include "numerical/math/Math.hpp"
 
 namespace foc
 {
@@ -13,7 +15,15 @@ namespace foc
         windowAngle = 0.0f;
         previousAngle = 0.0f;
         lastSpeed = 0.0f;
+        filteredSpeed = 0.0f;
+        filter.Reset();
         previousAngleValid = false;
+    }
+
+    void SpeedDifferentiator::SetFilterTimeConstant(float seconds)
+    {
+        really_assert(seconds > 0.0f);
+        filter.SetAlpha(1.0f - math::Exp(-samplePeriod / seconds));
     }
 
     float SpeedDifferentiator::Measure()
@@ -40,6 +50,7 @@ namespace foc
             return lastSpeed;
 
         lastSpeed = detail::PositionWithWrapAround(angle - previousAngle) / (static_cast<float>(windows) * samplePeriod);
+        filteredSpeed = filter.Filter(lastSpeed);
         previousAngle = angle;
         previousIndex = index;
         return lastSpeed;

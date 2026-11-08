@@ -7,6 +7,7 @@
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
+#include <vector>
 
 namespace
 {
@@ -50,6 +51,17 @@ namespace
         parameters.maxCurrent = foc::Ampere{ 10.0f };
         parameters.samplingFrequency = lowPriorityFrequency;
         return parameters;
+    }
+
+    float WindowSpeed(float step)
+    {
+        return step * static_cast<float>(lowPriorityFrequency.Value());
+    }
+
+    float FilterCoefficient(float speedBandwidth)
+    {
+        const auto timeConstant = 1.0f / (8.0f * speedBandwidth);
+        return 1.0f - std::exp(-1.0f / (timeConstant * static_cast<float>(lowPriorityFrequency.Value())));
     }
 
     class TestSpeedCascade
@@ -514,9 +526,91 @@ TEST_F(TestSpeedCascade, the_observed_motion_carries_the_window_speed_and_the_re
     }
 
     const auto observation = focSpeed->ObserveMotion();
-    EXPECT_NEAR(observation.measuredSpeed.Value(), step * static_cast<float>(lowPriorityFrequency.Value()), 1e-3f);
+    EXPECT_NEAR(observation.measuredSpeed.Value(), WindowSpeed(step) * FilterCoefficient(foc::SpeedLoopTunings{}.bandwidth), 1e-3f);
     EXPECT_NEAR(observation.demandedSpeed.Value(), 12.0f, 1e-6f);
     EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, the_filter_follows_the_speed_bandwidth_of_the_accepted_tunings)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    auto tunings = foc::SpeedLoopTunings{};
+    tunings.bandwidth = 50.0f;
+    focSpeed->SetSpeedTunings(tunings);
+
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    EXPECT_NEAR(focSpeed->ObserveMotion().measuredSpeed.Value(), WindowSpeed(step) * FilterCoefficient(50.0f), 1e-3f);
+}
+
+TEST_F(TestSpeedCascade, enabling_again_clears_the_filtered_speed)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focSpeed->Enable();
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    ASSERT_GT(focSpeed->ObserveMotion().measuredSpeed.Value(), 0.5f);
+    focSpeed->Enable();
+
+    EXPECT_NEAR(focSpeed->ObserveMotion().measuredSpeed.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, the_online_mechanical_estimator_gets_the_unfiltered_window_rotation)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    testing::StrictMock<foc::OnlineMechanicalEstimatorMock> mechanicalEstimator;
+    std::vector<foc::MechanicalWindow> windows;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    EXPECT_CALL(mechanicalEstimator, Update(_)).WillRepeatedly(Invoke([&windows](const foc::MechanicalWindow& window)
+        {
+            windows.push_back(window);
+        }));
+
+    focSpeed->SetOnlineMechanicalEstimator(mechanicalEstimator);
+    focSpeed->Enable();
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    ASSERT_EQ(windows.size(), 2u);
+    EXPECT_NEAR(windows.back().rotation.Value(), step, 1e-6f);
+    EXPECT_LT(focSpeed->ObserveMotion().measuredSpeed.Value(), WindowSpeed(step) * 0.9f);
 }
 
 TEST_F(TestSpeedCascade, a_disabled_cascade_observes_no_motion)

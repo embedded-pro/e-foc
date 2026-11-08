@@ -18,4 +18,5 @@ target_sources(e_foc.model_in_the_loop_test PRIVATE
     TestParameterIdentification.cpp
     TestDriveLimits.cpp
     TestFrictionFeedForward.cpp
+    TestSpeedNoise.cpp
 )

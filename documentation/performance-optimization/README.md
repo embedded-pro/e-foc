@@ -264,6 +264,10 @@ a compare to the cascade and to each difference the position law takes, and a wr
 they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate put at 976–1295
 cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
 
+The speed low-pass (`documentation/theory/disturbances-and-noise.md`, *Encoder quantisation*) adds one subtract, one
+multiply and one add per outer period, inside `SpeedDifferentiator::Measure`, which `cycle-analysis-outer.json` already
+lists; its coefficient is computed once, when the speed tunings are accepted. The inline accessor it reads costs one load.
+
 The Coulomb friction feed-forward (`documentation/theory/disturbances-and-noise.md`, *Friction*) is computed in the outer
 loop, not in the interrupt: one scaled, clamped multiply of the speed reference per period, inlined into
 `CascadeWithSpeedLoop::RunSpeedLoop` and listed in `cycle-analysis-outer.json` as `FrictionFeedForward::CurrentFor`. The

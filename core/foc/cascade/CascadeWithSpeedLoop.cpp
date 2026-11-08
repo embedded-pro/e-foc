@@ -1,4 +1,5 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include <algorithm>
@@ -12,6 +13,14 @@ namespace foc
         const hal::Hertz excitationFrequency{ 50 };
         constexpr std::chrono::seconds excitationBurst{ 4 };
         constexpr std::chrono::seconds excitationCycle{ 60 };
+        constexpr float speedFilterBandwidthRatio{ 8.0f };
+        constexpr float maxSpeedFilterTimeConstant{ 0.005f };
+
+        float SpeedFilterTimeConstant(float speedBandwidth)
+        {
+            const auto bandwidth = std::clamp(speedBandwidth, CommandLimits::minBandwidth, CommandLimits::maxSpeedBandwidth);
+            return std::min(1.0f / (speedFilterBandwidthRatio * bandwidth), maxSpeedFilterTimeConstant);
+        }
     }
 
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
@@ -28,6 +37,7 @@ namespace foc
         really_assert(lowPriorityFrequency.Value() > 0);
         really_assert(lowPriorityFrequency.Value() <= baseFrequency.Value());
         really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
+        speedDifferentiator.SetFilterTimeConstant(SpeedFilterTimeConstant(SpeedLoopTunings{}.bandwidth));
     }
 
     CascadeWithSpeedLoop::~CascadeWithSpeedLoop()
@@ -57,7 +67,11 @@ namespace foc
 
     SelectResult CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedLoopTunings& tunings)
     {
-        return speedLoop.TrySetTunings(tunings);
+        const auto result = speedLoop.TrySetTunings(tunings);
+        if (result == SelectResult::ok)
+            speedDifferentiator.SetFilterTimeConstant(SpeedFilterTimeConstant(tunings.bandwidth));
+
+        return result;
     }
 
     void CascadeWithSpeedLoop::EnableSpeedLoop()
@@ -175,7 +189,8 @@ namespace foc
 
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
-        const auto mechanicalSpeed = speedDifferentiator.Measure();
+        speedDifferentiator.Measure();
+        const auto mechanicalSpeed = speedDifferentiator.FilteredSpeed();
         lastMechanicalSpeed = mechanicalSpeed;
         lastElectricalSpeed = mechanicalSpeed * polePairs;
         return mechanicalSpeed;

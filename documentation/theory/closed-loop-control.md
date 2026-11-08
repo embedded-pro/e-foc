@@ -2,9 +2,9 @@
 title: "Closed-Loop Control of a PMSM"
 type: theory
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: "closed-loop-control"
-date: 2026-10-30
+date: 2026-11-08
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Closed-Loop Control of a PMSM |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 0.2.1                         |
+| Version   | 0.3.0                         |
 | Component | closed-loop-control           |
-| Date      | 2026-10-30                    |
+| Date      | 2026-11-08                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -283,6 +283,12 @@ The **speed loop** has its own delay. The 1 ms window difference is the average 
 millisecond, half a window old. The speed controller runs as soon as the window closes, and the current
 reference it produces is picked up by the next 20 kHz period and held for the next millisecond, half a window
 late on average. With $T_d \approx 1$ ms, a 100 rad/s speed loop loses 5.7°, a 300 rad/s loop 17°.
+
+The speed measurement also passes a one-pole low-pass with $\tau = 1/(8\,\omega_{bw})$ against the encoder
+quantisation. Its lag at the crossover is $\arctan(\omega_{bw}\tau)$ = 7.1° at most for any bandwidth, and
+4.6° at 100 rad/s once the 1 ms sampling is accounted for (it falls as the bandwidth nears the sampling rate),
+so the budget above grows by under 8°. The ratio 8 is the compromise between noise and phase: a ratio of 4
+would almost halve the noise again at 100 rad/s (0.26 against 0.46) but cost up to 14° at the crossover.
 
 **Sampling the right instant.** Sampling the phase currents at the centre of the PWM period, where the
 symmetric ripple crosses its mean, takes the average current without filtering it, so the current loop

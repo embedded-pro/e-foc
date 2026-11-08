@@ -2,9 +2,9 @@
 title: "Speed Loop — PI (Baseline)"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.1.0
 component: "speed-loop-pi"
-date: 2026-08-31
+date: 2026-11-08
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Speed Loop — PI (Baseline) |
 | Type      | theory                     |
 | Status    | draft                      |
-| Version   | 1.0.0                      |
+| Version   | 1.1.0                      |
 | Component | speed-loop-pi              |
-| Date      | 2026-08-31                 |
+| Date      | 2026-11-08                 |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -176,7 +176,9 @@ is needed.
 - Single-DOF structure — cannot independently shape command tracking and disturbance rejection.
   Use S3 (Two-DOF) when both are required simultaneously.
 - Speed estimate must be smooth. A noisy encoder derivative degrades this controller equally to
-  all speed controllers; an alpha-beta filter or Kalman smoother is recommended upstream.
+  all speed controllers. e-foc low-passes the window speed upstream with $\tau = 1/(8\,\omega_{bw})$, which
+  adds at most 7.1° of lag at the crossover and cuts the quantisation noise through $K_p$ to 46 % at 100 rad/s
+  ([disturbances and noise](disturbances-and-noise.md) §4). The ideal-measurement analysis above ignores that lag.
 
 ---
 

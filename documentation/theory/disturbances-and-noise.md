@@ -2,7 +2,7 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.4.1
+version: 0.5.0
 component: "disturbances-and-noise"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.4.1                                  |
+| Version   | 0.5.0                                  |
 | Component | disturbances-and-noise                 |
 | Date      | 2026-11-08                             |
 
@@ -278,9 +278,32 @@ $$
 The speed loop multiplies it by $K_p$: on the Teknic at 100 rad/s ($K_p$ = 0.037 A per rad/s) that is 24 mA RMS of
 $i_q^*$ and 0.9 mN·m of torque noise; at 300 rad/s three times more. Longer windows trade this noise for delay;
 more counts per revolution or an observer (a tracking PLL, a Kalman filter) reduce it without the delay.
-*e-foc today:* the window difference is used unfiltered (`core/foc/cascade/SpeedDifferentiator.cpp`); the
-identification estimators avoid end-sample speeds by using window-mean positions
-(`documentation/theory/friction-inertia-estimation.md` §4.1).
+*e-foc today:* the speed and position cascades pass the window difference
+(`core/foc/cascade/SpeedDifferentiator.cpp`) through a first-order low-pass before any loop uses it:
+
+$$
+\hat\omega_k = \hat\omega_{k-1} + a\,(\omega_k - \hat\omega_{k-1}), \qquad
+a = 1 - e^{-T_w/\tau}, \qquad \tau = \frac{1}{8\,\omega_{bw}} \le 5\ \text{ms}
+$$
+
+with $\omega_{bw}$ the speed-loop bandwidth in force. The raw difference is the first difference of the
+floored angle, a high-passed noise, so the low-pass removes more than it would from white noise: the RMS
+ratio is $\sqrt{(a^2 + a^3/(2-a))/2}$.
+
+| Speed bandwidth | $\tau$  | $a$   | Phase lag at $\omega_{bw}$ | Noise RMS ratio | Speed noise | $i_q^*$ noise on the Teknic |
+|-----------------|---------|-------|---------------------------|-----------------|-------------|-----------------------------|
+| 50 rad/s        | 2.5 ms  | 0.330 | 5.8°                      | 0.26            | 0.16 rad/s  | 3 mA                        |
+| 100 rad/s       | 1.25 ms | 0.551 | 4.6°                      | 0.46            | 0.29 rad/s  | 11 mA                       |
+| 300 rad/s       | 0.42 ms | 0.909 | 1.7°                      | 0.87            | 0.56 rad/s  | 60 mA                       |
+
+The gain is largest where the speed loop is slow, because $\tau$ follows the bandwidth, and fades as the loop
+approaches the 1 ms window, where a one-pole filter has nothing to average. The lag is below the continuous
+bound $\arctan(1/8)$ = 7.1° at every bandwidth (`closed-loop-control.md` §7 budgets it). A feed-forward that
+reads the filtered speed lags the true speed by about $\tau - T_w$ at a constant acceleration, a back-EMF error
+of $p\,\psi_f\,\alpha\,\tau$ that the current loop's integral action absorbs.
+Which consumer reads which value is in `documentation/design/foc-speed.md`. The identification estimators
+never read the filtered value: they use window-mean positions and the wrapped rotation of the window
+(`documentation/theory/friction-inertia-estimation.md` §4.1), so their acceleration and speed stay consistent.
 
 **Encoder eccentricity and periodic error.** A disk mounted off-centre, or a code wheel with uneven slots,
 gives an angle error that repeats once (or a few times) per mechanical revolution, $a\sin\theta_m$. Its
@@ -416,7 +439,7 @@ The Teknic at 3000 rpm: $f_m$ = 50 Hz, $f_e$ = 200 Hz, current loop at 5000 rad/
 | Gain mismatch, if 2 %   | 400 Hz    | Inside the current bandwidth: reproduced     | 0.7 % of $I$ at 400 Hz, the same in torque                                     |
 | Dead time / cogging     | 1200 Hz   | Above the current bandwidth: partly rejected | Filtered by inertia before it reaches speed                                    |
 | Eccentricity, if 1 mrad | 50 Hz     | Inside the speed bandwidth? No: above 16 Hz  | Speed error $a\omega_m$ = 0.31 rad/s, passed to torque by $K_p$                |
-| Speed quantum           | Broadband | Through $K_p$ of the speed loop              | 24 mA RMS of $i_q^*$, 0.9 mN·m                                                 |
+| Speed quantum           | Broadband | Through $K_p$ of the speed loop, after the speed low-pass | 11 mA RMS of $i_q^*$ (24 mA unfiltered), 0.4 mN·m                 |
 | Load step 20 mN·m       | Step      | Rejected through $S$ of the speed loop       | Dip $0.407 \times 0.02/(7.06\times10^{-6} \times 100)$ = 11.5 rad/s at 12.5 ms |
 
 The table reads as a priority list: the speed quantum and the load dip dominate what this rotor feels, the

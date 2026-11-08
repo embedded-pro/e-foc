@@ -2,7 +2,7 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: foc-speed
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.3.1             |
+| Version   | 0.4.0             |
 | Component | foc-speed         |
 | Date      | 2026-11-08        |
 
@@ -88,6 +88,24 @@ previous one, and counts each window it closes. `n` is the number of windows clo
 normally, more when the outer-loop handler ran late. Dividing by one period after a late read would report a
 multiple of the true speed followed by zero. A read that finds no new window keeps the previous estimate. The
 angle and the count are read together and the read is retried if a window closes in between.
+
+**Speed filter:**
+
+The window difference is quantised: one encoder count per window is a speed step of 2π / (N_enc · Δt). Each new
+window result passes through a first-order low-pass (an exponential moving average) with time constant
+τ = 1 / (8 · ω_bw), capped at 5 ms, where ω_bw is the speed-loop bandwidth of the tunings in force. The filter
+coefficient is recomputed when the speed tunings are accepted and starts from the default bandwidth. A read that
+finds no new window leaves the filter unchanged, and the filter is cleared to zero wherever the estimator
+restarts: enabling the speed loop, which a current command does as well. Theory and the choice of 8:
+`disturbances-and-noise.md` §4 and `closed-loop-control.md` §7.
+
+| Consumer                                                                         | Value     | Reason                                                                         |
+|----------------------------------------------------------------------------------|-----------|--------------------------------------------------------------------------------|
+| Speed law feedback (PID, LQI, ADRC, two-degree-of-freedom)                       | Filtered  | Quantisation noise passes straight through the proportional gain               |
+| Position law speed state and the position PID stationary test                    | Filtered  | Same noise; the stationary test chatters on single counts                      |
+| Current loop decoupling and back-EMF feed-forward                                | Filtered  | A one-count step is a voltage step; the lag is about τ − Δt at constant acceleration, which the current loop's integral absorbs |
+| Telemetry, overspeed, phase-loss and flux-linkage identification overspeed check | Filtered  | They read the observed motion; the lag is at most a few milliseconds           |
+| Online mechanical and electrical estimators, mechanical identification           | Raw       | They accumulate window rotation and window-mean positions themselves and never read the speed estimate, so a fitted J sees an acceleration consistent with its speed |
 
 Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap
 boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted
@@ -227,7 +245,7 @@ stateDiagram-v2
 | Entity            | Field      | Type / Unit              | Range                                    | Notes                                                    |
 |-------------------|------------|--------------------------|------------------------------------------|----------------------------------------------------------|
 | Speed setpoint    | ω_sp       | RadiansPerSecond (float) | ± mechanical max                         | Written by application; applied on next outer-loop tick  |
-| Estimated speed   | ω          | RadiansPerSecond (float) | computed from Δθ/Δt                      | Computed each outer-loop cycle                           |
+| Estimated speed   | ω          | RadiansPerSecond (float) | Δθ/Δt through the low-pass, τ = 1/(8·ω_bw) | Computed each outer-loop cycle                         |
 | Speed PID output  | Iq_sp      | Ampere (float)           | ± maxCurrent                             | Written to inner loop; clamped by speed PID output limit |
 | d-axis setpoint   | Id_sp      | Ampere (float)           | 0 A; ±2.5 % Imax at 50 Hz with estimator | SPMSM maximum torque per ampere                          |
 | Previous angle    | θm_prev    | Radians (float)          | [0, 2π)                                  | Saved each outer cycle for finite-difference estimator   |
