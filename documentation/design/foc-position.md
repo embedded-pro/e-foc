@@ -2,9 +2,9 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: foc-position
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.4.0                |
+| Version   | 0.5.0                |
 | Component | foc-position         |
-| Date      | 2026-11-05           |
+| Date      | 2026-11-08           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -147,12 +147,46 @@ stateDiagram-v2
     Reached --> Moving : error beyond the window, or leaves Enabled
 ```
 
+### Homing and the Position Reference
+
+The position the drive reports is measured from the zero its alignment set. A plain alignment can land that zero
+on any of the electrical detents of the rotor, one per pole pair, so after one the position zero need not be the one
+the machine was commissioned with. The drive therefore tracks whether its position frame is the commissioned one and
+calls it *homed* (REQ-CMS-006):
+
+- Homed after a successful calibration in this power-up, because that calibration's alignment defines the frame.
+- Homed after the first Start restored the rotor reference from the encoder index, because the index angle stored
+  with the calibration puts the encoder back in the frame of that calibration (`state-machine.md`, Referencing the
+  Rotor from the Encoder Index).
+- Not homed at every power-up, after Clear Calibration, after an alignment, an identification of the electrical
+  parameters or a pole-pair change, and whenever the rotor reference is lost.
+
+A control-mode switch that keeps the rotor reference keeps the homed state with it. The state is the read-only
+parameter `homed` of contract 2.19 (`service-can.md`).
+
+A machine whose process depends on that zero can make the drive hold position mode back until it is homed, with the
+stored drive-wide setting `homingRequired`, off by default (REQ-CMS-007). With it on, the Start of position mode is
+refused unless the drive is homed or the first Start is about to restore the reference from the index, which
+homes it; an index search that then finds nothing refuses the Start as before. Speed and torque mode are never
+held back, whatever the setting says, as they do not depend on the position zero. A drive whose reference is
+valid but not homed has to be calibrated to be homed again; the index restore runs only for a drive without a
+reference.
+
+```mermaid
+stateDiagram-v2
+    [*] --> NotHomed : power-up
+    NotHomed --> Homed : calibration succeeds
+    NotHomed --> Homed : index restore finds the index
+    Homed --> NotHomed : alignment, identification,\nclear calibration, pole-pair change
+    Homed --> Homed : control-mode switch
+```
+
 ### Software Position Limits
 
 Machines rely on software travel limits to protect their mechanics (REQ-CTL-007). Two stored drive-wide
 limits, the position minimum and maximum, bound the travel in the frame the position is measured in: the
 mechanical angle from the alignment zero, in [−π, π). They are off while the minimum is not below the
-maximum, as both are 0 by default. A homing reference, once the drive has one, makes the same limits absolute.
+maximum, as both are 0 by default. Once the drive is homed (Homing and the Position Reference) the same limits are absolute.
 
 With the limits on:
 

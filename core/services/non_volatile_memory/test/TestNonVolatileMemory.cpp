@@ -491,6 +491,33 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_ok_with_correct_data_after_sav
     ExpectConfigDataEqual(loaded, written);
 }
 
+TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
+{
+    auto written = MakeTestConfig();
+    written.homingRequired = 1;
+    bool saveDone = false;
+    nvm.SaveConfig(written, [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData loaded{};
+    bool done = false;
+    nvm.LoadConfig(loaded, [&](auto)
+        {
+            done = true;
+        });
+    RunUntilDone(done);
+
+    EXPECT_EQ(loaded.homingRequired, uint8_t{ 1 });
+}
+
+TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_14)
+{
+    EXPECT_EQ(services::ConfigLayoutVersion, 14);
+}
+
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)
 {
     const services::ConfigData defaults = services::MakeDefaultConfigData();

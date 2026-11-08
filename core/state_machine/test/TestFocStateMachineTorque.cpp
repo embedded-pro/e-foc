@@ -3921,3 +3921,176 @@ TEST_F(FocStateMachineTorqueTest, a_re_alignment_stores_the_index_angle_the_sear
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
     EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
 }
+
+TEST_F(FocStateMachineTorqueTest, a_drive_is_not_homed_after_boot)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_FALSE(sm.IsHomed());
+}
+
+TEST_F(FocStateMachineTorqueTest, a_re_alignment_does_not_home_the_drive)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_FALSE(sm.IsHomed());
+    EXPECT_FALSE(std::get<state_machine::Ready>(sm.CurrentState()).homed);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_calibration_homes_the_drive)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectCalibrationSequence();
+    auto sm = CreateStateMachine();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(sm.IsHomed());
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).homed);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_drive_kept_homed_across_a_mode_switch_boots_homed)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::keptHomed };
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(sm.IsHomed());
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).homed);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_drive_kept_aligned_across_a_mode_switch_boots_not_homed)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::kept };
+
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_FALSE(sm.IsHomed());
+}
+
+TEST_F(FocStateMachineTorqueTest, a_restored_index_reference_homes_the_drive_and_a_re_alignment_drops_it)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+    ASSERT_FALSE(sm.IsHomed());
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    EXPECT_CALL(inverterMock, Start());
+    searchDone(foc::Radians{ -1.0f });
+    EXPECT_TRUE(sm.IsHomed());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdDisable());
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).homed);
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    ExpectIndexSearch();
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    searchDone(foc::Radians{ -1.75f });
+
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_FALSE(sm.IsHomed());
+}
+
+TEST_F(FocStateMachineTorqueTest, an_index_search_that_finds_nothing_leaves_the_drive_not_homed)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    searchDone(std::nullopt);
+
+    EXPECT_FALSE(sm.IsHomed());
+}
+
+TEST_F(FocStateMachineTorqueTest, required_homing_refuses_an_enable_after_a_plain_alignment)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    sm.RequireHoming(true);
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueTest, required_homing_lets_an_enable_through_once_the_drive_is_calibrated)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectCalibrationSequence();
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+    sm.RequireHoming(true);
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdEnable());
+}
+
+TEST_F(FocStateMachineTorqueTest, required_homing_lets_an_enable_through_when_the_index_restore_is_due)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+    sm.RequireHoming(true);
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    EXPECT_CALL(inverterMock, Start());
+    searchDone(foc::Radians{ -1.0f });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueTest, required_homing_keeps_the_refusal_of_a_failed_index_search)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(RecordWithIndexAngle());
+    auto sm = CreateStateMachineWithIndex();
+    sm.RequireHoming(true);
+
+    ExpectIndexSearch();
+    EnableAsync(sm);
+    searchDone(std::nullopt);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::calibrationFailed, enableResult);
+}
+
+TEST_F(FocStateMachineTorqueTest, required_homing_refuses_an_enable_after_an_alignment_even_with_an_index_to_restore)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachineWithIndex();
+    ExpectIndexSearch();
+    AlignAfterBoot(sm);
+    searchDone(foc::Radians{ -1.75f });
+    sm.RequireHoming(true);
+
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+}

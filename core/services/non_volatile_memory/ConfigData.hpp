@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/interfaces/LoopTunings.hpp"
-#include <array>
 #include <cstdint>
 #include <numbers>
 
@@ -89,7 +88,7 @@ namespace services
         uint8_t currentTwoStepDeadbeat = 0;
         uint8_t stallDetection = 1;
         uint8_t recalibrationMode = 0;
-        std::array<uint8_t, 1> reserved{};
+        uint8_t homingRequired = 0;
     };
 
     static_assert(sizeof(ConfigData) == 168, "ConfigData layout must be free of implicit padding");

@@ -56,6 +56,7 @@ namespace state_machine
 
         services::CalibrationData loadedData{};
         bool rotorReferenceValid{ false };
+        bool homed{ false };
     };
 
     struct Enabled

@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: state-machine
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.11.0                     |
+| Version   | 0.12.0                     |
 | Component | state-machine              |
-| Date      | 2026-11-06                 |
+| Date      | 2026-11-08                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -876,6 +876,33 @@ While the search runs, `HasPendingAsyncWork()` is true. `Disable` abandons it an
 with `rejected`; an emergency stop or a fault aborts it, which stops the inverter and leaves the
 encoder untouched. Both the offset refresh and the search are internal transitions of `Ready`, decided
 by their completion events `OffsetsRefreshed` and `IndexSearched`.
+
+### Homed State and the Homing Requirement
+
+Besides whether a rotor reference exists, the state machine tracks whether the position frame is the commissioned
+one (`foc-position.md`, Homing and the Position Reference). The *homed* state is set when a full calibration
+completes and when an index restore finds the index; an alignment-only run (`CmdReAlign()`, the external
+calibration) clears it, as does every loss of the rotor reference, `CmdClearCalibration()`, a pole-pair change and
+every boot. A machine built by a control-mode switch out of a `Ready` that is aligned and homed boots homed; one out
+of a `Ready` that is only aligned boots aligned and not homed.
+
+The stored setting `homingRequired` (`service-nvm.md`) is handed to the position-mode machine only; the speed
+and torque machines never see it. With it on, the `Enable` guard of a position-mode machine refuses, after its
+other checks, when the drive is not homed and no index restore is due. A restore that is due counts because it
+runs during the preparation of the `Enable` and homes the drive; if the search finds nothing, the `Enable` is
+refused with `calibrationFailed` as before. The guard refusal is answered `rejected` and traced as "position mode
+requires homing; calibrate or restore the reference from the encoder index".
+
+```mermaid
+flowchart TD
+    E["Enable in Ready"] --> A{"board protection,\nrotor reference"}
+    A -- refused --> R["rejected"]
+    A -- ok --> H{"position mode and\nhoming required?"}
+    H -- no --> P["enable"]
+    H -- yes --> D{"homed, or index\nrestore due?"}
+    D -- yes --> P
+    D -- no --> R
+```
 
 ### Alignment-Only Recovery
 

@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 18;
+    static constexpr uint8_t focContractVersionMinor = 19;
 
     enum class FieldType : uint8_t
     {
@@ -267,7 +267,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 81> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 83> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -341,6 +341,7 @@ namespace can
         { FocParameter::stagedVersionPatch, "stagedVersionPatch", "-", 0.0f, 255.0f, true, false, true },
         { FocParameter::targetReached, "targetReached", "-", 0.0f, 1.0f, true, false, true },
         { FocParameter::windingTemperature, "windingTemperature", "degC", -focMaxReading, focMaxReading, false, false, true },
+        { FocParameter::homed, "homed", "-", 0.0f, 1.0f, true, false, true },
         { FocParameter::recalibrationMode, "recalibrationMode", "-", 0.0f, 2.0f, true, false },
         { FocParameter::modelResistance, "modelResistance", "ohm", 0.0f, focMaxReading, false, false, true },
         { FocParameter::modelInductance, "modelInductance", "mH", 0.0f, focMaxReading, false, false, true },
@@ -349,6 +350,7 @@ namespace can
         { FocParameter::recalibrationsApplied, "recalibrationsApplied", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::recalibrationsRejected, "recalibrationsRejected", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::recalibrationsStored, "recalibrationsStored", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::homingRequired, "homingRequired", "-", 0.0f, 1.0f, true, false },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)

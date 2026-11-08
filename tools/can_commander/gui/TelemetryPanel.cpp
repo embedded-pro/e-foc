@@ -71,6 +71,9 @@ namespace tool
         statusLayout->addRow("State:", motorStateLabel);
         statusLayout->addRow("Fault:", faultLabel);
         statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::targetReached).label), targetReachedLabel);
+        homedLabel = new QLabel();
+        homedLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::homed).description));
+        statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::homed).label), homedLabel);
         windingTemperatureLabel = new QLabel();
         windingTemperatureLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::windingTemperature).description));
         statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::windingTemperature).label), windingTemperatureLabel);
@@ -133,6 +136,8 @@ namespace tool
         targetReachedLabel->setText(placeholder);
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, ui::theme::StatusLevel::Neutral);
         windingTemperatureLabel->setText(placeholder);
+        homedLabel->setText(placeholder);
+        ui::backend::qt::StyleStatusLabel(*homedLabel, ui::theme::StatusLevel::Neutral);
         ShowPlaceholders(measurements);
         ShowPlaceholders(parameters);
     }
@@ -187,6 +192,12 @@ namespace tool
     {
         targetReachedLabel->setText(reached ? "Yes" : "No");
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, reached ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
+    }
+
+    void TelemetryPanel::OnHomed(bool homed)
+    {
+        homedLabel->setText(homed ? "Yes" : "No");
+        ui::backend::qt::StyleStatusLabel(*homedLabel, homed ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
     }
 
     void TelemetryPanel::OnWindingTemperature(float celsius)

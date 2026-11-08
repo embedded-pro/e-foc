@@ -1801,3 +1801,115 @@ TEST_F(ControlModeStateMachineTest, Held_Async_Work_Refuses_Calibrate_And_Select
     subject->ReleaseAsyncWork();
     EXPECT_TRUE(subject->IsStoppedAndIdle());
 }
+
+TEST_F(ControlModeStateMachineExtTest, A_Plain_Alignment_Does_Not_Home_The_Drive)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    EXPECT_TRUE(IsReadyWithRotorReference());
+    EXPECT_FALSE(subject->IsHomed());
+}
+
+TEST_F(ControlModeStateMachineExtTest, Position_Mode_Is_Refused_Without_Homing_When_Homing_Is_Required)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+    subject->Config().homingRequired = 1;
+    subject->Select(state_machine::ControlMode::position, [](state_machine::SelectResult) {});
+
+    ASSERT_TRUE(IsReadyWithRotorReference());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineExtTest, Position_Mode_Is_Enabled_Without_Homing_When_Homing_Is_Not_Required)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+    subject->Select(state_machine::ControlMode::position, [](state_machine::SelectResult) {});
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Speed_Mode_Is_Never_Held_Back_By_Required_Homing)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+    subject->Config().homingRequired = 1;
+    subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Torque_Mode_Is_Never_Held_Back_By_Required_Homing)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    AlignAfterBoot();
+    subject->Config().homingRequired = 1;
+    subject->PersistConfig([](services::NvmStatus) {});
+
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, A_Calibration_Homes_The_Drive_And_A_Mode_Switch_Keeps_It_Homed)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    ASSERT_FALSE(subject->IsHomed());
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(subject->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(subject->IsHomed());
+
+    subject->Config().homingRequired = 1;
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    EXPECT_TRUE(subject->IsHomed());
+    EXPECT_CALL(inverterMock, Start());
+    EXPECT_EQ(subject->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, A_Re_Alignment_After_A_Calibration_Leaves_The_Drive_Not_Homed)
+{
+    GivenNvmAlwaysValidWithMechanics();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+    ASSERT_TRUE(subject->IsHomed());
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    subject->CmdReAlign([](state_machine::CommandResult) {});
+    ExecuteAllActions();
+
+    EXPECT_TRUE(IsReadyWithRotorReference());
+    EXPECT_FALSE(subject->IsHomed());
+}

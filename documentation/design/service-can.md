@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.20.3
+version: 0.21.0
 component: can-service
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.20.3                   |
+| Version   | 0.21.0                   |
 | Component | can-service              |
-| Date      | 2026-11-06               |
+| Date      | 2026-11-08               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -495,6 +495,23 @@ error `persistenceFailed`. It is accepted in every control mode and whatever the
 
 A client older than 2.18 does not ask for it.
 
+**Contract 2.19 — homing.** Version 2.19 adds one stored setting and one read-only parameter; nothing in 2.18
+changes (`foc-position.md`, Homing and the Position Reference). The setting is a toggle among the drive-wide
+limits, stored at once and in force at the next Start.
+
+| ID     | Parameter        | Unit | Range             | Automatic | Takes effect      |
+|--------|------------------|------|-------------------|-----------|-------------------|
+| `0x63` | `homingRequired` | -    | 0 off, 1 required | no        | at the next Start |
+
+| ID     | Parameter | Unit | Value                                                                           | Automatic |
+|--------|-----------|------|---------------------------------------------------------------------------------|-----------|
+| `0xC2` | `homed`   | -    | `1` once the position zero is the commissioned one, `0` otherwise, in any mode  | no        |
+
+With `homingRequired` set to `1`, a `Start` in position mode is refused with the acknowledgement `rejected` unless
+the drive is homed or the Start restores the reference from the encoder index; speed and torque mode ignore the
+setting (`state-machine.md`, Homed State and the Homing Requirement). A client reads `homed` with each status, as it
+does `targetReached`, and older than 2.19 asks for neither parameter.
+
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
@@ -544,7 +561,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                            |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                           |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on    |
-| `0x17`–`0x19`, `0x80`–`0xC1`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                 |
+| `0x17`–`0x19`, `0x80`–`0xC2`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                 |
 | `0x88`                        | retired, never reused                       | `TelemetryElectrical`  | the bus voltage is measured once at start-up, so a live bus-voltage field would be stale |
 | `0x8A`                        | `TelemetryCurrents` stream                  | absent                 | a host rebuilds the current and position waveforms from a stream at up to 1 kHz          |
 

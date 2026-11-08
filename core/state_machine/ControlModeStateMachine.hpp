@@ -105,6 +105,7 @@ namespace state_machine
         const services::CalibrationData& CalibrationRecord() const;
         // From the online resistance estimate; nullopt in torque mode and without a calibrated resistance.
         std::optional<foc::Celsius> WindingTemperature();
+        bool IsHomed() const;
         foc::Weber DefaultFluxLinkage() const;
 
         services::ConfigData& Config();

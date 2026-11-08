@@ -31,7 +31,8 @@ namespace application
     enum class RotorReference : uint8_t
     {
         lost,
-        kept
+        kept,
+        keptHomed
     };
 
     struct CalibrationServices

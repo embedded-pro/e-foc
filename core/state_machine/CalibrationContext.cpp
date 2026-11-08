@@ -38,6 +38,7 @@ namespace application
     {
         calibrationData = services::CalibrationData{};
         rotorReferenceValid_ = false;
+        homed_ = false;
         ApplyCurrentOffsets();
     }
 
@@ -71,6 +72,17 @@ namespace application
     void CalibrationContext::SetRotorReferenceValid(bool valid)
     {
         rotorReferenceValid_ = valid;
+        homed_ = homed_ && valid;
+    }
+
+    bool CalibrationContext::IsHomed() const
+    {
+        return homed_ && rotorReferenceValid_;
+    }
+
+    void CalibrationContext::SetHomed(bool homed)
+    {
+        homed_ = homed;
     }
 
     bool CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)

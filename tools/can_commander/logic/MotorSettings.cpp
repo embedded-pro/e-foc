@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 81> presentations{ {
+        constexpr std::array<SettingPresentation, 83> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -133,6 +133,7 @@ namespace tool
             { FocParameter::windingTemperature, "Winding temperature", "Winding temperature:", " \xC2\xB0"
                                                                                                "C",
                 "Winding temperature inferred from the online resistance estimate in speed and position mode; unknown in torque mode and without a calibration. Read with every status, from firmware contract 2.13.", {} },
+            { FocParameter::homed, "Homed", "Homed:", {}, "Whether the position zero is the one the drive was commissioned with: yes after a calibration or a reference restored from the encoder index in this power-up, no after a plain alignment or at power-up. Read with every status, from firmware contract 2.19.", {} },
             { FocParameter::recalibrationMode, "Online recalibration", "Recalibration:", {}, "When settled online estimates may replace the model the speed and position loops are designed from: Off never, On command on Recalibrate (Diagnostics tab), Automatic at every stop. From firmware contract 2.17.", {} },
             { FocParameter::modelResistance, "Resistance in use", "Resistance:", ohm, "Resistance the current loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelInductance, "Inductance in use", "Inductance:", " mH", "Inductance the current loop is designed from; the calibration record's until a recalibration.", {} },
@@ -141,6 +142,7 @@ namespace tool
             { FocParameter::recalibrationsApplied, "Recalibrations applied", "Applied:", {}, "Quantities recalibrated since power-up.", {} },
             { FocParameter::recalibrationsRejected, "Recalibrations rejected", "Rejected:", {}, "Settled readings outside their plausibility band since power-up.", {} },
             { FocParameter::recalibrationsStored, "Recalibrations stored", "Stored:", {}, "Stores of the recalibrated inductance, inertia and friction since power-up, at most one every 15 minutes. From firmware contract 2.18.", {} },
+            { FocParameter::homingRequired, "Homing required", "Require homing:", {}, "Refuse to enable position mode until the drive is homed, that is until a calibration or a reference restored from the encoder index has defined the commissioned position zero in this power-up. Speed and torque mode are never held back. From firmware contract 2.19.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -351,17 +353,22 @@ namespace tool
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(71, 2);
+        return Slice(71, 3);
     }
 
     std::span<const SettingPresentation> RecalibrationSettings()
     {
-        return Slice(73, 1);
+        return Slice(74, 1);
     }
 
     std::span<const SettingPresentation> RecalibrationReadings()
     {
-        return Slice(74, 7);
+        return Slice(75, 7);
+    }
+
+    std::span<const SettingPresentation> HomingSettings()
+    {
+        return Slice(82, 1);
     }
 
     namespace

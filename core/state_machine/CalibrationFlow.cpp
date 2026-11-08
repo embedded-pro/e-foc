@@ -123,6 +123,7 @@ namespace application
     {
         calibrating.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
         env.context.SetRotorReferenceValid(true);
+        env.context.SetHomed(false);
 
         if (calibrating.alignmentOnly)
             Save(calibrating);
@@ -330,6 +331,7 @@ namespace application
 
         env.mode.ProvisionalControlSuperseded();
         env.context.SetData(data);
+        env.context.SetHomed(!calibrating.alignmentOnly);
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
         env.mode.ApplyModeSpecificCalibration(data);
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
@@ -347,7 +349,7 @@ namespace application
 
     state_machine::Ready CalibrationFlow::ReadyState() const
     {
-        return state_machine::Ready{ env.context.Data(), env.context.IsRotorReferenceValid() };
+        return state_machine::Ready{ env.context.Data(), env.context.IsRotorReferenceValid(), env.context.IsHomed() };
     }
 
     bool CalibrationFlow::HasValidCalibration() const

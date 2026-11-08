@@ -154,6 +154,11 @@ namespace tool
         return SupportsMinor(nodeId, storedRecalibrationContractMinor);
     }
 
+    bool CanCommandClient::SupportsHoming(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, homedContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -182,6 +187,8 @@ namespace tool
             return SupportsOverTemperature(nodeId);
         if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
             return SupportsBusVoltageLimits(nodeId);
+        if (parameter == can::FocParameter::homed || parameter == can::FocParameter::homingRequired)
+            return SupportsHoming(nodeId);
         if (parameter == can::FocParameter::recalibrationsStored)
             return SupportsStoredRecalibration(nodeId);
         if (IsRecalibrationParameter(parameter))
@@ -462,7 +469,7 @@ namespace tool
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && SupportsSetting(nodeId, descriptor.id))
+            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && descriptor.id != can::FocParameter::homed && SupportsSetting(nodeId, descriptor.id))
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
@@ -553,6 +560,8 @@ namespace tool
             QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
         if (SupportsThermal(nodeId))
             QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
+        if (SupportsHoming(nodeId))
+            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::homed });
     }
 
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)

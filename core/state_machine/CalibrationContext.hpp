@@ -34,6 +34,8 @@ namespace application
 
         bool IsRotorReferenceValid() const;
         void SetRotorReferenceValid(bool valid);
+        bool IsHomed() const;
+        void SetHomed(bool homed);
 
         bool Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
         void ApplyCurrentOffsets();
@@ -64,6 +66,7 @@ namespace application
 
         services::CalibrationData calibrationData{};
         bool rotorReferenceValid_{ false };
+        bool homed_{ false };
 
         static constexpr float nyquistFactor = 15.0f;
         static constexpr float inaudibleVoltageNoise = 0.08f;

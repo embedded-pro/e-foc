@@ -40,7 +40,8 @@ namespace application
 
     void FocStateMachineCommon::Boot(RotorReference rotorReference)
     {
-        calibrationContext.SetRotorReferenceValid(rotorReference == RotorReference::kept);
+        calibrationContext.SetRotorReferenceValid(rotorReference != RotorReference::lost);
+        calibrationContext.SetHomed(rotorReference == RotorReference::keptHomed);
         stateMachine.Start<state_machine::Idle>();
         boot.Begin();
     }
@@ -63,6 +64,16 @@ namespace application
     bool FocStateMachineCommon::HasPartialCalibration() const
     {
         return stateMachine.Is<state_machine::Idle>() && calibrationContext.HasPartial();
+    }
+
+    bool FocStateMachineCommon::IsHomed() const
+    {
+        return calibrationContext.IsHomed();
+    }
+
+    void FocStateMachineCommon::RequireHoming(bool required)
+    {
+        operation.RequireHoming(required);
     }
 
     const FocStateMachineCommon::StateMachine& FocStateMachineCommon::TransitionTable() const

@@ -403,7 +403,10 @@ namespace state_machine
             return application::RotorReference::lost;
 
         const auto* ready = std::get_if<Ready>(&ActiveStateMachine().CurrentState());
-        return ready != nullptr && ready->rotorReferenceValid ? application::RotorReference::kept : application::RotorReference::lost;
+        if (ready == nullptr || !ready->rotorReferenceValid)
+            return application::RotorReference::lost;
+
+        return ready->homed ? application::RotorReference::keptHomed : application::RotorReference::kept;
     }
 
     void ControlModeStateMachine::Activate(ControlMode mode)
@@ -935,6 +938,11 @@ namespace state_machine
         return foc::WindingTemperatureFromResistance(estimates->resistance, foc::Ohm{ CalibrationRecord().rPhase }, foc::Celsius{ configData.limits.calibrationTemperature });
     }
 
+    bool ControlModeStateMachine::IsHomed() const
+    {
+        return !std::holds_alternative<std::monostate>(activeSm) && ActiveCommon().IsHomed();
+    }
+
     foc::Weber ControlModeStateMachine::DefaultFluxLinkage() const
     {
         return calibServices.fluxLinkage;
@@ -969,6 +977,7 @@ namespace state_machine
         const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
         const foc::Radians positionMinimum{ configData.limits.positionMinimum };
         const foc::Radians positionMaximum{ configData.limits.positionMaximum };
+        const bool homingRequired = configData.homingRequired != 0;
 
         std::visit([&]<class Machine>(Machine& sm)
             {
@@ -978,6 +987,8 @@ namespace state_machine
                 {
                     sm.RampSpeed(acceleration, deceleration);
                     sm.LimitTravel(positionMinimum, positionMaximum);
+                    if constexpr (std::is_same_v<Machine, application::PositionStateMachine>)
+                        sm.RequireHoming(homingRequired);
                 }
             },
             activeSm);

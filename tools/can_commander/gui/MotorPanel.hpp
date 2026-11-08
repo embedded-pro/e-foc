@@ -90,6 +90,7 @@ namespace tool
         QString LimitsUnavailableReason() const;
         QString TargetWindowUnavailableReason() const;
         QString TravelLimitsUnavailableReason() const;
+        QString HomingUnavailableReason() const;
         QString ThermalUnavailableReason() const;
         QString OverTemperatureUnavailableReason() const;
         QString BusVoltageLimitsUnavailableReason() const;
