@@ -325,7 +325,7 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
 | [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
-| [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes           |
+| [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
 | [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
 
 ### Requirements
