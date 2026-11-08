@@ -84,14 +84,8 @@ namespace
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.stage = services::CalibrationStage::complete;
 
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .WillOnce(Invoke([data](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {

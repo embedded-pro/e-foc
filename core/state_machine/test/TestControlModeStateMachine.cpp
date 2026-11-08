@@ -102,11 +102,11 @@ namespace
 
         void GivenNvmAlwaysInvalid()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillRepeatedly(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {
-                        onDone(false);
+                        out = services::CalibrationData{};
+                        onDone(services::NvmStatus::InvalidData);
                     }));
         }
 
@@ -424,15 +424,16 @@ TEST_F(ControlModeStateMachineTest, Select_While_Active_Machine_Has_Pending_Nvm_
 
 TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Check_In_Flight_Reports_Busy)
 {
-    infra::Function<void(bool)> deferredValidityCheck;
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([&deferredValidityCheck](infra::Function<void(bool)> onDone)
+    infra::Function<void(services::NvmStatus)> deferredLoad;
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([&deferredLoad](services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
             {
-                deferredValidityCheck = onDone;
+                deferredLoad = onDone;
             }))
-        .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
+        .WillRepeatedly(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
             {
-                onDone(false);
+                out = services::CalibrationData{};
+                onDone(services::NvmStatus::InvalidData);
             }));
 
     ConstructSubject();
@@ -446,7 +447,7 @@ TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Check_In_Flight_Report
     EXPECT_EQ(result, state_machine::SelectResult::busy);
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
 
-    deferredValidityCheck(false);
+    deferredLoad(services::NvmStatus::InvalidData);
 
     GivenNvmSaveConfigSucceeds();
     state_machine::SelectResult retryResult{ state_machine::SelectResult::nvmFailed };
@@ -471,14 +472,7 @@ namespace
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.stage = services::CalibrationStage::complete;
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([data](services::CalibrationData& out,
@@ -496,16 +490,9 @@ namespace
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.inertia = 1.0e-5f;
             data.frictionViscous = 1.0e-4f;
             data.stage = services::CalibrationStage::complete;
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([data](services::CalibrationData& out,
@@ -529,13 +516,7 @@ namespace
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.stage = services::CalibrationStage::complete;
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .WillOnce(Invoke([data](services::CalibrationData& out,
                                      infra::Function<void(services::NvmStatus)> onDone)
@@ -605,15 +586,9 @@ TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfigure
     stored.polePairs = 7;
     stored.rPhase = 0.5f;
     stored.lD = 1.0f;
-    stored.lQ = 1.0f;
     stored.fluxLinkage = 0.02f;
     stored.stage = services::CalibrationStage::complete;
 
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-            {
-                onDone(true);
-            }));
     EXPECT_CALL(nvmMock, LoadCalibration(_, _))
         .WillOnce(Invoke([stored](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
             {

@@ -134,22 +134,16 @@ namespace
 
         void GivenNvmAlwaysInvalid()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillRepeatedly(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {
-                        done(false);
+                        out = services::CalibrationData{};
+                        onDone(services::NvmStatus::InvalidData);
                     }));
         }
 
         void GivenNvmHoldsValidCalibration()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-                    {
-                        done(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -158,7 +152,6 @@ namespace
                         data.polePairs = 4;
                         data.rPhase = 0.5f;
                         data.lD = 1.0f;
-                        data.lQ = 1.0f;
                         data.inertia = 0.005f;
                         data.stage = services::CalibrationStage::complete;
                         done(services::NvmStatus::Ok);
@@ -174,12 +167,6 @@ namespace
 
         void GivenNvmHoldsPartialCalibration()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-                    {
-                        done(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -1740,10 +1727,11 @@ TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_AfterSuccessfulSelect_ReportsA
 TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
 {
     EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AtLeast(1));
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillRepeatedly(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
             {
-                done(false);
+                out = services::CalibrationData{};
+                onDone(services::NvmStatus::InvalidData);
             }));
 
     services::ConfigData config{};
@@ -2387,12 +2375,6 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_FirmwareIdentity_ReportsTheVersionA
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_CalibrationReadings_ReportTheStoredRecord)
 {
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .Times(AnyNumber())
-        .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-            {
-                done(true);
-            }));
     EXPECT_CALL(nvmMock, LoadCalibration(_, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -2401,7 +2383,6 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_CalibrationReadings_ReportTheStored
                 data.polePairs = 4;
                 data.rPhase = 0.5f;
                 data.lD = 1.0f;
-                data.lQ = 1.0f;
                 data.currentOffsetA = 0.012f;
                 data.currentOffsetB = -0.004f;
                 data.currentOffsetC = 0.002f;
