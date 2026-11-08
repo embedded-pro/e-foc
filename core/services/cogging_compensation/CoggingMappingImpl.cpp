@@ -35,17 +35,18 @@ namespace services
         , supportedCurrent(inverter.MaxCurrentSupported())
     {}
 
-    void CoggingMappingImpl::Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, const Config& config, const infra::Function<void(std::optional<CoggingMap>)>& onDone)
+    void CoggingMappingImpl::Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone)
     {
-        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !foc::IsFiniteValue(inertia.Value()) || inertia.Value() < 0.0f || polePairs == 0)
+        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !foc::IsFiniteValue(inertia.Value()) || inertia.Value() < 0.0f || !foc::IsFiniteValue(viscousFriction.Value()) || viscousFriction.Value() < 0.0f || polePairs == 0)
         {
-            onDone(std::nullopt);
+            onDone(CoggingMeasurement{});
             return;
         }
 
         this->config = config;
         this->torqueConstant = torqueConstant;
         this->inertia = inertia;
+        this->viscousFriction = viscousFriction;
         this->polePairs = polePairs;
         this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
@@ -205,9 +206,14 @@ namespace services
         StopMotion();
         phase = Phase::idle;
 
-        const auto map = complete ? builder.Build(torqueConstant, inertia, polePairs, samplePeriod) : std::nullopt;
+        CoggingMeasurement measurement{};
+        if (complete)
+        {
+            measurement.map = builder.Build(torqueConstant, inertia, polePairs, samplePeriod);
+            measurement.frictionCoulomb = builder.FrictionCoulomb(torqueConstant, inertia, viscousFriction, polePairs, samplePeriod).value_or(foc::NewtonMeter{ 0.0f });
+        }
 
         if (onDone)
-            onDone(map);
+            onDone(measurement);
     }
 }

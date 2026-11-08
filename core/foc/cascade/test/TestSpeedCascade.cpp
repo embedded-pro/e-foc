@@ -952,3 +952,101 @@ TEST_F(TestSpeedCascade, a_bus_at_half_the_configured_voltage_doubles_the_inner_
     EXPECT_NEAR(DutyPercent(halved.b) - 50.0f, 2.0f * (DutyPercent(expected.b) - 50.0f), 0.1f);
     EXPECT_NEAR(DutyPercent(halved.c) - 50.0f, 2.0f * (DutyPercent(expected.c) - 50.0f), 0.1f);
 }
+
+namespace
+{
+    constexpr float frictionTorque{ 0.5f };
+    constexpr float justBeyondTheRamp{ 1.25f * foc::FrictionFeedForward::rampWidth };
+
+    float QuadratureDrive(const foc::PhasePwmDutyCycles& duty)
+    {
+        return DutyPercent(duty.b) - DutyPercent(duty.c);
+    }
+
+    foc::SpeedLoopTunings SlowSpeedLoop()
+    {
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = 1.0f;
+        return tunings;
+    }
+
+    float DriveAddedByFriction(std::size_t polePairs, float setPoint, float ceiling = 10.0f)
+    {
+        SpeedCascadeUnderTest withFriction{ polePairs, SlowSpeedLoop() };
+        SpeedCascadeUnderTest withoutFriction{ polePairs, SlowSpeedLoop() };
+        withFriction.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+        withFriction.cascade->LimitCurrent(foc::Ampere{ ceiling });
+        withoutFriction.cascade->LimitCurrent(foc::Ampere{ ceiling });
+
+        return QuadratureDrive(FirstDutyAfterSpeedStep(withFriction, setPoint)) - QuadratureDrive(FirstDutyAfterSpeedStep(withoutFriction, setPoint));
+    }
+}
+
+TEST_F(TestSpeedCascade, a_forward_speed_reference_adds_the_friction_current_to_the_quadrature_reference)
+{
+    EXPECT_GT(DriveAddedByFriction(polePairs, justBeyondTheRamp), 1.0f);
+}
+
+TEST_F(TestSpeedCascade, a_reverse_speed_reference_subtracts_the_friction_current)
+{
+    EXPECT_LT(DriveAddedByFriction(polePairs, -justBeyondTheRamp), -1.0f);
+}
+
+TEST_F(TestSpeedCascade, the_friction_current_is_the_same_either_way_round)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, justBeyondTheRamp), -DriveAddedByFriction(polePairs, -justBeyondTheRamp), 1e-3f);
+}
+
+TEST_F(TestSpeedCascade, a_zero_speed_reference_adds_no_friction_current)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 0.0f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestSpeedCascade, a_reference_inside_the_ramp_adds_a_proportional_share_of_the_friction_current)
+{
+    const auto full = DriveAddedByFriction(polePairs, justBeyondTheRamp);
+
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 0.5f * foc::FrictionFeedForward::rampWidth), 0.5f * full, 0.02f * full);
+}
+
+TEST_F(TestSpeedCascade, the_sum_of_speed_loop_and_friction_current_is_held_within_the_current_limit)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 500.0f, 1.0f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestSpeedCascade, a_cleared_friction_adds_no_current)
+{
+    SpeedCascadeUnderTest cleared{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    cleared.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+    cleared.cascade->ClearFrictionFeedForward();
+
+    ExpectSameDuty(FirstDutyAfterSpeedStep(cleared, 50.0f), FirstDutyAfterSpeedStep(reference, 50.0f));
+}
+
+TEST_F(TestSpeedCascade, friction_is_not_added_to_the_current_a_current_command_asks_for)
+{
+    SpeedCascadeUnderTest commanded{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    commanded.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+    auto firstDuty = [](SpeedCascadeUnderTest& under)
+    {
+        under.cascade->EnableCurrentCommand();
+        under.cascade->CommandCurrent(foc::Ampere{ 1.0f });
+        foc::Radians position{ 0.0f };
+        under.cascade->Calculate(ZeroCurrents(), position);
+        under.lowPriorityInterrupt.TriggerHandler();
+        return under.cascade->Calculate(ZeroCurrents(), position);
+    };
+
+    ExpectSameDuty(firstDuty(commanded), firstDuty(reference));
+}
+
+TEST_F(TestSpeedCascade, a_friction_beyond_the_current_envelope_adds_no_current)
+{
+    SpeedCascadeUnderTest implausible{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    implausible.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ 1.5f }, foc::NewtonMeter{ 0.1f });
+
+    ExpectSameDuty(FirstDutyAfterSpeedStep(implausible, 50.0f), FirstDutyAfterSpeedStep(reference, 50.0f));
+}

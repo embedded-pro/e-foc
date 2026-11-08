@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.16.0
+version: 0.16.1
 component: service-nvm
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.16.0                       |
+| Version   | 0.16.1                       |
 | Component | service-nvm                  |
 | Date      | 2026-11-08                   |
 
@@ -288,7 +288,7 @@ stateDiagram-v2
 | fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF                 |
 | currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor                |
 | inertia              | kg·m²         | Estimated rotor inertia                                          |
-| frictionCoulomb      | N·m           | Coulomb (constant) friction                                      |
+| frictionCoulomb      | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
 | frictionViscous      | N·m·s/rad     | Viscous friction coefficient                                     |
 | encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service)              |
 | currentLoopBandwidth | rad/s         | Not measured: carried from the previous record; 0 = automatic    |

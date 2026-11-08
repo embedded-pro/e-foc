@@ -12,9 +12,10 @@ namespace services
         MOCK_METHOD(void, Measure,
             (foc::NewtonMeter torqueConstant,
                 foc::NewtonMeterSecondSquared inertia,
+                foc::NewtonMeterSecondPerRadian viscousFriction,
                 std::size_t polePairs,
                 const Config& config,
-                const infra::Function<void(std::optional<CoggingMap>)>& onDone),
+                const infra::Function<void(const CoggingMeasurement&)>& onDone),
             (override));
         MOCK_METHOD(bool, IsRunning, (), (const, override));
         MOCK_METHOD(void, Abort, (), (override));

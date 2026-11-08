@@ -2,9 +2,9 @@
 title: "FOC Controllers — Map and Trade-offs"
 type: theory
 status: draft
-version: 0.4.2
+version: 0.4.3
 component: "foc-controllers"
-date: 2026-10-29
+date: 2026-11-08
 ---
 
 | Field     | Value                                |
@@ -220,9 +220,10 @@ controller tuned against a current loop that later changes is tuned against the 
 | Position | P2 | Cascade P→PI                | [position-loop-cascade-p.md](position-loop-cascade-p.md)       |
 | Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
 
-Friction compensation is not implemented: the mechanical estimator fits a Coulomb term internally but does not
-output it, and no cascade applies a friction feed-forward. Cogging, the other low-speed torque disturbance, is
-compensated (`documentation/design/service-cogging-compensation.md`).
+Friction is compensated in the speed and position cascades by a Coulomb feed-forward on the quadrature-current
+reference, with the dry friction measured by the cogging-map step (`documentation/theory/disturbances-and-noise.md`,
+*Friction*). Cogging, the other low-speed torque disturbance, is compensated too
+(`documentation/design/service-cogging-compensation.md`).
 
 ---
 

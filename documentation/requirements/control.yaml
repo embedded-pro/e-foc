@@ -71,3 +71,14 @@
     between two points inside them without crossing the excluded arc, and enter Fault with
     positionLimit within 2 ms of the rotor being carried more than four encoder counts outside
     them.
+
+- id: REQ-CTL-008
+  title: Speed and position mode counter the rotor's dry friction
+  status: implemented
+  verification: [mil, unit]
+  shall: >
+    In speed and position mode, once the calibration has stored a dry friction, the drive shall
+    add the torque that cancels it in the direction the speed reference asks the rotor to turn,
+    fading it out as the reference nears zero so that it does not chatter about
+    standstill, and shall keep the total demand within the current limit. Torque mode shall add
+    none, and a slow start from rest shall meet less speed error than it does without it.

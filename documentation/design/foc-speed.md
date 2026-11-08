@@ -2,9 +2,9 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: foc-speed
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value             |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.3.0             |
+| Version   | 0.3.1             |
 | Component | foc-speed         |
-| Date      | 2026-11-05        |
+| Date      | 2026-11-08        |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -98,11 +98,18 @@ by −2π; if it is less than −π, it is shifted by +2π. This produces a sign
 
 The speed PID receives the speed error (setpoint minus estimate) and produces the Iq setpoint. Its output is clamped to ± maxCurrent (in Ampere), which directly limits the peak torque the motor can apply while tracking the speed command. This clamp is the primary over-current protection for the speed-control mode.
 
-The inner loop clamps the q-axis reference it receives, the law's output plus the cogging feed-forward, once
+The inner loop clamps the q-axis reference it receives, the law's output plus the friction and cogging feed-forwards, once
 more, to a current limit that starts at maxCurrent and that the motor's overload protection can lower
 (`fault-supervision.md` Part I). The limit reaches the interrupt as one single-precision store, written from the
 event loop in any state and capped at maxCurrent. The law does not see this second clamp: while it cuts the
 output the law keeps integrating up to its own clamp at maxCurrent.
+
+The friction feed-forward is the Coulomb current of the calibration (`service-cogging-compensation.md`, Part F)
+times a sign of the speed reference that ramps through zero over ±2 rad/s. The outer loop evaluates it with the law,
+once per period, and holds it for the interrupt; a current command or a law that commands current directly holds none.
+Because the law's integrator is charged while the rotor accelerates, a law that integrates may overshoot a start
+more with the feed-forward than without it, where the integrator alone had to supply the friction; the
+feed-forward does not enter the law's own limit or its integrator.
 
 The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
 adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable. It runs in

@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.12.0
+version: 0.12.1
 component: state-machine
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.12.0                     |
+| Version   | 0.12.1                     |
 | Component | state-machine              |
 | Date      | 2026-11-08                 |
 
@@ -282,7 +282,7 @@ sequenceDiagram
 | 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified              |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor            |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` (fixed 100 rad/s) |
-| 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured            |
+| 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`, `frictionCoulomb`             |
 | 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                                   |
 
 The sequence starts only once the rotor is at rest: the encoder must stay within 2 mrad of where a
@@ -307,11 +307,15 @@ replacing an inertia entered or identified earlier with nothing would leave a sp
 uncalibrated again.
 
 The cogging map is measured with the speed loop configured from the identified mechanics, and a
-run that measures no map does not fail the calibration (`service-cogging-compensation.md`).
+run that measures no map does not fail the calibration (`service-cogging-compensation.md`). The same two-direction run
+measures the dry friction, kept even when the map is refused; an estimate that is negative, not finite or missing is stored
+as 0 and traced as none, and 0 means no friction feed-forward. In speed and position modes the friction is applied with the
+mechanics and the cogging map, and cleared with the map before the mechanical identification and the cogging step, so
+neither measures through an earlier calibration's compensation. Torque mode applies none.
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
-Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… psi_mWb=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=… In_mA=… cog_mNm=…`, where `In_mA` is the measured current noise, 0 when not measured, and `cog_mNm` is the peak of the cogging map, 0 when there is none. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… psi_mWb=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=… In_mA=… cog_mNm=… fc_mNm=…`, where `In_mA` is the measured current noise, 0 when not measured, `cog_mNm` is the peak of the cogging map, 0 when there is none, and `fc_mNm` is the Coulomb friction, 0 when there is none. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
 
 The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
 
@@ -1172,7 +1176,7 @@ sequenceDiagram
 | `CalibrationData` | `encoderIndexAngle`    | rad (float), mechanical        | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                                          |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
-| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Coulomb friction; currently 0 (not identified)                                                                                                                                                                          |
+| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                                        |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                                               |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTL-006                                                  |
 | `FaultCode`       | —                      | enum (uint8)                   | 14 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout`, `positionLimit` |

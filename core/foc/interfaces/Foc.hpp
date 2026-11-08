@@ -126,6 +126,16 @@ namespace foc
         virtual void ClearCoggingMap() = 0;
     };
 
+    class FrictionCompensable
+    {
+    protected:
+        ~FrictionCompensable() = default;
+
+    public:
+        virtual void LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant) = 0;
+        virtual void ClearFrictionFeedForward() = 0;
+    };
+
     class SpeedLimitable
     {
     protected:

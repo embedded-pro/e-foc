@@ -15,6 +15,7 @@ target_sources(e_foc.foc.math INTERFACE
     CoggingFeedForward.hpp
     FastTrigonometry.hpp
     FiniteGuard.hpp
+    FrictionFeedForward.hpp
     ParameterValidation.hpp
     TravelLimits.hpp
     WindingTemperature.hpp

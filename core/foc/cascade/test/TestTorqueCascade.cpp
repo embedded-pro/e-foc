@@ -5,6 +5,7 @@
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
+#include <type_traits>
 
 namespace
 {
@@ -798,4 +799,10 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_
     EXPECT_NEAR(DutyPercent(halved.a), DutyPercent(expected.a), 0.1f);
     EXPECT_NEAR(DutyPercent(halved.b), DutyPercent(expected.b), 0.1f);
     EXPECT_NEAR(DutyPercent(halved.c), DutyPercent(expected.c), 0.1f);
+}
+
+TEST(TestTorqueCascadeFriction, the_torque_cascade_has_no_friction_feed_forward)
+{
+    static_assert(!std::is_base_of_v<foc::FrictionCompensable, foc::TorqueCascade>);
+    SUCCEED();
 }

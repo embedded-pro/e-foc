@@ -12,6 +12,7 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestCoggingFeedForward.cpp
     TestFastTrigonometry.cpp
     TestFiniteGuard.cpp
+    TestFrictionFeedForward.cpp
     TestParameterValidation.cpp
     TestTravelLimits.cpp
     TestWindingTemperature.cpp

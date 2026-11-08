@@ -1,4 +1,5 @@
 #include "core/state_machine/CalibrationFlow.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
@@ -244,16 +245,33 @@ namespace application
 
     void CalibrationFlow::OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event)
     {
-        if (event.map)
+        const auto& map = event.measurement.map;
+        if (map)
         {
-            calibrating.pendingData.coggingTorque = event.map->torque;
-            calibrating.pendingData.coggingTorqueScale = event.map->torqueScale;
-            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << event.map->peak.Value() * milliPerUnit << " agreement=" << event.map->agreement;
+            calibrating.pendingData.coggingTorque = map->torque;
+            calibrating.pendingData.coggingTorqueScale = map->torqueScale;
+            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << map->peak.Value() * milliPerUnit << " agreement=" << map->agreement;
         }
         else
             env.tracer.Trace() << "[SM] Cogging map: none";
 
+        StoreFrictionCoulomb(calibrating, event.measurement.frictionCoulomb);
+
         Save(calibrating);
+    }
+
+    void CalibrationFlow::StoreFrictionCoulomb(state_machine::Calibrating& calibrating, foc::NewtonMeter measured)
+    {
+        if (foc::IsFinitePositive(measured.Value()))
+        {
+            calibrating.pendingData.frictionCoulomb = measured.Value();
+            env.tracer.Trace() << "[SM] Coulomb friction: mNm=" << measured.Value() * milliPerUnit;
+        }
+        else
+        {
+            calibrating.pendingData.frictionCoulomb = 0.0f;
+            env.tracer.Trace() << "[SM] Coulomb friction: none";
+        }
     }
 
     void CalibrationFlow::Save(state_machine::Calibrating& calibrating)
@@ -290,7 +308,8 @@ namespace application
                            << " Ib_mA=" << data.currentOffsetB * milliPerUnit
                            << " Ic_mA=" << data.currentOffsetC * milliPerUnit
                            << " In_mA=" << static_cast<uint32_t>(data.currentNoiseMilliAmpere)
-                           << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit;
+                           << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit
+                           << " fc_mNm=" << data.frictionCoulomb * milliPerUnit;
     }
 
     // Busy is contention with another writer of the shared NVM, not a failure of this record

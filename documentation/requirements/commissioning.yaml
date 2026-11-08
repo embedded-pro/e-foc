@@ -71,3 +71,13 @@
     position zero is the commissioned one or the start restores it from the encoder index, and
     shall start in speed and torque mode whatever the setting. Without the requirement, which is
     the default, the drive shall start in position mode as before.
+
+- id: REQ-CMS-008
+  title: The calibration measures the rotor's dry friction whatever constant load the shaft carries
+  status: implemented
+  verification: [mil, unit]
+  shall: >
+    In speed and position mode the calibration shall measure the rotor's dry friction, a torque
+    that opposes the motion whichever way the rotor turns, so that a constant torque on the shaft
+    does not enter it, and shall store it with the other mechanical parameters. A measurement that
+    is negative, not a number or cannot be made shall be stored as no dry friction.

@@ -52,6 +52,21 @@ namespace application
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
         ApplyCoggingMap(data);
+        ApplyFrictionFeedForward(data);
+    }
+
+    void OuterLoopStateMachine::ApplyFrictionFeedForward(const services::CalibrationData& data)
+    {
+        if (foc::IsFinitePositive(data.frictionCoulomb))
+            LoadFrictionCompensation(foc::NewtonMeter{ data.frictionCoulomb }, TorqueConstantFor(data));
+        else
+            ClearFrictionCompensation();
+    }
+
+    void OuterLoopStateMachine::ClearFeedForwards()
+    {
+        ClearCoggingCompensation();
+        ClearFrictionCompensation();
     }
 
     void OuterLoopStateMachine::ApplyCoggingMap(const services::CalibrationData& data)
@@ -105,7 +120,7 @@ namespace application
 
     bool OuterLoopStateMachine::ApplyProvisionalCurrentControl(const services::CalibrationData& pending)
     {
-        ClearCoggingCompensation();
+        ClearFeedForwards();
         return FocStateMachineCommon::ApplyProvisionalCurrentControl(pending);
     }
 
@@ -127,9 +142,9 @@ namespace application
         calibrating.step = state_machine::CalibrationStep::coggingMap;
         GetTracer().Trace() << "[SM] Mapping cogging torque";
 
-        mapping->Measure(torqueConstant, foc::NewtonMeterSecondSquared{ pending.inertia }, static_cast<std::size_t>(pending.polePairs), CoggingConfig(), [this](std::optional<services::CoggingMap> map)
+        mapping->Measure(torqueConstant, foc::NewtonMeterSecondSquared{ pending.inertia }, foc::NewtonMeterSecondPerRadian{ pending.frictionViscous }, static_cast<std::size_t>(pending.polePairs), CoggingConfig(), [this](const services::CoggingMeasurement& measurement)
             {
-                Dispatch(state_machine::CoggingMapped{ map });
+                Dispatch(state_machine::CoggingMapped{ measurement });
             });
 
         return true;
@@ -220,7 +235,7 @@ namespace application
     {
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
         const auto pending = calibrating.pendingData;
-        ClearCoggingCompensation();
+        ClearFeedForwards();
 
         if (!ApplyIdentificationControl(pending))
         {

@@ -2,9 +2,9 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.2.1
+version: 1.2.2
 component: "foc"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                             |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.2.1                             |
+| Version   | 1.2.2                             |
 | Component | foc                               |
-| Date      | 2026-11-05                        |
+| Date      | 2026-11-08                        |
 
 ## Overview
 
@@ -263,6 +263,11 @@ The 1 kHz outer loop follows the same rules. The software position limits (`docu
 a compare to the cascade and to each difference the position law takes, and a wrap and a clamp of the reference while
 they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate put at 976–1295
 cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
+
+The Coulomb friction feed-forward (`documentation/theory/disturbances-and-noise.md`, *Friction*) is computed in the outer
+loop, not in the interrupt: one scaled, clamped multiply of the speed reference per period, inlined into
+`CascadeWithSpeedLoop::RunSpeedLoop` and listed in `cycle-analysis-outer.json` as `FrictionFeedForward::CurrentFor`. The
+20 kHz path gains one load and one addition of the stored current, before the clamp that was already there.
 
 ---
 

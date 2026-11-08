@@ -224,6 +224,16 @@ namespace foc
         ClearCoggingMapImpl();
     }
 
+    void PositionCascade::LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant)
+    {
+        LoadFrictionFeedForwardImpl(coulomb, torqueConstant);
+    }
+
+    void PositionCascade::ClearFrictionFeedForward()
+    {
+        ClearFrictionFeedForwardImpl();
+    }
+
     void PositionCascade::TrackBusVoltage(Volts measured)
     {
         TrackBusVoltageImpl(measured);

@@ -80,6 +80,8 @@ namespace application
         virtual const services::CoggingMapping* CoggingMappingImpl() const = 0;
         virtual void LoadCoggingCompensation(infra::MemoryRange<const int8_t> torque, float torqueScale, foc::NewtonMeter torqueConstant) = 0;
         virtual void ClearCoggingCompensation() = 0;
+        virtual void LoadFrictionCompensation(foc::NewtonMeter coulomb, foc::NewtonMeter torqueConstant) = 0;
+        virtual void ClearFrictionCompensation() = 0;
 
     private:
         bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant);
@@ -88,6 +90,8 @@ namespace application
         services::MechanicalParametersIdentification::Config ExcitationConfig() const;
         services::CoggingMapping::Config CoggingConfig() const;
         void ApplyCoggingMap(const services::CalibrationData& data);
+        void ApplyFrictionFeedForward(const services::CalibrationData& data);
+        void ClearFeedForwards();
 
         static constexpr float velocityBandwidthRadPerSec = 100.0f;
 

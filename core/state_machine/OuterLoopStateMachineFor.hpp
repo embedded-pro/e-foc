@@ -149,6 +149,18 @@ namespace application
                 focController.ClearCoggingMap();
         }
 
+        void LoadFrictionCompensation(foc::NewtonMeter coulomb, foc::NewtonMeter torqueConstant) override
+        {
+            if constexpr (std::is_base_of_v<foc::FrictionCompensable, Cascade>)
+                focController.LoadFrictionFeedForward(coulomb, torqueConstant);
+        }
+
+        void ClearFrictionCompensation() override
+        {
+            if constexpr (std::is_base_of_v<foc::FrictionCompensable, Cascade>)
+                focController.ClearFrictionFeedForward();
+        }
+
     private:
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;

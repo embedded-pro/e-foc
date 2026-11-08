@@ -77,9 +77,10 @@ namespace
 
         void Start(services::CoggingMapping::Config config = {})
         {
-            mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, polePairs, config, [this](std::optional<services::CoggingMap> map)
+            mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, foc::NewtonMeterSecondPerRadian{ 0.0f }, polePairs, config, [this](const services::CoggingMeasurement& measurement)
                 {
-                    result = map;
+                    result = measurement.map;
+                    frictionCoulomb = measurement.frictionCoulomb.Value();
                     reported = true;
                 });
         }
@@ -119,6 +120,7 @@ namespace
         float position{ 0.0f };
         float commandedSpeed{ 0.0f };
         std::optional<services::CoggingMap> result;
+        float frictionCoulomb{ -1.0f };
         bool reported{ false };
     };
 }
@@ -145,6 +147,18 @@ TEST_F(TestCoggingMappingImpl, turning_each_way_maps_the_cogging_the_winding_hel
     }
 }
 
+TEST_F(TestCoggingMappingImpl, turning_each_way_also_measures_the_dry_friction)
+{
+    ExpectRunStarted();
+    Start();
+
+    ExpectDriveReleased();
+    Run();
+
+    ASSERT_TRUE(reported);
+    EXPECT_NEAR(frictionCoulomb, dryFriction, 0.05f * dryFriction);
+}
+
 TEST_F(TestCoggingMappingImpl, a_phase_current_beyond_the_envelope_stops_the_bridge_and_yields_no_map)
 {
     ExpectRunStarted();
@@ -158,6 +172,7 @@ TEST_F(TestCoggingMappingImpl, a_phase_current_beyond_the_envelope_stops_the_bri
 
     EXPECT_TRUE(reported);
     EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(frictionCoulomb, 0.0f);
 }
 
 TEST_F(TestCoggingMappingImpl, a_rotor_that_does_not_turn_runs_into_the_timeout_without_a_map)
@@ -172,6 +187,7 @@ TEST_F(TestCoggingMappingImpl, a_rotor_that_does_not_turn_runs_into_the_timeout_
 
     EXPECT_TRUE(reported);
     EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(frictionCoulomb, 0.0f);
 }
 
 TEST_F(TestCoggingMappingImpl, an_aborted_run_releases_the_drive_and_never_reports)
@@ -190,9 +206,10 @@ TEST_F(TestCoggingMappingImpl, an_aborted_run_releases_the_drive_and_never_repor
 
 TEST_F(TestCoggingMappingImpl, a_request_without_pole_pairs_is_refused_at_once)
 {
-    mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, 0, {}, [this](std::optional<services::CoggingMap> map)
+    mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, foc::NewtonMeterSecondPerRadian{ 0.0f }, 0, {}, [this](const services::CoggingMeasurement& measurement)
         {
-            result = map;
+            result = measurement.map;
+            frictionCoulomb = measurement.frictionCoulomb.Value();
             reported = true;
         });
 

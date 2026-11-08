@@ -15,6 +15,7 @@ namespace mil
         inductance,
         inertia,
         friction,
+        dryFriction,
         cogging,
         fluxLinkage
     };
@@ -34,6 +35,8 @@ namespace mil
                 return "inertia";
             case Quantity::friction:
                 return "friction";
+            case Quantity::dryFriction:
+                return "dryFriction";
             case Quantity::cogging:
                 return "cogging";
             case Quantity::fluxLinkage:
@@ -54,6 +57,8 @@ namespace mil
                 return plant.rotorInertiaKgM2;
             case Quantity::friction:
                 return plant.viscousDampingNmSPerRad;
+            case Quantity::dryFriction:
+                return plant.coulombFrictionNm;
             case Quantity::cogging:
                 return plant.coggingTorqueNm;
             case Quantity::fluxLinkage:
@@ -74,6 +79,8 @@ namespace mil
                 return record.inertia;
             case Quantity::friction:
                 return record.frictionViscous;
+            case Quantity::dryFriction:
+                return record.frictionCoulomb;
             case Quantity::cogging:
                 return services::CoggingPeak(record.coggingTorque, record.coggingTorqueScale).Value();
             case Quantity::fluxLinkage:
@@ -94,6 +101,7 @@ namespace mil
                 return estimates.inertia.Value();
             case Quantity::friction:
                 return estimates.viscousFriction.Value();
+            case Quantity::dryFriction:
             case Quantity::cogging:
             case Quantity::fluxLinkage:
                 return 0.0f;

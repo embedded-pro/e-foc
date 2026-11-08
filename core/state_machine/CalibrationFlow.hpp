@@ -41,6 +41,7 @@ namespace application
     private:
         void RunFluxLinkageStep(state_machine::Calibrating& calibrating);
         bool IsIdentifyingFluxLinkage() const;
+        void StoreFrictionCoulomb(state_machine::Calibrating& calibrating, foc::NewtonMeter measured);
         void TraceRecord(const services::CalibrationData& data) const;
         void OnSaved(services::NvmStatus status);
         void RetrySave();

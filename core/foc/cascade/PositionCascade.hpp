@@ -12,6 +12,7 @@ namespace foc
         , public SpeedCommandable
         , public CurrentCommandable
         , public CoggingCompensable
+        , public FrictionCompensable
         , public CurrentLimitable
         , public BusVoltageTrackable
         , public PositionLimitable
@@ -51,6 +52,8 @@ namespace foc
 
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;
+        void LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant) override;
+        void ClearFrictionFeedForward() override;
         void LimitCurrent(Ampere limit) override;
         void TrackBusVoltage(Volts measured) override;
         void LimitTravel(Radians minimum, Radians maximum) override;

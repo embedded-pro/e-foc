@@ -36,6 +36,7 @@ namespace services
         }
 
         std::optional<CoggingMap> Build(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, float samplePeriod) const;
+        std::optional<foc::NewtonMeter> FrictionCoulomb(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, float samplePeriod) const;
 
     private:
         struct Bin
@@ -47,6 +48,12 @@ namespace services
 
         using Profile = std::array<float, bins>;
 
+        struct DirectionResult
+        {
+            Profile torque{};
+            float meanSpeed{ 0.0f };
+        };
+
         ALWAYS_INLINE_HOT static std::size_t BinOf(float electricalAngle)
         {
             constexpr float perPeriod{ 0.5f * std::numbers::inv_pi_v<float> };
@@ -56,7 +63,8 @@ namespace services
             return bin < bins ? bin : bins - 1;
         }
 
-        std::optional<Profile> DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const;
+        std::optional<DirectionResult> DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const;
+        static float Mean(const Profile& profile);
         static float Agreement(const Profile& forward, const Profile& backward);
 
         std::array<std::array<Bin, bins>, 2> accumulated{};
