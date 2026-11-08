@@ -1,5 +1,5 @@
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -37,7 +37,6 @@ namespace services
         if (std::abs(reference) < minimumDirectCurrent)
             return;
 
-        // A step of the reference lies inside its window, so the window's mean says nothing of whether the current follows.
         if (std::abs(referenceChange) < minimumDirectCurrent)
             following = std::abs(window.meanId.Value()) >= minimumFollowedFraction * std::abs(reference);
 
@@ -70,7 +69,7 @@ namespace services
         const auto resistance = estimator->Coefficients().at(0, 0);
         const auto inductance = estimator->Coefficients().at(1, 0);
 
-        if (!foc::IsFiniteValue(resistance) || !foc::IsFiniteValue(inductance) || resistance <= 0.0f || inductance <= 0.0f)
+        if (!math::IsFinite(resistance) || !math::IsFinite(inductance) || resistance <= 0.0f || inductance <= 0.0f)
             return;
 
         currentResistance = foc::Ohm{ resistance };

@@ -62,8 +62,8 @@
         "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
         "ClarkePark::Forward",
         "ExceedsInjectionLimit",
-        "PositionWithWrapAround",
-        "IsFiniteValue",
+        "math::WrapToPi",
+        "math::IsFinite",
         "MechanicalParametersIdentificationImpl::Post",
         "IsMechanicallyObservable"
       ]

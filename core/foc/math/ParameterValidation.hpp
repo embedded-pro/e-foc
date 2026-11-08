@@ -1,23 +1,23 @@
 #pragma once
 
 #include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 
 namespace foc
 {
     inline bool IsWithinInclusive(float value, float minValue, float maxValue)
     {
-        return IsFiniteValue(value) && value >= minValue && value <= maxValue;
+        return math::IsFinite(value) && value >= minValue && value <= maxValue;
     }
 
     inline bool IsFinitePositive(float value)
     {
-        return IsFiniteValue(value) && value > 0.0f;
+        return math::IsFinite(value) && value > 0.0f;
     }
 
     inline bool IsFiniteNonNegative(float value)
     {
-        return IsFiniteValue(value) && value >= 0.0f;
+        return math::IsFinite(value) && value >= 0.0f;
     }
 
     inline bool IsAcceptableCurrentBandwidth(float bandwidth)

@@ -1,5 +1,5 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -17,8 +17,6 @@ namespace
     constexpr uint32_t samplingFrequency = 20000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
 
-    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
-    // rather than folded away against a compile-time constant
     float NonFinite(uint32_t bits)
     {
         volatile uint32_t opaque = bits;
@@ -229,7 +227,7 @@ TEST_F(TestCurrentPlantModel, a_voltage_vector_outside_the_modulation_circle_kee
 
 TEST_F(TestCurrentPlantModel, an_infinite_electrical_parameter_is_rejected_rather_than_passing_the_positive_test)
 {
-    ASSERT_FALSE(foc::IsFiniteValue(Infinity()));
+    ASSERT_FALSE(math::IsFinite(Infinity()));
 
     auto resistanceParameters = ValidParameters();
     resistanceParameters.resistance = foc::Ohm{ Infinity() };

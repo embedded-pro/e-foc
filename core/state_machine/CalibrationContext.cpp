@@ -1,6 +1,7 @@
 #include "core/state_machine/CalibrationContext.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <numbers>
 
@@ -45,9 +46,9 @@ namespace application
     bool CalibrationContext::HasFiniteElectricalParameters(const services::CalibrationData& data)
     {
         return foc::IsFinitePositive(data.rPhase) &&
-               foc::IsFiniteValue(data.lD) &&
-               foc::IsFiniteValue(data.fluxLinkage) &&
-               foc::IsFiniteValue(data.currentLoopBandwidth);
+               math::IsFinite(data.lD) &&
+               math::IsFinite(data.fluxLinkage) &&
+               math::IsFinite(data.currentLoopBandwidth);
     }
 
     bool CalibrationContext::IsComplete(bool modeSpecificValid) const

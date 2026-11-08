@@ -1,21 +1,20 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include "numerical/math/Math.hpp"
 
 namespace foc
 {
     class FrictionFeedForward
     {
     public:
-        // Mechanical rad/s: about one encoder count of speed at the 1 kHz outer loop for a 4000-count encoder.
         static constexpr float rampWidth{ 2.0f };
 
         void Load(NewtonMeter coulomb, NewtonMeter torqueConstant, Ampere ceiling)
         {
             const auto current = coulomb.Value() / torqueConstant.Value();
-            const bool plausible = IsFiniteValue(current) && torqueConstant.Value() > 0.0f && current >= 0.0f && current < ceiling.Value();
+            const bool plausible = math::IsFinite(current) && torqueConstant.Value() > 0.0f && current >= 0.0f && current < ceiling.Value();
             amplitude = plausible ? current : 0.0f;
         }
 

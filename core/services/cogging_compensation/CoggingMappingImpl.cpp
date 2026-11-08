@@ -1,10 +1,10 @@
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -37,7 +37,7 @@ namespace services
 
     void CoggingMappingImpl::Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone)
     {
-        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !foc::IsFiniteValue(inertia.Value()) || inertia.Value() < 0.0f || !foc::IsFiniteValue(viscousFriction.Value()) || viscousFriction.Value() < 0.0f || polePairs == 0)
+        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !math::IsFinite(inertia.Value()) || inertia.Value() < 0.0f || !math::IsFinite(viscousFriction.Value()) || viscousFriction.Value() < 0.0f || polePairs == 0)
         {
             onDone(CoggingMeasurement{});
             return;
@@ -109,7 +109,7 @@ namespace services
         }
 
         const auto position = encoder.Read().Value();
-        const auto rotation = foc::detail::PositionWithWrapAround(position - previousPosition);
+        const auto rotation = math::WrapToPi(position - previousPosition);
         previousPosition = position;
         turned += rotation;
 

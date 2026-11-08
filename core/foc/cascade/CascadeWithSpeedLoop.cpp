@@ -1,5 +1,4 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/DelayCompensation.hpp"
 #include <algorithm>

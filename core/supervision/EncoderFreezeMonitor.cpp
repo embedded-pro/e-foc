@@ -1,5 +1,5 @@
 #include "core/supervision/EncoderFreezeMonitor.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -60,7 +60,7 @@ namespace supervision
         if (now - anchorTime < evaluationPeriod)
             return;
 
-        const auto travel = std::abs(foc::detail::PositionWithWrapAround(reading - *anchor));
+        const auto travel = std::abs(math::WrapToPi(reading - *anchor));
 
         if (travel >= 0.5f * armedLimits.encoderStep.Value())
             NoteTravel(reading, travel, now);

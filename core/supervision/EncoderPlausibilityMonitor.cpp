@@ -1,5 +1,5 @@
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cmath>
 #include <variant>
 
@@ -79,7 +79,7 @@ namespace supervision
             return;
         }
 
-        const auto travel = foc::detail::PositionWithWrapAround(reading - *travelAnchor);
+        const auto travel = math::WrapToPi(reading - *travelAnchor);
         if (std::abs(travel) < config.maximumStillExcursion.Value())
             return;
 
@@ -89,7 +89,7 @@ namespace supervision
 
     bool EncoderPlausibilityMonitor::StillForWholeWindow(float reading)
     {
-        if (!tracking || std::abs(foc::detail::PositionWithWrapAround(reading - anchor)) >= config.maximumStillExcursion.Value())
+        if (!tracking || std::abs(math::WrapToPi(reading - anchor)) >= config.maximumStillExcursion.Value())
         {
             anchor = reading;
             stillFor = infra::Duration{};
@@ -105,7 +105,6 @@ namespace supervision
     {
         Restart();
 
-        // A stall the operator chose not to report keeps the watch going, so a later encoder loss is still raised
         if (overpowered && !config.stallDetection)
             return;
 

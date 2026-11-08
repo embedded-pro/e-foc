@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -35,7 +35,7 @@ namespace foc
                 seeded = true;
             }
 
-            shapedReference = detail::PositionWithWrapAround(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
+            shapedReference = math::WrapToPi(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
 
             return Radians{ shapedReference };
         }
