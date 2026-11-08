@@ -1,9 +1,9 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -77,7 +77,7 @@ namespace services
         measurementSamples = activeConfig.measurementPeriods * samplesPerPeriod;
         sampleCount = 0;
         sumSquared = 0.0f;
-        const auto binPhasor = foc::FastTrigonometry::AccurateSineAndCosine(phaseIncrement);
+        const auto binPhasor = math::AccurateSineAndCosine(phaseIncrement);
         goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, measurementSamples);
 
         return true;
@@ -94,7 +94,6 @@ namespace services
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
 
-        // The interrupt can trip between registering the callback and the write above, which would re-arm the bridge it stopped.
         if (finishing)
         {
             driver.Stop();
@@ -109,14 +108,12 @@ namespace services
         if (!onDone)
             return;
 
-        // Ended before the bridge stops: a sample taken in between would write the injection and re-arm it
         finishing = true;
         noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
     }
 
-    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void SinusoidalInductanceEstimator::Finish(bool measured)
     {
         driver.Stop();
@@ -171,7 +168,7 @@ namespace services
     {
         sampleSeen = true;
 
-        const float vNorm = injectionAmplitude * foc::FastTrigonometry::Sine(injectionPhase);
+        const float vNorm = injectionAmplitude * math::FastSine(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));
 
@@ -211,7 +208,7 @@ namespace services
         auto I = goertzel->Result();
 
         const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples) / static_cast<float>(samplingFrequency.Value());
-        const auto delay = foc::FastTrigonometry::AccurateSineAndCosine(delayAngle);
+        const auto delay = math::AccurateSineAndCosine(delayAngle);
         const float iRe = I.Real() * delay.cosine - I.Imaginary() * delay.sine;
         const float iIm = I.Real() * delay.sine + I.Imaginary() * delay.cosine;
 

@@ -1,10 +1,10 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -130,7 +130,6 @@ namespace services
         }
     }
 
-    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void ElectricalParametersIdentificationImpl::FinishPolePairs()
     {
         driver.Stop();
@@ -175,9 +174,8 @@ namespace services
         const float voltage = foc::DutyFraction(polePairsConfig.testVoltage);
 
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle))));
 
-        // The interrupt can trip between this step's check and the write above, which would re-arm the bridge it stopped.
         if (polePairsFinishing)
         {
             driver.Stop();
@@ -189,7 +187,6 @@ namespace services
                 if (!polePairsRunning || polePairsFinishing)
                     return;
 
-                // A rotor on the first vector's null moves only once a later one pulls it; wait a turn.
                 const auto currentPosition = encoder.Read();
                 if (currentSampleIndex > leadInSteps)
                 {

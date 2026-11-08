@@ -1,11 +1,11 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -26,8 +26,8 @@ namespace
     foc::PhaseCurrents CurrentsProducing(float torque, float position)
     {
         const auto electricalAngle = position * static_cast<float>(polePairs);
-        const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle);
-        const auto sine = foc::FastTrigonometry::Sine(electricalAngle);
+        const auto cosine = math::FastCosine(electricalAngle);
+        const auto sine = math::FastSine(electricalAngle);
         const foc::ClarkePark transform;
 
         const auto unitGain = transform.Forward(transform.Inverse(foc::RotatingFrame{ 0.0f, 1.0f }, cosine, sine), cosine, sine).q;

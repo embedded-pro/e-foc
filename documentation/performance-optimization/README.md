@@ -127,12 +127,11 @@ float sin_val = trig->Sine(angle);
 
 **Prefer** (static dispatch, inlinable):
 ```cpp
-struct FastTrigonometry {
-    static inline float Sine(float angle) noexcept {
-        return LookupTable[index];  // Direct access, fully inlined
-    }
-};
-float sin_val = FastTrigonometry::Sine(angle);
+template<typename T>
+OPTIMIZE_FOR_SPEED T FastSine(T angle) {
+    return fastSineTable[index];  // Direct access, fully inlined
+}
+float sin_val = math::FastSine(angle);
 ```
 
 ### 2. Avoid `std::optional` in Performance-Critical Code
@@ -151,7 +150,7 @@ if (!hasSetPoint) [[unlikely]] return;
 
 ```cpp
 // Computed entirely at compile time — zero runtime cost
-inline constexpr std::array<float, 512> sineLUT = []() {
+inline constexpr std::array<float, 512> fastSineTable = []() {
     std::array<float, 512> table{};
     for (size_t i = 0; i < 512; ++i)
         table[i] = std::sin(2.0f * M_PI * i / 512.0f);

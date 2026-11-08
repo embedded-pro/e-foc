@@ -1,9 +1,9 @@
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -114,7 +114,7 @@ namespace services
         turned += rotation;
 
         const auto electricalAngle = position * static_cast<float>(polePairs);
-        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
 
         Advance(electricalAngle, rotatingFrame.q, rotation);
     }

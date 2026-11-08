@@ -1,6 +1,6 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/DelayCompensation.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <algorithm>
 #include <chrono>
 
@@ -129,8 +129,8 @@ namespace foc
         auto electricalAngle = mechanicalAngle * polePairs;
         speedDifferentiator.Track(mechanicalAngle);
 
-        auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
-        auto sinTheta = FastTrigonometry::Sine(electricalAngle);
+        auto cosTheta = math::FastCosine(electricalAngle);
+        auto sinTheta = math::FastSine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
         if (currentStream != nullptr)

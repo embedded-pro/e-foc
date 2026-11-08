@@ -1,9 +1,9 @@
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <array>
 #include <cmath>
 #include <gtest/gtest.h>
@@ -313,7 +313,7 @@ TEST_F(MotorModelTest, the_phase_currents_read_back_in_the_frame_the_rotor_has_r
     const auto electricalAngle = static_cast<float>(foc::M_2310P_LN_04K::parameters.p) * model->MechanicalAngle().Value();
     const auto phases = model->LastMeasuredCurrents();
     const auto dq = transform.Forward(foc::ThreePhase{ phases.a.Value(), phases.b.Value(), phases.c.Value() },
-        foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+        math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
     const auto modelled = model->LastDqCurrents();
 
     ASSERT_GT(std::abs(model->MechanicalSpeed().Value()), 5.0f);

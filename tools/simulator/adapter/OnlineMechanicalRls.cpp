@@ -1,6 +1,6 @@
 #include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 
 namespace simulator
 {
@@ -29,7 +29,7 @@ namespace simulator
     void OnlineMechanicalRls::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond)
     {
         const float thetaElec = static_cast<float>(polePairs) * thetaMech.Value();
-        const auto idq = park.Forward(clarke.Forward({ currents.a.Value(), currents.b.Value(), currents.c.Value() }), foc::FastTrigonometry::Cosine(thetaElec), foc::FastTrigonometry::Sine(thetaElec));
+        const auto idq = park.Forward(clarke.Forward({ currents.a.Value(), currents.b.Value(), currents.c.Value() }), math::FastCosine(thetaElec), math::FastSine(thetaElec));
         window.Accumulate(idq.q, primed ? math::WrapToPi(thetaMech.Value() - previousAngle) : 0.0f);
         previousAngle = thetaMech.Value();
         primed = true;

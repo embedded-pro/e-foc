@@ -8,7 +8,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 - `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
-- `core/foc/math/` — `FastTrigonometry.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); angle wrapping and finiteness come from the toolbox (`math::WrapToPi`, `math::IsFinite`)
+- `core/foc/math/` — `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `EncoderModel` and `PhaseCurrentSensor`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
@@ -35,7 +35,7 @@ Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStora
 
 `Calculate()` runs at 20 kHz in interrupt. Budget: **≤4500 cycles at 120 MHz** (inner loop, 75% of the 6000-cycle period); **≤20000** (1 kHz outer loop).
 
-Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp` or another lookup table. No blocking calls in any ISR-reachable code. `Calculate()` delegates to focused helper methods.
+Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `math::FastSine`/`math::FastCosine` from `numerical/math/FastTrigonometry.hpp` or another lookup table. No blocking calls in any ISR-reachable code. `Calculate()` delegates to focused helper methods.
 
 Also forbidden: per-sample validation — no plausibility check on the phase currents and no finiteness check on
 currents or duty cycles in the 20 kHz path. Sensor and power-stage failures belong to the hardware protection path.

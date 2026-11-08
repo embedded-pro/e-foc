@@ -1,9 +1,9 @@
 #include "core/services/index_search/IndexSearchImpl.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -139,7 +139,7 @@ namespace services
     void IndexSearchImpl::OutputVector()
     {
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ amplitude, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ amplitude, 0.0f }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle))));
     }
 
     void IndexSearchImpl::FailFromInterrupt()

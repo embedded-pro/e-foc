@@ -1,5 +1,5 @@
 #include "core/foc/model/ElectricalPlant.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 
 namespace foc
 {
@@ -37,14 +37,14 @@ namespace foc
     foc::RotatingFrame ElectricalPlant::Step(const foc::ThreePhase& phaseVoltages, foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding, float dt)
     {
         const auto stepRotation = omega.Value() * dt;
-        const auto cosTheta = foc::FastTrigonometry::Cosine(theta.Value());
-        const auto sinTheta = foc::FastTrigonometry::Sine(theta.Value());
+        const auto cosTheta = math::FastCosine(theta.Value());
+        const auto sinTheta = math::FastSine(theta.Value());
         const auto midAngle = theta.Value() + 0.5f * stepRotation;
         const auto endAngle = theta.Value() + stepRotation;
-        const auto cosEnd = foc::FastTrigonometry::Cosine(endAngle);
-        const auto sinEnd = foc::FastTrigonometry::Sine(endAngle);
+        const auto cosEnd = math::FastCosine(endAngle);
+        const auto sinEnd = math::FastSine(endAngle);
 
-        const auto vDq = park.Forward(clarke.Forward(phaseVoltages), foc::FastTrigonometry::Cosine(midAngle), foc::FastTrigonometry::Sine(midAngle));
+        const auto vDq = park.Forward(clarke.Forward(phaseVoltages), math::FastCosine(midAngle), math::FastSine(midAngle));
         const auto iDqAtStart = park.Forward(clarke.Forward(foc::ThreePhase{ ia.Value(), ib.Value(), ic.Value() }), cosTheta, sinTheta);
 
         auto id = iDqAtStart.d;

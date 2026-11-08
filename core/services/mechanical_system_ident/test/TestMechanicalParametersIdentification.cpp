@@ -1,12 +1,12 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <algorithm>
 #include <cmath>
 #include <gmock/gmock.h>
@@ -39,8 +39,8 @@ namespace
     foc::PhaseCurrents CurrentsProducing(float torque, float position)
     {
         const auto electricalAngle = position * polePairs;
-        const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle);
-        const auto sine = foc::FastTrigonometry::Sine(electricalAngle);
+        const auto cosine = math::FastCosine(electricalAngle);
+        const auto sine = math::FastSine(electricalAngle);
         const foc::ClarkePark transform;
 
         const auto unitGain = transform.Forward(transform.Inverse(foc::RotatingFrame{ 0.0f, 1.0f }, cosine, sine), cosine, sine).q;
@@ -188,8 +188,8 @@ namespace
             foc::PhaseCurrents Currents() const
             {
                 const auto electricalAngle = Position().Value() * static_cast<float>(model.polePairs);
-                const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle);
-                const auto sine = foc::FastTrigonometry::Sine(electricalAngle);
+                const auto cosine = math::FastCosine(electricalAngle);
+                const auto sine = math::FastSine(electricalAngle);
                 const auto quadrature = torque / model.torqueConstant / (cosine * cosine + sine * sine);
                 const auto phases = foc::ClarkePark{}.Inverse(foc::RotatingFrame{ 0.0f, quadrature }, cosine, sine);
                 return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
