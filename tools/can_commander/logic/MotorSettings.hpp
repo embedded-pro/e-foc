@@ -75,6 +75,7 @@ namespace tool
     std::span<const SettingPresentation> StatusReadings();
     std::span<const SettingPresentation> RecalibrationSettings();
     std::span<const SettingPresentation> RecalibrationReadings();
+    std::span<const SettingPresentation> HomingSettings();
     std::span<const std::string_view> RecalibrationModes();
     std::string_view RecalibrationModeName(float mode);
     std::string_view ResetCauseName(float cause);

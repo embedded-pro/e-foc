@@ -21,6 +21,7 @@ namespace application
         state_machine::FaultCode LastFaultCode() const;
         bool HasPendingFault() const;
 
+        void RequireHoming(bool required);
         bool IsEnableAllowed(const state_machine::Ready& ready);
         bool IsEnablePreparationDue() const;
         bool IsIndexSearchDue() const;
@@ -65,6 +66,7 @@ namespace application
         IndexReference index;
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         bool faultDispatched{ false };
+        bool homingRequired{ false };
         infra::Function<void()> readyHandler;
         infra::Function<void(state_machine::FaultCode)> faultEnteredHandler;
     };

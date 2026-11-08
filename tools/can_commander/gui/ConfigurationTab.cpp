@@ -102,6 +102,12 @@ namespace tool
                                 "never across the angle outside them. Stored at once and in force from the next control period.");
         note->setWordWrap(true);
         form.addRow(note);
+
+        AddEditors(form, HomingSettings());
+        auto* homingNote = new QLabel("With homing required, position mode starts only once a calibration or the encoder index "
+                                      "has set the commissioned zero in this power-up. Speed and torque mode are not held back.");
+        homingNote->setWordWrap(true);
+        form.addRow(homingNote);
     }
 
     void ConfigurationTab::BuildThermalGroup()
@@ -223,6 +229,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetHomingUnavailable(const QString& reason)
+    {
+        if (reason == homingReason)
+            return;
+
+        homingReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::SetTargetWindowUnavailable(const QString& reason)
     {
         if (reason == targetWindowReason)
@@ -258,6 +274,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
             else if (IsIn(BusVoltageSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
+            else if (IsIn(HomingSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? homingReason : legacyReason);
             else if (IsIn(RecalibrationSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? recalibrationReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)

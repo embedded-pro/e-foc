@@ -43,7 +43,7 @@ namespace can
                 if (id >= static_cast<uint8_t>(range.first) && id <= static_cast<uint8_t>(range.last))
                     return range.group;
 
-            if (parameter == FocParameter::targetReached)
+            if (parameter == FocParameter::targetReached || parameter == FocParameter::homed)
                 return ParameterGroup::motion;
             if (parameter == FocParameter::windingTemperature)
                 return ParameterGroup::thermal;
@@ -111,6 +111,7 @@ namespace can
             case FocParameter::positionWindowTime:
             case FocParameter::positionMinimum:
             case FocParameter::positionMaximum:
+            case FocParameter::homingRequired:
             case FocParameter::calibrationTemperature:
             case FocParameter::temperatureLimit:
             case FocParameter::temperatureMargin:
@@ -335,6 +336,8 @@ namespace can
                 return config.limits.busVoltageMinimum;
             case FocParameter::busVoltageMaximum:
                 return config.limits.busVoltageMaximum;
+            case FocParameter::homingRequired:
+                return config.homingRequired != 0 ? 1.0f : 0.0f;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -394,6 +397,9 @@ namespace can
                 break;
             case FocParameter::busVoltageMaximum:
                 config.limits.busVoltageMaximum = value;
+                break;
+            case FocParameter::homingRequired:
+                config.homingRequired = value != 0.0f ? 1 : 0;
                 break;
             default:
                 config.limits.overspeedLimit = value;

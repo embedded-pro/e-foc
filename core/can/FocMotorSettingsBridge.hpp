@@ -46,6 +46,7 @@ namespace can
         FocParameterValue HeldOnlineEstimate(FocParameter parameter) const;
         FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
         FocParameterValue HeldPlatformReading(FocParameter parameter) const;
+        FocParameterValue HeldMotionReading(FocParameter parameter) const;
         FocParameterValue HeldWindingTemperature() const;
         FocParameterValue HeldRecalibrationReading(FocParameter parameter) const;
 

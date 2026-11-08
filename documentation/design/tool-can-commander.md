@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.18.0
+version: 0.19.0
 component: "tool-can-commander"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.18.0               |
+| Version   | 0.19.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-08           |
 
@@ -112,6 +112,7 @@ graph TD
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
 | Target reached                                    | *Yes* once position mode reports its target reached, *No* otherwise; "—" before 2.10                      | `targetReached`, read with each status  |
 | Winding temperature                               | °C from the online resistance; "—" in torque mode, uncalibrated or before 2.13                            | `windingTemperature`, with each status  |
+| Homed                                             | *Yes* once the position zero is the commissioned one, *No* otherwise; "—" before 2.19                     | `homed`, read with each status          |
 | Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
 | Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
@@ -259,7 +260,11 @@ flowchart LR
   Its **Travel Limits** group holds the position minimum and maximum of contract 2.11 (`foc-position.md`,
   Software Position Limits). The group says they are measured from the alignment zero and are off while the
   minimum is not below the maximum, and that when on, position mode refuses a setpoint outside them and moves
-  the direct way between them. They are stored at once and in force from the next control period.
+  the direct way between them. They are stored at once and in force from the next control period. The same group
+  holds the **Require homing** toggle of contract 2.19 (`foc-position.md`, Homing and the Position Reference)
+  with a note: position mode then starts only once a calibration or the encoder index has set the commissioned
+  zero in this power-up, and speed and torque mode are not held back. The Motor Status group shows the *Homed*
+  reading next to *Target reached*.
   Its **Thermal** group holds the calibration temperature of contract 2.13 (`fault-supervision.md` Part K): the
   winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
   from; and the temperature limit and margin of contract 2.14, over which speed and position mode derate the current
@@ -305,6 +310,8 @@ commander does not ask it for them, and the Supply Limits fields are disabled wi
 has no online recalibration: the commander does not ask it for the mode or the model in use, and the Online
 Recalibration field and both Diagnostics buttons are disabled with the reason; a node of 2.17 has no Reset Model, which
 is disabled with the reason.
+A node older than 2.19 has no homing: the commander does not ask it for the homed reading or the requirement, and the
+Require homing toggle is disabled with the reason.
 
 ### Part K — diagnostics
 

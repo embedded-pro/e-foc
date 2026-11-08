@@ -260,3 +260,27 @@ TEST(FocMotorSettings, only_the_three_bandwidths_are_bandwidths)
 
     EXPECT_EQ(bandwidths, 3u);
 }
+
+TEST(FocMotorSettings, homing_required_is_a_stored_toggle_limit_and_homed_a_read_only_motion_reading)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::homingRequired, 1.0f);
+
+    EXPECT_EQ(config.homingRequired, uint8_t{ 1 });
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::homingRequired), 1.0f, 1e-6f);
+    can::WriteLimitSetting(config, can::FocParameter::homingRequired, 0.0f);
+    EXPECT_EQ(config.homingRequired, uint8_t{ 0 });
+    EXPECT_EQ(can::GroupOf(can::FocParameter::homingRequired), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::homed), can::ParameterGroup::motion);
+
+    const auto required = can::FindParameter(can::FocParameter::homingRequired);
+    ASSERT_TRUE(required.has_value());
+    EXPECT_FALSE(required->readOnly);
+    EXPECT_TRUE(required->integer);
+    const auto homed = can::FindParameter(can::FocParameter::homed);
+    ASSERT_TRUE(homed.has_value());
+    EXPECT_TRUE(homed->readOnly);
+    EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::homed), uint8_t{ 0xC2 });
+    EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::homingRequired), uint8_t{ 0x63 });
+}

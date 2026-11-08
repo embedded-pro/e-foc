@@ -29,6 +29,7 @@ namespace tool
         void OnFaultEvent(FocFaultCode fault);
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnTargetReached(bool reached);
+        void OnHomed(bool homed);
         void OnWindingTemperature(float celsius);
 
         void Clear();
@@ -54,6 +55,7 @@ namespace tool
         QLabel* motorStateLabel;
         QLabel* faultLabel;
         QLabel* targetReachedLabel;
+        QLabel* homedLabel;
         QLabel* windingTemperatureLabel;
 
         struct StreamSample

@@ -2182,6 +2182,62 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_StallDetectionOff_IsAcceptedWhileTheD
     ExpectAnswered(0.0f, false);
 }
 
+TEST_F(FocMotorCanBridgeTest, SetParameter_HomingRequired_IsStoredAndAnswered)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::homingRequired, 1.0f);
+
+    ASSERT_TRUE(savedConfig.has_value());
+    EXPECT_EQ(savedConfig->homingRequired, uint8_t{ 1 });
+    EXPECT_EQ(coordinator->Config().homingRequired, uint8_t{ 1 });
+    ExpectAnswered(1.0f, false);
+
+    DispatchQueryParameter(can::FocParameter::homingRequired);
+    ExpectAnswered(1.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_HomingRequired_ThatIsNotAToggle_IsRejected)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchSetParameter(can::FocParameter::homingRequired, 2.0f);
+
+    EXPECT_EQ(coordinator->Config().homingRequired, uint8_t{ 0 });
+    EXPECT_FALSE(savedConfig.has_value());
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_Homed_IsZeroBeforeTheDriveIsHomed)
+{
+    ConstructFixtureInReady();
+    AlignAfterBoot();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::homed);
+
+    ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, Start_InPositionMode_WithRequiredHomingAfterAPlainAlignment_IsRefused)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::homingRequired, 1.0f);
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_NE(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(coordinator->ActiveStateMachine().HasPendingAsyncWork());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
 TEST_F(FocMotorCanBridgeTest, SetParameter_TheOverspeedLimit_IsStoredAndInForceWhileTheDriveRuns)
 {
     ConstructFixtureInReady();

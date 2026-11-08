@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.15.0
+version: 0.16.0
 component: service-nvm
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.15.0                       |
+| Version   | 0.16.0                       |
 | Component | service-nvm                  |
-| Date      | 2026-11-06                   |
+| Date      | 2026-11-08                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -63,9 +63,10 @@ The service manages four independent EEPROM regions. Each region holds exactly o
 
 The calibration record's layout is at version 5. The encoder index angle (`service-index-search.md`) took its data from 108 to 112 bytes, as version 4's cogging map (`service-cogging-compensation.md`) had taken it from 56 to 108, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again. A record without an index angle holds a NaN there; the 121-byte record still fits the 128-byte calibration region.
 
-The configuration record's layout is at version 13. The recalibration mode (`online-recalibration.md`) took one of
-the two reserved bytes, so a record written at version 12 reads as a version mismatch and the configuration returns to
-its defaults. Version 12's bus-voltage minimum and maximum (`fault-supervision.md`
+The configuration record's layout is at version 14. The homing requirement (`foc-position.md`, Homing and the
+Position Reference) took the last reserved byte, so a record written at version 13 reads as a version mismatch and
+the configuration returns to its defaults; the record keeps its 168 bytes. Version 13's recalibration mode
+(`online-recalibration.md`) had taken one of the two reserved bytes, and version 12's bus-voltage minimum and maximum (`fault-supervision.md`
 Part L) took its data from 160 to 168 bytes, as version 11 had taken it from 152 to 160 bytes for the temperature limit
 and margin (Part K), version 10 from 148 to 152 bytes for the calibration temperature and version 9 from 140 to 148 bytes for the software position
 limits (`foc-position.md` Software Position Limits) and version 8 from 132 to 140 bytes for the
@@ -202,7 +203,7 @@ E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM); the faul
 records, the number its 128 bytes take. The configuration region grew
 from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the 24LC04;
 the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
-177-byte record of layout 13 fits in the 224 that remain, and no stored record moves. The NUCLEO-H563ZI and host targets use an in-memory stub of
+177-byte record of layout 14 fits in the 224 that remain, and no stored record moves. The NUCLEO-H563ZI and host targets use an in-memory stub of
 identical layout for regression testing.
 
 ### Power-Loss Mitigation
@@ -323,6 +324,7 @@ firmware derived, so the layout stays at version 4 and no stored calibration is 
 | currentTwoStepDeadbeat | —                               | Two-step variant of the deadbeat current law                                                                   |
 | stallDetection         | —                               | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
 | recalibrationMode      | —                               | Online recalibration: 0 off (the default), 1 on command, 2 automatic (`online-recalibration.md`)               |
+| homingRequired         | —                               | Whether position mode starts only once the drive is homed: 0 no (the default), 1 yes (`foc-position.md`)       |
 
 The limits are the overspeed limit (`fault-supervision.md` Part G), 1–5000 rad/s, default 1000; the
 following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H); the speed

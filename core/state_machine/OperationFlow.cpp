@@ -40,6 +40,11 @@ namespace application
         return faultController.IsPending();
     }
 
+    void OperationFlow::RequireHoming(bool required)
+    {
+        homingRequired = required;
+    }
+
     bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready)
     {
         faultController.SampleCondition();
@@ -56,9 +61,18 @@ namespace application
         const bool referenced = ready.rotorReferenceValid || env.context.IsRotorReferenceValid() || IsIndexSearchDue();
 
         if (!referenced)
+        {
             env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
+            return false;
+        }
 
-        return referenced;
+        if (homingRequired && !env.context.IsHomed() && !IsIndexSearchDue())
+        {
+            env.tracer.Trace() << "[SM] Enable rejected: position mode requires homing; calibrate or restore the reference from the encoder index";
+            return false;
+        }
+
+        return true;
     }
 
     bool OperationFlow::IsEnablePreparationDue() const
@@ -104,7 +118,10 @@ namespace application
         index.Start(env.context.Data(), env.context.BusVoltage(), [this](bool found)
             {
                 if (found)
+                {
                     env.context.SetRotorReferenceValid(true);
+                    env.context.SetHomed(true);
+                }
 
                 env.machine.Dispatch(state_machine::IndexSearched{ found });
             });

@@ -582,6 +582,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::HomingUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsHoming(nodeId))
+            return QString("Needs firmware contract 2.19 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     QString MotorPanel::ThermalUnavailableReason() const
     {
         if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsThermal(nodeId))
@@ -662,6 +669,7 @@ namespace tool
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
         commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
+        commandPanel->Configuration().SetHomingUnavailable(HomingUnavailableReason());
         commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
         commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
         commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
@@ -884,6 +892,8 @@ namespace tool
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
         if (parameter == can::FocParameter::windingTemperature)
             telemetryPanel->OnWindingTemperature(value.value);
+        if (parameter == can::FocParameter::homed)
+            telemetryPanel->OnHomed(value.value >= 0.5f);
         if (parameter == can::FocParameter::recalibrationMode)
             Refresh();
     }

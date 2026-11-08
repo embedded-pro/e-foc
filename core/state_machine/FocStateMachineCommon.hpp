@@ -51,6 +51,8 @@ namespace application
         foc::Weber ActiveFluxLinkage() const;
         const services::CalibrationData& CalibrationRecord() const;
         float AutomaticCurrentLoopBandwidth() const;
+        bool IsHomed() const;
+        void RequireHoming(bool required);
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
         void RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered);

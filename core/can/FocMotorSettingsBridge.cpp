@@ -228,7 +228,7 @@ namespace can
             case ParameterGroup::platform:
                 return HeldPlatformReading(parameter);
             case ParameterGroup::motion:
-                return FocParameterValue{ targetReached != nullptr && targetReached() ? 1.0f : 0.0f, false };
+                return HeldMotionReading(parameter);
             case ParameterGroup::thermal:
                 return HeldWindingTemperature();
             default:
@@ -325,6 +325,12 @@ namespace can
         const auto result = controlMode.CmdResetModel(onDone);
         if (result != state_machine::SettingResult::ok)
             ReportSettingFailure(focResetModelId, result);
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldMotionReading(FocParameter parameter) const
+    {
+        const bool value = parameter == FocParameter::homed ? controlMode.IsHomed() : targetReached != nullptr && targetReached();
+        return FocParameterValue{ value ? 1.0f : 0.0f, false };
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const

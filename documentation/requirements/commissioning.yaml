@@ -50,3 +50,24 @@
     relative to the rotor's electrical angle. After a power cycle the drive shall be Ready, and its
     first Start shall turn the rotor at a bounded current, at most a revolution and a quarter, until
     the index passes, then run without aligning; a Start that finds no index shall be refused.
+
+- id: REQ-CMS-006
+  title: The drive reports whether its position zero is the commissioned one
+  status: implemented
+  verification: unit
+  shall: >
+    The drive shall report to the operator whether its position zero is the one it was commissioned
+    with: yes after a successful calibration or after the rotor reference has been restored from
+    the encoder index in this power-up, no at every power-up, after the calibration is cleared and
+    after an alignment that is not part of a calibration, and it shall keep the report across a
+    change of control mode.
+
+- id: REQ-CMS-007
+  title: Position mode can be held back until the position zero is the commissioned one
+  status: implemented
+  verification: unit
+  shall: >
+    When the operator requires homing, the drive shall refuse to start in position mode unless its
+    position zero is the commissioned one or the start restores it from the encoder index, and
+    shall start in speed and torque mode whatever the setting. Without the requirement, which is
+    the default, the drive shall start in position mode as before.

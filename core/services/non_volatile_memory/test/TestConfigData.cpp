@@ -78,6 +78,11 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_se
     EXPECT_EQ(cfg.stallDetection, uint8_t{ 1 });
 }
 
+TEST_F(TestConfigData, make_default_config_data_does_not_require_homing)
+{
+    EXPECT_EQ(services::MakeDefaultConfigData().homingRequired, uint8_t{ 0 });
+}
+
 TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic)
 {
     const auto cfg = services::MakeDefaultConfigData();

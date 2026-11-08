@@ -171,6 +171,7 @@ namespace can
         encoderResolution = 0x60,
         canNodeId = 0x61,
         canBitrate = 0x62,
+        homingRequired = 0x63,
         supervisionWindow = 0x70,
         supervisionCurrentFraction = 0x71,
         supervisionDemandedSpeed = 0x72,
@@ -210,7 +211,8 @@ namespace can
         stagedVersionMinor = 0xB6,
         stagedVersionPatch = 0xB7,
         targetReached = 0xC0,
-        windingTemperature = 0xC1
+        windingTemperature = 0xC1,
+        homed = 0xC2
     };
 
     struct FocFirmwareIdentity

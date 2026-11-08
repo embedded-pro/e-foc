@@ -23,6 +23,7 @@ namespace tool
         void SetOverTemperatureUnavailable(const QString& reason);
         void SetBusVoltageLimitsUnavailable(const QString& reason);
         void SetRecalibrationUnavailable(const QString& reason);
+        void SetHomingUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -48,5 +49,6 @@ namespace tool
         QString overTemperatureReason;
         QString busVoltageLimitsReason;
         QString recalibrationReason;
+        QString homingReason;
     };
 }
