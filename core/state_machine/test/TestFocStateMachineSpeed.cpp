@@ -2817,12 +2817,13 @@ TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_ag
     ExpectSpeedCalibrationSequence();
     auto sm = CreateStateMachineMappingCogging();
 
-    EXPECT_CALL(coggingMock, Measure(_, _, 4, _, _))
-        .WillOnce(Invoke([](foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+    EXPECT_CALL(coggingMock, Measure(_, _, _, 4, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(const services::CoggingMeasurement&)>& onDone)
             {
                 EXPECT_GT(torqueConstant.Value(), 0.0f);
                 EXPECT_NEAR(inertia.Value(), 0.005f, 1e-6f);
-                onDone(AMap());
+                EXPECT_NEAR(viscousFriction.Value(), 0.01f, 1e-6f);
+                onDone(services::CoggingMeasurement{ AMap(), foc::NewtonMeter{ 4.0e-3f } });
             }));
 
     sm.CmdCalibrate([](state_machine::CommandResult) {});
@@ -2831,6 +2832,7 @@ TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_ag
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_EQ(data.coggingTorque, AMap().torque);
     EXPECT_NEAR(data.coggingTorqueScale, AMap().torqueScale, 1e-10f);
+    EXPECT_NEAR(data.frictionCoulomb, 4.0e-3f, 1e-9f);
 }
 
 TEST_F(FocStateMachineSpeedCoggingTest, a_cogging_map_that_cannot_be_measured_leaves_the_calibration_complete_without_one)
@@ -2840,16 +2842,17 @@ TEST_F(FocStateMachineSpeedCoggingTest, a_cogging_map_that_cannot_be_measured_le
     ExpectSpeedCalibrationSequence();
     auto sm = CreateStateMachineMappingCogging();
 
-    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
-        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, foc::NewtonMeterSecondPerRadian, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(const services::CoggingMeasurement&)>& onDone)
             {
-                onDone(std::nullopt);
+                onDone(services::CoggingMeasurement{});
             }));
 
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
     EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.coggingTorqueScale, 0.0f);
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.frictionCoulomb, 0.0f);
 }
 
 TEST_F(FocStateMachineSpeedCoggingTest, an_emergency_stop_while_mapping_aborts_the_mapping)
@@ -2859,8 +2862,8 @@ TEST_F(FocStateMachineSpeedCoggingTest, an_emergency_stop_while_mapping_aborts_t
     ExpectSpeedCalibrationSequence(true, true, true, true, true, false);
     auto sm = CreateStateMachineMappingCogging();
 
-    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
-        .WillOnce(Invoke([this](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>&)
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _, _))
+        .WillOnce(Invoke([this](foc::NewtonMeter, foc::NewtonMeterSecondSquared, foc::NewtonMeterSecondPerRadian, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(const services::CoggingMeasurement&)>&)
             {
                 mappingInFlight = true;
             }));
@@ -2875,4 +2878,235 @@ TEST_F(FocStateMachineSpeedCoggingTest, an_emergency_stop_while_mapping_aborts_t
     EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
 
     EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+namespace
+{
+    class FrictionRecordingSpeedCascade
+        : public foc::SpeedCascade
+    {
+    public:
+        using foc::SpeedCascade::SpeedCascade;
+
+        void LoadFrictionFeedForward(foc::NewtonMeter coulomb, foc::NewtonMeter torqueConstant) override
+        {
+            ++loads;
+            lastCoulomb = coulomb.Value();
+            lastTorqueConstant = torqueConstant.Value();
+            foc::SpeedCascade::LoadFrictionFeedForward(coulomb, torqueConstant);
+        }
+
+        void ClearFrictionFeedForward() override
+        {
+            ++clears;
+            foc::SpeedCascade::ClearFrictionFeedForward();
+        }
+
+        std::size_t loads{ 0 };
+        std::size_t clears{ 0 };
+        float lastCoulomb{ 0.0f };
+        float lastTorqueConstant{ 0.0f };
+    };
+
+    using FrictionRecordingController = foc::FocController<FrictionRecordingSpeedCascade>;
+
+    class FocStateMachineSpeedFrictionTest
+        : public FocStateMachineSpeedCoggingTest
+    {
+    public:
+        using FrictionStateMachine = application::OuterLoopStateMachineFor<FrictionRecordingController, FrictionRecordingController>;
+
+        FrictionStateMachine CreateFrictionStateMachine()
+        {
+            EXPECT_CALL(coggingMock, IsRunning()).WillRepeatedly(Return(false));
+
+            auto services = application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } };
+            services.coggingMappingOverride = std::ref(coggingMock);
+
+            return FrictionStateMachine{
+                tracer,
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                services,
+                faultNotifierMock,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
+            };
+        }
+
+        void GivenNvmValidWithFriction(float frictionCoulomb)
+        {
+            services::CalibrationData data{};
+            data.polePairs = 4;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.fluxLinkage = 0.007f;
+            data.speedLoopBandwidth = 50.0f;
+            data.inertia = 0.01f;
+            data.frictionViscous = 0.005f;
+            data.frictionCoulomb = frictionCoulomb;
+            data.stage = services::CalibrationStage::complete;
+
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([data](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        void ExpectImplausibleFrictionStoredAsNone(float measured)
+        {
+            GivenFaultNotifierRegistered();
+            GivenNvmInvalid();
+            ExpectSpeedCalibrationSequence();
+            auto sm = CreateFrictionStateMachine();
+            GivenCoggingMeasures(services::CoggingMeasurement{ std::nullopt, foc::NewtonMeter{ measured } });
+
+            sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+            ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+            EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.frictionCoulomb, 0.0f);
+            EXPECT_EQ(sm.GetController().loads, 0u);
+        }
+
+        void GivenCoggingMeasures(services::CoggingMeasurement measurement, FrictionRecordingController** cascade = nullptr)
+        {
+            EXPECT_CALL(coggingMock, Measure(_, _, _, _, _, _))
+                .WillOnce(Invoke([measurement, cascade](foc::NewtonMeter, foc::NewtonMeterSecondSquared, foc::NewtonMeterSecondPerRadian, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(const services::CoggingMeasurement&)>& onDone)
+                    {
+                        if (cascade != nullptr)
+                        {
+                            EXPECT_EQ((*cascade)->loads, 0u);
+                            EXPECT_GE((*cascade)->clears, 1u);
+                        }
+                        onDone(measurement);
+                    }));
+        }
+    };
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_stored_dry_friction_is_loaded_into_the_cascade_with_the_torque_constant)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+
+    auto sm = CreateFrictionStateMachine();
+
+    EXPECT_EQ(sm.GetController().loads, 1u);
+    EXPECT_NEAR(sm.GetController().lastCoulomb, 4.0e-3f, 1e-9f);
+    EXPECT_NEAR(sm.GetController().lastTorqueConstant, 1.5f * 4.0f * 0.007f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_record_without_a_dry_friction_leaves_the_cascade_without_a_feed_forward)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(0.0f);
+
+    auto sm = CreateFrictionStateMachine();
+
+    EXPECT_EQ(sm.GetController().loads, 0u);
+    EXPECT_GE(sm.GetController().clears, 1u);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_calibration_stores_the_measured_dry_friction_and_applies_it_after_both_measurements)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence();
+    auto sm = CreateFrictionStateMachine();
+    auto* cascade = &sm.GetController();
+    GivenCoggingMeasures(services::CoggingMeasurement{ std::nullopt, foc::NewtonMeter{ 3.7e-3f } }, &cascade);
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_NEAR(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.frictionCoulomb, 3.7e-3f, 1e-9f);
+    EXPECT_EQ(cascade->loads, 1u);
+    EXPECT_NEAR(cascade->lastCoulomb, 3.7e-3f, 1e-9f);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_negative_measured_dry_friction_is_stored_as_none)
+{
+    ExpectImplausibleFrictionStoredAsNone(-1.0e-3f);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_not_a_number_measured_dry_friction_is_stored_as_none)
+{
+    ExpectImplausibleFrictionStoredAsNone(std::numeric_limits<float>::quiet_NaN());
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, an_infinite_measured_dry_friction_is_stored_as_none)
+{
+    ExpectImplausibleFrictionStoredAsNone(std::numeric_limits<float>::infinity());
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, writing_the_dry_friction_reloads_the_cascade_feed_forward)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+    ASSERT_EQ(sm.GetController().loads, 1u);
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(data.frictionCoulomb, 6.0e-3f, 1e-9f);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_EQ(sm.GetController().loads, 2u);
+    EXPECT_NEAR(sm.GetController().lastCoulomb, 6.0e-3f, 1e-9f);
+    EXPECT_NEAR(sm.CalibrationRecord().frictionViscous, 0.005f, 1e-9f);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, writing_a_zero_dry_friction_clears_the_cascade_feed_forward)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+    const auto clears = sm.GetController().clears;
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 0.0f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.GetController().loads, 1u);
+    EXPECT_EQ(sm.GetController().clears, clears + 1);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_dry_friction_that_cannot_be_stored_leaves_the_feed_forward_alone)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::WriteFailed);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.GetController().loads, 1u);
+    EXPECT_NEAR(sm.CalibrationRecord().frictionCoulomb, 4.0e-3f, 1e-9f);
 }

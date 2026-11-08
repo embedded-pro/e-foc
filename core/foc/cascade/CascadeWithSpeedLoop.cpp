@@ -71,6 +71,7 @@ namespace foc
         estimatorWindow.Restart();
         directAxisExcitation.Restart();
         lastSpeedLoopOutput = 0.0f;
+        frictionCurrent = 0.0f;
         directCurrentReference = 0.0f;
         lastElectricalSpeed = 0.0f;
         lastMechanicalSpeed = 0.0f;
@@ -135,7 +136,7 @@ namespace foc
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
         const float limit = quadratureLimit;
-        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -limit, limit);
+        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + frictionCurrent + coggingCurrent, -limit, limit);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed, busRatio.Ratio() });
 
         const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
@@ -183,11 +184,13 @@ namespace foc
     void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
     {
         lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ speedReference } }).Value();
+        frictionCurrent = frictionFeedForward.CurrentFor(speedReference);
     }
 
     void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
     {
         lastSpeedLoopOutput = current;
+        frictionCurrent = 0.0f;
     }
 
     void CascadeWithSpeedLoop::EnableCurrentCommandImpl()
@@ -266,6 +269,17 @@ namespace foc
     void CascadeWithSpeedLoop::ClearCoggingMapImpl()
     {
         coggingFeedForward.Clear();
+    }
+
+    void CascadeWithSpeedLoop::LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant)
+    {
+        frictionFeedForward.Load(coulomb, torqueConstant, maxCurrent);
+    }
+
+    void CascadeWithSpeedLoop::ClearFrictionFeedForwardImpl()
+    {
+        frictionFeedForward.Clear();
+        frictionCurrent = 0.0f;
     }
 
     void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)

@@ -538,6 +538,9 @@ TEST_F(FocMotorCategoryServerTest, HandleSetParameter_ValueOutsideTheParameterDo
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x40, std::numeric_limits<float>::quiet_NaN())));
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x42, 4.5f)));
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x62, 300000.0f)));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x46, -0.001f)));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x46, 101.0f)));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x46, std::numeric_limits<float>::infinity())));
     EXPECT_FALSE(ackSpy.last.has_value());
 }
 

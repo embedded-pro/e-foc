@@ -269,6 +269,22 @@ TEST_F(TestParameterIdentification, the_full_calibration_stores_no_cogging_map_f
     mil::ExpectIdentified(mil, Quantity::inertia, 5.0f);
 }
 
+TEST_F(TestParameterIdentification, the_full_calibration_reads_the_benchs_dry_friction_with_and_without_cogging)
+{
+    for (const float cogging : { 0.0f, 0.004f })
+    {
+        SCOPED_TRACE(cogging);
+        mil::Scenario scenario;
+        scenario.Plant("bench").BootsIn(state_machine::ControlMode::speed);
+        sil::DescribeBenchFrictionAndCogging(scenario.plant);
+        scenario.plant.coggingTorqueNm = cogging;
+
+        mil::ModelInTheLoop mil{ scenario };
+        ASSERT_TRUE(mil.Calibrate());
+        mil::ExpectIdentified(mil, Quantity::dryFriction, 5.0f);
+    }
+}
+
 TEST_F(TestParameterIdentification, a_constant_shaft_torque_does_not_bias_the_online_mechanical_estimates)
 {
     for (const auto* motor : referenceMotors)

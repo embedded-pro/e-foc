@@ -13,6 +13,7 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
+#include "core/foc/math/FrictionFeedForward.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
@@ -59,6 +60,8 @@ namespace foc
         void UpdateOnlineElectricalEstimator();
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
+        void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
+        void ClearFrictionFeedForwardImpl();
         void SetCurrentStream(CurrentStream& stream);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
@@ -74,6 +77,8 @@ namespace foc
         hal::Hertz outerLoopFrequency;
         SpeedDifferentiator speedDifferentiator;
         volatile float lastSpeedLoopOutput{ 0.0f };
+        // Written by the outer loop, read by the control interrupt.
+        volatile float frictionCurrent{ 0.0f };
         volatile float directCurrentReference{ 0.0f };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float lastMechanicalSpeed{ 0.0f };
@@ -94,6 +99,7 @@ namespace foc
         EstimatorWindowAccumulator estimatorWindow;
         DirectAxisExcitation directAxisExcitation;
         CoggingFeedForward coggingFeedForward;
+        FrictionFeedForward frictionFeedForward;
         QuadratureVoltageWindow voltageWindow;
         CurrentStream* currentStream{ nullptr };
     };

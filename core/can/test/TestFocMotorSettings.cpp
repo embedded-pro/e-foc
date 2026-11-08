@@ -64,6 +64,10 @@ TEST(FocMotorSettings, every_motor_parameter_reaches_the_calibration_record_fiel
     services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::inertia), 7.06e-6f);
     EXPECT_NEAR(record.rPhase, 0.36f, 1e-6f);
     EXPECT_NEAR(record.inertia, 7.06e-6f, 1e-11f);
+
+    services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::frictionCoulomb), 4.0e-3f);
+    EXPECT_NEAR(record.frictionCoulomb, 4.0e-3f, 1e-9f);
+    EXPECT_EQ(record.frictionViscous, 0.0f);
 }
 
 TEST(FocMotorSettings, every_startup_setting_reaches_its_configuration_field)

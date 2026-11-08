@@ -23,8 +23,10 @@ namespace state_machine
                 return value == 0.0f || foc::IsWithinInclusive(value, CommandLimits::minFluxLinkage, CommandLimits::maxFluxLinkage);
             case services::MotorParameter::inertia:
                 return foc::IsWithinInclusive(value, CommandLimits::minInertia, CommandLimits::maxInertia);
-            default:
+            case services::MotorParameter::viscousFriction:
                 return foc::IsWithinInclusive(value, 0.0f, CommandLimits::maxViscousFriction);
+            default:
+                return foc::IsWithinInclusive(value, 0.0f, CommandLimits::maxFrictionCoulomb);
         }
     }
 }

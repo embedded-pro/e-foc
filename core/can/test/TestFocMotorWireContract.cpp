@@ -421,10 +421,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_19)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_20)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(19, can::focContractVersionMinor);
+    EXPECT_EQ(20, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
@@ -799,6 +799,26 @@ TEST_F(FocMotorWireContractTest, values_outside_a_parameter_s_domain_are_refused
     EXPECT_TRUE(check(can::FocParameter::canBitrate, 500000.0f));
     EXPECT_TRUE(check(can::FocParameter::polePairs, 7.0f));
     EXPECT_TRUE(check(can::FocParameter::viscousFriction, 0.0f));
+    EXPECT_TRUE(check(can::FocParameter::frictionCoulomb, 0.0f));
+    EXPECT_TRUE(check(can::FocParameter::frictionCoulomb, foc::CommandLimits::maxFrictionCoulomb));
+    EXPECT_FALSE(check(can::FocParameter::frictionCoulomb, -1.0e-6f));
+    EXPECT_FALSE(check(can::FocParameter::frictionCoulomb, foc::CommandLimits::maxFrictionCoulomb * 1.01f));
+    EXPECT_FALSE(check(can::FocParameter::frictionCoulomb, std::numeric_limits<float>::quiet_NaN()));
+}
+
+TEST_F(FocMotorWireContractTest, the_coulomb_friction_is_a_writable_motor_parameter_at_0x46)
+{
+    const auto parameter = can::FindParameter(can::FocParameter::frictionCoulomb);
+
+    ASSERT_TRUE(parameter.has_value());
+    EXPECT_EQ(0x46, static_cast<uint8_t>(can::FocParameter::frictionCoulomb));
+    EXPECT_FALSE(parameter->readOnly);
+    EXPECT_FALSE(parameter->integer);
+    EXPECT_FALSE(parameter->automatic);
+
+    EXPECT_CALL(serverObserver, OnSetParameter(can::FocParameter::frictionCoulomb, FloatEq(0.004f), _));
+    client.SendSetParameter(1, can::FocParameter::frictionCoulomb, 0.004f);
+    DeliverToServer();
 }
 
 TEST_F(FocMotorWireContractTest, a_read_only_parameter_is_refused_by_a_write_and_answered_by_a_query)

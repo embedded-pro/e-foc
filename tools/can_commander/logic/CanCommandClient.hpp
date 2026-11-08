@@ -90,6 +90,7 @@ namespace tool
         static constexpr uint8_t recalibrationContractMinor{ 17 };
         static constexpr uint8_t storedRecalibrationContractMinor{ 18 };
         static constexpr uint8_t homedContractMinor{ 19 };
+        static constexpr uint8_t frictionCoulombContractMinor{ 20 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -112,6 +113,7 @@ namespace tool
         bool SupportsRecalibration(uint16_t nodeId) const;
         bool SupportsStoredRecalibration(uint16_t nodeId) const;
         bool SupportsHoming(uint16_t nodeId) const;
+        bool SupportsCoulombFriction(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);

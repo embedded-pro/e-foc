@@ -2,9 +2,9 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: "disturbances-and-noise"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                                  |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.4.0                                  |
+| Version   | 0.4.1                                  |
 | Component | disturbances-and-noise                 |
-| Date      | 2026-11-05                             |
+| Date      | 2026-11-08                             |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -112,9 +112,28 @@ or an explicit disturbance estimate (ADRC, `speed-loop-adrc.md`).
 constant torque opposing motion, and the Stribeck rise in breakaway torque near standstill are not linear:
 the rotor sticks until the drive overcomes breakaway, then slips. A position loop with integral action hunts
 around the setpoint; at low speed the velocity ripples. Feed-forward of the friction level removes most of it.
-*e-foc today:* the mechanical estimator fits a Coulomb term
-internally but does not output it (`documentation/design/service-mechanical-ident.md`); the calibration record
-has a field for it that stays zero, and no cascade applies a friction feed-forward.
+
+*e-foc:* the speed and position cascades add a Coulomb feed-forward to the quadrature-current reference,
+
+$$
+i_{q,ff} = \frac{\tau_c}{K_t}\,\operatorname{clamp}\!\left(\frac{\omega^*}{\omega_{ramp}},\,-1,\,1\right)
+$$
+
+driven by the speed reference $\omega^*$, not the measured speed: the measurement is quantised and noisy at
+standstill, and a sign taken from it would chatter. The linear ramp of half-width $\omega_{ramp}$ = 2 rad/s
+(mechanical) around zero keeps the torque continuous through a reversal; 2 rad/s is about one encoder count of
+speed resolution at the 1 kHz outer loop for a 4000-count encoder (1.6 rad/s), so a reference inside the ramp is
+one the measurement cannot resolve anyway. Torque mode has no speed reference and no feed-forward. The term is
+added to the demanded current before the current limit, so the sum is still clamped, and it stays out of the
+estimator windows: friction is real torque and the online estimator needs the full $i_q$.
+
+$\tau_c$ is measured, not fitted next to $J$ and $B$. The one-shot mechanical identification turns one way
+only, and its constant term is $\tau_c + \tau_L$, so it cannot separate dry friction from a constant load. The
+cogging-map step turns both ways at constant speed: the forward torque is $\tau_{cog} + \tau_L + \tau_c + B\omega$
+and the backward one $\tau_{cog} + \tau_L - \tau_c - B\omega$, so
+$\tau_c = (\bar T_{fwd} - \bar T_{bwd})/2 - B\bar\omega$ whatever the load. A negative or non-finite result is
+stored as 0, which the cascade reads as no feed-forward. The online estimator's two fits give the same number as
+$(c_+ - c_-)/2$ (`documentation/design/service-mechanical-ident.md`).
 
 **Cogging.** The magnets' attraction to the stator teeth gives a torque, independent of current, that repeats
 $N_{cog} = \operatorname{lcm}(N_s, 2p)$ times per mechanical revolution for $N_s$ slots

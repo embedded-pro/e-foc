@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 19;
+    static constexpr uint8_t focContractVersionMinor = 20;
 
     enum class FieldType : uint8_t
     {
@@ -267,7 +267,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 83> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 84> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -288,6 +288,7 @@ namespace can
         { FocParameter::fluxLinkage, "fluxLinkage", "Wb", foc::CommandLimits::minFluxLinkage, foc::CommandLimits::maxFluxLinkage, false, true },
         { FocParameter::inertia, "inertia", "kg.m2", foc::CommandLimits::minInertia, foc::CommandLimits::maxInertia, false, false },
         { FocParameter::viscousFriction, "viscousFriction", "Nm.s/rad", 0.0f, foc::CommandLimits::maxViscousFriction, false, false },
+        { FocParameter::frictionCoulomb, "frictionCoulomb", "Nm", 0.0f, foc::CommandLimits::maxFrictionCoulomb, false, false },
         { FocParameter::encoderResolution, "encoderResolution", "counts/rev", 1.0f, focMaxEncoderResolution, true, false },
         { FocParameter::canNodeId, "canNodeId", "-", 1.0f, focMaxCanNodeId, true, false },
         { FocParameter::canBitrate, "canBitrate", "bit/s", 125000.0f, 1000000.0f, true, false },

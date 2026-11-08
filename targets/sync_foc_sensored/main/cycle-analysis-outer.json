@@ -12,6 +12,7 @@
         "PositionCascade::LowPriorityHandler",
         "SpeedCascade::LowPriorityHandler",
         "CascadeWithSpeedLoop::RunSpeedLoop",
+        "FrictionFeedForward::CurrentFor",
         "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
         "CascadeWithSpeedLoop::SetSpeedReference",
         "CascadeWithSpeedLoop::SetDirectCurrentReference",

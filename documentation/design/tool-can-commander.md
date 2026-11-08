@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.19.0
+version: 0.20.0
 component: "tool-can-commander"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.19.0               |
+| Version   | 0.20.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-08           |
 
@@ -228,7 +228,8 @@ flowchart LR
   shown for deadbeat too, which estimates its voltage error at that bandwidth. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
 - **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (measured by Calibrate, or the
-  platform default), inertia and viscous friction, and the commissioning actions Align, Identify Electrical
+  platform default), inertia, viscous friction and Coulomb friction (the dry friction the calibration measures in
+  speed and position mode and the controller feeds forward, contract 2.20), and the commissioning actions Align, Identify Electrical
   and Calibrate, the whole sequence of the firmware's calibration, which includes the mechanical
   identification in speed and position mode. Changing the pole pairs
   says that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
@@ -311,7 +312,8 @@ has no online recalibration: the commander does not ask it for the mode or the m
 Recalibration field and both Diagnostics buttons are disabled with the reason; a node of 2.17 has no Reset Model, which
 is disabled with the reason.
 A node older than 2.19 has no homing: the commander does not ask it for the homed reading or the requirement, and the
-Require homing toggle is disabled with the reason.
+Require homing toggle is disabled with the reason. A node older than 2.20 has no Coulomb friction: the commander does
+not ask it for the value, and the field is disabled with the reason.
 
 ### Part K — diagnostics
 

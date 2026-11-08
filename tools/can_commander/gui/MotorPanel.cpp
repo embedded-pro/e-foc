@@ -589,6 +589,13 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::CoulombFrictionUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsCoulombFriction(nodeId))
+            return QString("Needs firmware contract 2.20 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+        return {};
+    }
+
     QString MotorPanel::ThermalUnavailableReason() const
     {
         if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsThermal(nodeId))
@@ -662,6 +669,7 @@ namespace tool
         commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
+        commandPanel->MotorParameters().SetCoulombFrictionUnavailable(CoulombFrictionUnavailableReason());
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
         commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason.isEmpty() ? FaultHistoryUnavailableReason() : commandsReason);
         commandPanel->Diagnostics().SetRecalibrationUnavailable(RecalibrateUnavailableReason(), ResetModelUnavailableReason());

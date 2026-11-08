@@ -759,3 +759,52 @@ TEST_F(TestPositionCascade, an_attached_stream_receives_the_measured_currents_an
     EXPECT_NEAR(sample->meanIq.Value(), 0.0f, 1e-2f);
     EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
 }
+
+namespace
+{
+    float QuadratureDrive(const foc::PhasePwmDutyCycles& duty)
+    {
+        return DutyPercent(duty.b) - DutyPercent(duty.c);
+    }
+
+    float DriveAddedByFriction(std::size_t polePairs, foc::PositionAlgorithm algorithm, float setPoint)
+    {
+        auto slowSpeedLoop = foc::SpeedLoopTunings{};
+        slowSpeedLoop.bandwidth = 1.0f;
+        PositionCascadeUnderTest withFriction{ polePairs, slowSpeedLoop, foc::PositionLoopTunings{}, algorithm };
+        PositionCascadeUnderTest withoutFriction{ polePairs, slowSpeedLoop, foc::PositionLoopTunings{}, algorithm };
+        withFriction.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ 0.5f }, foc::NewtonMeter{ 0.1f });
+
+        return QuadratureDrive(DutyAfterOuterCycles(withFriction, setPoint, 0.0f)) - QuadratureDrive(DutyAfterOuterCycles(withoutFriction, setPoint, 0.0f));
+    }
+}
+
+TEST_F(TestPositionCascade, a_position_error_ahead_adds_the_friction_current_towards_it)
+{
+    EXPECT_GT(DriveAddedByFriction(polePairs, foc::PositionAlgorithm::pid, 0.005f), 0.5f);
+}
+
+TEST_F(TestPositionCascade, a_position_error_behind_adds_the_friction_current_towards_it)
+{
+    EXPECT_LT(DriveAddedByFriction(polePairs, foc::PositionAlgorithm::pid, -0.005f), -0.5f);
+}
+
+TEST_F(TestPositionCascade, a_position_at_its_setpoint_adds_no_friction_current)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, foc::PositionAlgorithm::pid, 0.0f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, a_current_commanding_algorithm_adds_no_friction_current)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, foc::PositionAlgorithm::lqr, 0.005f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, a_cleared_friction_adds_no_current)
+{
+    PositionCascadeUnderTest cleared{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    PositionCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    cleared.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ 0.5f }, foc::NewtonMeter{ 0.1f });
+    cleared.cascade->ClearFrictionFeedForward();
+
+    ExpectSameDuty(DutyAfterOuterCycles(cleared, 0.5f, 0.0f), DutyAfterOuterCycles(reference, 0.5f, 0.0f));
+}

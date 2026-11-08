@@ -67,10 +67,29 @@ namespace tool
 
     void MotorParametersTab::SetLegacy(bool legacyContract)
     {
-        for (auto* editor : Editors())
-            editor->SetUnavailable(legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{});
+        legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
+        ShowAvailability();
 
         SettingsPage::SetLegacy(legacyContract);
+    }
+
+    void MotorParametersTab::SetCoulombFrictionUnavailable(const QString& reason)
+    {
+        if (reason == coulombFrictionReason)
+            return;
+
+        coulombFrictionReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
+    void MotorParametersTab::ShowAvailability()
+    {
+        for (auto* editor : Editors())
+            if (!legacyReason.isEmpty())
+                editor->SetUnavailable(legacyReason);
+            else
+                editor->SetUnavailable(editor->Parameter() == can::FocParameter::frictionCoulomb ? coulombFrictionReason : QString{});
     }
 
     void MotorParametersTab::SetActionsAvailable(const QString& reason)

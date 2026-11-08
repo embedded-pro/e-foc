@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: service-mechanical-ident
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.5.0                                         |
+| Version   | 0.5.1                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-11-06                                    |
+| Date      | 2026-11-08                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -264,10 +264,10 @@ name only.
 
 ### Recursive Least Squares Estimator
 
-The RLS estimator maintains a 3×1 parameter vector θ = [J, B, τ_friction]ᵀ and a 3×3 covariance matrix P. At each observation k, a 1×3 regressor row vector is formed:
+The RLS estimator maintains a 3×1 parameter vector θ = [τ_friction, J, B]ᵀ and a 3×3 covariance matrix P. At each observation k, a 1×3 regressor row vector is formed:
 
 ```text
-φ_k = [ dω/dt_k,  ω_k,  1 ]
+φ_k = [ 1,  dω/dt_k,  ω_k ]
 ```
 
 and the scalar observation is:
@@ -310,7 +310,7 @@ flowchart TD
     CB --> VEL["Accumulate ω, dω/dt\nfrom encoder"]
     TAU --> POST["Close the window,\npost it to the ring"]
     VEL --> POST
-    POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[dω/dt, ω, 1], y=τ)"]
+    POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[1, dω/dt, ω], y=τ)"]
     RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
     TIMEOUT -->|No| CB
     TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
@@ -350,9 +350,9 @@ without an estimate rather than skipping a window.
 
 A `TimerSingleShot` starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:
 
-- **J** (inertia) is the first element of θ; reported as `NewtonMeterSecondSquared`.
-- **B** (viscous friction) is the second element of θ; reported as `NewtonMeterSecondPerRadian`.
-- **τ_friction** (Coulomb friction) is the third element of θ; it is observed internally but is not part of the output interface for this version.
+- **τ_friction** (the constant term) is the first element of θ. It is τ_c plus any constant shaft load, because the one-shot run turns one way only and cannot separate dry friction from a load, so it is not reported. The Coulomb friction comes from the cogging-map step, which turns both ways (`service-cogging-compensation.md`).
+- **J** (inertia) is the second element of θ; reported as `NewtonMeterSecondSquared`.
+- **B** (viscous friction) is the third element of θ; reported as `NewtonMeterSecondPerRadian`.
 
 ### Acceptance Policy
 

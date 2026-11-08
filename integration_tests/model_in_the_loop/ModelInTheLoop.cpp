@@ -33,6 +33,8 @@ namespace mil
                 calibration.inertia *= factor;
             else if (quantity == "friction")
                 calibration.frictionViscous *= factor;
+            else if (quantity == "dryFriction")
+                calibration.frictionCoulomb *= factor;
             else if (quantity == "fluxLinkage")
                 calibration.fluxLinkage *= factor;
             else
@@ -67,6 +69,7 @@ namespace mil
         nvm.calibration.fluxLinkage = plant.fluxLinkageWeber;
         nvm.calibration.inertia = plant.rotorInertiaKgM2;
         nvm.calibration.frictionViscous = plant.viscousDampingNmSPerRad;
+        nvm.calibration.frictionCoulomb = plant.coulombFrictionNm;
         nvm.calibration.currentOffsetA = plant.noiseBiasAmpereA;
         nvm.calibration.currentOffsetB = plant.noiseBiasAmpereB;
         nvm.calibration.currentOffsetC = plant.noiseBiasAmpereC;

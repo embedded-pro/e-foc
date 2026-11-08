@@ -159,6 +159,11 @@ namespace tool
         return SupportsMinor(nodeId, homedContractMinor);
     }
 
+    bool CanCommandClient::SupportsCoulombFriction(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, frictionCoulombContractMinor);
+    }
+
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
         return firmwareUpgrade;
@@ -189,6 +194,8 @@ namespace tool
             return SupportsBusVoltageLimits(nodeId);
         if (parameter == can::FocParameter::homed || parameter == can::FocParameter::homingRequired)
             return SupportsHoming(nodeId);
+        if (parameter == can::FocParameter::frictionCoulomb)
+            return SupportsCoulombFriction(nodeId);
         if (parameter == can::FocParameter::recalibrationsStored)
             return SupportsStoredRecalibration(nodeId);
         if (IsRecalibrationParameter(parameter))

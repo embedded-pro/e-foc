@@ -115,7 +115,7 @@ namespace state_machine
     struct CoggingMapped
     {
         static constexpr const char* name{ "CoggingMapped" };
-        std::optional<services::CoggingMap> map;
+        services::CoggingMeasurement measurement;
     };
 
     struct CalibrationSaved

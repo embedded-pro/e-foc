@@ -19,7 +19,7 @@ namespace services
     public:
         CoggingMappingImpl(foc::SpeedCommandable& controller, foc::Controllable& drive, foc::PhaseCurrentsObservable& observable, drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder);
 
-        void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, const Config& config, const infra::Function<void(std::optional<CoggingMap>)>& onDone) override;
+        void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone) override;
         bool IsRunning() const override;
         void Abort() override;
 
@@ -55,9 +55,10 @@ namespace services
         Config config;
         foc::NewtonMeter torqueConstant{ 0.0f };
         foc::NewtonMeterSecondSquared inertia{ 0.0f };
+        foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
         std::size_t polePairs{ 0 };
         foc::Ampere currentEnvelope{ 0.0f };
-        infra::AutoResetFunction<void(std::optional<CoggingMap>)> onDone;
+        infra::AutoResetFunction<void(const CoggingMeasurement&)> onDone;
 
         CoggingMapBuilder builder;
         [[no_unique_address]] foc::ClarkePark transform;

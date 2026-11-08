@@ -61,7 +61,8 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::speedBandwidth, LoopSettings(FocControlLoop::speed).front().parameter);
     EXPECT_EQ(FocParameter::positionReferenceTimeConstant, LoopSettings(FocControlLoop::position).back().parameter);
     EXPECT_EQ(FocParameter::resistance, MotorParameterSettings().front().parameter);
-    EXPECT_EQ(FocParameter::viscousFriction, MotorParameterSettings().back().parameter);
+    EXPECT_EQ(7u, MotorParameterSettings().size());
+    EXPECT_EQ(FocParameter::frictionCoulomb, MotorParameterSettings().back().parameter);
     EXPECT_EQ(FocParameter::encoderResolution, StartupSettings().front().parameter);
     EXPECT_EQ(FocParameter::canBitrate, StartupSettings().back().parameter);
     EXPECT_EQ(FocParameter::supervisionWindow, SupervisionSettings().front().parameter);
@@ -212,6 +213,9 @@ TEST_F(TestMotorSettings, accepts_entries_within_the_firmware_range)
     EXPECT_TRUE(IsAcceptableEntry(FocParameter::inertia, 1.0e-9f, false));
     EXPECT_FALSE(IsAcceptableEntry(FocParameter::resistance, 0.0f, false));
     EXPECT_TRUE(IsAcceptableEntry(FocParameter::viscousFriction, 0.0f, false));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::frictionCoulomb, 0.0f, false));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::frictionCoulomb, -0.001f, false));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::frictionCoulomb, 101.0f, false));
     EXPECT_TRUE(IsAcceptableEntry(FocParameter::polePairs, 7.0f, false));
     EXPECT_FALSE(IsAcceptableEntry(FocParameter::polePairs, 7.5f, false));
     EXPECT_TRUE(IsAcceptableEntry(FocParameter::canBitrate, 500000.0f, false));

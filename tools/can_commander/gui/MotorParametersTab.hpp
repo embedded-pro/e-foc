@@ -18,6 +18,7 @@ namespace tool
         void SetLegacy(bool legacyContract) override;
         void SetActionsAvailable(const QString& reason);
         void SetMaintenanceUnavailable(const QString& reason);
+        void SetCoulombFrictionUnavailable(const QString& reason);
 
     signals:
         void AlignRequested();
@@ -29,6 +30,8 @@ namespace tool
         void Refresh() override;
 
     private:
+        void ShowAvailability();
+
         QGroupBox* CreateCommissioningGroup();
 
         QLabel* polePairsHint{ nullptr };
@@ -38,5 +41,7 @@ namespace tool
         QPushButton* clearCalibrationButton{ nullptr };
         QString actionsUnavailable;
         QString maintenanceUnavailable;
+        QString legacyReason;
+        QString coulombFrictionReason;
     };
 }
