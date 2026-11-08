@@ -27,6 +27,7 @@
 #include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
+#include "core/services/leds/StatusLeds.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
@@ -44,7 +45,7 @@
 #include "core/supervision/PositionLimitMonitor.hpp"
 #include "core/supervision/TargetReachedMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
-#include "services/peripheral/DebugLed.hpp"
+#include "targets/sync_foc_sensored/main/instantiations/ControlModeLedStatus.hpp"
 #include <optional>
 
 namespace application
@@ -79,7 +80,8 @@ namespace application
 
         application::PlatformFactory& hardware;
         uint8_t boardId;
-        services::DebugLed debugLed;
+        ControlModeLedStatus ledStatus;
+        services::StatusLeds statusLeds;
         foc::Volts vdc;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;

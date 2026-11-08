@@ -85,6 +85,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                          |
 | [Service: Command-Line Interface](../design/service-cli.md)                            | Bring-up command line of `hardware_test` and the startup banner                        |
 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                        |
+| [Service: Status LEDs](../design/service-leds.md)                                      | Green, amber and red LED patterns, blink codes of the latched faults                   |
 | [Service: Firmware Upgrade](../design/service-firmware-upgrade.md)                     | Receiving a firmware pack over CAN, checking it and restarting into the bootloader     |
 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                            |
 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry          |
