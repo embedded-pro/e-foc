@@ -231,10 +231,10 @@ sequenceDiagram
 
 ### Provided
 
-| Interface            | Purpose                                                          | Contract                                                                  |
-|----------------------|------------------------------------------------------------------|---------------------------------------------------------------------------|
-| Cogging mapping      | Measure the map during the calibration                           | One run at a time; reports a map or none exactly once, unless aborted     |
-| Cogging compensation | Load or clear the map in the torque, speed and position cascades | Takes effect at the next control interrupt; a cleared map adds no current |
+| Interface             | Purpose                                                           | Contract                                                                       |
+|-----------------------|-------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Cogging mapping       | Measure the map during the calibration                            | One run at a time; reports a map or none exactly once, unless aborted          |
+| Cogging compensation  | Load or clear the map in the torque, speed and position cascades  | Takes effect at the next control interrupt; a cleared map adds no current      |
 | Friction compensation | Load or clear the dry friction in the speed and position cascades | Takes effect at the next outer-loop period; a cleared friction adds no current |
 
 ### Required
