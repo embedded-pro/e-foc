@@ -164,7 +164,7 @@ The EK-TM4C1294XL's Cortex-M4F has a single-precision floating-point unit. That 
 
 Source: `documentation/performance-optimization/README.md`. Further choices:
 
-- **Compiler flags.** Embedded builds use `-ffast-math -fno-finite-math-only` (`cmake/CompilerOptimizations.cmake`):
+- **Compiler flags.** Embedded builds use `-ffast-math -fno-finite-math-only` (`numerical_toolbox_enable_embedded_optimizations()`):
   reassociation and contraction into fused multiply-adds are allowed, but infinities and NaNs keep their meaning,
   so a check for them still works where one is made. Hot functions defined in headers are forced inline; nothing
   uses per-function optimisation pragmas, which would block inlining.

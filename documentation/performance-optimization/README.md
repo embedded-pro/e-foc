@@ -216,7 +216,7 @@ their own callers. That costs more than the O3/fast-math such a bracket buys: wi
 calls to helpers of 12 bytes or less; with one set of options for the whole build, 11.
 
 Embedded and QEMU builds therefore compile all of e-foc with one set of options, from
-`cmake/CompilerOptimizations.cmake`: the configuration's level (`-O2` for `RelWithDebInfo`) plus
+`numerical_toolbox_enable_embedded_optimizations()` from the numerical toolbox: the configuration's level (`-O2` for `RelWithDebInfo`) plus
 `-ffast-math -fno-finite-math-only`. `-fno-finite-math-only` keeps NaN and infinity checks meaningful everywhere,
 including configuration-time validation in the same translation unit as a hot function. Never add
 `#pragma GCC optimize` or an `optimize` attribute.
