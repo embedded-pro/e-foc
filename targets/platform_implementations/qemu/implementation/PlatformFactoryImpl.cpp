@@ -34,7 +34,6 @@ namespace
     std::array<uint8_t, 320 * 1024> stagingStorage;
     std::array<uint8_t, 16 * 1024> journalStorage;
 
-    // No reset-cause register and reset reloads RAM, so the watchdog leaves its record in a host file.
     constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
     constexpr uint8_t watchdogResetMarker = 0x01;
 
@@ -142,7 +141,6 @@ namespace application
         const auto torqueStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u);
         torqueStep.Configure(plantConfig->torqueStepNm != 0.0f ? std::make_optional(torqueStepDelay) : std::nullopt);
 
-        // The delay is carried in centiseconds because it reuses a byte the record already had.
         const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
         encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
 
@@ -303,7 +301,6 @@ namespace application
 
     void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
     {
-        // The simulated bridge has no gate to cut; the machine reset that follows restarts the plant as well
         WriteWatchdogResetMarker(watchdogResetMarker);
     }
 
@@ -317,7 +314,6 @@ namespace application
         return diagnostics;
     }
 
-    // Sample-and-hold follows the firmware's request, as on TI, unless a scenario pins it in the plant.
     void PlatformFactoryImpl::ApplyCurrentSense(SampleAndHold requested)
     {
         if (!plantConfig.has_value())
@@ -352,7 +348,7 @@ namespace application
         }
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *canBusAdapter;
     }
@@ -466,7 +462,6 @@ namespace application
         if (!canBusAdapter)
             return;
 
-        // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
         const uint32_t tick = controlTick.load(std::memory_order_relaxed);
         if (const auto frame = canBusAdapter->PollIncoming())
             StampReceivedFrame(tick, *frame);

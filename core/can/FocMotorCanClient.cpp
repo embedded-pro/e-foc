@@ -25,7 +25,7 @@ namespace can
         return categoryClient;
     }
 
-    const CanFrameOrigin& FocMotorCanClient::Origin() const
+    const services::CanFrameOrigin& FocMotorCanClient::Origin() const
     {
         return originTracker;
     }

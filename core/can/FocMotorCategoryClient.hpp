@@ -1,11 +1,11 @@
 #pragma once
 
 #include "can-lite/core/CanCategory.hpp"
+#include "can-lite/core/CanFrameOrigin.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/CanMessageHandler.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/CanSequenceSource.hpp"
-#include "core/can/CanFrameOrigin.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "infra/util/Function.hpp"
@@ -72,7 +72,7 @@ namespace can
     public:
         static constexpr std::size_t maxTrackedNodes{ NodeContracts::maxTracked };
 
-        FocMotorCategoryClient(services::CanFrameTransport& transport, services::CanSequenceSource& sequenceSource, const CanFrameOrigin& origin);
+        FocMotorCategoryClient(services::CanFrameTransport& transport, services::CanSequenceSource& sequenceSource, const services::CanFrameOrigin& origin);
 
         uint8_t Id() const override;
 
@@ -132,7 +132,7 @@ namespace can
 
         FaultHistoryMessages faultHistoryMessages{ *this };
 
-        const CanFrameOrigin& origin;
+        const services::CanFrameOrigin& origin;
         NodeContracts contracts;
     };
 }

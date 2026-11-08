@@ -1,6 +1,6 @@
+#include "can-lite/core/test/MonitoredCanMock.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
-#include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
@@ -39,7 +39,7 @@ namespace
         MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
         MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
-        MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
+        MOCK_METHOD(services::MonitoredCan&, CanBus, (), (override));
 
         MOCK_METHOD(void, PhaseCurrentsReady, (const infra::Function<void(foc::PhaseCurrents)>&), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
@@ -91,7 +91,7 @@ namespace
         services::TerminalWithStorage::WithMaxSize<25> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
-        testing::StrictMock<application::CanBusAdapterMock> canAdapterMock;
+        testing::StrictMock<services::MonitoredCanMock> canAdapterMock;
 
         std::optional<application::TerminalInteractor> terminalInteractor;
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
@@ -1075,7 +1075,7 @@ TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_29bit_message)
 
 TEST_F(TestHardwareTerminal, can_error_callback_traces_error)
 {
-    infra::Function<void(application::CanBusAdapter::CanError)> errorCallback;
+    infra::Function<void(services::CanBusError)> errorCallback;
 
     InvokeCommand("can_start 500000", [this, &errorCallback]()
         {
@@ -1089,7 +1089,7 @@ TEST_F(TestHardwareTerminal, can_error_callback_traces_error)
     ExecuteAllActions();
 
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
-    errorCallback(application::CanBusAdapter::CanError::busOff);
+    errorCallback(services::CanBusError::busOff);
 }
 
 TEST_F(TestHardwareTerminal, can_send_with_29bit_id)
@@ -1300,6 +1300,5 @@ TEST_F(TestHardwareTerminal, watchdog_stall_reports_before_stalling_the_event_lo
 
     ExecuteAllActions();
 
-    // Stops short of the stall delay: the stall action never returns, so running it would hang the test
     ForwardTime(std::chrono::milliseconds(99));
 }

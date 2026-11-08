@@ -1,9 +1,9 @@
 #pragma once
 
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/foc/model/OneShotDelay.hpp"
 #include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
@@ -50,7 +50,7 @@ namespace application
         uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -149,7 +149,6 @@ namespace application
 
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
             hal::WatchdogQemu watchdog{ hal::WatchdogQemu::Config{ .timeout = watchdogEarlyWarningPeriod } };
-            // The TI boards' depth, so the SIL suite runs the application within it
             EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<24> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
                 {
                     OnWatchdogExpired();
@@ -217,7 +216,6 @@ namespace application
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;
-        // Latched by the control tick, as the TI interface latches it, and read from the same interrupt
         bool indexLatched{ false };
         foc::OneShotDelay cableDisconnect;
         foc::OneShotDelay supplyStep;

@@ -77,7 +77,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds, SampleAndHold)
     {
         phaseCurrentAdc.reset();
         phaseCurrentAdc.emplace(1.0f, 0.0f);
@@ -92,14 +92,14 @@ namespace application
         encoder.emplace(resolution);
     }
 
-    void PlatformFactoryImpl::ConfigureCanBus(uint32_t /*bitRate*/, bool /*testMode*/)
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t, bool)
     {
         canBus.reset();
         canBus.emplace();
         diagnostics.AttachCanBus(*canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *canBus;
     }

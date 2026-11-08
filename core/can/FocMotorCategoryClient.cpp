@@ -6,7 +6,7 @@
 namespace can
 {
     FocMotorCategoryClient::FocMotorCategoryClient(services::CanFrameTransport& transport,
-        services::CanSequenceSource& sequenceSource, const CanFrameOrigin& origin)
+        services::CanSequenceSource& sequenceSource, const services::CanFrameOrigin& origin)
         : CanCategoryClient(transport, sequenceSource)
         , origin(origin)
     {

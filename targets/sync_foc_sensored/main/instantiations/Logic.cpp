@@ -1,5 +1,5 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
-#include "core/can/CanNodeAddress.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "generated/Version.h"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <algorithm>
@@ -132,11 +132,14 @@ namespace application
                 this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                 this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
 
-                const auto nodeId = can::CanNodeId(this->configData.canNodeId, boardId);
+                const auto nodeId = services::MakeCanNodeId(this->configData.canNodeId, boardId);
                 this->hardware.Tracer().Trace() << "[CAN] node " << nodeId << " = base " << this->configData.canNodeId << " + board ID " << boardId;
 
                 tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
-                canBus.emplace(*tracingCan, this->hardware.CanBus());
+                canBus.emplace(*tracingCan, this->hardware.CanBus(), [](hal::Can::Id id)
+                    {
+                        return can::FocMotorCurrentStreamer::IsStreamFrame(id);
+                    });
                 canServer.emplace(*canBus, services::CanProtocolServer::Config{ .nodeId = nodeId });
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());

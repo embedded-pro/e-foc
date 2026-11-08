@@ -224,9 +224,9 @@ number from `SCB->ICSR`, its bit in `NVIC->ISPR`). Both drivers clear their inte
 pending bit before calling back, so the bit is set only by a conversion or transfer that completed
 during the callback.
 
-**CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
-that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
-omit it. This is what separates a bus with marginal termination from one that is unplugged.
+**CAN errors.** Every error class the controller reports is counted, not only the bus-off condition
+that raises a fault. Each platform's bus is a can-lite `MonitoredCanImpl` around its driver, and
+counting happens in its `MonitoredCan` base, so no platform's reporting path can omit it. This is what separates a bus with marginal termination from one that is unplugged.
 
 Both sets saturate rather than wrap. The cost on the control path is a pair of register reads and
 about two dozen inlined instructions, under one percent of the 20 kHz period.

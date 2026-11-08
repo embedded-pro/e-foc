@@ -254,3 +254,16 @@ TEST_F(FocMotorCurrentStreamerTest, a_client_back_online_after_going_offline_res
 
     EXPECT_EQ(frames.size(), 1u);
 }
+
+TEST(FocMotorCurrentStreamerFrames, only_the_current_stream_telemetry_is_a_stream_frame)
+{
+    const auto frame = [](uint8_t category, uint8_t messageType)
+    {
+        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::telemetry, category, messageType, 1));
+    };
+
+    EXPECT_TRUE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(can::focMotorCategoryId, can::focTelemetryCurrentsId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(can::focMotorCategoryId, can::focTelemetryStatusResponseId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(services::canSystemCategoryId, can::focTelemetryCurrentsId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(hal::Can::Id::Create11BitId(0x123)));
+}

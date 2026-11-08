@@ -85,7 +85,7 @@ namespace
     };
 
     struct FrameOriginStub
-        : can::CanFrameOrigin
+        : services::CanFrameOrigin
     {
         uint16_t SourceNodeId() const override
         {

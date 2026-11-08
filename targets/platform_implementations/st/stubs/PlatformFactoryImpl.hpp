@@ -4,8 +4,8 @@
 #include <array>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
@@ -34,7 +34,7 @@ namespace application
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -63,7 +63,6 @@ namespace application
             return PlatformFactory::BoardProtectionState::unknown;
         }
 
-        // Also satisfies ThreePhaseInverter::Start; no-op on ST
         void Start() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -160,7 +159,6 @@ namespace application
             HalInitialization();
         };
 
-        // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
         HalInitialization halInitialization;
         hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         hal::WatchDogStm watchdog{ WatchdogConfig() };
@@ -179,7 +177,7 @@ namespace application
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;
         std::optional<ThreeChannelsPwmStub> pwm;
         std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
-        std::optional<CanBusAdapterImpl<CanStub>> canBus;
+        std::optional<services::MonitoredCanImpl<CanStub>> canBus;
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
         ControlLoopMetrics controlLoopMetrics;

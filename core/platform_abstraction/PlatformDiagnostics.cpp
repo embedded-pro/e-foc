@@ -4,14 +4,14 @@ namespace application
 {
     namespace
     {
-        constexpr CanBusAdapter::ErrorCounters noBus{};
+        constexpr services::CanBusErrorCounters noBus{};
     }
 
     PlatformDiagnostics::PlatformDiagnostics(ControlLoopMetrics& metrics)
         : metrics(metrics)
     {}
 
-    void PlatformDiagnostics::AttachCanBus(CanBusAdapter& bus)
+    void PlatformDiagnostics::AttachCanBus(services::MonitoredCan& bus)
     {
         canBus = &bus;
     }
@@ -21,7 +21,7 @@ namespace application
         return metrics.Read();
     }
 
-    const CanBusAdapter::ErrorCounters& PlatformDiagnostics::CanStatistics() const
+    const services::CanBusErrorCounters& PlatformDiagnostics::CanStatistics() const
     {
         return canBus == nullptr ? noBus : canBus->ErrorStatistics();
     }

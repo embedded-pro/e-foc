@@ -2,6 +2,7 @@
 
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeCategoryServer.hpp"
 #include "can-lite/server/CanProtocolServer.hpp"
+#include "can-lite/tracing/TracingBypassCan.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
 #include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
 #include "core/can/CanCommandTimeout.hpp"
@@ -10,7 +11,6 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCurrentStreamer.hpp"
-#include "core/can/UntracedStreamCan.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
@@ -118,7 +118,7 @@ namespace application
         foc::CurrentStream currentStream;
 
         std::optional<services::TracingCan> tracingCan;
-        std::optional<can::UntracedStreamCan> canBus;
+        std::optional<services::TracingBypassCan> canBus;
         std::optional<services::CanProtocolServer> canServer;
         std::optional<services::TracingCanProtocolServerObserver> tracingServerObserver;
         std::optional<can::FocMotorCategoryServer> motorCanServer;

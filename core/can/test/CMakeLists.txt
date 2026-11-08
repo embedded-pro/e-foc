@@ -25,8 +25,6 @@ target_link_libraries(e_foc.can_test PUBLIC
 )
 
 target_sources(e_foc.can_test PRIVATE
-    TestCanFrameOrigin.cpp
-    TestCanNodeAddress.cpp
     TestCanCommandTimeout.cpp
     TestCanLivenessWatchdog.cpp
     TestFocMotorCategoryServer.cpp
@@ -36,7 +34,6 @@ target_sources(e_foc.can_test PRIVATE
     TestFocMotorCurrentStreamer.cpp
     TestFocMotorWireContract.cpp
     TestFocMotorSettings.cpp
-    TestUntracedStreamCan.cpp
     TestWireContractDocumentation.cpp
 )
 

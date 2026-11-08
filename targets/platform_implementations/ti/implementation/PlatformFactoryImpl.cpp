@@ -293,7 +293,7 @@ namespace application
         diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *peripherals->canBus;
     }
@@ -379,7 +379,6 @@ namespace application
         return pwmBaseFrequency;
     }
 
-    // The encoder exists only once the NVM load has supplied its resolution
     foc::Radians PlatformFactoryImpl::Read()
     {
         if (!peripherals->encoder)
@@ -409,7 +408,6 @@ namespace application
         return peripherals->encoder.has_value();
     }
 
-    // The interface latches the index pulse in its raw interrupt status whether or not the interrupt is enabled
     void PlatformFactoryImpl::ArmIndex()
     {
         static_assert(Peripheral::QeiIndex == 0, "The index latch is read from QEI0");
@@ -471,7 +469,6 @@ namespace application
         return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
-    // Both regions lie in the upper flash half: an erase stalls every read of its own half, the watchdog handler included (flash_layout.ld)
     infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
     {
         return infra::ConstByteRange{ __staging_slot_start, __staging_slot_end };
