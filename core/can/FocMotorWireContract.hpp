@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 20;
+    static constexpr uint8_t focContractVersionMinor = 21;
 
     enum class FieldType : uint8_t
     {
@@ -85,6 +85,10 @@ namespace can
     inline constexpr std::array<FieldDescriptor, 1> torqueFields{ { { "iq", FieldType::fixed16, focCurrentScale, "A" } } };
     inline constexpr std::array<FieldDescriptor, 1> speedFields{ { { "speed", FieldType::fixed16, focSpeedScale, "rad/s" } } };
     inline constexpr std::array<FieldDescriptor, 1> positionFields{ { { "position", FieldType::fixed16, focPositionScale, "rad" } } };
+    inline constexpr std::array<FieldDescriptor, 1> preciseTorqueFields{ { { "iq", FieldType::float32, 1, "A" } } };
+    inline constexpr std::array<FieldDescriptor, 1> torqueNewtonMeterFields{ { { "torque", FieldType::float32, 1, "Nm" } } };
+    inline constexpr std::array<FieldDescriptor, 1> preciseSpeedFields{ { { "speed", FieldType::float32, 1, "rad/s" } } };
+    inline constexpr std::array<FieldDescriptor, 1> precisePositionFields{ { { "position", FieldType::float32, 1, "rad" } } };
     inline constexpr std::array<FieldDescriptor, 1> modeFields{ { { "mode", FieldType::uint8, 1, "enum" } } };
     inline constexpr std::array<FieldDescriptor, 1> resolutionFields{ { { "resolution", FieldType::uint32, 1, "counts/rev" } } };
     inline constexpr std::array<FieldDescriptor, 1> telemetryRateFields{ { { "rate", FieldType::uint32, 1, "Hz" } } };
@@ -160,6 +164,11 @@ namespace can
         { "position", FieldType::fixed16, focPositionScale, "rad" },
     } };
 
+    inline constexpr std::array<FieldDescriptor, 2> telemetryStatusPreciseFields{ {
+        { "speed", FieldType::float32, 1, "rad/s" },
+        { "position", FieldType::float32, 1, "rad" },
+    } };
+
     constexpr MessageDescriptor MakeDescriptor(uint8_t id, const char* name, Direction direction)
     {
         return MessageDescriptor{ id, name, direction, nullptr, 0 };
@@ -171,7 +180,7 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 28> focMotorMessages{ {
+    inline constexpr std::array<MessageDescriptor, 33> focMotorMessages{ {
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
         MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
@@ -200,12 +209,18 @@ namespace can
         MakeDescriptor(focClearFaultHistoryId, "ClearFaultHistory", Direction::command),
         MakeDescriptor(focRecalibrateId, "Recalibrate", Direction::command),
         MakeDescriptor(focResetModelId, "ResetModel", Direction::command),
+        MakeDescriptor(focSetTorqueSetpointPreciseId, "SetTorqueSetpointPrecise", Direction::command, preciseTorqueFields),
+        MakeDescriptor(focSetTorqueSetpointNewtonMeterId, "SetTorqueSetpointNewtonMeter", Direction::command, torqueNewtonMeterFields),
+        MakeDescriptor(focSetSpeedSetpointPreciseId, "SetSpeedSetpointPrecise", Direction::command, preciseSpeedFields),
+        MakeDescriptor(focSetPositionSetpointPreciseId, "SetPositionSetpointPrecise", Direction::command, precisePositionFields),
+        MakeDescriptor(focRequestTelemetryPreciseId, "RequestTelemetryPrecise", Direction::command),
     } };
 
-    inline constexpr std::array<MessageDescriptor, 10> focMotorResponses{ {
+    inline constexpr std::array<MessageDescriptor, 11> focMotorResponses{ {
         MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
         MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
         MakeDescriptor(focTelemetryCurrentsId, "TelemetryCurrents", Direction::telemetry, telemetryCurrentsFields),
+        MakeDescriptor(focTelemetryStatusPreciseId, "TelemetryStatusPrecise", Direction::telemetry, telemetryStatusPreciseFields),
         MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
         MakeDescriptor(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
         MakeDescriptor(focAlgorithmsResponseId, "AlgorithmsResponse", Direction::response, algorithmsResponseFields),
@@ -399,5 +414,10 @@ namespace can
     inline float ReadFloat32(services::CanPayloadReader& reader)
     {
         return std::bit_cast<float>(reader.ReadUInt32());
+    }
+
+    inline bool IsPreciseSetpointAcceptable(float value)
+    {
+        return std::isfinite(value);
     }
 }

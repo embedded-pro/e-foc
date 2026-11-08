@@ -67,3 +67,31 @@ TEST_F(TestSetpointAxis, picks_the_axis_of_each_control_mode)
     EXPECT_EQ(&SpeedAxis(), &AxisFor(can::FocMotorMode::speed));
     EXPECT_EQ(&PositionAxis(), &AxisFor(can::FocMotorMode::position));
 }
+
+TEST_F(TestSetpointAxis, a_precise_axis_steps_finer_than_the_scaled_wire_count)
+{
+    EXPECT_NEAR(0.001, PreciseAxisFor(can::FocMotorMode::torque).DisplayStep(), 1e-12);
+    EXPECT_EQ(3, PreciseAxisFor(can::FocMotorMode::torque).Decimals());
+    EXPECT_NEAR(0.01, PreciseAxisFor(can::FocMotorMode::speed).DisplayStep() / PreciseAxisFor(can::FocMotorMode::speed).DisplayOfSi(1.0), 1e-9);
+    EXPECT_NEAR(0.001, PreciseAxisFor(can::FocMotorMode::position).DisplayStep() / PreciseAxisFor(can::FocMotorMode::position).DisplayOfSi(1.0), 1e-9);
+}
+
+TEST_F(TestSetpointAxis, a_precise_axis_offers_the_whole_firmware_limit)
+{
+    EXPECT_EQ(100000, PreciseAxisFor(can::FocMotorMode::torque).MaxCounts());
+    EXPECT_EQ(100000, PreciseAxisFor(can::FocMotorMode::speed).MaxCounts());
+    EXPECT_EQ(3141, PreciseAxisFor(can::FocMotorMode::position).MaxCounts());
+}
+
+TEST_F(TestSetpointAxis, a_precise_count_sends_its_exact_si_value)
+{
+    EXPECT_NEAR(0.005f, PreciseAxisFor(can::FocMotorMode::speed).SiOf(1) * 0.5f, 1e-9f);
+    EXPECT_NEAR(3.25f, PreciseAxisFor(can::FocMotorMode::speed).SiOf(325), 1e-6f);
+    EXPECT_NEAR(-0.123f, PreciseAxisFor(can::FocMotorMode::torque).SiOf(-123), 1e-6f);
+}
+
+TEST_F(TestSetpointAxis, picks_the_precise_or_scaled_axis_by_the_contract)
+{
+    EXPECT_EQ(&SpeedAxis(), &AxisFor(can::FocMotorMode::speed, false));
+    EXPECT_EQ(&PreciseAxisFor(can::FocMotorMode::speed), &AxisFor(can::FocMotorMode::speed, true));
+}

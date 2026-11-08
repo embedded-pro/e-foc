@@ -29,6 +29,7 @@ namespace can
         virtual void OnSelectControlModeResponse(uint16_t sourceNodeId, FocMotorMode activeMode) = 0;
         virtual void OnCategoryError(uint16_t sourceNodeId, uint8_t originCommandId, FocMotorCategoryError errorCode) = 0;
         virtual void OnTelemetryStatus(uint16_t sourceNodeId, const hal::Can::Message& msg) = 0;
+        virtual void OnTelemetryStatusPrecise(uint16_t sourceNodeId, foc::RadiansPerSecond speed, foc::Radians position) = 0;
         virtual void OnTelemetryCurrents(uint16_t sourceNodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position) = 0;
         virtual void OnContractVersionResponse(uint16_t sourceNodeId, uint8_t major, uint8_t minor) = 0;
         virtual void OnElectricalParamsResponse(uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) = 0;
@@ -84,6 +85,7 @@ namespace can
         bool SendSetTorqueSetpoint(uint16_t targetNodeId, foc::Ampere value);
         bool SendSetSpeedSetpoint(uint16_t targetNodeId, foc::RadiansPerSecond value);
         bool SendSetPositionSetpoint(uint16_t targetNodeId, foc::Radians value);
+        bool SendSetPreciseSetpoint(uint16_t targetNodeId, const FocPreciseSetpoint& setpoint);
 
         bool SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth);
@@ -91,7 +93,7 @@ namespace can
         bool SendQueryContractVersion(uint16_t targetNodeId);
         bool SendAlign(uint16_t targetNodeId);
         bool SendIdentifyElectrical(uint16_t targetNodeId);
-        bool SendRequestTelemetry(uint16_t targetNodeId);
+        bool SendRequestTelemetry(uint16_t targetNodeId, FocTelemetryResolution resolution = FocTelemetryResolution::scaled);
         bool SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t targetNodeId, FocControlLoop loop, uint8_t algorithm);
         bool SendQueryAlgorithms(uint16_t targetNodeId);
@@ -137,6 +139,20 @@ namespace can
         };
 
         FaultHistoryMessages faultHistoryMessages{ *this };
+
+        class PreciseMessages
+        {
+        public:
+            explicit PreciseMessages(FocMotorCategoryClient& client);
+
+        private:
+            bool HandleTelemetryStatus(const hal::Can::Message& data);
+
+            FocMotorCategoryClient& client;
+            services::CanMessageHandler<PreciseMessages> telemetryStatus;
+        };
+
+        PreciseMessages preciseMessages{ *this };
 
         const CanFrameOrigin& origin;
         NodeContracts contracts;

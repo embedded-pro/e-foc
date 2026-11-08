@@ -1,5 +1,7 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCommandOutcome.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TravelLimits.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
@@ -183,7 +185,55 @@ namespace can
 
     void FocMotorCanBridge::OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone)
     {
-        if (SetpointRejected(can::focSetTorqueSetpointId, state_machine::ControlMode::torque,
+        ApplyTorqueSetpoint(can::focSetTorqueSetpointId, value, onDone);
+    }
+
+    void FocMotorCanBridge::OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone)
+    {
+        ApplySpeedSetpoint(can::focSetSpeedSetpointId, value, onDone);
+    }
+
+    void FocMotorCanBridge::OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone)
+    {
+        ApplyPositionSetpoint(can::focSetPositionSetpointId, value, onDone);
+    }
+
+    void FocMotorCanBridge::OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone)
+    {
+        const auto commandId = PreciseSetpointCommandId(setpoint.kind);
+
+        switch (setpoint.kind)
+        {
+            case FocPreciseSetpointKind::torqueCurrent:
+                ApplyTorqueSetpoint(commandId, foc::Ampere{ setpoint.value }, onDone);
+                break;
+            case FocPreciseSetpointKind::torqueNewtonMeter:
+                ApplyTorqueInNewtonMeter(commandId, foc::NewtonMeter{ setpoint.value }, onDone);
+                break;
+            case FocPreciseSetpointKind::speed:
+                ApplySpeedSetpoint(commandId, foc::RadiansPerSecond{ setpoint.value }, onDone);
+                break;
+            case FocPreciseSetpointKind::position:
+                ApplyPositionSetpoint(commandId, foc::Radians{ setpoint.value }, onDone);
+                break;
+        }
+    }
+
+    void FocMotorCanBridge::ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone)
+    {
+        const auto torqueConstant = foc::TorqueConstantFor(controlMode.CalibrationRecord().polePairs, controlMode.ActiveFluxLinkage());
+        if (!foc::IsFinitePositive(torqueConstant.Value()))
+        {
+            server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
+            return;
+        }
+
+        ApplyTorqueSetpoint(commandId, foc::Ampere{ torque.Value() / torqueConstant.Value() }, onDone);
+    }
+
+    void FocMotorCanBridge::ApplyTorqueSetpoint(uint8_t commandId, foc::Ampere value, const infra::Function<void()>& onDone)
+    {
+        if (SetpointRejected(commandId, state_machine::ControlMode::torque,
                 std::fabs(value.Value()) <= inverter.MaxCurrentSupported().Value()))
             return;
 
@@ -193,12 +243,12 @@ namespace can
             onDone();
         }
         else
-            server.SendCategoryError(can::focSetTorqueSetpointId, FocMotorCategoryError::modeMismatch);
+            server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
     }
 
-    void FocMotorCanBridge::OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone)
+    void FocMotorCanBridge::ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone)
     {
-        if (SetpointRejected(can::focSetSpeedSetpointId, state_machine::ControlMode::speed,
+        if (SetpointRejected(commandId, state_machine::ControlMode::speed,
                 std::fabs(value.Value()) <= maxSpeedSetpoint))
             return;
 
@@ -208,13 +258,13 @@ namespace can
             onDone();
         }
         else
-            server.SendCategoryError(can::focSetSpeedSetpointId, FocMotorCategoryError::modeMismatch);
+            server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
     }
 
-    void FocMotorCanBridge::OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone)
+    void FocMotorCanBridge::ApplyPositionSetpoint(uint8_t commandId, foc::Radians value, const infra::Function<void()>& onDone)
     {
         const foc::TravelLimits limits{ foc::Radians{ controlMode.Config().limits.positionMinimum }, foc::Radians{ controlMode.Config().limits.positionMaximum } };
-        if (SetpointRejected(can::focSetPositionSetpointId, state_machine::ControlMode::position,
+        if (SetpointRejected(commandId, state_machine::ControlMode::position,
                 std::fabs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
             return;
 
@@ -224,7 +274,7 @@ namespace can
             onDone();
         }
         else
-            server.SendCategoryError(can::focSetPositionSetpointId, FocMotorCategoryError::modeMismatch);
+            server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
     }
 
     void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
@@ -312,6 +362,12 @@ namespace can
             faultCode,
             controlMode.ActiveStateMachine().MeasuredSpeed(),
             encoder.Read());
+        onDone();
+    }
+
+    void FocMotorCanBridge::OnRequestTelemetryPrecise(const infra::Function<void()>& onDone)
+    {
+        server.BroadcastTelemetryStatusPrecise(controlMode.ActiveStateMachine().MeasuredSpeed(), encoder.Read());
         onDone();
     }
 

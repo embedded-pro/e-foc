@@ -219,7 +219,7 @@ namespace
         {
             services::ConfigData config{};
             config.defaultControlMode = 0;
-            application::CalibrationServices calibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } };
+            application::CalibrationServices calibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), defaultFluxLinkage };
             if (stateMachineRefreshesOffsets)
             {
                 calibrationServices.currentOffsets = currentOffsetsMock;
@@ -327,6 +327,21 @@ namespace
             return message;
         }
 
+        void DispatchPreciseSetpoint(uint8_t commandId, float value)
+        {
+            hal::Can::Message data;
+            data.resize(5, 0);
+            services::CanFrameCodec::WriteUInt32(data, 1, std::bit_cast<uint32_t>(value));
+            Dispatch(commandId, data);
+        }
+
+        void ExpectAcknowledged(uint8_t commandId, services::CanAckStatus status) const
+        {
+            ASSERT_TRUE(ackSpy.last.has_value());
+            EXPECT_EQ(ackSpy.last->commandType, commandId);
+            EXPECT_EQ(ackSpy.last->status, status);
+        }
+
         void DispatchSelectAlgorithm(can::FocControlLoop loop, uint8_t algorithm)
         {
             hal::Can::Message data;
@@ -397,6 +412,7 @@ namespace
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<services::PhaseCurrentOffsetsMock> currentOffsetsMock;
         StrictMock<services::RotorStandstillMock> standstillMock;
+        foc::Weber defaultFluxLinkage{ 0.007f };
         bool bridgeMeasuresOffsets{ false };
         bool stateMachineRefreshesOffsets{ false };
         infra::Function<void(bool)> standstillDone;
@@ -1752,6 +1768,145 @@ TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InIdle_RejectsWithInvalidSta
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
     EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_Torque_ResolvesTheCurrentLimitToAMilliampere)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointPreciseId, 14.9995f);
+    ExpectAcknowledged(can::focSetTorqueSetpointPreciseId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointPreciseId, 15.0005f);
+    ExpectAcknowledged(can::focSetTorqueSetpointPreciseId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_Speed_ResolvesTheSpeedLimitFarBelowOneRadianPerSecond)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    AlignAfterBoot();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetSpeedSetpointPreciseId, can::FocMotorCanBridge::maxSpeedSetpoint - 0.005f);
+    ExpectAcknowledged(can::focSetSpeedSetpointPreciseId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchPreciseSetpoint(can::focSetSpeedSetpointPreciseId, can::FocMotorCanBridge::maxSpeedSetpoint + 0.5f);
+    ExpectAcknowledged(can::focSetSpeedSetpointPreciseId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_Position_ResolvesTheTravelLimitBelowAnEncoderCount)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    coordinator->Config().limits.positionMinimum = -0.5f;
+    coordinator->Config().limits.positionMaximum = 0.5f;
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetPositionSetpointPreciseId, 0.4999f);
+    ExpectAcknowledged(can::focSetPositionSetpointPreciseId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchPreciseSetpoint(can::focSetPositionSetpointPreciseId, 0.5001f);
+    ExpectAcknowledged(can::focSetPositionSetpointPreciseId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_InIdle_RejectsWithInvalidState)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetSpeedSetpointPreciseId, 3.25f);
+
+    ExpectAcknowledged(can::focSetSpeedSetpointPreciseId, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_InAnotherMode_RejectsWithModeMismatch)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    AlignAfterBoot();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointPreciseId, 1.0f);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focSetTorqueSetpointPreciseId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::modeMismatch);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_Torque_FeedsTheCommandTimeoutLikeTheScaledCommand)
+{
+    ConstructFixtureInReady();
+    std::size_t accepted{ 0 };
+    bridge->ObserveCommands([&accepted]()
+        {
+            ++accepted;
+        });
+
+    DispatchSetpoint(can::focSetTorqueSetpointId, 10);
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointPreciseId, 1.0005f);
+
+    EXPECT_EQ(2u, accepted);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_TorqueInNewtonMetres_ConvertsWithTheCalibratedTorqueConstant)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.62f);
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointNewtonMeterId, -0.62f);
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.64f);
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_TorqueInNewtonMetres_WithoutATorqueConstant_RejectsWithInvalidState)
+{
+    defaultFluxLinkage = foc::Weber{ 0.0f };
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.1f);
+
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPreciseSetpoint_TorqueInNewtonMetres_WhenUncalibrated_RejectsWithInvalidState)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchPreciseSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.1f);
+
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetryPrecise_BroadcastsSpeedAndPositionAsFloats)
+{
+    ConstructFixtureInReady();
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.00123f }));
+    ResetCaptures();
+
+    DispatchCommand(can::focRequestTelemetryPreciseId);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusPreciseId);
+    ASSERT_EQ(lastSentData.size(), 8u);
+    EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentData, 0)), 0.0f);
+    EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentData, 4)), 0.00123f);
+    ExpectAcknowledged(can::focRequestTelemetryPreciseId, services::CanAckStatus::success);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_TooHighRate_RejectsInvalidPayload)

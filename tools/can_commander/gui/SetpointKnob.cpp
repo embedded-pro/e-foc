@@ -41,15 +41,23 @@ namespace tool
 
     SetpointKnob::SetpointKnob(const SetpointAxis& axis, QWidget* parent)
         : QDial(parent)
-        , axis(axis)
+        , axis(&axis)
     {
-        setRange(-axis.MaxCounts(), axis.MaxCounts());
         setSingleStep(1);
-        setPageStep(std::max(1, axis.MaxCounts() / 20));
         setWrapping(false);
         setNotchesVisible(false);
         setFocusPolicy(Qt::StrongFocus);
+        SetAxis(axis);
+    }
+
+    void SetpointKnob::SetAxis(const SetpointAxis& newAxis)
+    {
+        axis = &newAxis;
+        accepted.reset();
+        setRange(-newAxis.MaxCounts(), newAxis.MaxCounts());
+        setPageStep(std::max(1, newAxis.MaxCounts() / 20));
         setValue(0);
+        update();
     }
 
     void SetpointKnob::SetAccepted(std::optional<int32_t> counts)
@@ -60,7 +68,7 @@ namespace tool
 
     QString SetpointKnob::Format(int32_t counts) const
     {
-        return FormatSetpoint(axis, counts);
+        return FormatSetpoint(*axis, counts);
     }
 
     QSize SetpointKnob::sizeHint() const

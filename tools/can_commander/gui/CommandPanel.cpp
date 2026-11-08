@@ -160,16 +160,15 @@ namespace tool
 
     QGroupBox* CommandPanel::CreateSetpointGroup(SetpointControls& controls, const char* title, const char* label)
     {
-        const auto& axis = AxisFor(controls.mode);
+        controls.axis = &AxisFor(controls.mode, preciseSetpoints);
         auto* group = new QGroupBox(title);
         auto* layout = new QHBoxLayout(group);
 
-        controls.knob = new SetpointKnob(axis);
-        const auto range = QString("%1: ±%2").arg(ui::backend::qt::ToQt(axis.RangeLabel()), controls.knob->Format(axis.MaxCounts()));
+        controls.knob = new SetpointKnob(*controls.axis);
         controls.knob->setAccessibleName(QString("%1 knob").arg(title));
-        controls.knob->setToolTip(QString("Turn to choose the setpoint, then Apply. Arrow keys step, Page Up and Page Down jump.\n%1").arg(range));
         layout->addWidget(controls.knob);
-        layout->addLayout(CreateSetpointEntry(controls, title, label, range), 1);
+        layout->addLayout(CreateSetpointEntry(controls, title, label), 1);
+        ApplyAxis(controls);
 
         commandWidgets.push_back(controls.apply);
         ConnectSetpoint(controls);
@@ -177,18 +176,34 @@ namespace tool
         return group;
     }
 
-    QLayout* CommandPanel::CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label, const QString& range)
+    QString CommandPanel::RangeText(const SetpointControls& controls)
     {
-        const auto& axis = AxisFor(controls.mode);
-        controls.spin = new QDoubleSpinBox();
+        return QString("%1: ±%2").arg(ui::backend::qt::ToQt(controls.axis->RangeLabel()), controls.knob->Format(controls.axis->MaxCounts()));
+    }
+
+    void CommandPanel::ApplyAxis(SetpointControls& controls)
+    {
+        const auto& axis = *controls.axis;
+        const QSignalBlocker knobBlocker{ controls.knob };
+        const QSignalBlocker spinBlocker{ controls.spin };
+        controls.knob->SetAxis(axis);
         controls.spin->setDecimals(axis.Decimals());
         controls.spin->setRange(axis.DisplayOf(-axis.MaxCounts()), axis.DisplayOf(axis.MaxCounts()));
         controls.spin->setSingleStep(axis.DisplayStep());
         controls.spin->setSuffix(ui::backend::qt::ToQt(axis.Suffix()));
+        controls.spin->setValue(0.0);
+
+        const auto range = RangeText(controls);
+        controls.knob->setToolTip(QString("Turn to choose the setpoint, then Apply. Arrow keys step, Page Up and Page Down jump.\n%1").arg(range));
+        controls.spin->setToolTip(QString("%1\nEnter applies the value.").arg(range));
+    }
+
+    QLayout* CommandPanel::CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label)
+    {
+        controls.spin = new QDoubleSpinBox();
         controls.spin->setKeyboardTracking(false);
         controls.spin->setMinimumWidth(140);
         controls.spin->setAccessibleName(title);
-        controls.spin->setToolTip(QString("%1\nEnter applies the value.").arg(range));
         auto* form = new QFormLayout();
         form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
         form->addRow(label, controls.spin);
@@ -221,7 +236,7 @@ namespace tool
             });
         connect(controls.spin, &QDoubleSpinBox::valueChanged, this, [this, &controls](double value)
             {
-                SyncSetpoint(controls, AxisFor(controls.mode).CountsOf(value));
+                SyncSetpoint(controls, controls.axis->CountsOf(value));
             });
         connect(controls.apply, &QPushButton::clicked, this, [this, &controls]()
             {
@@ -235,7 +250,7 @@ namespace tool
             const QSignalBlocker knobBlocker{ controls.knob };
             const QSignalBlocker spinBlocker{ controls.spin };
             controls.knob->setValue(counts);
-            controls.spin->setValue(AxisFor(controls.mode).DisplayOf(counts));
+            controls.spin->setValue(controls.axis->DisplayOf(counts));
         }
         RefreshSetpointStatus(controls);
     }
@@ -348,6 +363,26 @@ namespace tool
         for (auto& controls : setpoints)
         {
             controls.accepted.reset();
+            RefreshSetpointStatus(controls);
+        }
+    }
+
+    bool CommandPanel::PreciseSetpoints() const
+    {
+        return preciseSetpoints;
+    }
+
+    void CommandPanel::SetPreciseSetpoints(bool precise)
+    {
+        if (precise == preciseSetpoints)
+            return;
+
+        preciseSetpoints = precise;
+        for (auto& controls : setpoints)
+        {
+            controls.axis = &AxisFor(controls.mode, precise);
+            controls.accepted.reset();
+            ApplyAxis(controls);
             RefreshSetpointStatus(controls);
         }
     }

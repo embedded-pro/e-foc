@@ -91,6 +91,7 @@ namespace tool
         static constexpr uint8_t storedRecalibrationContractMinor{ 18 };
         static constexpr uint8_t homedContractMinor{ 19 };
         static constexpr uint8_t frictionCoulombContractMinor{ 20 };
+        static constexpr uint8_t preciseSetpointContractMinor{ 21 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -114,6 +115,7 @@ namespace tool
         bool SupportsStoredRecalibration(uint16_t nodeId) const;
         bool SupportsHoming(uint16_t nodeId) const;
         bool SupportsCoulombFriction(uint16_t nodeId) const;
+        bool SupportsPreciseSetpoints(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
@@ -123,6 +125,7 @@ namespace tool
         bool SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent);
         bool SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec);
         bool SendSetPositionSetpoint(uint16_t nodeId, float positionRad);
+        bool SendSetTorqueSetpointNewtonMeter(uint16_t nodeId, float torqueNewtonMeter);
 
         bool SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth);
         bool SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth);
@@ -194,6 +197,7 @@ namespace tool
         bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
         bool SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const;
         void RefreshStatus();
+        bool SendSetpoint(uint16_t nodeId, uint8_t scaledCommand, can::FocPreciseSetpointKind kind, float value);
         static bool IsRead(uint8_t commandType);
         void CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value);
         void OnReadRefused(uint16_t nodeId, uint8_t commandType);
@@ -212,6 +216,7 @@ namespace tool
         void OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
         void OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) override;
+        void OnTelemetryStatusPrecise(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position) override;
         void OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position) override;
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;

@@ -54,6 +54,8 @@ namespace
         MOCK_METHOD(void, OnSetTorqueSetpoint, (foc::Ampere, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetSpeedSetpoint, (foc::RadiansPerSecond, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPositionSetpoint, (foc::Radians, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSetPreciseSetpoint, (const can::FocPreciseSetpoint&, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnRequestTelemetryPrecise, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnSetPidCurrent, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidSpeed, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
@@ -351,6 +353,83 @@ TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_DecodesEachKindAndAcknowledgesUnderItsOwnCommand)
+{
+    struct Case
+    {
+        uint8_t id;
+        can::FocPreciseSetpointKind kind;
+        std::vector<uint8_t> bytes;
+        float value;
+    };
+
+    const Case cases[]{
+        { can::focSetTorqueSetpointPreciseId, can::FocPreciseSetpointKind::torqueCurrent, { 0x3A, 0x03, 0x12, 0x6F }, 0.0005f },
+        { can::focSetTorqueSetpointNewtonMeterId, can::FocPreciseSetpointKind::torqueNewtonMeter, { 0x3D, 0xCC, 0xCC, 0xCD }, 0.1f },
+        { can::focSetSpeedSetpointPreciseId, can::FocPreciseSetpointKind::speed, { 0x40, 0x50, 0x00, 0x00 }, 3.25f },
+        { can::focSetPositionSetpointPreciseId, can::FocPreciseSetpointKind::position, { 0xBF, 0xC0, 0x00, 0x00 }, -1.5f },
+    };
+
+    for (const auto& item : cases)
+    {
+        hal::Can::Message payload;
+        payload.push_back(0);
+        for (const auto byte : item.bytes)
+            payload.push_back(byte);
+
+        EXPECT_CALL(observer, OnSetPreciseSetpoint(can::FocPreciseSetpoint{ item.kind, item.value }, _)).WillOnce(InvokeArgument<1>());
+        ackSpy.Reset();
+
+        server.HandleMessage(item.id, payload);
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, item.id);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_RejectsNonFiniteValuesAndWrongLengths)
+{
+    const std::vector<std::vector<uint8_t>> frames{
+        { 0x00, 0x7F, 0xC0, 0x00, 0x00 },
+        { 0x00, 0x7F, 0x80, 0x00, 0x00 },
+        { 0x00, 0xFF, 0x80, 0x00, 0x00 },
+        { 0x00, 0x40, 0x50, 0x00 },
+        { 0x00, 0x40, 0x50, 0x00, 0x00, 0x00 },
+    };
+
+    for (const auto id : { can::focSetTorqueSetpointPreciseId, can::focSetTorqueSetpointNewtonMeterId, can::focSetSpeedSetpointPreciseId, can::focSetPositionSetpointPreciseId })
+        for (const auto& bytes : frames)
+        {
+            hal::Can::Message payload;
+            for (const auto byte : bytes)
+                payload.push_back(byte);
+
+            EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(id, payload));
+        }
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleRequestTelemetryPrecise_InvokesObserverAndAcknowledges)
+{
+    EXPECT_CALL(observer, OnRequestTelemetryPrecise(_)).WillOnce(InvokeArgument<0>());
+
+    server.HandleMessage(can::focRequestTelemetryPreciseId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->commandType, can::focRequestTelemetryPreciseId);
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryStatusPrecise_SendsSpeedThenPositionAsFloats)
+{
+    server.BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond{ 3.25f }, foc::Radians{ 1.5f });
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusPreciseId);
+    ASSERT_EQ(lastSentMsg.size(), 8u);
+    EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentMsg, 0)), 3.25f);
+    EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentMsg, 4)), 1.5f);
 }
 
 TEST_F(FocMotorCategoryServerTest, HandleRequestTelemetry_InvokesObserver)

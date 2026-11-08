@@ -44,6 +44,17 @@ namespace can
         , queryParameter{ focQueryParameterId, server, &FocMotorCategoryServer::HandleQueryParameter }
     {}
 
+    FocMotorCategoryServer::PreciseMessages::PreciseMessages(FocMotorCategoryServer& server)
+        : server(server)
+        , torqueCurrent{ focSetTorqueSetpointPreciseId, *this, &PreciseMessages::HandleTorqueCurrent }
+        , torqueNewtonMeter{ focSetTorqueSetpointNewtonMeterId, *this, &PreciseMessages::HandleTorqueNewtonMeter }
+        , speed{ focSetSpeedSetpointPreciseId, *this, &PreciseMessages::HandleSpeed }
+        , position{ focSetPositionSetpointPreciseId, *this, &PreciseMessages::HandlePosition }
+        , requestTelemetry{ focRequestTelemetryPreciseId, *this, &PreciseMessages::HandleRequestTelemetry }
+    {
+        server.AddMessageTypes(torqueCurrent, torqueNewtonMeter, speed, position, requestTelemetry);
+    }
+
     uint8_t FocMotorCategoryServer::Id() const
     {
         return focMotorCategoryId;
@@ -584,6 +595,14 @@ namespace can
         SendTelemetry(focTelemetryStatusResponseId, payload);
     }
 
+    void FocMotorCategoryServer::BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond speed, foc::Radians position)
+    {
+        services::CanPayloadWriter payload;
+        WriteFloat32(payload, speed.Value());
+        WriteFloat32(payload, position.Value());
+        SendTelemetry(focTelemetryStatusPreciseId, payload);
+    }
+
     bool FocMotorCategoryServer::BroadcastTelemetryCurrents(uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position,
         const infra::Function<void(bool sent)>& onDone)
     {
@@ -602,6 +621,66 @@ namespace can
         payload.WriteFixed16(inductance.Value(), focInductanceScale);
         payload.WriteUInt8(static_cast<uint8_t>(polePairs));
         SendResponse(focElectricalParamsResponseId, payload);
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandleTorqueCurrent(const hal::Can::Message& data)
+    {
+        return HandleSetpoint(data, FocPreciseSetpointKind::torqueCurrent);
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandleTorqueNewtonMeter(const hal::Can::Message& data)
+    {
+        return HandleSetpoint(data, FocPreciseSetpointKind::torqueNewtonMeter);
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandleSpeed(const hal::Can::Message& data)
+    {
+        return HandleSetpoint(data, FocPreciseSetpointKind::speed);
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandlePosition(const hal::Can::Message& data)
+    {
+        return HandleSetpoint(data, FocPreciseSetpointKind::position);
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandleSetpoint(const hal::Can::Message& data, FocPreciseSetpointKind kind)
+    {
+        const auto commandId = PreciseSetpointCommandId(kind);
+        if (!PayloadExact(data, commandId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const FocPreciseSetpoint setpoint{ kind, ReadFloat32(reader) };
+
+        if (!reader.Valid() || !IsPreciseSetpointAcceptable(setpoint.value))
+            return false;
+
+        server.NotifyObservers([this, setpoint, commandId](auto& observer)
+            {
+                observer.OnSetPreciseSetpoint(setpoint, [this, commandId]()
+                    {
+                        server.SendCommandAck(commandId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryServer::PreciseMessages::HandleRequestTelemetry(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focRequestTelemetryPreciseId))
+            return false;
+
+        server.NotifyObservers([this](auto& observer)
+            {
+                observer.OnRequestTelemetryPrecise([this]()
+                    {
+                        server.SendCommandAck(focRequestTelemetryPreciseId, services::CanAckStatus::success);
+                    });
+            });
+
+        return true;
     }
 
     bool FocMotorCategoryServer::MaintenanceMessages::HandleClearDiagnostics(const hal::Can::Message& data)
