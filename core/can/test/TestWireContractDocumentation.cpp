@@ -200,6 +200,6 @@ TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documen
 {
     const auto document = DesignDocument();
 
-    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents", "QueryFaultHistory", "ClearFaultHistory", "FaultRecordResponse", "FaultConditionsResponse" })
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents", "QueryFaultHistory", "ClearFaultHistory", "FaultRecordResponse", "FaultConditionsResponse", "SetTorqueSetpointPrecise", "SetTorqueSetpointNewtonMeter", "SetSpeedSetpointPrecise", "SetPositionSetpointPrecise", "RequestTelemetryPrecise", "TelemetryStatusPrecise" })
         EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

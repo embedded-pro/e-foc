@@ -41,8 +41,8 @@ namespace tool
         const std::array<FieldSpec, 4> measurementFields{
             ReadOut(idCurrent, "Id current:", " A", DecimalsFor(can::focStreamCurrentScale)),
             ReadOut(iqCurrent, "Iq current:", " A", DecimalsFor(can::focStreamCurrentScale)),
-            ReadOut(speed, "Speed:", SpeedAxis().Suffix(), SpeedAxis().Decimals()),
-            ReadOut(position, "Position:", PositionAxis().Suffix(), PositionAxis().Decimals())
+            ReadOut(speed, "Speed:", SpeedAxis().Suffix(), PreciseAxisFor(can::FocMotorMode::speed).Decimals()),
+            ReadOut(position, "Position:", PositionAxis().Suffix(), PreciseAxisFor(can::FocMotorMode::position).Decimals())
         };
 
         constexpr std::chrono::milliseconds streamRefreshInterval{ 40 };

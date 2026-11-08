@@ -29,3 +29,21 @@
   shall: >
     A controller shall answer on its configured base node ID plus the board ID its jumpers set at
     start-up, so that boards with the same firmware and configuration can share a bus.
+
+- id: REQ-COM-004
+  title: Setpoints and motion telemetry resolve finer than the encoder
+  status: implemented
+  verification: unit
+  shall: >
+    A host shall be able to command a torque, speed or position setpoint and read back the measured
+    speed and position with a resolution of at most 1 mA, 0.01 rad/s and a tenth of an encoder count
+    of a 4000-count encoder, and the drive shall refuse a setpoint that is not a finite number.
+
+- id: REQ-COM-005
+  title: Torque can be commanded in newton-metres
+  status: implemented
+  verification: unit
+  shall: >
+    A host shall be able to command the shaft torque in newton-metres, which the drive shall
+    convert to the q-axis current with the torque constant of the calibrated motor, and the drive
+    shall refuse the request when it has no calibrated torque constant.

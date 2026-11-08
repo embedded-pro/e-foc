@@ -64,6 +64,8 @@ namespace can
         void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) override;
         void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) override;
         void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) override;
+        void OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone) override;
+        void OnRequestTelemetryPrecise(const infra::Function<void()>& onDone) override;
 
         void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) override;
@@ -86,6 +88,10 @@ namespace can
         void OnResetModel(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
+        void ApplyTorqueSetpoint(uint8_t commandId, foc::Ampere value, const infra::Function<void()>& onDone);
+        void ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone);
+        void ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone);
+        void ApplyPositionSetpoint(uint8_t commandId, foc::Radians value, const infra::Function<void()>& onDone);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         void NotifyCommandAccepted();
 

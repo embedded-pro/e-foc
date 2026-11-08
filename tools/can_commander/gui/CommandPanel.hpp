@@ -39,6 +39,7 @@ namespace tool
         FirmwareTab& Firmware() const;
         std::array<SettingsPage*, 3> SettingsPages() const;
         std::optional<can::FocMotorMode> ActiveControlMode() const;
+        bool PreciseSetpoints() const;
 
     signals:
         void StartMotorRequested();
@@ -58,6 +59,7 @@ namespace tool
         void ShowAcceptedSetpoint(can::FocMotorMode mode, int32_t counts);
         void ForgetAcceptedSetpoints();
         void ShowMotorParameters();
+        void SetPreciseSetpoints(bool precise);
 
     protected:
         bool eventFilter(QObject* watched, QEvent* event) override;
@@ -66,6 +68,7 @@ namespace tool
         struct SetpointControls
         {
             can::FocMotorMode mode{ can::FocMotorMode::torque };
+            const SetpointAxis* axis{ nullptr };
             SetpointKnob* knob{ nullptr };
             QDoubleSpinBox* spin{ nullptr };
             QPushButton* apply{ nullptr };
@@ -78,10 +81,12 @@ namespace tool
         QGroupBox* CreateModeGroup();
         QStackedWidget* CreateSetpointStack();
         QGroupBox* CreateSetpointGroup(SetpointControls& controls, const char* title, const char* label);
-        QLayout* CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label, const QString& range);
+        QLayout* CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label);
         void ConnectSetpoint(SetpointControls& controls);
         void SyncSetpoint(SetpointControls& controls, int32_t counts);
         void RefreshSetpointStatus(SetpointControls& controls);
+        void ApplyAxis(SetpointControls& controls);
+        static QString RangeText(const SetpointControls& controls);
 
         QLabel* hintLabel;
         QTabWidget* tabs;
@@ -95,5 +100,6 @@ namespace tool
         std::vector<QWidget*> commandWidgets;
         std::array<SetpointControls, 3> setpoints{};
         std::optional<can::FocMotorMode> activeMode;
+        bool preciseSetpoints{ false };
     };
 }

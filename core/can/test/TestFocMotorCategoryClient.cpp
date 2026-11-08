@@ -7,6 +7,7 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "infra/util/Function.hpp"
 #include <gtest/gtest.h>
+#include <limits>
 #include <optional>
 
 namespace
@@ -43,6 +44,7 @@ namespace
         MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t sourceNodeId, can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnCategoryError, (uint16_t sourceNodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
         MOCK_METHOD(void, OnTelemetryStatus, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
+        MOCK_METHOD(void, OnTelemetryStatusPrecise, (uint16_t sourceNodeId, foc::RadiansPerSecond speed, foc::Radians position), (override));
         MOCK_METHOD(void, OnTelemetryCurrents, (uint16_t sourceNodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
@@ -340,6 +342,53 @@ TEST_F(FocMotorCategoryClientTest, OnTelemetryCurrents_WrongLength_IsRejected)
 TEST_F(FocMotorCategoryClientTest, the_retired_electrical_telemetry_frame_is_not_handled)
 {
     EXPECT_EQ(services::CanDispatchResult::unknownMessageType, client.HandleMessage(0x88, MakeMessage({ 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 })));
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSetPreciseSetpoint_EncodesTheFloatAfterTheSequenceByte)
+{
+    EXPECT_TRUE(client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::speed, 3.25f }));
+
+    EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointPreciseId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0x00, 0x40, 0x50, 0x00, 0x00 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSetPreciseSetpoint_ANonFiniteValueIsNotSent)
+{
+    lastSentMsgType = 0;
+
+    EXPECT_FALSE(client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::torqueNewtonMeter, std::numeric_limits<float>::quiet_NaN() }));
+    EXPECT_EQ(lastSentMsgType, 0);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSetPreciseSetpoint_ToANodeOfAnotherMajorIsRefused)
+{
+    EXPECT_CALL(observer, OnContractVersionResponse(3, _, _));
+    client.HandleMessage(can::focContractVersionResponseId, MakeMessage({ 0x7F, 0x00 }));
+    lastSentMsgType = 0;
+
+    EXPECT_FALSE(client.SendSetPreciseSetpoint(3, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::position, 1.0f }));
+    EXPECT_FALSE(client.SendRequestTelemetry(3, can::FocTelemetryResolution::precise));
+    EXPECT_EQ(lastSentMsgType, 0);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendRequestTelemetryPrecise_SendsTheCommandAlone)
+{
+    EXPECT_TRUE(client.SendRequestTelemetry(1, can::FocTelemetryResolution::precise));
+
+    EXPECT_EQ(lastSentMsgType, can::focRequestTelemetryPreciseId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0x00 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnTelemetryStatusPrecise_DecodesSpeedAndPositionAtFullResolution)
+{
+    EXPECT_CALL(observer, OnTelemetryStatusPrecise(3, foc::RadiansPerSecond{ 0.005f }, foc::Radians{ 0.00015f }));
+
+    client.HandleMessage(can::focTelemetryStatusPreciseId, MakeMessage({ 0x3B, 0xA3, 0xD7, 0x0A, 0x39, 0x1D, 0x49, 0x52 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnTelemetryStatusPrecise_WrongLength_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focTelemetryStatusPreciseId, MakeMessage({ 0x40, 0x50, 0x00, 0x00, 0x3F, 0xC0, 0x00 })));
 }
 
 TEST_F(FocMotorCategoryClientTest, SendQueryFaultHistory_CarriesTheAge)

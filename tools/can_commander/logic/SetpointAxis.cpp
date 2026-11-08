@@ -16,6 +16,15 @@ namespace tool
 
         constexpr SetpointAxis torqueAxis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
         constexpr SetpointAxis speedAxis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
+        constexpr int32_t preciseTorqueScale{ 1000 };
+        constexpr int32_t preciseSpeedScale{ 100 };
+        constexpr int32_t precisePositionScale{ 1000 };
+        constexpr int32_t preciseCountCap{ 1 << 24 };
+
+        constexpr SetpointAxis preciseTorqueAxis{ " A", 1.0, preciseTorqueScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange, preciseCountCap };
+        constexpr SetpointAxis preciseSpeedAxis{ " rpm", rpmPerRadPerSecond, preciseSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange, preciseCountCap };
+        constexpr SetpointAxis precisePositionAxis{ "\xC2\xB0", degreesPerRadian, precisePositionScale, halfTurn, "One turn from the alignment zero", preciseCountCap };
+
         constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, halfTurn, "One turn from the alignment zero" };
     }
 
@@ -79,6 +88,24 @@ namespace tool
     const SetpointAxis& PositionAxis()
     {
         return positionAxis;
+    }
+
+    const SetpointAxis& PreciseAxisFor(can::FocMotorMode mode)
+    {
+        switch (mode)
+        {
+            case can::FocMotorMode::speed:
+                return preciseSpeedAxis;
+            case can::FocMotorMode::position:
+                return precisePositionAxis;
+            default:
+                return preciseTorqueAxis;
+        }
+    }
+
+    const SetpointAxis& AxisFor(can::FocMotorMode mode, bool precise)
+    {
+        return precise ? PreciseAxisFor(mode) : AxisFor(mode);
     }
 
     const SetpointAxis& AxisFor(can::FocMotorMode mode)
