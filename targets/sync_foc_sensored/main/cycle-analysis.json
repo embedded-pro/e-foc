@@ -71,6 +71,8 @@
         "AntiWindupPi::CommitRealized",
         "AntiWindupPi::Propose",
         "math::WrapToPi",
+        "infra::TripleBuffer<.*>::Publish",
+        "infra::TripleBuffer<.*>::Acquire",
         "LowPriorityInterrupt::Trigger",
         "FocLowPriorityInterruptAdapter::Trigger",
         "std::array<float.*>::operator\\[\\]",

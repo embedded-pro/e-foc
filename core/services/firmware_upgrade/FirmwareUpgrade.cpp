@@ -204,7 +204,7 @@ namespace services
         if (Downloading() || state == State::restarting || FlashBusy() || !drive.IsStoppedAndIdle())
             return FwuError::busy;
 
-        if (firmwareSize < minimumPackSize || firmwareSize > staging->pack.TotalSize())
+        if (firmwareSize < application::minimumUpgradePackSize || firmwareSize > staging->pack.TotalSize())
             return FwuError::invalidSize;
 
         return std::nullopt;
@@ -255,16 +255,16 @@ namespace services
                 if (!matches)
                     Fail(FwuError::crcMismatch);
                 else
-                    reader->ReadHeader(packSize, [this](const PackHeader& header)
+                    reader->ReadHeader(packSize, [this](const application::StagedPackHeader& header)
                         {
                             OnVerifiedHeader(header);
                         });
             });
     }
 
-    void FirmwareUpgrade::OnVerifiedHeader(const PackHeader& header)
+    void FirmwareUpgrade::OnVerifiedHeader(const application::StagedPackHeader& header)
     {
-        const auto version = CheckPackHeader(header, PackLimits{ staging->productName, staging->applicationCapacity, packSize });
+        const auto version = application::CheckStagedPackHeader(header, application::StagedPackLimits{ staging->productName, "app", staging->applicationCapacity, packSize });
         if (!version)
         {
             Fail(FwuError::notReady);
@@ -279,9 +279,9 @@ namespace services
 
     void FirmwareUpgrade::ReadStagedVersion()
     {
-        reader->ReadHeader(staging->pack.TotalSize(), [this](const PackHeader& header)
+        reader->ReadHeader(staging->pack.TotalSize(), [this](const application::StagedPackHeader& header)
             {
-                stagedVersion = ParseVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
+                stagedVersion = application::ParseUpgradePackVersion(header.epilogue.productVersion).value_or(FirmwareVersion{});
                 packSize = std::min<uint32_t>(header.epilogue.headerLength + header.image.lengthOfHeaderAndImage, staging->pack.TotalSize());
                 nextBlock = TotalBlocks();
             });

@@ -18,7 +18,7 @@ target_include_directories(e_foc.services.firmware_upgrade.test_pack PUBLIC
 )
 
 target_link_libraries(e_foc.services.firmware_upgrade.test_pack PUBLIC
-    e_foc.services.firmware_upgrade.pack_header
+    upgrade.staging
 )
 
 target_sources(e_foc.services.firmware_upgrade.test_pack PRIVATE

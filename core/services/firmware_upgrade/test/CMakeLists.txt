@@ -15,5 +15,4 @@ target_link_libraries(e_foc.services.firmware_upgrade_test PUBLIC
 
 target_sources(e_foc.services.firmware_upgrade_test PRIVATE
     TestFirmwareUpgrade.cpp
-    TestPackHeaderCheck.cpp
 )

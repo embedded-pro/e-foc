@@ -32,6 +32,8 @@
         "OuterSamplePeriod",
         "WrappedPositionError",
         "math::WrapToPi",
+        "infra::TripleBuffer<.*>::Publish",
+        "infra::TripleBuffer<.*>::Acquire",
         "LimitToCurrentEnvelope"
       ]
     },

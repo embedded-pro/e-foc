@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/foc/cascade/EstimatorWindowAccumulator.hpp"
-#include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "infra/util/TripleBuffer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -25,6 +25,6 @@ namespace foc
     private:
         OnlineMechanicalEstimator* mechanical{ nullptr };
         OnlineElectricalEstimator* electrical{ nullptr };
-        TripleBuffer<EstimatorSnapshot> buffer;
+        infra::TripleBuffer<EstimatorSnapshot> buffer;
     };
 }

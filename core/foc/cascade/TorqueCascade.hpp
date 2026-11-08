@@ -3,13 +3,13 @@
 #include "core/foc/cascade/BusVoltageRatio.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
-#include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "infra/util/TripleBuffer.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
 namespace foc
@@ -68,7 +68,7 @@ namespace foc
         MotorConstants motor;
         volatile bool enabled{ false };
         IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
-        TripleBuffer<IdAndIqPoint> setPointBuffer;
+        infra::TripleBuffer<IdAndIqPoint> setPointBuffer;
 
         struct SpeedMeasurement
         {
@@ -81,9 +81,7 @@ namespace foc
         struct DriveLimits
         {
             RadiansPerSecond speed{ 0.0f };
-            // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
             volatile float inverseElectricalSpeed{ 0.0f };
-            // Written by the event loop, read by the control interrupt; never above the envelope.
             volatile float current{ 0.0f };
         };
 
