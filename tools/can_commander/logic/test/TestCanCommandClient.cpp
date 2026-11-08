@@ -132,6 +132,14 @@ namespace
             Receive(FocId(services::CanPriority::response, can::focContractVersionResponseId, node), Message({ major, minor }));
         }
 
+        static hal::Can::Message AfterSequence(const hal::Can::Message& payload)
+        {
+            hal::Can::Message fields;
+            for (std::size_t i = 1; i < payload.size(); ++i)
+                fields.push_back(payload[i]);
+            return fields;
+        }
+
         struct SentFrame
         {
             uint16_t node;
@@ -1588,4 +1596,163 @@ TEST_F(TestCanCommandClient, an_accepted_model_reset_reads_the_model_in_use_agai
 
     EXPECT_TRUE(Queried(can::FocParameter::modelInductance));
     EXPECT_TRUE(Queried(can::FocParameter::modelInertia));
+}
+
+TEST_F(TestCanCommandClient, a_2_21_node_takes_the_setpoints_as_floats)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    EXPECT_TRUE(client.SendSetTorqueSetpoint(1, 0.0005f));
+    EXPECT_TRUE(client.SendSetSpeedSetpoint(1, 3.25f));
+    EXPECT_TRUE(client.SendSetPositionSetpoint(1, -1.5f));
+
+    ASSERT_EQ(3u, sent.size());
+    EXPECT_EQ(can::focSetTorqueSetpointPreciseId, sent[0].messageType);
+    EXPECT_EQ(Message({ 0x3A, 0x03, 0x12, 0x6F }), AfterSequence(sent[0].payload));
+    EXPECT_EQ(can::focSetSpeedSetpointPreciseId, sent[1].messageType);
+    EXPECT_EQ(Message({ 0x40, 0x50, 0x00, 0x00 }), AfterSequence(sent[1].payload));
+    EXPECT_EQ(can::focSetPositionSetpointPreciseId, sent[2].messageType);
+    EXPECT_EQ(Message({ 0xBF, 0xC0, 0x00, 0x00 }), AfterSequence(sent[2].payload));
+}
+
+TEST_F(TestCanCommandClient, a_2_20_node_keeps_the_scaled_setpoints)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    EXPECT_FALSE(client.SupportsPreciseSetpoints(1));
+    EXPECT_TRUE(client.SendSetTorqueSetpoint(1, 5.0f));
+    EXPECT_TRUE(client.SendSetSpeedSetpoint(1, 3.25f));
+
+    ASSERT_EQ(2u, sent.size());
+    EXPECT_EQ(can::focSetTorqueSetpointId, sent[0].messageType);
+    EXPECT_EQ(Message({ 0x00, 0x32 }), AfterSequence(sent[0].payload));
+    EXPECT_EQ(can::focSetSpeedSetpointId, sent[1].messageType);
+}
+
+TEST_F(TestCanCommandClient, a_node_of_unknown_contract_keeps_the_scaled_setpoints)
+{
+    RecordSends();
+
+    EXPECT_FALSE(client.SupportsPreciseSetpoints(1));
+    EXPECT_TRUE(client.SendSetPositionSetpoint(1, 0.1f));
+
+    ASSERT_EQ(1u, sent.size());
+    EXPECT_EQ(can::focSetPositionSetpointId, sent[0].messageType);
+}
+
+TEST_F(TestCanCommandClient, a_precise_setpoint_that_is_not_finite_is_not_sent)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    EXPECT_FALSE(client.SendSetSpeedSetpoint(1, std::numeric_limits<float>::quiet_NaN()));
+    EXPECT_FALSE(client.SendSetTorqueSetpointNewtonMeter(1, std::numeric_limits<float>::infinity()));
+
+    EXPECT_TRUE(sent.empty());
+    EXPECT_FALSE(client.IsBusy(1));
+}
+
+TEST_F(TestCanCommandClient, a_torque_in_newton_metres_goes_only_to_a_node_that_takes_it)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
+    BringCompatible(2, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads(1);
+    AnswerAllReads(2);
+    sent.clear();
+
+    EXPECT_FALSE(client.SendSetTorqueSetpointNewtonMeter(1, 0.1f));
+    EXPECT_TRUE(client.SendSetTorqueSetpointNewtonMeter(2, 0.1f));
+
+    ASSERT_EQ(1u, sent.size());
+    EXPECT_EQ(2u, sent[0].node);
+    EXPECT_EQ(can::focSetTorqueSetpointNewtonMeterId, sent[0].messageType);
+    EXPECT_EQ(Message({ 0x3D, 0xCC, 0xCC, 0xCD }), AfterSequence(sent[0].payload));
+}
+
+TEST_F(TestCanCommandClient, the_acknowledge_of_a_precise_setpoint_is_reported_under_the_scaled_command)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+    client.SendSetSpeedSetpoint(1, 3.25f);
+    EXPECT_TRUE(client.IsBusy(1));
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focSetSpeedSetpointId, services::CanAckStatus::success));
+    DeliverAck(can::focSetSpeedSetpointPreciseId);
+
+    EXPECT_FALSE(client.IsBusy(1));
+}
+
+TEST_F(TestCanCommandClient, the_refusal_of_a_newton_metre_torque_is_reported_under_the_scaled_command)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+    client.SendSetTorqueSetpointNewtonMeter(1, 0.1f);
+
+    EXPECT_CALL(observer, OnCommandRejected(1, can::focSetTorqueSetpointId, can::FocMotorCategoryError::modeMismatch));
+    Receive(FocId(services::CanPriority::response, services::canCategoryErrorResponseMessageTypeId, 1),
+        Message({ can::focSetTorqueSetpointNewtonMeterId, static_cast<uint8_t>(can::FocMotorCategoryError::modeMismatch) }));
+
+    EXPECT_FALSE(client.IsBusy(1));
+}
+
+TEST_F(TestCanCommandClient, a_2_21_node_is_asked_for_its_precise_status_with_every_status)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_EQ(1u, Count(can::focRequestTelemetryPreciseId));
+    EXPECT_EQ(1u, Count(can::focRequestTelemetryId));
+}
+
+TEST_F(TestCanCommandClient, a_2_20_node_is_not_asked_for_a_precise_status)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_EQ(0u, Count(can::focRequestTelemetryPreciseId));
+}
+
+TEST_F(TestCanCommandClient, a_precise_status_reports_speed_and_position_at_full_resolution)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+
+    EXPECT_CALL(observer, OnSpeedPositionReceived(1, 0.005f, 0.00015f));
+    const auto rawId = FocId(services::CanPriority::telemetry, can::focTelemetryStatusPreciseId, 1);
+    const auto data = Message({ 0x3B, 0xA3, 0xD7, 0x0A, 0x39, 0x1D, 0x49, 0x52 });
+    LogReceived(rawId, data);
+    Receive(rawId, data);
+}
+
+TEST_F(TestCanCommandClient, on_a_2_21_node_the_coarse_status_leaves_speed_and_position_to_the_precise_one)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
+    AnswerAllReads();
+
+    EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::running, FocFaultCode::none));
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
+        Message({ static_cast<uint8_t>(FocMotorState::running), static_cast<uint8_t>(FocFaultCode::none), 0, 10, 0, 100 }));
 }

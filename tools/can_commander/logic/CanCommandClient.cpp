@@ -41,6 +41,23 @@ namespace tool
             return static_cast<std::size_t>(slot - identityParameters.begin());
         }
 
+        // The acknowledge and the refusal of a precise command name the precise id; the rest of the tool knows the scaled one.
+        uint8_t ScaledCommandOf(uint8_t commandType)
+        {
+            switch (commandType)
+            {
+                case can::focSetTorqueSetpointPreciseId:
+                case can::focSetTorqueSetpointNewtonMeterId:
+                    return can::focSetTorqueSetpointId;
+                case can::focSetSpeedSetpointPreciseId:
+                    return can::focSetSpeedSetpointId;
+                case can::focSetPositionSetpointPreciseId:
+                    return can::focSetPositionSetpointId;
+                default:
+                    return commandType;
+            }
+        }
+
         uint8_t VersionNumber(const std::optional<float>& value)
         {
             return static_cast<uint8_t>(std::lround(value.value_or(0.0f)));
@@ -157,6 +174,11 @@ namespace tool
     bool CanCommandClient::SupportsHoming(uint16_t nodeId) const
     {
         return SupportsMinor(nodeId, homedContractMinor);
+    }
+
+    bool CanCommandClient::SupportsPreciseSetpoints(uint16_t nodeId) const
+    {
+        return SupportsMinor(nodeId, preciseSetpointContractMinor);
     }
 
     bool CanCommandClient::SupportsCoulombFriction(uint16_t nodeId) const
@@ -310,28 +332,47 @@ namespace tool
             });
     }
 
+    bool CanCommandClient::SendSetpoint(uint16_t nodeId, uint8_t scaledCommand, can::FocPreciseSetpointKind kind, float value)
+    {
+        return Tracked(nodeId, scaledCommand, [&]()
+            {
+                auto& category = focClient.CategoryClient();
+                if (SupportsPreciseSetpoints(nodeId))
+                    return category.SendSetPreciseSetpoint(nodeId, can::FocPreciseSetpoint{ kind, value });
+
+                switch (kind)
+                {
+                    case can::FocPreciseSetpointKind::speed:
+                        return category.SendSetSpeedSetpoint(nodeId, foc::RadiansPerSecond{ value });
+                    case can::FocPreciseSetpointKind::position:
+                        return category.SendSetPositionSetpoint(nodeId, foc::Radians{ value });
+                    default:
+                        return category.SendSetTorqueSetpoint(nodeId, foc::Ampere{ value });
+                }
+            });
+    }
+
     bool CanCommandClient::SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent)
     {
-        return Tracked(nodeId, can::focSetTorqueSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetTorqueSetpoint(nodeId, foc::Ampere{ iqCurrent });
-            });
+        return SendSetpoint(nodeId, can::focSetTorqueSetpointId, can::FocPreciseSetpointKind::torqueCurrent, iqCurrent);
     }
 
     bool CanCommandClient::SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec)
     {
-        return Tracked(nodeId, can::focSetSpeedSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetSpeedSetpoint(nodeId, foc::RadiansPerSecond{ speedRadPerSec });
-            });
+        return SendSetpoint(nodeId, can::focSetSpeedSetpointId, can::FocPreciseSetpointKind::speed, speedRadPerSec);
     }
 
     bool CanCommandClient::SendSetPositionSetpoint(uint16_t nodeId, float positionRad)
     {
-        return Tracked(nodeId, can::focSetPositionSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetPositionSetpoint(nodeId, foc::Radians{ positionRad });
-            });
+        return SendSetpoint(nodeId, can::focSetPositionSetpointId, can::FocPreciseSetpointKind::position, positionRad);
+    }
+
+    bool CanCommandClient::SendSetTorqueSetpointNewtonMeter(uint16_t nodeId, float torqueNewtonMeter)
+    {
+        if (!SupportsPreciseSetpoints(nodeId))
+            return false;
+
+        return SendSetpoint(nodeId, can::focSetTorqueSetpointId, can::FocPreciseSetpointKind::torqueNewtonMeter, torqueNewtonMeter);
     }
 
     bool CanCommandClient::SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth)
@@ -569,6 +610,8 @@ namespace tool
             QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
         if (SupportsHoming(nodeId))
             QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::homed });
+        if (SupportsPreciseSetpoints(nodeId))
+            QueueRead(nodeId, Read{ can::focRequestTelemetryPreciseId });
     }
 
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
@@ -618,6 +661,8 @@ namespace tool
                 return category.SendQueryParameter(nodeId, read.parameter);
             case can::focQueryFaultHistoryId:
                 return category.SendQueryFaultHistory(nodeId, read.age);
+            case can::focRequestTelemetryPreciseId:
+                return category.SendRequestTelemetry(nodeId, can::FocTelemetryResolution::precise);
             default:
                 return category.SendRequestTelemetry(nodeId);
         }
@@ -650,7 +695,7 @@ namespace tool
     bool CanCommandClient::IsRead(uint8_t commandType)
     {
         return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId ||
-               commandType == can::focQueryFaultHistoryId;
+               commandType == can::focRequestTelemetryPreciseId || commandType == can::focQueryFaultHistoryId;
     }
 
     void CanCommandClient::OnAccepted(uint16_t nodeId, uint8_t commandType)
@@ -736,8 +781,9 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode)
+    void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t wireCommandId, can::FocMotorCategoryError errorCode)
     {
+        const auto originCommandId = ScaledCommandOf(wireCommandId);
         if (IsRead(originCommandId))
         {
             CompleteRead(nodeId, originCommandId);
@@ -754,6 +800,14 @@ namespace tool
     void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg)
     {
         DecodeTelemetryStatus(nodeId, msg);
+    }
+
+    void CanCommandClient::OnTelemetryStatusPrecise(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position)
+    {
+        NotifyObservers([nodeId, speed, position](auto& observer)
+            {
+                observer.OnSpeedPositionReceived(nodeId, speed.Value(), position.Value());
+            });
     }
 
     void CanCommandClient::OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position)
@@ -843,10 +897,11 @@ namespace tool
             {
                 observer.OnMotorStatusReceived(nodeId, state, fault);
             });
-        NotifyObservers([nodeId, speed, position](auto& observer)
-            {
-                observer.OnSpeedPositionReceived(nodeId, speed, position);
-            });
+        if (!SupportsPreciseSetpoints(nodeId))
+            NotifyObservers([nodeId, speed, position](auto& observer)
+                {
+                    observer.OnSpeedPositionReceived(nodeId, speed, position);
+                });
         if (fault != FocFaultCode::none)
         {
             NotifyObservers([nodeId, fault](auto& observer)
@@ -863,7 +918,7 @@ namespace tool
 
         const auto nodeId = static_cast<uint16_t>(ExtractCanNodeId(id));
         const uint8_t ackCategory = data[0];
-        const uint8_t ackMsgType = data[1];
+        const uint8_t ackMsgType = ScaledCommandOf(data[1]);
         const auto ackStatus = static_cast<CanAckStatus>(data[2]);
 
         if (ackCategory == can::focMotorCategoryId && IsRead(ackMsgType))
@@ -895,7 +950,7 @@ namespace tool
             MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
 
             const uint8_t msgType = ExtractCanMessageType(id);
-            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
+            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryStatusPreciseId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
         }
 
         if (!consumed)

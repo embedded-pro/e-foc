@@ -22,6 +22,13 @@ namespace can
         client.AddMessageTypes(faultRecordResponse, faultConditionsResponse);
     }
 
+    FocMotorCategoryClient::PreciseMessages::PreciseMessages(FocMotorCategoryClient& client)
+        : client(client)
+        , telemetryStatus{ focTelemetryStatusPreciseId, *this, &PreciseMessages::HandleTelemetryStatus }
+    {
+        client.AddMessageTypes(telemetryStatus);
+    }
+
     uint8_t FocMotorCategoryClient::Id() const
     {
         return focMotorCategoryId;
@@ -99,6 +106,16 @@ namespace can
         return SendCommand(targetNodeId, focSetPositionSetpointId, payload);
     }
 
+    bool FocMotorCategoryClient::SendSetPreciseSetpoint(uint16_t targetNodeId, const FocPreciseSetpoint& setpoint)
+    {
+        if (contracts.Incompatible(targetNodeId) || !IsPreciseSetpointAcceptable(setpoint.value))
+            return false;
+
+        services::CanPayloadWriter payload;
+        WriteFloat32(payload, setpoint.value);
+        return SendCommand(targetNodeId, PreciseSetpointCommandId(setpoint.kind), payload);
+    }
+
     bool FocMotorCategoryClient::SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth)
     {
         if (contracts.Incompatible(targetNodeId))
@@ -159,12 +176,12 @@ namespace can
         return SendCommand(targetNodeId, focIdentifyElectricalId);
     }
 
-    bool FocMotorCategoryClient::SendRequestTelemetry(uint16_t targetNodeId)
+    bool FocMotorCategoryClient::SendRequestTelemetry(uint16_t targetNodeId, FocTelemetryResolution resolution)
     {
         if (contracts.Incompatible(targetNodeId))
             return false;
 
-        return SendCommand(targetNodeId, focRequestTelemetryId);
+        return SendCommand(targetNodeId, resolution == FocTelemetryResolution::precise ? focRequestTelemetryPreciseId : focRequestTelemetryId);
     }
 
     bool FocMotorCategoryClient::SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution)
@@ -334,6 +351,26 @@ namespace can
         NotifyObservers([source = origin.SourceNodeId(), &data](auto& observer)
             {
                 observer.OnTelemetryStatus(source, data);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::PreciseMessages::HandleTelemetryStatus(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focTelemetryStatusPreciseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const foc::RadiansPerSecond speed{ ReadFloat32(reader) };
+        const foc::Radians position{ ReadFloat32(reader) };
+
+        if (!IsPreciseSetpointAcceptable(speed.Value()) || !IsPreciseSetpointAcceptable(position.Value()))
+            return false;
+
+        client.NotifyObservers([source = client.origin.SourceNodeId(), speed, position](auto& observer)
+            {
+                observer.OnTelemetryStatusPrecise(source, speed, position);
             });
 
         return true;

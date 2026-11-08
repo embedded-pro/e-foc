@@ -52,6 +52,8 @@ namespace
         MOCK_METHOD(void, OnSetTorqueSetpoint, (foc::Ampere, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetSpeedSetpoint, (foc::RadiansPerSecond, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPositionSetpoint, (foc::Radians, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSetPreciseSetpoint, (const can::FocPreciseSetpoint&, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnRequestTelemetryPrecise, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnSetPidCurrent, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidSpeed, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
@@ -82,6 +84,7 @@ namespace
         MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t, can::FocMotorMode), (override));
         MOCK_METHOD(void, OnCategoryError, (uint16_t, uint8_t, can::FocMotorCategoryError), (override));
         MOCK_METHOD(void, OnTelemetryStatus, (uint16_t, const hal::Can::Message&), (override));
+        MOCK_METHOD(void, OnTelemetryStatusPrecise, (uint16_t, foc::RadiansPerSecond, foc::Radians), (override));
         MOCK_METHOD(void, OnTelemetryCurrents, (uint16_t, uint8_t, foc::Ampere, foc::Ampere, foc::Radians), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t, uint8_t, uint8_t), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
@@ -230,6 +233,98 @@ TEST_F(FocMotorWireContractTest, a_position_setpoint_is_the_documented_three_byt
 
     EXPECT_EQ(can::focSetPositionSetpointId, sentMessageType);
     EXPECT_EQ(Bytes({ 0x00, 0x01, 0x3A }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_torque_setpoint_is_the_documented_five_bytes)
+{
+    client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::torqueCurrent, 0.0005f });
+
+    EXPECT_EQ(can::focSetTorqueSetpointPreciseId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x3A, 0x03, 0x12, 0x6F }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_torque_setpoint_in_newton_metres_is_the_documented_five_bytes)
+{
+    client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::torqueNewtonMeter, 0.1f });
+
+    EXPECT_EQ(can::focSetTorqueSetpointNewtonMeterId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x3D, 0xCC, 0xCC, 0xCD }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_speed_setpoint_is_the_documented_five_bytes)
+{
+    client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::speed, 3.25f });
+
+    EXPECT_EQ(can::focSetSpeedSetpointPreciseId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x40, 0x50, 0x00, 0x00 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_position_setpoint_is_the_documented_five_bytes)
+{
+    client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ can::FocPreciseSetpointKind::position, -1.5f });
+
+    EXPECT_EQ(can::focSetPositionSetpointPreciseId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0xBF, 0xC0, 0x00, 0x00 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_telemetry_request_is_the_sequence_byte_alone)
+{
+    client.SendRequestTelemetry(1, can::FocTelemetryResolution::precise);
+
+    EXPECT_EQ(can::focRequestTelemetryPreciseId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_telemetry_frame_is_the_documented_eight_bytes)
+{
+    server.BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond{ 3.25f }, foc::Radians{ 1.5f });
+
+    EXPECT_EQ(can::focTelemetryStatusPreciseId, respondedMessageType);
+    EXPECT_EQ(Bytes({ 0x40, 0x50, 0x00, 0x00, 0x3F, 0xC0, 0x00, 0x00 }), respondedMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_setpoint_survives_the_trip_to_the_server_to_the_last_bit)
+{
+    const can::FocPreciseSetpoint setpoints[]{
+        { can::FocPreciseSetpointKind::torqueCurrent, 0.0005f },
+        { can::FocPreciseSetpointKind::torqueNewtonMeter, -0.0123f },
+        { can::FocPreciseSetpointKind::speed, 0.005f },
+        { can::FocPreciseSetpointKind::position, 0.00015f },
+    };
+
+    for (const auto& setpoint : setpoints)
+    {
+        EXPECT_CALL(serverObserver, OnSetPreciseSetpoint(setpoint, _)).WillOnce(InvokeArgument<1>());
+        EXPECT_TRUE(client.SendSetPreciseSetpoint(1, setpoint));
+        ackSpy.Reset();
+        DeliverToServer();
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(can::PreciseSetpointCommandId(setpoint.kind), ackSpy.last->commandType);
+        EXPECT_EQ(services::CanAckStatus::success, ackSpy.last->status);
+    }
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_setpoint_that_is_not_finite_is_never_sent_and_never_accepted)
+{
+    for (const auto kind : { can::FocPreciseSetpointKind::torqueCurrent, can::FocPreciseSetpointKind::torqueNewtonMeter, can::FocPreciseSetpointKind::speed, can::FocPreciseSetpointKind::position })
+    {
+        EXPECT_FALSE(client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ kind, std::numeric_limits<float>::quiet_NaN() }));
+        EXPECT_FALSE(client.SendSetPreciseSetpoint(1, can::FocPreciseSetpoint{ kind, std::numeric_limits<float>::infinity() }));
+
+        const auto id = can::PreciseSetpointCommandId(kind);
+        EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(id, Bytes({ 0x00, 0x7F, 0xC0, 0x00, 0x00 })));
+        EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(id, Bytes({ 0x00, 0xFF, 0x80, 0x00, 0x00 })));
+        EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(id, Bytes({ 0x00, 0x40, 0x50, 0x00 })));
+    }
+}
+
+TEST_F(FocMotorWireContractTest, a_precise_telemetry_frame_reaches_the_client_and_a_non_finite_one_is_dropped)
+{
+    EXPECT_CALL(clientObserver, OnTelemetryStatusPrecise(1, foc::RadiansPerSecond{ 3.25f }, foc::Radians{ 1.5f }));
+    client.HandleMessage(can::focTelemetryStatusPreciseId, Bytes({ 0x40, 0x50, 0x00, 0x00, 0x3F, 0xC0, 0x00, 0x00 }));
+
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focTelemetryStatusPreciseId, Bytes({ 0x7F, 0xC0, 0x00, 0x00, 0x3F, 0xC0, 0x00, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focTelemetryStatusPreciseId, Bytes({ 0x40, 0x50, 0x00, 0x00, 0x7F, 0x80, 0x00, 0x00 })));
 }
 
 TEST_F(FocMotorWireContractTest, a_commandless_payload_still_carries_the_sequence_byte)
@@ -421,10 +516,10 @@ TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_clie
     DeliverToClient();
 }
 
-TEST_F(FocMotorWireContractTest, the_contract_is_version_2_20)
+TEST_F(FocMotorWireContractTest, the_contract_is_version_2_21)
 {
     EXPECT_EQ(2, can::focContractVersionMajor);
-    EXPECT_EQ(20, can::focContractVersionMinor);
+    EXPECT_EQ(21, can::focContractVersionMinor);
 }
 
 TEST_F(FocMotorWireContractTest, a_ready_telemetry_status_frame_carries_state_five)
@@ -619,9 +714,15 @@ namespace
             { can::focClearFaultHistoryId, { 0x00 } },
             { can::focRecalibrateId, { 0x00 } },
             { can::focResetModelId, { 0x00 } },
+            { can::focSetTorqueSetpointPreciseId, { 0x00, 0x3A, 0x03, 0x12, 0x6F } },
+            { can::focSetTorqueSetpointNewtonMeterId, { 0x00, 0x3D, 0xCC, 0xCC, 0xCD } },
+            { can::focSetSpeedSetpointPreciseId, { 0x00, 0x40, 0x50, 0x00, 0x00 } },
+            { can::focSetPositionSetpointPreciseId, { 0x00, 0xBF, 0xC0, 0x00, 0x00 } },
+            { can::focRequestTelemetryPreciseId, { 0x00 } },
 
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
+            { can::focTelemetryStatusPreciseId, { 0x40, 0x50, 0x00, 0x00, 0x3F, 0xC0, 0x00, 0x00 } },
             { can::focTelemetryCurrentsId, { 0x2A, 0x02, 0x00, 0xFC, 0x18, 0x85, 0x48 } },
             { can::focSelectControlModeResponseId, { 0x02 } },
             { can::focContractVersionResponseId, { can::focContractVersionMajor, can::focContractVersionMinor } },
@@ -682,6 +783,8 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnSetTorqueSetpoint(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetSpeedSetpoint(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetPositionSetpoint(_, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnSetPreciseSetpoint(_, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnRequestTelemetryPrecise(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetPidCurrent(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetPidSpeed(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetPidPosition(_, _)).Times(AnyNumber());

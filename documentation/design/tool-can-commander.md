@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.20.0
+version: 0.21.0
 component: "tool-can-commander"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.20.0               |
+| Version   | 0.21.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-08           |
 
@@ -157,8 +157,18 @@ the frame can carry. Turning the knob or typing never sends anything: Apply, or 
 focused knob, sends the value shown. Beside the knob the panel shows the value the controller last
 accepted, also marked on the knob's scale; while the knob shows another value it says what Apply would
 send. An acknowledged mode change or the node leaving the bus forgets the accepted value, because the new
-mode starts from its own setpoint. The measured speed and position read in rpm and degrees as well; loop
-bandwidths stay in rad/s, since they are frequencies, not speeds.
+mode starts from its own setpoint. The measured speed and position read in rpm and degrees as well, to two
+decimals; loop bandwidths stay in rad/s, since they are frequencies, not speeds.
+
+A node of contract 2.21 or newer takes each setpoint as a float, so the knob and the box step finer on it: one step
+is 0.001 A, 0.01 rad/s (about 0.095 rpm) and 0.001 rad (about 0.057°), the range stays the firmware limit, and the
+tool sends the precise setpoint messages of `service-can.md` instead of the scaled ones. It asks such a node for its
+precise speed and position with every status and shows those, since the scaled status quantises them. A node older
+than 2.21, or one whose contract is not yet known, keeps the scaled steps and messages; the knob switches when the
+contract answer arrives and forgets the accepted values, because a count means a different value on each axis. The
+acknowledgement or refusal of a precise setpoint is reported and recovered from exactly as that of the scaled one. The
+panel offers no torque in newton-metres; the tool's client can send it to a 2.21 node, which converts it with the
+calibrated torque constant.
 
 Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally

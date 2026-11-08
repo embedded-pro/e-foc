@@ -37,10 +37,16 @@ namespace can
     static constexpr uint8_t focClearFaultHistoryId = 0x1C;
     static constexpr uint8_t focRecalibrateId = 0x1D;
     static constexpr uint8_t focResetModelId = 0x1E;
+    static constexpr uint8_t focSetTorqueSetpointPreciseId = 0x1F;
+    static constexpr uint8_t focSetTorqueSetpointNewtonMeterId = 0x20;
+    static constexpr uint8_t focSetSpeedSetpointPreciseId = 0x21;
+    static constexpr uint8_t focSetPositionSetpointPreciseId = 0x22;
+    static constexpr uint8_t focRequestTelemetryPreciseId = 0x23;
 
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
     static constexpr uint8_t focTelemetryCurrentsId = 0x8A;
+    static constexpr uint8_t focTelemetryStatusPreciseId = 0x8B;
     static constexpr uint8_t focSelectControlModeResponseId = 0x8E;
     static constexpr uint8_t focContractVersionResponseId = 0x92;
     static constexpr uint8_t focAlgorithmsResponseId = 0x93;
@@ -215,6 +221,43 @@ namespace can
         windingTemperature = 0xC1,
         homed = 0xC2
     };
+
+    enum class FocPreciseSetpointKind : uint8_t
+    {
+        torqueCurrent,
+        torqueNewtonMeter,
+        speed,
+        position
+    };
+
+    enum class FocTelemetryResolution : uint8_t
+    {
+        scaled,
+        precise
+    };
+
+    struct FocPreciseSetpoint
+    {
+        FocPreciseSetpointKind kind{ FocPreciseSetpointKind::torqueCurrent };
+        float value{ 0.0f };
+
+        friend constexpr bool operator==(const FocPreciseSetpoint&, const FocPreciseSetpoint&) = default;
+    };
+
+    constexpr uint8_t PreciseSetpointCommandId(FocPreciseSetpointKind kind)
+    {
+        switch (kind)
+        {
+            case FocPreciseSetpointKind::torqueNewtonMeter:
+                return focSetTorqueSetpointNewtonMeterId;
+            case FocPreciseSetpointKind::speed:
+                return focSetSpeedSetpointPreciseId;
+            case FocPreciseSetpointKind::position:
+                return focSetPositionSetpointPreciseId;
+            default:
+                return focSetTorqueSetpointPreciseId;
+        }
+    }
 
     struct FocFirmwareIdentity
     {

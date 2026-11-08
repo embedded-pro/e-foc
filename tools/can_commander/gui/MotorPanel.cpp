@@ -230,9 +230,10 @@ namespace tool
 
     void MotorPanel::SendSetpoint(can::FocMotorMode mode, int32_t counts)
     {
-        const auto value = AxisFor(mode).SiOf(counts);
+        const auto& axis = AxisFor(mode, commandPanel->PreciseSetpoints());
+        const auto value = axis.SiOf(counts);
         pendingSetpoint = PendingSetpoint{ mode, counts };
-        if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(AxisFor(mode), counts)), SetpointCommandOf(mode), [this, mode, value]()
+        if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(axis, counts)), SetpointCommandOf(mode), [this, mode, value]()
                 {
                     return SendSetpointValue(mode, value);
                 }))
@@ -817,6 +818,8 @@ namespace tool
     void MotorPanel::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
     {
         contractVersion = QString("%1.%2").arg(major).arg(minor);
+        pendingSetpoint.reset();
+        commandPanel->SetPreciseSetpoints(compatible && client.SupportsPreciseSetpoints(nodeId));
 
         if (compatible)
         {

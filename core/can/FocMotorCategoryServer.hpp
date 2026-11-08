@@ -31,6 +31,8 @@ namespace can
         virtual void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone) = 0;
+        virtual void OnRequestTelemetryPrecise(const infra::Function<void()>& onDone) = 0;
 
         virtual void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) = 0;
@@ -73,6 +75,7 @@ namespace can
         void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
             foc::RadiansPerSecond speed, foc::Radians position);
         void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
+        void BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond speed, foc::Radians position);
         bool BroadcastTelemetryCurrents(uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position,
             const infra::Function<void(bool sent)>& onDone);
         void SendAlgorithmsResponse(const FocAlgorithms& algorithms);
@@ -171,5 +174,28 @@ namespace can
         };
 
         MaintenanceMessages maintenanceMessages{ *this };
+
+        class PreciseMessages
+        {
+        public:
+            explicit PreciseMessages(FocMotorCategoryServer& server);
+
+        private:
+            bool HandleTorqueCurrent(const hal::Can::Message& data);
+            bool HandleTorqueNewtonMeter(const hal::Can::Message& data);
+            bool HandleSpeed(const hal::Can::Message& data);
+            bool HandlePosition(const hal::Can::Message& data);
+            bool HandleRequestTelemetry(const hal::Can::Message& data);
+            bool HandleSetpoint(const hal::Can::Message& data, FocPreciseSetpointKind kind);
+
+            FocMotorCategoryServer& server;
+            services::CanMessageHandler<PreciseMessages> torqueCurrent;
+            services::CanMessageHandler<PreciseMessages> torqueNewtonMeter;
+            services::CanMessageHandler<PreciseMessages> speed;
+            services::CanMessageHandler<PreciseMessages> position;
+            services::CanMessageHandler<PreciseMessages> requestTelemetry;
+        };
+
+        PreciseMessages preciseMessages{ *this };
     };
 }
