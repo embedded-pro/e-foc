@@ -2,9 +2,9 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.4.2
+version: 0.4.3
 component: foc-torque
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value              |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.4.2              |
+| Version   | 0.4.3              |
 | Component | foc-torque         |
-| Date      | 2026-11-05         |
+| Date      | 2026-11-08         |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -67,7 +67,7 @@ The sequence executed each cycle is:
 8. Speed limiter: fold Iq_setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
    add the cogging current at θe (`service-cogging-compensation.md` Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
-10. Inverse Park: (Vd, Vq, θe) → (Vα, Vβ).
+10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The sampled cos/sin pair is rotated through the delay angle (`foc-transforms.md`, *Delay compensation*), with ωe the filtered electrical speed of step 8's limiter and n the platform's duty delay in periods.
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
 12. Return `PhasePwmDutyCycles` to the Runner for immediate PWM register update.
 

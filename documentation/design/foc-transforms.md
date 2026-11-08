@@ -2,9 +2,9 @@
 title: "FOC Mathematical Transforms"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: foc-transforms
-date: 2026-04-07
+date: 2026-11-08
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | FOC Mathematical Transforms |
 | Type      | design                      |
 | Status    | draft                       |
-| Version   | 0.1.0                       |
+| Version   | 0.2.0                       |
 | Component | foc-transforms              |
-| Date      | 2026-04-07                  |
+| Date      | 2026-11-08                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -97,6 +97,10 @@ Vβ = Vd·sin(θe) + Vq·cos(θe)
 
 The inverse Park transform is applied after the PID controllers produce voltage demands Vd and Vq, converting them back to the stationary frame for SVM processing.
 
+**Delay compensation (angle advance):**
+
+The duty computed from a sample takes effect n periods after the next counter zero and is held for a period, so the rotor turns through (n + ½)·ωe·Ts before the average of the applied vector. The advance rotates the already evaluated (cos θe, sin θe) pair through δ = (n + ½)·ωe·Ts, with cos δ ≈ 1 − δ²/2 and sin δ ≈ δ − δ³/6, instead of looking the trigonometry up a second time: nine multiplications and a few additions, against a wrap, two table reads and two interpolations. The product (n + ½)·Ts is computed when the controller is configured. δ is limited to ±0.35 rad: the largest error inside that band is 6.3·10⁻⁴ on the cosine (δ⁴/24) and 4.4·10⁻⁵ on the sine (δ⁵/120), a 3·10⁻⁴ error in the length of the voltage vector, and the angle error is below 10⁻⁴ rad. The band covers the Teknic at 6000 rpm (δ = 0.19 rad with n = 1) and any 4-pole-pair motor up to the 1000 rad/s speed setpoint limit with n = 1 (0.30 rad); beyond it the compensation saturates instead of leaving the approximation. At zero speed the pair is returned unchanged.
+
 **Electrical angle:**
 
 The electrical angle θe is obtained by multiplying the mechanical rotor angle θm by the motor's pole-pair count P:
@@ -108,7 +112,7 @@ The electrical angle θe is obtained by multiplying the mechanical rotor angle �
 The caller is responsible for supplying the correct θe.
 
 **Invariants:**
-- The same θe (and therefore the same cos/sin pair) must be used for both the forward Park in the current-sensing path and the inverse Park in the voltage-output path within a single control cycle.
+- The forward Park in the current-sensing path uses the sampled θe. The inverse Park of the closed-loop current paths uses that angle advanced by the delay between the sample and the instant the voltage is applied, θe + (n + ½)·ωe·Ts, where n is the number of periods the bridge takes to load a new duty and ωe is the electrical speed the cascade already holds. The open-loop drives (alignment, pole-pair sweep, inductance injection, resistance hold) and the cogging feed-forward keep the sampled angle.
 - The transform is stateless — no memory of previous cycles.
 
 ### Composite ClarkePark — Chained Transform with Single Trigonometric Evaluation

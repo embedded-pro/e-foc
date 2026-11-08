@@ -2,9 +2,9 @@
 title: "Field-Oriented Control (FOC)"
 type: theory
 status: approved
-version: 1.1.1
+version: 1.1.2
 component: "foc"
-date: 2026-10-29
+date: 2026-11-08
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Field-Oriented Control (FOC) |
 | Type      | theory                       |
 | Status    | approved                     |
-| Version   | 1.1.1                        |
+| Version   | 1.1.2                        |
 | Component | foc                          |
-| Date      | 2026-10-29                   |
+| Date      | 2026-11-08                   |
 
 ## Overview
 
@@ -130,7 +130,11 @@ $$
 This confirms: when the current vector is aligned with the d-axis (rotor flux axis), $i_q = 0$ (zero torque).
 When the current vector is 90° ahead of the rotor (MTPA), $i_d = 0$ and $i_q = I$ (maximum torque).
 
-**Inverse Park Transform** (dq → αβ, for voltage reconstruction):
+**Inverse Park Transform** (dq → αβ, for voltage reconstruction). e-foc evaluates it at the advanced angle
+$\theta_e + (n + \tfrac12)\,\omega_e T_s$, not at the sampled $\theta_e$: the duty computed now acts $n$ periods
+after the next counter zero and is then held for a period, so the rotor has turned by that much when the vector
+is applied ([disturbances and noise](disturbances-and-noise.md) §5). The forward Park keeps the sampled angle:
+the current was measured at it.
 
 $$
 \begin{pmatrix} v_\alpha \\ v_\beta \end{pmatrix}

@@ -42,7 +42,7 @@ namespace foc
 
             iqSum += meanIq;
             idSum += 0.5f * (measured.d + previousId);
-            vdSum += applied.d + 0.5f * electricalRotation * applied.q;
+            vdSum += applied.d;
             rotationTimesIqSum += electricalRotation * meanIq;
 
             previousIq = measured.q;

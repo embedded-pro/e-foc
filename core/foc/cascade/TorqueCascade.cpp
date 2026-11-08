@@ -1,6 +1,7 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/DelayCompensation.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
@@ -68,12 +69,13 @@ namespace foc
 
     bool TorqueCascade::Configure(const MotorModelParameters& parameters)
     {
-        polePairs = static_cast<float>(parameters.polePairs);
+        motor.polePairs = static_cast<float>(parameters.polePairs);
         UpdateSpeedLimit();
         const bool ok = currentLoop.Configure(parameters);
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
-        speedMeasurement.scale = polePairs * samplingFrequency;
+        speedMeasurement.scale = motor.polePairs * samplingFrequency;
+        motor.dutyDelay = DutyDelay(parameters.dutyUpdateDelayPeriods, samplingFrequency);
         voltageScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         busRatio.Configure(parameters.busVoltage);
         samplesPerMillisecond = std::max<uint32_t>(1, parameters.samplingFrequency.Value() / 1000);
@@ -109,7 +111,7 @@ namespace foc
 
     MotionObservation TorqueCascade::ObserveMotion() const
     {
-        const auto mechanicalSpeed = polePairs > 0.0f ? lastElectricalSpeed / polePairs : 0.0f;
+        const auto mechanicalSpeed = motor.polePairs > 0.0f ? lastElectricalSpeed / motor.polePairs : 0.0f;
 
         const auto demanded = LimitedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed, 0.0f);
 
@@ -150,7 +152,7 @@ namespace foc
 
     void TorqueCascade::UpdateSpeedLimit()
     {
-        const auto electricalLimit = limits.speed.Value() * polePairs;
+        const auto electricalLimit = limits.speed.Value() * motor.polePairs;
         limits.inverseElectricalSpeed = electricalLimit > 0.0f ? 1.0f / electricalLimit : 0.0f;
     }
 
@@ -189,7 +191,7 @@ namespace foc
         const float ic = currentPhases.c.Value();
 
         auto mechanicalAngle = position.Value();
-        auto electricalAngle = mechanicalAngle * polePairs;
+        auto electricalAngle = mechanicalAngle * motor.polePairs;
 
         auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
@@ -205,7 +207,8 @@ namespace foc
         const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
         voltageWindow.Accumulate(voltage.q);
-        return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
+        const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, motor.dutyDelay);
+        return spaceVectorModulator.Generate(park.Inverse(voltage, applied.cosine, applied.sine), busRatio.Inverse());
     }
 
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)

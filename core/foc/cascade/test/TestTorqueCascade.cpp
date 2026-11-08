@@ -28,6 +28,38 @@ namespace
         return parameters;
     }
 
+    foc::PhaseCurrents ZeroCurrents()
+    {
+        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
+    foc::PhasePwmDutyCycles DutyAfterConstantSpeed(uint32_t dutyUpdateDelayPeriods, std::size_t polePairs, float mechanicalStep, float angleOffset)
+    {
+        auto parameters = MotorParameters(polePairs);
+        parameters.dutyUpdateDelayPeriods = dutyUpdateDelayPeriods;
+
+        foc::TorqueCascade cascade{ foc::Ampere{ 10.0f } };
+        cascade.Configure(parameters);
+        cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
+        cascade.SetPoint({ foc::Ampere{ 0.5f }, foc::Ampere{ 1.0f } });
+        cascade.Enable();
+
+        foc::PhasePwmDutyCycles duty{};
+        for (int sample = 0; sample != 400; ++sample)
+        {
+            foc::Radians position{ angleOffset + static_cast<float>(sample) * mechanicalStep };
+            duty = cascade.Calculate(ZeroCurrents(), position);
+        }
+        return duty;
+    }
+
+    void ExpectSameDuty(const foc::PhasePwmDutyCycles& actual, const foc::PhasePwmDutyCycles& expected)
+    {
+        EXPECT_NEAR(DutyPercent(actual.a), DutyPercent(expected.a), 0.05f);
+        EXPECT_NEAR(DutyPercent(actual.b), DutyPercent(expected.b), 0.05f);
+        EXPECT_NEAR(DutyPercent(actual.c), DutyPercent(expected.c), 0.05f);
+    }
+
     class TestTorqueCascade
         : public ::testing::Test
     {
@@ -44,11 +76,6 @@ namespace
         std::optional<foc::TorqueCascade> focTorque;
         const std::size_t polePairs{ 7 };
     };
-
-    foc::PhaseCurrents ZeroCurrents()
-    {
-        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    }
 
     void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
     {
@@ -799,6 +826,34 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_
     EXPECT_NEAR(DutyPercent(halved.a), DutyPercent(expected.a), 0.1f);
     EXPECT_NEAR(DutyPercent(halved.b), DutyPercent(expected.b), 0.1f);
     EXPECT_NEAR(DutyPercent(halved.c), DutyPercent(expected.c), 0.1f);
+}
+
+// A duty one period later than another acts one electrical step further on, so the voltage must be
+// rotated one more step: (n = 1, sampled at θ) lands where (n = 0, sampled one step later) does.
+TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
+{
+    constexpr float step = 0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_negative_speed)
+{
+    constexpr float step = -0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestTorqueCascade, the_advance_moves_the_voltage_once_the_rotor_turns)
+{
+    constexpr float step = 0.005f;
+
+    EXPECT_GT(std::abs(DutyPercent(DutyAfterConstantSpeed(1, polePairs, step, 0.0f).a) - DutyPercent(DutyAfterConstantSpeed(0, polePairs, step, 0.0f).a)), 0.1f);
+}
+
+TEST_F(TestTorqueCascade, a_duty_that_acts_later_leaves_the_voltage_at_standstill_unchanged)
+{
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, 0.0f, 0.3f), DutyAfterConstantSpeed(0, polePairs, 0.0f, 0.3f));
 }
 
 TEST(TestTorqueCascadeFriction, the_torque_cascade_has_no_friction_feed_forward)

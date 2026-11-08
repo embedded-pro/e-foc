@@ -92,6 +92,7 @@ namespace foc
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
         float vdcInvScale{ 1.0f };
+        float dutyDelay{ 0.0f };
         BusVoltageRatio busRatio;
         volatile bool enabled{ false };
 

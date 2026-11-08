@@ -16,6 +16,7 @@ target_sources(e_foc.model_in_the_loop_test PRIVATE
     TestIdentificationRobustness.cpp
     TestOnlineRecalibration.cpp
     TestParameterIdentification.cpp
+    TestDelayCompensation.cpp
     TestDriveLimits.cpp
     TestFrictionFeedForward.cpp
 )

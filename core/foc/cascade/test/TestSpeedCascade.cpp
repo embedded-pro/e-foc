@@ -129,6 +129,35 @@ namespace
         std::optional<foc::SpeedCascade> cascade;
     };
 
+    foc::PhasePwmDutyCycles DutyAfterConstantSpeed(uint32_t dutyUpdateDelayPeriods, std::size_t polePairs, float mechanicalStep, float angleOffset)
+    {
+        auto parameters = MotorParameters(polePairs);
+        parameters.dutyUpdateDelayPeriods = dutyUpdateDelayPeriods;
+
+        testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+        EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
+        EXPECT_CALL(lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency };
+        cascade.Configure(parameters);
+        cascade.ConfigureMechanics(MechanicalParameters());
+        cascade.SetCurrentTunings(UnsaturatedCurrentTunings());
+        cascade.SetSpeedTunings(foc::SpeedLoopTunings{});
+        cascade.Enable();
+        cascade.SetPoint(foc::RadiansPerSecond{ 20.0f });
+
+        foc::PhasePwmDutyCycles duty{};
+        for (int sample = 0; sample != 400; ++sample)
+        {
+            foc::Radians position{ angleOffset + static_cast<float>(sample) * mechanicalStep };
+            duty = cascade.Calculate(ZeroCurrents(), position);
+            if (sample % static_cast<int>(baseFrequencyValue / lowPriorityFrequency.Value()) == 0)
+                lowPriorityInterrupt.TriggerHandler();
+        }
+        return duty;
+    }
+
     foc::PhasePwmDutyCycles FirstDutyAtStandstill(SpeedCascadeUnderTest& speedCascade, float stationaryAngle)
     {
         speedCascade.cascade->Enable();
@@ -253,6 +282,34 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
                         (DutyPercent(result1.c) != DutyPercent(result2.c));
 
     EXPECT_TRUE(anyDifferent);
+}
+
+// A duty one period later than another acts one electrical step further on, so the voltage must be
+// rotated one more step: (n = 1, sampled at θ) lands where (n = 0, sampled one step later) does.
+TEST_F(TestSpeedCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
+{
+    constexpr float step = 0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestSpeedCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_negative_speed)
+{
+    constexpr float step = -0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestSpeedCascade, the_advance_moves_the_voltage_once_the_rotor_turns)
+{
+    constexpr float step = 0.005f;
+
+    EXPECT_GT(std::abs(DutyPercent(DutyAfterConstantSpeed(1, polePairs, step, 0.0f).a) - DutyPercent(DutyAfterConstantSpeed(0, polePairs, step, 0.0f).a)), 0.1f);
+}
+
+TEST_F(TestSpeedCascade, a_duty_that_acts_later_leaves_the_voltage_at_standstill_unchanged)
+{
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, 0.0f, 0.3f), DutyAfterConstantSpeed(0, polePairs, 0.0f, 0.3f));
 }
 
 TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)

@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.2.2
+version: 1.2.3
 component: "foc"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.2.2                             |
+| Version   | 1.2.3                             |
 | Component | foc                               |
 | Date      | 2026-11-08                        |
 
@@ -441,6 +441,17 @@ into it, so the cycle gate measures it as part of `TorqueCascade::Calculate` wit
 The motor overload protection's current limit adds one volatile load and a clamp of the q-axis reference to each
 cascade's inner loop; in the speed and position cascades it replaces the constant bound of the clamp that was
 already there, so it costs nothing there.
+
+The inverse Park's delay compensation (`documentation/design/foc-transforms.md`, *Delay compensation*) rotates the
+sampled cos/sin pair through the small angle $(n + \tfrac12)\,\omega_e T_s$ instead of looking the trigonometry up
+a second time. One multiply gives the angle, a clamp keeps it inside the band where the series hold (two compares),
+one multiply squares it, three fused multiply-adds give $\cos\delta$ and $\sin\delta$, and four more
+multiplications and additions rotate the pair: about ten floating-point operations and the clamp, 20 to 25 cycles
+against well over 60 for a second interpolated lookup with its wrap. $(n + \tfrac12)\,T_s$ is settled at
+configuration time. The helper is an `ALWAYS_INLINE_HOT` function defined in a header, so the cycle gate measures it
+inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`, which are already listed; it adds
+no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
+a multiply-add per sample in the speed and position cascades.
 
 ### Key Performance Sensitivities
 

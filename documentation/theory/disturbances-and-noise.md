@@ -2,7 +2,7 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.4.1
+version: 0.4.2
 component: "disturbances-and-noise"
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.4.1                                  |
+| Version   | 0.4.2                                  |
 | Component | disturbances-and-noise                 |
 | Date      | 2026-11-08                             |
 
@@ -301,9 +301,17 @@ sampled angle is applied, on average, $\omega_e \cdot 1.5\,T_s^i$ late. On the T
 10.8° electrical, and since the applied vector is rotated against the rotor by that angle the error is about
 $|V|\,\Delta\theta = 19.0\ \text{V} \times 0.19 = 3.6$ V, mostly on the d-axis. The integrators absorb it as a
 speed-proportional disturbance; a feed-forward law that assumes the voltage lands where it was computed is off
-by it. A common remedy is to rotate the inverse Park by an advanced angle $\theta_e + 1.5\,\omega_e T_s^i$.
-*e-foc today:* the inverse Park uses the sampled angle (`core/foc/cascade/CascadeWithSpeedLoop.cpp`); the
-deadbeat law models the one-period duty delay explicitly (`current-loop-deadbeat.md`).
+by it. The remedy is to rotate the inverse Park by an advanced angle
+$\theta_e + (n + \tfrac{1}{2})\,\omega_e T_s^i$, where $n$ is the number of periods the bridge takes to load a
+new duty (1 on the TI board, 0 on the emulated plant), so that the vector, fixed in the stator while it is held,
+is centred on the rotor over the hold.
+*e-foc today:* the inverse Park of the torque, speed and position cascades uses the advanced angle, with the
+filtered electrical speed the cascade already holds; the forward Park, the cogging feed-forward and the
+open-loop drives keep the sampled angle. The residual is second order: the held vector sweeps
+$\pm\tfrac12\omega_e T_s^i$ about the rotor, so its mean in the rotor frame is the commanded vector scaled by
+$\mathrm{sinc}(\tfrac12\omega_e T_s^i)$, with no cross term between the axes (0.07 % short at 6000 rpm on the
+Teknic). The deadbeat law still models the duty delay of the current, not of the angle
+(`current-loop-deadbeat.md`); with the advance, its assumption that the voltage acts in the rotor frame holds.
 
 **Aliasing.** A sampled signal cannot tell a component at $f$ from one at $f \pm k f_s$. Centre sampling
 keeps the PWM ripple out of the current samples. Where a slower consumer takes every $n$-th sample
