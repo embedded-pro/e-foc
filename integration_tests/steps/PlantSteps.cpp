@@ -240,6 +240,7 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.includeCalibration = true;
     setup.nvm.includeConfig = true;
     setup.nvm.calibration = sil::CompleteCalibration();
+    setup.nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
     setup.nvm.calibration.polePairs = setup.plant.polePairs;
     setup.nvm.calibration.rPhase = setup.plant.statorResistanceOhm;
     // The calibration record carries inductance in millihenry; the plant record in henry.

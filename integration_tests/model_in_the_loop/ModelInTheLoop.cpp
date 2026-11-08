@@ -59,6 +59,7 @@ namespace mil
         nvm.includeCalibration = true;
         nvm.includeConfig = true;
         nvm.calibration = sil::CompleteCalibration();
+        nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
         nvm.calibration.polePairs = plant.polePairs;
         nvm.calibration.rPhase = plant.statorResistanceOhm;
         nvm.calibration.lD = plant.dAxisInductanceHenry * kMilliPerUnit;

@@ -422,7 +422,7 @@ TEST_F(ControlModeStateMachineTest, Select_While_Active_Machine_Has_Pending_Nvm_
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
 
-TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Check_In_Flight_Reports_Busy)
+TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Load_In_Flight_Reports_Busy)
 {
     infra::Function<void(services::NvmStatus)> deferredLoad;
     EXPECT_CALL(nvmMock, LoadCalibration(_, _))
