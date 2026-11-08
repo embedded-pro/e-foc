@@ -1,6 +1,7 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/DelayCompensation.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
@@ -74,6 +75,7 @@ namespace foc
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
         speedMeasurement.scale = polePairs * samplingFrequency;
+        dutyDelay = DutyDelay(parameters.dutyUpdateDelayPeriods, samplingFrequency);
         voltageScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         busRatio.Configure(parameters.busVoltage);
         samplesPerMillisecond = std::max<uint32_t>(1, parameters.samplingFrequency.Value() / 1000);
@@ -205,7 +207,8 @@ namespace foc
         const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
         voltageWindow.Accumulate(voltage.q);
-        return spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
+        const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, dutyDelay);
+        return spaceVectorModulator.Generate(park.Inverse(voltage, applied.cosine, applied.sine), busRatio.Inverse());
     }
 
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)

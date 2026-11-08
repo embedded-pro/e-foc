@@ -82,3 +82,13 @@
     fading it out as the reference nears zero so that it does not chatter about
     standstill, and shall keep the total demand within the current limit. Torque mode shall add
     none, and a slow start from rest shall meet less speed error than it does without it.
+
+- id: REQ-CTL-009
+  title: The direct-axis current stays near its reference at high speed
+  status: implemented
+  verification: [mil, unit]
+  shall: >
+    At speeds where the rotor turns a noticeable fraction of an electrical revolution during one
+    control period, the drive shall keep the direct-axis current excursion after a change of speed
+    demand within the limit set for each current law, whether the power stage applies a new duty at
+    once or a period after it is computed.

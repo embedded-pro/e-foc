@@ -1,6 +1,7 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/DelayCompensation.hpp"
 #include <algorithm>
 #include <chrono>
 
@@ -40,6 +41,7 @@ namespace foc
         polePairs = static_cast<float>(parameters.polePairs);
         vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         busRatio.Configure(parameters.busVoltage);
+        dutyDelay = DutyDelay(parameters.dutyUpdateDelayPeriods, static_cast<float>(parameters.samplingFrequency.Value()));
         return currentLoop.Configure(parameters);
     }
 
@@ -137,9 +139,11 @@ namespace foc
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
         const float limit = quadratureLimit;
         const auto quadratureReference = std::clamp(lastSpeedLoopOutput + frictionCurrent + coggingCurrent, -limit, limit);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed, busRatio.Ratio() });
+        const float electricalSpeed = lastElectricalSpeed;
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, electricalSpeed, busRatio.Ratio() });
 
-        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
+        const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, dutyDelay);
+        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, applied.cosine, applied.sine), busRatio.Inverse());
         voltageWindow.Accumulate(voltage.q);
 
         estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);

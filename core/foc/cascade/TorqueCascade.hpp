@@ -59,6 +59,7 @@ namespace foc
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         Ampere maxCurrent;
         float polePairs{ 0.0f };
+        float dutyDelay{ 0.0f };
         volatile bool enabled{ false };
         IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
         TripleBuffer<IdAndIqPoint> setPointBuffer;

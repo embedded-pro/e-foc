@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.8.0
+version: 0.8.1
 component: service-electrical-ident
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.8.0                                         |
+| Version   | 0.8.1                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-11-06                                    |
+| Date      | 2026-11-08                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -398,8 +398,21 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
   much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
   laws. The emulated board applying each duty a period late reproduces it (REQ-CMS-003).
-- The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
-  in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
+- $V_d$ is the d component the command has *in the rotor frame* while it acts, and the cascades rotate the
+  command by the delay angle $(n + \tfrac12)\,\omega_e T_s$ before they apply it (`foc-transforms.md`, *Delay
+  compensation*). The vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$,
+  so its angle to the rotor runs from $-\tfrac12\Delta\theta_e$ to $+\tfrac12\Delta\theta_e$ about zero and
+  the tick's mean d component is $v_d\,\mathrm{sinc}(\tfrac12\Delta\theta_e) - 0\cdot v_q$: the term in $v_q$
+  is odd about the centre and averages out, the shortfall in $v_d$ is second order (0.07 % at 6000 rpm). The
+  window therefore takes $v_d$ as paired, with no cross-axis term. Before the advance the vector was
+  stationary relative to the sample instant: the rotor ran from $0$ to $\Delta\theta_e$ ahead of it, and the
+  mean of $v_d\cos x + v_q\sin x$ over that span is $v_d + \tfrac12\Delta\theta_e v_q$, which is the
+  correction the window used to add. Half was the right figure for a duty applied at once. For a duty applied a
+  period late the vector is a further $\Delta\theta_e$ behind when it lands, so the correct term was
+  $\tfrac32\Delta\theta_e v_q$ and the half left $\Delta\theta_e v_q$ uncorrected; the advance removes
+  the whole $(n + \tfrac12)\,\Delta\theta_e$ at the source, for both values of $n$. The estimate depends on the
+  advance only through the speed it is computed with: an error $\Delta\omega_e$ in that speed leaves
+  $(n + \tfrac12)\,\Delta\omega_e T_s\,v_q$, second order in the small figures.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,
   rather than the outer loop's last speed, which lags an accelerating rotor.
 

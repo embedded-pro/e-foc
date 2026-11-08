@@ -2,9 +2,9 @@
 title: "Closed-Loop Control of a PMSM"
 type: theory
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: "closed-loop-control"
-date: 2026-10-30
+date: 2026-11-08
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Closed-Loop Control of a PMSM |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 0.2.1                         |
+| Version   | 0.2.2                         |
 | Component | closed-loop-control           |
-| Date      | 2026-10-30                    |
+| Date      | 2026-11-08                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -259,6 +259,12 @@ applies the voltage computed from it, time passes:
 | Computation, then duty applied next period | Duty takes effect one period after the sample (`targets/platform_implementations/ti/implementation/PlatformFactoryImpl.cpp`, `DutyUpdateDelayPeriods`) | $T_s^i$ = 50 µs                  |
 | Zero-order hold                            | A duty held for a whole period acts on average half a period late                                                                                      | $T_s^i/2$ = 25 µs                |
 | **Total**                                  |                                                                                                                                                        | $T_d \approx 1.5\,T_s^i$ = 75 µs |
+
+The same delay lets the rotor turn $\omega_e T_d$ before the voltage lands. e-foc rotates the inverse Park by
+that angle, $(n + \tfrac12)\,\omega_e T_s^i$ with $n$ the platform's duty delay in periods, so the vector is
+aligned with the rotor over the hold and the voltage acts on the axis the controller meant
+([disturbances and noise](disturbances-and-noise.md) §5). That removes the speed-proportional angle error, not the
+phase the delay costs at crossover, which the table below still counts.
 
 A pure delay has unit gain and a phase of $-\omega T_d$. For a PI current controller that cancels the
 plant pole ([current-loop-pi.md](current-loop-pi.md)), the loop gain is

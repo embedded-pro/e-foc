@@ -2,9 +2,9 @@
 title: "From Equations to Firmware — Practical Implementation"
 type: theory
 status: draft
-version: 0.1.2
+version: 0.1.3
 component: "firmware-implementation"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                                                 |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | From Equations to Firmware — Practical Implementation |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.2                                                 |
+| Version   | 0.1.3                                                 |
 | Component | firmware-implementation                               |
-| Date      | 2026-11-05                                            |
+| Date      | 2026-11-08                                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -145,8 +145,10 @@ The platform states the delay (`DutyUpdateDelayPeriods() = 1` on TI) so that cod
 account for it: the deadbeat current law predicts the current at the instant its duty lands, and the estimators
 pair each current change with the voltage that caused it (`documentation/theory/current-loop-deadbeat.md`,
 `documentation/design/service-electrical-ident.md`). Together with the hold it gives the 1.5-period loop delay of
-[closed-loop control](closed-loop-control.md) §7. The inverse Park still uses the sampled angle
-([disturbances and noise](disturbances-and-noise.md) §5).
+[closed-loop control](closed-loop-control.md) §7. The inverse Park does not use the sampled angle: the rotor turns
+during those $n + \tfrac12$ periods, so the angle is advanced by $(n + \tfrac12)\,\omega_e T_s$, with $n$ the
+platform's delay, by rotating the sampled $(\cos\theta_e, \sin\theta_e)$ through that small angle
+([disturbances and noise](disturbances-and-noise.md) §5, [FOC transforms](../design/foc-transforms.md)).
 
 ### 4. Numerics on a Cortex-M4F
 
