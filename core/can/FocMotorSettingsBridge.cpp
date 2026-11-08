@@ -1,6 +1,5 @@
 #include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/can/FocMotorSettings.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include <limits>
@@ -74,84 +73,6 @@ namespace can
         , firmware(firmware)
         , firmwareUpgrade(firmwareUpgrade)
     {}
-
-    void FocMotorSettingsBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(messageId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (!(bandwidth >= foc::CommandLimits::minBandwidth))
-        {
-            server.SendCommandAck(messageId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        pendingLegacyCommand = messageId;
-        pendingNvmDoneCallback = onDone;
-        SetLoopSetting(parameter, bandwidth, [this](state_machine::SettingResult result)
-            {
-                CompleteStoredCommand(pendingLegacyCommand, result);
-            });
-    }
-
-    void FocMotorSettingsBridge::SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (resolution == 0)
-        {
-            server.SendCommandAck(can::focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().encoderResolution = resolution;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::persistenceFailed);
-            });
-    }
-
-    void FocMotorSettingsBridge::ConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (rateHz > focMaxTelemetryRateHz)
-        {
-            server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().telemetryRateHz = rateHz;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::persistenceFailed);
-            });
-    }
 
     void FocMotorSettingsBridge::SelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)
     {
@@ -372,7 +293,7 @@ namespace can
     bool FocMotorSettingsBridge::SettingOutstanding() const
     {
         const bool downloading = firmwareUpgrade && firmwareUpgrade->get().IsRunning();
-        return downloading || pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
+        return downloading || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
     }
 
     void FocMotorSettingsBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
@@ -419,17 +340,6 @@ namespace can
             onDone(HeldValue(pendingParameter));
         else
             ReportSettingFailure(can::focSetParameterId, result);
-    }
-
-    void FocMotorSettingsBridge::CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result)
-    {
-        auto onDone = pendingNvmDoneCallback;
-        pendingNvmDoneCallback = nullptr;
-
-        if (result == state_machine::SettingResult::ok)
-            onDone();
-        else
-            ReportSettingFailure(commandId, result);
     }
 
     void FocMotorSettingsBridge::ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result)

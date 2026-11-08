@@ -41,8 +41,8 @@ namespace tool
         const std::array<FieldSpec, 4> measurementFields{
             ReadOut(idCurrent, "Id current:", " A", DecimalsFor(can::focStreamCurrentScale)),
             ReadOut(iqCurrent, "Iq current:", " A", DecimalsFor(can::focStreamCurrentScale)),
-            ReadOut(speed, "Speed:", SpeedAxis().Suffix(), PreciseAxisFor(can::FocMotorMode::speed).Decimals()),
-            ReadOut(position, "Position:", PositionAxis().Suffix(), PreciseAxisFor(can::FocMotorMode::position).Decimals())
+            ReadOut(speed, "Speed:", SpeedAxis().Suffix(), SpeedAxis().Decimals()),
+            ReadOut(position, "Position:", PositionAxis().Suffix(), PositionAxis().Decimals())
         };
 
         constexpr std::chrono::milliseconds streamRefreshInterval{ 40 };
@@ -181,11 +181,14 @@ namespace tool
         ShowFault(fault);
     }
 
-    void TelemetryPanel::OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairsValue)
+    void TelemetryPanel::OnMotorParameter(can::FocParameter parameter, float value)
     {
-        Show(parameters, resistance, static_cast<double>(resistanceOhm));
-        Show(parameters, inductance, static_cast<double>(inductanceMilliHenry));
-        Show(parameters, polePairs, static_cast<double>(polePairsValue));
+        if (parameter == can::FocParameter::resistance)
+            Show(parameters, resistance, static_cast<double>(value));
+        else if (parameter == can::FocParameter::inductance)
+            Show(parameters, inductance, static_cast<double>(value));
+        else if (parameter == can::FocParameter::polePairs)
+            Show(parameters, polePairs, static_cast<double>(value));
     }
 
     void TelemetryPanel::OnTargetReached(bool reached)

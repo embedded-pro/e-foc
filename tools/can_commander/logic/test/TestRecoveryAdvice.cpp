@@ -119,6 +119,14 @@ TEST_F(TestRecoveryAdvice, setpoint_for_another_mode_names_both_modes)
     EXPECT_THAT(advice->text, HasSubstr("runs position mode"));
 }
 
+TEST_F(TestRecoveryAdvice, a_torque_setpoint_in_newton_metres_is_a_torque_setpoint)
+{
+    const auto advice = Refuse(can::focSetTorqueSetpointNewtonMeterId, FocMotorState::idle, Refusal::modeMismatch, FocMotorMode::speed);
+
+    ASSERT_TRUE(advice.has_value());
+    EXPECT_THAT(advice->text, HasSubstr("torque setpoint applies in torque mode only"));
+}
+
 TEST_F(TestRecoveryAdvice, align_refused_while_stopped_asks_for_a_calibration)
 {
     const auto advice = Refuse(can::focAlignId, FocMotorState::idle, Refusal::modeMismatch, FocMotorMode::speed);

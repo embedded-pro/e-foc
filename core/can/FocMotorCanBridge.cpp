@@ -5,7 +5,6 @@
 #include "core/foc/math/TravelLimits.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
-#include <limits>
 #include <variant>
 
 namespace can
@@ -183,37 +182,22 @@ namespace can
             });
     }
 
-    void FocMotorCanBridge::OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone)
+    void FocMotorCanBridge::OnSetSetpoint(const FocSetpoint& setpoint, const infra::Function<void()>& onDone)
     {
-        ApplyTorqueSetpoint(can::focSetTorqueSetpointId, value, onDone);
-    }
-
-    void FocMotorCanBridge::OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone)
-    {
-        ApplySpeedSetpoint(can::focSetSpeedSetpointId, value, onDone);
-    }
-
-    void FocMotorCanBridge::OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone)
-    {
-        ApplyPositionSetpoint(can::focSetPositionSetpointId, value, onDone);
-    }
-
-    void FocMotorCanBridge::OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone)
-    {
-        const auto commandId = PreciseSetpointCommandId(setpoint.kind);
+        const auto commandId = SetpointCommandId(setpoint.kind);
 
         switch (setpoint.kind)
         {
-            case FocPreciseSetpointKind::torqueCurrent:
+            case FocSetpointKind::torqueCurrent:
                 ApplyTorqueSetpoint(commandId, foc::Ampere{ setpoint.value }, onDone);
                 break;
-            case FocPreciseSetpointKind::torqueNewtonMeter:
+            case FocSetpointKind::torqueNewtonMeter:
                 ApplyTorqueInNewtonMeter(commandId, foc::NewtonMeter{ setpoint.value }, onDone);
                 break;
-            case FocPreciseSetpointKind::speed:
+            case FocSetpointKind::speed:
                 ApplySpeedSetpoint(commandId, foc::RadiansPerSecond{ setpoint.value }, onDone);
                 break;
-            case FocPreciseSetpointKind::position:
+            case FocSetpointKind::position:
                 ApplyPositionSetpoint(commandId, foc::Radians{ setpoint.value }, onDone);
                 break;
         }
@@ -275,21 +259,6 @@ namespace can
         }
         else
             server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
-    }
-
-    void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
-    {
-        settings.SetLegacyBandwidth(can::focSetPidCurrentId, FocParameter::currentBandwidth, bandwidth, onDone);
-    }
-
-    void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
-    {
-        settings.SetLegacyBandwidth(can::focSetPidSpeedId, FocParameter::speedBandwidth, bandwidth, onDone);
-    }
-
-    void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
-    {
-        settings.SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -357,28 +326,9 @@ namespace can
                                    ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
                                    : FocFaultCode::none;
 
-        server.BroadcastTelemetryStatus(
-            ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()),
-            faultCode,
-            controlMode.ActiveStateMachine().MeasuredSpeed(),
-            encoder.Read());
+        server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()), faultCode);
+        server.BroadcastTelemetryMotion(controlMode.ActiveStateMachine().MeasuredSpeed(), encoder.Read());
         onDone();
-    }
-
-    void FocMotorCanBridge::OnRequestTelemetryPrecise(const infra::Function<void()>& onDone)
-    {
-        server.BroadcastTelemetryStatusPrecise(controlMode.ActiveStateMachine().MeasuredSpeed(), encoder.Read());
-        onDone();
-    }
-
-    void FocMotorCanBridge::OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
-    {
-        settings.SetEncoderResolution(resolution, onDone);
-    }
-
-    void FocMotorCanBridge::OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
-    {
-        settings.ConfigureTelemetryRate(rateHz, onDone);
     }
 
     void FocMotorCanBridge::OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)

@@ -25,7 +25,6 @@ namespace tool
         void ShowValue(can::FocParameter parameter, can::FocParameterValue value);
         virtual void ForgetValues();
         virtual void Revert();
-        virtual void SetLegacy(bool legacyContract);
         void SetUnavailable(const QString& reason);
         void SetApplying(bool active);
 
@@ -45,7 +44,6 @@ namespace tool
         virtual int EditCount() const;
         virtual void Refresh();
         const std::vector<SettingEditor*>& Editors() const;
-        bool IsLegacy() const;
 
     private:
         QWidget* CreateApplyBar();
@@ -57,6 +55,5 @@ namespace tool
         std::vector<SettingEditor*> editors;
         QString unavailableReason;
         bool applying{ false };
-        bool legacy{ false };
     };
 }

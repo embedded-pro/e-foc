@@ -60,7 +60,6 @@ namespace tool
         void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) override;
         void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) override;
         void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) override;
-        void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
         void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
         void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) override;

@@ -27,7 +27,7 @@ namespace tool
         void OnCurrentStream(float idCurrent, float iqCurrent, float position);
         void OnSpeedPosition(float speed, float position);
         void OnFaultEvent(FocFaultCode fault);
-        void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
+        void OnMotorParameter(can::FocParameter parameter, float value);
         void OnTargetReached(bool reached);
         void OnHomed(bool homed);
         void OnWindingTemperature(float celsius);

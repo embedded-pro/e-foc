@@ -1,26 +1,14 @@
 #include "tools/can_commander/gui/ConfigurationTab.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
-#include <algorithm>
-#include <span>
 
 namespace tool
 {
-    namespace
-    {
-        bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter)
-        {
-            return std::ranges::any_of(settings, [parameter](const SettingPresentation& setting)
-                {
-                    return setting.parameter == parameter;
-                });
-        }
-    }
-
     ConfigurationTab::ConfigurationTab(QWidget* parent)
         : SettingsPage(parent)
     {
         BuildStartupGroup();
+        BuildStreamGroup();
         BuildSupervisionGroup();
         BuildLimitsGroup();
         BuildTargetWindowGroup();
@@ -43,6 +31,18 @@ namespace tool
                                 "appears under another tab; after a new bitrate, reconnect at that bitrate to reach it.");
         note->setWordWrap(true);
         ui::backend::qt::StyleStatusLabel(*note, ui::theme::StatusLevel::Warning);
+        form.addRow(note);
+    }
+
+    void ConfigurationTab::BuildStreamGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Current Stream", group);
+        AddEditors(form, StreamSettings());
+
+        auto* note = new QLabel("Stored at once and in force within 1 ms, also while the motor runs; 0 stops the stream. Every "
+                                "controller's stream shares the bus: keep the rates of all of them together within its bitrate.");
+        note->setWordWrap(true);
         form.addRow(note);
     }
 
@@ -151,134 +151,11 @@ namespace tool
         form.addRow(note);
     }
 
-    void ConfigurationTab::SetLegacy(bool legacyContract)
-    {
-        legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
-        ShowAvailability();
-
-        SettingsPage::SetLegacy(legacyContract);
-    }
-
-    void ConfigurationTab::SetSupervisionUnavailable(const QString& reason)
-    {
-        if (reason == supervisionReason)
-            return;
-
-        supervisionReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetLimitsUnavailable(const QString& reason)
-    {
-        if (reason == limitsReason)
-            return;
-
-        limitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetThermalUnavailable(const QString& reason)
-    {
-        if (reason == thermalReason)
-            return;
-
-        thermalReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetOverTemperatureUnavailable(const QString& reason)
-    {
-        if (reason == overTemperatureReason)
-            return;
-
-        overTemperatureReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetBusVoltageLimitsUnavailable(const QString& reason)
-    {
-        if (reason == busVoltageLimitsReason)
-            return;
-
-        busVoltageLimitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetRecalibrationUnavailable(const QString& reason)
-    {
-        if (reason == recalibrationReason)
-            return;
-
-        recalibrationReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
-    {
-        if (reason == travelLimitsReason)
-            return;
-
-        travelLimitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetHomingUnavailable(const QString& reason)
-    {
-        if (reason == homingReason)
-            return;
-
-        homingReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetTargetWindowUnavailable(const QString& reason)
-    {
-        if (reason == targetWindowReason)
-            return;
-
-        targetWindowReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
     void ConfigurationTab::Refresh()
     {
         const auto* stall = EditorFor(can::FocParameter::stallDetection);
         stallWarning->setVisible(stall->IsAvailable() && stall->Held().has_value() && stall->EditedValue() < 0.5f);
 
         SettingsPage::Refresh();
-    }
-
-    void ConfigurationTab::ShowAvailability()
-    {
-        for (auto* editor : Editors())
-            if (IsIn(SupervisionSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? supervisionReason : legacyReason);
-            else if (IsIn(LimitSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? limitsReason : legacyReason);
-            else if (IsIn(TargetWindowSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? targetWindowReason : legacyReason);
-            else if (IsIn(TravelLimitSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? travelLimitsReason : legacyReason);
-            else if (IsIn(ThermalSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? thermalReason : legacyReason);
-            else if (IsIn(OverTemperatureSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
-            else if (IsIn(BusVoltageSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
-            else if (IsIn(HomingSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? homingReason : legacyReason);
-            else if (IsIn(RecalibrationSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? recalibrationReason : legacyReason);
-            else if (editor->Parameter() != can::FocParameter::encoderResolution)
-                editor->SetUnavailable(legacyReason);
     }
 }

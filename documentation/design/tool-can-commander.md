@@ -151,24 +151,18 @@ alignment zero, the same half turn either side that the measured position is rep
 
 The setpoint of the active control mode is chosen with a knob and the number box beside it, which follow
 each other: torque in amperes, speed in revolutions per minute, position in degrees. The wire still carries
-amperes, radians per second and radians; the tool converts at its edge, and one knob step is one count of
-the wire field (0.1 A, 1 rad/s ≈ 9.55 rpm, 0.01 rad ≈ 0.57°), so a typed value snaps to the nearest value
-the frame can carry. Turning the knob or typing never sends anything: Apply, or Enter in the box or on the
+amperes, radians per second and radians as floats; the tool converts at its edge, and one knob step is
+0.001 A, 0.01 rad/s (about 0.095 rpm) or 0.001 rad (about 0.057°), so a typed value snaps to the nearest
+step. Turning the knob or typing never sends anything: Apply, or Enter in the box or on the
 focused knob, sends the value shown. Beside the knob the panel shows the value the controller last
 accepted, also marked on the knob's scale; while the knob shows another value it says what Apply would
 send. An acknowledged mode change or the node leaving the bus forgets the accepted value, because the new
 mode starts from its own setpoint. The measured speed and position read in rpm and degrees as well, to two
 decimals; loop bandwidths stay in rad/s, since they are frequencies, not speeds.
 
-A node of contract 2.21 or newer takes each setpoint as a float, so the knob and the box step finer on it: one step
-is 0.001 A, 0.01 rad/s (about 0.095 rpm) and 0.001 rad (about 0.057°), the range stays the firmware limit, and the
-tool sends the precise setpoint messages of `service-can.md` instead of the scaled ones. It asks such a node for its
-precise speed and position with every status and shows those, since the scaled status quantises them. A node older
-than 2.21, or one whose contract is not yet known, keeps the scaled steps and messages; the knob switches when the
-contract answer arrives and forgets the accepted values, because a count means a different value on each axis. The
-acknowledgement or refusal of a precise setpoint is reported and recovered from exactly as that of the scaled one. The
-panel offers no torque in newton-metres; the tool's client can send it to a 2.21 node, which converts it with the
-calibrated torque constant.
+The measured speed and position come from the motion telemetry that answers each status request
+(`service-can.md`, contract 3.0). The panel offers no torque in newton-metres; the tool's client can send it,
+and the controller converts it with the calibrated torque constant.
 
 Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally
@@ -212,8 +206,8 @@ inertia and friction does, after they are set.
 
 ### Part J — controllers, motor parameters and configuration
 
-The settings tabs show what the node holds, not what was last typed. A node whose firmware contract is 2.1
-or newer is read completely when it is found compatible, and again after a mode change (accepted or
+The settings tabs show what the node holds, not what was last typed. A node is read completely when it is
+found compatible, and again after a mode change (accepted or
 refused), a controller change, an identification, an alignment, applied motor parameters, a refused
 setting or a Revert: the active mode and the algorithm of every loop, then every numbered parameter the
 operator can set — the read-only values of contract 2.2 are readings, not settings, and are not read here. Reads
@@ -222,7 +216,7 @@ logged one by one. A read that is not answered leaves "—".
 
 ```mermaid
 flowchart LR
-    Node["Node compatible (2.1)"] --> Read["Read mode, algorithms, parameters"]
+    Node["Node compatible"] --> Read["Read mode, algorithms, parameters"]
     Read --> Forms["Forms show the values in force"]
     Forms --> Edit["Operator edits: field marked as changed"]
     Edit --> Apply["Apply: changed values sent one at a time"]
@@ -248,6 +242,10 @@ flowchart LR
 - **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.
   They are stored at once and take effect when the controller restarts; a new node ID or bitrate means the
   motor appears under another tab, or only after reconnecting at the new bitrate, and the tab says so.
+  Beside them, *Current stream rate* (Hz, 0–1000, 0 stops the stream) sets how often the controller sends the
+  Id, Iq and position samples the Telemetry panel plots (`service-can.md` Part J); it is stored at once and in
+  force within a millisecond, in any state. The field says that every node's stream shares the bus, so the
+  rates of all nodes together have to fit its bitrate.
   Its **Fault Supervision** group holds the drive-wide settings of the fault supervisor
   (`fault-supervision.md`): the window, current fraction, demanded speed, position error and still excursion
   that decide when a rotor is not following the drive, and *Report stalls*. They are stored at once and in
@@ -301,29 +299,11 @@ drops the edits and reads the values in force again.
 Controllers and motor parameters change only while the motor is stopped: their Apply is disabled, with the
 reason, while the last status says the motor runs or calibrates. Start-up settings can be stored at any time.
 
-A node on contract 2.0 has none of the 2.1 messages. Its Controllers tab offers the loop bandwidths alone,
-sent with the 2.0 bandwidth commands and not read back; the motor parameter fields are disabled with the
-reason; the commissioning actions and the encoder resolution work as on 2.1. A node older than 2.2 has no
-Calibrate, Clear Calibration or diagnostics: those buttons and the Diagnostics tab are disabled with the
-reason. A node older than 2.4 has no fault supervision settings: the commander does not ask it for them, and
-the Fault Supervision fields are disabled with the reason. Its faults never read *Stall*, which 2.4 added, and a
-node older than 2.7 never reports *Phase missing*, and a node older than 2.8 never reports *Ready*, *Hardware
-fault* or *Calibration failed*. A node older than 2.9 has no limits: the commander does not ask it for them, the
-Limits fields are disabled with the reason, and it never reports *Overspeed*, *Following error* or *Command
-timeout*. A node older than 2.10 has no target window: the commander does not ask it for the
-position window, its time or the target-reached reading, and the Target Window fields are disabled with the
-reason. A node older than 2.11 has no travel limits: the commander does not ask it for them, and the
-Travel Limits fields are disabled with the reason, and a node older than 2.12 never reports *Position limit*. A node
-older than 2.13 has no winding temperature: the commander does not ask it for the estimate or the calibration
-temperature, and the Thermal fields are disabled with the reason; a node of 2.13 has no temperature limit or
-margin, and those two fields are disabled with the reason. A node older than 2.15 has no bus-voltage limits: the
-commander does not ask it for them, and the Supply Limits fields are disabled with the reason. A node older than 2.17
-has no online recalibration: the commander does not ask it for the mode or the model in use, and the Online
-Recalibration field and both Diagnostics buttons are disabled with the reason; a node of 2.17 has no Reset Model, which
-is disabled with the reason.
-A node older than 2.19 has no homing: the commander does not ask it for the homed reading or the requirement, and the
-Require homing toggle is disabled with the reason. A node older than 2.20 has no Coulomb friction: the commander does
-not ask it for the value, and the field is disabled with the reason.
+A node is compatible only when its contract version equals the tool's (`service-can.md` Part A), so every
+setting, reading and command in this part is offered on every compatible node; the tool keeps no path for older
+firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
+firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot
+read from it: the controller's own interlock refuses the transfer while its motor runs.
 
 ### Part K — diagnostics
 
@@ -349,8 +329,7 @@ peak torque current. The commander asks for every age (contract 2.16) when the n
 Refresh, when the motor reports a fault and after a clear, and pairs each age's two responses into one row. The
 group shows "—" until the newest age is answered, "No faults recorded." when the controller holds none, and
 forgets the rows when the node leaves the bus. Clear Fault History asks for confirmation, sends
-`ClearFaultHistory` and reads the history again once the controller has stored it. On firmware older than 2.16
-the group says which contract it needs and its button is disabled.
+`ClearFaultHistory` and reads the history again once the controller has stored it.
 
 ### Part E — issue log
 
@@ -783,7 +762,7 @@ sequenceDiagram
 | Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                        |
 | Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase          |
 | Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                          |
-| Status reads           | each compatible node every 1 s and after every accepted command; from contract 2.10 each also reads the target-reached flag                              |
+| Status reads           | each compatible node every 1 s and after every accepted command: state and fault, motion, target reached, winding temperature and homed                  |
 | Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                          |
 | On-screen event log    | newest 5000 lines                                                                                                                                        |
 | Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                                  |

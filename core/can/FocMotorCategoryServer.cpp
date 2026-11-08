@@ -1,18 +1,13 @@
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
-#include <cmath>
-#include <limits>
 
 namespace can
 {
     FocMotorCategoryServer::FocMotorCategoryServer(services::CanFrameTransport& transport)
         : CanCategoryServer(transport)
     {
-        AddMessageTypes(start, stop, clearFault, emergencyStop, selectControlMode,
-            setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
-            setPidCurrent, setPidSpeed, setPidPosition, requestTelemetry,
-            setEncoderResolution, configureTelemetryRate, queryContractVersion,
+        AddMessageTypes(start, stop, clearFault, emergencyStop, selectControlMode, requestTelemetry, queryContractVersion,
             settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter);
     }
 
@@ -44,15 +39,14 @@ namespace can
         , queryParameter{ focQueryParameterId, server, &FocMotorCategoryServer::HandleQueryParameter }
     {}
 
-    FocMotorCategoryServer::PreciseMessages::PreciseMessages(FocMotorCategoryServer& server)
+    FocMotorCategoryServer::SetpointMessages::SetpointMessages(FocMotorCategoryServer& server)
         : server(server)
-        , torqueCurrent{ focSetTorqueSetpointPreciseId, *this, &PreciseMessages::HandleTorqueCurrent }
-        , torqueNewtonMeter{ focSetTorqueSetpointNewtonMeterId, *this, &PreciseMessages::HandleTorqueNewtonMeter }
-        , speed{ focSetSpeedSetpointPreciseId, *this, &PreciseMessages::HandleSpeed }
-        , position{ focSetPositionSetpointPreciseId, *this, &PreciseMessages::HandlePosition }
-        , requestTelemetry{ focRequestTelemetryPreciseId, *this, &PreciseMessages::HandleRequestTelemetry }
+        , torqueCurrent{ focSetTorqueSetpointId, *this, &SetpointMessages::HandleTorqueCurrent }
+        , torqueNewtonMeter{ focSetTorqueSetpointNewtonMeterId, *this, &SetpointMessages::HandleTorqueNewtonMeter }
+        , speed{ focSetSpeedSetpointId, *this, &SetpointMessages::HandleSpeed }
+        , position{ focSetPositionSetpointId, *this, &SetpointMessages::HandlePosition }
     {
-        server.AddMessageTypes(torqueCurrent, torqueNewtonMeter, speed, position, requestTelemetry);
+        server.AddMessageTypes(torqueCurrent, torqueNewtonMeter, speed, position);
     }
 
     uint8_t FocMotorCategoryServer::Id() const
@@ -78,8 +72,6 @@ namespace can
         services::CanPayloadWriter payload;
         payload.WriteUInt8(static_cast<uint8_t>(FocMotorState::fault));
         payload.WriteUInt8(static_cast<uint8_t>(fault));
-        payload.WriteFixed16(0.0f, focSpeedScale);
-        payload.WriteFixed16(0.0f, focPositionScale);
 
         SendEmergency(focTelemetryStatusResponseId, payload);
     }
@@ -192,144 +184,6 @@ namespace can
         return true;
     }
 
-    bool FocMotorCategoryServer::HandleSetTorqueSetpoint(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetTorqueSetpointId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto value = foc::Ampere{ reader.ReadFixed16(focCurrentScale) };
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, value](auto& observer)
-            {
-                observer.OnSetTorqueSetpoint(value, [this]()
-                    {
-                        SendCommandAck(focSetTorqueSetpointId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetSpeedSetpoint(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetSpeedSetpointId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto value = foc::RadiansPerSecond{ reader.ReadFixed16(focSpeedScale) };
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, value](auto& observer)
-            {
-                observer.OnSetSpeedSetpoint(value, [this]()
-                    {
-                        SendCommandAck(focSetSpeedSetpointId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetPositionSetpoint(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetPositionSetpointId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto value = foc::Radians{ reader.ReadFixed16(focPositionScale) };
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, value](auto& observer)
-            {
-                observer.OnSetPositionSetpoint(value, [this]()
-                    {
-                        SendCommandAck(focSetPositionSetpointId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetPidCurrent(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetPidCurrentId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto bandwidth = reader.ReadFixed16(focPidScale);
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, bandwidth](auto& observer)
-            {
-                observer.OnSetPidCurrent(bandwidth, [this]()
-                    {
-                        SendCommandAck(focSetPidCurrentId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetPidSpeed(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetPidSpeedId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto bandwidth = reader.ReadFixed16(focPidScale);
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, bandwidth](auto& observer)
-            {
-                observer.OnSetPidSpeed(bandwidth, [this]()
-                    {
-                        SendCommandAck(focSetPidSpeedId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetPidPosition(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetPidPositionId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto bandwidth = reader.ReadFixed16(focPidScale);
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, bandwidth](auto& observer)
-            {
-                observer.OnSetPidPosition(bandwidth, [this]()
-                    {
-                        SendCommandAck(focSetPidPositionId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
     bool FocMotorCategoryServer::CommissioningMessages::HandleAlign(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focAlignId))
@@ -404,52 +258,6 @@ namespace can
                 observer.OnRequestTelemetry([this]()
                     {
                         SendCommandAck(focRequestTelemetryId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleSetEncoderResolution(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focSetEncoderResolutionId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto resolution = reader.ReadUInt32();
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, resolution](auto& observer)
-            {
-                observer.OnSetEncoderResolution(resolution, [this]()
-                    {
-                        SendCommandAck(focSetEncoderResolutionId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::HandleConfigureTelemetryRate(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focConfigureTelemetryRateId))
-            return false;
-
-        services::CanPayloadReader reader{ data };
-        reader.Skip(1);
-        const auto rateHz = reader.ReadUInt32();
-
-        if (!reader.Valid())
-            return false;
-
-        NotifyObservers([this, rateHz](auto& observer)
-            {
-                observer.OnConfigureTelemetryRate(rateHz, [this]()
-                    {
-                        SendCommandAck(focConfigureTelemetryRateId, services::CanAckStatus::success);
                     });
             });
 
@@ -584,23 +392,20 @@ namespace can
         SendResponse(focParameterResponseId, payload);
     }
 
-    void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
-        foc::RadiansPerSecond speed, foc::Radians position)
+    void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault)
     {
         services::CanPayloadWriter payload;
         payload.WriteUInt8(static_cast<uint8_t>(state));
         payload.WriteUInt8(static_cast<uint8_t>(fault));
-        payload.WriteFixed16(speed.Value(), focSpeedScale);
-        payload.WriteFixed16(position.Value(), focPositionScale);
         SendTelemetry(focTelemetryStatusResponseId, payload);
     }
 
-    void FocMotorCategoryServer::BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond speed, foc::Radians position)
+    void FocMotorCategoryServer::BroadcastTelemetryMotion(foc::RadiansPerSecond speed, foc::Radians position)
     {
         services::CanPayloadWriter payload;
         WriteFloat32(payload, speed.Value());
         WriteFloat32(payload, position.Value());
-        SendTelemetry(focTelemetryStatusPreciseId, payload);
+        SendTelemetry(focTelemetryMotionId, payload);
     }
 
     bool FocMotorCategoryServer::BroadcastTelemetryCurrents(uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position,
@@ -614,69 +419,44 @@ namespace can
         return payload.Valid() && Transport().SendFrame(services::CanPriority::telemetry, Id(), focTelemetryCurrentsId, payload.Message(), onDone);
     }
 
-    void FocMotorCategoryServer::BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs)
+    bool FocMotorCategoryServer::SetpointMessages::HandleTorqueCurrent(const hal::Can::Message& data)
     {
-        services::CanPayloadWriter payload;
-        payload.WriteFixed16(resistance.Value(), focResistanceScale);
-        payload.WriteFixed16(inductance.Value(), focInductanceScale);
-        payload.WriteUInt8(static_cast<uint8_t>(polePairs));
-        SendResponse(focElectricalParamsResponseId, payload);
+        return HandleSetpoint(data, FocSetpointKind::torqueCurrent);
     }
 
-    bool FocMotorCategoryServer::PreciseMessages::HandleTorqueCurrent(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::SetpointMessages::HandleTorqueNewtonMeter(const hal::Can::Message& data)
     {
-        return HandleSetpoint(data, FocPreciseSetpointKind::torqueCurrent);
+        return HandleSetpoint(data, FocSetpointKind::torqueNewtonMeter);
     }
 
-    bool FocMotorCategoryServer::PreciseMessages::HandleTorqueNewtonMeter(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::SetpointMessages::HandleSpeed(const hal::Can::Message& data)
     {
-        return HandleSetpoint(data, FocPreciseSetpointKind::torqueNewtonMeter);
+        return HandleSetpoint(data, FocSetpointKind::speed);
     }
 
-    bool FocMotorCategoryServer::PreciseMessages::HandleSpeed(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::SetpointMessages::HandlePosition(const hal::Can::Message& data)
     {
-        return HandleSetpoint(data, FocPreciseSetpointKind::speed);
+        return HandleSetpoint(data, FocSetpointKind::position);
     }
 
-    bool FocMotorCategoryServer::PreciseMessages::HandlePosition(const hal::Can::Message& data)
+    bool FocMotorCategoryServer::SetpointMessages::HandleSetpoint(const hal::Can::Message& data, FocSetpointKind kind)
     {
-        return HandleSetpoint(data, FocPreciseSetpointKind::position);
-    }
-
-    bool FocMotorCategoryServer::PreciseMessages::HandleSetpoint(const hal::Can::Message& data, FocPreciseSetpointKind kind)
-    {
-        const auto commandId = PreciseSetpointCommandId(kind);
+        const auto commandId = SetpointCommandId(kind);
         if (!PayloadExact(data, commandId))
             return false;
 
         services::CanPayloadReader reader{ data };
         reader.Skip(1);
-        const FocPreciseSetpoint setpoint{ kind, ReadFloat32(reader) };
+        const FocSetpoint setpoint{ kind, ReadFloat32(reader) };
 
-        if (!reader.Valid() || !IsPreciseSetpointAcceptable(setpoint.value))
+        if (!reader.Valid() || !IsFiniteWireValue(setpoint.value))
             return false;
 
         server.NotifyObservers([this, setpoint, commandId](auto& observer)
             {
-                observer.OnSetPreciseSetpoint(setpoint, [this, commandId]()
+                observer.OnSetSetpoint(setpoint, [this, commandId]()
                     {
                         server.SendCommandAck(commandId, services::CanAckStatus::success);
-                    });
-            });
-
-        return true;
-    }
-
-    bool FocMotorCategoryServer::PreciseMessages::HandleRequestTelemetry(const hal::Can::Message& data)
-    {
-        if (!PayloadExact(data, focRequestTelemetryPreciseId))
-            return false;
-
-        server.NotifyObservers([this](auto& observer)
-            {
-                observer.OnRequestTelemetryPrecise([this]()
-                    {
-                        server.SendCommandAck(focRequestTelemetryPreciseId, services::CanAckStatus::success);
                     });
             });
 

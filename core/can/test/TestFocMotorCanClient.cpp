@@ -18,11 +18,10 @@ namespace
 
         MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t sourceNodeId, can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnCategoryError, (uint16_t sourceNodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
-        MOCK_METHOD(void, OnTelemetryStatus, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
-        MOCK_METHOD(void, OnTelemetryStatusPrecise, (uint16_t sourceNodeId, foc::RadiansPerSecond speed, foc::Radians position), (override));
+        MOCK_METHOD(void, OnTelemetryStatus, (uint16_t sourceNodeId, can::FocMotorState state, can::FocFaultCode fault), (override));
+        MOCK_METHOD(void, OnTelemetryMotion, (uint16_t sourceNodeId, foc::RadiansPerSecond speed, foc::Radians position), (override));
         MOCK_METHOD(void, OnTelemetryCurrents, (uint16_t sourceNodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
-        MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
         MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t sourceNodeId, const can::FocAlgorithms& algorithms), (override));
         MOCK_METHOD(void, OnParameterResponse, (uint16_t sourceNodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
         MOCK_METHOD(void, OnFaultRecordResponse, (uint16_t sourceNodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs), (override));

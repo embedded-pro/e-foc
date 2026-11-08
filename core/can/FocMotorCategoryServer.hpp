@@ -28,20 +28,11 @@ namespace can
         virtual void OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnSelectControlMode(FocMotorMode mode, const infra::Function<void(FocMotorMode)>& onActivated) = 0;
-        virtual void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone) = 0;
-        virtual void OnRequestTelemetryPrecise(const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetSetpoint(const FocSetpoint& setpoint, const infra::Function<void()>& onDone) = 0;
 
-        virtual void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnIdentifyElectrical(const infra::Function<void()>& onDone) = 0;
         virtual void OnRequestTelemetry(const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) = 0;
-        virtual void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) = 0;
 
         virtual void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) = 0;
         virtual void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) = 0;
@@ -72,10 +63,8 @@ namespace can
         void SendSelectControlModeResponse(FocMotorMode activeMode);
         void SendCategoryError(uint8_t origCommandId, FocMotorCategoryError errorCode);
         void BroadcastFaultStatus(FocFaultCode fault);
-        void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
-            foc::RadiansPerSecond speed, foc::Radians position);
-        void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
-        void BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond speed, foc::Radians position);
+        void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault);
+        void BroadcastTelemetryMotion(foc::RadiansPerSecond speed, foc::Radians position);
         bool BroadcastTelemetryCurrents(uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position,
             const infra::Function<void(bool sent)>& onDone);
         void SendAlgorithmsResponse(const FocAlgorithms& algorithms);
@@ -88,16 +77,7 @@ namespace can
         bool HandleClearFault(const hal::Can::Message& data);
         bool HandleEmergencyStop(const hal::Can::Message& data);
         bool HandleSelectControlMode(const hal::Can::Message& data);
-        bool HandleSetTorqueSetpoint(const hal::Can::Message& data);
-        bool HandleSetSpeedSetpoint(const hal::Can::Message& data);
-        bool HandleSetPositionSetpoint(const hal::Can::Message& data);
-
-        bool HandleSetPidCurrent(const hal::Can::Message& data);
-        bool HandleSetPidSpeed(const hal::Can::Message& data);
-        bool HandleSetPidPosition(const hal::Can::Message& data);
         bool HandleRequestTelemetry(const hal::Can::Message& data);
-        bool HandleSetEncoderResolution(const hal::Can::Message& data);
-        bool HandleConfigureTelemetryRate(const hal::Can::Message& data);
         bool HandleQueryContractVersion(const hal::Can::Message& data);
         bool HandleSelectAlgorithm(const hal::Can::Message& data);
         bool HandleQueryAlgorithms(const hal::Can::Message& data);
@@ -109,15 +89,7 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> clearFault{ focClearFaultId, *this, &FocMotorCategoryServer::HandleClearFault };
         services::CanMessageHandler<FocMotorCategoryServer> emergencyStop{ focEmergencyStopId, *this, &FocMotorCategoryServer::HandleEmergencyStop };
         services::CanMessageHandler<FocMotorCategoryServer> selectControlMode{ focSelectControlModeId, *this, &FocMotorCategoryServer::HandleSelectControlMode };
-        services::CanMessageHandler<FocMotorCategoryServer> setTorqueSetpoint{ focSetTorqueSetpointId, *this, &FocMotorCategoryServer::HandleSetTorqueSetpoint };
-        services::CanMessageHandler<FocMotorCategoryServer> setSpeedSetpoint{ focSetSpeedSetpointId, *this, &FocMotorCategoryServer::HandleSetSpeedSetpoint };
-        services::CanMessageHandler<FocMotorCategoryServer> setPositionSetpoint{ focSetPositionSetpointId, *this, &FocMotorCategoryServer::HandleSetPositionSetpoint };
-        services::CanMessageHandler<FocMotorCategoryServer> setPidCurrent{ focSetPidCurrentId, *this, &FocMotorCategoryServer::HandleSetPidCurrent };
-        services::CanMessageHandler<FocMotorCategoryServer> setPidSpeed{ focSetPidSpeedId, *this, &FocMotorCategoryServer::HandleSetPidSpeed };
-        services::CanMessageHandler<FocMotorCategoryServer> setPidPosition{ focSetPidPositionId, *this, &FocMotorCategoryServer::HandleSetPidPosition };
         services::CanMessageHandler<FocMotorCategoryServer> requestTelemetry{ focRequestTelemetryId, *this, &FocMotorCategoryServer::HandleRequestTelemetry };
-        services::CanMessageHandler<FocMotorCategoryServer> setEncoderResolution{ focSetEncoderResolutionId, *this, &FocMotorCategoryServer::HandleSetEncoderResolution };
-        services::CanMessageHandler<FocMotorCategoryServer> configureTelemetryRate{ focConfigureTelemetryRateId, *this, &FocMotorCategoryServer::HandleConfigureTelemetryRate };
         services::CanMessageHandler<FocMotorCategoryServer> queryContractVersion{ focQueryContractVersionId, *this, &FocMotorCategoryServer::HandleQueryContractVersion };
 
         struct SettingsMessages
@@ -175,27 +147,25 @@ namespace can
 
         MaintenanceMessages maintenanceMessages{ *this };
 
-        class PreciseMessages
+        class SetpointMessages
         {
         public:
-            explicit PreciseMessages(FocMotorCategoryServer& server);
+            explicit SetpointMessages(FocMotorCategoryServer& server);
 
         private:
             bool HandleTorqueCurrent(const hal::Can::Message& data);
             bool HandleTorqueNewtonMeter(const hal::Can::Message& data);
             bool HandleSpeed(const hal::Can::Message& data);
             bool HandlePosition(const hal::Can::Message& data);
-            bool HandleRequestTelemetry(const hal::Can::Message& data);
-            bool HandleSetpoint(const hal::Can::Message& data, FocPreciseSetpointKind kind);
+            bool HandleSetpoint(const hal::Can::Message& data, FocSetpointKind kind);
 
             FocMotorCategoryServer& server;
-            services::CanMessageHandler<PreciseMessages> torqueCurrent;
-            services::CanMessageHandler<PreciseMessages> torqueNewtonMeter;
-            services::CanMessageHandler<PreciseMessages> speed;
-            services::CanMessageHandler<PreciseMessages> position;
-            services::CanMessageHandler<PreciseMessages> requestTelemetry;
+            services::CanMessageHandler<SetpointMessages> torqueCurrent;
+            services::CanMessageHandler<SetpointMessages> torqueNewtonMeter;
+            services::CanMessageHandler<SetpointMessages> speed;
+            services::CanMessageHandler<SetpointMessages> position;
         };
 
-        PreciseMessages preciseMessages{ *this };
+        SetpointMessages setpointMessages{ *this };
     };
 }

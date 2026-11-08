@@ -1,5 +1,6 @@
 #include "integration_tests/support/Fixture.hpp"
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -8,6 +9,13 @@
 
 namespace
 {
+    float ReadFloat32BE(const hal::Can::Message& payload, std::size_t offset)
+    {
+        const auto bits = (static_cast<uint32_t>(payload[offset]) << 24) | (static_cast<uint32_t>(payload[offset + 1]) << 16) |
+                          (static_cast<uint32_t>(payload[offset + 2]) << 8) | static_cast<uint32_t>(payload[offset + 3]);
+        return std::bit_cast<float>(bits);
+    }
+
     hal::Can::Id MakeId(services::CanPriority priority, uint8_t category, uint8_t messageType, uint16_t nodeId)
     {
         return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
@@ -164,37 +172,53 @@ namespace integration
         return WaitForMotorState(std::initializer_list<can::FocMotorState>{ expectedState }, timeout);
     }
 
-    bool Fixture::WaitForMotorState(std::initializer_list<can::FocMotorState> expectedStates, std::chrono::milliseconds timeout)
+    std::optional<Fixture::TelemetrySample> Fixture::RequestTelemetry(std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,
             can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
-        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+        const hal::Can::Id statusId = MakeId(services::CanPriority::telemetry,
             can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
+        const hal::Can::Id motionId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryMotionId, ServerNodeId());
 
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        hal::Can::Message request;
+        request.push_back(nextSequence++);
+        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
+        hal::Can::Message status;
+        std::chrono::milliseconds elapsed{ 0 };
+        if (!WaitForCanFrame(statusId, status, timeout, elapsed) || status.size() != 2)
+            return std::nullopt;
+
+        // The motion frame follows the status frame of the same request; taking it here keeps a later read from finding it stale.
+        hal::Can::Message motion;
+        const auto remaining = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()), std::chrono::milliseconds{ 100 });
+        if (!WaitForCanFrame(motionId, motion, remaining, elapsed) || motion.size() != 8)
+            return std::nullopt;
+
+        return TelemetrySample{ static_cast<can::FocMotorState>(status[0]), static_cast<can::FocFaultCode>(status[1]),
+            ReadFloat32BE(motion, 0), ReadFloat32BE(motion, 4) };
+    }
+
+    bool Fixture::WaitForMotorState(std::initializer_list<can::FocMotorState> expectedStates, std::chrono::milliseconds timeout)
+    {
         static constexpr auto kMinPollInterval = std::chrono::milliseconds{ 20 };
 
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline)
         {
             const auto pollStart = std::chrono::steady_clock::now();
-            hal::Can::Message request;
-            request.push_back(nextSequence++);
-            interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
-
-            hal::Can::Message payload;
-            std::chrono::milliseconds elapsed{ 0 };
-            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-                deadline - std::chrono::steady_clock::now());
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - pollStart);
             if (remaining <= std::chrono::milliseconds{ 0 })
                 break;
-            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed) && !payload.empty())
+
+            if (const auto sample = RequestTelemetry(std::min(remaining, std::chrono::milliseconds{ 1000 })))
             {
                 if (std::getenv("SIL_VERBOSE") != nullptr)
-                    std::fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",
-                        static_cast<int>(payload[0]),
-                        static_cast<int>(*expectedStates.begin()),
-                        static_cast<long>(elapsed.count()));
-                if (std::ranges::find(expectedStates, static_cast<can::FocMotorState>(payload[0])) != expectedStates.end())
+                    std::fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d\n",
+                        static_cast<int>(sample->state), static_cast<int>(*expectedStates.begin()));
+                if (std::ranges::find(expectedStates, sample->state) != expectedStates.end())
                     return true;
             }
 
@@ -212,31 +236,20 @@ namespace integration
 
     bool Fixture::WaitForFaultCode(can::FocFaultCode expectedFault, std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
-        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
-
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline)
         {
-            hal::Can::Message request;
-            request.push_back(nextSequence++);
-            interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
-
-            hal::Can::Message payload;
-            std::chrono::milliseconds elapsed{ 0 };
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
                 deadline - std::chrono::steady_clock::now());
             if (remaining <= std::chrono::milliseconds{ 0 })
                 break;
 
-            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed) && payload.size() >= 2)
+            if (const auto sample = RequestTelemetry(std::min(remaining, std::chrono::milliseconds{ 1000 })))
             {
                 if (std::getenv("SIL_VERBOSE") != nullptr)
                     std::fprintf(stderr, "[Fixture] WaitForFaultCode: got fault=%d expected=%d\n",
-                        static_cast<int>(payload[1]), static_cast<int>(expectedFault));
-                if (static_cast<can::FocFaultCode>(payload[1]) == expectedFault)
+                        static_cast<int>(sample->fault), static_cast<int>(expectedFault));
+                if (sample->fault == expectedFault)
                     return true;
             }
 
@@ -247,61 +260,26 @@ namespace integration
 
     std::optional<float> Fixture::ReadMeasuredPosition(std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
-        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
-
-        hal::Can::Message request;
-        request.push_back(nextSequence++);
-        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
-
-        hal::Can::Message payload;
-        std::chrono::milliseconds elapsed{ 0 };
-        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.size() < 6)
+        const auto sample = RequestTelemetry(timeout);
+        if (!sample)
             return std::nullopt;
-
-        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[4]) << 8) | payload[5]);
-        return static_cast<float>(raw) / static_cast<float>(can::focPositionScale);
+        return sample->position;
     }
 
     std::optional<float> Fixture::ReadMeasuredSpeed(std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
-        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
-
-        hal::Can::Message request;
-        request.push_back(nextSequence++);
-        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
-
-        hal::Can::Message payload;
-        std::chrono::milliseconds elapsed{ 0 };
-        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.size() < 4)
+        const auto sample = RequestTelemetry(timeout);
+        if (!sample)
             return std::nullopt;
-
-        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[2]) << 8) | payload[3]);
-        return static_cast<float>(raw) / static_cast<float>(can::focSpeedScale);
+        return sample->speed;
     }
 
     std::optional<can::FocMotorState> Fixture::ReadMotorState(std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
-            can::focMotorCategoryId, can::focRequestTelemetryId, ServerNodeId());
-        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
-            can::focMotorCategoryId, can::focTelemetryStatusResponseId, ServerNodeId());
-
-        hal::Can::Message request;
-        request.push_back(nextSequence++);
-        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
-
-        hal::Can::Message payload;
-        std::chrono::milliseconds elapsed{ 0 };
-        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.empty())
+        const auto sample = RequestTelemetry(timeout);
+        if (!sample)
             return std::nullopt;
-
-        return static_cast<can::FocMotorState>(payload[0]);
+        return sample->state;
     }
 
     bool Fixture::SelectControlMode(can::FocMotorMode mode, std::chrono::milliseconds timeout)

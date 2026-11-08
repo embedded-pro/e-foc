@@ -22,16 +22,12 @@ namespace tool
                 return "Control Mode";
             case can::focSetTorqueSetpointId:
                 return "Torque Setpoint";
+            case can::focSetTorqueSetpointNewtonMeterId:
+                return "Torque Setpoint (N\xC2\xB7m)";
             case can::focSetSpeedSetpointId:
                 return "Speed Setpoint";
             case can::focSetPositionSetpointId:
                 return "Position Setpoint";
-            case can::focSetPidCurrentId:
-                return "Current Loop Bandwidth";
-            case can::focSetPidSpeedId:
-                return "Speed Loop Bandwidth";
-            case can::focSetPidPositionId:
-                return "Position Loop Bandwidth";
             case can::focQueryContractVersionId:
                 return "Firmware Compatibility Check";
             case can::focAlignId:
@@ -40,10 +36,6 @@ namespace tool
                 return "Identify Electrical";
             case can::focRequestTelemetryId:
                 return "Status Request";
-            case can::focSetEncoderResolutionId:
-                return "Encoder Resolution";
-            case can::focConfigureTelemetryRateId:
-                return "Telemetry Rate";
             case can::focSelectAlgorithmId:
                 return "Controller Selection";
             case can::focQueryAlgorithmsId:

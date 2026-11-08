@@ -61,20 +61,11 @@ namespace can
         void OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnSelectControlMode(FocMotorMode mode, const infra::Function<void(FocMotorMode)>& onActivated) override;
-        void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) override;
-        void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) override;
-        void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) override;
-        void OnSetPreciseSetpoint(const FocPreciseSetpoint& setpoint, const infra::Function<void()>& onDone) override;
-        void OnRequestTelemetryPrecise(const infra::Function<void()>& onDone) override;
+        void OnSetSetpoint(const FocSetpoint& setpoint, const infra::Function<void()>& onDone) override;
 
-        void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) override;
-        void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) override;
-        void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnIdentifyElectrical(const infra::Function<void()>& onDone) override;
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
-        void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) override;
-        void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) override;
         void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) override;
         void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) override;
         void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) override;

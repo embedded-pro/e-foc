@@ -160,7 +160,7 @@ namespace tool
 
     QGroupBox* CommandPanel::CreateSetpointGroup(SetpointControls& controls, const char* title, const char* label)
     {
-        controls.axis = &AxisFor(controls.mode, preciseSetpoints);
+        controls.axis = &AxisFor(controls.mode);
         auto* group = new QGroupBox(title);
         auto* layout = new QHBoxLayout(group);
 
@@ -363,26 +363,6 @@ namespace tool
         for (auto& controls : setpoints)
         {
             controls.accepted.reset();
-            RefreshSetpointStatus(controls);
-        }
-    }
-
-    bool CommandPanel::PreciseSetpoints() const
-    {
-        return preciseSetpoints;
-    }
-
-    void CommandPanel::SetPreciseSetpoints(bool precise)
-    {
-        if (precise == preciseSetpoints)
-            return;
-
-        preciseSetpoints = precise;
-        for (auto& controls : setpoints)
-        {
-            controls.axis = &AxisFor(controls.mode, precise);
-            controls.accepted.reset();
-            ApplyAxis(controls);
             RefreshSetpointStatus(controls);
         }
     }

@@ -8,23 +8,17 @@ namespace can
     static constexpr uint8_t focMotorCategoryId = 0x02;
 
     // Retired and never reused: 0x00 QueryMotorType, 0x07 IdentifyMechanical, 0x80 MotorTypeResponse,
-    // 0x87 MechanicalParamsResponse (contract 2.3); 0x88 TelemetryElectrical (contract 2.5)
+    // 0x87 MechanicalParamsResponse (contract 2.3); 0x88 TelemetryElectrical (contract 2.5); 0x03-0x05 SetPid*,
+    // 0x09 SetEncoderResolution, 0x0D ConfigureTelemetryRate, 0x0F-0x11 int16 setpoints, 0x23 RequestTelemetryPrecise,
+    // 0x86 ElectricalParamsResponse (contract 3.0)
     static constexpr uint8_t focStartId = 0x01;
     static constexpr uint8_t focStopId = 0x02;
-    static constexpr uint8_t focSetPidCurrentId = 0x03;
-    static constexpr uint8_t focSetPidSpeedId = 0x04;
-    static constexpr uint8_t focSetPidPositionId = 0x05;
     static constexpr uint8_t focIdentifyElectricalId = 0x06;
     static constexpr uint8_t focRequestTelemetryId = 0x08;
-    static constexpr uint8_t focSetEncoderResolutionId = 0x09;
     static constexpr uint8_t focAlignId = 0x0A;
     static constexpr uint8_t focClearFaultId = 0x0B;
     static constexpr uint8_t focEmergencyStopId = 0x0C;
-    static constexpr uint8_t focConfigureTelemetryRateId = 0x0D;
     static constexpr uint8_t focSelectControlModeId = 0x0E;
-    static constexpr uint8_t focSetTorqueSetpointId = 0x0F;
-    static constexpr uint8_t focSetSpeedSetpointId = 0x10;
-    static constexpr uint8_t focSetPositionSetpointId = 0x11;
     static constexpr uint8_t focQueryContractVersionId = 0x12;
     static constexpr uint8_t focSelectAlgorithmId = 0x13;
     static constexpr uint8_t focQueryAlgorithmsId = 0x14;
@@ -37,16 +31,14 @@ namespace can
     static constexpr uint8_t focClearFaultHistoryId = 0x1C;
     static constexpr uint8_t focRecalibrateId = 0x1D;
     static constexpr uint8_t focResetModelId = 0x1E;
-    static constexpr uint8_t focSetTorqueSetpointPreciseId = 0x1F;
+    static constexpr uint8_t focSetTorqueSetpointId = 0x1F;
     static constexpr uint8_t focSetTorqueSetpointNewtonMeterId = 0x20;
-    static constexpr uint8_t focSetSpeedSetpointPreciseId = 0x21;
-    static constexpr uint8_t focSetPositionSetpointPreciseId = 0x22;
-    static constexpr uint8_t focRequestTelemetryPreciseId = 0x23;
+    static constexpr uint8_t focSetSpeedSetpointId = 0x21;
+    static constexpr uint8_t focSetPositionSetpointId = 0x22;
 
-    static constexpr uint8_t focElectricalParamsResponseId = 0x86;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
     static constexpr uint8_t focTelemetryCurrentsId = 0x8A;
-    static constexpr uint8_t focTelemetryStatusPreciseId = 0x8B;
+    static constexpr uint8_t focTelemetryMotionId = 0x8B;
     static constexpr uint8_t focSelectControlModeResponseId = 0x8E;
     static constexpr uint8_t focContractVersionResponseId = 0x92;
     static constexpr uint8_t focAlgorithmsResponseId = 0x93;
@@ -179,6 +171,7 @@ namespace can
         canNodeId = 0x61,
         canBitrate = 0x62,
         homingRequired = 0x63,
+        telemetryRate = 0x64,
         supervisionWindow = 0x70,
         supervisionCurrentFraction = 0x71,
         supervisionDemandedSpeed = 0x72,
@@ -222,7 +215,7 @@ namespace can
         homed = 0xC2
     };
 
-    enum class FocPreciseSetpointKind : uint8_t
+    enum class FocSetpointKind : uint8_t
     {
         torqueCurrent,
         torqueNewtonMeter,
@@ -230,32 +223,26 @@ namespace can
         position
     };
 
-    enum class FocTelemetryResolution : uint8_t
+    struct FocSetpoint
     {
-        scaled,
-        precise
-    };
-
-    struct FocPreciseSetpoint
-    {
-        FocPreciseSetpointKind kind{ FocPreciseSetpointKind::torqueCurrent };
+        FocSetpointKind kind{ FocSetpointKind::torqueCurrent };
         float value{ 0.0f };
 
-        friend constexpr bool operator==(const FocPreciseSetpoint&, const FocPreciseSetpoint&) = default;
+        friend constexpr bool operator==(const FocSetpoint&, const FocSetpoint&) = default;
     };
 
-    constexpr uint8_t PreciseSetpointCommandId(FocPreciseSetpointKind kind)
+    constexpr uint8_t SetpointCommandId(FocSetpointKind kind)
     {
         switch (kind)
         {
-            case FocPreciseSetpointKind::torqueNewtonMeter:
+            case FocSetpointKind::torqueNewtonMeter:
                 return focSetTorqueSetpointNewtonMeterId;
-            case FocPreciseSetpointKind::speed:
-                return focSetSpeedSetpointPreciseId;
-            case FocPreciseSetpointKind::position:
-                return focSetPositionSetpointPreciseId;
+            case FocSetpointKind::speed:
+                return focSetSpeedSetpointId;
+            case FocSetpointKind::position:
+                return focSetPositionSetpointId;
             default:
-                return focSetTorqueSetpointPreciseId;
+                return focSetTorqueSetpointId;
         }
     }
 
@@ -316,12 +303,6 @@ namespace can
         foc::Ampere peakCurrent{ 0.0f };
     };
 
-    static constexpr int32_t focCurrentScale = 10;
-    static constexpr int32_t focSpeedScale = 1;
-    static constexpr int32_t focPositionScale = 100;
-    static constexpr int32_t focResistanceScale = 1000;
-    static constexpr int32_t focInductanceScale = 1000;
-    static constexpr int32_t focPidScale = 1;
     static constexpr int32_t focStreamCurrentScale = 1000;
     static constexpr int32_t focStreamPositionScale = 10000;
     static constexpr int32_t focRecordedVoltageScale = 100;

@@ -51,19 +51,10 @@ namespace
         MOCK_METHOD(void, OnClearFault, (const infra::Function<void(services::CanAckStatus)>&), (override));
         MOCK_METHOD(void, OnEmergencyStop, (const infra::Function<void(services::CanAckStatus)>&), (override));
         MOCK_METHOD(void, OnSelectControlMode, (can::FocMotorMode, (const infra::Function<void(can::FocMotorMode)>&)), (override));
-        MOCK_METHOD(void, OnSetTorqueSetpoint, (foc::Ampere, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetSpeedSetpoint, (foc::RadiansPerSecond, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetPositionSetpoint, (foc::Radians, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetPreciseSetpoint, (const can::FocPreciseSetpoint&, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnRequestTelemetryPrecise, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnSetPidCurrent, (float, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetPidSpeed, (float, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSetSetpoint, (const can::FocSetpoint&, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnAlign, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnIdentifyElectrical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnSetEncoderResolution, (uint32_t, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnConfigureTelemetryRate, (uint32_t, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSelectAlgorithm, (can::FocControlLoop, uint8_t, (const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
         MOCK_METHOD(void, OnQueryAlgorithms, ((const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
         MOCK_METHOD(void, OnSetParameter, (can::FocParameter, float, (const infra::Function<void(can::FocParameterValue)>&)), (override));
@@ -108,27 +99,11 @@ namespace
             return msg;
         }
 
-        hal::Can::Message MakeSetpointPayload(int16_t wireValue) const
-        {
-            hal::Can::Message msg;
-            msg.resize(3, 0);
-            services::CanFrameCodec::WriteInt16(msg, 1, wireValue);
-            return msg;
-        }
-
         hal::Can::Message MakeModePayload(can::FocMotorMode mode) const
         {
             hal::Can::Message msg;
             msg.resize(2, 0);
             msg[1] = static_cast<uint8_t>(mode);
-            return msg;
-        }
-
-        hal::Can::Message MakeUInt32Payload(uint32_t value) const
-        {
-            hal::Can::Message msg;
-            msg.resize(5, 0);
-            services::CanFrameCodec::WriteUInt32(msg, 1, value);
             return msg;
         }
 
@@ -198,51 +173,6 @@ TEST_F(FocMotorCategoryServerTest, HandleStop_InvokesOnStopObserver)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetTorqueSetpoint_DecodesCurrentCorrectly)
-{
-    foc::Ampere received{ 0.0f };
-    EXPECT_CALL(observer, OnSetTorqueSetpoint(_, _))
-        .WillOnce(Invoke([&received](foc::Ampere val, const infra::Function<void()>& done)
-            {
-                received = val;
-                done();
-            }));
-
-    server.HandleMessage(can::focSetTorqueSetpointId, MakeSetpointPayload(15));
-
-    EXPECT_NEAR(received.Value(), 15.0f / can::focCurrentScale, 0.001f);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetSpeedSetpoint_DecodesSpeedCorrectly)
-{
-    foc::RadiansPerSecond received{ 0.0f };
-    EXPECT_CALL(observer, OnSetSpeedSetpoint(_, _))
-        .WillOnce(Invoke([&received](foc::RadiansPerSecond val, const infra::Function<void()>& done)
-            {
-                received = val;
-                done();
-            }));
-
-    server.HandleMessage(can::focSetSpeedSetpointId, MakeSetpointPayload(300));
-
-    EXPECT_NEAR(received.Value(), 300.0f / can::focSpeedScale, 0.01f);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPositionSetpoint_DecodesPositionCorrectly)
-{
-    foc::Radians received{ 0.0f };
-    EXPECT_CALL(observer, OnSetPositionSetpoint(_, _))
-        .WillOnce(Invoke([&received](foc::Radians val, const infra::Function<void()>& done)
-            {
-                received = val;
-                done();
-            }));
-
-    server.HandleMessage(can::focSetPositionSetpointId, MakeSetpointPayload(314));
-
-    EXPECT_NEAR(received.Value(), 314.0f / can::focPositionScale, 0.001f);
-}
-
 TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_ValidMode_InvokesObserver)
 {
     can::FocMotorMode received{ can::FocMotorMode::torque };
@@ -272,27 +202,13 @@ TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_InvalidMode_IsRejecte
 
 TEST_F(FocMotorCategoryServerTest, SendCategoryError_EmitsCategoryErrorFrame)
 {
-    server.SendCategoryError(can::focSetPidCurrentId, can::FocMotorCategoryError::applicationError);
+    server.SendCategoryError(can::focSetParameterId, can::FocMotorCategoryError::applicationError);
 
     EXPECT_TRUE(categoryErrorSent);
-    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focSetPidCurrentId);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focSetParameterId);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ParsesBandwidthAndInvokesObserver)
-{
-    EXPECT_CALL(observer, OnSetPidCurrent(_, _))
-        .WillOnce(Invoke([](float, const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focSetPidCurrentId, MakeSetpointPayload(1000));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
 TEST_F(FocMotorCategoryServerTest, HandleClearFault_InvokesOnClearFaultObserver)
@@ -323,24 +239,6 @@ TEST_F(FocMotorCategoryServerTest, HandleEmergencyStop_InvokesOnEmergencyStopObs
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetTorqueSetpoint_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetTorqueSetpointId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetSpeedSetpoint_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetSpeedSetpointId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPositionSetpoint_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPositionSetpointId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
 TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
 {
     EXPECT_CALL(observer, OnIdentifyElectrical(_))
@@ -355,21 +253,21 @@ TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_DecodesEachKindAndAcknowledgesUnderItsOwnCommand)
+TEST_F(FocMotorCategoryServerTest, HandleSetSetpoint_DecodesEachKindAndAcknowledgesUnderItsOwnCommand)
 {
     struct Case
     {
         uint8_t id;
-        can::FocPreciseSetpointKind kind;
+        can::FocSetpointKind kind;
         std::vector<uint8_t> bytes;
         float value;
     };
 
     const Case cases[]{
-        { can::focSetTorqueSetpointPreciseId, can::FocPreciseSetpointKind::torqueCurrent, { 0x3A, 0x03, 0x12, 0x6F }, 0.0005f },
-        { can::focSetTorqueSetpointNewtonMeterId, can::FocPreciseSetpointKind::torqueNewtonMeter, { 0x3D, 0xCC, 0xCC, 0xCD }, 0.1f },
-        { can::focSetSpeedSetpointPreciseId, can::FocPreciseSetpointKind::speed, { 0x40, 0x50, 0x00, 0x00 }, 3.25f },
-        { can::focSetPositionSetpointPreciseId, can::FocPreciseSetpointKind::position, { 0xBF, 0xC0, 0x00, 0x00 }, -1.5f },
+        { can::focSetTorqueSetpointId, can::FocSetpointKind::torqueCurrent, { 0x3A, 0x03, 0x12, 0x6F }, 0.0005f },
+        { can::focSetTorqueSetpointNewtonMeterId, can::FocSetpointKind::torqueNewtonMeter, { 0x3D, 0xCC, 0xCC, 0xCD }, 0.1f },
+        { can::focSetSpeedSetpointId, can::FocSetpointKind::speed, { 0x40, 0x50, 0x00, 0x00 }, 3.25f },
+        { can::focSetPositionSetpointId, can::FocSetpointKind::position, { 0xBF, 0xC0, 0x00, 0x00 }, -1.5f },
     };
 
     for (const auto& item : cases)
@@ -379,7 +277,7 @@ TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_DecodesEachKindAndAc
         for (const auto byte : item.bytes)
             payload.push_back(byte);
 
-        EXPECT_CALL(observer, OnSetPreciseSetpoint(can::FocPreciseSetpoint{ item.kind, item.value }, _)).WillOnce(InvokeArgument<1>());
+        EXPECT_CALL(observer, OnSetSetpoint(can::FocSetpoint{ item.kind, item.value }, _)).WillOnce(InvokeArgument<1>());
         ackSpy.Reset();
 
         server.HandleMessage(item.id, payload);
@@ -390,7 +288,7 @@ TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_DecodesEachKindAndAc
     }
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_RejectsNonFiniteValuesAndWrongLengths)
+TEST_F(FocMotorCategoryServerTest, HandleSetSetpoint_RejectsNonFiniteValuesAndWrongLengths)
 {
     const std::vector<std::vector<uint8_t>> frames{
         { 0x00, 0x7F, 0xC0, 0x00, 0x00 },
@@ -400,7 +298,7 @@ TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_RejectsNonFiniteValu
         { 0x00, 0x40, 0x50, 0x00, 0x00, 0x00 },
     };
 
-    for (const auto id : { can::focSetTorqueSetpointPreciseId, can::focSetTorqueSetpointNewtonMeterId, can::focSetSpeedSetpointPreciseId, can::focSetPositionSetpointPreciseId })
+    for (const auto id : { can::focSetTorqueSetpointId, can::focSetTorqueSetpointNewtonMeterId, can::focSetSpeedSetpointId, can::focSetPositionSetpointId })
         for (const auto& bytes : frames)
         {
             hal::Can::Message payload;
@@ -411,22 +309,27 @@ TEST_F(FocMotorCategoryServerTest, HandleSetPreciseSetpoint_RejectsNonFiniteValu
         }
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleRequestTelemetryPrecise_InvokesObserverAndAcknowledges)
+TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryStatus_SendsStateThenFaultCode)
 {
-    EXPECT_CALL(observer, OnRequestTelemetryPrecise(_)).WillOnce(InvokeArgument<0>());
+    server.BroadcastTelemetryStatus(can::FocMotorState::running, can::FocFaultCode::stall);
 
-    server.HandleMessage(can::focRequestTelemetryPreciseId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->commandType, can::focRequestTelemetryPreciseId);
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ static_cast<uint8_t>(can::FocMotorState::running), static_cast<uint8_t>(can::FocFaultCode::stall) }));
 }
 
-TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryStatusPrecise_SendsSpeedThenPositionAsFloats)
+TEST_F(FocMotorCategoryServerTest, BroadcastFaultStatus_SendsTheFaultStateAndCode)
 {
-    server.BroadcastTelemetryStatusPrecise(foc::RadiansPerSecond{ 3.25f }, foc::Radians{ 1.5f });
+    server.BroadcastFaultStatus(can::FocFaultCode::overCurrent);
 
-    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusPreciseId);
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ static_cast<uint8_t>(can::FocMotorState::fault), static_cast<uint8_t>(can::FocFaultCode::overCurrent) }));
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastTelemetryMotion_SendsSpeedThenPositionAsFloats)
+{
+    server.BroadcastTelemetryMotion(foc::RadiansPerSecond{ 3.25f }, foc::Radians{ 1.5f });
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryMotionId);
     ASSERT_EQ(lastSentMsg.size(), 8u);
     EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentMsg, 0)), 3.25f);
     EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentMsg, 4)), 1.5f);
@@ -441,92 +344,6 @@ TEST_F(FocMotorCategoryServerTest, HandleRequestTelemetry_InvokesObserver)
             }));
 
     server.HandleMessage(can::focRequestTelemetryId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ParsesBandwidthAndInvokesObserver)
-{
-    EXPECT_CALL(observer, OnSetPidSpeed(_, _))
-        .WillOnce(Invoke([](float, const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focSetPidSpeedId, MakeSetpointPayload(100));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ParsesBandwidthAndInvokesObserver)
-{
-    EXPECT_CALL(observer, OnSetPidPosition(_, _))
-        .WillOnce(Invoke([](float, const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focSetPidPositionId, MakeSetpointPayload(18));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidCurrentId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidSpeedId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidPositionId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ShortPayload_IsRejected)
-{
-    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1)));
-    EXPECT_FALSE(ackSpy.last.has_value());
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ParsesResolutionAndInvokesObserver)
-{
-    EXPECT_CALL(observer, OnSetEncoderResolution(4000u, _))
-        .WillOnce(Invoke([](uint32_t, const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focSetEncoderResolutionId, MakeUInt32Payload(4000));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ParsesRateAndInvokesObserver)
-{
-    EXPECT_CALL(observer, OnConfigureTelemetryRate(100u, _))
-        .WillOnce(Invoke([](uint32_t, const infra::Function<void()>& done)
-            {
-                done();
-            }));
-
-    server.HandleMessage(can::focConfigureTelemetryRateId, MakeUInt32Payload(100));
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);

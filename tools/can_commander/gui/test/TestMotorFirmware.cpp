@@ -92,7 +92,7 @@ namespace
         void BringCompatible(uint16_t node = 1)
         {
             Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, node, {});
-            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, CanCommandClient::firmwareContractMinor });
+            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, can::focContractVersionMinor });
         }
 
         void StoppedOn(const e_foc::boards::Board& board, services::FirmwareVersion staged = {})
@@ -194,6 +194,17 @@ TEST_F(TestMotorFirmware, download_and_apply_are_disabled_while_the_motor_runs)
     EXPECT_TRUE(Button(applyButton).toolTip().contains("Stop the motor first"));
 }
 
+TEST_F(TestMotorFirmware, a_motor_on_another_contract_version_is_offered_the_download_without_its_state)
+{
+    Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, 1, {});
+    Receive(can::focMotorCategoryId, can::focContractVersionResponseId, 1, { 2, 21 });
+    firmware.OnFirmwareIdentity(FirmwareIdentity{ { 1, 6, 0 }, e_foc::boards::ekTm4c1294xl.kind, {} });
+
+    EXPECT_TRUE(firmware.OfferPackFile(pack, "release 1.7.0"));
+
+    EXPECT_TRUE(Button(downloadButton).isEnabled());
+}
+
 TEST_F(TestMotorFirmware, download_and_apply_are_disabled_while_the_motor_has_a_command_pending)
 {
     StoppedOn(e_foc::boards::ekTm4c1294xl, { 1, 7, 0 });
@@ -286,7 +297,7 @@ TEST_F(TestMotorFirmware, the_emergency_stop_stays_available_to_a_motor_during_i
     MotorPanel panel{ client, transfer, 1, [](IssueSeverity, const QString&) {} };
     panel.SetBusConnected(true);
     BringCompatible();
-    panel.OnContractVersion(can::focContractVersionMajor, CanCommandClient::firmwareContractMinor, true);
+    panel.OnContractVersion(can::focContractVersionMajor, can::focContractVersionMinor, true);
     ASSERT_TRUE(transfer.StartDownload(1, *InspectPack(pack, *BoardOfKind(e_foc::boards::ekTm4c1294xl.kind)).pack));
 
     EXPECT_TRUE(panel.AcceptsEmergencyStop());

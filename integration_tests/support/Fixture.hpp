@@ -73,6 +73,15 @@ namespace integration
         uint8_t nextSequence{ 0 };
 
     private:
+        struct TelemetrySample
+        {
+            can::FocMotorState state;
+            can::FocFaultCode fault;
+            float speed;
+            float position;
+        };
+
+        std::optional<TelemetrySample> RequestTelemetry(std::chrono::milliseconds timeout);
         void RequestStatus();
         std::optional<uint16_t> FindHeartbeatNode(CaptureMark from) const;
 

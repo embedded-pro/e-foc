@@ -306,15 +306,13 @@ THEN(R"(the drive reports the version of its build and its board kind)")
 THEN(R"(setting the telemetry rate to {int} Hz is refused as busy)", (int rateHz))
 {
     auto& fixture = context.Get<Fixture>();
-    services::CanPayloadWriter payload;
-    payload.WriteUInt32(static_cast<uint32_t>(rateHz));
 
     const auto mark = fixture.MarkCapture();
-    EXPECT_FALSE(fixture.SendCanCommand(can::focMotorCategoryId, can::focConfigureTelemetryRateId, payload.Message())) << "The telemetry rate was accepted";
+    EXPECT_FALSE(WriteParameter(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz))) << "The telemetry rate was accepted";
 
     const auto error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
     ASSERT_TRUE(error.has_value() && error->size() == 2) << "The drive sent no category error";
-    EXPECT_EQ((*error)[0], can::focConfigureTelemetryRateId);
+    EXPECT_EQ((*error)[0], can::focSetParameterId);
     EXPECT_EQ((*error)[1], static_cast<uint8_t>(can::FocMotorCategoryError::busy));
 }
 

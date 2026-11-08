@@ -11,6 +11,7 @@ namespace tool
             switch (commandType)
             {
                 case can::focSetTorqueSetpointId:
+                case can::focSetTorqueSetpointNewtonMeterId:
                     return "torque";
                 case can::focSetSpeedSetpointId:
                     return "speed";

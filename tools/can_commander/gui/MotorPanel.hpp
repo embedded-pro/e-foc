@@ -49,7 +49,6 @@ namespace tool
         void OnMotorStatus(FocMotorState state, FocFaultCode fault);
         void OnCurrentStream(float idCurrent, float iqCurrent, float position);
         void OnSpeedPosition(float speed, float position);
-        void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnAlgorithms(const can::FocAlgorithms& algorithms);
         void OnParameter(can::FocParameter parameter, can::FocParameterValue value);
         void OnFaultRecord(const can::FocFaultRecord& record);
@@ -84,22 +83,10 @@ namespace tool
         void Report(IssueSeverity severity, const QString& message) const;
         void ForgetNodeState();
         QString CommandsUnavailableReason() const;
+        QString FirmwareUnavailableReason() const;
         QString SettingsUnavailableReason() const;
-        QString DiagnosticsUnavailableReason() const;
-        QString SupervisionUnavailableReason() const;
-        QString LimitsUnavailableReason() const;
-        QString TargetWindowUnavailableReason() const;
-        QString TravelLimitsUnavailableReason() const;
-        QString HomingUnavailableReason() const;
-        QString CoulombFrictionUnavailableReason() const;
-        QString ThermalUnavailableReason() const;
-        QString OverTemperatureUnavailableReason() const;
-        QString BusVoltageLimitsUnavailableReason() const;
-        QString FaultHistoryUnavailableReason() const;
-        QString RecalibrationModeUnavailableReason() const;
         QString RecalibrateUnavailableReason() const;
         QString ResetModelUnavailableReason() const;
-        QString NeedsContract(uint8_t minor) const;
         void Refresh();
         void RefreshHeader();
 
@@ -111,7 +98,6 @@ namespace tool
         void OnChangeAccepted();
         void StopApplying(const QString& reason, bool currentSent = true);
         void ForgetControlMode();
-        bool IsLegacy() const;
 
         CanCommandClient& client;
         FirmwareTransfer& transfer;

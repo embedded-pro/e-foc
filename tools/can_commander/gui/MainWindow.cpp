@@ -805,12 +805,6 @@ namespace tool
     void MainWindow::OnFaultEventReceived(uint16_t, FocFaultCode)
     {}
 
-    void MainWindow::OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
-    {
-        if (auto* motor = Motor(nodeId))
-            motor->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
-    }
-
     void MainWindow::OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms)
     {
         if (auto* motor = Motor(nodeId))

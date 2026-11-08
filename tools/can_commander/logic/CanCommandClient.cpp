@@ -1,7 +1,5 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
-#include "can-lite/core/CanPayload.hpp"
-#include "core/can/FocMotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
 #include <cmath>
@@ -14,13 +12,6 @@ namespace tool
 
     namespace
     {
-        bool IsRecalibrationParameter(can::FocParameter parameter)
-        {
-            const auto id = static_cast<uint8_t>(parameter);
-            return parameter == can::FocParameter::recalibrationMode ||
-                   (id >= static_cast<uint8_t>(can::FocParameter::modelResistance) && id <= static_cast<uint8_t>(can::FocParameter::recalibrationsRejected));
-        }
-
         constexpr std::array<can::FocParameter, 7> identityParameters{
             can::FocParameter::firmwareVersionMajor,
             can::FocParameter::firmwareVersionMinor,
@@ -39,23 +30,6 @@ namespace tool
             if (slot == identityParameters.end())
                 return std::nullopt;
             return static_cast<std::size_t>(slot - identityParameters.begin());
-        }
-
-        // The acknowledge and the refusal of a precise command name the precise id; the rest of the tool knows the scaled one.
-        uint8_t ScaledCommandOf(uint8_t commandType)
-        {
-            switch (commandType)
-            {
-                case can::focSetTorqueSetpointPreciseId:
-                case can::focSetTorqueSetpointNewtonMeterId:
-                    return can::focSetTorqueSetpointId;
-                case can::focSetSpeedSetpointPreciseId:
-                    return can::focSetSpeedSetpointId;
-                case can::focSetPositionSetpointPreciseId:
-                    return can::focSetPositionSetpointId;
-                default:
-                    return commandType;
-            }
         }
 
         uint8_t VersionNumber(const std::optional<float>& value)
@@ -106,84 +80,9 @@ namespace tool
         return focClient.CategoryClient().Compatibility(nodeId);
     }
 
-    bool CanCommandClient::SupportsSettings(uint16_t nodeId) const
+    bool CanCommandClient::IsCompatible(uint16_t nodeId) const
     {
-        return SupportsMinor(nodeId, settingsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsDiagnostics(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, diagnosticsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsSupervision(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, supervisionContractMinor);
-    }
-
-    bool CanCommandClient::SupportsFirmwareIdentity(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, firmwareContractMinor);
-    }
-
-    bool CanCommandClient::SupportsLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, limitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsTargetWindow(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, targetWindowContractMinor);
-    }
-
-    bool CanCommandClient::SupportsTravelLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, travelLimitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsThermal(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, thermalContractMinor);
-    }
-
-    bool CanCommandClient::SupportsOverTemperature(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, overTemperatureContractMinor);
-    }
-
-    bool CanCommandClient::SupportsBusVoltageLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, busVoltageLimitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsFaultHistory(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, faultHistoryContractMinor);
-    }
-
-    bool CanCommandClient::SupportsRecalibration(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, recalibrationContractMinor);
-    }
-
-    bool CanCommandClient::SupportsStoredRecalibration(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, storedRecalibrationContractMinor);
-    }
-
-    bool CanCommandClient::SupportsHoming(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, homedContractMinor);
-    }
-
-    bool CanCommandClient::SupportsPreciseSetpoints(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, preciseSetpointContractMinor);
-    }
-
-    bool CanCommandClient::SupportsCoulombFriction(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, frictionCoulombContractMinor);
+        return Compatibility(nodeId) == can::ContractCompatibility::compatible;
     }
 
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
@@ -194,44 +93,6 @@ namespace tool
     const can::CanFrameOrigin& CanCommandClient::FrameOrigin() const
     {
         return focClient.Origin();
-    }
-
-    bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
-    {
-        const auto minor = contractMinors.find(nodeId);
-        return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= minimumMinor;
-    }
-
-    bool CanCommandClient::SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const
-    {
-        if (parameter == can::FocParameter::positionWindow || parameter == can::FocParameter::positionWindowTime)
-            return SupportsTargetWindow(nodeId);
-        if (parameter == can::FocParameter::positionMinimum || parameter == can::FocParameter::positionMaximum)
-            return SupportsTravelLimits(nodeId);
-        if (parameter == can::FocParameter::calibrationTemperature)
-            return SupportsThermal(nodeId);
-        if (parameter == can::FocParameter::temperatureLimit || parameter == can::FocParameter::temperatureMargin)
-            return SupportsOverTemperature(nodeId);
-        if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
-            return SupportsBusVoltageLimits(nodeId);
-        if (parameter == can::FocParameter::homed || parameter == can::FocParameter::homingRequired)
-            return SupportsHoming(nodeId);
-        if (parameter == can::FocParameter::frictionCoulomb)
-            return SupportsCoulombFriction(nodeId);
-        if (parameter == can::FocParameter::recalibrationsStored)
-            return SupportsStoredRecalibration(nodeId);
-        if (IsRecalibrationParameter(parameter))
-            return SupportsRecalibration(nodeId);
-
-        switch (can::GroupOf(parameter))
-        {
-            case can::ParameterGroup::supervision:
-                return SupportsSupervision(nodeId);
-            case can::ParameterGroup::limits:
-                return SupportsLimits(nodeId);
-            default:
-                return true;
-        }
     }
 
     infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
@@ -332,71 +193,32 @@ namespace tool
             });
     }
 
-    bool CanCommandClient::SendSetpoint(uint16_t nodeId, uint8_t scaledCommand, can::FocPreciseSetpointKind kind, float value)
+    bool CanCommandClient::SendSetpoint(uint16_t nodeId, can::FocSetpointKind kind, float value)
     {
-        return Tracked(nodeId, scaledCommand, [&]()
+        return Tracked(nodeId, can::SetpointCommandId(kind), [this, nodeId, kind, value]()
             {
-                auto& category = focClient.CategoryClient();
-                if (SupportsPreciseSetpoints(nodeId))
-                    return category.SendSetPreciseSetpoint(nodeId, can::FocPreciseSetpoint{ kind, value });
-
-                switch (kind)
-                {
-                    case can::FocPreciseSetpointKind::speed:
-                        return category.SendSetSpeedSetpoint(nodeId, foc::RadiansPerSecond{ value });
-                    case can::FocPreciseSetpointKind::position:
-                        return category.SendSetPositionSetpoint(nodeId, foc::Radians{ value });
-                    default:
-                        return category.SendSetTorqueSetpoint(nodeId, foc::Ampere{ value });
-                }
+                return focClient.CategoryClient().SendSetpoint(nodeId, can::FocSetpoint{ kind, value });
             });
     }
 
     bool CanCommandClient::SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent)
     {
-        return SendSetpoint(nodeId, can::focSetTorqueSetpointId, can::FocPreciseSetpointKind::torqueCurrent, iqCurrent);
+        return SendSetpoint(nodeId, can::FocSetpointKind::torqueCurrent, iqCurrent);
     }
 
     bool CanCommandClient::SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec)
     {
-        return SendSetpoint(nodeId, can::focSetSpeedSetpointId, can::FocPreciseSetpointKind::speed, speedRadPerSec);
+        return SendSetpoint(nodeId, can::FocSetpointKind::speed, speedRadPerSec);
     }
 
     bool CanCommandClient::SendSetPositionSetpoint(uint16_t nodeId, float positionRad)
     {
-        return SendSetpoint(nodeId, can::focSetPositionSetpointId, can::FocPreciseSetpointKind::position, positionRad);
+        return SendSetpoint(nodeId, can::FocSetpointKind::position, positionRad);
     }
 
     bool CanCommandClient::SendSetTorqueSetpointNewtonMeter(uint16_t nodeId, float torqueNewtonMeter)
     {
-        if (!SupportsPreciseSetpoints(nodeId))
-            return false;
-
-        return SendSetpoint(nodeId, can::focSetTorqueSetpointId, can::FocPreciseSetpointKind::torqueNewtonMeter, torqueNewtonMeter);
-    }
-
-    bool CanCommandClient::SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return Tracked(nodeId, can::focSetPidCurrentId, [&]()
-            {
-                return focClient.CategoryClient().SendSetCurrentBandwidth(nodeId, bandwidth);
-            });
-    }
-
-    bool CanCommandClient::SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return Tracked(nodeId, can::focSetPidSpeedId, [&]()
-            {
-                return focClient.CategoryClient().SendSetSpeedBandwidth(nodeId, bandwidth);
-            });
-    }
-
-    bool CanCommandClient::SendSetPositionBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return Tracked(nodeId, can::focSetPidPositionId, [&]()
-            {
-                return focClient.CategoryClient().SendSetPositionBandwidth(nodeId, bandwidth);
-            });
+        return SendSetpoint(nodeId, can::FocSetpointKind::torqueNewtonMeter, torqueNewtonMeter);
     }
 
     bool CanCommandClient::SendClearFault(uint16_t nodeId)
@@ -471,14 +293,6 @@ namespace tool
             });
     }
 
-    bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
-    {
-        return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
-            {
-                return focClient.CategoryClient().SendSetEncoderResolution(nodeId, countsPerRevolution);
-            });
-    }
-
     bool CanCommandClient::SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm)
     {
         return Tracked(nodeId, can::focSelectAlgorithmId, [this, nodeId, loop, algorithm]()
@@ -502,28 +316,28 @@ namespace tool
 
     void CanCommandClient::RequestSettings(uint16_t nodeId)
     {
-        if (!SupportsSettings(nodeId))
+        if (!IsCompatible(nodeId))
             return;
 
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
         for (const auto& descriptor : can::focParameters)
-            if (!descriptor.readOnly && SupportsSetting(nodeId, descriptor.id))
+            if (!descriptor.readOnly)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
     void CanCommandClient::RequestReadings(uint16_t nodeId)
     {
-        if (!SupportsDiagnostics(nodeId))
+        if (!IsCompatible(nodeId))
             return;
 
         for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && descriptor.id != can::FocParameter::homed && SupportsSetting(nodeId, descriptor.id))
+            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature && descriptor.id != can::FocParameter::homed)
                 QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
     void CanCommandClient::RequestFaultHistory(uint16_t nodeId)
     {
-        if (!SupportsFaultHistory(nodeId))
+        if (!IsCompatible(nodeId))
             return;
 
         for (uint8_t age = 0; age != can::focFaultHistoryDepth; ++age)
@@ -532,7 +346,7 @@ namespace tool
 
     void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
     {
-        if (!SupportsFirmwareIdentity(nodeId) || IsIdentityQueued(nodeId))
+        if (Compatibility(nodeId) == can::ContractCompatibility::unknown || IsIdentityQueued(nodeId))
             return;
 
         identities.erase(nodeId);
@@ -600,18 +414,13 @@ namespace tool
 
     void CanCommandClient::RequestStatus(uint16_t nodeId)
     {
-        if (Compatibility(nodeId) != can::ContractCompatibility::compatible)
+        if (!IsCompatible(nodeId))
             return;
 
         QueueRead(nodeId, Read{ can::focRequestTelemetryId });
-        if (SupportsTargetWindow(nodeId))
-            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
-        if (SupportsThermal(nodeId))
-            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
-        if (SupportsHoming(nodeId))
-            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::homed });
-        if (SupportsPreciseSetpoints(nodeId))
-            QueueRead(nodeId, Read{ can::focRequestTelemetryPreciseId });
+        QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
+        QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
+        QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::homed });
     }
 
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
@@ -661,8 +470,6 @@ namespace tool
                 return category.SendQueryParameter(nodeId, read.parameter);
             case can::focQueryFaultHistoryId:
                 return category.SendQueryFaultHistory(nodeId, read.age);
-            case can::focRequestTelemetryPreciseId:
-                return category.SendRequestTelemetry(nodeId, can::FocTelemetryResolution::precise);
             default:
                 return category.SendRequestTelemetry(nodeId);
         }
@@ -695,7 +502,7 @@ namespace tool
     bool CanCommandClient::IsRead(uint8_t commandType)
     {
         return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId ||
-               commandType == can::focRequestTelemetryPreciseId || commandType == can::focQueryFaultHistoryId;
+               commandType == can::focQueryFaultHistoryId;
     }
 
     void CanCommandClient::OnAccepted(uint16_t nodeId, uint8_t commandType)
@@ -781,9 +588,8 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t wireCommandId, can::FocMotorCategoryError errorCode)
+    void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode)
     {
-        const auto originCommandId = ScaledCommandOf(wireCommandId);
         if (IsRead(originCommandId))
         {
             CompleteRead(nodeId, originCommandId);
@@ -797,12 +603,21 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg)
+    void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, can::FocMotorState state, can::FocFaultCode fault)
     {
-        DecodeTelemetryStatus(nodeId, msg);
+        NotifyObservers([nodeId, state, fault](auto& observer)
+            {
+                observer.OnMotorStatusReceived(nodeId, state, fault);
+            });
+
+        if (fault != FocFaultCode::none)
+            NotifyObservers([nodeId, fault](auto& observer)
+                {
+                    observer.OnFaultEventReceived(nodeId, fault);
+                });
     }
 
-    void CanCommandClient::OnTelemetryStatusPrecise(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position)
+    void CanCommandClient::OnTelemetryMotion(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position)
     {
         NotifyObservers([nodeId, speed, position](auto& observer)
             {
@@ -820,8 +635,7 @@ namespace tool
 
     void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
     {
-        const bool compatible = major == can::focContractVersionMajor;
-        contractMinors[nodeId] = minor;
+        const bool compatible = can::IsCompatibleContract(major, minor);
 
         NotifyObservers([nodeId, major, minor, compatible](auto& observer)
             {
@@ -833,14 +647,6 @@ namespace tool
         RequestFaultHistory(nodeId);
         RequestFirmwareIdentity(nodeId);
         RequestStatus(nodeId);
-    }
-
-    void CanCommandClient::OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
-    {
-        NotifyObservers([nodeId, resistance, inductance, polePairs](auto& observer)
-            {
-                observer.OnElectricalParametersReceived(nodeId, resistance.Value(), inductance.Value(), polePairs);
-            });
     }
 
     void CanCommandClient::OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms)
@@ -882,35 +688,6 @@ namespace tool
             });
     }
 
-    void CanCommandClient::DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const
-    {
-        if (!can::PayloadExact(msg, can::focTelemetryStatusResponseId))
-            return;
-
-        services::CanPayloadReader reader{ msg };
-        const auto state = static_cast<FocMotorState>(reader.ReadUInt8());
-        const auto fault = static_cast<FocFaultCode>(reader.ReadUInt8());
-        const auto speed = reader.ReadFixed16(can::focSpeedScale);
-        const auto position = reader.ReadFixed16(can::focPositionScale);
-
-        NotifyObservers([nodeId, state, fault](auto& observer)
-            {
-                observer.OnMotorStatusReceived(nodeId, state, fault);
-            });
-        if (!SupportsPreciseSetpoints(nodeId))
-            NotifyObservers([nodeId, speed, position](auto& observer)
-                {
-                    observer.OnSpeedPositionReceived(nodeId, speed, position);
-                });
-        if (fault != FocFaultCode::none)
-        {
-            NotifyObservers([nodeId, fault](auto& observer)
-                {
-                    observer.OnFaultEventReceived(nodeId, fault);
-                });
-        }
-    }
-
     bool CanCommandClient::HandleCommandAck(uint32_t id, const services::CanFrame& data)
     {
         if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
@@ -918,7 +695,7 @@ namespace tool
 
         const auto nodeId = static_cast<uint16_t>(ExtractCanNodeId(id));
         const uint8_t ackCategory = data[0];
-        const uint8_t ackMsgType = ScaledCommandOf(data[1]);
+        const uint8_t ackMsgType = data[1];
         const auto ackStatus = static_cast<CanAckStatus>(data[2]);
 
         if (ackCategory == can::focMotorCategoryId && IsRead(ackMsgType))
@@ -950,7 +727,7 @@ namespace tool
             MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
 
             const uint8_t msgType = ExtractCanMessageType(id);
-            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryStatusPreciseId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
+            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryMotionId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
         }
 
         if (!consumed)

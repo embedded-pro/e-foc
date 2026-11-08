@@ -1,5 +1,6 @@
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorMessages.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/Fixture.hpp"
@@ -11,10 +12,10 @@ using namespace integration;
 
 namespace
 {
-    hal::Can::Message EncodeFixed16BE(float value, int32_t scale)
+    hal::Can::Message EncodeFloat32(float value)
     {
         services::CanPayloadWriter payload;
-        payload.WriteFixed16(value, scale);
+        can::WriteFloat32(payload, value);
         return payload.Message();
     }
 }
@@ -53,7 +54,7 @@ WHEN(R"(a torque setpoint of {float} A is applied)", (float iq))
     auto& setup = context.Get<ScenarioSetup>();
     const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetTorqueSetpointId,
-        EncodeFixed16BE(iq, can::focCurrentScale)))
+        EncodeFloat32(iq)))
         << "Torque setpoint command rejected";
     setup.lastSetpoint = Setpoint{ can::focSetTorqueSetpointId, iq, fixture.ServerNodeId(), commandsBefore };
 }
@@ -64,7 +65,7 @@ WHEN(R"(a speed setpoint of {float} rad\/s is applied)", (float radiansPerSecond
     auto& setup = context.Get<ScenarioSetup>();
     const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId,
-        EncodeFixed16BE(radiansPerSecond, can::focSpeedScale)))
+        EncodeFloat32(radiansPerSecond)))
         << "Speed setpoint command rejected";
     setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, radiansPerSecond, fixture.ServerNodeId(), commandsBefore };
 }
@@ -75,7 +76,7 @@ WHEN(R"(a position setpoint of {float} rad is applied)", (float rad))
     auto& setup = context.Get<ScenarioSetup>();
     const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetPositionSetpointId,
-        EncodeFixed16BE(rad, can::focPositionScale)))
+        EncodeFloat32(rad)))
         << "Position setpoint command rejected";
     setup.lastSetpoint = Setpoint{ can::focSetPositionSetpointId, rad, fixture.ServerNodeId(), commandsBefore };
 }
@@ -84,7 +85,7 @@ THEN(R"(a position setpoint of {float} rad shall be refused)", (float rad))
 {
     auto& fixture = context.Get<Fixture>();
     EXPECT_FALSE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetPositionSetpointId,
-        EncodeFixed16BE(rad, can::focPositionScale)))
+        EncodeFloat32(rad)))
         << "The target accepted a position setpoint of " << rad << " rad";
 }
 

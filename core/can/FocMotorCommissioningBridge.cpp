@@ -140,11 +140,6 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
 
-        server.BroadcastElectricalParams(
-            foc::Ohm{ data.rPhase },
-            foc::MilliHenry{ data.lD },
-            static_cast<std::size_t>(data.polePairs));
-
         controlMode.CmdCompleteExternalCalibration(data,
             [this](state_machine::CommandResult result)
             {

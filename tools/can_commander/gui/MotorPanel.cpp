@@ -11,7 +11,6 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <chrono>
-#include <cmath>
 #include <utility>
 
 namespace tool
@@ -60,7 +59,7 @@ namespace tool
             },
             [this]()
             {
-                return CommandsUnavailableReason();
+                return FirmwareUnavailableReason();
             },
             this);
         connect(firmware, &MotorFirmware::StatusChanged, this, &MotorPanel::StatusChanged);
@@ -230,7 +229,7 @@ namespace tool
 
     void MotorPanel::SendSetpoint(can::FocMotorMode mode, int32_t counts)
     {
-        const auto& axis = AxisFor(mode, commandPanel->PreciseSetpoints());
+        const auto& axis = AxisFor(mode);
         const auto value = axis.SiOf(counts);
         pendingSetpoint = PendingSetpoint{ mode, counts };
         if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(axis, counts)), SetpointCommandOf(mode), [this, mode, value]()
@@ -399,7 +398,7 @@ namespace tool
     void MotorPanel::SendCurrentChange()
     {
         const auto change = changes.Current();
-        if (!Send(Describe(change), CommandTypeOf(change, IsLegacy()), [this, change]()
+        if (!Send(Describe(change), CommandTypeOf(change), [this, change]()
                 {
                     return SendChange(change);
                 }))
@@ -411,22 +410,7 @@ namespace tool
         if (change.kind == SettingChange::Kind::algorithm)
             return client.SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
 
-        if (!IsLegacy())
-            return client.SendSetParameter(nodeId, change.parameter, change.value);
-
-        switch (change.parameter)
-        {
-            case can::FocParameter::currentBandwidth:
-                return client.SendSetCurrentBandwidth(nodeId, change.value);
-            case can::FocParameter::speedBandwidth:
-                return client.SendSetSpeedBandwidth(nodeId, change.value);
-            case can::FocParameter::positionBandwidth:
-                return client.SendSetPositionBandwidth(nodeId, change.value);
-            case can::FocParameter::encoderResolution:
-                return client.SendSetEncoderResolution(nodeId, static_cast<uint32_t>(std::lround(change.value)));
-            default:
-                return false;
-        }
+        return client.SendSetParameter(nodeId, change.parameter, change.value);
     }
 
     QString MotorPanel::Describe(const SettingChange& change) const
@@ -441,15 +425,11 @@ namespace tool
 
     bool MotorPanel::IsChangeAnswer(uint8_t commandType) const
     {
-        return changes.Active() && commandType == CommandTypeOf(changes.Current(), IsLegacy());
+        return changes.Active() && commandType == CommandTypeOf(changes.Current());
     }
 
     void MotorPanel::OnChangeAccepted()
     {
-        const auto& change = changes.Current();
-        if (IsLegacy() && change.kind == SettingChange::Kind::parameter)
-            applyingPage->ShowValue(change.parameter, can::FocParameterValue{ change.value, false });
-
         if (changes.Advance())
         {
             SendCurrentChange();
@@ -485,11 +465,6 @@ namespace tool
         client.RequestSettings(nodeId);
     }
 
-    bool MotorPanel::IsLegacy() const
-    {
-        return !client.SupportsSettings(nodeId);
-    }
-
     void MotorPanel::Report(IssueSeverity severity, const QString& message) const
     {
         reporter(severity, QString("%1: %2").arg(Title(), message));
@@ -511,6 +486,13 @@ namespace tool
         firmware->ForgetNodeState();
     }
 
+    QString MotorPanel::FirmwareUnavailableReason() const
+    {
+        if (busConnected && nodeOnline == true && client.Compatibility(nodeId) == can::ContractCompatibility::incompatible)
+            return {};
+        return CommandsUnavailableReason();
+    }
+
     QString MotorPanel::CommandsUnavailableReason() const
     {
         if (!busConnected)
@@ -521,9 +503,10 @@ namespace tool
         switch (client.Compatibility(nodeId))
         {
             case can::ContractCompatibility::incompatible:
-                return QString("Firmware contract %1 is incompatible with this tool (%2.x): commands are disabled. Update the firmware or the tool.")
+                return QString("Firmware contract %1 is incompatible with this tool (%2.%3): commands are disabled. Update the firmware or the tool.")
                     .arg(contractVersion.isEmpty() ? QString("?") : contractVersion)
-                    .arg(can::focContractVersionMajor);
+                    .arg(can::focContractVersionMajor)
+                    .arg(can::focContractVersionMinor);
             case can::ContractCompatibility::unknown:
                 return QString("Waiting for node %1 to report its firmware version…").arg(nodeId);
             default:
@@ -548,101 +531,10 @@ namespace tool
         return {};
     }
 
-    QString MotorPanel::DiagnosticsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsDiagnostics(nodeId))
-            return QString("Needs firmware contract 2.2 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::SupervisionUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsSupervision(nodeId))
-            return QString("Needs firmware contract 2.4 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::LimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsLimits(nodeId))
-            return QString("Needs firmware contract 2.9 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::TargetWindowUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTargetWindow(nodeId))
-            return QString("Needs firmware contract 2.10 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::TravelLimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTravelLimits(nodeId))
-            return QString("Needs firmware contract 2.11 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::HomingUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsHoming(nodeId))
-            return QString("Needs firmware contract 2.19 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::CoulombFrictionUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsCoulombFriction(nodeId))
-            return QString("Needs firmware contract 2.20 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::ThermalUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsThermal(nodeId))
-            return QString("Needs firmware contract 2.13 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::OverTemperatureUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsOverTemperature(nodeId))
-            return QString("Needs firmware contract 2.14 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::BusVoltageLimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsBusVoltageLimits(nodeId))
-            return QString("Needs firmware contract 2.15 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::FaultHistoryUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsFaultHistory(nodeId))
-            return QString("Needs firmware contract 2.16 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::NeedsContract(uint8_t minor) const
-    {
-        return QString("Needs firmware contract 2.%1 or newer: this controller has %2.").arg(minor).arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-    }
-
-    QString MotorPanel::RecalibrationModeUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsRecalibration(nodeId))
-            return NeedsContract(CanCommandClient::recalibrationContractMinor);
-        return {};
-    }
-
     QString MotorPanel::RecalibrateUnavailableReason() const
     {
         if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
             return reason;
-        if (!client.SupportsRecalibration(nodeId))
-            return NeedsContract(CanCommandClient::recalibrationContractMinor);
         if (commandPanel->ActiveControlMode() == can::FocMotorMode::torque)
             return "Torque mode runs no online estimators: select speed or position mode to recalibrate.";
         if (const auto mode = commandPanel->Configuration().EditorFor(can::FocParameter::recalibrationMode)->Held(); mode.has_value() && *mode < 0.5f)
@@ -656,8 +548,6 @@ namespace tool
     {
         if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
             return reason;
-        if (!client.SupportsStoredRecalibration(nodeId))
-            return NeedsContract(CanCommandClient::storedRecalibrationContractMinor);
         if (lastState == FocMotorState::running || lastState == FocMotorState::calibrating)
             return "Stop the motor first: the loops are redesigned only while it is stopped.";
         return {};
@@ -666,23 +556,11 @@ namespace tool
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
-        const auto diagnosticsReason = DiagnosticsUnavailableReason();
         commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
-        commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
-        commandPanel->MotorParameters().SetCoulombFrictionUnavailable(CoulombFrictionUnavailableReason());
-        commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
-        commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason.isEmpty() ? FaultHistoryUnavailableReason() : commandsReason);
+        commandPanel->Diagnostics().SetUnavailable(commandsReason);
+        commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason);
         commandPanel->Diagnostics().SetRecalibrationUnavailable(RecalibrateUnavailableReason(), ResetModelUnavailableReason());
-        commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
-        commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
-        commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
-        commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
-        commandPanel->Configuration().SetHomingUnavailable(HomingUnavailableReason());
-        commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
-        commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
-        commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
-        commandPanel->Configuration().SetRecalibrationUnavailable(RecalibrationModeUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();
@@ -819,14 +697,9 @@ namespace tool
     {
         contractVersion = QString("%1.%2").arg(major).arg(minor);
         pendingSetpoint.reset();
-        commandPanel->SetPreciseSetpoints(compatible && client.SupportsPreciseSetpoints(nodeId));
 
         if (compatible)
-        {
             Report(IssueSeverity::info, QString("firmware contract %1 is compatible").arg(contractVersion));
-            for (auto* page : commandPanel->SettingsPages())
-                page->SetLegacy(IsLegacy());
-        }
         else
             Report(IssueSeverity::error, CommandsUnavailableReason());
 
@@ -881,12 +754,6 @@ namespace tool
         telemetryPanel->OnSpeedPosition(speed, position);
     }
 
-    void MotorPanel::OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
-    {
-        telemetryPanel->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
-        Report(IssueSeverity::info, QString("electrical parameters R = %1 Ω, L = %2 mH, %3 pole pairs").arg(resistanceOhm).arg(inductanceMilliHenry).arg(polePairs));
-    }
-
     void MotorPanel::OnAlgorithms(const can::FocAlgorithms& algorithms)
     {
         commandPanel->Controllers().SetAlgorithms(algorithms);
@@ -899,6 +766,7 @@ namespace tool
         for (auto* page : commandPanel->SettingsPages())
             page->ShowValue(parameter, value);
         commandPanel->Diagnostics().ShowValue(parameter, value);
+        telemetryPanel->OnMotorParameter(parameter, value.value);
         if (parameter == can::FocParameter::targetReached)
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
         if (parameter == can::FocParameter::windingTemperature)

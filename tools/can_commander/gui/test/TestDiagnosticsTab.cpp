@@ -104,10 +104,10 @@ TEST_F(TestDiagnosticsTab, a_node_that_leaves_the_bus_takes_its_history_with_it)
 
 TEST_F(TestDiagnosticsTab, an_unavailable_history_cannot_be_cleared_and_says_why)
 {
-    tab.SetFaultHistoryUnavailable("Needs firmware contract 2.16 or newer: this controller has 2.15.");
+    tab.SetFaultHistoryUnavailable("Connect to a CAN interface to send commands.");
 
     EXPECT_FALSE(ClearButton().isEnabled());
-    EXPECT_EQ("Needs firmware contract 2.16 or newer: this controller has 2.15.", ClearButton().toolTip());
+    EXPECT_EQ("Connect to a CAN interface to send commands.", ClearButton().toolTip());
 }
 
 TEST_F(TestDiagnosticsTab, the_model_in_use_and_the_recalibration_counts_are_shown_with_their_units)
