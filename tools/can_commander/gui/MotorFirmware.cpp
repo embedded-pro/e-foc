@@ -459,8 +459,6 @@ namespace tool
     {
         if (const auto reason = commandsUnavailable(); !reason.isEmpty())
             return reason;
-        if (!client.SupportsFirmwareIdentity(nodeId))
-            return QString("%1 runs a firmware contract older than 2.%2, which cannot report its version or board.").arg(MotorName()).arg(CanCommandClient::firmwareContractMinor);
         if (!identity)
             return QString("Reading the firmware %1 runs…").arg(MotorName());
         if (const auto board = Board(); !board || !CanBeUpdated(*board))

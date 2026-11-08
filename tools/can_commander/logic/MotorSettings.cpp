@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 84> presentations{ {
+        constexpr std::array<SettingPresentation, 85> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -74,10 +74,11 @@ namespace tool
             { FocParameter::fluxLinkage, "Flux linkage", "Flux linkage:", " Wb", "Permanent-magnet flux linkage. Calibrate measures it; Platform default uses the value built into the firmware.", "Platform default" },
             { FocParameter::inertia, "Inertia", "Inertia:", kilogramSquareMetre, "Inertia of the rotor and its load.", {} },
             { FocParameter::viscousFriction, "Viscous friction", "Viscous friction:", frictionUnit, "Viscous friction coefficient of the rotor and its load.", {} },
-            { FocParameter::frictionCoulomb, "Coulomb friction", "Coulomb friction:", newtonMetre, "Dry friction measured by Calibrate in speed and position mode, fed forward to the current reference. From firmware contract 2.20.", {} },
+            { FocParameter::frictionCoulomb, "Coulomb friction", "Coulomb friction:", newtonMetre, "Dry friction measured by Calibrate in speed and position mode, fed forward to the current reference.", {} },
             { FocParameter::encoderResolution, "Encoder resolution", "Encoder resolution:", " counts/rev", "Encoder counts per mechanical revolution.", {} },
             { FocParameter::canNodeId, "CAN node ID base", "CAN node ID base:", {}, "Base of the controller's CAN node ID; the board ID set by its jumpers is added to it.", {} },
             { FocParameter::canBitrate, "CAN bitrate", "CAN bitrate:", " bit/s", "Bitrate of the CAN bus.", {} },
+            { FocParameter::telemetryRate, "Current stream rate", "Current stream rate:", " Hz", "How often the controller sends the Id, Iq and position samples the Telemetry panel plots, while this tool is connected and a control loop runs; 0 stops the stream. Every node's stream shares the bus, so the rates of all nodes together have to fit its bitrate.", {} },
             { FocParameter::supervisionWindow, "Supervision window", "Window:", " s", "How long the encoder reading has to stay still while the drive pushes for motion before a fault is raised.", {} },
             { FocParameter::supervisionCurrentFraction, "Supervision current fraction", "Current fraction:", {}, "Torque current, as a fraction of the drive's current limit, from which the drive counts as pushing.", {} },
             { FocParameter::supervisionDemandedSpeed, "Supervision demanded speed", "Demanded speed:", radPerSecond, "Speed reference from which the drive counts as demanding motion.", {} },
@@ -130,20 +131,20 @@ namespace tool
             { FocParameter::stagedVersionMajor, "Staged major version", "Staged major:", {}, "Major number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the release version of the pack staged for an update; 0 when none is staged.", {} },
-            { FocParameter::targetReached, "Target reached", "Target reached:", {}, "Whether position mode's error has stayed within the position window for the window time. Read with every status, from firmware contract 2.10.", {} },
+            { FocParameter::targetReached, "Target reached", "Target reached:", {}, "Whether position mode's error has stayed within the position window for the window time. Read with every status.", {} },
             { FocParameter::windingTemperature, "Winding temperature", "Winding temperature:", " \xC2\xB0"
                                                                                                "C",
-                "Winding temperature inferred from the online resistance estimate in speed and position mode; unknown in torque mode and without a calibration. Read with every status, from firmware contract 2.13.", {} },
-            { FocParameter::homed, "Homed", "Homed:", {}, "Whether the position zero is the one the drive was commissioned with: yes after a calibration or a reference restored from the encoder index in this power-up, no after a plain alignment or at power-up. Read with every status, from firmware contract 2.19.", {} },
-            { FocParameter::recalibrationMode, "Online recalibration", "Recalibration:", {}, "When settled online estimates may replace the model the speed and position loops are designed from: Off never, On command on Recalibrate (Diagnostics tab), Automatic at every stop. From firmware contract 2.17.", {} },
+                "Winding temperature inferred from the online resistance estimate in speed and position mode; unknown in torque mode and without a calibration. Read with every status.", {} },
+            { FocParameter::homed, "Homed", "Homed:", {}, "Whether the position zero is the one the drive was commissioned with: yes after a calibration or a reference restored from the encoder index in this power-up, no after a plain alignment or at power-up. Read with every status.", {} },
+            { FocParameter::recalibrationMode, "Online recalibration", "Recalibration:", {}, "When settled online estimates may replace the model the speed and position loops are designed from: Off never, On command on Recalibrate (Diagnostics tab), Automatic at every stop.", {} },
             { FocParameter::modelResistance, "Resistance in use", "Resistance:", ohm, "Resistance the current loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelInductance, "Inductance in use", "Inductance:", " mH", "Inductance the current loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelInertia, "Inertia in use", "Inertia:", kilogramSquareMetre, "Inertia the speed loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelViscousFriction, "Viscous friction in use", "Viscous friction:", frictionUnit, "Viscous friction the speed loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::recalibrationsApplied, "Recalibrations applied", "Applied:", {}, "Quantities recalibrated since power-up.", {} },
             { FocParameter::recalibrationsRejected, "Recalibrations rejected", "Rejected:", {}, "Settled readings outside their plausibility band since power-up.", {} },
-            { FocParameter::recalibrationsStored, "Recalibrations stored", "Stored:", {}, "Stores of the recalibrated inductance, inertia and friction since power-up, at most one every 15 minutes. From firmware contract 2.18.", {} },
-            { FocParameter::homingRequired, "Homing required", "Require homing:", {}, "Refuse to enable position mode until the drive is homed, that is until a calibration or a reference restored from the encoder index has defined the commissioned position zero in this power-up. Speed and torque mode are never held back. From firmware contract 2.19.", {} },
+            { FocParameter::recalibrationsStored, "Recalibrations stored", "Stored:", {}, "Stores of the recalibrated inductance, inertia and friction since power-up, at most one every 15 minutes.", {} },
+            { FocParameter::homingRequired, "Homing required", "Require homing:", {}, "Refuse to enable position mode until the drive is homed, that is until a calibration or a reference restored from the encoder index has defined the commissioned position zero in this power-up. Speed and torque mode are never held back.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -312,64 +313,69 @@ namespace tool
         return Slice(21, 3);
     }
 
+    std::span<const SettingPresentation> StreamSettings()
+    {
+        return Slice(24, 1);
+    }
+
     std::span<const SettingPresentation> SupervisionSettings()
     {
-        return Slice(24, 6);
+        return Slice(25, 6);
     }
 
     std::span<const SettingPresentation> LimitSettings()
     {
-        return Slice(30, 9);
+        return Slice(31, 9);
     }
 
     std::span<const SettingPresentation> TargetWindowSettings()
     {
-        return Slice(39, 2);
+        return Slice(40, 2);
     }
 
     std::span<const SettingPresentation> TravelLimitSettings()
     {
-        return Slice(41, 2);
+        return Slice(42, 2);
     }
 
     std::span<const SettingPresentation> ThermalSettings()
     {
-        return Slice(43, 1);
+        return Slice(44, 1);
     }
 
     std::span<const SettingPresentation> OverTemperatureSettings()
     {
-        return Slice(44, 2);
+        return Slice(45, 2);
     }
 
     std::span<const SettingPresentation> BusVoltageSettings()
     {
-        return Slice(46, 2);
+        return Slice(47, 2);
     }
 
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(48, 24);
+        return Slice(49, 24);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(72, 3);
+        return Slice(73, 3);
     }
 
     std::span<const SettingPresentation> RecalibrationSettings()
     {
-        return Slice(75, 1);
+        return Slice(76, 1);
     }
 
     std::span<const SettingPresentation> RecalibrationReadings()
     {
-        return Slice(76, 7);
+        return Slice(77, 7);
     }
 
     std::span<const SettingPresentation> HomingSettings()
     {
-        return Slice(83, 1);
+        return Slice(84, 1);
     }
 
     namespace
@@ -440,41 +446,21 @@ namespace tool
         return descriptor.has_value() && descriptor->integer && descriptor->minimum == 0.0f && descriptor->maximum == 1.0f;
     }
 
-    bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy)
+    bool IsAcceptableEntry(can::FocParameter parameter, float value)
     {
         const auto descriptor = can::FindParameter(parameter);
         if (!descriptor.has_value() || (descriptor->automatic && value == 0.0f))
             return false;
 
-        if (legacy && IsBandwidth(parameter) && std::round(value) != value)
-            return false;
-
         return can::IsAcceptableParameterValue(*descriptor, value);
     }
 
-    std::optional<uint8_t> LegacyCommandOf(can::FocParameter parameter)
-    {
-        switch (parameter)
-        {
-            case FocParameter::currentBandwidth:
-                return can::focSetPidCurrentId;
-            case FocParameter::speedBandwidth:
-                return can::focSetPidSpeedId;
-            case FocParameter::positionBandwidth:
-                return can::focSetPidPositionId;
-            case FocParameter::encoderResolution:
-                return can::focSetEncoderResolutionId;
-            default:
-                return std::nullopt;
-        }
-    }
-
-    uint8_t CommandTypeOf(const SettingChange& change, bool legacy)
+    uint8_t CommandTypeOf(const SettingChange& change)
     {
         if (change.kind == SettingChange::Kind::algorithm)
             return can::focSelectAlgorithmId;
 
-        return legacy ? LegacyCommandOf(change.parameter).value_or(can::focSetParameterId) : can::focSetParameterId;
+        return can::focSetParameterId;
     }
 
     ChangePlan PlanLoop(const LoopEdits& edits)

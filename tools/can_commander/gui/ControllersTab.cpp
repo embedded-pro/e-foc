@@ -2,7 +2,6 @@
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
-#include <QStringList>
 #include <algorithm>
 
 namespace tool
@@ -128,7 +127,6 @@ namespace tool
         for (auto& loop : loops)
         {
             loop.group->setVisible(IsLoopShown(loop));
-            loop.form->setRowVisible(loop.algorithm, !IsLegacy());
             for (auto* editor : loop.editors)
                 loop.form->setRowVisible(editor, Shows(loop, *editor));
 
@@ -153,14 +151,11 @@ namespace tool
 
     bool ControllersTab::IsAlgorithmEdited(const Loop& loop) const
     {
-        return !IsLegacy() && IsLoopShown(loop) && loop.algorithm->currentIndex() >= 0 && ChosenAlgorithm(loop) != loop.held;
+        return IsLoopShown(loop) && loop.algorithm->currentIndex() >= 0 && ChosenAlgorithm(loop) != loop.held;
     }
 
     bool ControllersTab::Shows(const Loop& loop, const SettingEditor& editor) const
     {
-        if (IsLegacy())
-            return IsBandwidth(editor.Parameter());
-
         const auto chosen = ChosenAlgorithm(loop);
         return !chosen.has_value() || IsUsedBy(editor.Presentation(), *chosen);
     }
@@ -219,12 +214,8 @@ namespace tool
 
     QString ControllersTab::Hint() const
     {
-        QStringList parts;
-        if (IsLegacy())
-            parts << "This controller has firmware contract 2.0: only the loop bandwidths can be set, and they are not read back. "
-                     "Update its firmware to choose the controller of each loop and set the other settings.";
         if (!mode.has_value())
-            parts << "The active control mode is not known yet: select one on the Motor Control tab to see the loops it runs.";
-        return parts.join(' ');
+            return "The active control mode is not known yet: select one on the Motor Control tab to see the loops it runs.";
+        return {};
     }
 }

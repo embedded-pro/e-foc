@@ -1,7 +1,6 @@
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
-#include "core/can/FocMotorSettings.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
@@ -127,7 +126,7 @@ namespace
             DeliverParameter(node, can::FocParameter::stagedVersionPatch, identity.staged.patch);
         }
 
-        void DeliverContract(uint8_t major, uint16_t node, uint8_t minor = 0)
+        void DeliverContract(uint8_t major, uint16_t node, uint8_t minor = can::focContractVersionMinor)
         {
             Receive(FocId(services::CanPriority::response, can::focContractVersionResponseId, node), Message({ major, minor }));
         }
@@ -175,33 +174,12 @@ namespace
                 }));
         }
 
-        static std::size_t SupervisionParameterCount()
+        static std::size_t ReadOnlyParameterCount()
         {
-            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::supervision;
-                }));
+            return can::focParameters.size() - WritableParameterCount();
         }
 
-        static std::size_t LimitParameterCount()
-        {
-            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::limits;
-                }));
-        }
-
-        static constexpr std::size_t targetWindowParameterCount{ 3 };
-        static constexpr std::size_t travelLimitParameterCount{ 2 };
         static constexpr std::size_t readWithTheStatus{ 3 };
-        static constexpr std::size_t thermalParameterCount{ 2 };
-        static constexpr std::size_t overTemperatureParameterCount{ 2 };
-        static constexpr std::size_t busVoltageLimitParameterCount{ 2 };
-        static constexpr std::size_t recalibrationParameterCount{ 8 };
-        static constexpr std::size_t recalibrationReadingCount{ 7 };
-        static constexpr std::size_t storedRecalibrationParameterCount{ 1 };
-        static constexpr std::size_t homingParameterCount{ 2 };
-        static constexpr std::size_t frictionCoulombParameterCount{ 1 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -209,36 +187,6 @@ namespace
                 {
                     return frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
                            frame.payload[1] == static_cast<uint8_t>(parameter);
-                });
-        }
-
-        bool QueriedALimit() const
-        {
-            return std::ranges::any_of(sent, [](const SentFrame& frame)
-                {
-                    return frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
-                           can::GroupOf(static_cast<can::FocParameter>(frame.payload[1])) == can::ParameterGroup::limits;
-                });
-        }
-
-        bool QueriedASupervisionParameter() const
-        {
-            return std::ranges::any_of(sent, [](const SentFrame& frame)
-                {
-                    return frame.messageType == can::focQueryParameterId && frame.payload.size() >= 2 &&
-                           can::GroupOf(static_cast<can::FocParameter>(frame.payload[1])) == can::ParameterGroup::supervision;
-                });
-        }
-
-        bool QueriedAReadOnlyParameter() const
-        {
-            return std::ranges::any_of(sent, [](const SentFrame& frame)
-                {
-                    if (frame.messageType != can::focQueryParameterId || frame.payload.size() < 2)
-                        return false;
-
-                    const auto descriptor = can::FindParameter(frame.payload[1]);
-                    return descriptor.has_value() && descriptor->readOnly;
                 });
         }
 
@@ -264,11 +212,16 @@ namespace
             }
         }
 
-        void BringCompatible(uint16_t node, uint8_t minor)
+        void BringCompatible(uint16_t node)
         {
             BringOnline(node);
-            EXPECT_CALL(observer, OnContractVersion(node, can::focContractVersionMajor, minor, true));
-            DeliverContract(can::focContractVersionMajor, node, minor);
+            EXPECT_CALL(observer, OnContractVersion(node, can::focContractVersionMajor, can::focContractVersionMinor, true));
+            DeliverContract(can::focContractVersionMajor, node);
+        }
+
+        void DeliverTelemetryStatus(uint16_t node, FocMotorState state, FocFaultCode fault)
+        {
+            Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, node), Message({ static_cast<uint8_t>(state), static_cast<uint8_t>(fault) }));
         }
 
         void SetBusConnected(bool connected)
@@ -464,17 +417,14 @@ TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
     EXPECT_TRUE(client.SendSetTorqueSetpoint(5, 5.0f));
     EXPECT_TRUE(client.SendSetSpeedSetpoint(6, 100.0f));
     EXPECT_TRUE(client.SendSetPositionSetpoint(7, 1.0f));
-    EXPECT_TRUE(client.SendSetCurrentBandwidth(8, 500.0f));
-    EXPECT_TRUE(client.SendSetSpeedBandwidth(9, 188.5f));
-    EXPECT_TRUE(client.SendSetPositionBandwidth(10, 18.8f));
-    EXPECT_TRUE(client.SendClearFault(11));
-    EXPECT_TRUE(client.SendAlign(12));
-    EXPECT_TRUE(client.SendIdentifyElectrical(13));
-    EXPECT_TRUE(client.SendSetEncoderResolution(14, 4096));
-    EXPECT_TRUE(client.SendSelectAlgorithm(15, can::FocControlLoop::speed, 1));
-    EXPECT_TRUE(client.SendSetParameter(16, can::FocParameter::inertia, 1.0e-5f));
+    EXPECT_TRUE(client.SendSetTorqueSetpointNewtonMeter(8, 0.1f));
+    EXPECT_TRUE(client.SendClearFault(9));
+    EXPECT_TRUE(client.SendAlign(10));
+    EXPECT_TRUE(client.SendIdentifyElectrical(11));
+    EXPECT_TRUE(client.SendSelectAlgorithm(12, can::FocControlLoop::speed, 1));
+    EXPECT_TRUE(client.SendSetParameter(13, can::FocParameter::inertia, 1.0e-5f));
 
-    for (uint16_t node = 1; node <= 16; ++node)
+    for (uint16_t node = 1; node <= 13; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 
@@ -578,7 +528,7 @@ TEST_F(TestCanCommandClient, an_incompatible_node_refuses_commands_without_touch
     BringOnline(1);
     client.SendStartMotor(1);
 
-    EXPECT_CALL(observer, OnContractVersion(1, static_cast<uint8_t>(can::focContractVersionMajor + 1), 0, false));
+    EXPECT_CALL(observer, OnContractVersion(1, static_cast<uint8_t>(can::focContractVersionMajor + 1), can::focContractVersionMinor, false));
     DeliverContract(static_cast<uint8_t>(can::focContractVersionMajor + 1), 1);
 
     EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(1));
@@ -586,12 +536,24 @@ TEST_F(TestCanCommandClient, an_incompatible_node_refuses_commands_without_touch
     EXPECT_TRUE(client.IsBusy(1));
 }
 
+TEST_F(TestCanCommandClient, a_node_on_another_minor_version_is_incompatible)
+{
+    BringOnline(1);
+    const auto otherMinor = static_cast<uint8_t>(can::focContractVersionMinor + 1);
+
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, otherMinor, false));
+    DeliverContract(can::focContractVersionMajor, 1, otherMinor);
+
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(1));
+    EXPECT_FALSE(client.SendStartMotor(1));
+}
+
 TEST_F(TestCanCommandClient, an_incompatible_node_does_not_block_the_others)
 {
     BringOnline(1);
     BringOnline(2);
     EXPECT_CALL(observer, OnContractVersion(1, _, _, false));
-    EXPECT_CALL(observer, OnContractVersion(2, can::focContractVersionMajor, 0, true));
+    EXPECT_CALL(observer, OnContractVersion(2, can::focContractVersionMajor, can::focContractVersionMinor, true));
 
     DeliverContract(static_cast<uint8_t>(can::focContractVersionMajor + 1), 1);
     DeliverContract(can::focContractVersionMajor, 2);
@@ -601,16 +563,20 @@ TEST_F(TestCanCommandClient, an_incompatible_node_does_not_block_the_others)
     EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility(2));
 }
 
-TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
+TEST_F(TestCanCommandClient, telemetry_status_notifies_the_motor_status)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::running, FocFaultCode::none));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(1, testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.001f)));
 
-    const auto data = Message({ static_cast<uint8_t>(FocMotorState::running), static_cast<uint8_t>(FocFaultCode::none), 0, 10, 0, 100 });
-    const auto rawId = FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1);
-    LogReceived(rawId, data);
-    Receive(rawId, data);
+    DeliverTelemetryStatus(1, FocMotorState::running, FocFaultCode::none);
+}
+
+TEST_F(TestCanCommandClient, telemetry_motion_reports_speed_and_position_at_full_resolution)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    EXPECT_CALL(observer, OnSpeedPositionReceived(1, 0.005f, 0.00015f));
+
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryMotionId, 1), Message({ 0x3B, 0xA3, 0xD7, 0x0A, 0x39, 0x1D, 0x49, 0x52 }));
 }
 
 TEST_F(TestCanCommandClient, telemetry_is_attributed_to_the_node_that_sent_it)
@@ -619,45 +585,43 @@ TEST_F(TestCanCommandClient, telemetry_is_attributed_to_the_node_that_sent_it)
     EXPECT_CALL(observer, OnNodeOnlineChanged(3, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(2, FocMotorState::running, FocFaultCode::none));
     EXPECT_CALL(observer, OnMotorStatusReceived(3, FocMotorState::idle, FocFaultCode::none));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(2, _, _));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(3, _, _));
 
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 2),
-        Message({ static_cast<uint8_t>(FocMotorState::running), 0, 0, 0, 0, 0 }));
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 3),
-        Message({ static_cast<uint8_t>(FocMotorState::idle), 0, 0, 0, 0, 0 }));
+    DeliverTelemetryStatus(2, FocMotorState::running, FocFaultCode::none);
+    DeliverTelemetryStatus(3, FocMotorState::idle, FocFaultCode::none);
 }
 
 TEST_F(TestCanCommandClient, telemetry_status_ready_is_passed_on_as_ready)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::ready, FocFaultCode::none));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(1, _, _));
 
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
-        Message({ 5, 0, 0, 0, 0, 0 }));
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1), Message({ 5, 0 }));
 }
 
-TEST_F(TestCanCommandClient, telemetry_status_with_a_contract_2_8_fault_notifies_fault_event)
+TEST_F(TestCanCommandClient, telemetry_status_with_a_hardware_fault_notifies_fault_event)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::fault, FocFaultCode::hardwareFault));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(1, _, _));
     EXPECT_CALL(observer, OnFaultEventReceived(1, FocFaultCode::hardwareFault));
 
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
-        Message({ 2, 8, 0, 0, 0, 0 }));
+    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1), Message({ 2, 8 }));
 }
 
 TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::fault, FocFaultCode::overCurrent));
-    EXPECT_CALL(observer, OnSpeedPositionReceived(1, _, _));
     EXPECT_CALL(observer, OnFaultEventReceived(1, FocFaultCode::overCurrent));
 
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
-        Message({ static_cast<uint8_t>(FocMotorState::fault), static_cast<uint8_t>(FocFaultCode::overCurrent), 0, 0, 0, 0 }));
+    DeliverTelemetryStatus(1, FocMotorState::fault, FocFaultCode::overCurrent);
+}
+
+TEST_F(TestCanCommandClient, telemetry_frames_stay_out_of_the_frame_log)
+{
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+
+    LogReceived(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1), Message({ 1, 0 }));
+    LogReceived(FocId(services::CanPriority::telemetry, can::focTelemetryMotionId, 1), Message({ 0, 0, 0, 0, 0, 0, 0, 0 }));
 }
 
 TEST_F(TestCanCommandClient, a_current_stream_frame_notifies_the_sample_of_its_node)
@@ -683,14 +647,6 @@ TEST_F(TestCanCommandClient, an_undecoded_response_does_not_call_any_observer)
     Receive(FocId(services::CanPriority::response, undecodedResponseId, 1), Message({ static_cast<uint8_t>(can::FocMotorMode::speed) }));
 }
 
-TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
-{
-    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
-    EXPECT_CALL(observer, OnElectricalParametersReceived(1, testing::FloatNear(0.5f, 0.001f), testing::FloatNear(1.0f, 0.001f), 7));
-
-    Receive(FocId(services::CanPriority::response, can::focElectricalParamsResponseId, 1), Message({ 0x01, 0xF4, 0x03, 0xE8, 7 }));
-}
-
 TEST_F(TestCanCommandClient, select_control_mode_response_acknowledges_the_mode_and_ends_the_command)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
@@ -702,74 +658,68 @@ TEST_F(TestCanCommandClient, select_control_mode_response_acknowledges_the_mode_
     EXPECT_FALSE(client.IsBusy(1));
 }
 
-TEST_F(TestCanCommandClient, send_torque_setpoint_encodes_with_correct_scale)
+TEST_F(TestCanCommandClient, the_setpoints_travel_as_big_endian_floats)
 {
-    CaptureNextPayload();
-    client.SendSetTorqueSetpoint(1, 5.0f); // 5.0 A * focCurrentScale(10) = 50 = 0x0032
+    RecordSends();
 
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x00u);
-    EXPECT_EQ(capturedPayload[2], 0x32u);
+    EXPECT_TRUE(client.SendSetTorqueSetpoint(1, 0.0005f));
+    EXPECT_TRUE(client.SendSetSpeedSetpoint(1, 3.25f));
+    EXPECT_TRUE(client.SendSetPositionSetpoint(1, -1.5f));
+
+    ASSERT_EQ(3u, sent.size());
+    EXPECT_EQ(can::focSetTorqueSetpointId, sent[0].messageType);
+    EXPECT_EQ(Message({ 0x3A, 0x03, 0x12, 0x6F }), AfterSequence(sent[0].payload));
+    EXPECT_EQ(can::focSetSpeedSetpointId, sent[1].messageType);
+    EXPECT_EQ(Message({ 0x40, 0x50, 0x00, 0x00 }), AfterSequence(sent[1].payload));
+    EXPECT_EQ(can::focSetPositionSetpointId, sent[2].messageType);
+    EXPECT_EQ(Message({ 0xBF, 0xC0, 0x00, 0x00 }), AfterSequence(sent[2].payload));
 }
 
-TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_wire_value_clamped_to_int16_max)
+TEST_F(TestCanCommandClient, a_torque_in_newton_metres_goes_out_as_its_own_command)
 {
-    CaptureNextPayload();
-    client.SendSetSpeedSetpoint(1, 100000.0f);
+    RecordSends();
 
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x7Fu);
-    EXPECT_EQ(capturedPayload[2], 0xFFu);
+    EXPECT_TRUE(client.SendSetTorqueSetpointNewtonMeter(2, 0.1f));
+
+    ASSERT_EQ(1u, sent.size());
+    EXPECT_EQ(2u, sent[0].node);
+    EXPECT_EQ(can::focSetTorqueSetpointNewtonMeterId, sent[0].messageType);
+    EXPECT_EQ(Message({ 0x3D, 0xCC, 0xCC, 0xCD }), AfterSequence(sent[0].payload));
 }
 
-TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_wire_value_clamped_to_int16_min)
+TEST_F(TestCanCommandClient, a_setpoint_that_is_not_finite_is_not_sent)
 {
-    CaptureNextPayload();
-    client.SendSetSpeedSetpoint(1, -100000.0f);
+    RecordSends();
 
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x80u);
-    EXPECT_EQ(capturedPayload[2], 0x00u);
+    EXPECT_FALSE(client.SendSetSpeedSetpoint(1, std::numeric_limits<float>::quiet_NaN()));
+    EXPECT_FALSE(client.SendSetTorqueSetpointNewtonMeter(1, std::numeric_limits<float>::infinity()));
+
+    EXPECT_TRUE(sent.empty());
+    EXPECT_FALSE(client.IsBusy(1));
 }
 
-TEST_F(TestCanCommandClient, send_speed_setpoint_extreme_value_clamps_without_ub)
+TEST_F(TestCanCommandClient, the_acknowledge_of_a_setpoint_ends_it)
 {
-    CaptureNextPayload();
-    client.SendSetSpeedSetpoint(1, 1e10f);
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    client.SendSetSpeedSetpoint(1, 3.25f);
+    EXPECT_TRUE(client.IsBusy(1));
 
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x7Fu);
-    EXPECT_EQ(capturedPayload[2], 0xFFu);
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focSetSpeedSetpointId, services::CanAckStatus::success));
+    DeliverAck(can::focSetSpeedSetpointId);
+
+    EXPECT_FALSE(client.IsBusy(1));
 }
 
-TEST_F(TestCanCommandClient, send_speed_setpoint_nan_encodes_as_zero)
+TEST_F(TestCanCommandClient, the_refusal_of_a_newton_metre_torque_names_that_command)
 {
-    CaptureNextPayload();
-    client.SendSetSpeedSetpoint(1, std::numeric_limits<float>::quiet_NaN());
+    EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
+    client.SendSetTorqueSetpointNewtonMeter(1, 0.1f);
 
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x00u);
-    EXPECT_EQ(capturedPayload[2], 0x00u);
-}
+    EXPECT_CALL(observer, OnCommandRejected(1, can::focSetTorqueSetpointNewtonMeterId, can::FocMotorCategoryError::modeMismatch));
+    Receive(FocId(services::CanPriority::response, services::canCategoryErrorResponseMessageTypeId, 1),
+        Message({ can::focSetTorqueSetpointNewtonMeterId, static_cast<uint8_t>(can::FocMotorCategoryError::modeMismatch) }));
 
-TEST_F(TestCanCommandClient, send_position_setpoint_encodes_with_correct_scale)
-{
-    CaptureNextPayload();
-    client.SendSetPositionSetpoint(1, 0.1f); // 0.1 * focPositionScale(100) = 10 = 0x000A
-
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x00u);
-    EXPECT_EQ(capturedPayload[2], 0x0Au);
-}
-
-TEST_F(TestCanCommandClient, send_position_setpoint_rounds_to_nearest_wire_value)
-{
-    CaptureNextPayload();
-    client.SendSetPositionSetpoint(1, 0.157f); // 15.7 → 16, truncation would give 15
-
-    ASSERT_EQ(capturedPayload.size(), 3u);
-    EXPECT_EQ(capturedPayload[1], 0x00u);
-    EXPECT_EQ(capturedPayload[2], 0x10u);
+    EXPECT_FALSE(client.IsBusy(1));
 }
 
 TEST_F(TestCanCommandClientAdapterFails, every_command_stays_pending_when_the_adapter_reports_failure)
@@ -781,11 +731,8 @@ TEST_F(TestCanCommandClientAdapterFails, every_command_stays_pending_when_the_ad
     client.SendSetTorqueSetpoint(5, 5.0f);
     client.SendSetSpeedSetpoint(6, 10.0f);
     client.SendSetPositionSetpoint(7, 1.0f);
-    client.SendSetCurrentBandwidth(8, 500.0f);
-    client.SendSetSpeedBandwidth(9, 188.5f);
-    client.SendSetPositionBandwidth(10, 18.8f);
 
-    for (uint16_t node = 1; node <= 10; ++node)
+    for (uint16_t node = 1; node <= 7; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 
@@ -799,24 +746,12 @@ TEST_F(TestCanCommandClientAdapterFails, timeout_after_failed_send_ends_the_pend
     EXPECT_FALSE(client.IsBusy(1));
 }
 
-TEST_F(TestCanCommandClient, a_node_supports_settings_from_contract_2_1)
-{
-    EXPECT_FALSE(client.SupportsSettings(1));
-
-    RecordSends();
-    BringCompatible(1, 0);
-    EXPECT_FALSE(client.SupportsSettings(1));
-
-    BringCompatible(2, 1);
-    EXPECT_TRUE(client.SupportsSettings(2));
-}
-
-TEST_F(TestCanCommandClient, a_2_1_node_is_read_one_request_at_a_time_once_found_compatible)
+TEST_F(TestCanCommandClient, a_compatible_node_is_read_one_request_at_a_time)
 {
     BringOnline(1);
     RecordSends();
-    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 1, true));
-    DeliverContract(can::focContractVersionMajor, 1, 1);
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, can::focContractVersionMinor, true));
+    DeliverContract(can::focContractVersionMajor, 1);
 
     EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId }), SentTypes());
     EXPECT_FALSE(client.IsBusy(1));
@@ -828,27 +763,18 @@ TEST_F(TestCanCommandClient, a_2_1_node_is_read_one_request_at_a_time_once_found
     EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::currentBandwidth), sent.back().payload[1]);
 }
 
-TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
+TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_every_parameter_once_its_fault_history_and_its_status)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
 
     AnswerAllReads();
 
     EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(QueriedAReadOnlyParameter());
-    EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
-}
-
-TEST_F(TestCanCommandClient, a_2_0_node_is_only_asked_for_its_status)
-{
-    BringOnline(1);
-    RecordSends();
-    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 0, true));
-    DeliverContract(can::focContractVersionMajor, 1, 0);
-
-    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId }), SentTypes());
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focFaultHistoryDepth, Count(can::focQueryFaultHistoryId));
+    EXPECT_EQ(1u, Count(can::focRequestTelemetryId));
+    EXPECT_TRUE(Queried(can::FocParameter::telemetryRate));
 }
 
 TEST_F(TestCanCommandClient, an_incompatible_node_is_not_read)
@@ -856,7 +782,7 @@ TEST_F(TestCanCommandClient, an_incompatible_node_is_not_read)
     BringOnline(1);
     RecordSends();
     EXPECT_CALL(observer, OnContractVersion(1, _, _, false));
-    DeliverContract(static_cast<uint8_t>(can::focContractVersionMajor + 1), 1, 1);
+    DeliverContract(static_cast<uint8_t>(can::focContractVersionMajor + 1), 1);
 
     ForwardTime(CanCommandClient::statusRefreshInterval);
 
@@ -867,8 +793,8 @@ TEST_F(TestCanCommandClient, an_unanswered_read_gives_way_to_the_next_after_the_
 {
     BringOnline(1);
     RecordSends();
-    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, 1, true));
-    DeliverContract(can::focContractVersionMajor, 1, 1);
+    EXPECT_CALL(observer, OnContractVersion(1, can::focContractVersionMajor, can::focContractVersionMinor, true));
+    DeliverContract(can::focContractVersionMajor, 1);
 
     ForwardTime(CanCommandClient::readTimeout - std::chrono::milliseconds(1));
     EXPECT_EQ((std::vector<uint8_t>{ can::focQueryAlgorithmsId }), SentTypes());
@@ -880,7 +806,7 @@ TEST_F(TestCanCommandClient, an_unanswered_read_gives_way_to_the_next_after_the_
 TEST_F(TestCanCommandClient, a_refused_read_is_not_reported_and_gives_way_to_the_next)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
 
     Receive(FocId(services::CanPriority::response, services::canCategoryErrorResponseMessageTypeId, 1),
         Message({ can::focQueryAlgorithmsId, static_cast<uint8_t>(can::FocMotorCategoryError::busy) }));
@@ -916,10 +842,22 @@ TEST_F(TestCanCommandClient, set_parameter_carries_the_value_as_a_big_endian_flo
         std::vector<uint8_t>(capturedPayload.begin() + 1, capturedPayload.end()));
 }
 
+TEST_F(TestCanCommandClient, the_current_stream_rate_is_set_as_a_parameter)
+{
+    RecordSends();
+
+    EXPECT_TRUE(client.SendSetParameter(1, can::FocParameter::telemetryRate, 500.0f));
+
+    ASSERT_EQ(1u, sent.size());
+    EXPECT_EQ(can::focSetParameterId, sent[0].messageType);
+    EXPECT_EQ(Message({ static_cast<uint8_t>(can::FocParameter::telemetryRate), 0x43, 0xFA, 0x00, 0x00 }), AfterSequence(sent[0].payload));
+    EXPECT_TRUE(client.IsBusy(1));
+}
+
 TEST_F(TestCanCommandClient, an_accepted_mode_change_reads_the_settings_again)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendSetControlMode(1, can::FocMotorMode::speed);
     sent.clear();
@@ -933,7 +871,7 @@ TEST_F(TestCanCommandClient, an_accepted_mode_change_reads_the_settings_again)
 TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendAlign(1);
     sent.clear();
@@ -942,13 +880,44 @@ TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
     DeliverAck(can::focAlignId);
     AnswerAllReads();
 
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount() + readWithTheStatus, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_identification_reads_the_identified_motor_parameters)
+{
+    RecordSends();
+    BringCompatible(1);
+    AnswerAllReads();
+    client.SendIdentifyElectrical(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focIdentifyElectricalId, services::CanAckStatus::success));
+    DeliverAck(can::focIdentifyElectricalId);
+    AnswerAllReads();
+
+    EXPECT_TRUE(Queried(can::FocParameter::resistance));
+    EXPECT_TRUE(Queried(can::FocParameter::inductance));
+    EXPECT_TRUE(Queried(can::FocParameter::polePairs));
+}
+
+TEST_F(TestCanCommandClient, a_refused_identification_reads_no_motor_parameters)
+{
+    RecordSends();
+    BringCompatible(1);
+    AnswerAllReads();
+    client.SendIdentifyElectrical(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focIdentifyElectricalId, services::CanAckStatus::invalidState));
+    DeliverAck(can::focIdentifyElectricalId, 1, services::CanAckStatus::invalidState);
+
+    EXPECT_TRUE(sent.empty());
 }
 
 TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
 {
     RecordSends();
-    BringCompatible(1, 0);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendStartMotor(1);
     sent.clear();
@@ -962,7 +931,7 @@ TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
 TEST_F(TestCanCommandClient, a_refused_command_reads_nothing)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendSetControlMode(1, can::FocMotorMode::speed);
     sent.clear();
@@ -976,7 +945,7 @@ TEST_F(TestCanCommandClient, a_refused_command_reads_nothing)
 TEST_F(TestCanCommandClient, the_status_of_a_compatible_node_is_read_every_second)
 {
     RecordSends();
-    BringCompatible(1, 0);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
 
@@ -984,25 +953,42 @@ TEST_F(TestCanCommandClient, the_status_of_a_compatible_node_is_read_every_secon
     AnswerAllReads();
     ForwardTime(CanCommandClient::statusRefreshInterval);
 
-    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focRequestTelemetryId }), SentTypes());
+    EXPECT_EQ(2u, Count(can::focRequestTelemetryId));
+    EXPECT_EQ(readWithTheStatus, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, each_status_asks_whether_the_target_is_reached_the_winding_temperature_and_whether_the_drive_is_homed)
+{
+    RecordSends();
+    BringCompatible(1);
+    AnswerAllReads();
+    sent.clear();
+
+    ForwardTime(CanCommandClient::statusRefreshInterval);
+    AnswerAllReads();
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId, can::focQueryParameterId, can::focQueryParameterId }), SentTypes());
+    EXPECT_TRUE(Queried(can::FocParameter::targetReached));
+    EXPECT_TRUE(Queried(can::FocParameter::windingTemperature));
+    EXPECT_TRUE(Queried(can::FocParameter::homed));
 }
 
 TEST_F(TestCanCommandClient, a_status_read_is_not_queued_twice)
 {
     RecordSends();
-    BringCompatible(1, 0);
+    BringCompatible(1);
 
     client.RequestStatus(1);
     client.RequestStatus(1);
     AnswerAllReads();
 
-    EXPECT_EQ(2u, Count(can::focRequestTelemetryId));
+    EXPECT_EQ(1u, Count(can::focRequestTelemetryId));
 }
 
 TEST_F(TestCanCommandClient, going_offline_forgets_the_reads)
 {
     RecordSends();
-    BringCompatible(1, 1);
+    BringCompatible(1);
 
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, false));
     EXPECT_CALL(observer, OnConnectionChanged(false));
@@ -1038,207 +1024,10 @@ TEST_F(TestCanCommandClient, a_start_waits_long_enough_for_the_rotor_to_rest_and
     EXPECT_EQ(std::chrono::seconds(12), CanCommandClient::TimeoutFor(can::focStartId));
 }
 
-TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
-{
-    RecordSends();
-    BringCompatible(1, 2);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
-    EXPECT_TRUE(QueriedAReadOnlyParameter());
-}
-
-TEST_F(TestCanCommandClient, a_2_3_node_is_not_asked_for_its_supervision_settings)
-{
-    RecordSends();
-    BringCompatible(1, 3);
-
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsSupervision(1));
-    EXPECT_FALSE(QueriedASupervisionParameter());
-}
-
-TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_settings)
-{
-    RecordSends();
-    BringCompatible(1, 4);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
-{
-    RecordSends();
-    BringCompatible(1, 8);
-
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsLimits(1));
-    EXPECT_FALSE(QueriedALimit());
-}
-
-TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
-{
-    RecordSends();
-    BringCompatible(1, 9);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
-{
-    RecordSends();
-    BringCompatible(1, 9);
-
-    AnswerAllReads();
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsTargetWindow(1));
-    EXPECT_FALSE(Queried(can::FocParameter::positionWindow));
-    EXPECT_FALSE(Queried(can::FocParameter::positionWindowTime));
-    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
-}
-
-TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
-{
-    RecordSends();
-    BringCompatible(1, 10);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsTargetWindow(1));
-    EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
-    EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
-}
-
-TEST_F(TestCanCommandClient, a_2_12_node_is_not_asked_for_its_winding_temperature)
-{
-    RecordSends();
-    BringCompatible(1, 12);
-
-    AnswerAllReads();
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsTravelLimits(1));
-    EXPECT_FALSE(client.SupportsThermal(1));
-    EXPECT_FALSE(Queried(can::FocParameter::calibrationTemperature));
-    EXPECT_FALSE(Queried(can::FocParameter::windingTemperature));
-}
-
-TEST_F(TestCanCommandClient, a_2_13_node_is_not_asked_for_its_temperature_limit)
-{
-    RecordSends();
-    BringCompatible(1, 13);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsThermal(1));
-    EXPECT_FALSE(client.SupportsOverTemperature(1));
-    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::temperatureLimit));
-}
-
-TEST_F(TestCanCommandClient, a_2_14_node_is_not_asked_for_its_bus_voltage_limits)
-{
-    RecordSends();
-    BringCompatible(1, 14);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsOverTemperature(1));
-    EXPECT_FALSE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::busVoltageMinimum));
-    EXPECT_FALSE(Queried(can::FocParameter::busVoltageMaximum));
-}
-
-TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_but_the_recalibration_ones)
-{
-    RecordSends();
-    BringCompatible(1, 16);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_13_node_is_asked_for_its_winding_temperature_with_every_status)
-{
-    RecordSends();
-    BringCompatible(1, 13);
-    AnswerAllReads();
-    sent.clear();
-
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId, can::focQueryParameterId }), SentTypes());
-    EXPECT_TRUE(Queried(can::FocParameter::windingTemperature));
-}
-
-TEST_F(TestCanCommandClient, a_2_10_node_is_asked_whether_it_reached_its_target_with_every_status)
-{
-    RecordSends();
-    BringCompatible(1, 10);
-    AnswerAllReads();
-    sent.clear();
-
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId }), SentTypes());
-    EXPECT_TRUE(Queried(can::FocParameter::targetReached));
-}
-
-TEST_F(TestCanCommandClient, a_2_18_node_is_not_asked_whether_it_is_homed)
-{
-    RecordSends();
-    BringCompatible(1, 18);
-    AnswerAllReads();
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsHoming(1));
-    EXPECT_FALSE(Queried(can::FocParameter::homed));
-    EXPECT_FALSE(Queried(can::FocParameter::homingRequired));
-}
-
-TEST_F(TestCanCommandClient, a_2_19_node_is_asked_whether_it_is_homed_with_every_status)
-{
-    RecordSends();
-    BringCompatible(1, 19);
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsHoming(1));
-    EXPECT_TRUE(Queried(can::FocParameter::homingRequired));
-    sent.clear();
-
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_EQ((std::vector<uint8_t>{ can::focRequestTelemetryId, can::focQueryParameterId, can::focQueryParameterId, can::focQueryParameterId }), SentTypes());
-    EXPECT_TRUE(Queried(can::FocParameter::homed));
-}
-
 TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_homed_flag_to_the_status)
 {
     RecordSends();
-    BringCompatible(1, 19);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
 
@@ -1251,7 +1040,7 @@ TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_homed_flag_to_
 TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_target_reached_flag_to_the_status)
 {
     RecordSends();
-    BringCompatible(1, 10);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
 
@@ -1259,19 +1048,6 @@ TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_target_reached
     AnswerAllReads();
 
     EXPECT_FALSE(Queried(can::FocParameter::targetReached));
-}
-
-TEST_F(TestCanCommandClient, a_2_1_node_is_not_asked_for_diagnostics)
-{
-    RecordSends();
-    BringCompatible(1, 1);
-    AnswerAllReads();
-    sent.clear();
-
-    client.RequestReadings(1);
-
-    EXPECT_FALSE(client.SupportsDiagnostics(1));
-    EXPECT_TRUE(sent.empty());
 }
 
 TEST_F(TestCanCommandClient, calibration_and_diagnostics_go_out_as_their_own_commands)
@@ -1295,7 +1071,7 @@ TEST_F(TestCanCommandClient, a_calibration_waits_two_minutes_for_its_answer)
 TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diagnostics_again)
 {
     RecordSends();
-    BringCompatible(1, 2);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendCalibrate(1);
     sent.clear();
@@ -1304,13 +1080,13 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
 {
     RecordSends();
-    BringCompatible(1, 2);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendClearCalibration(1);
     sent.clear();
@@ -1319,13 +1095,13 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
 {
     RecordSends();
-    BringCompatible(1, 2);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendClearDiagnostics(1);
     sent.clear();
@@ -1334,31 +1110,19 @@ TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
     DeliverAck(can::focClearDiagnosticsId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - WritableParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(ReadOnlyParameterCount(), Count(can::focQueryParameterId));
 }
 
-TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
+TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_its_firmware_identity)
 {
     RecordSends();
-    BringCompatible(1, 6);
+    BringCompatible(1);
 
     AnswerAllReads();
 
-    EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)
-{
-    RecordSends();
-    BringCompatible(1, 5);
-    AnswerAllReads();
-    sent.clear();
-
-    client.RequestFirmwareIdentity(1);
-
-    EXPECT_FALSE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(0, Count(can::focQueryParameterId));
+    EXPECT_TRUE(Queried(can::FocParameter::firmwareVersionMajor));
+    EXPECT_TRUE(Queried(can::FocParameter::boardKind));
+    EXPECT_TRUE(Queried(can::FocParameter::stagedVersionPatch));
 }
 
 TEST_F(TestCanCommandClient, the_firmware_identity_is_reported_once_every_value_arrived)
@@ -1374,7 +1138,7 @@ TEST_F(TestCanCommandClient, the_firmware_identity_is_reported_once_every_value_
 TEST_F(TestCanCommandClient, a_firmware_identity_request_reads_the_values_again_once)
 {
     RecordSends();
-    BringCompatible(1, 6);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
 
@@ -1388,7 +1152,7 @@ TEST_F(TestCanCommandClient, a_firmware_identity_request_reads_the_values_again_
 TEST_F(TestCanCommandClient, firmware_that_refuses_the_staged_version_has_no_upgrade_service)
 {
     RecordSends();
-    BringCompatible(1, 6);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
     client.RequestFirmwareIdentity(1);
@@ -1405,7 +1169,7 @@ TEST_F(TestCanCommandClient, firmware_that_refuses_the_staged_version_has_no_upg
 TEST_F(TestCanCommandClient, a_refused_reading_other_than_the_staged_version_reports_no_identity)
 {
     RecordSends();
-    BringCompatible(1, 6);
+    BringCompatible(1);
     AnswerAllReads();
     sent.clear();
     client.RequestFirmwareIdentity(1);
@@ -1423,32 +1187,18 @@ TEST_F(TestCanCommandClient, a_firmware_upgrade_answer_names_the_node_it_came_fr
     EXPECT_EQ(3, client.FrameOrigin().SourceNodeId());
 }
 
-TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_its_eight_newest_faults)
+TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_its_eight_newest_faults)
 {
     RecordSends();
-    BringCompatible(1, CanCommandClient::faultHistoryContractMinor);
+    BringCompatible(1);
 
     AnswerAllReads();
 
-    EXPECT_TRUE(client.SupportsFaultHistory(1));
     std::vector<uint8_t> ages;
     for (const auto& frame : sent)
         if (frame.messageType == can::focQueryFaultHistoryId && frame.payload.size() == 2)
             ages.push_back(frame.payload[1]);
     EXPECT_EQ((std::vector<uint8_t>{ 0, 1, 2, 3, 4, 5, 6, 7 }), ages);
-}
-
-TEST_F(TestCanCommandClient, a_2_15_node_is_not_asked_for_its_fault_history)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::busVoltageLimitsContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    client.RequestFaultHistory(1);
-
-    EXPECT_FALSE(client.SupportsFaultHistory(1));
-    EXPECT_EQ(0u, Count(can::focQueryFaultHistoryId));
 }
 
 TEST_F(TestCanCommandClient, a_fault_record_is_reported_once_both_of_its_responses_arrived)
@@ -1480,7 +1230,7 @@ TEST_F(TestCanCommandClient, fault_conditions_of_another_age_are_not_reported)
 TEST_F(TestCanCommandClient, an_accepted_clear_of_the_fault_history_reads_it_again)
 {
     RecordSends();
-    BringCompatible(1, CanCommandClient::faultHistoryContractMinor);
+    BringCompatible(1);
     AnswerAllReads();
     EXPECT_TRUE(client.SendClearFaultHistory(1));
     EXPECT_EQ(can::focClearFaultHistoryId, sent.back().messageType);
@@ -1491,65 +1241,6 @@ TEST_F(TestCanCommandClient, an_accepted_clear_of_the_fault_history_reads_it_aga
     AnswerAllReads();
 
     EXPECT_EQ(can::focFaultHistoryDepth, Count(can::focQueryFaultHistoryId));
-}
-
-TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_but_the_store_count)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::recalibrationContractMinor);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsRecalibration(1));
-    EXPECT_FALSE(client.SupportsStoredRecalibration(1));
-    EXPECT_FALSE(Queried(can::FocParameter::recalibrationsStored));
-    EXPECT_EQ(can::focParameters.size() - storedRecalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_18_node_is_read_for_every_parameter_once)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsStoredRecalibration(1));
-    EXPECT_EQ(can::focParameters.size() - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_19_node_is_read_for_every_parameter_once)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::homedContractMinor);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsHoming(1));
-    EXPECT_FALSE(client.SupportsCoulombFriction(1));
-    EXPECT_EQ(can::focParameters.size() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_19_node_is_not_asked_for_its_coulomb_friction)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::homedContractMinor);
-
-    AnswerAllReads();
-
-    EXPECT_FALSE(Queried(can::FocParameter::frictionCoulomb));
-    EXPECT_TRUE(Queried(can::FocParameter::viscousFriction));
-}
-
-TEST_F(TestCanCommandClient, a_2_20_node_is_asked_for_its_coulomb_friction_and_read_for_every_parameter_once)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsCoulombFriction(1));
-    EXPECT_TRUE(Queried(can::FocParameter::frictionCoulomb));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, recalibrate_and_reset_model_go_out_as_their_own_commands)
@@ -1567,7 +1258,7 @@ TEST_F(TestCanCommandClient, recalibrate_and_reset_model_go_out_as_their_own_com
 TEST_F(TestCanCommandClient, an_accepted_recalibration_reads_the_model_in_use_again)
 {
     RecordSends();
-    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendRecalibrate(1);
     sent.clear();
@@ -1585,7 +1276,7 @@ TEST_F(TestCanCommandClient, an_accepted_recalibration_reads_the_model_in_use_ag
 TEST_F(TestCanCommandClient, an_accepted_model_reset_reads_the_model_in_use_again)
 {
     RecordSends();
-    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
+    BringCompatible(1);
     AnswerAllReads();
     client.SendResetModel(1);
     sent.clear();
@@ -1596,163 +1287,4 @@ TEST_F(TestCanCommandClient, an_accepted_model_reset_reads_the_model_in_use_agai
 
     EXPECT_TRUE(Queried(can::FocParameter::modelInductance));
     EXPECT_TRUE(Queried(can::FocParameter::modelInertia));
-}
-
-TEST_F(TestCanCommandClient, a_2_21_node_takes_the_setpoints_as_floats)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    EXPECT_TRUE(client.SendSetTorqueSetpoint(1, 0.0005f));
-    EXPECT_TRUE(client.SendSetSpeedSetpoint(1, 3.25f));
-    EXPECT_TRUE(client.SendSetPositionSetpoint(1, -1.5f));
-
-    ASSERT_EQ(3u, sent.size());
-    EXPECT_EQ(can::focSetTorqueSetpointPreciseId, sent[0].messageType);
-    EXPECT_EQ(Message({ 0x3A, 0x03, 0x12, 0x6F }), AfterSequence(sent[0].payload));
-    EXPECT_EQ(can::focSetSpeedSetpointPreciseId, sent[1].messageType);
-    EXPECT_EQ(Message({ 0x40, 0x50, 0x00, 0x00 }), AfterSequence(sent[1].payload));
-    EXPECT_EQ(can::focSetPositionSetpointPreciseId, sent[2].messageType);
-    EXPECT_EQ(Message({ 0xBF, 0xC0, 0x00, 0x00 }), AfterSequence(sent[2].payload));
-}
-
-TEST_F(TestCanCommandClient, a_2_20_node_keeps_the_scaled_setpoints)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    EXPECT_FALSE(client.SupportsPreciseSetpoints(1));
-    EXPECT_TRUE(client.SendSetTorqueSetpoint(1, 5.0f));
-    EXPECT_TRUE(client.SendSetSpeedSetpoint(1, 3.25f));
-
-    ASSERT_EQ(2u, sent.size());
-    EXPECT_EQ(can::focSetTorqueSetpointId, sent[0].messageType);
-    EXPECT_EQ(Message({ 0x00, 0x32 }), AfterSequence(sent[0].payload));
-    EXPECT_EQ(can::focSetSpeedSetpointId, sent[1].messageType);
-}
-
-TEST_F(TestCanCommandClient, a_node_of_unknown_contract_keeps_the_scaled_setpoints)
-{
-    RecordSends();
-
-    EXPECT_FALSE(client.SupportsPreciseSetpoints(1));
-    EXPECT_TRUE(client.SendSetPositionSetpoint(1, 0.1f));
-
-    ASSERT_EQ(1u, sent.size());
-    EXPECT_EQ(can::focSetPositionSetpointId, sent[0].messageType);
-}
-
-TEST_F(TestCanCommandClient, a_precise_setpoint_that_is_not_finite_is_not_sent)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    EXPECT_FALSE(client.SendSetSpeedSetpoint(1, std::numeric_limits<float>::quiet_NaN()));
-    EXPECT_FALSE(client.SendSetTorqueSetpointNewtonMeter(1, std::numeric_limits<float>::infinity()));
-
-    EXPECT_TRUE(sent.empty());
-    EXPECT_FALSE(client.IsBusy(1));
-}
-
-TEST_F(TestCanCommandClient, a_torque_in_newton_metres_goes_only_to_a_node_that_takes_it)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
-    BringCompatible(2, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads(1);
-    AnswerAllReads(2);
-    sent.clear();
-
-    EXPECT_FALSE(client.SendSetTorqueSetpointNewtonMeter(1, 0.1f));
-    EXPECT_TRUE(client.SendSetTorqueSetpointNewtonMeter(2, 0.1f));
-
-    ASSERT_EQ(1u, sent.size());
-    EXPECT_EQ(2u, sent[0].node);
-    EXPECT_EQ(can::focSetTorqueSetpointNewtonMeterId, sent[0].messageType);
-    EXPECT_EQ(Message({ 0x3D, 0xCC, 0xCC, 0xCD }), AfterSequence(sent[0].payload));
-}
-
-TEST_F(TestCanCommandClient, the_acknowledge_of_a_precise_setpoint_is_reported_under_the_scaled_command)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-    client.SendSetSpeedSetpoint(1, 3.25f);
-    EXPECT_TRUE(client.IsBusy(1));
-
-    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focSetSpeedSetpointId, services::CanAckStatus::success));
-    DeliverAck(can::focSetSpeedSetpointPreciseId);
-
-    EXPECT_FALSE(client.IsBusy(1));
-}
-
-TEST_F(TestCanCommandClient, the_refusal_of_a_newton_metre_torque_is_reported_under_the_scaled_command)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-    client.SendSetTorqueSetpointNewtonMeter(1, 0.1f);
-
-    EXPECT_CALL(observer, OnCommandRejected(1, can::focSetTorqueSetpointId, can::FocMotorCategoryError::modeMismatch));
-    Receive(FocId(services::CanPriority::response, services::canCategoryErrorResponseMessageTypeId, 1),
-        Message({ can::focSetTorqueSetpointNewtonMeterId, static_cast<uint8_t>(can::FocMotorCategoryError::modeMismatch) }));
-
-    EXPECT_FALSE(client.IsBusy(1));
-}
-
-TEST_F(TestCanCommandClient, a_2_21_node_is_asked_for_its_precise_status_with_every_status)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_EQ(1u, Count(can::focRequestTelemetryPreciseId));
-    EXPECT_EQ(1u, Count(can::focRequestTelemetryId));
-}
-
-TEST_F(TestCanCommandClient, a_2_20_node_is_not_asked_for_a_precise_status)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
-    AnswerAllReads();
-    sent.clear();
-
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_EQ(0u, Count(can::focRequestTelemetryPreciseId));
-}
-
-TEST_F(TestCanCommandClient, a_precise_status_reports_speed_and_position_at_full_resolution)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-
-    EXPECT_CALL(observer, OnSpeedPositionReceived(1, 0.005f, 0.00015f));
-    const auto rawId = FocId(services::CanPriority::telemetry, can::focTelemetryStatusPreciseId, 1);
-    const auto data = Message({ 0x3B, 0xA3, 0xD7, 0x0A, 0x39, 0x1D, 0x49, 0x52 });
-    LogReceived(rawId, data);
-    Receive(rawId, data);
-}
-
-TEST_F(TestCanCommandClient, on_a_2_21_node_the_coarse_status_leaves_speed_and_position_to_the_precise_one)
-{
-    RecordSends();
-    BringCompatible(1, CanCommandClient::preciseSetpointContractMinor);
-    AnswerAllReads();
-
-    EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::running, FocFaultCode::none));
-    Receive(FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1),
-        Message({ static_cast<uint8_t>(FocMotorState::running), static_cast<uint8_t>(FocFaultCode::none), 0, 10, 0, 100 }));
 }

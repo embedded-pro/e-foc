@@ -16,7 +16,8 @@ TEST_F(TestCommandDescriptions, names_motor_commands_like_the_gui)
     EXPECT_EQ("Start Motor", CommandDisplayName(can::focMotorCategoryId, can::focStartId));
     EXPECT_EQ("Emergency Stop", CommandDisplayName(can::focMotorCategoryId, can::focEmergencyStopId));
     EXPECT_EQ("Torque Setpoint", CommandDisplayName(can::focMotorCategoryId, can::focSetTorqueSetpointId));
-    EXPECT_EQ("Position Loop Bandwidth", CommandDisplayName(can::focMotorCategoryId, can::focSetPidPositionId));
+    EXPECT_EQ("Torque Setpoint (N\xC2\xB7m)", CommandDisplayName(can::focMotorCategoryId, can::focSetTorqueSetpointNewtonMeterId));
+    EXPECT_EQ("Position Setpoint", CommandDisplayName(can::focMotorCategoryId, can::focSetPositionSetpointId));
 }
 
 TEST_F(TestCommandDescriptions, has_no_name_outside_motor_category)
@@ -42,7 +43,6 @@ TEST_F(TestCommandDescriptions, names_commissioning_and_settings_commands)
 {
     EXPECT_EQ("Align Rotor", CommandDisplayName(can::focMotorCategoryId, can::focAlignId));
     EXPECT_EQ("Identify Electrical", CommandDisplayName(can::focMotorCategoryId, can::focIdentifyElectricalId));
-    EXPECT_EQ("Encoder Resolution", CommandDisplayName(can::focMotorCategoryId, can::focSetEncoderResolutionId));
     EXPECT_EQ("Controller Selection", CommandDisplayName(can::focMotorCategoryId, can::focSelectAlgorithmId));
     EXPECT_EQ("Setting", CommandDisplayName(can::focMotorCategoryId, can::focSetParameterId));
     EXPECT_EQ("Calibrate", CommandDisplayName(can::focMotorCategoryId, can::focCalibrateId));

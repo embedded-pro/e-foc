@@ -39,7 +39,6 @@ namespace tool
         FirmwareTab& Firmware() const;
         std::array<SettingsPage*, 3> SettingsPages() const;
         std::optional<can::FocMotorMode> ActiveControlMode() const;
-        bool PreciseSetpoints() const;
 
     signals:
         void StartMotorRequested();
@@ -59,7 +58,6 @@ namespace tool
         void ShowAcceptedSetpoint(can::FocMotorMode mode, int32_t counts);
         void ForgetAcceptedSetpoints();
         void ShowMotorParameters();
-        void SetPreciseSetpoints(bool precise);
 
     protected:
         bool eventFilter(QObject* watched, QEvent* event) override;
@@ -100,6 +98,5 @@ namespace tool
         std::vector<QWidget*> commandWidgets;
         std::array<SetpointControls, 3> setpoints{};
         std::optional<can::FocMotorMode> activeMode;
-        bool preciseSetpoints{ false };
     };
 }

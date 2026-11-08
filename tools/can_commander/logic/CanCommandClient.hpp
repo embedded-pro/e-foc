@@ -56,7 +56,6 @@ namespace tool
         virtual void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) = 0;
         virtual void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) = 0;
         virtual void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) = 0;
-        virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
         virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
         virtual void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) = 0;
@@ -76,22 +75,6 @@ namespace tool
         static constexpr infra::Duration motionCommandTimeout{ std::chrono::minutes(2) };
         static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
-        static constexpr uint8_t settingsContractMinor{ 1 };
-        static constexpr uint8_t diagnosticsContractMinor{ 2 };
-        static constexpr uint8_t supervisionContractMinor{ 4 };
-        static constexpr uint8_t firmwareContractMinor{ 6 };
-        static constexpr uint8_t limitsContractMinor{ 9 };
-        static constexpr uint8_t targetWindowContractMinor{ 10 };
-        static constexpr uint8_t travelLimitsContractMinor{ 11 };
-        static constexpr uint8_t thermalContractMinor{ 13 };
-        static constexpr uint8_t overTemperatureContractMinor{ 14 };
-        static constexpr uint8_t busVoltageLimitsContractMinor{ 15 };
-        static constexpr uint8_t faultHistoryContractMinor{ 16 };
-        static constexpr uint8_t recalibrationContractMinor{ 17 };
-        static constexpr uint8_t storedRecalibrationContractMinor{ 18 };
-        static constexpr uint8_t homedContractMinor{ 19 };
-        static constexpr uint8_t frictionCoulombContractMinor{ 20 };
-        static constexpr uint8_t preciseSetpointContractMinor{ 21 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -100,22 +83,6 @@ namespace tool
         bool IsOnline(uint16_t nodeId) const;
         std::set<uint16_t> OnlineNodes() const;
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
-        bool SupportsSettings(uint16_t nodeId) const;
-        bool SupportsDiagnostics(uint16_t nodeId) const;
-        bool SupportsSupervision(uint16_t nodeId) const;
-        bool SupportsFirmwareIdentity(uint16_t nodeId) const;
-        bool SupportsLimits(uint16_t nodeId) const;
-        bool SupportsTargetWindow(uint16_t nodeId) const;
-        bool SupportsTravelLimits(uint16_t nodeId) const;
-        bool SupportsThermal(uint16_t nodeId) const;
-        bool SupportsOverTemperature(uint16_t nodeId) const;
-        bool SupportsBusVoltageLimits(uint16_t nodeId) const;
-        bool SupportsFaultHistory(uint16_t nodeId) const;
-        bool SupportsRecalibration(uint16_t nodeId) const;
-        bool SupportsStoredRecalibration(uint16_t nodeId) const;
-        bool SupportsHoming(uint16_t nodeId) const;
-        bool SupportsCoulombFriction(uint16_t nodeId) const;
-        bool SupportsPreciseSetpoints(uint16_t nodeId) const;
         static infra::Duration TimeoutFor(uint8_t commandType);
 
         bool SendStartMotor(uint16_t nodeId);
@@ -127,10 +94,6 @@ namespace tool
         bool SendSetPositionSetpoint(uint16_t nodeId, float positionRad);
         bool SendSetTorqueSetpointNewtonMeter(uint16_t nodeId, float torqueNewtonMeter);
 
-        bool SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth);
-        bool SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth);
-        bool SendSetPositionBandwidth(uint16_t nodeId, float bandwidth);
-
         bool SendClearFault(uint16_t nodeId);
         bool SendAlign(uint16_t nodeId);
         bool SendIdentifyElectrical(uint16_t nodeId);
@@ -140,7 +103,6 @@ namespace tool
         bool SendClearFaultHistory(uint16_t nodeId);
         bool SendRecalibrate(uint16_t nodeId);
         bool SendResetModel(uint16_t nodeId);
-        bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
         bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);
 
@@ -194,10 +156,9 @@ namespace tool
         bool SendRead(uint16_t nodeId, const Read& read);
         void ForgetReads(uint16_t nodeId);
         void OnAccepted(uint16_t nodeId, uint8_t commandType);
-        bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
-        bool SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const;
+        bool IsCompatible(uint16_t nodeId) const;
         void RefreshStatus();
-        bool SendSetpoint(uint16_t nodeId, uint8_t scaledCommand, can::FocPreciseSetpointKind kind, float value);
+        bool SendSetpoint(uint16_t nodeId, can::FocSetpointKind kind, float value);
         static bool IsRead(uint8_t commandType);
         void CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value);
         void OnReadRefused(uint16_t nodeId, uint8_t commandType);
@@ -215,11 +176,10 @@ namespace tool
         // FocMotorCategoryClientObserver
         void OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
-        void OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) override;
-        void OnTelemetryStatusPrecise(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position) override;
+        void OnTelemetryStatus(uint16_t nodeId, can::FocMotorState state, can::FocFaultCode fault) override;
+        void OnTelemetryMotion(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position) override;
         void OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position) override;
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
-        void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
         void OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs) override;
@@ -231,13 +191,11 @@ namespace tool
         void OnConnectionChanged(bool connected) override;
 
         bool HandleCommandAck(uint32_t id, const services::CanFrame& data);
-        void DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const;
 
         can::FocMotorCanClient focClient;
         services::FirmwareUpgradeCategoryClient firmwareUpgrade;
         std::map<uint16_t, NodeCommand> commands;
         std::map<uint16_t, NodeReads> reads;
-        std::map<uint16_t, uint8_t> contractMinors;
         std::map<uint16_t, PartialIdentity> identities;
         std::map<uint16_t, can::FocFaultRecord> faultRecords;
         std::set<uint16_t> onlineNodes;

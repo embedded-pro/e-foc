@@ -64,6 +64,7 @@ namespace tool
     std::span<const SettingPresentation> LoopSettings(can::FocControlLoop loop);
     std::span<const SettingPresentation> MotorParameterSettings();
     std::span<const SettingPresentation> StartupSettings();
+    std::span<const SettingPresentation> StreamSettings();
     std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> LimitSettings();
     std::span<const SettingPresentation> TargetWindowSettings();
@@ -85,9 +86,8 @@ namespace tool
     bool IsBandwidth(can::FocParameter parameter);
     bool IsInteger(can::FocParameter parameter);
     bool IsToggle(can::FocParameter parameter);
-    bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy);
-    std::optional<uint8_t> LegacyCommandOf(can::FocParameter parameter);
-    uint8_t CommandTypeOf(const SettingChange& change, bool legacy);
+    bool IsAcceptableEntry(can::FocParameter parameter, float value);
+    uint8_t CommandTypeOf(const SettingChange& change);
 
     ChangePlan PlanLoop(const LoopEdits& edits);
 

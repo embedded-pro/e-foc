@@ -92,7 +92,7 @@ namespace
         void BringCompatible(uint16_t node = 1)
         {
             Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, node, {});
-            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, CanCommandClient::firmwareContractMinor });
+            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, can::focContractVersionMinor });
         }
 
         void StoppedOn(const e_foc::boards::Board& board, services::FirmwareVersion staged = {})
@@ -286,7 +286,7 @@ TEST_F(TestMotorFirmware, the_emergency_stop_stays_available_to_a_motor_during_i
     MotorPanel panel{ client, transfer, 1, [](IssueSeverity, const QString&) {} };
     panel.SetBusConnected(true);
     BringCompatible();
-    panel.OnContractVersion(can::focContractVersionMajor, CanCommandClient::firmwareContractMinor, true);
+    panel.OnContractVersion(can::focContractVersionMajor, can::focContractVersionMinor, true);
     ASSERT_TRUE(transfer.StartDownload(1, *InspectPack(pack, *BoardOfKind(e_foc::boards::ekTm4c1294xl.kind)).pack));
 
     EXPECT_TRUE(panel.AcceptsEmergencyStop());

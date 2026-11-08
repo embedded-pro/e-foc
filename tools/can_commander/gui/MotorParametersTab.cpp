@@ -65,42 +65,9 @@ namespace tool
         return group;
     }
 
-    void MotorParametersTab::SetLegacy(bool legacyContract)
-    {
-        legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
-        ShowAvailability();
-
-        SettingsPage::SetLegacy(legacyContract);
-    }
-
-    void MotorParametersTab::SetCoulombFrictionUnavailable(const QString& reason)
-    {
-        if (reason == coulombFrictionReason)
-            return;
-
-        coulombFrictionReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void MotorParametersTab::ShowAvailability()
-    {
-        for (auto* editor : Editors())
-            if (!legacyReason.isEmpty())
-                editor->SetUnavailable(legacyReason);
-            else
-                editor->SetUnavailable(editor->Parameter() == can::FocParameter::frictionCoulomb ? coulombFrictionReason : QString{});
-    }
-
     void MotorParametersTab::SetActionsAvailable(const QString& reason)
     {
         actionsUnavailable = reason;
-        Refresh();
-    }
-
-    void MotorParametersTab::SetMaintenanceUnavailable(const QString& reason)
-    {
-        maintenanceUnavailable = reason;
         Refresh();
     }
 
@@ -114,11 +81,10 @@ namespace tool
         identifyElectricalButton->setEnabled(available);
         identifyElectricalButton->setToolTip(available ? QString("Measure resistance, inductance and pole pairs, then align the rotor") : actionsUnavailable);
 
-        const auto& maintenanceReason = available ? maintenanceUnavailable : actionsUnavailable;
-        calibrateButton->setEnabled(maintenanceReason.isEmpty());
-        calibrateButton->setToolTip(maintenanceReason.isEmpty() ? QString(calibrateHint) : maintenanceReason);
-        clearCalibrationButton->setEnabled(maintenanceReason.isEmpty());
-        clearCalibrationButton->setToolTip(maintenanceReason.isEmpty() ? QString(clearCalibrationHint) : maintenanceReason);
+        calibrateButton->setEnabled(available);
+        calibrateButton->setToolTip(available ? QString(calibrateHint) : actionsUnavailable);
+        clearCalibrationButton->setEnabled(available);
+        clearCalibrationButton->setToolTip(available ? QString(clearCalibrationHint) : actionsUnavailable);
 
         SettingsPage::Refresh();
     }

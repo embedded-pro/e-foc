@@ -28,7 +28,6 @@ namespace tool
         QLabel* Label() const;
 
         void SetHeld(std::optional<can::FocParameterValue> value);
-        void SetLegacy(bool legacyContract);
         void SetUnavailable(const QString& reason);
         void Revert();
 
@@ -66,6 +65,5 @@ namespace tool
         std::optional<can::FocParameterValue> held;
         QString heldText;
         QString unavailableReason;
-        bool legacy{ false };
     };
 }
