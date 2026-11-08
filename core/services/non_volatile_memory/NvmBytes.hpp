@@ -8,7 +8,6 @@
 
 namespace services::nvm
 {
-    // Every multi-byte field on the media is stored least significant byte first.
     template<class T>
     void Put(infra::ByteRange image, std::size_t offset, T value)
     {

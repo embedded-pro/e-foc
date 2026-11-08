@@ -69,7 +69,6 @@ namespace services
         automatic = 2
     };
 
-    // Bumping it returns every stored configuration to its defaults; see service-nvm.md.
     inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
     inline constexpr uint8_t ConfigLayoutVersion = 14;
 

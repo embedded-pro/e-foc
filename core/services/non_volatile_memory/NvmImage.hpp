@@ -10,7 +10,6 @@
 
 namespace services
 {
-    // Written whole without an erase, then read back and compared; see service-nvm.md.
     template<std::size_t Size>
     class NvmImage
     {

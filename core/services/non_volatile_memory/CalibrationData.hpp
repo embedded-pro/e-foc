@@ -19,11 +19,9 @@ namespace services
 
     inline constexpr std::size_t coggingMapBins = 48;
 
-    // Bumping it invalidates every stored calibration; see service-nvm.md.
     inline constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     inline constexpr uint8_t CalibrationLayoutVersion = 6;
 
-    // Padding-free schema: four-byte fields first, then the noise, pole pairs and stage fill one word; see service-nvm.md.
     struct CalibrationData
     {
         float rPhase = 0.0f;

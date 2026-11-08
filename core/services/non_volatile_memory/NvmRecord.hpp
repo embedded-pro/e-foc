@@ -13,7 +13,6 @@
 
 namespace services
 {
-    // Magic, version and the CRC-32 of the data, then the data's own bytes; see service-nvm.md.
     template<class T, uint32_t Magic, uint8_t Version>
     struct NvmRecord
     {
