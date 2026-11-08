@@ -174,7 +174,7 @@ namespace application
     float FocStateMachineCommon::AutomaticCurrentLoopBandwidth() const
     {
         const auto& data = calibrationContext.Data();
-        return calibrationContext.CurrentTuningsFor(data.currentLoopBandwidth, foc::MilliHenry{ data.lD }, foc::Ampere{ services::CurrentNoiseAmpere(data.currentNoiseMilliAmpere) }).bandwidth;
+        return calibrationContext.DefaultCurrentLoopBandwidth(foc::MilliHenry{ data.lD }, foc::Ampere{ services::CurrentNoiseAmpere(data.currentNoiseMilliAmpere) });
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
@@ -198,7 +198,7 @@ namespace application
             return false;
 
         MarkProvisionalControlApplied();
-        return ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) });
+        return ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) });
     }
 
     services::FluxLinkageIdentification* FocStateMachineCommon::ResolveFluxLinkageIdent(
@@ -292,9 +292,9 @@ namespace application
         return calibrationContext.EffectiveFluxLinkage(data);
     }
 
-    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage, foc::Ampere currentNoise)
+    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise)
     {
-        return calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, currentNoise, GetFoc(), CurrentTunable());
+        return calibrationContext.ApplyModel(resistance, inductance, polePairs, fluxLinkage, currentNoise, GetFoc(), CurrentTunable());
     }
 
     state_machine::CommandResult FocStateMachineCommon::ToCommandResult(services::DispatchResult result)

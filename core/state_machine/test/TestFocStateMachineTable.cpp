@@ -84,7 +84,6 @@ namespace
         NonCommandEvent{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::CalibrationInvalidated>(), idleReadyAndFault },
-        NonCommandEvent{ Event<state_machine::BootValidityChecked>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::MotorParameterSaved>(), idleReadyAndFault },
         NonCommandEvent{ Event<state_machine::OffsetsRefreshed>(), onlyReady },
@@ -121,10 +120,12 @@ namespace
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
         infra::Execute setupMachineExpectations{ [this]()
             {
-                EXPECT_CALL(nvmMock, IsCalibrationValid(_)).WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(false);
-                    }));
+                EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                    .WillOnce(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
+                        {
+                            out = services::CalibrationData{};
+                            onDone(services::NvmStatus::InvalidData);
+                        }));
                 EXPECT_CALL(faultNotifierMock, Register(_, _));
                 EXPECT_CALL(faultNotifierMock, Unregister());
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());

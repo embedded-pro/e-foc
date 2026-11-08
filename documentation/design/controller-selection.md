@@ -421,13 +421,11 @@ the bench board the sense chain carries 38.5 mA RMS of noise; at the PWM-derived
 became 0.40 V of voltage noise and an audible hiss, which was gone at 0.08 V. A record that holds no
 noise measurement keeps the PWM-derived value.
 
-The calibration record also holds a `currentLoopBandwidth` and a `speedLoopBandwidth`, and a value in
-the acceptable range there is used instead of the derivation above (for the current loop, without the
-noise cap). Neither is measured. Calibration copies `currentLoopBandwidth` from the record it
-replaces — zero on a first calibration, which leaves the derivation in charge — and the mechanical
-identification writes a fixed 100 rad/s into `speedLoopBandwidth`, the value the derivation gives anyway.
-Only a record built outside calibration, such as the software-in-the-loop NVM images (2000 and
-100 rad/s), holds anything else. The bandwidth is therefore a performance choice, not a motor property
+The calibration record holds no current-loop bandwidth: the automatic one is always the derivation
+above, and the operator's `currentBandwidth` setting replaces it. The record does hold a
+`speedLoopBandwidth`, and a value in the acceptable range there is used instead of the speed loop's
+derivation. It is not measured: the mechanical identification writes a fixed 100 rad/s into it, the value
+the derivation gives anyway. The bandwidth is therefore a performance choice, not a motor property
 (`documentation/theory/closed-loop-control.md` §8).
 
 Setting a bandwidth replaces the derivation until it is set back to automatic. A drive whose settings
@@ -562,7 +560,6 @@ repeat the selection after every power cycle. The motor state machine will trans
 | NvmRecord            | currentAlgorithm     | uint8             | 0–255                                         | Validated on load; invalid → default (PID)                       |
 | NvmRecord            | speedAlgorithm       | uint8             | 0–255                                         | As above                                                         |
 | NvmRecord            | positionAlgorithm    | uint8             | 0–255                                         | As above                                                         |
-| CalibrationRecord    | currentLoopBandwidth | rad/s (float)     | ≥ 0                                           | Not measured: carried from the previous record; 0 = automatic    |
 | CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Not measured: mechanical identification writes a fixed 100 rad/s |
 | ConfigRecord         | loop tunings         | per knob          | `service-can.md` parameter table              | Operator's settings; a bandwidth of 0 is automatic               |
 

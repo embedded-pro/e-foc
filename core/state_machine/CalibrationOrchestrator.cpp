@@ -183,7 +183,6 @@ namespace application
                 {
                     pendingData->rPhase = result.resistance->Value();
                     pendingData->lD = result.inductance->Value();
-                    pendingData->lQ = result.inductance->Value();
                     RunAlignmentStep();
                 }
             });

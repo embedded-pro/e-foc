@@ -236,7 +236,10 @@ Reaching a mode that regulates speed or position requires a complete calibration
 mechanical parameters. Rather than run identification in every scenario, the harness writes a
 memory image whose calibration record already satisfies every completeness check. The target then
 boots straight to Ready, and one alignment command establishes the rotor reference the state
-machine requires before enabling.
+machine requires before enabling. The builder encodes the record with the firmware's own encoding
+(`service-nvm.md`), so the two cannot drift apart. Beside it the image stores a configuration
+whose current-loop bandwidth is the operator setting of 2000 rad/s, the operating point every
+calibrated scenario's limits were pinned at; the calibration record holds no bandwidth of its own.
 
 This cuts a scenario from the better part of a minute to a few seconds, and it is also what makes
 the damaged-record scenarios possible: the same builder can produce a record with a wrong magic
@@ -1135,7 +1138,6 @@ where, balanced by the time each takes, is a file next to the features
 (`integration_tests/sil-shards.json`), and every job checks that the plan lists every feature with
 an emulated scenario exactly once before it runs its share, so a new feature cannot be left out. A
 last job gathers the three reports into the one check the suite always published.
-
 
 ### Part O — How the plant is put together
 

@@ -42,9 +42,4 @@ namespace services
     {
         eeprom.WriteBuffer(infra::ConstByteRange{ erasePattern.data(), erasePattern.data() + regionSize }, baseAddress, onDone);
     }
-
-    std::size_t NvmEepromRegion::Size() const
-    {
-        return regionSize;
-    }
 }

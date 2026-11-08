@@ -19,10 +19,7 @@ namespace
         if (quantity == "resistance")
             calibration.rPhase *= factor;
         else if (quantity == "inductance")
-        {
             calibration.lD *= factor;
-            calibration.lQ *= factor;
-        }
         else if (quantity == "inertia")
             calibration.inertia *= factor;
         else if (quantity == "friction")
@@ -243,10 +240,10 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.includeCalibration = true;
     setup.nvm.includeConfig = true;
     setup.nvm.calibration = sil::CompleteCalibration();
+    setup.nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
     setup.nvm.calibration.polePairs = setup.plant.polePairs;
     setup.nvm.calibration.rPhase = setup.plant.statorResistanceOhm;
     setup.nvm.calibration.lD = setup.plant.dAxisInductanceHenry * kMilliPerUnit;
-    setup.nvm.calibration.lQ = setup.plant.qAxisInductanceHenry * kMilliPerUnit;
     setup.nvm.calibration.fluxLinkage = setup.plant.fluxLinkageWeber;
     setup.nvm.calibration.inertia = setup.plant.rotorInertiaKgM2;
     setup.nvm.calibration.frictionViscous = setup.plant.viscousDampingNmSPerRad;

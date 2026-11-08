@@ -130,7 +130,6 @@ namespace can
         services::CalibrationData data{};
         data.rPhase = pendingElectricalR->Value();
         data.lD = pendingElectricalL->Value();
-        data.lQ = pendingElectricalL->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs);
         data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
         data.currentOffsetA = pendingOffsets.a.Value();

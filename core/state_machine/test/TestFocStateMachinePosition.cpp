@@ -69,10 +69,11 @@ namespace
 
         void GivenNvmInvalid()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {
-                        onDone(false);
+                        out = services::CalibrationData{};
+                        onDone(services::NvmStatus::InvalidData);
                     }));
         }
 
@@ -82,17 +83,11 @@ namespace
             data.polePairs = 4;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
             data.inertia = 0.005f;
             data.frictionViscous = 0.0f;
             data.stage = services::CalibrationStage::complete;
 
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .WillOnce(Invoke([data](services::CalibrationData& out,
                                      infra::Function<void(services::NvmStatus)> onDone)
@@ -266,11 +261,6 @@ TEST_F(FocStateMachinePositionTest, nvm_valid_on_boot_remains_in_idle_pending_al
 TEST_F(FocStateMachinePositionTest, nvm_load_failure_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-            {
-                onDone(true);
-            }));
     EXPECT_CALL(nvmMock, LoadCalibration(_, _))
         .WillOnce(Invoke([](services::CalibrationData&,
                              infra::Function<void(services::NvmStatus)> onDone)
@@ -627,10 +617,11 @@ namespace
 
         void GivenNvmInvalid()
         {
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {
-                        onDone(false);
+                        out = services::CalibrationData{};
+                        onDone(services::NvmStatus::InvalidData);
                     }));
         }
 
@@ -640,17 +631,11 @@ namespace
             data.polePairs = 4;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
             data.inertia = 0.005f;
             data.frictionViscous = 0.0f;
             data.stage = services::CalibrationStage::complete;
 
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .WillOnce(Invoke([data](services::CalibrationData& out,
                                      infra::Function<void(services::NvmStatus)> onDone)
@@ -824,11 +809,6 @@ TEST_F(FocStateMachinePositionAutoTest, nvm_valid_on_boot_remains_in_idle_pendin
 TEST_F(FocStateMachinePositionAutoTest, nvm_load_failure_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-            {
-                onDone(true);
-            }));
     EXPECT_CALL(nvmMock, LoadCalibration(_, _))
         .WillOnce(Invoke([](services::CalibrationData&,
                              infra::Function<void(services::NvmStatus)> onDone)
@@ -1545,9 +1525,9 @@ TEST_F(FocStateMachinePositionTest, late_nvm_save_callback_after_fault_is_ignore
 TEST_F(FocStateMachinePositionTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
-    infra::Function<void(bool)> bootCb;
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([&bootCb](infra::Function<void(bool)> onDone)
+    infra::Function<void(services::NvmStatus)> bootCb;
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([&bootCb](services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
             {
                 bootCb = onDone;
             }));
@@ -1562,7 +1542,7 @@ TEST_F(FocStateMachinePositionTest, calibrate_is_rejected_until_the_boot_check_h
     EXPECT_EQ(state_machine::CommandResult::rejected, result);
     ASSERT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 
-    bootCb(false);
+    bootCb(services::NvmStatus::InvalidData);
     sm.CmdCalibrate([](state_machine::CommandResult) {});
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
@@ -1847,9 +1827,9 @@ TEST_F(FocStateMachinePositionAutoTest, late_nvm_save_callback_after_fault_is_ig
 TEST_F(FocStateMachinePositionAutoTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
-    infra::Function<void(bool)> bootCb;
-    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-        .WillOnce(Invoke([&bootCb](infra::Function<void(bool)> onDone)
+    infra::Function<void(services::NvmStatus)> bootCb;
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([&bootCb](services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
             {
                 bootCb = onDone;
             }));
@@ -1864,7 +1844,7 @@ TEST_F(FocStateMachinePositionAutoTest, calibrate_is_rejected_until_the_boot_che
     EXPECT_EQ(state_machine::CommandResult::rejected, result);
     ASSERT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 
-    bootCb(false);
+    bootCb(services::NvmStatus::InvalidData);
     sm.CmdCalibrate([](state_machine::CommandResult) {});
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }

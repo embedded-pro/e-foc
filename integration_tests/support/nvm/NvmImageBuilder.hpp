@@ -12,6 +12,7 @@ namespace sil
     static constexpr uint32_t configRegionOffset = 128;
     static constexpr uint32_t learnedModelRegionOffset = 352;
     static constexpr uint32_t faultHistoryRegionOffset = 384;
+    static constexpr float calibratedCurrentLoopBandwidth = 2000.0f;
 
     enum class RecordDamage : uint8_t
     {

@@ -69,12 +69,6 @@ namespace
                 EXPECT_CALL(canMock, SendData(_, _, _)).Times(AnyNumber());
                 EXPECT_CALL(canMock, ReceiveData(_)).Times(AnyNumber());
                 EXPECT_CALL(faultNotifierMock, Register(_, _)).Times(AnyNumber());
-                EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                    .Times(AnyNumber())
-                    .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-                        {
-                            done(true);
-                        }));
                 EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -83,7 +77,6 @@ namespace
                             data.polePairs = 4;
                             data.rPhase = 0.5f;
                             data.lD = 1.0f;
-                            data.lQ = 1.0f;
                             data.stage = services::CalibrationStage::complete;
                             done(services::NvmStatus::Ok);
                         }));
