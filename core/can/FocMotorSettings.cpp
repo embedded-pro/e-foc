@@ -89,6 +89,7 @@ namespace can
             case FocParameter::encoderResolution:
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
+            case FocParameter::telemetryRate:
                 return ParameterGroup::startup;
             case FocParameter::supervisionWindow:
             case FocParameter::supervisionCurrentFraction:
@@ -238,6 +239,8 @@ namespace can
             return config.canNodeId;
         if (parameter == FocParameter::canBitrate)
             return config.canBaudrate;
+        if (parameter == FocParameter::telemetryRate)
+            return config.telemetryRateHz;
         return config.encoderResolution;
     }
 
@@ -247,6 +250,8 @@ namespace can
             config.canNodeId = value;
         else if (parameter == FocParameter::canBitrate)
             config.canBaudrate = value;
+        else if (parameter == FocParameter::telemetryRate)
+            config.telemetryRateHz = value;
         else
             config.encoderResolution = value;
     }

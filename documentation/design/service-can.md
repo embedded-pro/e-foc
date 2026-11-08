@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.23.0
+version: 0.24.0
 component: can-service
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.23.0                   |
+| Version   | 0.24.0                   |
 | Component | can-service              |
 | Date      | 2026-11-08               |
 
@@ -35,13 +35,12 @@ date: 2026-11-08
 - Bridging the server category to `ControlModeStateMachine`, translating motor control commands into state machine transitions.
 - Providing a user-facing client API that composes the protocol client, transport, and category client into a single object for use by host-side tools and SIL tests.
 - Applying tracing decorators at every layer boundary so all CAN frames and protocol lifecycle events are observable.
-- Delegating the electrical identification command to `ElectricalParametersIdentification` and broadcasting its result via a response frame.
-- Persisting encoder resolution and telemetry rate changes to `NonVolatileMemory`.
-- Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
+- Delegating the electrical identification command to `ElectricalParametersIdentification`; its result lands in the calibration record, which a client reads back as parameters.
+- Broadcasting the on-demand status and motion telemetry frames in response to `RequestTelemetry`.
 - Streaming the measured d- and q-axis currents and the rotor position at the configured telemetry rate (Part J).
 - Selecting the control algorithm of each loop and reporting the algorithms in force.
 - Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
-  parameters of the calibration record, the settings that take effect at the next start and the drive-wide
+  parameters of the calibration record, the start-up settings, the current stream's rate and the drive-wide
   supervision settings.
 - Registering the `can-lite` firmware-upgrade category beside the FOC motor category, and answering `busy`
   to configuration writes while a firmware pack is received (Part K).
@@ -80,13 +79,58 @@ against them by hand. A descriptor edit therefore changes the accepted length an
 which is what surfaces the encode or decode change that has to accompany it.
 
 **Contract version.** `focContractVersionMajor.focContractVersionMinor` identifies the contract, and
-`QueryContractVersion` (`0x12`) answers it in `ContractVersionResponse` (`0x92`). A client whose major differs
-from the server's shall report the mismatch and send no further category-`0x02` commands; equal majors are
-compatible. Adding a message is a minor bump; changing any field layout, or the meaning of any enumerator, is
-a major bump. The client keeps the verdict per server node, because one client commands several drives on a
-bus: an incompatible node silences commands to itself only, and a node that answers again (after a firmware
-update) is judged afresh. The client remembers the eight most recent nodes, the number of servers `can-lite`
-tracks per bus.
+`QueryContractVersion` (`0x12`) answers it in `ContractVersionResponse` (`0x92`). A client and a server are
+compatible only when both numbers are equal: the CAN Commander, the integration suite and the firmware are
+built and released together, and no client keeps a path for an older or newer server. A client whose version
+differs from the server's shall report the mismatch and send no further category-`0x02` commands to that
+node. Adding a message is a minor bump; removing one, changing any field layout, or changing the meaning of
+any enumerator, is a major bump. The client keeps the verdict per server node, because one client commands
+several drives on a bus: an incompatible node silences commands to itself only, and a node that answers again
+(after a firmware update) is judged afresh. The client remembers the eight most recent nodes, the number of
+servers `can-lite` tracks per bus.
+
+The sections that follow name the version that introduced each message and parameter. They record history:
+since compatibility needs equal versions, no client branches on a minor version, and a remark below that an
+older client does not ask for something describes the contract as it was, not behaviour to implement.
+
+**Contract 3.0 — one form per command.** Version 3.0 removes every message that duplicated another one, so
+each quantity has one way onto the wire. The identifiers of the removed messages are retired and never reused.
+
+| Removed                                          | Retired IDs   | Replaced by                                                                       |
+|--------------------------------------------------|---------------|-----------------------------------------------------------------------------------|
+| `SetPidCurrent`, `SetPidSpeed`, `SetPidPosition` | `0x03`–`0x05` | `SetParameter` of `currentBandwidth`, `speedBandwidth`, `positionBandwidth`       |
+| `SetEncoderResolution`                           | `0x09`        | `SetParameter` of `encoderResolution`                                             |
+| `ConfigureTelemetryRate`                         | `0x0D`        | `SetParameter` of `telemetryRate`                                                 |
+| the `int16` setpoints of 2.0                     | `0x0F`–`0x11` | the `float32` setpoints `0x1F`–`0x22` (contract 2.21)                             |
+| `RequestTelemetryPrecise`                        | `0x23`        | `RequestTelemetry`, which now answers with both telemetry frames                  |
+| `ElectricalParamsResponse`                       | `0x86`        | `QueryParameter` of `resistance`, `inductance`, `polePairs` after the acknowledge |
+
+The dedicated commands accepted values the parameter table refuses — a bandwidth above the loop's maximum, an
+encoder resolution above 2²⁴ — and could not select an automatic bandwidth; through `SetParameter` every
+value meets the one table. The `int16` setpoints resolved 0.1 A, 1 rad/s and 0.01 rad, and the electrical
+parameters response a thousandth of an ohm and a millihenry, coarser than the `float32` values that were
+already on the wire; the response also went out before the calibration record that holds the values had been
+accepted, so it could report a result the drive then discarded.
+
+`TelemetryStatusResponse` (`0x89`) keeps the state and the fault code and drops the `int16` speed and position;
+the measured speed and position travel only in `TelemetryMotion` (`0x8B`, named `TelemetryStatusPrecise` in
+2.21), as `float32`. The two do not fit one eight-byte frame, so `RequestTelemetry` (`0x08`) is answered with
+`TelemetryStatusResponse`, then `TelemetryMotion`, then the acknowledge. The emergency status broadcast on a
+fault (Part G) is a `TelemetryStatusResponse` and no longer carries a zero speed and position.
+
+| ID     | Message                   | Direction | Fields (after the sequence byte for commands)     | Answer                                                             |
+|--------|---------------------------|-----------|---------------------------------------------------|--------------------------------------------------------------------|
+| `0x08` | `RequestTelemetry`        | command   | —                                                 | `TelemetryStatusResponse`, `TelemetryMotion`, then the acknowledge |
+| `0x89` | `TelemetryStatusResponse` | telemetry | state `uint8`, fault `uint8`                      | —                                                                  |
+| `0x8B` | `TelemetryMotion`         | telemetry | speed `float32` (rad/s), position `float32` (rad) | —                                                                  |
+
+The current stream's rate is a numbered parameter beside the other configuration fields. It is stored at
+once and in force within one millisecond (Part J); writing it is refused `busy` while a firmware pack is
+received, as every configuration write is (Part K).
+
+| ID     | Parameter       | Unit | Range                      | Automatic | Takes effect |
+|--------|-----------------|------|----------------------------|-----------|--------------|
+| `0x64` | `telemetryRate` | Hz   | 0 stops the stream, 1–1000 | no        | within 1 ms  |
 
 **Contract 2.1 — algorithms and parameters.** Version 2.1 adds four commands and two responses; nothing in
 2.0 changes, so a 2.0 client keeps working against a 2.1 server and a 2.1 client can tell from the minor
@@ -523,65 +567,51 @@ record before it is applied, and then replaces the feed-forward at once, a value
 can be commissioned from a measured value or have the feed-forward switched off without a recalibration. Torque
 mode stores the value and has no feed-forward to change. A client older than 2.20 does not ask for it.
 
-**Contract 2.21 — float32 setpoints and telemetry, torque in N·m.** Version 2.21 adds five commands and one
-telemetry frame; nothing in 2.20 changes, and the scaled setpoint commands (`0x0F`–`0x11`) and the status
-telemetry (`0x89`) stay byte for byte as they were, so an older host keeps working. The scaled commands resolve
-0.1 A, 1 rad/s and 0.01 rad (about six counts of a 4000-count encoder); the new commands carry the quantity as an
-IEEE-754 `float32`, most significant byte first like every multi-byte field of the category, the encoding `SetParameter` already uses, and resolve far finer than 1 mA,
+**Contract 2.21 — float32 setpoints and telemetry, torque in N·m.** Version 2.21 added the `float32` setpoints
+and the `float32` motion telemetry; 3.0 removed the `int16` forms they duplicated and gave the remaining ones the
+plain names below. Each carries its quantity as an IEEE-754 `float32`, most significant byte first like every
+multi-byte field of the category, the encoding `SetParameter` uses, and resolves far finer than 1 mA,
 0.01 rad/s and a tenth of an encoder count.
 
-| ID     | Message                        | Direction | Fields (after the sequence byte for commands)     | Answer                                         |
-|--------|--------------------------------|-----------|---------------------------------------------------|------------------------------------------------|
-| `0x1F` | `SetTorqueSetpointPrecise`     | command   | iq `float32` (A)                                  | the acknowledge                                |
-| `0x20` | `SetTorqueSetpointNewtonMeter` | command   | torque `float32` (N·m)                            | the acknowledge                                |
-| `0x21` | `SetSpeedSetpointPrecise`      | command   | speed `float32` (rad/s)                           | the acknowledge                                |
-| `0x22` | `SetPositionSetpointPrecise`   | command   | position `float32` (rad)                          | the acknowledge                                |
-| `0x23` | `RequestTelemetryPrecise`      | command   | —                                                 | `TelemetryStatusPrecise`, then the acknowledge |
-| `0x8B` | `TelemetryStatusPrecise`       | telemetry | speed `float32` (rad/s), position `float32` (rad) | —                                              |
+| ID     | Message                        | Direction | Fields (after the sequence byte for commands) | Answer          |
+|--------|--------------------------------|-----------|-----------------------------------------------|-----------------|
+| `0x1F` | `SetTorqueSetpoint`            | command   | iq `float32` (A)                              | the acknowledge |
+| `0x20` | `SetTorqueSetpointNewtonMeter` | command   | torque `float32` (N·m)                        | the acknowledge |
+| `0x21` | `SetSpeedSetpoint`             | command   | speed `float32` (rad/s)                       | the acknowledge |
+| `0x22` | `SetPositionSetpoint`          | command   | position `float32` (rad)                      | the acknowledge |
 
-A precise setpoint is the scaled setpoint of the same quantity with a finer wire value: the same control mode
-must be active, the same state is required, the same limits bound it (the inverter's current limit, the speed and
-position bounds of the command limits, the travel limits), it feeds the same command-timeout supervision and
-setpoint ramp, and it is acknowledged and refused in the same words. A value that is not finite (NaN or an
-infinity) is a foreign layout: the frame is rejected as `invalidPayload` before it reaches the drive.
+A setpoint is accepted only in the control mode of its quantity and only while the drive is `Ready` or
+`Enabled`; it is bounded by the inverter's current limit, the speed and position bounds of the command limits
+and the travel limits, it feeds the command-timeout supervision and the setpoint ramp, and it is refused
+`modeMismatch`, `invalidPayload` or `invalidState` in that order of checks (Part D). A value that is not finite
+(NaN or an infinity) is a foreign layout: the frame is rejected as `invalidPayload` before it reaches the drive.
 
 `SetTorqueSetpointNewtonMeter` demands shaft torque instead of q-axis current. The drive converts it with the
 torque constant of the calibrated motor, `1.5 · polePairs · fluxLinkage` (amplitude-invariant Clarke, the factor
 the plant model applies too), the pole pairs from the calibration record and the flux linkage in force (the
 recorded one, or the platform's default while none is recorded). The q-axis current that results is held to the
-same current limit as `SetTorqueSetpointPrecise`. A drive whose torque constant is not positive — no
+same current limit as `SetTorqueSetpoint`. A drive whose torque constant is not positive — no
 calibration record, so no pole pairs, or no usable flux linkage — refuses the command with `invalidState`: it has
 no motor to convert for. The torque constant is also a motor parameter pair a client reads (`polePairs`,
 `fluxLinkage`), so a client can show the conversion it expects.
 
-`TelemetryStatusPrecise` carries the measured speed and the encoder angle exactly as `TelemetryStatusResponse`
-does (Part D, `OnRequestTelemetry`), in `float32`, and is sent only when the host asks with
-`RequestTelemetryPrecise`; an older host never asks, so it never receives the frame. State and fault code stay
-in `TelemetryStatusResponse`, which does not fit the same eight-byte frame beside two floats, so a host that wants
-all four requests both. The d- and q-axis currents of `TelemetryCurrents` already resolve 1 mA and are not
-repeated; the position is the encoder's mechanical angle from the alignment zero in [−π, π), as in the scaled telemetry. A
-client older than 2.21 does not ask for any of the six.
+`TelemetryMotion` carries the measured speed and the encoder angle (Part D, `OnRequestTelemetry`). The d- and
+q-axis currents of `TelemetryCurrents` already resolve 1 mA and are not repeated; the position is the encoder's
+mechanical angle from the alignment zero in [−π, π), as in the current stream.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):
 
 | Quantity          | Wire type | Scale factor | Example                                    |
 |-------------------|-----------|--------------|--------------------------------------------|
-| Current           | int16     | 10           | 1.5 A → 15 wire                            |
-| Speed             | int16     | 1            | 300 rad/s → 300 wire                       |
-| Position          | int16     | 100          | 3.14 rad → 314 wire                        |
-| Bandwidth         | int16     | 1            | closed-loop bandwidth in rad/s             |
-| Resistance        | int16     | 1000         | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire  |
-| Inductance        | int16     | 1000         | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire |
 | Streamed current  | int16     | 1000         | 0.512 A → 512 wire; saturates at ±32.767 A |
 | Streamed position | int16     | 10000        | −3.1416 rad → −31416 wire                  |
 | Recorded voltage  | int16     | 100          | 40.00 V → 4000 wire                        |
 | Recorded current  | int16     | 100          | 1.25 A → 125 wire                          |
 | Power-up count    | int16     | 1            | 12 → 12 wire                               |
 
-The reference-motor values come from `documentation/theory/foc-plant-models.md` "Reference motors". Inertia
-and friction, around 1e-6 and 1e-5 in SI units, travel only as `float32` parameters (`SetParameter`,
-`QueryParameter`).
+Every other quantity — setpoints, measured speed and position, and every motor parameter, from a resistance of
+a few hundred milliohms to an inertia around 1e-6 kg·m² — travels as `float32`.
 
 ### One definition, verified byte for byte
 
@@ -605,7 +635,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 
 | Message / item                | e-foc                                       | can-lite example       | Why                                                                                      |
 |-------------------------------|---------------------------------------------|------------------------|------------------------------------------------------------------------------------------|
-| `0x03/0x04/0x05`              | one `int16` closed-loop bandwidth           | three `int16` kp/ki/kd | each loop derives its gains from its bandwidth (REQ-CTL-006), never from per-axis gains  |
+| `0x03/0x04/0x05`              | retired, never reused                       | three `int16` kp/ki/kd | each loop derives its gains from its bandwidth (REQ-CTL-006), set through `SetParameter` |
 | `0x0A`                        | `Align`                                     | reserved, unused       | alignment is a first-class command here                                                  |
 | `FocMotorState`               | adds `partialCalibration = 4`, `ready = 5`  | stops at `calibrating` | speed and position modes can hold a partial record                                       |
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                            |
@@ -623,13 +653,9 @@ The observer interface provides callbacks for:
 - `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop` — lifecycle commands with a `CanAckStatus` result callback.
 - `OnQueryFaultHistory`, `OnClearFaultHistory` — the fault history of contract 2.16, with a record or a status callback.
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
-- `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
-- `OnSetPreciseSetpoint` — takes a small tagged value (torque as current, torque in N·m, speed or position, as `float32` in the unit the kind names) and a completion callback; the four precise setpoints of contract 2.21 share it, so the observer surface stays small; `OnRequestTelemetryPrecise` answers the precise telemetry request.
-- `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parsed from the CAN frame and set the bandwidth `SetParameter` sets, through the same `ControlModeStateMachine` path: acknowledged once in force and stored, refused as a `SetParameter` of that bandwidth would be. Contract 2.0 has no automatic bandwidth, so `0` stays `invalidPayload`.
-- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CMS-001); on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
-- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-CTL-003); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-COM-002).
-- `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
-  The telemetry rate is the current stream's rate (Part J), 0–1000 Hz.
+- `OnSetSetpoint` — takes a small tagged value (torque as current, torque in N·m, speed or position, as `float32` in the unit the kind names) and a completion callback; the four setpoint commands share it, so the observer surface stays small.
+- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; waits for the rotor to come to rest and measures and applies the current-sensor offsets before it estimates (REQ-CMS-001); on estimation success calls `CmdCompleteExternalCalibration()` and acknowledges once it is accepted; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
+- `OnRequestTelemetry` — broadcasts the current state and fault code via `focTelemetryStatusResponseId`, then the measured speed and measured position via `focTelemetryMotionId`. Position is the encoder's mechanical angle from the alignment zero, in [−π, π) (REQ-CTL-003); speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-COM-002).
 - `OnSelectAlgorithm`, `OnQueryAlgorithms` — receive a loop and algorithm already range-checked against the
   contract's enumerations; the result callback sends `AlgorithmsResponse` and then the acknowledgement.
 - `OnSetParameter`, `OnQueryParameter` — receive a parameter number and, for a write, a value the server has
@@ -642,7 +668,7 @@ The observer interface provides callbacks for:
 - `OnRecalibrate` — the recalibration command of contract 2.17, with a `CanAckStatus` result callback.
 - `OnResetModel` — the reset of the stored recalibration of contract 2.18, with a status callback.
 
-The precise handlers of contract 2.21 — the four setpoints and `RequestTelemetryPrecise` — sit in a third handler group.
+The four setpoint handlers sit in a third handler group.
 The commissioning handlers — `Align`, the electrical identification, `Calibrate` and `ClearCalibration` — sit in
 one handler group of the server, and the maintenance handlers — `ClearDiagnostics`, the fault history,
 `Recalibrate` and `ResetModel` — in another, so the server's own surface stays small as the contract grows.
@@ -652,10 +678,10 @@ one handler group of the server, and the maintenance handlers — `ClearDiagnost
 Inherits `CanCategoryClient` from `can-lite`. Provides typed `Send*` methods that encode physical units into wire format via `CanPayloadWriter` and call `SendCommand(nodeId, messageType, payload)`.
 
 The three commands without fields that 2.2 adds — `Calibrate`, `ClearCalibration`, `ClearDiagnostics` — share
-one send method that takes the command; like every other send it is refused for a node whose major contract
+one send method that takes the command; like every other send it is refused for a node whose contract
 version differs.
 
-The four precise setpoints of 2.21 share one send method that takes a tagged setpoint (kind and `float32` value) and refuses a value that is not finite before it is sent; the status request takes the telemetry resolution as an argument, and `TelemetryStatusPrecise` has its own callback, answered by a handler group of its own.
+The four setpoints share one send method that takes a tagged setpoint (kind and `float32` value) and refuses a value that is not finite before it is sent. `TelemetryStatusResponse` is decoded into a state and a fault code and `TelemetryMotion` into a speed and a position, each on its own callback; a frame whose state is not one the contract defines is dropped, a fault code the client does not know is passed on.
 
 Registers response handlers for the server-to-client response message types. Response handlers decode the payload and invoke the corresponding observer callbacks, each naming the node that sent the response.
 
@@ -677,20 +703,10 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnQueryFaultHistory(age)` → the fault history's record of that age, answered with both responses.
 - `OnClearFaultHistory` → clears the fault history; the acknowledgement follows the store.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
-- `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
-- PID bandwidth commands → the loop's stored settings with this bandwidth, through `Set*Tunings` on the state
-  machine, as a `SetParameter` of that bandwidth: the same `foc::CommandLimits` ranges and stopped-state policy,
-  acknowledged once stored; a value out of range is acknowledged `invalidPayload`, a loop the active mode does
-  not run is answered `modeMismatch`, and a drive that is not stopped is acknowledged `invalidState`.
-- `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
-- `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds.
+- `OnSetSetpoint` → validate mode, range and state, then delegate to `TrySet*` on the state machine; the N·m kind first converts with the torque constant of Part A (contract 2.21) and is refused `invalidState` when there is none.
+- `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the calibration record's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
+- `OnRequestTelemetry` → broadcast the current state and fault code via `focTelemetryStatusResponseId`, then the measured speed and measured position via `focTelemetryMotionId`; always succeeds.
   `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
-- `OnSetPreciseSetpoint` → the same validation and `TrySet*` path as the scaled setpoint of the quantity, so a precise setpoint differs from it in resolution only; the N·m kind first converts with the torque constant of Part A (contract 2.21) and is refused `invalidState` when there is none.
-- `OnRequestTelemetryPrecise` → broadcast the measured speed and measured position of `OnRequestTelemetry` through `focTelemetryStatusPreciseId`; always succeeds.
-- `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
-  The configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
-  record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection that
-  an older copy of the record still held.
 - `OnSelectAlgorithm` → the control mode's selection for that loop, then the configuration record is stored;
   the response and acknowledgement follow the write. `AlgorithmsResponse` reports what the selectors run, so
   a refused selection is visible as the unchanged algorithm.
@@ -701,15 +717,19 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   - a motor parameter: the control mode dispatches `SetMotorParameter` to the lifecycle, which stores the
     edited calibration record and re-applies the model (`state-machine.md`); the operator's tuning settings
     are re-applied on top, because applying a model re-derives the loop tunings;
-  - a start-up setting: changed in the configuration record and stored; it takes effect at the next start.
-    A start-up setting that cannot be stored is taken back, and the record's next write leaves it out.
+  - a start-up setting or the telemetry rate: changed in the configuration record and stored; a start-up
+    setting takes effect at the next start, the telemetry rate at the current stream's next tick (Part J).
+    A setting that cannot be stored is taken back, and the record's next write leaves it out. The
+    configuration record has one owner, `ControlModeStateMachine`: the bridge changes the field in that
+    record and asks it to store it, so a write from CAN can never put back an algorithm or mode selection
+    that an older copy of the record still held.
   A second write while one is outstanding, or while a mode selection or a configuration write is in
   flight, answers `busy`.
 - `OnQueryParameter` → the value in force: a loop setting's effective value (an automatic bandwidth reports
   the bandwidth the firmware derived, flagged automatic, or `0` flagged automatic when the active mode does
   not run that loop), a motor parameter from the calibration record in RAM (`0` while unknown; an unset flux
-  linkage reports the platform's default, flagged automatic), a start-up setting from the stored
-  configuration. The read-only parameters report, never flagged automatic: the current offsets and the
+  linkage reports the platform's default, flagged automatic), a start-up setting or the telemetry rate from
+  the stored configuration. The read-only parameters report, never flagged automatic: the current offsets and the
   cogging-map peak from the calibration record in RAM; the active mode's online estimates (`0` in torque
   mode, which runs none); the control-loop statistics of `PlatformDiagnostics`; and the reset cause the
   platform reported at start-up.
@@ -726,11 +746,10 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnResetModel` → `ControlModeStateMachine::CmdResetModel()`; not stopped answers `invalidState`, a store that
   fails `persistenceFailed`.
 
-The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
-`OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and `OnClearDiagnostics` — are
-forwarded to `FocMotorSettingsBridge`, which the bridge owns. It holds the one outstanding setting at a time,
-so a settings write that arrives while another is being stored is answered `busy`, whichever message carried
-it. The commissioning callbacks — `OnAlign`, the identifications, `OnCalibrate` and `OnClearCalibration` — are
+The settings callbacks — `OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and
+`OnClearDiagnostics` — are forwarded to `FocMotorSettingsBridge`, which the bridge owns. It holds the one
+outstanding setting at a time, so a settings write that arrives while another is being stored is answered
+`busy`, whichever message carried it. The commissioning callbacks — `OnAlign`, the identifications, `OnCalibrate` and `OnClearCalibration` — are
 forwarded to `FocMotorCommissioningBridge`, which the bridge also owns and which holds each one's outstanding
 answer. The bridge takes the platform it reads from as one argument: the inverter and encoder, the platform
 diagnostics, and the reset cause.
@@ -791,7 +810,7 @@ stateDiagram-v2
 through `SendTelemetry`, which uses `CanPriority::telemetry` (12). CAN arbitration is by identifier, and the
 priority field is the high bits of the identifier, so a telemetry-priority fault notification loses arbitration
 to routine telemetry on a busy bus — exactly when the bus is busiest and the notification matters most. The
-payload is unchanged.
+payload is a `TelemetryStatusResponse`: the `fault` state and the fault code.
 
 Arbitration only helps a frame that reaches the controller. The `can-lite` send queue therefore orders queued
 frames by priority, keeps two of its slots for emergency frames only, and lets an emergency frame displace the
@@ -871,9 +890,10 @@ the configured rate is not zero and a closed-loop cascade runs — torque, speed
 calibration steps that drive the motor through the cascade (mechanical identification, cogging map). The
 open-loop steps (alignment, resistance and inductance injection) and a stopped drive produce no windows.
 
-**Rate.** The rate is `telemetryRateHz` of the configuration record, set by `ConfigureTelemetryRate`
-(`0x0D`): 0 stops the stream, 1–1000 Hz runs it; a larger value is answered `invalidPayload` and changes
-nothing. A stored change takes effect within one millisecond. The default record holds 100 Hz.
+**Rate.** The rate is `telemetryRateHz` of the configuration record, read and written as the parameter
+`telemetryRate` (Part A, contract 3.0): 0 stops the stream, 1–1000 Hz runs it; any other value is answered
+`invalidPayload` and changes nothing. A stored change takes effect within one millisecond. The default record
+holds 100 Hz.
 
 **Sending.** An event-loop timer drains the ring every millisecond and hands each sample to the send queue
 at telemetry priority (12). At most two stream frames are in the send queue at once, which leaves the other
@@ -931,7 +951,7 @@ firmware-upgrade category (`0x1`), on the same node ID, with the firmware upgrad
 (`service-firmware-upgrade.md`). Its commands carry no sequence byte, as the `can-lite` specification defines,
 so they do not take part in the FOC motor category's sequence bookkeeping, and the server's rate limit of 500
 commands a second covers both categories. While a pack is received the bridge answers `busy` to every command
-that writes the configuration record — start-up settings, `ConfigureTelemetryRate` and the fault supervision
+that writes the configuration record — start-up settings, the telemetry rate and the fault supervision
 settings — and the control-mode state machine refuses the commands that start the drive or asynchronous work,
 because the download counts as pending work. A pack that is staged, waiting for the user to apply it, holds
 nothing. `EmergencyStop` is always accepted.
@@ -966,9 +986,9 @@ nothing. `EmergencyStop` is always accepted.
 | Entity                | Field     | Type / Unit    | Range                          | Notes                                                            |
 |-----------------------|-----------|----------------|--------------------------------|------------------------------------------------------------------|
 | FocMotorMode          | mode      | enum uint8     | torque=0, speed=1, position=2  | Transmitted as single byte                                       |
-| Torque setpoint       | iq        | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 10 [A]                                         |
-| Speed setpoint        | speed     | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 1 [rad/s]                                      |
-| Position setpoint     | position  | int16 wire     | INT16_MIN – INT16_MAX          | Physical = wire / 100 [rad]                                      |
+| Setpoint              | value     | float32 wire   | finite                         | A, N·m, rad/s or rad by command; IEEE 754, MSB first             |
+| TelemetryMotion       | speed     | float32 wire   | finite                         | rad/s, the active mode's measured speed                          |
+| TelemetryMotion       | position  | float32 wire   | [−π, π)                        | rad, the encoder angle from the alignment zero                   |
 | FocMotorCategoryError | code      | enum uint8     | 0–6                            | See FocMotorMessages.hpp                                         |
 | FocControlLoop        | loop      | enum uint8     | current=0, speed=1, position=2 | Selects the loop of `SelectAlgorithm`                            |
 | FocParameter          | parameter | enum uint8     | see the parameter table        | Numbers of `SetParameter`, `QueryParameter`, `ParameterResponse` |
@@ -1022,34 +1042,6 @@ sequenceDiagram
     BRG->>SRV: SendResponse(focSelectControlModeResponseId, activeMode)
     BRG->>ACK: responseCallback(CanAckStatus::success)
 ```
-
-### 2.0 Bandwidth Commands
-
-```mermaid
-sequenceDiagram
-    participant CAN as CAN Bus
-    participant SRV as FocMotorCategoryServer
-    participant BRG as FocMotorCanBridge
-    participant CMS as ControlModeStateMachine
-    participant NVM as ConfigWriter
-
-    CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
-    SRV->>BRG: OnSetPidCurrent(bandwidth, successCallback)
-    alt bandwidth below 1 rad/s
-        BRG->>SRV: SendCommandAck(invalidPayload)
-    else
-        BRG->>CMS: SetCurrentTunings(stored tunings with this bandwidth)
-        CMS->>NVM: Persist
-        NVM-->>CMS: stored
-        CMS-->>BRG: ok | invalidState | wrongMode | invalidParameters | nvmFailed
-        BRG->>SRV: success ack, or the SetParameter answer for the refusal
-    end
-    SRV->>CAN: commandAck frame (and category error when refused)
-```
-
-From contract 2.1 the 2.0 bandwidth commands no longer change the running loop alone: they set the stored
-setting, so a bandwidth survives a restart and reads back through `QueryParameter`. A command for a loop the
-active mode does not run is answered `modeMismatch` rather than `invalidPayload`.
 
 ### SetParameter (tuning setting)
 
@@ -1135,5 +1127,5 @@ graph LR
 | # | Question                                                         | Resolution                                                                                                                       | Status   |
 |---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|----------|
 | 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | Status on demand via `OnRequestTelemetry`; currents and position pushed by the current stream (Part J)                           | resolved |
-| 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, stored as that loop's bandwidth setting (2.0 Bandwidth Commands) | resolved |
+| 2 | PID bandwidth commands                                           | Retired in 3.0: a loop's bandwidth is the parameter `currentBandwidth`, `speedBandwidth` or `positionBandwidth` (`SetParameter`) | resolved |
 | 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                     | resolved |

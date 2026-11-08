@@ -125,12 +125,6 @@ TEST(WireContractDocumentation, the_scale_table_matches_the_contract)
     const auto documented = DocumentedScales();
     ASSERT_FALSE(documented.empty()) << "no scale table found in service-can.md";
 
-    EXPECT_EQ(can::focCurrentScale, documented.at("Current"));
-    EXPECT_EQ(can::focSpeedScale, documented.at("Speed"));
-    EXPECT_EQ(can::focPositionScale, documented.at("Position"));
-    EXPECT_EQ(can::focPidScale, documented.at("Bandwidth"));
-    EXPECT_EQ(can::focResistanceScale, documented.at("Resistance"));
-    EXPECT_EQ(can::focInductanceScale, documented.at("Inductance"));
     EXPECT_EQ(can::focStreamCurrentScale, documented.at("Streamed current"));
     EXPECT_EQ(can::focStreamPositionScale, documented.at("Streamed position"));
     EXPECT_EQ(can::focRecordedVoltageScale, documented.at("Recorded voltage"));
@@ -200,6 +194,6 @@ TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documen
 {
     const auto document = DesignDocument();
 
-    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents", "QueryFaultHistory", "ClearFaultHistory", "FaultRecordResponse", "FaultConditionsResponse", "SetTorqueSetpointPrecise", "SetTorqueSetpointNewtonMeter", "SetSpeedSetpointPrecise", "SetPositionSetpointPrecise", "RequestTelemetryPrecise", "TelemetryStatusPrecise" })
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics", "TelemetryCurrents", "QueryFaultHistory", "ClearFaultHistory", "FaultRecordResponse", "FaultConditionsResponse", "SetTorqueSetpoint", "SetTorqueSetpointNewtonMeter", "SetSpeedSetpoint", "SetPositionSetpoint", "RequestTelemetry", "TelemetryStatusResponse", "TelemetryMotion" })
         EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

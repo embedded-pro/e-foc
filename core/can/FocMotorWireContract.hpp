@@ -18,8 +18,13 @@
 
 namespace can
 {
-    static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 21;
+    static constexpr uint8_t focContractVersionMajor = 3;
+    static constexpr uint8_t focContractVersionMinor = 0;
+
+    constexpr bool IsCompatibleContract(uint8_t major, uint8_t minor)
+    {
+        return major == focContractVersionMajor && minor == focContractVersionMinor;
+    }
 
     enum class FieldType : uint8_t
     {
@@ -81,17 +86,11 @@ namespace can
         }
     };
 
-    inline constexpr std::array<FieldDescriptor, 1> bandwidthFields{ { { "bandwidth", FieldType::fixed16, focPidScale, "rad/s" } } };
-    inline constexpr std::array<FieldDescriptor, 1> torqueFields{ { { "iq", FieldType::fixed16, focCurrentScale, "A" } } };
-    inline constexpr std::array<FieldDescriptor, 1> speedFields{ { { "speed", FieldType::fixed16, focSpeedScale, "rad/s" } } };
-    inline constexpr std::array<FieldDescriptor, 1> positionFields{ { { "position", FieldType::fixed16, focPositionScale, "rad" } } };
-    inline constexpr std::array<FieldDescriptor, 1> preciseTorqueFields{ { { "iq", FieldType::float32, 1, "A" } } };
+    inline constexpr std::array<FieldDescriptor, 1> torqueFields{ { { "iq", FieldType::float32, 1, "A" } } };
     inline constexpr std::array<FieldDescriptor, 1> torqueNewtonMeterFields{ { { "torque", FieldType::float32, 1, "Nm" } } };
-    inline constexpr std::array<FieldDescriptor, 1> preciseSpeedFields{ { { "speed", FieldType::float32, 1, "rad/s" } } };
-    inline constexpr std::array<FieldDescriptor, 1> precisePositionFields{ { { "position", FieldType::float32, 1, "rad" } } };
+    inline constexpr std::array<FieldDescriptor, 1> speedFields{ { { "speed", FieldType::float32, 1, "rad/s" } } };
+    inline constexpr std::array<FieldDescriptor, 1> positionFields{ { { "position", FieldType::float32, 1, "rad" } } };
     inline constexpr std::array<FieldDescriptor, 1> modeFields{ { { "mode", FieldType::uint8, 1, "enum" } } };
-    inline constexpr std::array<FieldDescriptor, 1> resolutionFields{ { { "resolution", FieldType::uint32, 1, "counts/rev" } } };
-    inline constexpr std::array<FieldDescriptor, 1> telemetryRateFields{ { { "rate", FieldType::uint32, 1, "Hz" } } };
 
     inline constexpr std::array<FieldDescriptor, 2> selectAlgorithmFields{ {
         { "loop", FieldType::uint8, 1, "enum" },
@@ -123,12 +122,6 @@ namespace can
         { "minor", FieldType::uint8, 1, "-" },
     } };
 
-    inline constexpr std::array<FieldDescriptor, 3> electricalParamsFields{ {
-        { "resistance", FieldType::fixed16, focResistanceScale, "ohm" },
-        { "inductance", FieldType::fixed16, focInductanceScale, "mH" },
-        { "polePairs", FieldType::uint8, 1, "-" },
-    } };
-
     inline constexpr std::array<FieldDescriptor, 4> telemetryCurrentsFields{ {
         { "sequence", FieldType::uint8, 1, "-" },
         { "id", FieldType::fixed16, focStreamCurrentScale, "A" },
@@ -157,14 +150,12 @@ namespace can
         { "peakCurrent", FieldType::fixed16, focRecordedCurrentScale, "A" },
     } };
 
-    inline constexpr std::array<FieldDescriptor, 4> telemetryStatusFields{ {
+    inline constexpr std::array<FieldDescriptor, 2> telemetryStatusFields{ {
         { "state", FieldType::uint8, 1, "enum" },
         { "fault", FieldType::uint8, 1, "enum" },
-        { "speed", FieldType::fixed16, focSpeedScale, "rad/s" },
-        { "position", FieldType::fixed16, focPositionScale, "rad" },
     } };
 
-    inline constexpr std::array<FieldDescriptor, 2> telemetryStatusPreciseFields{ {
+    inline constexpr std::array<FieldDescriptor, 2> telemetryMotionFields{ {
         { "speed", FieldType::float32, 1, "rad/s" },
         { "position", FieldType::float32, 1, "rad" },
     } };
@@ -180,23 +171,15 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 33> focMotorMessages{ {
+    inline constexpr std::array<MessageDescriptor, 24> focMotorMessages{ {
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
-        MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
-        MakeDescriptor(focSetPidSpeedId, "SetPidSpeed", Direction::command, bandwidthFields),
-        MakeDescriptor(focSetPidPositionId, "SetPidPosition", Direction::command, bandwidthFields),
         MakeDescriptor(focIdentifyElectricalId, "IdentifyElectrical", Direction::command),
         MakeDescriptor(focRequestTelemetryId, "RequestTelemetry", Direction::command),
-        MakeDescriptor(focSetEncoderResolutionId, "SetEncoderResolution", Direction::command, resolutionFields),
         MakeDescriptor(focAlignId, "Align", Direction::command),
         MakeDescriptor(focClearFaultId, "ClearFault", Direction::command),
         MakeDescriptor(focEmergencyStopId, "EmergencyStop", Direction::command),
-        MakeDescriptor(focConfigureTelemetryRateId, "ConfigureTelemetryRate", Direction::command, telemetryRateFields),
         MakeDescriptor(focSelectControlModeId, "SelectControlMode", Direction::command, modeFields),
-        MakeDescriptor(focSetTorqueSetpointId, "SetTorqueSetpoint", Direction::command, torqueFields),
-        MakeDescriptor(focSetSpeedSetpointId, "SetSpeedSetpoint", Direction::command, speedFields),
-        MakeDescriptor(focSetPositionSetpointId, "SetPositionSetpoint", Direction::command, positionFields),
         MakeDescriptor(focQueryContractVersionId, "QueryContractVersion", Direction::command),
         MakeDescriptor(focSelectAlgorithmId, "SelectAlgorithm", Direction::command, selectAlgorithmFields),
         MakeDescriptor(focQueryAlgorithmsId, "QueryAlgorithms", Direction::command),
@@ -209,18 +192,16 @@ namespace can
         MakeDescriptor(focClearFaultHistoryId, "ClearFaultHistory", Direction::command),
         MakeDescriptor(focRecalibrateId, "Recalibrate", Direction::command),
         MakeDescriptor(focResetModelId, "ResetModel", Direction::command),
-        MakeDescriptor(focSetTorqueSetpointPreciseId, "SetTorqueSetpointPrecise", Direction::command, preciseTorqueFields),
+        MakeDescriptor(focSetTorqueSetpointId, "SetTorqueSetpoint", Direction::command, torqueFields),
         MakeDescriptor(focSetTorqueSetpointNewtonMeterId, "SetTorqueSetpointNewtonMeter", Direction::command, torqueNewtonMeterFields),
-        MakeDescriptor(focSetSpeedSetpointPreciseId, "SetSpeedSetpointPrecise", Direction::command, preciseSpeedFields),
-        MakeDescriptor(focSetPositionSetpointPreciseId, "SetPositionSetpointPrecise", Direction::command, precisePositionFields),
-        MakeDescriptor(focRequestTelemetryPreciseId, "RequestTelemetryPrecise", Direction::command),
+        MakeDescriptor(focSetSpeedSetpointId, "SetSpeedSetpoint", Direction::command, speedFields),
+        MakeDescriptor(focSetPositionSetpointId, "SetPositionSetpoint", Direction::command, positionFields),
     } };
 
-    inline constexpr std::array<MessageDescriptor, 11> focMotorResponses{ {
-        MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
+    inline constexpr std::array<MessageDescriptor, 10> focMotorResponses{ {
         MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
         MakeDescriptor(focTelemetryCurrentsId, "TelemetryCurrents", Direction::telemetry, telemetryCurrentsFields),
-        MakeDescriptor(focTelemetryStatusPreciseId, "TelemetryStatusPrecise", Direction::telemetry, telemetryStatusPreciseFields),
+        MakeDescriptor(focTelemetryMotionId, "TelemetryMotion", Direction::telemetry, telemetryMotionFields),
         MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
         MakeDescriptor(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
         MakeDescriptor(focAlgorithmsResponseId, "AlgorithmsResponse", Direction::response, algorithmsResponseFields),
@@ -279,10 +260,11 @@ namespace can
     inline constexpr std::array<uint32_t, 4> focCanBitrates{ 125000, 250000, 500000, 1000000 };
     inline constexpr float focMaxEncoderResolution{ 16777216.0f };
     inline constexpr float focMaxCanNodeId{ 4095.0f };
+    inline constexpr float focMaxTelemetryRate{ static_cast<float>(focMaxTelemetryRateHz) };
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 84> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 85> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -307,6 +289,7 @@ namespace can
         { FocParameter::encoderResolution, "encoderResolution", "counts/rev", 1.0f, focMaxEncoderResolution, true, false },
         { FocParameter::canNodeId, "canNodeId", "-", 1.0f, focMaxCanNodeId, true, false },
         { FocParameter::canBitrate, "canBitrate", "bit/s", 125000.0f, 1000000.0f, true, false },
+        { FocParameter::telemetryRate, "telemetryRate", "Hz", 0.0f, focMaxTelemetryRate, true, false },
         { FocParameter::supervisionWindow, "supervisionWindow", "s", foc::CommandLimits::minSupervisionWindow, foc::CommandLimits::maxSupervisionWindow, false, false },
         { FocParameter::supervisionCurrentFraction, "supervisionCurrentFraction", "-", foc::CommandLimits::minSupervisionCurrentFraction, foc::CommandLimits::maxSupervisionCurrentFraction, false, false },
         { FocParameter::supervisionDemandedSpeed, "supervisionDemandedSpeed", "rad/s", foc::CommandLimits::minSupervisionDemandedSpeed, foc::CommandLimits::maxSupervisionDemandedSpeed, false, false },
@@ -416,7 +399,7 @@ namespace can
         return std::bit_cast<float>(reader.ReadUInt32());
     }
 
-    inline bool IsPreciseSetpointAcceptable(float value)
+    inline bool IsFiniteWireValue(float value)
     {
         return std::isfinite(value);
     }

@@ -3,6 +3,7 @@
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include <chrono>
@@ -56,9 +57,7 @@ namespace
 WHEN(R"(the telemetry rate is set to {int} Hz)", (int rateHz))
 {
     auto& fixture = context.Get<Fixture>();
-    services::CanPayloadWriter payload;
-    payload.WriteUInt32(static_cast<uint32_t>(rateHz));
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focConfigureTelemetryRateId, payload.Message()))
+    ASSERT_TRUE(WriteParameter(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz)))
         << "Telemetry rate " << rateHz << " Hz was refused";
 }
 

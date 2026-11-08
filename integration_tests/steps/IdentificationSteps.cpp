@@ -1,6 +1,7 @@
 #include "can-lite/core/CanPayload.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/CanParameters.hpp"
@@ -19,28 +20,15 @@ using namespace integration;
 namespace
 {
     constexpr auto kIdentificationTimeout = std::chrono::seconds{ 180 };
-    constexpr auto kResponseTimeout = std::chrono::seconds{ 15 };
     constexpr auto kRecordPollSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kExcitationWallClockTimeout = std::chrono::seconds{ 300 };
     constexpr float kMilliPerUnit = 1000.0f;
     constexpr float kReferenceCelsius = 25.0f;
-    constexpr std::size_t kElectricalResponseBytes = 5;
 
-    hal::Can::Id ResponseId(Fixture& fixture, uint8_t messageType)
-    {
-        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
-    }
-
-    float Fixed16(const hal::Can::Message& payload, std::size_t offset, int32_t scale)
-    {
-        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[offset]) << 8) | payload[offset + 1]);
-        return static_cast<float>(raw) / static_cast<float>(scale);
-    }
-
-    hal::Can::Message EncodeFixed16BE(float value, int32_t scale)
+    hal::Can::Message EncodeFloat32(float value)
     {
         services::CanPayloadWriter payload;
-        payload.WriteFixed16(value, scale);
+        can::WriteFloat32(payload, value);
         return payload.Message();
     }
 
@@ -165,17 +153,14 @@ WHEN(R"(electrical identification is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.MarkCapture();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    const auto payload = fixture.WaitForCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark, kResponseTimeout);
-    ASSERT_TRUE(payload.has_value()) << "The target sent no electrical parameters response";
-    ASSERT_GE(payload->size(), kElectricalResponseBytes) << "Electrical parameters response is too short";
-
-    setup.identified.resistanceOhm = Fixed16(*payload, 0, can::focResistanceScale);
-    setup.identified.inductanceMilliHenry = Fixed16(*payload, 2, can::focInductanceScale);
-    setup.identified.polePairs = (*payload)[4];
+    ReadCalibrationRecord(fixture, setup.identified);
+    const auto polePairs = ReadParameterValue(fixture, can::FocParameter::polePairs);
+    ASSERT_TRUE(setup.identified.resistanceOhm.has_value() && setup.identified.inductanceMilliHenry.has_value() && polePairs.has_value())
+        << "The target did not report the identified parameters over CAN";
+    setup.identified.polePairs = static_cast<unsigned>(*polePairs);
 }
 
 WHEN(R"(the calibration record is read)")
@@ -223,7 +208,7 @@ namespace
 
             atHigh = !atHigh;
             const float target = atHigh ? high : low;
-            ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFixed16BE(target, can::focSpeedScale)))
+            ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFloat32(target)))
                 << "Speed setpoint command rejected";
             setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target, fixture.ServerNodeId() };
 

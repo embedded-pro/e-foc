@@ -224,10 +224,10 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 The CAN service layer (`core/can/`) provides the FOC motor CAN category as a server/client pair and the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
 
 **Server half** (runs on the embedded target):
-- `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire scaling (int16 ↔ physical unit) is contained entirely here.
+- `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire encoding (`float32` and the stream's `int16` scaling ↔ physical unit) is contained entirely here.
 - The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while a pack is received the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
-- `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
-  It also implements the PID bandwidth, identification, telemetry, and encoder-resolution commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
+- `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, the torque, speed and position setpoints, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
+  It also implements the identification, telemetry and settings commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetParameter`, `OnQueryParameter`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
 
 **Client half** (runs on the desktop host — CAN Commander, SIL tests):
 - `FocMotorCategoryClient` — a `CanCategoryClient` subclass. Encodes typed setpoints into CAN frames and decodes response frames into typed callbacks.
