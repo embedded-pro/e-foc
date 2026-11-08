@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
+#include "upgrade/staging/UpgradePackCheck.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -33,7 +33,7 @@ namespace services::test
         return result;
     }
 
-    PackHeader MakeTestPackHeader(const TestPackDescription& description = {});
+    application::StagedPackHeader MakeTestPackHeader(const TestPackDescription& description = {});
     uint32_t TestPackSize(const TestPackDescription& description = {});
     std::vector<uint8_t> MakeTestPack(const TestPackDescription& description = {});
 }

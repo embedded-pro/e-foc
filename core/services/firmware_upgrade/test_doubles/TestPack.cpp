@@ -14,9 +14,9 @@ namespace services::test
         }
     }
 
-    PackHeader MakeTestPackHeader(const TestPackDescription& description)
+    application::StagedPackHeader MakeTestPackHeader(const TestPackDescription& description)
     {
-        PackHeader header{};
+        application::StagedPackHeader header{};
         header.prologue = application::UpgradePackHeaderPrologue{ application::UpgradePackStatus::readyToDeploy, description.magic, 0, 0, 2, testPackSignatureLength };
         header.epilogue.headerVersion = description.headerVersion;
         header.epilogue.headerLength = sizeof(header.prologue) + testPackSignatureLength + sizeof(header.epilogue);

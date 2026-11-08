@@ -5,12 +5,12 @@
 #include "core/platform_abstraction/FirmwareStaging.hpp"
 #include "core/services/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/services/firmware_upgrade/FirmwareUpgradeDrive.hpp"
-#include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
-#include "core/services/firmware_upgrade/StagedPackReader.hpp"
-#include "core/services/firmware_upgrade/StagingWriter.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Function.hpp"
+#include "upgrade/staging/PackStagingWriter.hpp"
+#include "upgrade/staging/StagedPackReader.hpp"
+#include "upgrade/staging/UpgradePackCheck.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -23,8 +23,8 @@ namespace services
         , public FirmwareUpgradeControl
     {
     public:
-        static constexpr uint16_t maxPageSize{ StagingWriter::maxPageSize };
-        static constexpr uint8_t blockSize{ StagingWriter::blockSize };
+        static constexpr uint16_t maxPageSize{ application::PackStagingWriter::maxPageSize };
+        static constexpr uint8_t blockSize{ 6 };
         static constexpr infra::Duration inactivityDeadline{ std::chrono::seconds(30) };
         static constexpr infra::Duration restartDelay{ std::chrono::milliseconds(250) };
         static constexpr infra::Duration discardRetry{ std::chrono::milliseconds(100) };
@@ -64,7 +64,7 @@ namespace services
         void OnSlotErased(bool erased);
         void OnBlockStored(bool stored);
         void CheckCrc(uint32_t expectedCrc);
-        void OnVerifiedHeader(const PackHeader& header);
+        void OnVerifiedHeader(const application::StagedPackHeader& header);
         void ReadStagedVersion();
 
         bool FlashBusy() const;
@@ -85,8 +85,8 @@ namespace services
         infra::Function<void()> reset;
         std::optional<bootloader::StatusJournal> journal;
         std::array<uint8_t, maxPageSize> scratch{};
-        std::optional<StagingWriter> writer;
-        std::optional<StagedPackReader> reader;
+        std::optional<application::PackStagingWriter> writer;
+        std::optional<application::StagedPackReader> reader;
 
         State state{ State::idle };
         bool abortRequested{ false };

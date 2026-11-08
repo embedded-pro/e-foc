@@ -199,7 +199,7 @@ Each context writes what another reads, without locks (a lock in an interrupt ca
 
 - **Control interrupt ↔ outer loop**: single-writer, single-reader **triple buffers**. The writer always has a free
   slot that the reader does not hold, so neither side waits and the reader always gets a complete, consistent
-  value (`core/foc/cascade/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
+  value (EmIL's `infra/util/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
   loop this way, and the torque-mode set point from the event loop to the control interrupt. A single 32-bit value
   needs no buffer: the speed loop's current reference is one `volatile float`, which the Cortex-M writes and reads in
   one access (`core/foc/cascade/CascadeWithSpeedLoop.hpp`).

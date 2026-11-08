@@ -308,7 +308,7 @@ TEST_F(FirmwareUpgradeTest, begin_is_refused_invalid_size_for_a_pack_smaller_tha
 {
     Construct();
 
-    EXPECT_EQ(FwuError::invalidSize, Begin(services::minimumPackSize - 1)->first);
+    EXPECT_EQ(FwuError::invalidSize, Begin(application::minimumUpgradePackSize - 1)->first);
     EXPECT_EQ(FwuError::invalidSize, Begin(numberOfSectors * sectorSize + 1)->first);
     EXPECT_EQ(0x00, packFlash.sectors[0][0]);
     EXPECT_EQ(0, drive.held);
@@ -430,13 +430,13 @@ TEST_F(FirmwareUpgradeTest, a_block_out_of_order_is_answered_sequence_error_and_
 TEST_F(FirmwareUpgradeTest, a_block_past_the_size_given_in_begin_is_answered_invalid_size)
 {
     Construct();
-    const std::vector<uint8_t> bytes(services::minimumPackSize + 2, 0x11);
-    Begin(services::minimumPackSize);
+    const std::vector<uint8_t> bytes(application::minimumUpgradePackSize + 2, 0x11);
+    Begin(application::minimumUpgradePackSize);
 
-    for (uint16_t index = 0; index * 6u + 6u <= services::minimumPackSize; ++index)
+    for (uint16_t index = 0; index * 6u + 6u <= application::minimumUpgradePackSize; ++index)
         ASSERT_EQ(FwuError::ok, Block(index, bytes));
 
-    SendBlock(static_cast<uint16_t>(services::minimumPackSize / 6), infra::ConstByteRange{ bytes.data(), bytes.data() + 6 });
+    SendBlock(static_cast<uint16_t>(application::minimumUpgradePackSize / 6), infra::ConstByteRange{ bytes.data(), bytes.data() + 6 });
     ExecuteAllActions();
     EXPECT_EQ(FwuError::invalidSize, blockResult);
 }

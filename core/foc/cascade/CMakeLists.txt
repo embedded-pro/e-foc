@@ -37,7 +37,6 @@ target_sources(e_foc.foc.cascade PRIVATE
     SpeedDifferentiator.hpp
     TorqueCascade.cpp
     TorqueCascade.hpp
-    TripleBuffer.hpp
 )
 
 add_subdirectory(test)

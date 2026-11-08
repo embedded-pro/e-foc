@@ -63,6 +63,8 @@
         "ClarkePark::Forward",
         "ExceedsInjectionLimit",
         "math::WrapToPi",
+        "infra::TripleBuffer<.*>::Publish",
+        "infra::TripleBuffer<.*>::Acquire",
         "math::IsFinite",
         "MechanicalParametersIdentificationImpl::Post",
         "IsMechanicallyObservable"
