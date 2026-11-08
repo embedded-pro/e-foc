@@ -136,8 +136,8 @@ dispatcher but its own repeating timer.
 
 ## State Machine
 
-Each LED runs the same player: a pattern and the number of ticks it has been playing. The pattern is recomputed from
-the status every tick.
+Each LED runs the same player, EmIL's `services::LedPatternPlayer`, playing a `services::LedPattern`: a pattern and the
+number of ticks it has been playing. The pattern is recomputed from the status every tick.
 
 ```mermaid
 stateDiagram-v2

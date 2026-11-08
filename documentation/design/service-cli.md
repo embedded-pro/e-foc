@@ -93,8 +93,8 @@ Both applications trace the same banner as they start, before anything else:
 ### Part C — The bring-up command line
 
 `TerminalWithBanner` is the `hardware_test` terminal: a `TerminalWithStorage` that traces the
-startup banner when it is built. `TerminalHelper` is a stateless utility that command handlers use
-to convert a bounded-string token into a number. A whole or decimal number within a caller-supplied
+startup banner when it is built. Command handlers convert a bounded-string token into a number with
+EmIL's `services::ParseDecimal` (`services/util/DecimalToken.hpp`). A whole or decimal number within a caller-supplied
 minimum and maximum is accepted; a malformed or out-of-range token yields no value, and the command
 handler answers with a non-ok status describing the expected input. No dynamic string allocation
 occurs.
@@ -134,7 +134,6 @@ held in a fixed-size table in `TerminalWithStorage` — no dynamic registration 
 |----------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------|
 | Startup banner       | Traces the banner of Part B                                        | Traced once, as the application starts                                   |
 | `TerminalWithBanner` | The `hardware_test` terminal, tracing the banner when built        | Transparent to the underlying terminal after the banner has been printed |
-| `TerminalHelper`     | Parses a command token into a number within caller-supplied bounds | Yields no value for a malformed or out-of-range token                    |
 
 ### Required
 

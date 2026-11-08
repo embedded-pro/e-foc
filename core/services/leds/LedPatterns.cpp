@@ -1,4 +1,4 @@
-#include "core/services/leds/LedPattern.hpp"
+#include "core/services/leds/LedPatterns.hpp"
 
 namespace services
 {
@@ -14,10 +14,17 @@ namespace services
         constexpr uint8_t motionFlashes = 7;
         constexpr uint8_t commandTimeoutFlashes = 8;
 
-        constexpr LedPattern heartbeat = LedPattern::Flashes(1, 1, 0, 39);
-        constexpr LedPattern slowBlink = LedPattern::Flashes(1, 10, 10, 0);
+        LedPattern Heartbeat()
+        {
+            return LedPattern::Flashes(1, 1, 0, 39);
+        }
 
-        constexpr LedPattern FaultCodeFlashes(uint8_t count)
+        LedPattern SlowBlink()
+        {
+            return LedPattern::Flashes(1, 10, 10, 0);
+        }
+
+        LedPattern FaultCodeFlashes(uint8_t count)
         {
             return LedPattern::Flashes(count, flashTicks, flashTicks, faultPauseTicks);
         }
@@ -54,7 +61,7 @@ namespace services
         {
             if (lifecycle == LedLifecycle::fault)
                 return LedPattern::Off();
-            return lifecycle == LedLifecycle::enabled ? LedPattern::Steady() : heartbeat;
+            return lifecycle == LedLifecycle::enabled ? LedPattern::Steady() : Heartbeat();
         }
 
         LedPattern AmberFor(LedLifecycle lifecycle)
@@ -62,32 +69,13 @@ namespace services
             switch (lifecycle)
             {
                 case LedLifecycle::idle:
-                    return slowBlink;
+                    return SlowBlink();
                 case LedLifecycle::calibrating:
                     return LedPattern::Steady();
                 default:
                     return LedPattern::Off();
             }
         }
-    }
-
-    uint32_t LedPattern::PeriodTicks() const
-    {
-        if (kind != Kind::flashes)
-            return 1;
-        return static_cast<uint32_t>(flashes) * (onTicks + offTicks) + pauseTicks;
-    }
-
-    bool LedPattern::LevelAt(uint32_t tick) const
-    {
-        if (kind != Kind::flashes)
-            return kind == Kind::steady;
-
-        const uint32_t flashLength = static_cast<uint32_t>(onTicks) + offTicks;
-        const uint32_t position = tick % PeriodTicks();
-        if (position >= flashes * flashLength)
-            return false;
-        return position % flashLength < onTicks;
     }
 
     LedPatterns PatternsFor(const LedStatus& status)

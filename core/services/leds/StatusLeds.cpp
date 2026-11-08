@@ -2,24 +2,6 @@
 
 namespace services
 {
-    StatusLeds::Player::Player(hal::GpioPin& pin)
-        : pin{ pin }
-    {}
-
-    void StatusLeds::Player::Update(const LedPattern& next)
-    {
-        if (!started || !(next == pattern))
-        {
-            pattern = next;
-            tick = 0;
-            started = true;
-        }
-        else
-            ++tick;
-
-        pin.Set(pattern.LevelAt(tick));
-    }
-
     StatusLeds::StatusLeds(hal::GpioPin& green, hal::GpioPin& amber, hal::GpioPin& red, const LedStatusSource& source)
         : source{ source }
         , green{ green }

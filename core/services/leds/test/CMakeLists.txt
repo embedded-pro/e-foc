@@ -11,6 +11,6 @@ target_link_libraries(e_foc.services.leds_test PUBLIC
 )
 
 target_sources(e_foc.services.leds_test PRIVATE
-    TestLedPattern.cpp
+    TestLedPatterns.cpp
     TestStatusLeds.cpp
 )
