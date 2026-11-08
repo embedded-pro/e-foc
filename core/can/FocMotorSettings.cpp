@@ -225,6 +225,8 @@ namespace can
                 return services::MotorParameter::inertia;
             case FocParameter::viscousFriction:
                 return services::MotorParameter::viscousFriction;
+            case FocParameter::frictionCoulomb:
+                return services::MotorParameter::frictionCoulomb;
             default:
                 return services::MotorParameter::resistance;
         }

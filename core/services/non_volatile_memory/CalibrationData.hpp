@@ -79,7 +79,8 @@ namespace services
         polePairs,
         fluxLinkage,
         inertia,
-        viscousFriction
+        viscousFriction,
+        frictionCoulomb
     };
 
     inline float ReadMotorParameter(const CalibrationData& data, MotorParameter parameter)
@@ -96,8 +97,10 @@ namespace services
                 return data.fluxLinkage;
             case MotorParameter::inertia:
                 return data.inertia;
-            default:
+            case MotorParameter::viscousFriction:
                 return data.frictionViscous;
+            default:
+                return data.frictionCoulomb;
         }
     }
 
@@ -121,8 +124,11 @@ namespace services
             case MotorParameter::inertia:
                 data.inertia = value;
                 break;
-            default:
+            case MotorParameter::viscousFriction:
                 data.frictionViscous = value;
+                break;
+            default:
+                data.frictionCoulomb = value;
                 break;
         }
     }

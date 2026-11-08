@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 83> presentations{ {
+        constexpr std::array<SettingPresentation, 84> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -74,6 +74,7 @@ namespace tool
             { FocParameter::fluxLinkage, "Flux linkage", "Flux linkage:", " Wb", "Permanent-magnet flux linkage. Calibrate measures it; Platform default uses the value built into the firmware.", "Platform default" },
             { FocParameter::inertia, "Inertia", "Inertia:", kilogramSquareMetre, "Inertia of the rotor and its load.", {} },
             { FocParameter::viscousFriction, "Viscous friction", "Viscous friction:", frictionUnit, "Viscous friction coefficient of the rotor and its load.", {} },
+            { FocParameter::frictionCoulomb, "Coulomb friction", "Coulomb friction:", newtonMetre, "Dry friction measured by Calibrate in speed and position mode, fed forward to the current reference. From firmware contract 2.20.", {} },
             { FocParameter::encoderResolution, "Encoder resolution", "Encoder resolution:", " counts/rev", "Encoder counts per mechanical revolution.", {} },
             { FocParameter::canNodeId, "CAN node ID base", "CAN node ID base:", {}, "Base of the controller's CAN node ID; the board ID set by its jumpers is added to it.", {} },
             { FocParameter::canBitrate, "CAN bitrate", "CAN bitrate:", " bit/s", "Bitrate of the CAN bus.", {} },
@@ -303,72 +304,72 @@ namespace tool
 
     std::span<const SettingPresentation> MotorParameterSettings()
     {
-        return Slice(14, 6);
+        return Slice(14, 7);
     }
 
     std::span<const SettingPresentation> StartupSettings()
     {
-        return Slice(20, 3);
+        return Slice(21, 3);
     }
 
     std::span<const SettingPresentation> SupervisionSettings()
     {
-        return Slice(23, 6);
+        return Slice(24, 6);
     }
 
     std::span<const SettingPresentation> LimitSettings()
     {
-        return Slice(29, 9);
+        return Slice(30, 9);
     }
 
     std::span<const SettingPresentation> TargetWindowSettings()
     {
-        return Slice(38, 2);
+        return Slice(39, 2);
     }
 
     std::span<const SettingPresentation> TravelLimitSettings()
     {
-        return Slice(40, 2);
+        return Slice(41, 2);
     }
 
     std::span<const SettingPresentation> ThermalSettings()
     {
-        return Slice(42, 1);
+        return Slice(43, 1);
     }
 
     std::span<const SettingPresentation> OverTemperatureSettings()
     {
-        return Slice(43, 2);
+        return Slice(44, 2);
     }
 
     std::span<const SettingPresentation> BusVoltageSettings()
     {
-        return Slice(45, 2);
+        return Slice(46, 2);
     }
 
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(47, 24);
+        return Slice(48, 24);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(71, 3);
+        return Slice(72, 3);
     }
 
     std::span<const SettingPresentation> RecalibrationSettings()
     {
-        return Slice(74, 1);
+        return Slice(75, 1);
     }
 
     std::span<const SettingPresentation> RecalibrationReadings()
     {
-        return Slice(75, 7);
+        return Slice(76, 7);
     }
 
     std::span<const SettingPresentation> HomingSettings()
     {
-        return Slice(82, 1);
+        return Slice(83, 1);
     }
 
     namespace

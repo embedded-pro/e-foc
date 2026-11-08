@@ -2101,6 +2101,37 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_AMotorParameter_IsWrittenToTheCalibra
     EXPECT_NEAR(coordinator->CalibrationRecord().rPhase, 0.36f, 1e-6f);
 }
 
+TEST_F(FocMotorCanBridgeTest, SetParameter_TheCoulombFriction_IsWrittenToTheCalibrationRecordAndRead)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    ExpectCalibrationSaved();
+    DispatchSetParameter(can::FocParameter::frictionCoulomb, 0.004f);
+
+    ASSERT_TRUE(savedCalibration.has_value());
+    EXPECT_NEAR(savedCalibration->frictionCoulomb, 0.004f, 1e-9f);
+    ExpectAnswered(0.004f, false);
+    EXPECT_NEAR(coordinator->CalibrationRecord().frictionCoulomb, 0.004f, 1e-9f);
+
+    ResetCaptures();
+    DispatchQueryParameter(can::FocParameter::frictionCoulomb);
+    ExpectAnswered(0.004f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_TheCoulombFrictionWhileEnabled_IsAnInvalidState)
+{
+    ConstructFixtureInReady();
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    DispatchSetParameter(can::FocParameter::frictionCoulomb, 0.004f);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_EQ(coordinator->CalibrationRecord().frictionCoulomb, 0.0f);
+}
+
 TEST_F(FocMotorCanBridgeTest, SetParameter_PolePairs_RequiresAnotherAlignmentBeforeStart)
 {
     ConstructFixtureInReady();

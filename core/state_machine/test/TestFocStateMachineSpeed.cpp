@@ -3047,3 +3047,66 @@ TEST_F(FocStateMachineSpeedFrictionTest, an_infinite_measured_dry_friction_is_st
 {
     ExpectImplausibleFrictionStoredAsNone(std::numeric_limits<float>::infinity());
 }
+
+TEST_F(FocStateMachineSpeedFrictionTest, writing_the_dry_friction_reloads_the_cascade_feed_forward)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+    ASSERT_EQ(sm.GetController().loads, 1u);
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(data.frictionCoulomb, 6.0e-3f, 1e-9f);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_EQ(sm.GetController().loads, 2u);
+    EXPECT_NEAR(sm.GetController().lastCoulomb, 6.0e-3f, 1e-9f);
+    EXPECT_NEAR(sm.CalibrationRecord().frictionViscous, 0.005f, 1e-9f);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, writing_a_zero_dry_friction_clears_the_cascade_feed_forward)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+    const auto clears = sm.GetController().clears;
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 0.0f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.GetController().loads, 1u);
+    EXPECT_EQ(sm.GetController().clears, clears + 1);
+}
+
+TEST_F(FocStateMachineSpeedFrictionTest, a_dry_friction_that_cannot_be_stored_leaves_the_feed_forward_alone)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithFriction(4.0e-3f);
+    auto sm = CreateFrictionStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::WriteFailed);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.GetController().loads, 1u);
+    EXPECT_NEAR(sm.CalibrationRecord().frictionCoulomb, 4.0e-3f, 1e-9f);
+}

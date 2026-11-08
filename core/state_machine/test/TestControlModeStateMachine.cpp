@@ -1659,6 +1659,12 @@ TEST_F(ControlModeStateMachineExtTest, SetMotorParameter_OutsideItsRange_IsRefus
 
     subject->SetMotorParameter(services::MotorParameter::inertia, 100.0f, record);
     EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
+
+    subject->SetMotorParameter(services::MotorParameter::frictionCoulomb, -1.0e-3f, record);
+    EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
+
+    subject->SetMotorParameter(services::MotorParameter::frictionCoulomb, foc::CommandLimits::maxFrictionCoulomb * 2.0f, record);
+    EXPECT_EQ(state_machine::SettingResult::outOfRange, result);
 }
 
 TEST_F(ControlModeStateMachineExtTest, SetMotorParameter_InterruptedByAnEmergencyStop_IsAnsweredAsAborted)

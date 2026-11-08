@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.21.0
+version: 0.22.0
 component: can-service
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.21.0                   |
+| Version   | 0.22.0                   |
 | Component | can-service              |
 | Date      | 2026-11-08               |
 
@@ -138,6 +138,7 @@ because none was set, and setting a parameter that allows it to `0` returns it t
 | `0x43` | `fluxLinkage`                   | Wb         | 0.00001 – 10                       | yes       | immediately              |
 | `0x44` | `inertia`                       | kg.m2      | 0.000000001 – 10                   | no        | immediately              |
 | `0x45` | `viscousFriction`               | Nm.s/rad   | 0 – 10                             | no        | immediately              |
+| `0x46` | `frictionCoulomb`               | Nm         | 0 – 100                            | no        | immediately              |
 | `0x60` | `encoderResolution`             | counts/rev | 1 – 16777216                       | no        | at the next start        |
 | `0x61` | `canNodeId`                     | -          | 1 – 4095                           | no        | at the next start        |
 | `0x62` | `canBitrate`                    | bit/s      | 125000, 250000, 500000 or 1000000  | no        | at the next start        |
@@ -145,7 +146,7 @@ because none was set, and setting a parameter that allows it to `0` returns it t
 The ranges are the firmware's command limits, so the table, the server's validation and the commander's
 input fields share one definition. The tuning settings (`0x00`–`0x24`) are the ones described in
 `controller-selection.md` Part H and are kept in the configuration record; the motor parameters
-(`0x40`–`0x45`) are fields of the calibration record; `0x60`–`0x62` are configuration fields read once at
+(`0x40`–`0x46`) are fields of the calibration record; `0x60`–`0x62` are configuration fields read once at
 start-up. A loop's settings can only be written while the active control mode runs that loop, and a
 tuning setting or motor parameter is refused unless the drive is stopped (`Idle` or `Ready`), so no
 setting changes under a running law. Start-up settings are read only at start-up and can be written at any
@@ -474,7 +475,7 @@ nothing.
 | `0x98` | `recalibrationsApplied`  | -        | Quantities recalibrated since power-up                           | no        |
 | `0x99` | `recalibrationsRejected` | -        | Settled readings outside their plausibility band since power-up  | no        |
 
-The model parameters equal the calibration record until a recalibration; the motor parameters (`0x40`–`0x45`) keep
+The model parameters equal the calibration record until a recalibration; the motor parameters (`0x40`–`0x46`) keep
 reading the record. A client older than 2.17 asks for none of them.
 
 **Contract 2.18 — stored recalibration.** Version 2.18 adds one command and one read-only parameter; nothing in
@@ -511,6 +512,16 @@ With `homingRequired` set to `1`, a `Start` in position mode is refused with the
 the drive is homed or the Start restores the reference from the encoder index; speed and torque mode ignore the
 setting (`state-machine.md`, Homed State and the Homing Requirement). A client reads `homed` with each status, as it
 does `targetReached`, and older than 2.19 asks for neither parameter.
+
+**Contract 2.20 — Coulomb friction.** Version 2.20 adds one writable motor parameter; nothing in 2.19 changes
+(`service-cogging-compensation.md`, Part F). `frictionCoulomb` is the dry friction of the calibration record, which
+Calibrate measures in speed and position mode and which the speed and position cascades feed forward to the
+current reference. It reads `0` when none was measured. Its range is `0` to `100` Nm, an upper bound well above the
+dry friction of any motor the drive is built for: the server refuses a negative, non-finite or larger value with
+the acknowledgement `invalidPayload`. A write is refused unless the drive is stopped, is stored in the calibration
+record before it is applied, and then replaces the feed-forward at once, a value of `0` removing it, so a motor
+can be commissioned from a measured value or have the feed-forward switched off without a recalibration. Torque
+mode stores the value and has no feed-forward to change. A client older than 2.20 does not ask for it.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`):

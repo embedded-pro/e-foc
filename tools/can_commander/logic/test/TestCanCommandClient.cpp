@@ -193,6 +193,7 @@ namespace
         static constexpr std::size_t recalibrationReadingCount{ 7 };
         static constexpr std::size_t storedRecalibrationParameterCount{ 1 };
         static constexpr std::size_t homingParameterCount{ 2 };
+        static constexpr std::size_t frictionCoulombParameterCount{ 1 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -827,7 +828,7 @@ TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
     AnswerAllReads();
 
     EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(QueriedAReadOnlyParameter());
     EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
 }
@@ -933,7 +934,7 @@ TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
     DeliverAck(can::focAlignId);
     AnswerAllReads();
 
-    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount() - SupervisionParameterCount() - LimitParameterCount() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)
@@ -1037,7 +1038,7 @@ TEST_F(TestCanCommandClient, a_2_2_node_is_also_read_for_its_diagnostics)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::targetReached));
     EXPECT_TRUE(QueriedAReadOnlyParameter());
 }
@@ -1061,7 +1062,7 @@ TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_setting
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
@@ -1083,7 +1084,7 @@ TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
@@ -1110,7 +1111,7 @@ TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
 
     EXPECT_TRUE(client.SupportsTargetWindow(1));
     EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
 }
@@ -1139,7 +1140,7 @@ TEST_F(TestCanCommandClient, a_2_13_node_is_not_asked_for_its_temperature_limit)
 
     EXPECT_TRUE(client.SupportsThermal(1));
     EXPECT_FALSE(client.SupportsOverTemperature(1));
-    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::temperatureLimit));
 }
 
@@ -1152,7 +1153,7 @@ TEST_F(TestCanCommandClient, a_2_14_node_is_not_asked_for_its_bus_voltage_limits
 
     EXPECT_TRUE(client.SupportsOverTemperature(1));
     EXPECT_FALSE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
     EXPECT_FALSE(Queried(can::FocParameter::busVoltageMinimum));
     EXPECT_FALSE(Queried(can::FocParameter::busVoltageMaximum));
 }
@@ -1165,7 +1166,7 @@ TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_but_the_rec
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - recalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - recalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_13_node_is_asked_for_its_winding_temperature_with_every_status)
@@ -1295,7 +1296,7 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     DeliverAck(can::focCalibrateId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
@@ -1310,7 +1311,7 @@ TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagno
     DeliverAck(can::focClearCalibrationId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus - recalibrationReadingCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
@@ -1336,7 +1337,7 @@ TEST_F(TestCanCommandClient, a_2_6_node_is_read_for_its_firmware_identity)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsFirmwareIdentity(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus - recalibrationParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_5_node_is_not_asked_for_its_firmware_identity)
@@ -1494,7 +1495,7 @@ TEST_F(TestCanCommandClient, a_2_17_node_is_read_for_every_parameter_but_the_sto
     EXPECT_TRUE(client.SupportsRecalibration(1));
     EXPECT_FALSE(client.SupportsStoredRecalibration(1));
     EXPECT_FALSE(Queried(can::FocParameter::recalibrationsStored));
-    EXPECT_EQ(can::focParameters.size() - storedRecalibrationParameterCount - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - storedRecalibrationParameterCount - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_18_node_is_read_for_every_parameter_once)
@@ -1505,7 +1506,7 @@ TEST_F(TestCanCommandClient, a_2_18_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsStoredRecalibration(1));
-    EXPECT_EQ(can::focParameters.size() - homingParameterCount, Count(can::focQueryParameterId));
+    EXPECT_EQ(can::focParameters.size() - homingParameterCount - frictionCoulombParameterCount, Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, a_2_19_node_is_read_for_every_parameter_once)
@@ -1516,6 +1517,30 @@ TEST_F(TestCanCommandClient, a_2_19_node_is_read_for_every_parameter_once)
     AnswerAllReads();
 
     EXPECT_TRUE(client.SupportsHoming(1));
+    EXPECT_FALSE(client.SupportsCoulombFriction(1));
+    EXPECT_EQ(can::focParameters.size() - frictionCoulombParameterCount, Count(can::focQueryParameterId));
+}
+
+TEST_F(TestCanCommandClient, a_2_19_node_is_not_asked_for_its_coulomb_friction)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::homedContractMinor);
+
+    AnswerAllReads();
+
+    EXPECT_FALSE(Queried(can::FocParameter::frictionCoulomb));
+    EXPECT_TRUE(Queried(can::FocParameter::viscousFriction));
+}
+
+TEST_F(TestCanCommandClient, a_2_20_node_is_asked_for_its_coulomb_friction_and_read_for_every_parameter_once)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::frictionCoulombContractMinor);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(client.SupportsCoulombFriction(1));
+    EXPECT_TRUE(Queried(can::FocParameter::frictionCoulomb));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 

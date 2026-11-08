@@ -152,6 +152,7 @@ namespace can
         fluxLinkage = 0x43,
         inertia = 0x44,
         viscousFriction = 0x45,
+        frictionCoulomb = 0x46,
         overspeedLimit = 0x50,
         followingErrorWindow = 0x51,
         followingErrorTime = 0x52,

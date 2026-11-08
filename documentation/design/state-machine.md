@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.12.1
+version: 0.13.0
 component: state-machine
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.12.1                     |
+| Version   | 0.13.0                     |
 | Component | state-machine              |
 | Date      | 2026-11-08                 |
 
@@ -311,7 +311,7 @@ run that measures no map does not fail the calibration (`service-cogging-compens
 measures the dry friction, kept even when the map is refused; an estimate that is negative, not finite or missing is stored
 as 0 and traced as none, and 0 means no friction feed-forward. In speed and position modes the friction is applied with the
 mechanics and the cogging map, and cleared with the map before the mechanical identification and the cogging step, so
-neither measures through an earlier calibration's compensation. Torque mode applies none.
+neither measures through an earlier calibration's compensation. Torque mode applies none. A Coulomb friction written as a motor parameter (contract 2.20) is stored first and then re-applied the same way, so a value of 0 removes the feed-forward.
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
@@ -325,8 +325,8 @@ A motor whose flux linkage is set as the motor parameter `fluxLinkage` therefore
 
 ### Editing motor parameters
 
-The six motor parameters of the record — phase resistance, inductance (written to both axes), pole
-pairs, flux linkage, inertia and viscous friction — can also be entered, one at a time, with
+The seven motor parameters of the record — phase resistance, inductance (written to both axes), pole
+pairs, flux linkage, inertia, viscous friction and Coulomb friction — can also be entered, one at a time, with
 `SetMotorParameter`, from CAN (`service-can.md`). The command is accepted in `Idle` and `Ready` with no work outstanding, for a
 value inside the parameter's range; a record need not exist yet, so a motor can be commissioned
 from its datasheet (REQ-CMS-004).
