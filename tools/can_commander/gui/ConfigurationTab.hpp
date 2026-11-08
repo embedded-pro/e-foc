@@ -22,6 +22,7 @@ namespace tool
         void SetThermalUnavailable(const QString& reason);
         void SetOverTemperatureUnavailable(const QString& reason);
         void SetBusVoltageLimitsUnavailable(const QString& reason);
+        void SetRecalibrationUnavailable(const QString& reason);
 
     protected:
         void Refresh() override;
@@ -34,6 +35,7 @@ namespace tool
         void BuildTravelLimitsGroup();
         void BuildThermalGroup();
         void BuildSupplyLimitsGroup();
+        void BuildRecalibrationGroup();
         void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };
@@ -45,5 +47,6 @@ namespace tool
         QString thermalReason;
         QString overTemperatureReason;
         QString busVoltageLimitsReason;
+        QString recalibrationReason;
     };
 }

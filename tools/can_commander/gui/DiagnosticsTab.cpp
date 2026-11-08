@@ -21,6 +21,10 @@ namespace tool
         constexpr const char* refreshHint = "Read every value and the fault history from the controller again";
         constexpr const char* clearHint = "Restart the control-loop and CAN error statistics from zero";
         constexpr const char* clearFaultHistoryHint = "Delete every fault the controller has recorded";
+        constexpr const char* recalibrateHint = "Redesign the current and speed loops now from the settled online estimates that pass their checks";
+        constexpr const char* resetModelHint = "Forget the learned inductance, inertia and friction and design the loops from the calibration record again";
+        constexpr const char* recalibrationText = "The model the loops are designed from: the calibration record's until settled online estimates replace it while the "
+                                                  "motor is stopped. The inductance, inertia and friction learned are stored; the resistance never is.";
         constexpr const char* faultHistoryText = "The controller's last eight faults, newest first. They are kept across power cycles until cleared.";
     }
 
@@ -40,12 +44,14 @@ namespace tool
         layout->addWidget(CreateGroup("Online Estimates", readings.subspan(4, 4)));
         layout->addWidget(CreateGroup("Control Loop", readings.subspan(8, 8)));
         layout->addWidget(CreateGroup("Platform", readings.subspan(16, 1)));
+        layout->addWidget(CreateRecalibration());
         layout->addWidget(CreateFaultHistory());
         layout->addWidget(CreateActions());
         layout->addStretch();
 
         SetUnavailable({});
         SetFaultHistoryUnavailable({});
+        SetRecalibrationUnavailable({}, {});
     }
 
     QWidget* DiagnosticsTab::CreateGroup(const QString& title, std::span<const SettingPresentation> readings)
@@ -66,6 +72,30 @@ namespace tool
             values[reading.parameter] = value;
         }
 
+        return group;
+    }
+
+    QWidget* DiagnosticsTab::CreateRecalibration()
+    {
+        auto* group = CreateGroup("Online Recalibration", RecalibrationReadings());
+        auto* form = static_cast<QFormLayout*>(group->layout());
+
+        recalibrationHint = new QLabel();
+        recalibrationHint->setWordWrap(true);
+        recalibrationHint->setAccessibleName("Online recalibration status");
+        ui::backend::qt::StyleStatusLabel(*recalibrationHint, ui::theme::StatusLevel::Neutral);
+        form->insertRow(0, recalibrationHint);
+
+        recalibrateButton = new QPushButton("Re&calibrate");
+        resetModelButton = new QPushButton("Reset &Model…");
+        auto* actions = new QHBoxLayout();
+        actions->addWidget(recalibrateButton);
+        actions->addStretch();
+        actions->addWidget(resetModelButton);
+        form->addRow(actions);
+
+        connect(recalibrateButton, &QPushButton::clicked, this, &DiagnosticsTab::RecalibrateRequested);
+        connect(resetModelButton, &QPushButton::clicked, this, &DiagnosticsTab::ResetModelRequested);
         return group;
     }
 
@@ -201,6 +231,15 @@ namespace tool
         faultHistoryHint->setText(available ? QString(faultHistoryText) : reason);
         clearFaultHistoryButton->setEnabled(available);
         clearFaultHistoryButton->setToolTip(available ? QString(clearFaultHistoryHint) : reason);
+    }
+
+    void DiagnosticsTab::SetRecalibrationUnavailable(const QString& recalibrateReason, const QString& resetModelReason)
+    {
+        recalibrationHint->setText(recalibrateReason.isEmpty() ? QString(recalibrationText) : recalibrateReason);
+        recalibrateButton->setEnabled(recalibrateReason.isEmpty());
+        recalibrateButton->setToolTip(recalibrateReason.isEmpty() ? QString(recalibrateHint) : recalibrateReason);
+        resetModelButton->setEnabled(resetModelReason.isEmpty());
+        resetModelButton->setToolTip(resetModelReason.isEmpty() ? QString(resetModelHint) : resetModelReason);
     }
 
     QString DiagnosticsTab::Format(can::FocParameter parameter, float value) const

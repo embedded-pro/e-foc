@@ -78,6 +78,7 @@ namespace tool
         void ConnectDiagnostics();
         void ConfirmClearCalibration();
         void ConfirmClearFaultHistory();
+        void ConfirmResetModel();
         void ConnectSettings();
         bool Send(const QString& command, uint8_t commandType, const std::function<bool()>& send);
         void Report(IssueSeverity severity, const QString& message) const;
@@ -93,6 +94,10 @@ namespace tool
         QString OverTemperatureUnavailableReason() const;
         QString BusVoltageLimitsUnavailableReason() const;
         QString FaultHistoryUnavailableReason() const;
+        QString RecalibrationModeUnavailableReason() const;
+        QString RecalibrateUnavailableReason() const;
+        QString ResetModelUnavailableReason() const;
+        QString NeedsContract(uint8_t minor) const;
         void Refresh();
         void RefreshHeader();
 

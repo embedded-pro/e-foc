@@ -62,6 +62,10 @@ namespace tool
                 return "Fault History Query";
             case can::focClearFaultHistoryId:
                 return "Clear Fault History";
+            case can::focRecalibrateId:
+                return "Recalibrate";
+            case can::focResetModelId:
+                return "Reset Model";
             default:
                 return {};
         }

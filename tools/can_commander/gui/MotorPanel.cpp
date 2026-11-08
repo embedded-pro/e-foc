@@ -307,9 +307,34 @@ namespace tool
             });
     }
 
+    void MotorPanel::ConfirmResetModel()
+    {
+        QMessageBox box(QMessageBox::Warning, "Reset Model",
+            QString("Forget the inductance, inertia and friction %1 has learned? Its loops are designed from the calibration record again.").arg(Title()),
+            QMessageBox::Cancel, this);
+        const auto* reset = box.addButton("Reset Model", QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != reset)
+            return;
+
+        Send("Reset Model", can::focResetModelId, [this]()
+            {
+                return client.SendResetModel(nodeId);
+            });
+    }
+
     void MotorPanel::ConnectDiagnostics()
     {
         auto& tab = commandPanel->Diagnostics();
+        connect(&tab, &DiagnosticsTab::RecalibrateRequested, this, [this]()
+            {
+                Send("Recalibrate", can::focRecalibrateId, [this]()
+                    {
+                        return client.SendRecalibrate(nodeId);
+                    });
+            });
+        connect(&tab, &DiagnosticsTab::ResetModelRequested, this, &MotorPanel::ConfirmResetModel);
         connect(&tab, &DiagnosticsTab::RefreshRequested, this, [this]()
             {
                 client.RequestReadings(nodeId);
@@ -585,6 +610,44 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::NeedsContract(uint8_t minor) const
+    {
+        return QString("Needs firmware contract 2.%1 or newer: this controller has %2.").arg(minor).arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
+    }
+
+    QString MotorPanel::RecalibrationModeUnavailableReason() const
+    {
+        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsRecalibration(nodeId))
+            return NeedsContract(CanCommandClient::recalibrationContractMinor);
+        return {};
+    }
+
+    QString MotorPanel::RecalibrateUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (!client.SupportsRecalibration(nodeId))
+            return NeedsContract(CanCommandClient::recalibrationContractMinor);
+        if (commandPanel->ActiveControlMode() == can::FocMotorMode::torque)
+            return "Torque mode runs no online estimators: select speed or position mode to recalibrate.";
+        if (const auto mode = commandPanel->Configuration().EditorFor(can::FocParameter::recalibrationMode)->Held(); mode.has_value() && *mode < 0.5f)
+            return "Online recalibration is off: choose On command or Automatic on the Configuration tab.";
+        if (lastState == FocMotorState::running || lastState == FocMotorState::calibrating)
+            return "Stop the motor first: the loops are redesigned only while it is stopped.";
+        return {};
+    }
+
+    QString MotorPanel::ResetModelUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (!client.SupportsStoredRecalibration(nodeId))
+            return NeedsContract(CanCommandClient::storedRecalibrationContractMinor);
+        if (lastState == FocMotorState::running || lastState == FocMotorState::calibrating)
+            return "Stop the motor first: the loops are redesigned only while it is stopped.";
+        return {};
+    }
+
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
@@ -594,6 +657,7 @@ namespace tool
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
         commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason.isEmpty() ? FaultHistoryUnavailableReason() : commandsReason);
+        commandPanel->Diagnostics().SetRecalibrationUnavailable(RecalibrateUnavailableReason(), ResetModelUnavailableReason());
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
@@ -601,6 +665,7 @@ namespace tool
         commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
         commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
         commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
+        commandPanel->Configuration().SetRecalibrationUnavailable(RecalibrationModeUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();
@@ -807,6 +872,7 @@ namespace tool
     {
         commandPanel->Controllers().SetAlgorithms(algorithms);
         commandPanel->SetActiveControlMode(algorithms.mode);
+        Refresh();
     }
 
     void MotorPanel::OnParameter(can::FocParameter parameter, can::FocParameterValue value)
@@ -818,6 +884,8 @@ namespace tool
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
         if (parameter == can::FocParameter::windingTemperature)
             telemetryPanel->OnWindingTemperature(value.value);
+        if (parameter == can::FocParameter::recalibrationMode)
+            Refresh();
     }
 
     void MotorPanel::OnFaultRecord(const can::FocFaultRecord& record)

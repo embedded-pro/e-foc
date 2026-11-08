@@ -131,6 +131,8 @@ namespace tool
         bool SendClearCalibration(uint16_t nodeId);
         bool SendClearDiagnostics(uint16_t nodeId);
         bool SendClearFaultHistory(uint16_t nodeId);
+        bool SendRecalibrate(uint16_t nodeId);
+        bool SendResetModel(uint16_t nodeId);
         bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
         bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
         bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);

@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.17.0
+version: 0.18.0
 component: "tool-can-commander"
-date: 2026-11-06
+date: 2026-11-08
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.17.0               |
+| Version   | 0.18.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-06           |
+| Date      | 2026-11-08           |
 
 ---
 
@@ -268,6 +268,10 @@ flowchart LR
   Part L). The group says each is off at 0, that a running drive faults with undervoltage or overvoltage when the
   bus leaves them while a stopped one is not watched, and that the board's own trips stay in force. They are
   stored at once and in force within 10 ms.
+  Its **Online Recalibration** group holds the recalibration mode of contract 2.17 (`online-recalibration.md`), chosen
+  by name: *Off*, *On command* or *Automatic*. The group says that speed and position mode re-estimate the motor while
+  it runs, that *On command* redesigns the loops when Recalibrate is pressed on the Diagnostics tab and *Automatic* at
+  every stop, and that the loops never change while the motor runs. It is stored at once.
 
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
@@ -297,7 +301,10 @@ Travel Limits fields are disabled with the reason, and a node older than 2.12 ne
 older than 2.13 has no winding temperature: the commander does not ask it for the estimate or the calibration
 temperature, and the Thermal fields are disabled with the reason; a node of 2.13 has no temperature limit or
 margin, and those two fields are disabled with the reason. A node older than 2.15 has no bus-voltage limits: the
-commander does not ask it for them, and the Supply Limits fields are disabled with the reason.
+commander does not ask it for them, and the Supply Limits fields are disabled with the reason. A node older than 2.17
+has no online recalibration: the commander does not ask it for the mode or the model in use, and the Online
+Recalibration field and both Diagnostics buttons are disabled with the reason; a node of 2.17 has no Reset Model, which
+is disabled with the reason.
 
 ### Part K — diagnostics
 
@@ -308,6 +315,14 @@ parameters of contract 2.2, read one at a time like the settings when the node i
 calibration and on Refresh; each shows "—" until it is read, and the values are dropped when the node leaves
 the bus. Clear Statistics sends `ClearDiagnostics`, which restarts the control-loop and CAN error statistics,
 and reads them again once the controller accepts it.
+
+Its **Online Recalibration** group shows the model the loops are designed from — resistance, inductance, inertia and
+viscous friction in use — and the recalibrations applied, rejected and stored since power-up (contracts 2.17 and 2.18),
+read with the other diagnostics and again after a Recalibrate or Reset Model is accepted. Recalibrate sends
+`Recalibrate`; it is disabled, with the reason shown in the group and on the button, while the mode is *Off*, in torque
+mode (which runs no estimators) and while the motor runs or calibrates, since the firmware refuses it then.
+Reset Model asks for confirmation, sends `ResetModel`, which forgets the learned inductance, inertia and friction,
+and is disabled with the reason while the motor runs or calibrates.
 
 Its **Fault History** group lists the controller's last eight faults, newest first (`service-fault-history.md`):
 the fault, the control mode, the power-up it happened in, the time from that power-up, the bus voltage and the

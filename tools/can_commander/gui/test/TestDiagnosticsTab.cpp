@@ -33,6 +33,22 @@ namespace
             throw std::logic_error("no Clear Fault History button");
         }
 
+        QPushButton& Button(const QString& text)
+        {
+            for (auto* button : tab.findChildren<QPushButton*>())
+                if (button->text() == text)
+                    return *button;
+            throw std::logic_error("no such button");
+        }
+
+        QLabel& Value(const QString& name)
+        {
+            for (auto* label : tab.findChildren<QLabel*>())
+                if (label->accessibleName() == name)
+                    return *label;
+            throw std::logic_error("no such value");
+        }
+
         static can::FocFaultRecord Record(uint8_t age, can::FocFaultCode code)
         {
             return can::FocFaultRecord{ age, code, can::FocMotorMode::speed, 1500, 3, foc::Volts{ 41.23f }, foc::Ampere{ -2.5f } };
@@ -92,4 +108,55 @@ TEST_F(TestDiagnosticsTab, an_unavailable_history_cannot_be_cleared_and_says_why
 
     EXPECT_FALSE(ClearButton().isEnabled());
     EXPECT_EQ("Needs firmware contract 2.16 or newer: this controller has 2.15.", ClearButton().toolTip());
+}
+
+TEST_F(TestDiagnosticsTab, the_model_in_use_and_the_recalibration_counts_are_shown_with_their_units)
+{
+    EXPECT_EQ("—", Value("Resistance in use").text());
+
+    tab.ShowValue(can::FocParameter::modelResistance, can::FocParameterValue{ 0.42f, false });
+    tab.ShowValue(can::FocParameter::recalibrationsApplied, can::FocParameterValue{ 3.0f, false });
+
+    EXPECT_EQ("0.42 \u03A9", Value("Resistance in use").text());
+    EXPECT_EQ("3", Value("Recalibrations applied").text());
+}
+
+TEST_F(TestDiagnosticsTab, recalibrate_and_reset_model_ask_the_panel_to_send_them)
+{
+    int recalibrations{ 0 };
+    int resets{ 0 };
+    QObject::connect(&tab, &tool::DiagnosticsTab::RecalibrateRequested, [&recalibrations]()
+        {
+            ++recalibrations;
+        });
+    QObject::connect(&tab, &tool::DiagnosticsTab::ResetModelRequested, [&resets]()
+        {
+            ++resets;
+        });
+
+    Button("Re&calibrate").click();
+    Button("Reset &Model…").click();
+
+    EXPECT_EQ(1, recalibrations);
+    EXPECT_EQ(1, resets);
+}
+
+TEST_F(TestDiagnosticsTab, unavailable_recalibration_commands_are_disabled_and_say_why)
+{
+    tab.SetRecalibrationUnavailable("Online recalibration is off: choose a mode on the Configuration tab.", "Stop the motor first.");
+
+    EXPECT_FALSE(Button("Re&calibrate").isEnabled());
+    EXPECT_EQ("Online recalibration is off: choose a mode on the Configuration tab.", Button("Re&calibrate").toolTip());
+    EXPECT_FALSE(Button("Reset &Model…").isEnabled());
+    EXPECT_EQ("Stop the motor first.", Button("Reset &Model…").toolTip());
+    EXPECT_EQ("Online recalibration is off: choose a mode on the Configuration tab.", Value("Online recalibration status").text());
+}
+
+TEST_F(TestDiagnosticsTab, available_recalibration_commands_are_enabled)
+{
+    tab.SetRecalibrationUnavailable("Stop the motor first.", "Stop the motor first.");
+    tab.SetRecalibrationUnavailable({}, {});
+
+    EXPECT_TRUE(Button("Re&calibrate").isEnabled());
+    EXPECT_TRUE(Button("Reset &Model…").isEnabled());
 }

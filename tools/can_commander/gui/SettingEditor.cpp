@@ -1,6 +1,7 @@
 #include "tools/can_commander/gui/SettingEditor.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include <cmath>
+#include <cstddef>
 
 namespace tool
 {
@@ -11,6 +12,18 @@ namespace tool
         QString BitrateText(uint32_t bitrate)
         {
             return bitrate >= 1000000 ? QString("%1 Mbit/s").arg(bitrate / 1000000) : QString("%1 kbit/s").arg(bitrate / 1000);
+        }
+
+        bool IsChoice(can::FocParameter parameter)
+        {
+            return parameter == can::FocParameter::canBitrate || parameter == can::FocParameter::recalibrationMode;
+        }
+
+        QString ChoiceText(can::FocParameter parameter, float value)
+        {
+            if (parameter == can::FocParameter::recalibrationMode)
+                return ToQt(RecalibrationModeName(value));
+            return BitrateText(static_cast<uint32_t>(value));
         }
     }
 
@@ -27,7 +40,7 @@ namespace tool
         auto* layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
-        if (presentation.parameter == can::FocParameter::canBitrate)
+        if (IsChoice(presentation.parameter))
             BuildChoice(*layout);
         else if (IsToggle(presentation.parameter))
             BuildToggle(*layout);
@@ -93,8 +106,12 @@ namespace tool
         choice->setPlaceholderText("—");
         choice->setAccessibleName(ToQt(presentation.name));
         choice->setToolTip(ToQt(presentation.description));
-        for (const auto bitrate : can::focCanBitrates)
-            choice->addItem(BitrateText(bitrate), static_cast<qlonglong>(bitrate));
+        if (presentation.parameter == can::FocParameter::recalibrationMode)
+            for (std::size_t mode = 0; mode != RecalibrationModes().size(); ++mode)
+                choice->addItem(ToQt(RecalibrationModes()[mode]), static_cast<qlonglong>(mode));
+        else
+            for (const auto bitrate : can::focCanBitrates)
+                choice->addItem(BitrateText(bitrate), static_cast<qlonglong>(bitrate));
         layout.addWidget(choice, 1);
         label->setBuddy(choice);
 
@@ -228,7 +245,7 @@ namespace tool
         if (toggle != nullptr)
             return QString("%1 %2").arg(name, value >= 0.5f ? "on" : "off");
         if (choice != nullptr)
-            return QString("%1 %2").arg(name, BitrateText(static_cast<uint32_t>(value)));
+            return QString("%1 %2").arg(name, ChoiceText(presentation.parameter, value));
         return QString("%1 %2%3").arg(name, Format(value), ToQt(presentation.suffix));
     }
 
