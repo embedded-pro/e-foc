@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
@@ -39,9 +39,6 @@ endif()
 set_directory_properties(PROPERTY USE_FOLDERS ON)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptimizations.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/Boards.cmake")
 
 set(EMIL_INCLUDE_ECHO Off CACHE BOOL "" FORCE)
@@ -50,7 +47,7 @@ set(EMIL_BUILD_ECHO_COMPILERS Off CACHE BOOL "" FORCE)
 set(EMIL_ENABLE_DOCKER_TOOLS Off CACHE BOOL "" FORCE)
 set(EMIL_INCLUDE_MBEDTLS Off CACHE BOOL "" FORCE)
 
-add_subdirectory(infra/embedded-infra-lib)
+add_subdirectory(infra/embedded-infra-lib SYSTEM)
 
 if (E_FOC_BUILD_TESTS AND NOT EMIL_BUILD_QEMU)
     set(CCR_FETCH_DEPS On CACHE BOOL "" FORCE)
@@ -61,6 +58,7 @@ if (E_FOC_BUILD_TESTS AND NOT EMIL_BUILD_QEMU)
         cucumber_cpp
         GIT_REPOSITORY https://github.com/philips-software/amp-cucumber-cpp-runner.git
         GIT_TAG        v4.0.0
+        SYSTEM
     )
     FetchContent_MakeAvailable(cucumber_cpp)
 
@@ -71,7 +69,7 @@ if (E_FOC_BUILD_TESTS AND NOT EMIL_BUILD_QEMU)
     endif()
 endif()
 
-add_subdirectory(infra/can-lite)
+add_subdirectory(infra/can-lite SYSTEM)
 
 if (E_FOC_BUILD_TESTS)
     include(CTest)
@@ -79,11 +77,11 @@ if (E_FOC_BUILD_TESTS)
 endif()
 
 if (DEFINED TARGET_MCU_VENDOR)
-    add_subdirectory(infra/hal/${TARGET_MCU_VENDOR})
+    add_subdirectory(infra/hal/${TARGET_MCU_VENDOR} SYSTEM)
     emil_exclude_directory_from_coverage(infra/hal/${TARGET_MCU_VENDOR})
 endif()
 
-add_subdirectory(infra/numerical-toolbox)
+add_subdirectory(infra/numerical-toolbox SYSTEM)
 
 if (NOT E_FOC_EMBEDDED_BUILD)
     set(UI_BUILD_QT_BACKEND On CACHE BOOL "" FORCE)
@@ -93,6 +91,7 @@ if (NOT E_FOC_EMBEDDED_BUILD)
         ui
         GIT_REPOSITORY https://github.com/embedded-pro/ui-cpp.git
         GIT_TAG        73b139fb65f92bad233ec354956d07d304f57274
+        SYSTEM
     )
     FetchContent_MakeAvailable(ui)
 
@@ -107,9 +106,10 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     endforeach()
 endif()
 
-e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
-e_foc_enable_project_warnings()
-e_foc_enable_embedded_optimizations()
+emil_enable_warnings()
+if (E_FOC_EMBEDDED_BUILD)
+    numerical_toolbox_enable_embedded_optimizations()
+endif()
 # Created here, not inside EmIL's project(), so the header carries this repository's revision.
 add_version_header_target(e_foc.version_header)
 e_foc_add_boards_header(e_foc.boards)

@@ -189,17 +189,16 @@ Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `c
 and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). Each MCU gets one cycle banner and one memory banner on the PR.
 It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
 
-**Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
-`-Wall -Wextra`; with `CMAKE_COMPILE_WARNING_AS_ERROR` on, any warning in `core/`, `targets/`,
-`integration_tests/` or `tools/` fails the build. Third-party include directories are marked SYSTEM by
-`e_foc_mark_includes_system` from `cmake/MarkIncludesSystem.cmake`, so warnings in headers we do not own
-cannot. That call marks every target that exists when it runs, which is why the **call** sits after the
-submodule and FetchContent additions and **before** `add_subdirectory(core)`: move it later and it would
-mark this project's own targets SYSTEM, silencing the warnings the flags exist to catch; move it earlier and
-FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence a warning with a pragma —
+**Warnings**: EmIL's `emil_enable_warnings()` (`infra/embedded-infra-lib/cmake/emil_compiler_warnings.cmake`) enables
+`-Wall -Wextra`, minus the GCC/Clang false positives on EmIL and GoogleTest code; with `CMAKE_COMPILE_WARNING_AS_ERROR`
+on, any warning in `core/`, `targets/`, `integration_tests/` or `tools/` fails the build. Every submodule
+`add_subdirectory` and every `FetchContent_Declare` passes `SYSTEM`, so warnings in headers we do not own cannot;
+a new dependency must do the same. The call sits after the dependencies and **before** `add_subdirectory(core)`, so
+the flags reach our targets and not the dependencies' own sources. Never silence a warning with a pragma —
 fix it, or drop the parameter name if it is genuinely unused.
 
-**Optimisation**: `cmake/CompilerOptimizations.cmake` provides `e_foc_enable_embedded_optimizations()`, which adds
+**Optimisation**: the numerical toolbox's `numerical_toolbox_enable_embedded_optimizations()`
+(`infra/numerical-toolbox/cmake/NumericalCompilerOptions.cmake`), called when `E_FOC_EMBEDDED_BUILD` is on, adds
 `-ffast-math -fno-finite-math-only` to the configuration's level in the embedded and QEMU builds; `-fno-finite-math-only`
 keeps NaN and infinity checks meaningful. Its call sits next to the warnings call, after the
 submodules and before `add_subdirectory(core)`, so `core/` and `targets/` — and the toolbox code they include — get the
