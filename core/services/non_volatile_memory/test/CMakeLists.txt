@@ -15,4 +15,5 @@ target_sources(e_foc.services.non_volatile_memory_test PRIVATE
     TestLearnedModelImage.cpp
     TestNonVolatileMemory.cpp
     TestNvmEepromRegion.cpp
+    TestNvmRecord.cpp
 )

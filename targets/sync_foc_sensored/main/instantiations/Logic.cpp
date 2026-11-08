@@ -128,7 +128,7 @@ namespace application
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
-                    configData = services::MakeDefaultConfigData();
+                    configData = services::ConfigData{};
                 this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                 this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
 

@@ -23,7 +23,7 @@ namespace application
 
         void RunSequence(state_machine::Calibrating& calibrating);
         void RunAlignmentOnly(state_machine::Calibrating& calibrating);
-        void OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle);
+        void OnAlignmentSucceeded(state_machine::Calibrating& calibrating);
         void OnFluxLinkageIdentified(state_machine::Calibrating& calibrating, const state_machine::FluxLinkageIdentified& event);
         void OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event);
         void OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event);

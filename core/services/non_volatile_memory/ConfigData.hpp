@@ -69,6 +69,10 @@ namespace services
         automatic = 2
     };
 
+    // Bumping it returns every stored configuration to its defaults; see service-nvm.md.
+    inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
+    inline constexpr uint8_t ConfigLayoutVersion = 14;
+
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
     {
@@ -92,9 +96,4 @@ namespace services
     };
 
     static_assert(sizeof(ConfigData) == 168, "ConfigData layout must be free of implicit padding");
-
-    inline ConfigData MakeDefaultConfigData()
-    {
-        return ConfigData{};
-    }
 }

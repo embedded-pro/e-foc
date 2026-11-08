@@ -25,10 +25,7 @@ namespace mil
             if (quantity == "resistance")
                 calibration.rPhase *= factor;
             else if (quantity == "inductance")
-            {
                 calibration.lD *= factor;
-                calibration.lQ *= factor;
-            }
             else if (quantity == "inertia")
                 calibration.inertia *= factor;
             else if (quantity == "friction")
@@ -65,7 +62,6 @@ namespace mil
         nvm.calibration.polePairs = plant.polePairs;
         nvm.calibration.rPhase = plant.statorResistanceOhm;
         nvm.calibration.lD = plant.dAxisInductanceHenry * kMilliPerUnit;
-        nvm.calibration.lQ = plant.qAxisInductanceHenry * kMilliPerUnit;
         nvm.calibration.fluxLinkage = plant.fluxLinkageWeber;
         nvm.calibration.inertia = plant.rotorInertiaKgM2;
         nvm.calibration.frictionViscous = plant.viscousDampingNmSPerRad;
@@ -214,7 +210,7 @@ namespace mil
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
-                    configData = services::MakeDefaultConfigData();
+                    configData = services::ConfigData{};
 
                 controlMode.emplace(
                     tracer,
@@ -395,7 +391,6 @@ namespace mil
         services::CalibrationData data{};
         data.rPhase = measured.resistance->Value();
         data.lD = measured.inductance->Value();
-        data.lQ = measured.inductance->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs->value());
         data.fluxLinkage = controlMode->ActiveFluxLinkage().Value();
 

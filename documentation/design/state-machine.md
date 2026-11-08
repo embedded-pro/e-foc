@@ -276,8 +276,8 @@ sequenceDiagram
 | Rotor at rest (`service-standstill.md`)        | Rotor Standstill    | Nothing; fails the calibration after 10 s                            |
 | 0. Current sensor offsets                      | Current Offsets     | `currentOffsetA`, `currentOffsetB`, `currentOffsetC`                 |
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                                          |
-| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                                 |
-| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                                  |
+| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`                                                       |
+| 3. Alignment                                   | Motor Alignment     | Nothing; the rotor reference is held in RAM                          |
 | 3b. Index search (encoder with an index)       | Index Search        | `encoderIndexAngle`; none when no index is found                     |
 | 3a. Flux linkage (every mode)                  | Flux Linkage Ident  | `fluxLinkage`; the configured value when not identified              |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor            |
@@ -752,8 +752,8 @@ decided by the transition table:
   response internally (see C2c) rather than dispatching it. The callback also carries the epoch
   of the transition that issued the save, so a save completing after an emergency stop and a
   fresh `CmdCalibrate` is discarded instead of being consumed by the new run.
-- The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
-  only have rows in `Idle`.
+- The boot-time NVM completion becomes `BootCalibrationLoaded`, which only has rows in `Idle`. The
+  load reports whether the record is intact, so boot reads the calibration region once.
 - The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, with rows in `Idle`
   and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the command
   with `rejected` when the NVM is busy. It needs no request identity: the guard on every
@@ -1119,7 +1119,7 @@ sequenceDiagram
     Old-->>CSM: yes
     CSM->>Old: EmergencyStop, destroy
     CSM->>New: construct (rotor reference kept)
-    New->>NVM: IsCalibrationValid, LoadCalibration
+    New->>NVM: LoadCalibration
     NVM-->>New: record complete for speed mode
     note over New: Idle to Ready, rotor reference valid
     CSM-->>Caller: cb(ok)
@@ -1171,14 +1171,12 @@ sequenceDiagram
 |-------------------|------------------------|--------------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255     | Number of electrical pole pairs                                                                                                                                                                                         |
 | `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                                                                         |
-| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0       | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                                                                   |
-| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any       | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration                                                            |
+| `CalibrationData` | `lD`                   | mH (float)                     | > 0       | Phase inductance, used for both axes (anisotropy not estimated)                                                                                                                                                         |
 | `CalibrationData` | `encoderIndexAngle`    | rad (float), mechanical        | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                                          |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                                        |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                                               |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0       | Current-loop bandwidth; not measured: calibration carries it from the previous record; when zero, 2π·fs/nyquistFactor held below the sensor-noise bound of REQ-CTL-006                                                  |
 | `FaultCode`       | —                      | enum (uint8)                   | 14 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout`, `positionLimit` |
 
 A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware

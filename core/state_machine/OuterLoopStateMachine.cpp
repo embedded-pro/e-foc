@@ -108,7 +108,7 @@ namespace application
 
         const auto& calibration = GetCalibration();
         ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, TorqueConstantFor(calibration));
-        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, calibration.currentLoopBandwidth, EffectiveFluxLinkage(calibration),
+        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, EffectiveFluxLinkage(calibration),
             foc::Ampere{ services::CurrentNoiseAmpere(calibration.currentNoiseMilliAmpere) });
         return true;
     }
@@ -210,7 +210,7 @@ namespace application
         // Marked first: the electrical model sets the current tunings even when the plant is refused.
         MarkProvisionalControlApplied();
 
-        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
+        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
             return false;
 
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);

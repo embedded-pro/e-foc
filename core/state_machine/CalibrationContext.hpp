@@ -43,7 +43,6 @@ namespace application
             foc::Ohm resistance,
             foc::MilliHenry inductance,
             std::size_t polePairs,
-            float bandwidth,
             foc::Weber fluxLinkage,
             foc::Ampere currentNoise,
             foc::FocBase& controller,
@@ -55,7 +54,6 @@ namespace application
         foc::Weber ActiveFluxLinkage() const;
 
         float DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const;
-        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth, foc::MilliHenry inductance, foc::Ampere currentNoise) const;
 
     private:
         drivers::ThreePhaseInverter& inverter;

@@ -98,9 +98,9 @@ namespace application
                         calibrating.step = event.step;
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::AlignmentSucceeded>(
-                    [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::AlignmentSucceeded& event)
+                    [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::AlignmentSucceeded&)
                     {
-                        context.calibration.OnAlignmentSucceeded(calibrating, event.angle);
+                        context.calibration.OnAlignmentSucceeded(calibrating);
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::MechanicalParametersIdentified>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
@@ -398,7 +398,7 @@ namespace application
             FaultReconciliationRows());
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 4> FocLifecycleTable::BootRows()
+    constexpr std::array<FocLifecycleTable::Transition, 3> FocLifecycleTable::BootRows()
     {
         return {
             Machine::Row<state_machine::Idle, state_machine::BootCalibrationLoaded, state_machine::Ready>(
@@ -419,11 +419,6 @@ namespace application
                 {
                     return context.boot.FinishFromIndex();
                 }),
-            Machine::InternalRow<state_machine::Idle, state_machine::BootValidityChecked>(
-                [](LifecycleContext& context, state_machine::Idle&, const state_machine::BootValidityChecked& event)
-                {
-                    context.boot.Continue(event.valid);
-                }),
             Machine::InternalRow<state_machine::Idle, state_machine::BootCalibrationLoaded>(
                 [](LifecycleContext& context, state_machine::Idle&, const state_machine::BootCalibrationLoaded& event)
                 {
@@ -432,7 +427,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 58> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 57> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }

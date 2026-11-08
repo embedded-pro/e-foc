@@ -10,22 +10,6 @@ namespace application
     void BootSequence::Begin()
     {
         env.nvmActivity.Begin();
-        env.nvm.IsCalibrationValid([this](bool valid)
-            {
-                OnValidityChecked(valid);
-            });
-    }
-
-    void BootSequence::Continue(bool valid)
-    {
-        if (!valid)
-        {
-            env.context.SetRotorReferenceValid(false);
-            env.tracer.Trace() << "[SM] NVM invalid, starting in Idle";
-            return;
-        }
-
-        env.nvmActivity.Begin();
         env.nvm.LoadCalibration(env.context.MutableData(), [this](services::NvmStatus status)
             {
                 OnCalibrationLoaded(status);
@@ -80,12 +64,6 @@ namespace application
     {
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
         env.mode.ApplyModeSpecificCalibration(env.context.Data());
-    }
-
-    void BootSequence::OnValidityChecked(bool valid)
-    {
-        env.nvmActivity.End();
-        env.machine.Dispatch(state_machine::BootValidityChecked{ valid });
     }
 
     void BootSequence::OnCalibrationLoaded(services::NvmStatus status)

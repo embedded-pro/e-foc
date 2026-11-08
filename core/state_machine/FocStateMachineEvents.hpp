@@ -89,7 +89,6 @@ namespace state_machine
     struct AlignmentSucceeded
     {
         static constexpr const char* name{ "AlignmentSucceeded" };
-        foc::Radians angle;
     };
 
     struct CalibrationStepFailed
@@ -196,12 +195,6 @@ namespace state_machine
         services::NvmStatus status;
     };
 
-    struct BootValidityChecked
-    {
-        static constexpr const char* name{ "BootValidityChecked" };
-        bool valid;
-    };
-
     struct BootCalibrationLoaded
     {
         static constexpr const char* name{ "BootCalibrationLoaded" };
@@ -233,7 +226,6 @@ namespace state_machine
         CalibrationInvalidated,
         SetMotorParameter,
         MotorParameterSaved,
-        BootValidityChecked,
         BootCalibrationLoaded,
         IndexSearched>;
 }
