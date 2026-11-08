@@ -26,7 +26,6 @@ jobs:
   build:
     name: Build Booklet (PDF + Site)
     runs-on: ubuntu-latest
-    # Pandoc, the XeLaTeX tool chain, mermaid-cli and pdf2svg come with the container image.
     container: gabrielfrasantos/embedded-devcontainer-documentation:v7.4.0@sha256:0537b16931e116f98fd62e0bad454af5bcd102ec6501ccdef2b270aa83fd281e
     permissions:
       contents: read
@@ -36,7 +35,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The checkout belongs to the runner user, while the container runs as root.
       - name: Mark the workspace as a safe Git directory
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 

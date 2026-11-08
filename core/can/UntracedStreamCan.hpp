@@ -4,7 +4,6 @@
 
 namespace can
 {
-    // At 1 kHz the trace lines of the current stream would outrun the trace port, so its frames skip the tracing bus.
     class UntracedStreamCan
         : public hal::Can
     {

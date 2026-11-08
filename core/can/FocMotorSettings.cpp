@@ -28,7 +28,6 @@ namespace can
             ParameterGroup group;
         };
 
-        // Each group of readings takes a contiguous block of identifiers.
         constexpr std::array<ReadingRange, 4> readingRanges{ {
             { FocParameter::currentOffsetA, FocParameter::coggingPeak, ParameterGroup::calibrationRecord },
             { FocParameter::estimatedResistance, FocParameter::recalibrationsStored, ParameterGroup::onlineEstimate },

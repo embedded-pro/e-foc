@@ -33,10 +33,6 @@ jobs:
           VALIDATE_ALL_CODEBASE: true
           GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN  }}
       - run: git diff
-      # - uses: github/codeql-action/upload-sarif@aa578102511db1f4524ed59b8cc2bae4f6e88195 # v3.27.6
-      #   if: ${{ success() || failure() }}
-      #   with:
-      #     sarif_file: megalinter-reports/megalinter-report.sarif
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: success() || failure()
         with:

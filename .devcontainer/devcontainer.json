@@ -3,10 +3,6 @@
     "context": "..",
     "dockerfile": "Dockerfile"
   },
-  // GUI support: requires an X server on the host.
-  //   Windows: install VcXsrv or X410, launch with "Disable access control" enabled.
-  //   macOS:   install XQuartz, enable "Allow connections from network clients" in Preferences > Security.
-  //   Linux:   run 'xhost +local:docker' to allow container access.
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
@@ -22,7 +18,7 @@
     "--shm-size=256m"
   ],
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/node:2.1.1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
   "customizations": {

@@ -82,9 +82,6 @@ jobs:
       matrix:
         configuration: ["RelWithDebInfo"]
         target: ["EK-TM4C1294XL", "NUCLEO-G474RE", "NUCLEO-H563ZI"]
-        # Each budget is the same slice of time on every MCU, in cycles of its clock: 37.5 us inner loop (75% of
-        # the 20 kHz period), 166.7 us outer loop, 50 us identification path (the whole period: it runs only
-        # while calibrating, where nothing but the 1 kHz outer loop competes for it).
         include:
           - target: EK-TM4C1294XL
             budget-analysis: true
@@ -149,7 +146,7 @@ jobs:
             exit 0
           fi
           cmake -D KEYS=targets/bootloader/keys/development.keys -D OUTPUT="$RUNNER_TEMP/sync_foc_sensored.upgrade" -P "$script"
-      # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
+
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
@@ -164,6 +161,7 @@ jobs:
           fail-over-max-cycles: ${{ matrix.inner-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-inner
+
       - name: Run outer loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
@@ -178,6 +176,7 @@ jobs:
           fail-over-max-cycles: ${{ matrix.outer-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-outer
+
       - name: Run identification path cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
@@ -192,6 +191,7 @@ jobs:
           fail-over-max-cycles: ${{ matrix.identification-max-cycles }}
           post-comment: "false"
           artifact-name: cycle-analysis-${{ matrix.target }}-identification
+
       - name: Compose cycle analysis banner
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
         run: >-
@@ -206,6 +206,7 @@ jobs:
           --analysis "Outer loop" cycle-analysis/outer "${{ matrix.outer-max-cycles }}"
           --analysis "Identification path" cycle-analysis/identification "${{ matrix.identification-max-cycles }}"
           --output cycle-analysis/banner.md
+
       - name: Post cycle analysis banner
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' && env.POST_PR_COMMENT == 'true' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -223,6 +224,7 @@ jobs:
             } else {
               await github.rest.issues.createComment({ ...issue, body });
             }
+
       - name: Run memory analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
         uses: embedded-pro/cortex-memory-budget@cc5057b824ad7a5c340dfa6a3c8d22be0b89b35c
@@ -244,6 +246,7 @@ jobs:
           output-dir: memory-analysis
           post-comment: ${{ env.POST_PR_COMMENT }}
           artifact-name: memory-analysis-${{ matrix.target }}
+
   qemu_foc_sensored_build:
     name: QEMU FOC Sensored Application Build
     runs-on: ubuntu-latest
@@ -282,6 +285,7 @@ jobs:
           name: e_foc.bootloader.qemu.elf
           path: build/qemu-foc-sensored/targets/bootloader/main/RelWithDebInfo/e_foc.bootloader.main.elf
           if-no-files-found: error
+
   software_in_the_loop_shard:
     name: Software-in-the-Loop Shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
@@ -394,8 +398,8 @@ jobs:
           name: sil-test-report-${{ matrix.shard }}
           path: sil-test-report-${{ matrix.shard }}.xml
           if-no-files-found: ignore
-          # A re-run shard replaces its earlier report, or the gather job publishes the stale one.
           overwrite: true
+
   software_in_the_loop_tests:
     name: Software-in-the-Loop Tests
     runs-on: ubuntu-latest

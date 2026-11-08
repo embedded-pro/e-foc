@@ -66,7 +66,6 @@ namespace can
             if (!sample)
                 return;
 
-            // A synchronous bus completes the frame inside the send, so the count goes up before it.
             ++framesWaiting;
             const auto position = foc::Radians{ foc::detail::PositionWithWrapAround(sample->position.Value()) };
             if (!server.BroadcastTelemetryCurrents(sample->sequence, sample->meanId, sample->meanIq, position, [this](bool)

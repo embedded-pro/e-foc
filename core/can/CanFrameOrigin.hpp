@@ -9,12 +9,12 @@ namespace can
     class CanFrameOrigin
     {
     public:
+        CanFrameOrigin(const CanFrameOrigin&) = delete;
+        CanFrameOrigin& operator=(const CanFrameOrigin&) = delete;
         virtual uint16_t SourceNodeId() const = 0;
 
     protected:
         CanFrameOrigin() = default;
-        CanFrameOrigin(const CanFrameOrigin&) = delete;
-        CanFrameOrigin& operator=(const CanFrameOrigin&) = delete;
         ~CanFrameOrigin() = default;
     };
 
