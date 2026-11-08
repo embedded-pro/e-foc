@@ -530,14 +530,14 @@ telemetry (`0x89`) stay byte for byte as they were, so an older host keeps worki
 IEEE-754 `float32`, most significant byte first like every multi-byte field of the category, the encoding `SetParameter` already uses, and resolve far finer than 1 mA,
 0.01 rad/s and a tenth of an encoder count.
 
-| ID     | Message                        | Direction | Fields (after the sequence byte for commands) | Answer          |
-|--------|--------------------------------|-----------|-----------------------------------------------|-----------------|
-| `0x1F` | `SetTorqueSetpointPrecise`     | command   | iq `float32` (A)                              | the acknowledge |
-| `0x20` | `SetTorqueSetpointNewtonMeter` | command   | torque `float32` (N·m)                        | the acknowledge |
-| `0x21` | `SetSpeedSetpointPrecise`      | command   | speed `float32` (rad/s)                       | the acknowledge |
-| `0x22` | `SetPositionSetpointPrecise`   | command   | position `float32` (rad)                      | the acknowledge |
-| `0x23` | `RequestTelemetryPrecise`      | command   | —                                             | `TelemetryStatusPrecise`, then the acknowledge |
-| `0x8B` | `TelemetryStatusPrecise`       | telemetry | speed `float32` (rad/s), position `float32` (rad) | —           |
+| ID     | Message                        | Direction | Fields (after the sequence byte for commands)     | Answer                                         |
+|--------|--------------------------------|-----------|---------------------------------------------------|------------------------------------------------|
+| `0x1F` | `SetTorqueSetpointPrecise`     | command   | iq `float32` (A)                                  | the acknowledge                                |
+| `0x20` | `SetTorqueSetpointNewtonMeter` | command   | torque `float32` (N·m)                            | the acknowledge                                |
+| `0x21` | `SetSpeedSetpointPrecise`      | command   | speed `float32` (rad/s)                           | the acknowledge                                |
+| `0x22` | `SetPositionSetpointPrecise`   | command   | position `float32` (rad)                          | the acknowledge                                |
+| `0x23` | `RequestTelemetryPrecise`      | command   | —                                                 | `TelemetryStatusPrecise`, then the acknowledge |
+| `0x8B` | `TelemetryStatusPrecise`       | telemetry | speed `float32` (rad/s), position `float32` (rad) | —                                              |
 
 A precise setpoint is the scaled setpoint of the same quantity with a finer wire value: the same control mode
 must be active, the same state is required, the same limits bound it (the inverter's current limit, the speed and
