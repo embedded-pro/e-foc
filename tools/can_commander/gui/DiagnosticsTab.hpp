@@ -29,14 +29,18 @@ namespace tool
         void ForgetValues();
         void SetUnavailable(const QString& reason);
         void SetFaultHistoryUnavailable(const QString& reason);
+        void SetRecalibrationUnavailable(const QString& recalibrateReason, const QString& resetModelReason);
 
     signals:
         void RefreshRequested();
         void ClearStatisticsRequested();
         void ClearFaultHistoryRequested();
+        void RecalibrateRequested();
+        void ResetModelRequested();
 
     private:
         QWidget* CreateGroup(const QString& title, std::span<const SettingPresentation> readings);
+        QWidget* CreateRecalibration();
         QWidget* CreateFaultHistory();
         QWidget* CreateActions();
         QString Format(can::FocParameter parameter, float value) const;
@@ -48,6 +52,10 @@ namespace tool
         QPushButton* clearStatisticsButton{ nullptr };
         std::map<can::FocParameter, QLabel*> values;
         QLocale numberLocale;
+
+        QLabel* recalibrationHint{ nullptr };
+        QPushButton* recalibrateButton{ nullptr };
+        QPushButton* resetModelButton{ nullptr };
 
         QLabel* faultHistoryHint{ nullptr };
         QTableWidget* faultTable{ nullptr };

@@ -1463,3 +1463,49 @@ TEST_F(TestCanCommandClient, a_2_18_node_is_read_for_every_parameter_once)
     EXPECT_TRUE(client.SupportsStoredRecalibration(1));
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
+
+TEST_F(TestCanCommandClient, recalibrate_and_reset_model_go_out_as_their_own_commands)
+{
+    RecordSends();
+
+    EXPECT_TRUE(client.SendRecalibrate(1));
+    EXPECT_TRUE(client.SendResetModel(2));
+
+    EXPECT_EQ((std::vector<uint8_t>{ can::focRecalibrateId, can::focResetModelId }), SentTypes());
+    EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focRecalibrateId));
+    EXPECT_EQ(CanCommandClient::commandTimeout, CanCommandClient::TimeoutFor(can::focResetModelId));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_recalibration_reads_the_model_in_use_again)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
+    AnswerAllReads();
+    client.SendRecalibrate(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focRecalibrateId, services::CanAckStatus::success));
+    DeliverAck(can::focRecalibrateId);
+    AnswerAllReads();
+
+    EXPECT_TRUE(Queried(can::FocParameter::modelResistance));
+    EXPECT_TRUE(Queried(can::FocParameter::modelViscousFriction));
+    EXPECT_TRUE(Queried(can::FocParameter::recalibrationsApplied));
+    EXPECT_TRUE(Queried(can::FocParameter::recalibrationsStored));
+}
+
+TEST_F(TestCanCommandClient, an_accepted_model_reset_reads_the_model_in_use_again)
+{
+    RecordSends();
+    BringCompatible(1, CanCommandClient::storedRecalibrationContractMinor);
+    AnswerAllReads();
+    client.SendResetModel(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focResetModelId, services::CanAckStatus::success));
+    DeliverAck(can::focResetModelId);
+    AnswerAllReads();
+
+    EXPECT_TRUE(Queried(can::FocParameter::modelInductance));
+    EXPECT_TRUE(Queried(can::FocParameter::modelInertia));
+}

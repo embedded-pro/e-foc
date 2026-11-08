@@ -2,7 +2,7 @@
 title: "Online Recalibration"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: online-recalibration
 date: 2026-11-06
 ---
@@ -12,7 +12,7 @@ date: 2026-11-06
 | Title     | Online Recalibration |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.0                |
+| Version   | 0.2.1                |
 | Component | online-recalibration |
 | Date      | 2026-11-06           |
 
@@ -99,7 +99,8 @@ whose commissioned value is not positive — a record without friction — is ne
 | Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                    |
 
 The mode is a drive-wide setting of the configuration record (`service-nvm.md`), read and written over CAN
-(`service-can.md`, contract 2.17).
+(`service-can.md`, contract 2.17). The CAN Commander chooses it on its Configuration tab and shows the model in
+use, the counters and the Recalibrate and Reset Model commands on its Diagnostics tab (`tool-can-commander.md`).
 
 ```mermaid
 stateDiagram-v2

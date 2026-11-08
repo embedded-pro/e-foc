@@ -27,6 +27,7 @@ namespace tool
         BuildTravelLimitsGroup();
         BuildThermalGroup();
         BuildSupplyLimitsGroup();
+        BuildRecalibrationGroup();
         Content().addStretch();
 
         Refresh();
@@ -131,6 +132,19 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildRecalibrationGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Online Recalibration", group);
+        AddEditors(form, RecalibrationSettings());
+
+        auto* note = new QLabel("Speed and position mode re-estimate the motor while it runs. On command redesigns the loops from "
+                                "the settled estimates when Recalibrate is pressed on the Diagnostics tab; Automatic does it at every "
+                                "stop. The loops never change while the motor runs. Stored at once.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
         legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
@@ -189,6 +203,16 @@ namespace tool
         Refresh();
     }
 
+    void ConfigurationTab::SetRecalibrationUnavailable(const QString& reason)
+    {
+        if (reason == recalibrationReason)
+            return;
+
+        recalibrationReason = reason;
+        ShowAvailability();
+        Refresh();
+    }
+
     void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
     {
         if (reason == travelLimitsReason)
@@ -234,6 +258,8 @@ namespace tool
                 editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
             else if (IsIn(BusVoltageSettings(), editor->Parameter()))
                 editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
+            else if (IsIn(RecalibrationSettings(), editor->Parameter()))
+                editor->SetUnavailable(legacyReason.isEmpty() ? recalibrationReason : legacyReason);
             else if (editor->Parameter() != can::FocParameter::encoderResolution)
                 editor->SetUnavailable(legacyReason);
     }

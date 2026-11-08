@@ -400,6 +400,22 @@ namespace tool
             });
     }
 
+    bool CanCommandClient::SendRecalibrate(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focRecalibrateId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::recalibrate);
+            });
+    }
+
+    bool CanCommandClient::SendResetModel(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focResetModelId, [this, nodeId]()
+            {
+                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::resetModel);
+            });
+    }
+
     bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
     {
         return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
@@ -637,6 +653,8 @@ namespace tool
                 RequestReadings(nodeId);
                 break;
             case can::focClearDiagnosticsId:
+            case can::focRecalibrateId:
+            case can::focResetModelId:
                 RequestReadings(nodeId);
                 break;
             case can::focClearFaultHistoryId:

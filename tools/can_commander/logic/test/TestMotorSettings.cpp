@@ -382,6 +382,15 @@ TEST_F(TestMotorSettings, names_the_reset_cause_the_controller_reports)
     EXPECT_EQ("Unknown", ResetCauseName(2.5f));
 }
 
+TEST_F(TestMotorSettings, names_the_online_recalibration_modes)
+{
+    ASSERT_EQ(3, RecalibrationModes().size());
+    EXPECT_EQ("Off", RecalibrationModeName(0.0f));
+    EXPECT_EQ("On command", RecalibrationModeName(1.0f));
+    EXPECT_EQ("Automatic", RecalibrationModeName(2.0f));
+    EXPECT_EQ("Unknown", RecalibrationModeName(3.0f));
+}
+
 TEST_F(TestMotorSettings, names_the_board_kind_the_controller_reports)
 {
     EXPECT_EQ("Unknown", BoardKindName(0.0f));
