@@ -36,8 +36,9 @@ It speaks CAN on a **virtual CAN bus**, so the CAN Commander connects to it as i
 board: through an interface name, without knowing that the motor is simulated. Beside the bus, each
 virtual motor opens a **plant port** through which the Virtual Motor app (`tool-virtual-motor.md`)
 watches what a bench instrument would watch — phase currents, leg voltages, the true and the reported
-rotor angle, the supply and the winding temperature — and injects what a bench could inflict: load,
-disturbance torque, sensor noise, wiring faults, a weak supply.
+rotor angle, the supply and the winding temperature — and injects load and disturbance torque and
+sensor noise while the motor runs. The motor itself — its parameters, its non-idealities and any wiring
+fault — is fixed by the plant description it starts with.
 
 It replaces the former desktop simulator, which ran the control loops in isolation against the plant
 without the application, the CAN surface or the non-volatile memory.
@@ -77,7 +78,7 @@ graph LR
 - Presenting itself on a virtual CAN bus that any number of virtual motors and CAN Commanders share
 - Keeping its non-volatile memory between runs, so a calibrated virtual motor stays calibrated
 - Publishing the plant's signals through the plant port, continuously and as triggered captures
-- Applying disturbances, sensor non-idealities and wiring faults the plant port asks for, at a
+- Applying the load and disturbance torque and the sensor noise the plant port asks for, at a
   control-period boundary, while the motor runs
 - Running headless, so a script or a CI job can start virtual motors without a display
 
@@ -87,7 +88,8 @@ graph LR
   is a bench, not a test oracle (Part I)
 - Exposing the firmware's internal variables. The drive's own view leaves it over CAN, as a real
   board's does; the plant port shows only what an instrument on the bench could measure
-- Installing firmware. A virtual board has no bootloader and no staging slot (Part B)
+- Firmware update. A virtual motor runs the application it was built with (Part B)
+- Changing the motor's intrinsic parameters while it runs (Part E)
 - Modelling CAN physical-layer faults beyond what Part G lists
 
 ---
@@ -106,40 +108,40 @@ and the CAN Commander reports it offline after its usual timeout. Nothing else o
 
 A virtual motor is started with:
 
-| Start option        | Meaning                                                                                               | Default                       |
-|---------------------|-------------------------------------------------------------------------------------------------------|-------------------------------|
-| Bus                 | Name of the virtual CAN bus to join                                                                   | `default`                     |
-| Node                | The board ID the CAN node address is built from (`service-can.md` Part I)                             | 0                             |
-| Plant               | A reference motor preset (`teknic`, `anaheim`) or a plant description file                            | `teknic`                      |
-| Memory              | The file holding its non-volatile memory                                                              | one file per bus and node     |
-| Start from          | Keep the memory file, start factory-fresh, or start from a calibration made for the plant            | keep                          |
-| Seed                | Seed of every noise source, so a run replays exactly                                                  | fixed                         |
-| Host the bus        | Open the hub for the named bus if no hub is listening yet                                             | off                           |
-| Plant port          | Open the plant port for the Virtual Motor app                                                         | on when started by the app    |
+| Start option | Meaning                                                                                   | Default                    |
+|--------------|-------------------------------------------------------------------------------------------|----------------------------|
+| Bus          | Name of the virtual CAN bus to join                                                       | `default`                  |
+| Node         | The board ID the CAN node address is built from (`service-can.md` Part I)                 | 0                          |
+| Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file                | `teknic`                   |
+| Memory       | The file holding its non-volatile memory                                                  | one file per bus and node  |
+| Start from   | Keep the memory file, start factory-fresh, or start from a calibration made for the plant | keep                       |
+| Seed         | Seed of every noise source, so a run replays exactly                                      | fixed                      |
+| Host the bus | Open the hub for the named bus if no hub is listening yet                                 | off                        |
+| Plant port   | Open the plant port for the Virtual Motor app                                             | on when started by the app |
 
 ### Part B — The virtual board
 
 To the application the virtual board is one more platform, behind the same platform interfaces as the
 boards. What each service of the platform is on the virtual board:
 
-| Platform service            | On the virtual board                                                                                                    |
-|-----------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Power stage and encoder     | The shared plant drive (Part D)                                                                                         |
-| Board protection            | The same simulated comparators the emulated target uses (`software-in-the-loop.md` Part E), armed with the inverter     |
-| Supply voltage              | The plant's supply model                                                                                                |
-| CAN bus                     | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                               |
-| Non-volatile memory         | The memory file of the start options; every write reaches the file before it completes                                  |
-| Status LEDs                 | Three pins whose state the plant port publishes                                                                         |
-| Terminal and trace          | The debug log, published through the plant port; there is no command line, as on the board                              |
-| Board ID                    | The node of the start options                                                                                           |
-| Board kind                  | *virtual*, which no release carries a firmware pack for                                                                 |
-| Reset                       | The process ends and is started again with the same options; the memory file survives                                   |
-| Watchdog                    | None: a stalled application is seen as a stalled real-time factor (Part C)                                              |
+| Platform service        | On the virtual board                                                                                                |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------|
+| Power stage and encoder | The shared plant drive (Part D)                                                                                     |
+| Board protection        | The same simulated comparators the emulated target uses (`software-in-the-loop.md` Part E), armed with the inverter |
+| Supply voltage          | The plant's supply model                                                                                            |
+| CAN bus                 | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                           |
+| Non-volatile memory     | The memory file of the start options; every write reaches the file before it completes                              |
+| Status LEDs             | Three pins whose state the plant port publishes                                                                     |
+| Terminal and trace      | The debug log, published through the plant port; there is no command line, as on the board                          |
+| Board ID                | The node of the start options                                                                                       |
+| Board kind              | *virtual*, which no release carries a firmware pack for                                                             |
+| Reset                   | The process ends and is started again with the same options; the memory file survives                               |
+| Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                          |
 
-**Firmware update.** A virtual board has no bootloader and no staging slot. It refuses a download
-before any data is sent, and the CAN Commander says that this motor cannot be updated
-(`tool-can-commander.md` Part N). Its firmware is the application it was built with; the CAN
-Commander shows that version and board kind on the Firmware tab as for any board.
+**Firmware update.** Does not apply. A virtual motor's firmware is the application it was built with,
+and a newer one comes with a newer tool; the virtual board has no bootloader and no staging slot. The
+CAN Commander shows its version and board kind and offers no update for it (`tool-can-commander.md`
+Part N).
 
 **Memory file.** A missing or unreadable file is a factory-fresh board. *Start factory-fresh* replaces
 the file with an erased memory; *start from a calibration* writes the calibration and configuration
@@ -204,27 +206,29 @@ Moving the plant drive out of its two current copies must not change their outpu
 trace with every non-ideality, fault and noise source enabled (`software-in-the-loop.md` Part O) stays
 bit for bit identical.
 
-### Part E — Disturbances and faults while running
+### Part E — Torque and noise while running
 
-The plant port can change the plant while the motor runs. A change is queued and applied at the start
-of the next control period, never inside one; the pacer is the only writer of the plant's state.
+While the motor runs, the plant port changes only what acts on the motor from outside: torque on the
+shaft and noise on the sensors. A change is queued and applied at the start of the next control period,
+never inside one; the pacer is the only writer of the plant's state.
 
-| Group          | Change                                                                                               | Plant part         |
-|----------------|------------------------------------------------------------------------------------------------------|--------------------|
-| Load           | Load torque; viscous and dry friction; cogging amplitude and cycles per revolution                  | Mechanical plant   |
-| Disturbance    | External torque as a constant, a step, a ramp or a sine; gripping the shaft at a given speed        | Mechanical plant   |
-| Current sense  | Noise standard deviation and bias per phase                                                          | Current sensor     |
-| Encoder        | Noise, bias, counts per revolution, a stuck encoder, the index pulse                                 | Encoder            |
-| Winding        | An open phase                                                                                        | Electrical plant   |
-| Supply         | Voltage scale, source resistance, a weak supply                                                      | Supply             |
-| Thermal        | Ambient temperature                                                                                  | Thermal model      |
-| Protection     | Tripping a board protection comparator                                                               | Board protection   |
+| Group         | Change                                                               | Plant part       |
+|---------------|----------------------------------------------------------------------|------------------|
+| Torque        | Load torque; external torque as a constant, a step, a ramp or a sine | Mechanical plant |
+| Current noise | Noise standard deviation per phase                                   | Current sensor   |
+| Encoder noise | Noise standard deviation                                             | Encoder          |
+
+The motor's intrinsic parameters — resistance, inductances, flux linkage, pole pairs, inertia,
+friction, cogging — and its non-idealities and wiring faults (sensor bias, encoder resolution, a stuck
+encoder, an open phase, a weak supply) never change while it runs. They come from the plant
+description it starts with; another motor is another description and a restart. An identification
+then always has one right answer, the description's.
 
 Every active change is listed by the plant port, and one request clears all of them, returning the
 plant to its description.
 
-**Disturbance profiles.** A profile is a timed list of such changes, relative to its start or to a
-trigger (a speed or current threshold, the drive entering a state the LEDs show). It is the bench
+**Disturbance profiles.** A profile is a timed list of torque and noise changes, relative to its start
+or to a trigger (a speed or current threshold, the drive entering a state the LEDs show). It is the bench
 counterpart of the scheduled disturbances of the scenarios (`software-in-the-loop.md` Part H): with
 the same seed and profile a run replays exactly. Profiles are files the app loads and saves.
 
@@ -243,8 +247,9 @@ periods, around a trigger: a signal crossing a level in a direction, a protectio
 show, or immediately. The request names the share of the capture before the trigger. A capture is
 delivered once complete.
 
-**Control and status.** Pause, resume, step, the changes of Part E, profiles, and the status: virtual
-time, real-time factor, overruns, LED states, board protection state and the debug log lines.
+**Control and status.** Pause, resume, step, the torque and noise changes of Part E, profiles, and the
+status: virtual time, real-time factor, overruns, LED states, board protection state and the debug log
+lines.
 
 ### Part G — The virtual CAN bus
 
@@ -266,8 +271,9 @@ rate.
   when no hub is listening, so headless runs need no app. When the hub stops, every participant sees
   its bus closed; the CAN Commander reports the disconnect as for an unplugged adapter.
 
-The CAN Commander reaches a virtual bus as `virtual:<bus name>` in its Interface box
-(`tool-can-commander.md` Part I).
+The participant side is an adapter of can-lite's host adapter composition, beside SocketCAN and slcan,
+so the CAN Commander reaches a virtual bus as `virtual:<bus name>` in its Interface box
+(`tool-can-commander.md` Part I) with no adapter code of its own.
 
 ### Part H — Lifecycle
 
@@ -305,20 +311,20 @@ so that the virtual board cannot drift from the emulated one unnoticed.
 
 ### Provided
 
-| Interface          | Purpose                                          | Contract                                                                                         |
-|--------------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| CAN node           | The drive's whole command and telemetry surface  | The FOC motor CAN category, unchanged (`service-can.md`), on the virtual bus                     |
-| Virtual CAN hub    | Shared buses for virtual motors and commanders   | Part G; loopback only                                                                            |
-| Plant port         | Plant signals, captures, disturbances, status    | Part F; one reader; a slow reader loses windows, never slows the motor                           |
-| Start options      | Headless start by a script, a CI job or the app  | Part A; an invalid option ends the process with a message before it joins the bus                |
+| Interface       | Purpose                                           | Contract                                                                          |
+|-----------------|---------------------------------------------------|-----------------------------------------------------------------------------------|
+| CAN node        | The drive's whole command and telemetry surface   | The FOC motor CAN category, unchanged (`service-can.md`), on the virtual bus      |
+| Virtual CAN hub | Shared buses for virtual motors and commanders    | Part G; loopback only                                                             |
+| Plant port      | Plant signals, captures, torque and noise, status | Part F; one reader; a slow reader loses windows, never slows the motor            |
+| Start options   | Headless start by a script, a CI job or the app   | Part A; an invalid option ends the process with a message before it joins the bus |
 
 ### Required
 
-| Interface                 | Purpose                                    | Contract                                                                 |
-|---------------------------|--------------------------------------------|--------------------------------------------------------------------------|
-| Application composition   | The drive itself                           | The same composition the board runs, against the platform interfaces     |
-| Plant drive and model     | Motor, power stage, sensors, supply        | Part D; one description format shared with the emulated target and MIL   |
-| Calibration image builder | *Start from a calibration*                 | The records the model-in-the-loop tests build for a plant                |
+| Interface                 | Purpose                             | Contract                                                               |
+|---------------------------|-------------------------------------|------------------------------------------------------------------------|
+| Application composition   | The drive itself                    | The same composition the board runs, against the platform interfaces   |
+| Plant drive and model     | Motor, power stage, sensors, supply | Part D; one description format shared with the emulated target and MIL |
+| Calibration image builder | *Start from a calibration*          | The records the model-in-the-loop tests build for a plant              |
 
 ---
 
@@ -326,43 +332,44 @@ so that the virtual board cannot drift from the emulated one unnoticed.
 
 Signals of the continuous stream and of a capture, per control period:
 
-| Signal                      | Unit  | Notes                                                                     |
-|-----------------------------|-------|---------------------------------------------------------------------------|
-| Phase currents a, b, c      | A     | True winding currents                                                     |
-| Measured phase currents     | A     | What the current-sense chain reports, with its noise, bias and conversion |
-| Duties a, b, c              | 1     | As applied to the legs, after the duty delay                              |
-| Leg voltages a, b, c        | V     | After dead time and the bus voltage                                       |
-| Stator voltage α, β         | V     | Amplitude-invariant Clarke of the leg voltages                            |
-| True d, q currents          | A     | Park of the true currents at the true electrical angle                    |
-| Rotor angle                 | rad   | True mechanical angle                                                     |
-| Encoder angle               | rad   | What the encoder reports, with its resolution, noise, bias or stuck state |
-| Rotor speed                 | rad/s | Mechanical                                                                |
-| Electrical torque           | N·m   | From the true currents                                                    |
-| Load and external torque    | N·m   | Including friction and cogging                                            |
-| Bus voltage, bus current    | V, A  | From the supply model                                                     |
-| Winding temperature         | °C    | From the thermal model                                                    |
+| Signal                   | Unit  | Notes                                                                     |
+|--------------------------|-------|---------------------------------------------------------------------------|
+| Phase currents a, b, c   | A     | True winding currents                                                     |
+| Measured phase currents  | A     | What the current-sense chain reports, with its noise, bias and conversion |
+| Duties a, b, c           | 1     | As applied to the legs, after the duty delay                              |
+| Leg voltages a, b, c     | V     | After dead time and the bus voltage                                       |
+| Stator voltage α, β      | V     | Amplitude-invariant Clarke of the leg voltages                            |
+| True d, q currents       | A     | Park of the true currents at the true electrical angle                    |
+| Rotor angle              | rad   | True mechanical angle                                                     |
+| Encoder angle            | rad   | What the encoder reports, with its resolution, noise, bias or stuck state |
+| Rotor speed              | rad/s | Mechanical                                                                |
+| Electrical torque        | N·m   | From the true currents                                                    |
+| Load and external torque | N·m   | Including friction and cogging                                            |
+| Bus voltage, bus current | V, A  | From the supply model                                                     |
+| Winding temperature      | °C    | From the thermal model                                                    |
 
 ---
 
 ## Constraints & Limitations
 
-| Constraint                 | Value / Description                                                                                           |
-|----------------------------|---------------------------------------------------------------------------------------------------------------|
-| Motors per bus             | Eight, the number of servers the CAN Commander follows                                                        |
-| Real-time ratio            | One; pause and single step only while on a bus (Part C)                                                       |
-| Catch-up limit             | 50 ms behind the wall clock, beyond which the backlog is dropped and counted as an overrun                    |
-| Continuous stream          | 2 kHz windows with minimum and maximum per signal                                                             |
-| Capture length             | Up to 16,384 control periods (0.82 s at 20 kHz)                                                               |
-| Network                    | Loopback only; a virtual bus never reaches another machine                                                     |
-| Firmware update            | Refused (Part B)                                                                                              |
-| Platforms                  | Linux and Windows, the platforms the CAN Commander ships for                                                  |
+| Constraint            | Value / Description                                                                        |
+|-----------------------|--------------------------------------------------------------------------------------------|
+| Motors per bus        | Eight, the number of servers the CAN Commander follows                                     |
+| Real-time ratio       | One; pause and single step only while on a bus (Part C)                                    |
+| Catch-up limit        | 50 ms behind the wall clock, beyond which the backlog is dropped and counted as an overrun |
+| Continuous stream     | 2 kHz windows with minimum and maximum per signal                                          |
+| Capture length        | Up to 16,384 control periods (0.82 s at 20 kHz)                                            |
+| Network               | Loopback only; a virtual bus never reaches another machine                                 |
+| Firmware update       | Not offered (Part B)                                                                       |
+| Changes while running | Torque and sensor noise only (Part E)                                                      |
+| Platforms             | Linux and Windows, the platforms the CAN Commander ships for                               |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                                       | Options                                                                                   | Status |
-|---|--------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|--------|
-| 1 | Where does the `virtual:` adapter live?                                        | In can-lite's host adapter composition, beside SocketCAN and slcan; or in the CAN Commander only | open, leaning can-lite |
-| 2 | Which refusal does the firmware-upgrade service give a board without a staging slot? | An existing refusal reason; or a new one the CAN Commander can name                         | open   |
-| 3 | Should a plant description be editable while the motor runs, beyond Part E?    | Restart with a new description only; or live parameter drift (resistance, inductance scale) | open, leaning restart |
+| # | Question                                     | Options                                                              | Status                              |
+|---|----------------------------------------------|----------------------------------------------------------------------|-------------------------------------|
+| 1 | Where does the `virtual:` adapter live?      | In can-lite's host adapter composition; or in the CAN Commander only | resolved: can-lite (Part G)         |
+| 2 | Does a virtual motor take a firmware update? | Refuse a download; or offer none                                     | resolved: none offered (Part B)     |
+| 3 | What may change while the motor runs?        | Torque and noise only; or intrinsic parameters too                   | resolved: torque and noise (Part E) |

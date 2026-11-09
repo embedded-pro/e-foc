@@ -33,8 +33,8 @@ date: 2026-11-09
 - Showing, per motor, what bench instruments would show: phase currents, leg voltages and the
   modulation hexagon, the rotor and the current and voltage space vectors turning, the encoder against
   the true angle, speed and torque, supply and winding temperature, the board LEDs and the debug log
-- Injecting load, disturbances, sensor non-idealities and wiring faults, and making every active one
-  visible and removable in one action
+- Injecting load and disturbance torque and sensor noise while a motor runs, and making every active
+  change visible and removable in one action
 - Shipping inside the e-foc CAN Commander installers, as "e-foc Virtual Motor"
 
 **Is NOT responsible for:**
@@ -76,9 +76,9 @@ without a display:
 +----------------------------------------------------------------------------------+
 ```
 
-- **Add Motor** asks for the node, the plant (Teknic, Anaheim, or a description file) and how it
-  starts: keep its memory, factory-fresh, or calibrated for the plant. A node already on the bus is
-  refused with the reason.
+- **Add Motor** asks for the node, the plant (Teknic, Anaheim, or a description file, which is where
+  non-idealities and wiring faults are set) and how it starts: keep its memory, factory-fresh, or
+  calibrated for the plant. A node already on the bus is refused with the reason.
 - **State** is the process's (`virtual-motor.md` Part H), never what the user last clicked: *Starting…*
   until the motor has joined the bus. A crashed motor keeps its row with its last log lines one click
   away; the row explains that the CAN Commander will report it offline.
@@ -100,14 +100,14 @@ mistaken for a bench instrument on real hardware.
 | VIRTUAL  Node 1 · Teknic M-2310P   Running  t = 00:01:42.315  RT 1.00   LEDs ● ○ ○  Prot: ok |
 | [Pause] [Step ▸] [Power Cycle] [Power Off]          Active disturbances: 2  [Clear All]    |
 +-----------------------------------------------------------+------------------------------+
-| Tabs: Currents | Voltages | Rotor | Encoder | Mechanics | Supply | Log | Disturbances      |
-|                                                           |  Load                         |
-|   (selected view)                                         |  Disturbance torque           |
-|                                                           |  Current sense                |
-|                                                           |  Encoder                      |
-|                                                           |  Winding · Supply · Thermal   |
-|                                                           |  Protection                   |
-|                                                           |  Profiles                     |
+| Tabs: Currents | Voltages | Rotor | Encoder | Mechanics | Supply | Log | Torque & Noise    |
+|                                                           |  Torque                      |
+|   (selected view)                                         |    load, external            |
+|                                                           |  Noise                       |
+|                                                           |    current, encoder          |
+|                                                           |  Profiles                    |
+|                                                           |  Motor (read-only)           |
+|                                                           |                              |
 +-----------------------------------------------------------+------------------------------+
 | Capture: trigger [Ia ▾] [rising ▾] level [ 2.00 A ]  pre 25 %  length 4096  [Arm] [Now]    |
 +------------------------------------------------------------------------------------------+
@@ -165,16 +165,15 @@ instead, and says so, rather than drawing an aliased rotation.
 - Counts per revolution, the index pulses seen, and a *stuck* indicator when the reported angle stopped
   while the rotor turns.
 
-### Part G — disturbances and faults
+### Part G — torque and noise
 
-The side panel holds every change of `virtual-motor.md` Part E, grouped as there. Values are typed or
+The side panel holds the changes of `virtual-motor.md` Part E: **Torque** (load torque, and external
+torque as a constant, a step, a ramp or a sine) and **Noise** (current noise per phase, encoder noise).
+Below them, the motor's parameters are shown read-only from its plant description, with a note that
+another motor means another description and a restart. Values are typed or
 dragged but **apply only on Apply** or Enter, never while typing; each group shows what is in force.
 Every active change appears in the header count and in a list with its own remove button; **Clear All**
 returns the plant to its description.
-
-Wiring faults (open phase, stuck encoder, weak supply) and tripping the board protection are set apart
-under *Faults* and say what the drive is expected to do (fault, coast), since their purpose is to make
-it fault.
 
 **Profiles** are loaded, saved, started and stopped from the panel; a running profile shows its time
 and next step, and stopping it clears what it applied.

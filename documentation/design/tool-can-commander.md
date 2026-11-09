@@ -576,8 +576,8 @@ the Virtual Motor app (`tool-virtual-motor.md`).
 - **Marking.** A node that reports the board kind *virtual* is marked **Virtual** on its tab, its overview
   chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
   motor.
-- **Firmware.** The Firmware tab shows a virtual motor's version and board kind, offers no release for it,
-  and disables Download to Controller with the reason that a virtual motor cannot be updated.
+- **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else: no release,
+  no pack and no update steps, because a virtual motor runs the firmware it was built with.
 - **Launching.** Motor → Launch Virtual Motor… starts the Virtual Motor app, which is installed with the
   tool (`tool-virtual-motor.md` Part I).
 - **Going offline.** A paused, powered-off or crashed virtual motor goes silent and is reported offline
