@@ -1,9 +1,9 @@
 #pragma once
 
+#include "core/foc/model/drive/SilPlantConfig.hpp"
 #include "motor_parameters/AnaheimBly172s24v4000.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include "targets/platform_implementations/motor_boards/E-FOC-HARDWARE/BoardCharacteristics.hpp"
-#include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
 #include <string>
 
 namespace sil

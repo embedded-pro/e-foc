@@ -1,12 +1,8 @@
 #pragma once
 
-#include "core/foc/model/OneShotDelay.hpp"
-#include "core/foc/model/PlantResponseRecorder.hpp"
-#include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "core/platform_abstraction/LowSideShuntWindow.hpp"
+#include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/HotSwapFunction.hpp"
-#include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -42,27 +38,10 @@ namespace mil
         void SetZero() override;
 
     private:
-        foc::PlantResponseSample SampleAt(uint32_t tick) const;
-
-        const sil::SilPlantConfig plant;
-        const hal::Hertz baseFrequency;
-        foc::ThreePhaseMotorModel model;
-        const foc::MechanicalPlant& mechanics{ model.Mechanics() };
-        const foc::ElectricalPlant& electrical{ model.Electrical() };
-        const foc::SupplyModel& supply{ model.Supply() };
-        foc::PlantResponseRecorder<1024> responseRecorder;
-        foc::OneShotDelay torqueStep;
-        foc::NewtonMeter torqueStepTorque{ 0.0f };
-        foc::OneShotDelay encoderFreeze;
-        foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection;
+        sil::PlantDrive drive;
+        const foc::ThreePhaseMotorModel& plantModel{ drive.Model() };
+        const foc::SupplyModel& supply{ drive.Model().Supply() };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
-        uint32_t controlTick{ 0 };
         bool controlLoopEntered{ false };
-        bool dutyDelayed;
-        hal::DutyCycle maxReadableDuty;
-        hal::DutyCycle maxDuty;
-        foc::LowSideShuntReadout shuntReadout;
-        foc::PhasePwmDutyCycles lastDutyPhases{};
-        foc::PhasePwmDutyCycles appliedDutyPhases{};
     };
 }

@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "virtual-motor"
 date: 2026-11-09
 ---
@@ -12,7 +12,7 @@ date: 2026-11-09
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.0                |
+| Version   | 0.2.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-09           |
 
@@ -202,9 +202,8 @@ keeps the low-side shunts readable, fires scheduled torque steps and encoder fre
 trajectory. It is configured from one plant description format, so a plant field added for one user
 reaches the others.
 
-Moving the plant drive out of its two current copies must not change their output: the 18,000-period
-trace with every non-ideality, fault and noise source enabled (`software-in-the-loop.md` Part O) stays
-bit for bit identical.
+Moving the plant drive out of its two former copies changed neither user's output
+(`software-in-the-loop.md` Part O).
 
 ### Part E — Torque and noise while running
 

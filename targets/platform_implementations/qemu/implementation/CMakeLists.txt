@@ -12,8 +12,6 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     EmulatedCanBusAdapter.hpp
     SemihostingPlantConfig.cpp
     SemihostingPlantConfig.hpp
-    SilPlantConfig.hpp
-    SilPlantModel.hpp
     QemuTimer.cpp
     QemuTimer.hpp
     PlatformFactoryImpl.cpp
@@ -37,6 +35,7 @@ target_compile_definitions(e_foc.platform_abstraction_qemu PUBLIC
 target_link_libraries(e_foc.platform_abstraction_qemu PUBLIC
     e_foc.platform_abstraction
     e_foc.foc.model
+    e_foc.foc.model.drive
     e_foc.state_machine
     e_foc.can
     can_lite.server
