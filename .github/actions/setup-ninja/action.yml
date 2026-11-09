@@ -1,20 +1,33 @@
 name: Set up Ninja
-description: Install Ninja, retrying when the release download fails
+description: Install Ninja from its GitHub release, or from the platform's package source when that download fails
 runs:
   using: composite
   steps:
-    - id: first
+    - id: installed
+      shell: bash
+      run: |
+        if command -v ninja >/dev/null 2>&1; then
+          echo "found=true" >> "$GITHUB_OUTPUT"
+        fi
+    - id: release
+      if: ${{ steps.installed.outputs.found != 'true' }}
       continue-on-error: true
       uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
-    - if: ${{ steps.first.outcome == 'failure' }}
+    - if: ${{ steps.release.outcome == 'failure' }}
       shell: bash
-      run: sleep 20
-    - id: second
-      if: ${{ steps.first.outcome == 'failure' }}
-      continue-on-error: true
-      uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
-    - if: ${{ steps.second.outcome == 'failure' }}
-      shell: bash
-      run: sleep 60
-    - if: ${{ steps.second.outcome == 'failure' }}
-      uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+      run: |
+        case "$RUNNER_OS" in
+          Linux)
+            sudo=""
+            if [ "$(id -u)" -ne 0 ]; then sudo="sudo"; fi
+            $sudo apt-get update
+            $sudo apt-get install -y --no-install-recommends ninja-build
+            ;;
+          macOS)
+            brew install ninja
+            ;;
+          Windows)
+            python -m pip install ninja
+            python -c "import sysconfig; print(sysconfig.get_path('scripts'))" >> "$GITHUB_PATH"
+            ;;
+        esac
