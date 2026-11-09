@@ -48,43 +48,43 @@ namespace sil
 
     inline void ConfigureModel(foc::ThreePhaseMotorModel& model, const SilPlantConfig& config)
     {
-        model.SetRandomSeed(config.randomSeed);
-        model.SetAdcNoise({
+        foc::SeedNoise(model, config.randomSeed);
+        model.CurrentSensor().SetNoise({
             .sigmaAmpere = config.noiseSigmaAmpere,
             .biasAmpereA = config.noiseBiasAmpereA,
             .biasAmpereB = config.noiseBiasAmpereB,
             .biasAmpereC = config.noiseBiasAmpereC,
         });
-        model.SetThermalConfig({
+        model.Thermal().Configure({
             .ambientCelsius = config.ambientCelsius,
             .thermalResistance = config.thermalResistance,
             .thermalCapacitance = config.thermalCapacitance,
             .copperTempCoeff = config.copperTempCoeff,
             .ironInductanceCoeff = config.ironInductanceCoeff,
         });
-        model.SetEncoderNoise({
+        model.Encoder().SetNoise({
             .sigmaRadians = config.encoderSigmaRadians,
             .biasRadians = config.encoderBiasRadians,
         });
-        model.SetFaultInjection(BootFaultInjection(config));
-        model.SetSupply({
+        foc::InjectFaults(model, BootFaultInjection(config));
+        model.Supply().Configure({
             .sourceResistanceOhm = config.supplySourceResistanceOhm,
             .currentLimitAmpere = config.supplyCurrentLimitAmpere,
         });
-        model.SetPowerStage({
+        model.Electrical().SetPowerStage({
             .deadTimeSeconds = config.deadTimeNanoseconds * 1e-9f,
             .switchNodeCapacitanceFarad = config.switchNodeCapacitancePicofarad * 1e-12f,
             .onResistanceOhm = config.switchOnResistanceOhm,
             .diodeForwardVolts = config.diodeForwardVolts,
             .minimumPulseSeconds = config.minimumPulseNanoseconds * 1e-9f,
         });
-        model.SetCoulombFriction(foc::NewtonMeter{ config.coulombFrictionNm });
-        model.SetCogging(foc::NewtonMeter{ config.coggingTorqueNm }, config.coggingCyclesPerRevolution);
-        model.SetEncoderResolution(config.encoderCountsPerRevolution);
-        model.SetEncoderIndex(config.encoderIndexWidthCounts != 0 ? std::make_optional(foc::Radians{ config.encoderIndexRadians }) : std::nullopt, config.encoderIndexWidthCounts);
-        model.ResetTemperature();
+        model.Mechanics().SetCoulombFriction(foc::NewtonMeter{ config.coulombFrictionNm });
+        model.Mechanics().SetCogging(foc::NewtonMeter{ config.coggingTorqueNm }, config.coggingCyclesPerRevolution);
+        model.Encoder().SetResolution(config.encoderCountsPerRevolution);
+        model.Encoder().SetIndex(config.encoderIndexWidthCounts != 0 ? std::make_optional(foc::Radians{ config.encoderIndexRadians }) : std::nullopt, config.encoderIndexWidthCounts);
+        model.Thermal().Reset();
 
         if (config.loadTorqueNm != 0.0f)
-            model.SetLoad(foc::NewtonMeter{ config.loadTorqueNm });
+            model.Mechanics().SetLoad(foc::NewtonMeter{ config.loadTorqueNm });
     }
 }

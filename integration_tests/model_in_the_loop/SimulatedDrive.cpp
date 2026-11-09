@@ -68,7 +68,7 @@ namespace mil
         , shuntReadout{ maxReadableDuty }
     {
         sil::ConfigureModel(model, plant);
-        model.SetCurrentSense(sil::CurrentSense(plant, shortestSampleHoldClocks));
+        model.CurrentSensor().SetChain(sil::CurrentSense(plant, shortestSampleHoldClocks));
 
         const uint32_t baseHz = baseFrequency.Value();
         if (plant.responseSampleRateHz != 0)
@@ -91,7 +91,7 @@ namespace mil
 
         if (torqueStep.Fire(tick))
         {
-            model.SetExternalTorque(torqueStepTorque);
+            model.Mechanics().SetExternalTorque(torqueStepTorque);
             responseRecorder.Note(foc::PlantResponseKind::torqueStep, SampleAt(tick));
         }
 
@@ -99,7 +99,7 @@ namespace mil
         {
             auto frozen = bootFaultInjection;
             frozen.encoderStuck = true;
-            model.SetFaultInjection(frozen);
+            foc::InjectFaults(model, frozen);
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, SampleAt(tick));
         }
 
@@ -112,7 +112,7 @@ namespace mil
         if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
-            onPhaseCurrentsReady(shuntReadout.Read(model.LastMeasuredCurrents()));
+            onPhaseCurrentsReady(shuntReadout.Read(model.CurrentSensor().Last()));
             controlLoopEntered = false;
         }
     }
@@ -141,7 +141,7 @@ namespace mil
 
     foc::Volts SimulatedDrive::PowerSupplyVoltage() const
     {
-        return model.EffectiveSupplyVoltage();
+        return supply.Voltage();
     }
 
     drivers::DeadTimeLoss SimulatedDrive::InverterDeadTimeLoss() const
@@ -175,8 +175,8 @@ namespace mil
     void SimulatedDrive::Stop()
     {
         model.Stop();
-        model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
-        model.SetFaultInjection(bootFaultInjection);
+        model.Mechanics().SetExternalTorque(foc::NewtonMeter{ 0.0f });
+        foc::InjectFaults(model, bootFaultInjection);
         responseRecorder.End();
     }
 
@@ -197,22 +197,22 @@ namespace mil
 
     foc::Radians SimulatedDrive::Read()
     {
-        return model.Read();
+        return model.Encoder().Read();
     }
 
     void SimulatedDrive::Set(foc::Radians value)
     {
-        model.Set(value);
+        model.Encoder().Set(value);
     }
 
     void SimulatedDrive::SetZero()
     {
-        model.SetZero();
+        model.Encoder().SetZero();
     }
 
     foc::PlantResponseSample SimulatedDrive::SampleAt(uint32_t tick) const
     {
-        const auto dq = model.LastDqCurrents();
-        return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
+        const auto dq = electrical.LastDqCurrents();
+        return foc::PlantResponseSample{ tick, mechanics.Speed().Value(), mechanics.Angle().Value(), dq.q, dq.d, mechanics.ExternalTorque().Value() };
     }
 }

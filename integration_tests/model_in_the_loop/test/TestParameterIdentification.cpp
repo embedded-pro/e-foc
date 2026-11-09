@@ -96,7 +96,7 @@ TEST_F(TestParameterIdentification, a_current_offset_window_one_phase_reads_wron
     mil::ModelInTheLoop mil{ scenario };
     const auto readPhaseBWithBias = [&mil, &scenario](float biasAmpereB)
     {
-        mil.Drive().Model().SetAdcNoise({ .sigmaAmpere = scenario.plant.noiseSigmaAmpere,
+        mil.Drive().Model().CurrentSensor().SetNoise({ .sigmaAmpere = scenario.plant.noiseSigmaAmpere,
             .biasAmpereA = scenario.plant.noiseBiasAmpereA,
             .biasAmpereB = biasAmpereB,
             .biasAmpereC = scenario.plant.noiseBiasAmpereC });

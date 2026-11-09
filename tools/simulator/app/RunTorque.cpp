@@ -27,9 +27,9 @@ namespace simulator
         const auto vdc = foc::M_2310P_LN_04K::ratedSupply;
 
         foc::ThreePhaseMotorModel model{ foc::M_2310P_LN_04K::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
-        model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
+        model.Mechanics().SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
-        foc::FocTorqueController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps } };
+        foc::FocTorqueController controller{ model, model.Encoder(), foc::Ampere{ defaults::maxCurrentAmps } };
         auto motorModel = foc::MotorModelParameters{};
         motorModel.resistance = foc::M_2310P_LN_04K::parameters.R;
         motorModel.inductance = foc::MilliHenry{ foc::M_2310P_LN_04K::parameters.Ld.Value() * 1000.0f };
@@ -58,8 +58,8 @@ namespace simulator
         GuiSimulation simulation{ model, controller, eventDispatcher,
             foc::M_2310P_LN_04K::parameters, pidParameters, setpointConfig, vdc };
 
-        infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ model, model };
-        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ model, model, vdc };
+        infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ model, model.Encoder() };
+        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ model, model.Encoder(), vdc };
 
         auto& gui = simulation.GetGui();
         gui.DisableMechanicalIdent();
