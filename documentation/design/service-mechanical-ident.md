@@ -346,6 +346,22 @@ interrupt schedules a fit at once. At the rig's window of about 4 ms the tick le
 waiting, so this never happens there. A run whose windows still fill the ring before they are fitted ends
 without an estimate rather than skipping a window.
 
+### Structure
+
+`MechanicalParametersIdentificationImpl` owns the run: the drive, the envelopes, the tick and timeout timers, the outcome
+and the result. The work above is split into parts that each run in one context:
+
+| Part                   | Context                | Holds                                                                                                              |
+|------------------------|------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `EncoderResolution`    | control interrupt      | Smallest step and step-change energy; the window length they call for                                              |
+| `SampleWindow`         | control interrupt      | Position and torque accumulation, the kernel-centred speed and torque, the window resize; owns `EncoderResolution` |
+| `ObservationQueue`     | interrupt → event loop | The 16-entry ring; reports when half of it waits and when it is full                                               |
+| `MechanicalFit`        | event loop             | The RLS estimator, persistence of excitation, the convergence decision and the dwell boundary to finish on         |
+| `InertiaSettling`      | event loop             | The inertia reference compared once per estimator memory                                                           |
+| `TwoLevelSpeedProfile` | event loop             | The dwell and target levels, the slewed speed command and the timer that alternates them                           |
+
+The interrupt reads two things the event loop writes: whether a run is active and the dwell boundary to finish on.
+
 ### Timeout and Result Delivery
 
 A `TimerSingleShot` starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:

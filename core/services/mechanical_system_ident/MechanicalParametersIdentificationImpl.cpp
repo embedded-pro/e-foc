@@ -2,43 +2,15 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
-#include <cmath>
-#include <limits>
-#include <numbers>
 
 namespace
 {
     constexpr infra::Duration tickPeriod{ std::chrono::milliseconds{ 1 } };
     constexpr float tickPeriodSeconds{ 0.001f };
-
-    constexpr float accelerationQuantumTarget{ 100.0f };
-    constexpr std::size_t maximumObservationWindow{ 256 };
-    constexpr std::size_t minimumCountSteps{ 8 };
-    constexpr std::size_t stepChangeMemory{ 4096 };
-    constexpr float stepChangeToResolution{ std::numbers::sqrt2_v<float> };
-    constexpr std::size_t windowHysteresisFloor{ 16 };
-    constexpr std::size_t windowHysteresisDivisor{ 16 };
-
-    constexpr float inertiaSettlingTolerance{ 0.1f };
-    constexpr std::size_t maximumSettlingInterval{ 2000 };
-    constexpr std::size_t minimumSettlingUpdates{ 8 };
-    constexpr float coveredWindowSamples{ 16.0f };
-
     constexpr float minimumRunDwells{ 2.0f };
-
-    std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
-    {
-        if (!math::IsFinite(countAngle))
-            return 1;
-
-        const auto seconds = math::Sqrt(countAngle / accelerationQuantumTarget);
-        const auto samples = static_cast<std::size_t>(math::Ceil(seconds / samplingPeriod));
-        return std::clamp<std::size_t>(samples, 1, maximumObservationWindow);
-    }
 }
 
 namespace services
@@ -56,144 +28,80 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone)
     {
-        if (rls.has_value() || !IsUsableIdentificationConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || numberOfPolePairs == 0)
+        if (fit.IsRunning() || !IsUsableIdentificationConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || numberOfPolePairs == 0)
         {
             onDone(std::nullopt, std::nullopt);
             return;
         }
 
-        this->currentConfig = config;
-        this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
+        currentConfig = config;
+        currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
-        this->previousPosition = encoder.Read().Value();
-        this->previousSpeed = 0.0f;
-        this->hasPreviousMean = false;
-        this->hasPreviousSpeed = false;
-        this->positionSum = 0.0f;
-        this->previousMeanToEnd = 0.0f;
-        this->torqueSum = 0.0f;
-        this->torqueRise = 0.0f;
-        this->torquePeak = 0.0f;
-        this->torqueFall = 0.0f;
-        this->lastSamplePosition = this->previousPosition;
-        this->countAngle = std::numeric_limits<float>::infinity();
-        this->countSteps = 0;
-        this->lastStep = 0.0f;
-        this->stepChangeEnergy = 0.0f;
-        this->stepChanges = 0;
-        this->windowSamples = 1;
-        this->samplesInWindow = 0;
-        this->windowPeriod = samplingPeriod;
-        this->polePairs = static_cast<float>(numberOfPolePairs);
-        this->excitation.Restart();
-        this->atDwellLevel = true;
-        this->outcome = Outcome::pending;
+        polePairs = static_cast<float>(numberOfPolePairs);
+        outcome = Outcome::pending;
+        window.Restart(encoder.Read().Value(), samplingPeriod);
+        queue.Clear();
 
-        RestartEstimator(config.forgettingFactor);
-        observationsPosted = 0;
-        observationsFitted = 0;
-        this->samplesSinceStart = 0;
-        this->dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
-        this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples));
-        this->finishAtSample = 0;
+        const auto dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
+        fit.Restart(config.forgettingFactor, dwellSamples, static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples)));
 
         observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
-        this->commandedSpeed = 0.0f;
-        this->levelSpeed = config.dwellSpeed.Value();
+        StartExcitation(config);
+    }
 
+    void MechanicalParametersIdentificationImpl::StartExcitation(const Config& config)
+    {
         drive.Start();
         controller.EnableSpeedCommand();
-        controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
+        controller.CommandSpeed(foc::RadiansPerSecond{ 0.0f });
 
         tickTimer.Start(tickPeriod, [this]()
             {
                 Tick();
             });
 
-        excitationTimer.Start(config.dwellTime, [this]()
-            {
-                CommandNextExcitationLevel();
-            });
+        profile.Start(TwoLevelSpeedProfile::Levels{ config.dwellSpeed.Value(), config.targetSpeed.Value(), config.speedSlewRate }, config.dwellTime);
 
         timeoutTimer.Start(config.timeout, [this]()
             {
                 FitPostedObservations();
 
-                if (finishAtSample != 0 && outcome == Outcome::pending)
+                if (fit.HasConverged() && outcome == Outcome::pending)
                     outcome = Outcome::converged;
 
                 FinishRun();
             });
     }
 
-    void MechanicalParametersIdentificationImpl::RestartEstimator(float forgettingFactor)
-    {
-        updateForgetting = forgettingFactor;
-        rls.emplace(1000.0f, updateForgetting);
-        hasInertiaReference = false;
-        inertiaSettled = false;
-        updatesSinceReference = 0;
-    }
-
-    void MechanicalParametersIdentificationImpl::TrackInertiaSettling(uint32_t observedWindowSamples)
-    {
-        const auto memoryInSamples = updateForgetting < 1.0f ? math::Ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
-        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(math::Ceil(memoryInSamples / static_cast<float>(observedWindowSamples))));
-
-        if (++updatesSinceReference < memoryInUpdates)
-            return;
-
-        const auto inertia = rls->Coefficients().at(1, 0);
-        inertiaSettled = hasInertiaReference && math::Abs(inertia - inertiaReference) <= inertiaSettlingTolerance * math::Abs(inertia);
-        inertiaReference = inertia;
-        hasInertiaReference = true;
-        updatesSinceReference = 0;
-    }
-
-    void MechanicalParametersIdentificationImpl::CommandNextExcitationLevel()
-    {
-        atDwellLevel = !atDwellLevel;
-        levelSpeed = atDwellLevel ? currentConfig.dwellSpeed.Value() : currentConfig.targetSpeed.Value();
-    }
-
-    void MechanicalParametersIdentificationImpl::StepSpeedCommand()
-    {
-        const auto step = currentConfig.speedSlewRate * tickPeriodSeconds;
-        const auto remaining = levelSpeed - commandedSpeed;
-
-        commandedSpeed = math::Abs(remaining) <= step ? levelSpeed : commandedSpeed + math::Copysign(step, remaining);
-        controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
-    }
-
     void MechanicalParametersIdentificationImpl::Abort()
     {
-        if (!rls.has_value())
+        if (!fit.IsRunning())
             return;
 
         StopExcitation();
         ReleaseDrive();
-        rls.reset();
+        fit.Stop();
         onDone = nullptr;
     }
 
     bool MechanicalParametersIdentificationImpl::IsRunning() const
     {
-        return rls.has_value();
+        return fit.IsRunning();
     }
 
     bool MechanicalParametersIdentificationImpl::HasConverged() const
     {
-        return finishAtSample != 0;
+        return fit.HasConverged();
     }
 
     void MechanicalParametersIdentificationImpl::StopExcitation()
     {
         timeoutTimer.Cancel();
-        excitationTimer.Cancel();
+        profile.Stop();
         tickTimer.Cancel();
     }
 
@@ -212,7 +120,7 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::Tick()
     {
-        StepSpeedCommand();
+        controller.CommandSpeed(foc::RadiansPerSecond{ profile.Step(tickPeriodSeconds) });
         FitPostedObservations();
 
         if (outcome != Outcome::pending)
@@ -221,21 +129,19 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::FinishRun()
     {
-        if (!rls.has_value())
+        if (!fit.IsRunning())
             return;
 
         StopExcitation();
         ReleaseDrive();
         FitPostedObservations();
 
-        const auto& theta = rls->Coefficients();
-        const auto inertia = theta.at(1, 0);
-        const auto friction = SettledFriction(theta.at(2, 0));
-        const bool usable = outcome == Outcome::converged && IsPlausibleMechanics(inertia, friction);
-        rls.reset();
+        const auto estimate = fit.Estimate();
+        const bool usable = outcome == Outcome::converged && IsPlausibleMechanics(estimate.inertia, estimate.friction);
+        fit.Stop();
 
         if (usable)
-            Complete(foc::NewtonMeterSecondPerRadian{ friction }, foc::NewtonMeterSecondSquared{ inertia });
+            Complete(foc::NewtonMeterSecondPerRadian{ estimate.friction }, foc::NewtonMeterSecondSquared{ estimate.inertia });
         else
             Complete(std::nullopt, std::nullopt);
     }
@@ -251,7 +157,7 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
-        if (!rls.has_value())
+        if (!fit.IsRunning())
             return;
 
         if (ExceedsInjectionLimit(currentPhases, currentEnvelope))
@@ -260,90 +166,17 @@ namespace services
             return;
         }
 
-        ++samplesSinceStart;
-
         const auto mechanicalPos = encoder.Read().Value();
         const auto electricalAngle = mechanicalPos * polePairs;
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
 
-        const auto sampleTorque = rotatingFrame.q * torqueConstant.Value();
-        const auto weight = (static_cast<float>(samplesInWindow) + 0.5f) / static_cast<float>(windowSamples);
-        torqueSum += sampleTorque;
-        torqueRise += sampleTorque * 0.5f * weight * weight;
-        torquePeak += sampleTorque * (0.5f + weight * (1.0f - weight));
-        torqueFall += sampleTorque * 0.5f * (1.0f - weight) * (1.0f - weight);
-        positionSum += math::WrapToPi(mechanicalPos - previousPosition);
+        if (const auto closed = window.Add(mechanicalPos, rotatingFrame.q * torqueConstant.Value()); closed.has_value())
+            OnWindowClosed(*closed);
+    }
 
-        const auto signedStep = math::WrapToPi(mechanicalPos - lastSamplePosition);
-        const auto step = math::Abs(signedStep);
-        lastSamplePosition = mechanicalPos;
-
-        if (samplesSinceStart > 1)
-        {
-            const auto change = signedStep - lastStep;
-            ++stepChanges;
-            stepChangeEnergy += (change * change - stepChangeEnergy) / static_cast<float>(std::min(stepChanges, stepChangeMemory));
-        }
-
-        lastStep = signedStep;
-
-        if (step > 0.0f)
-        {
-            countAngle = std::min(countAngle, step);
-            ++countSteps;
-        }
-
-        if (++samplesInWindow < windowSamples)
-            return;
-
-        samplesInWindow = 0;
-
-        const auto windowTorque = torqueSum / static_cast<float>(windowSamples);
-        const auto windowRise = torqueRise;
-        const auto windowPeak = torquePeak;
-        const auto windowFall = torqueFall;
-        const auto meanOffset = positionSum / static_cast<float>(windowSamples);
-        torqueSum = 0.0f;
-        torqueRise = 0.0f;
-        torquePeak = 0.0f;
-        torqueFall = 0.0f;
-        positionSum = 0.0f;
-
-        const auto speed = (previousMeanToEnd + meanOffset) / windowPeriod;
-        const auto acceleration = (speed - previousSpeed) / windowPeriod;
-        const auto hadMean = hasPreviousMean;
-        const auto hadSpeed = hasPreviousSpeed;
-
-        const auto centred = windowSamples > 1;
-        const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
-        const auto centredTorque = centred ? (earlierTorqueRise + previousTorquePeak + windowFall) / static_cast<float>(windowSamples) : windowTorque;
-
-        previousMeanToEnd = math::WrapToPi(mechanicalPos - previousPosition) - meanOffset;
-        previousPosition = mechanicalPos;
-        previousSpeed = speed;
-        hasPreviousSpeed = hadMean;
-        hasPreviousMean = true;
-        earlierTorqueRise = previousTorqueRise;
-        previousTorqueRise = windowRise;
-        previousTorquePeak = windowPeak;
-
-        const auto countKnown = countSteps >= minimumCountSteps;
-
-        const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * math::Sqrt(stepChangeEnergy) : 0.0f;
-        const auto wanted = countKnown ? WindowSamplesFor(std::max(countAngle, stepChangeResolution), samplingPeriod) : windowSamples;
-
-        const auto windowDifference = wanted > windowSamples ? wanted - windowSamples : windowSamples - wanted;
-
-        if (windowDifference != 0 && (windowSamples < windowHysteresisFloor || windowDifference * windowHysteresisDivisor > windowSamples))
-        {
-            windowSamples = wanted;
-            windowPeriod = samplingPeriod * static_cast<float>(wanted);
-            hasPreviousMean = false;
-            hasPreviousSpeed = false;
-            return;
-        }
-
-        if (countKnown && hadMean && math::Abs(speed) > currentConfig.maxSpeed.Value())
+    void MechanicalParametersIdentificationImpl::OnWindowClosed(const ClosedWindow& closed)
+    {
+        if (closed.resolutionKnown && closed.hadMean && math::Abs(closed.speed) > currentConfig.maxSpeed.Value())
         {
             FailEnvelope();
             return;
@@ -352,33 +185,24 @@ namespace services
         if (outcome != Outcome::pending)
             return;
 
-        if (finishAtSample != 0 && samplesSinceStart >= finishAtSample)
+        if (fit.IsFinishedAt(closed.sample))
         {
             outcome = Outcome::converged;
             return;
         }
 
-        if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
+        if (!closed.resolutionKnown || !closed.hadSpeed || !IsMechanicallyObservable(closed.centredSpeed))
             return;
 
-        Post(Observation{ acceleration, centredSpeed, centredTorque, static_cast<uint32_t>(samplesSinceStart), static_cast<uint32_t>(windowSamples) });
+        Post(IdentificationObservation{ closed.acceleration, closed.centredSpeed, closed.centredTorque, closed.sample, closed.windowSamples });
     }
 
-    void MechanicalParametersIdentificationImpl::Post(const Observation& observation)
+    void MechanicalParametersIdentificationImpl::Post(const IdentificationObservation& observation)
     {
-        const auto posted = observationsPosted.load();
-        const auto pending = posted - observationsFitted.load();
-
-        if (pending == observationCapacity)
-        {
+        const auto result = queue.Post(observation);
+        if (result == ObservationQueue::PostResult::full)
             outcome = Outcome::observationsDropped;
-            return;
-        }
-
-        observations[posted % observationCapacity] = observation;
-        observationsPosted = posted + 1;
-
-        if (pending + 1 == observationCapacity / 2)
+        else if (result == ObservationQueue::PostResult::halfFull)
             ScheduleFit();
     }
 
@@ -393,30 +217,13 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::FitPostedObservations()
     {
-        auto fitted = observationsFitted.load();
-        while (rls.has_value() && fitted != observationsPosted.load())
+        while (fit.IsRunning())
         {
-            Fit(observations[fitted % observationCapacity]);
-            ++fitted;
-            observationsFitted = fitted;
+            const auto observation = queue.Take();
+            if (!observation.has_value())
+                return;
+
+            fit.Fit(*observation);
         }
-    }
-
-    void MechanicalParametersIdentificationImpl::Fit(const Observation& observation)
-    {
-        if (finishAtSample != 0 && observation.sample >= finishAtSample)
-            return;
-
-        MechanicalRls::MakeRegressor(regressor, observation.acceleration, observation.speed);
-        torque.at(0, 0) = observation.torque;
-
-        auto metrics = rls->Update(regressor, torque);
-        excitation.Count(observation.acceleration, observation.speed);
-        TrackInertiaSettling(observation.windowSamples);
-
-        if (finishAtSample != 0 || observation.sample < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(observation.windowSamples) / coveredWindowSamples)))
-            return;
-
-        finishAtSample = (observation.sample / dwellSamples + 1) * dwellSamples;
     }
 }

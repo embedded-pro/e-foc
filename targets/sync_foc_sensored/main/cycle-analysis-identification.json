@@ -67,7 +67,18 @@
         "infra::TripleBuffer<.*>::Publish",
         "infra::TripleBuffer<.*>::Acquire",
         "math::IsFinite",
+        "MechanicalParametersIdentificationImpl::OnWindowClosed",
         "MechanicalParametersIdentificationImpl::Post",
+        "SampleWindow::Add",
+        "SampleWindow::Accumulate",
+        "SampleWindow::Close",
+        "SampleWindow::Resize",
+        "EncoderResolution::Sample",
+        "EncoderResolution::Known",
+        "EncoderResolution::WindowSamples",
+        "ObservationQueue::Post",
+        "MechanicalFit::IsRunning",
+        "MechanicalFit::IsFinishedAt",
         "IsMechanicallyObservable"
       ]
     },
