@@ -592,7 +592,7 @@ namespace tool
         for (auto nodeId : targets)
         {
             auto* motor = Motor(nodeId);
-            const bool accepted = motor != nullptr ? motor->SendEmergencyStop() : client.SendEmergencyStop(nodeId);
+            const bool accepted = motor != nullptr ? motor->SendEmergencyStop() : client.Commands().SendEmergencyStop(nodeId);
             (accepted ? sent : refused).push_back(nodeId);
         }
 

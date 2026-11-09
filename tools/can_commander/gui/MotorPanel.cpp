@@ -166,7 +166,7 @@ namespace tool
         StopApplying("emergency stop");
         pendingCommand = "Emergency Stop";
         pendingCommandType = can::focEmergencyStopId;
-        if (!client.SendEmergencyStop(nodeId))
+        if (!client.Commands().SendEmergencyStop(nodeId))
             return false;
 
         transfer.EmergencyStopSent(nodeId);
@@ -179,21 +179,21 @@ namespace tool
             {
                 Send("Start Motor", can::focStartId, [this]()
                     {
-                        return client.SendStartMotor(nodeId);
+                        return client.Commands().SendStartMotor(nodeId);
                     });
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, this, &MotorPanel::SendStopMotor);
         connect(commandPanel, &CommandPanel::ClearFaultRequested, this, &MotorPanel::SendClearFault);
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
             {
-                client.RequestData(nodeId);
+                client.Data().RequestData(nodeId);
             });
         connect(commandPanel, &CommandPanel::SetControlModeRequested, this, [this](can::FocMotorMode mode)
             {
                 commandPanel->ShowRequestedControlMode(mode);
                 Send("Control Mode " + CommandPanel::ControlModeName(mode), can::focSelectControlModeId, [this, mode]()
                     {
-                        return client.SendSetControlMode(nodeId, mode);
+                        return client.Commands().SendSetControlMode(nodeId, mode);
                     });
             });
     }
@@ -202,7 +202,7 @@ namespace tool
     {
         Send("Stop Motor", can::focStopId, [this]()
             {
-                return client.SendStopMotor(nodeId);
+                return client.Commands().SendStopMotor(nodeId);
             });
     }
 
@@ -210,7 +210,7 @@ namespace tool
     {
         Send("Clear Fault", can::focClearFaultId, [this]()
             {
-                return client.SendClearFault(nodeId);
+                return client.Commands().SendClearFault(nodeId);
             });
     }
 
@@ -218,7 +218,7 @@ namespace tool
     {
         Send("Align Rotor", can::focAlignId, [this]()
             {
-                return client.SendAlign(nodeId);
+                return client.Commands().SendAlign(nodeId);
             });
     }
 
@@ -244,11 +244,11 @@ namespace tool
         switch (mode)
         {
             case can::FocMotorMode::speed:
-                return client.SendSetSpeedSetpoint(nodeId, value);
+                return client.Commands().SendSetSpeedSetpoint(nodeId, value);
             case can::FocMotorMode::position:
-                return client.SendSetPositionSetpoint(nodeId, value);
+                return client.Commands().SendSetPositionSetpoint(nodeId, value);
             default:
-                return client.SendSetTorqueSetpoint(nodeId, value);
+                return client.Commands().SendSetTorqueSetpoint(nodeId, value);
         }
     }
 
@@ -260,14 +260,14 @@ namespace tool
             {
                 Send("Identify Electrical", can::focIdentifyElectricalId, [this]()
                     {
-                        return client.SendIdentifyElectrical(nodeId);
+                        return client.Commands().SendIdentifyElectrical(nodeId);
                     });
             });
         connect(&tab, &MotorParametersTab::CalibrateRequested, this, [this]()
             {
                 Send("Calibrate", can::focCalibrateId, [this]()
                     {
-                        return client.SendCalibrate(nodeId);
+                        return client.Commands().SendCalibrate(nodeId);
                     });
             });
         connect(&tab, &MotorParametersTab::ClearCalibrationRequested, this, &MotorPanel::ConfirmClearCalibration);
@@ -286,7 +286,7 @@ namespace tool
 
         Send("Clear Calibration", can::focClearCalibrationId, [this]()
             {
-                return client.SendClearCalibration(nodeId);
+                return client.Commands().SendClearCalibration(nodeId);
             });
     }
 
@@ -303,7 +303,7 @@ namespace tool
 
         Send("Clear Fault History", can::focClearFaultHistoryId, [this]()
             {
-                return client.SendClearFaultHistory(nodeId);
+                return client.Commands().SendClearFaultHistory(nodeId);
             });
     }
 
@@ -320,7 +320,7 @@ namespace tool
 
         Send("Reset Model", can::focResetModelId, [this]()
             {
-                return client.SendResetModel(nodeId);
+                return client.Commands().SendResetModel(nodeId);
             });
     }
 
@@ -331,21 +331,21 @@ namespace tool
             {
                 Send("Recalibrate", can::focRecalibrateId, [this]()
                     {
-                        return client.SendRecalibrate(nodeId);
+                        return client.Commands().SendRecalibrate(nodeId);
                     });
             });
         connect(&tab, &DiagnosticsTab::ResetModelRequested, this, &MotorPanel::ConfirmResetModel);
         connect(&tab, &DiagnosticsTab::RefreshRequested, this, [this]()
             {
-                client.RequestReadings(nodeId);
-                client.RequestFaultHistory(nodeId);
+                client.Data().RequestReadings(nodeId);
+                client.Data().RequestFaultHistory(nodeId);
             });
         connect(&tab, &DiagnosticsTab::ClearFaultHistoryRequested, this, &MotorPanel::ConfirmClearFaultHistory);
         connect(&tab, &DiagnosticsTab::ClearStatisticsRequested, this, [this]()
             {
                 Send("Clear Diagnostics", can::focClearDiagnosticsId, [this]()
                     {
-                        return client.SendClearDiagnostics(nodeId);
+                        return client.Commands().SendClearDiagnostics(nodeId);
                     });
             });
     }
@@ -360,7 +360,7 @@ namespace tool
                 });
             connect(page, &SettingsPage::RevertRequested, this, [this]()
                 {
-                    client.RequestSettings(nodeId);
+                    client.Data().RequestSettings(nodeId);
                 });
         }
     }
@@ -408,9 +408,9 @@ namespace tool
     bool MotorPanel::SendChange(const SettingChange& change)
     {
         if (change.kind == SettingChange::Kind::algorithm)
-            return client.SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
+            return client.Commands().SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
 
-        return client.SendSetParameter(nodeId, change.parameter, change.value);
+        return client.Commands().SendSetParameter(nodeId, change.parameter, change.value);
     }
 
     QString MotorPanel::Describe(const SettingChange& change) const
@@ -437,7 +437,7 @@ namespace tool
         }
 
         if (applyingPage == &commandPanel->MotorParameters())
-            client.RequestSettings(nodeId);
+            client.Data().RequestSettings(nodeId);
 
         applyingPage->SetApplying(false);
         applyingPage = nullptr;
@@ -462,7 +462,7 @@ namespace tool
     void MotorPanel::ForgetControlMode()
     {
         commandPanel->ClearActiveControlMode();
-        client.RequestSettings(nodeId);
+        client.Data().RequestSettings(nodeId);
     }
 
     void MotorPanel::Report(IssueSeverity severity, const QString& message) const
@@ -620,7 +620,7 @@ namespace tool
 
     void MotorPanel::OnCommandTimeout(uint8_t commandType)
     {
-        const auto timeout = std::chrono::duration_cast<std::chrono::seconds>(CanCommandClient::TimeoutFor(commandType));
+        const auto timeout = std::chrono::duration_cast<std::chrono::seconds>(CommandTracker::TimeoutFor(commandType));
         Report(IssueSeverity::warning, QString("no response to %1 within %2 s: check that the controller is powered")
                                            .arg(pendingCommand.isEmpty() ? QString("the last command") : pendingCommand)
                                            .arg(timeout.count()));
@@ -690,7 +690,7 @@ namespace tool
             StopApplying(QString("%1 was refused").arg(name));
 
         if (commandType == can::focSetParameterId || commandType == can::focSelectAlgorithmId)
-            client.RequestSettings(nodeId);
+            client.Data().RequestSettings(nodeId);
     }
 
     void MotorPanel::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
@@ -729,7 +729,7 @@ namespace tool
             if (fault != FocFaultCode::none)
             {
                 Report(IssueSeverity::error, QString("fault: %1").arg(TelemetryPanel::FaultCodeName(fault)));
-                client.RequestFaultHistory(nodeId);
+                client.Data().RequestFaultHistory(nodeId);
             }
             else if (lastFault.has_value())
                 Report(IssueSeverity::info, "fault cleared");

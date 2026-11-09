@@ -311,7 +311,7 @@ namespace tool
         {
             case DownloadOutcome::staged:
                 Succeed(QString("Firmware %1 downloaded, apply when ready.").arg(version));
-                client.RequestFirmwareIdentity(nodeId);
+                client.Data().RequestFirmwareIdentity(nodeId);
                 break;
             case DownloadOutcome::cancelled:
                 Succeed("Download cancelled; nothing was staged.", IssueSeverity::warning);
@@ -344,7 +344,7 @@ namespace tool
             Succeed("The staged pack was discarded.");
         else
             Fail("The controller did not acknowledge the discard; the pack may still be staged.");
-        client.RequestFirmwareIdentity(nodeId);
+        client.Data().RequestFirmwareIdentity(nodeId);
         emit TransferChanged();
     }
 

@@ -14,11 +14,15 @@ target_sources(e_foc.tool.can_commander.logic_test PRIVATE
     CanCommandClientObserverMock.hpp
     TestCanCommandClient.cpp
     TestCommandDescriptions.cpp
+    TestCommandTracker.cpp
+    TestFaultRecordAssembler.cpp
+    TestFirmwareIdentityCollector.cpp
     TestFaultHistoryText.cpp
     TestFirmwarePack.cpp
     TestFirmwareRefusal.cpp
     TestFirmwareTransfer.cpp
     TestMotorSettings.cpp
+    TestReadScheduler.cpp
     TestRecoveryAdvice.cpp
     TestSetpointAxis.cpp
     TestPack.cpp
