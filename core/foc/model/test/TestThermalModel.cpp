@@ -1,5 +1,4 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <gtest/gtest.h>
 
@@ -9,13 +8,10 @@ namespace
         : public ::testing::Test
     {
     protected:
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
-            hal::Hertz{ 100000 },
-            std::optional<std::size_t>{}
+            hal::Hertz{ 100000 }
         };
     };
 }

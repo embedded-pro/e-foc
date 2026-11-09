@@ -1,5 +1,4 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
@@ -24,14 +23,10 @@ namespace
                 model.StepForTest(duty);
         }
 
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
-            hal::Hertz{ 20000 },
-            std::optional<std::size_t>{},
-            false
+            hal::Hertz{ 20000 }
         };
     };
 }
@@ -108,9 +103,7 @@ TEST_F(TestFaultInjection, a_sagging_supply_produces_less_current_than_a_healthy
     foc::ThreePhaseMotorModel sagging{
         foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
-        hal::Hertz{ 20000 },
-        std::optional<std::size_t>{},
-        false
+        hal::Hertz{ 20000 }
     };
     foc::InjectFaults(sagging, { .supplyVoltageScale = 0.25f });
     sagging.Start();
@@ -131,9 +124,7 @@ TEST_F(TestFaultInjection, the_same_seed_reproduces_the_same_noise_sequence)
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
-            hal::Hertz{ 20000 },
-            std::optional<std::size_t>{},
-            false
+            hal::Hertz{ 20000 }
         };
         model.CurrentSensor().SetNoise(noise);
         foc::SeedNoise(model, seed);

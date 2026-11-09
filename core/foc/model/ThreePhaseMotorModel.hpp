@@ -15,9 +15,7 @@
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
-#include "infra/util/SharedPtr.hpp"
-#include <cstddef>
-#include <optional>
+#include <cstdint>
 
 namespace foc
 {
@@ -35,13 +33,11 @@ namespace foc
         virtual void Started() = 0;
         virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) = 0;
         virtual void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) = 0;
-        virtual void Finished() = 0;
     };
 
     class ThreePhaseMotorModel
         : public drivers::ThreePhaseInverter
         , public infra::Subject<ThreePhaseMotorModelObserver>
-        , public infra::EnableSharedFromThis<ThreePhaseMotorModel>
     {
     public:
         struct Parameters
@@ -72,7 +68,7 @@ namespace foc
             float supplyVoltageScale{ 1.0f };
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency);
 
         MechanicalPlant& Mechanics();
         ElectricalPlant& Electrical();
@@ -94,15 +90,6 @@ namespace foc
 
     private:
         void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
-        void EnableSelfDriving();
-        void ScheduleNextCycle();
-
-        struct SelfDriveState
-        {
-            bool driving{ false };
-            bool cycleScheduled{ false };
-            foc::PhasePwmDutyCycles pendingDuties{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
-        };
 
         Parameters parameters;
         hal::Hertz baseFrequency;
@@ -112,9 +99,6 @@ namespace foc
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
-        const bool selfDriveEnabled;
-        const std::optional<std::size_t> maxIterations;
-        std::optional<std::size_t> counter;
 
         ElectricalPlant electrical;
         MechanicalPlant mechanical;
@@ -123,7 +107,6 @@ namespace foc
         SimulatedEncoder encoder{ mechanical };
         PhaseCurrentSensor currentSensor;
         foc::ThreePhase lastPhaseVoltages{};
-        SelfDriveState selfDrive;
     };
 
     void InjectFaults(ThreePhaseMotorModel& model, const ThreePhaseMotorModel::FaultInjectionConfig& config);

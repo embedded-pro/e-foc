@@ -264,10 +264,8 @@ jobs:
           v="${{ needs.release_please.outputs.version }}"
           ls -l release-assets
           for asset in \
-            "e_foc-simulator-${v}-linux-x86_64.tar.gz" \
             "e_foc-can_commander-${v}-linux-x86_64.tar.gz" \
             "e_foc-can_commander-${v}-linux-x86_64.deb" \
-            "e_foc-simulator-${v}-windows-x86_64.zip" \
             "e_foc-can_commander-${v}-windows-x86_64.zip" \
             "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \

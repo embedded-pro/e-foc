@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: system
-date: 2026-11-08
+date: 2026-11-09
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.3.1                     |
+| Version   | 0.4.0                     |
 | Component | system                    |
-| Date      | 2026-11-08                |
+| Date      | 2026-11-09                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -50,7 +50,7 @@ The system is structured in four tiers:
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
 2. **Core / Library tier** — the FOC algorithm library (`core/foc/`), service library (`core/services/`), and the Platform Abstraction Layer interface (`core/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
 3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `PlatformFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
-4. **Tools tier** — host-only desktop tools (simulator, CAN commander) that run on development machines only. Lives under `tools/`.
+4. **Tools tier** — host-only desktop tools (CAN commander, virtual motor) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
 graph TD
@@ -58,7 +58,7 @@ graph TD
         INST["Application / Instantiation"]
         PAL_TI["TI Target\nimplementation"]
         PAL_ST["ST Target\nimplementation"]
-        PAL_HOST["Host / Simulator\nimplementation"]
+        PAL_HOST["Host and Virtual\nimplementations"]
     end
 
     subgraph SRC["Core / Library Tier"]
@@ -77,7 +77,7 @@ graph TD
     end
 
     subgraph TOOLS["Tools Tier"]
-        SIM["Simulator"]
+        VM["Virtual Motor"]
         CANC["CAN Commander"]
     end
 
@@ -104,7 +104,7 @@ graph TD
     TOOLS --> FOC
 ```
 
-The simulator implements the same PAL contracts as real hardware. Control logic never needs to distinguish between running on a microcontroller or on the host; this enables full-fidelity closed-loop validation without hardware.
+The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a microcontroller or on the host, so the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
 
 ---
 
@@ -253,7 +253,8 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 Concrete implementations exist for:
 - **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
 - **ST STM32 (NUCLEO-G474RE, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`. The NUCLEO-G474RE drives E-FOC-HARDWARE; the NUCLEO-H563ZI still runs on peripheral stubs.
-- **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
+- **Host**: peripheral stubs that let the application build and link on a development machine, located under `targets/platform_implementations/host/`.
+- **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus; it runs the application as a virtual motor ([design](../design/virtual-motor.md)).
 
 On the Texas Instruments targets and the NUCLEO-G474RE the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
 A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
@@ -294,7 +295,7 @@ graph LR
     FOC_CORE["FOC Core\n+ Services"] -->|depends on| PAL_IF["PAL Interfaces\n(ThreePhaseInverter · Encoder\nLowPriorityInterrupt · …)"]
     PAL_IF --> TI["TI Target\nimpl"]
     PAL_IF --> ST["ST Target\nimpl"]
-    PAL_IF --> HOST["Host / Simulator\nimpl"]
+    PAL_IF --> HOST["Virtual board\nimpl"]
     TI --> HAL_TI["infra/hal/ti"]
     ST --> HAL_ST["infra/hal/st"]
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
@@ -319,7 +320,7 @@ Host-only tools that do not run on the embedded target:
 
 | Tool            | Responsibility                                                                                                                                                                                                                                                                     |
 |-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.                                                                                   |
+| Virtual Motor   | Starts virtual motors — the shipping application on the host against the simulation plant, one CAN node each on a virtual bus — and shows and disturbs their plant ([design](../design/tool-virtual-motor.md)).                                                                    |
 | CAN Commander   | Desktop application that commands and monitors the motor controllers on a CAN bus, one tab per node; keeps an issue log, checks for new releases, updates a controller's firmware over CAN and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
 | Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                                                                                                  |
 
@@ -415,7 +416,7 @@ The interface design reflects explicit SOLID choices:
 
 - **Single Responsibility**: Each interface (`FocTorque`, `FocSpeed`, `FocPosition`, `ThreePhaseInverter`, `Encoder`, `NonVolatileMemory`, …) is narrowly scoped to one concern. No interface carries unrelated responsibilities.
 - **Open/Closed**: New control modes are added by implementing a new derived control interface, not by modifying existing implementations. The PAL is similarly extended by creating a new platform factory implementation for a new board without touching the core.
-- **Liskov Substitution**: Every FOC controller instantiation (torque, speed, position) is fully substitutable wherever the base control interface is expected. The simulator's motor model is fully substitutable for the real PAL hardware.
+- **Liskov Substitution**: Every FOC controller instantiation (torque, speed, position) is fully substitutable wherever the base control interface is expected. The virtual board's simulation plant is fully substitutable for the real PAL hardware.
 - **Interface Segregation**: `FocBase` carries only the minimal common contract. Callers that need only torque control depend on `FocTorque`, not on `FocSpeed` or `FocPosition`. The PAL is similarly split — callers that only need an encoder do not depend on the PWM interface.
 - **Dependency Inversion**: The FOC core and all services depend exclusively on abstract interfaces. Concrete implementations are injected at application wiring time via the platform factory and constructor arguments. No global variables; no direct peripheral access from the control layer.
 
@@ -481,7 +482,7 @@ sequenceDiagram
 The system uses two complementary asynchronous communication patterns, both supplied by `infra/embedded-infra-lib`:
 
 - **Zero-allocation closures** (from `embedded-infra-lib`) — used for one-shot or single-subscriber callbacks. All service operations (NVM, identification, alignment) deliver their results through this mechanism.
-- **Observer/Subject pattern** (from `embedded-infra-lib`) — a type-safe, heap-free mechanism where a subject notifies multiple observers. The simulator's motor model is a subject; views and loggers attach as observers. No raw event buses or dynamic dispatch lists are used.
+- **Observer/Subject pattern** (from `embedded-infra-lib`) — a type-safe, heap-free mechanism where a subject notifies multiple observers. The simulation plant's model is a subject; recorders attach as observers. No raw event buses or dynamic dispatch lists are used.
 
 These patterns eliminate polling, decouple producers from consumers, and allow the application to remain single-threaded and non-blocking.
 
@@ -497,7 +498,7 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` for debuggability.                 |
 | Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                     |
 | Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                     |
-| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware.                                                 |
+| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                     |
 
 ---
 

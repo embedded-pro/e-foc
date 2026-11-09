@@ -93,6 +93,8 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings              |
 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                              |
 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers              |
+| [Virtual Motor](../design/virtual-motor.md)                                            | Shipping application on the host against the plant, on a virtual CAN bus               |
+| [Tool: Virtual Motor](../design/tool-virtual-motor.md)                                 | Starting virtual motors, their plant views, disturbances and faults                    |
 
 ## Building the booklet
 

@@ -182,7 +182,7 @@ namespace application
               })
         , stagingFlash(fileSystem, "staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
         , journalFlash(fileSystem, "journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
-        , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig), std::nullopt, false)
+        , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig))
         , baseFrequency(BaseFrequencyFrom(plantConfig))
     {
         really_assert(stagingStorage.size() == static_cast<std::size_t>(__staging_slot_end - __staging_slot_start) && journalStorage.size() == static_cast<std::size_t>(__status_journal_end - __status_journal_start));

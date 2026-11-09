@@ -2,9 +2,9 @@
 title: "Cogging and Other Motor Imperfections"
 type: theory
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: "cogging-and-motor-imperfections"
-date: 2026-11-05
+date: 2026-11-09
 ---
 
 | Field     | Value                                 |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Cogging and Other Motor Imperfections |
 | Type      | theory                                |
 | Status    | draft                                 |
-| Version   | 0.1.1                                 |
+| Version   | 0.1.2                                 |
 | Component | cogging-and-motor-imperfections       |
-| Date      | 2026-11-05                            |
+| Date      | 2026-11-09                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -318,7 +318,7 @@ The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles),
 - **Assumes**: the speed during the measurement is steady enough for the inertia correction to hold.
 - **Simplifies**: the speed-ripple estimate keeps the fundamental only and ignores the loop's partial rejection.
 - **Board-specific**: the bench figures are those of the motor on the E-FOC-HARDWARE rig; the reference motors
-  in the simulator have no cogging unless a scenario adds it.
+  in the simulation plant have no cogging unless a scenario adds it.
 
 ## References
 

@@ -2,9 +2,9 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.4.2
+version: 0.4.3
 component: "disturbances-and-noise"
-date: 2026-11-08
+date: 2026-11-09
 ---
 
 | Field     | Value                                  |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.4.2                                  |
+| Version   | 0.4.3                                  |
 | Component | disturbances-and-noise                 |
-| Date      | 2026-11-08                             |
+| Date      | 2026-11-09                             |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -191,7 +191,7 @@ torque command converted to current with a cold $K_t$ delivers less torque on a 
 lose the accuracy of their model. *e-foc today:* the online estimator follows $R_s$
 (`documentation/design/service-electrical-ident.md`), and the drive turns it back into a winding temperature,
 $T = T_{cal} + (R_s / R_{cal} - 1)/0.00393$, from the resistance $R_{cal}$ the calibration measured at
-$T_{cal}$ (`documentation/design/fault-supervision.md` Part K); the simulator models $R_s$ and $L_s$ against
+$T_{cal}$ (`documentation/design/fault-supervision.md` Part K); the simulation plant models $R_s$ and $L_s$ against
 winding temperature but not $\psi_f$ (`core/foc/model/ThermalModel.cpp`).
 
 **Bus voltage.** The modulator works in per-unit of $V_{dc}/\sqrt3$, and the current-loop gains are normalised

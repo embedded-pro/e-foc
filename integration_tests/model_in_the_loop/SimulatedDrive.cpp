@@ -60,7 +60,7 @@ namespace mil
     SimulatedDrive::SimulatedDrive(const sil::SilPlantConfig& plant)
         : plant{ plant }
         , baseFrequency{ plant.baseFrequencyHz != 0 ? plant.baseFrequencyHz : 20000u }
-        , model{ sil::MotorParameters(plant), foc::Volts{ plant.powerSupplyVoltageVolts }, baseFrequency, std::nullopt, false }
+        , model{ sil::MotorParameters(plant), foc::Volts{ plant.powerSupplyVoltageVolts }, baseFrequency }
         , bootFaultInjection{ sil::BootFaultInjection(plant) }
         , dutyDelayed{ plant.dutyDelayPeriods != 0 }
         , maxReadableDuty{ DutyOrFull(plant.maxReadableDutyPercent) }

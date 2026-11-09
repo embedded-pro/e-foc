@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.21.0
+version: 0.22.0
 component: "tool-can-commander"
-date: 2026-11-08
+date: 2026-11-09
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.21.0               |
+| Version   | 0.22.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-08           |
+| Date      | 2026-11-09           |
 
 ---
 
@@ -438,6 +438,7 @@ The tool does not implement bus access itself. It uses the platform composition 
 | Windows  | Kvaser                         | `Kvaser:0`, `Kvaser:1`, … |
 | Windows  | slcan: CANable and compatibles | `slcan:COM3`              |
 | Windows  | candleLight (gs_usb firmware)  | `candleLight:1`, …        |
+| Both     | Virtual CAN bus (Part N)       | `virtual:default`, …      |
 
 `CANable:` is accepted as an alias of `slcan:`. The Interface box lists every name the adapters enumerate
 and stays editable; with nothing to list it explains how to get an entry. The PCAN and Kvaser libraries are
@@ -562,6 +563,25 @@ stateDiagram-v2
     Failed --> Downloading : Try Again confirmed
     Failed --> Available : another pack opened or offered
 ```
+
+### Part N — virtual motors
+
+A virtual motor (`virtual-motor.md`) is the shipping application running on the development machine
+against the simulation plant. The tool reaches it on a virtual CAN bus, named `virtual:<bus>` in the
+Interface box, and commands it like any board; it learns nothing about the plant, whose views belong to
+the Virtual Motor app (`tool-virtual-motor.md`).
+
+- **Listing.** The Interface box lists `virtual:<bus>` for every bus the local virtual CAN hub offers.
+  Connecting while no hub runs fails with the advice to start the Virtual Motor app.
+- **Marking.** A node that reports the board kind *virtual* is marked **Virtual** on its tab, its overview
+  chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
+  motor.
+- **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else: no release,
+  no pack and no update steps, because a virtual motor runs the firmware it was built with.
+- **Launching.** Motor → Launch Virtual Motor… starts the Virtual Motor app, which is installed with the
+  tool (`tool-virtual-motor.md` Part I).
+- **Going offline.** A paused, powered-off or crashed virtual motor goes silent and is reported offline
+  after the usual liveness timeout; closing the hub closes the bus as an unplugged adapter would.
 
 ## Interfaces
 

@@ -1,7 +1,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace foc
 {
@@ -32,12 +31,10 @@ namespace foc
         }
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit, bool selfDriveEnabled)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency)
         : parameters(params)
         , baseFrequency(pwmFrequency)
         , period(1.0f / static_cast<float>(pwmFrequency.Value()))
-        , selfDriveEnabled(selfDriveEnabled)
-        , maxIterations(iterationLimit)
         , mechanical(params.J, params.B, params.p)
         , supply(supplyVoltage)
     {
@@ -87,27 +84,17 @@ namespace foc
 
     void ThreePhaseMotorModel::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        selfDrive.pendingDuties = dutyPhases;
-        EnableSelfDriving();
+        RunOneCycle(dutyPhases);
     }
 
     void ThreePhaseMotorModel::StepForTest(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        selfDrive.pendingDuties = dutyPhases;
         RunOneCycle(dutyPhases);
     }
 
     void ThreePhaseMotorModel::RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         lastPhaseVoltages = StepPlant(Plant{ electrical, mechanical, thermal, supply }, dutyPhases, Winding(), parameters.p, period);
-
-        bool justFinished = false;
-        if (counter.has_value())
-        {
-            const std::size_t remaining = --counter.value();
-            justFinished = (remaining == 0);
-            running = !justFinished;
-        }
 
         currentSensor.Measure(dutyPhases, electrical.Currents(), electrical.PowerStage(), period);
         encoder.Sample();
@@ -122,44 +109,8 @@ namespace foc
                 observer.StatorVoltages(vAbc, vAlphaBeta);
             });
 
-        if (onCurrentPhasesReady && !justFinished)
+        if (onCurrentPhasesReady)
             onCurrentPhasesReady(measured);
-
-        if (justFinished)
-        {
-            selfDrive.driving = false;
-            NotifyObservers([](auto& observer)
-                {
-                    observer.Finished();
-                });
-        }
-    }
-
-    void ThreePhaseMotorModel::EnableSelfDriving()
-    {
-        if (selfDrive.driving)
-            return;
-
-        selfDrive.driving = true;
-        ScheduleNextCycle();
-    }
-
-    void ThreePhaseMotorModel::ScheduleNextCycle()
-    {
-        if (selfDrive.cycleScheduled || !selfDrive.driving)
-            return;
-
-        selfDrive.cycleScheduled = true;
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [](const infra::SharedPtr<ThreePhaseMotorModel>& self)
-            {
-                self->selfDrive.cycleScheduled = false;
-                if (!self->selfDrive.driving)
-                    return;
-                self->RunOneCycle(self->selfDrive.pendingDuties);
-                self->ScheduleNextCycle();
-            },
-            WeakFromThis());
     }
 
     void ThreePhaseMotorModel::Start()
@@ -168,31 +119,23 @@ namespace foc
             return;
 
         running = true;
-        counter = maxIterations;
         electrical.Reset();
 
         if (!encoder.HasIndex())
             mechanical.Reset();
         thermal.Reset();
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(49), hal::DutyCycle::FromPercent(51) };
 
         NotifyObservers([](auto& observer)
             {
                 observer.Started();
             });
-
-        if (selfDriveEnabled)
-            EnableSelfDriving();
     }
 
     void ThreePhaseMotorModel::Stop()
     {
         running = false;
-        selfDrive.driving = false;
-        counter = std::nullopt;
         supply.Release();
         electrical.Reset();
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
         onCurrentPhasesReady = nullptr;
     }
 
