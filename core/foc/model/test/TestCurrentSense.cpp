@@ -1,6 +1,5 @@
 #include "core/foc/model/CurrentSense.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
@@ -32,10 +31,9 @@ namespace
     protected:
         foc::ThreePhaseMotorModel Model() const
         {
-            return { foc::M_2310P_LN_04K::parameters, foc::Volts{ 24.0f }, hal::Hertz{ 20000 }, std::optional<std::size_t>{} };
+            return { foc::M_2310P_LN_04K::parameters, foc::Volts{ 24.0f }, hal::Hertz{ 20000 } };
         }
 
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         foc::ThreePhaseMotorModel ideal{ Model() };
         foc::ThreePhaseMotorModel sensed{ Model() };
     };

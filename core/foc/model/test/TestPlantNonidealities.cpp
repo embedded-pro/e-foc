@@ -1,5 +1,4 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
@@ -30,14 +29,10 @@ namespace
             DriveCycles(cycles, 90, 50, 10);
         }
 
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ supplyVolts },
-            hal::Hertz{ 20000 },
-            std::optional<std::size_t>{},
-            false
+            hal::Hertz{ 20000 }
         };
     };
 }
@@ -99,7 +94,7 @@ TEST_F(TestPlantNonidealities, coulomb_friction_holds_a_rotor_that_the_torque_ca
 
 TEST_F(TestPlantNonidealities, coulomb_friction_lowers_the_speed_the_same_drive_reaches)
 {
-    foc::ThreePhaseMotorModel frictionless{ foc::M_2310P_LN_04K::parameters, foc::Volts{ supplyVolts }, hal::Hertz{ 20000 }, std::optional<std::size_t>{}, false };
+    foc::ThreePhaseMotorModel frictionless{ foc::M_2310P_LN_04K::parameters, foc::Volts{ supplyVolts }, hal::Hertz{ 20000 } };
     frictionless.Start();
     model.Mechanics().SetCoulombFriction(foc::NewtonMeter{ 0.02f });
     model.Start();
