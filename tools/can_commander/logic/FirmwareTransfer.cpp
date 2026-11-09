@@ -216,7 +216,7 @@ namespace tool
             });
         identityTimer.Start(identityRetry, [this]()
             {
-                client.RequestFirmwareIdentity(nodeId);
+                client.Data().RequestFirmwareIdentity(nodeId);
             });
     }
 
