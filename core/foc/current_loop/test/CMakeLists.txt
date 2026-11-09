@@ -8,7 +8,6 @@ target_link_libraries(e_foc.foc.current_loop_test PUBLIC
 )
 
 target_sources(e_foc.foc.current_loop_test PRIVATE
-    TestAntiWindupPi.cpp
     TestCurrentControllerSelector.cpp
     TestCurrentPlantModel.cpp
     TestDeadbeatCurrentController.cpp
