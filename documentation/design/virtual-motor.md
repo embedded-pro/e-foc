@@ -202,7 +202,7 @@ keeps the low-side shunts readable, fires scheduled torque steps and encoder fre
 trajectory. It is configured from one plant description format, so a plant field added for one user
 reaches the others.
 
-Moving the plant drive out of its two former copies changed neither user's output
+Moving the plant drive out of its two former copies left every metric of the host suite as it was
 (`software-in-the-loop.md` Part O).
 
 ### Part E — Torque and noise while running
