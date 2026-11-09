@@ -8,6 +8,7 @@
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
+#include "numerical/math/Math.hpp"
 #include <chrono>
 #include <optional>
 
@@ -50,7 +51,7 @@ namespace supervision
         infra::Function<Settings()> settings;
         infra::TimerRepeating evaluationTimer;
         foc::Ampere limit;
-        filters::passive::ExponentialMovingAverage<float> filter;
+        filters::passive::ExponentialMovingAverage<float> filter{ 1.0f - math::Exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) };
         bool filterSeeded{ false };
         SustainedCondition enabledFor;
     };

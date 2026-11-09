@@ -11,7 +11,6 @@ namespace supervision
         , onLimit{ onLimit }
         , onFault{ onFault }
         , limit{ boardLimit }
-        , filter{ 1.0f - math::Exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
     {}
 
     void OverTemperature::Enable(const infra::Function<Settings()>& settings)

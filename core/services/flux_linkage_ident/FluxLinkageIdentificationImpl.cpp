@@ -220,7 +220,9 @@ namespace services
 
     void FluxLinkageIdentificationImpl::Brake(float speed)
     {
-        if (math::Abs(speed) <= config.stoppedSpeed.Value() || ++phaseTicks >= TicksIn(config.brakeLimit))
+        ++phaseTicks;
+
+        if (math::Abs(speed) <= config.stoppedSpeed.Value() || phaseTicks >= TicksIn(config.brakeLimit))
         {
             Finish(Evaluate());
             return;
