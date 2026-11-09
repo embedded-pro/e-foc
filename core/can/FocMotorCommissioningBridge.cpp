@@ -26,7 +26,7 @@ namespace can
         }
 
         pendingAlignDoneCallback = onDone;
-        controlMode.Drive().ActiveCommon().CmdReAlign([this](state_machine::CommandResult result)
+        controlMode.Drive().ActiveCommon().Commissioning().CmdReAlign([this](state_machine::CommandResult result)
             {
                 auto callback = pendingAlignDoneCallback;
                 pendingAlignDoneCallback = nullptr;
@@ -131,7 +131,7 @@ namespace can
         data.rPhase = pendingElectricalR->Value();
         data.lD = pendingElectricalL->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs);
-        data.fluxLinkage = controlMode.Drive().ActiveCommon().ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode.Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value();
         data.currentOffsetA = pendingOffsets.a.Value();
         data.currentOffsetB = pendingOffsets.b.Value();
         data.currentOffsetC = pendingOffsets.c.Value();
@@ -139,7 +139,7 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
 
-        controlMode.Drive().ActiveCommon().CmdCompleteExternalCalibration(data,
+        controlMode.Drive().ActiveCommon().Commissioning().CmdCompleteExternalCalibration(data,
             [this](state_machine::CommandResult result)
             {
                 auto callback = pendingElectricalIdentDoneCallback;
@@ -150,7 +150,7 @@ namespace can
                 else
                 {
                     if (result == state_machine::CommandResult::rejected)
-                        controlMode.Drive().ActiveCommon().CmdReleaseExternalCalibration();
+                        controlMode.Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
 
                     server.SendCategoryError(can::focIdentifyElectricalId,
                         state_machine::ToCategoryError(result));
@@ -199,7 +199,7 @@ namespace can
 
     bool FocMotorCommissioningBridge::ReserveCalibration(uint8_t commandId)
     {
-        const auto reservation = controlMode.Drive().ActiveCommon().CmdReserveExternalCalibration();
+        const auto reservation = controlMode.Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration();
 
         if (reservation == state_machine::CommandResult::ok)
             return true;
@@ -223,7 +223,7 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
         pendingElectricalIdentDoneCallback = nullptr;
-        controlMode.Drive().ActiveCommon().CmdReleaseExternalCalibration();
+        controlMode.Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
         server.SendCategoryError(can::focIdentifyElectricalId, error);
     }
 }

@@ -235,7 +235,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            sm.CmdReAlign([](state_machine::CommandResult) {});
+            sm.Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
     };
 }
@@ -783,7 +783,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            sm.CmdReAlign([](state_machine::CommandResult) {});
+            sm.Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
     };
 }

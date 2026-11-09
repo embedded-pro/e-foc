@@ -242,7 +242,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            sm.CmdReAlign([](state_machine::CommandResult) {});
+            sm.Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
 
         void GivenNvmValidWithSpeedGainsAndInertia()
@@ -1205,7 +1205,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            sm.CmdReAlign([](state_machine::CommandResult) {});
+            sm.Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
     };
 }
@@ -2118,10 +2118,10 @@ TEST_F(FocStateMachineSpeedTest, external_calibration_without_mechanics_stays_id
 
     ExpectExternalCalibrationPersistsStage(services::CalibrationStage::none);
 
-    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    EXPECT_EQ(sm.Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
 
     auto result = state_machine::CommandResult::rejected;
-    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2139,8 +2139,8 @@ TEST_F(FocStateMachineSpeedTest, entering_the_inertia_completes_an_electrical_on
     auto sm = CreateSpeedStateMachine();
 
     ExpectExternalCalibrationPersistsStage(services::CalibrationStage::none);
-    ASSERT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
-    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
+    ASSERT_EQ(sm.Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    sm.Commissioning().CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
     ASSERT_TRUE(sm.HasPartialCalibration());
 
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
@@ -2152,7 +2152,7 @@ TEST_F(FocStateMachineSpeedTest, entering_the_inertia_completes_an_electrical_on
             }));
 
     auto result = state_machine::CommandResult::rejected;
-    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 1.0e-5f, [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::inertia, 1.0e-5f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2186,8 +2186,8 @@ TEST_F(FocStateMachineSpeedTest, an_electrical_identification_keeps_the_mechanic
                 onDone(services::NvmStatus::Ok);
             }));
 
-    ASSERT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
-    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
+    ASSERT_EQ(sm.Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    sm.Commissioning().CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
@@ -2205,13 +2205,13 @@ TEST_F(FocStateMachineSpeedTest, a_motor_parameter_that_cannot_be_stored_leaves_
             }));
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 0.02f, [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::inertia, 0.02f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
 
     EXPECT_EQ(result, state_machine::CommandResult::nvmFailed);
-    EXPECT_NEAR(sm.CalibrationRecord().inertia, 0.005f, 1e-8f);
+    EXPECT_NEAR(sm.Calibration().Data().inertia, 0.005f, 1e-8f);
 }
 
 TEST_F(FocStateMachineSpeedTest, a_non_physical_motor_parameter_is_rejected_without_a_write)
@@ -2221,13 +2221,13 @@ TEST_F(FocStateMachineSpeedTest, a_non_physical_motor_parameter_is_rejected_with
     auto sm = CreateSpeedStateMachine();
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 0.0f, [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::inertia, 0.0f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
 
-    sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 4.5f, [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::polePairs, 4.5f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2241,7 +2241,7 @@ TEST_F(FocStateMachineSpeedTest, complete_external_calibration_without_reserve_i
     auto sm = CreateSpeedStateMachine();
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2257,8 +2257,8 @@ TEST_F(FocStateMachineSpeedTest, reserve_external_calibration_is_rejected_while_
     GivenNvmInvalid();
     auto sm = CreateSpeedStateMachine();
 
-    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
-    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::rejected);
+    EXPECT_EQ(sm.Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    EXPECT_EQ(sm.Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::rejected);
 }
 
 TEST_F(FocStateMachineSpeedTest, has_pending_async_work_true_when_mech_ident_is_running)
@@ -3018,7 +3018,7 @@ TEST_F(FocStateMachineSpeedFrictionTest, writing_the_dry_friction_reloads_the_ca
             }));
 
     auto result = state_machine::CommandResult::rejected;
-    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [&result](state_machine::CommandResult r)
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -3026,7 +3026,7 @@ TEST_F(FocStateMachineSpeedFrictionTest, writing_the_dry_friction_reloads_the_ca
     EXPECT_EQ(result, state_machine::CommandResult::ok);
     EXPECT_EQ(sm.GetController().loads, 2u);
     EXPECT_NEAR(sm.GetController().lastCoulomb, 6.0e-3f, 1e-9f);
-    EXPECT_NEAR(sm.CalibrationRecord().frictionViscous, 0.005f, 1e-9f);
+    EXPECT_NEAR(sm.Calibration().Data().frictionViscous, 0.005f, 1e-9f);
 }
 
 TEST_F(FocStateMachineSpeedFrictionTest, writing_a_zero_dry_friction_clears_the_cascade_feed_forward)
@@ -3042,7 +3042,7 @@ TEST_F(FocStateMachineSpeedFrictionTest, writing_a_zero_dry_friction_clears_the_
                 onDone(services::NvmStatus::Ok);
             }));
 
-    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 0.0f, [](state_machine::CommandResult) {});
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 0.0f, [](state_machine::CommandResult) {});
 
     EXPECT_EQ(sm.GetController().loads, 1u);
     EXPECT_EQ(sm.GetController().clears, clears + 1);
@@ -3060,8 +3060,8 @@ TEST_F(FocStateMachineSpeedFrictionTest, a_dry_friction_that_cannot_be_stored_le
                 onDone(services::NvmStatus::WriteFailed);
             }));
 
-    sm.CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [](state_machine::CommandResult) {});
+    sm.Commissioning().CmdSetMotorParameter(services::MotorParameter::frictionCoulomb, 6.0e-3f, [](state_machine::CommandResult) {});
 
     EXPECT_EQ(sm.GetController().loads, 1u);
-    EXPECT_NEAR(sm.CalibrationRecord().frictionCoulomb, 4.0e-3f, 1e-9f);
+    EXPECT_NEAR(sm.Calibration().Data().frictionCoulomb, 4.0e-3f, 1e-9f);
 }

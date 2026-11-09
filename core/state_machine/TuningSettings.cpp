@@ -104,7 +104,7 @@ namespace state_machine
     {
         auto tunings = StoredCurrentTunings();
         if (tunings.bandwidth == 0.0f)
-            tunings.bandwidth = drive.ActiveCommon().AutomaticCurrentLoopBandwidth();
+            tunings.bandwidth = drive.ActiveCommon().Calibration().AutomaticCurrentLoopBandwidth();
         return tunings;
     }
 
@@ -222,7 +222,7 @@ namespace state_machine
         }
 
         transaction.Begin(onDone);
-        drive.ActiveCommon().CmdSetMotorParameter(parameter, value, [this](CommandResult result)
+        drive.ActiveCommon().Commissioning().CmdSetMotorParameter(parameter, value, [this](CommandResult result)
             {
                 if (result != CommandResult::ok)
                 {

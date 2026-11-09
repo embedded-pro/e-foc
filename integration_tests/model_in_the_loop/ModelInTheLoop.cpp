@@ -323,7 +323,7 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->Drive().ActiveCommon().CmdReAlign(onDone);
+                controlMode->Drive().ActiveCommon().Commissioning().CmdReAlign(onDone);
             },
             kCommandTimeout);
     }
@@ -348,7 +348,7 @@ namespace mil
 
     std::optional<ElectricalIdentification> ModelInTheLoop::IdentifyElectrical()
     {
-        if (controlMode->Drive().ActiveCommon().CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
             return std::nullopt;
 
         using Result = services::ElectricalParametersIdentification::ResistanceInductanceResult;
@@ -368,7 +368,7 @@ namespace mil
         const auto& measured = **resistanceAndInductance;
         if (!measured.resistance.has_value() || !measured.inductance.has_value() || measured.fitQuality < 0.5f)
         {
-            controlMode->Drive().ActiveCommon().CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
@@ -385,7 +385,7 @@ namespace mil
                 kCalibrationTimeout) ||
             !polePairs->value().has_value())
         {
-            controlMode->Drive().ActiveCommon().CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
@@ -393,11 +393,11 @@ namespace mil
         data.rPhase = measured.resistance->Value();
         data.lD = measured.inductance->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs->value());
-        data.fluxLinkage = controlMode->Drive().ActiveCommon().ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode->Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value();
 
         if (!Command([this, &data](const auto& onDone)
                 {
-                    controlMode->Drive().ActiveCommon().CmdCompleteExternalCalibration(data, onDone);
+                    controlMode->Drive().ActiveCommon().Commissioning().CmdCompleteExternalCalibration(data, onDone);
                 },
                 kCommandTimeout))
             return std::nullopt;

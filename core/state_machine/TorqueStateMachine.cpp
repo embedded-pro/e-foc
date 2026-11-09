@@ -79,7 +79,7 @@ namespace application
 
     void TorqueStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
-        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, Calibration().EffectiveFluxLinkage(data));
 
         if (foc::IsFinitePositive(data.coggingTorqueScale) && foc::IsFinitePositive(torqueConstant.Value()))
             focController.LoadCoggingMap(infra::MakeRange(data.coggingTorque), data.coggingTorqueScale, torqueConstant);

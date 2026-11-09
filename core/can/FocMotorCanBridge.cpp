@@ -206,7 +206,7 @@ namespace can
 
     void FocMotorCanBridge::ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone)
     {
-        const auto torqueConstant = foc::TorqueConstantFor(controlMode.Drive().CalibrationRecord().polePairs, controlMode.Drive().ActiveCommon().ActiveFluxLinkage());
+        const auto torqueConstant = foc::TorqueConstantFor(controlMode.Drive().CalibrationRecord().polePairs, controlMode.Drive().ActiveCommon().Calibration().ActiveFluxLinkage());
         if (!foc::IsFinitePositive(torqueConstant.Value()))
         {
             server.SendCommandAck(commandId, services::CanAckStatus::invalidState);

@@ -110,11 +110,11 @@ namespace state_machine
 
     bool ActiveDrive::IsHomed() const
     {
-        return HasMachine() && ActiveCommon().IsHomed();
+        return HasMachine() && ActiveCommon().Calibration().IsHomed();
     }
 
     const services::CalibrationData& ActiveDrive::CalibrationRecord() const
     {
-        return ActiveCommon().CalibrationRecord();
+        return ActiveCommon().Calibration().Data();
     }
 }
