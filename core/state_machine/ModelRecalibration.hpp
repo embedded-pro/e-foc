@@ -20,13 +20,9 @@ namespace state_machine
     public:
         ModelRecalibration(ActiveDrive& drive, const services::ConfigData& config, services::NonVolatileMemory& nvm, application::NvmActivity& nvmActivity, SettingTransaction& transaction, TuningSettings& tunings, services::Tracer& tracer);
 
-        // Adopts the settled online estimates now; refused unless stopped, with the mode off and in torque mode.
         SettingResult CmdRecalibrate();
-        // Reads the stored inductance, inertia and friction once; until then nothing is stored.
         void RestoreStoredModel();
-        // Refused unless stopped; onStored reports whether the empty learned model reached the record.
         SettingResult CmdResetModel(const infra::Function<void(bool stored)>& onStored);
-        // The model the loops are designed from; nullopt in torque mode, which designs no outer loop.
         std::optional<MotorModel> ModelInUse() const;
         uint16_t RecalibrationsApplied() const;
         uint16_t RecalibrationsRejected() const;

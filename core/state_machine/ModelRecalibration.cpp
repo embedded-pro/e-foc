@@ -74,7 +74,6 @@ namespace state_machine
         if (model.IsCommissionedFrom(commissioned, stored))
             return model.InUse();
 
-        // Not yet commissioned since power-up or a new record: report what the next Ready designs the loops from.
         Recalibration next;
         next.Commission(commissioned, stored);
         return next.InUse();
@@ -121,7 +120,6 @@ namespace state_machine
     void ModelRecalibration::CommissionModel()
     {
         const auto commissioned = CommissionedModel();
-        // A changed record has already redesigned the loops from itself.
         if (commissioned != model.Commissioned())
             loopsRecalibrated = false;
 
