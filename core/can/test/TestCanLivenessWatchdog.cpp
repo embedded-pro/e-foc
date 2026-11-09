@@ -122,12 +122,12 @@ namespace
                     {
                         cb(foc::Radians{ 0.0f });
                     }));
-            controlMode->CmdReAlign([](state_machine::CommandResult) {});
+            controlMode->Drive().ActiveCommon().CmdReAlign([](state_machine::CommandResult) {});
         }
 
         bool IsEnabled() const
         {
-            return std::holds_alternative<state_machine::Enabled>(controlMode->ActiveStateMachine().CurrentState());
+            return std::holds_alternative<state_machine::Enabled>(controlMode->Drive().ActiveStateMachine().CurrentState());
         }
     };
 }
@@ -136,11 +136,11 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileStoppedLeavesTheStateMachine
 {
     Construct();
 
-    const auto before = controlMode->ActiveStateMachine().CurrentState().index();
+    const auto before = controlMode->Drive().ActiveStateMachine().CurrentState().index();
 
     watchdog->Offline();
 
-    EXPECT_EQ(controlMode->ActiveStateMachine().CurrentState().index(), before);
+    EXPECT_EQ(controlMode->Drive().ActiveStateMachine().CurrentState().index(), before);
 }
 
 TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
@@ -148,7 +148,7 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
     ASSERT_TRUE(IsEnabled());
 
     watchdog->Offline();
@@ -161,7 +161,7 @@ TEST_F(CanLivenessWatchdogTest, RegainingTheClientDoesNotDisturbTheStateMachine)
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
 
     watchdog->Online();
 
@@ -173,9 +173,9 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientDuringItsIdentificationStopsTheDr
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveCommon().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
 
     watchdog->Offline();
 
-    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(controlMode->ActiveStateMachine().CurrentState()));
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(controlMode->Drive().ActiveStateMachine().CurrentState()));
 }

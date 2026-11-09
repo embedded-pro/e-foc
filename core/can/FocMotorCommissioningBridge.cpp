@@ -26,7 +26,7 @@ namespace can
         }
 
         pendingAlignDoneCallback = onDone;
-        controlMode.CmdReAlign([this](state_machine::CommandResult result)
+        controlMode.Drive().ActiveCommon().CmdReAlign([this](state_machine::CommandResult result)
             {
                 auto callback = pendingAlignDoneCallback;
                 pendingAlignDoneCallback = nullptr;
@@ -131,7 +131,7 @@ namespace can
         data.rPhase = pendingElectricalR->Value();
         data.lD = pendingElectricalL->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs);
-        data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode.Drive().ActiveCommon().ActiveFluxLinkage().Value();
         data.currentOffsetA = pendingOffsets.a.Value();
         data.currentOffsetB = pendingOffsets.b.Value();
         data.currentOffsetC = pendingOffsets.c.Value();
@@ -139,7 +139,7 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
 
-        controlMode.CmdCompleteExternalCalibration(data,
+        controlMode.Drive().ActiveCommon().CmdCompleteExternalCalibration(data,
             [this](state_machine::CommandResult result)
             {
                 auto callback = pendingElectricalIdentDoneCallback;
@@ -150,7 +150,7 @@ namespace can
                 else
                 {
                     if (result == state_machine::CommandResult::rejected)
-                        controlMode.CmdReleaseExternalCalibration();
+                        controlMode.Drive().ActiveCommon().CmdReleaseExternalCalibration();
 
                     server.SendCategoryError(can::focIdentifyElectricalId,
                         state_machine::ToCategoryError(result));
@@ -167,7 +167,7 @@ namespace can
         }
 
         pendingCalibrateCallback = onDone;
-        controlMode.ActiveStateMachine().CmdCalibrate([this](state_machine::CommandResult result)
+        controlMode.Drive().ActiveStateMachine().CmdCalibrate([this](state_machine::CommandResult result)
             {
                 auto callback = pendingCalibrateCallback;
                 pendingCalibrateCallback = nullptr;
@@ -184,7 +184,7 @@ namespace can
         }
 
         pendingClearCalibrationCallback = onDone;
-        controlMode.ActiveStateMachine().CmdClearCalibration([this](state_machine::CommandResult result)
+        controlMode.Drive().ActiveStateMachine().CmdClearCalibration([this](state_machine::CommandResult result)
             {
                 auto callback = pendingClearCalibrationCallback;
                 pendingClearCalibrationCallback = nullptr;
@@ -194,12 +194,12 @@ namespace can
 
     bool FocMotorCommissioningBridge::MaintenanceOutstanding() const
     {
-        return pendingCalibrateCallback != nullptr || pendingClearCalibrationCallback != nullptr || controlMode.ActiveStateMachine().HasPendingAsyncWork() || controlMode.HasPendingConfigWrite();
+        return pendingCalibrateCallback != nullptr || pendingClearCalibrationCallback != nullptr || controlMode.Drive().ActiveStateMachine().HasPendingAsyncWork() || controlMode.HasPendingConfigWrite();
     }
 
     bool FocMotorCommissioningBridge::ReserveCalibration(uint8_t commandId)
     {
-        const auto reservation = controlMode.CmdReserveExternalCalibration();
+        const auto reservation = controlMode.Drive().ActiveCommon().CmdReserveExternalCalibration();
 
         if (reservation == state_machine::CommandResult::ok)
             return true;
@@ -215,7 +215,7 @@ namespace can
     // An emergency stop or a fault ends the reservation and aborts the estimation without answering it
     bool FocMotorCommissioningBridge::ElectricalIdentificationInProgress() const
     {
-        return pendingElectricalIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.ActiveStateMachine().CurrentState());
+        return pendingElectricalIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.Drive().ActiveStateMachine().CurrentState());
     }
 
     void FocMotorCommissioningBridge::FailElectricalIdentification(FocMotorCategoryError error)
@@ -223,7 +223,7 @@ namespace can
         pendingElectricalR.reset();
         pendingElectricalL.reset();
         pendingElectricalIdentDoneCallback = nullptr;
-        controlMode.CmdReleaseExternalCalibration();
+        controlMode.Drive().ActiveCommon().CmdReleaseExternalCalibration();
         server.SendCategoryError(can::focIdentifyElectricalId, error);
     }
 }

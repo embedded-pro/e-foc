@@ -189,7 +189,7 @@ namespace mil
             [this](foc::Volts measured)
             {
                 filteredBusVoltage = measured;
-                controlMode->TrackBusVoltage(measured);
+                controlMode->Commands().TrackBusVoltage(measured);
             } };
 
         std::vector<std::string> recordLines;

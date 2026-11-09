@@ -219,11 +219,11 @@ namespace mil
         switch (signal)
         {
             case integration::response::Signal::speed:
-                return static_cast<uint8_t>(mil.ControlMode().ActiveSpeedAlgorithm()) == config.speedAlgorithm;
+                return static_cast<uint8_t>(mil.ControlMode().Algorithms().ActiveSpeedAlgorithm()) == config.speedAlgorithm;
             case integration::response::Signal::position:
-                return static_cast<uint8_t>(mil.ControlMode().ActivePositionAlgorithm()) == config.positionAlgorithm;
+                return static_cast<uint8_t>(mil.ControlMode().Algorithms().ActivePositionAlgorithm()) == config.positionAlgorithm;
             case integration::response::Signal::currentQ:
-                return static_cast<uint8_t>(mil.ControlMode().ActiveCurrentAlgorithm()) == config.currentAlgorithm;
+                return static_cast<uint8_t>(mil.ControlMode().Algorithms().ActiveCurrentAlgorithm()) == config.currentAlgorithm;
         }
         return false;
     }

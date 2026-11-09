@@ -743,9 +743,9 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   outstanding is answered `busy`.
 - `OnClearDiagnostics` → `PlatformDiagnostics::Reset()`, which restarts the control-loop and CAN statistics;
   always succeeds.
-- `OnRecalibrate` → `ControlModeStateMachine::CmdRecalibrate()`; not stopped or the mode off answers
+- `OnRecalibrate` → `ModelRecalibration::CmdRecalibrate()`; not stopped or the mode off answers
   `invalidState`, torque mode `modeMismatch`.
-- `OnResetModel` → `ControlModeStateMachine::CmdResetModel()`; not stopped answers `invalidState`, a store that
+- `OnResetModel` → `ModelRecalibration::CmdResetModel()`; not stopped answers `invalidState`, a store that
   fails `persistenceFailed`.
 
 The settings callbacks — `OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and
