@@ -35,7 +35,6 @@ namespace services
         void FinishPolePairs();
         void FailPolePairs();
 
-        static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr std::size_t stepsPerRevolution = 12;
         static constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
 

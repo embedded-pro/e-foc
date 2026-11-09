@@ -4,6 +4,7 @@
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
@@ -191,8 +192,7 @@ namespace services
                 const auto currentPosition = encoder.Read();
                 if (currentSampleIndex > leadInSteps)
                 {
-                    auto delta = currentPosition.Value() - previousPosition.Value();
-                    accumulatedRotation += delta - twoPi * math::Floor((delta + std::numbers::pi_v<float>) / twoPi);
+                    accumulatedRotation += math::AngleDifference(currentPosition.Value(), previousPosition.Value());
                 }
 
                 previousPosition = currentPosition;

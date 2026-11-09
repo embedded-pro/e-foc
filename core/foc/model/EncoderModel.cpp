@@ -47,8 +47,7 @@ namespace foc
         if (!indexAngle)
             return false;
 
-        const float twoPi = 2.0f * std::numbers::pi_v<float>;
-        const float past = math::Fmod(math::Fmod(rotorAngle.Value() - indexAngle->Value(), twoPi) + twoPi, twoPi);
+        const float past = math::WrapToTwoPi(rotorAngle.Value() - indexAngle->Value());
 
         return past < static_cast<float>(indexWidthCounts) * CountWidth();
     }
