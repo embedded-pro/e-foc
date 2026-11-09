@@ -68,9 +68,15 @@ namespace services
 
         CoggingMapBuilder builder;
         [[no_unique_address]] foc::ClarkePark transform;
-        float previousPosition{ 0.0f };
-        float turned{ 0.0f };
-        float mark{ 0.0f };
+
+        struct Travel
+        {
+            float previousPosition{ 0.0f };
+            float turned{ 0.0f };
+            float mark{ 0.0f };
+        };
+
+        Travel travel;
         float commandedSpeed{ 0.0f };
         volatile Phase phase{ Phase::idle };
         uint32_t run{ 0 };
