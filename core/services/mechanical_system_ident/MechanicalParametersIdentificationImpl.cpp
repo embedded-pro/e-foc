@@ -1,9 +1,9 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -263,7 +263,7 @@ namespace services
 
         const auto mechanicalPos = encoder.Read().Value();
         const auto electricalAngle = mechanicalPos * polePairs;
-        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
 
         const auto sampleTorque = rotatingFrame.q * torqueConstant.Value();
         const auto weight = (static_cast<float>(samplesInWindow) + 0.5f) / static_cast<float>(windowSamples);

@@ -1,8 +1,8 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/DelayCompensation.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -193,8 +193,8 @@ namespace foc
         auto mechanicalAngle = position.Value();
         auto electricalAngle = mechanicalAngle * motor.polePairs;
 
-        auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
-        auto sinTheta = FastTrigonometry::Sine(electricalAngle);
+        auto cosTheta = math::FastCosine(electricalAngle);
+        auto sinTheta = math::FastSine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);

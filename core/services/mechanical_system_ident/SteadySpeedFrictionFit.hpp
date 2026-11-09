@@ -1,12 +1,12 @@
 #pragma once
 
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
+#include "numerical/estimators/online/RunningLinearFit.hpp"
 #include <cmath>
 #include <cstdint>
 
 namespace services
 {
-    // Per constant-speed run, the mean speed and torque a viscous-friction slope is fitted from.
     class SteadySpeedFrictionFit
     {
     public:
@@ -40,19 +40,19 @@ namespace services
 
         bool SpansDistinctSpeeds() const
         {
-            const auto spread = 0.5f * mechanical_estimate::minimumSpeedSpan * std::abs(meanSpeed);
+            const auto spread = 0.5f * mechanical_estimate::minimumSpeedSpan * std::abs(line.MeanX());
 
-            return weight != 0.0f && speedVariance >= spread * spread * weight;
+            return line.Weight() != 0.0f && line.SumSquaredDeviationsX() >= spread * spread * line.Weight();
         }
 
         float SpeedVariance() const
         {
-            return speedVariance;
+            return line.SumSquaredDeviationsX();
         }
 
         float SpeedTorqueCovariance() const
         {
-            return speedTorqueCovariance;
+            return line.SumCrossDeviations();
         }
 
     private:
@@ -64,28 +64,15 @@ namespace services
         void Fold()
         {
             const auto observations = static_cast<float>(runObservations);
-            const auto speed = runSpeed / observations;
-            const auto torque = runTorque / observations;
 
-            weight = runDecay * weight + observations;
-
-            const auto speedDeviation = speed - meanSpeed;
-            meanSpeed += observations * speedDeviation / weight;
-            meanTorque += observations * (torque - meanTorque) / weight;
-
-            speedVariance = runDecay * speedVariance + observations * speedDeviation * (speed - meanSpeed);
-            speedTorqueCovariance = runDecay * speedTorqueCovariance + observations * speedDeviation * (torque - meanTorque);
+            line.Decay(runDecay);
+            line.Add(runSpeed / observations, runTorque / observations, observations);
         }
 
         uint32_t runObservations{ 0 };
         float runSpeed{ 0.0f };
         float runTorque{ 0.0f };
         float runDecay{ 1.0f };
-
-        float weight{ 0.0f };
-        float meanSpeed{ 0.0f };
-        float meanTorque{ 0.0f };
-        float speedVariance{ 0.0f };
-        float speedTorqueCovariance{ 0.0f };
+        estimators::RunningLinearFit<float> line;
     };
 }

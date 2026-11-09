@@ -12,7 +12,6 @@ target_link_libraries(e_foc.foc.math INTERFACE
 
 target_sources(e_foc.foc.math INTERFACE
     CoggingFeedForward.hpp
-    FastTrigonometry.hpp
     FrictionFeedForward.hpp
     ParameterValidation.hpp
     TravelLimits.hpp

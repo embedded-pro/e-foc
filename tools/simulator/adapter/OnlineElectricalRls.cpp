@@ -1,5 +1,5 @@
 #include "tools/simulator/adapter/OnlineElectricalRls.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 
 namespace simulator
 {
@@ -22,8 +22,8 @@ namespace simulator
     void OnlineElectricalRls::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond omegaMech)
     {
         const float thetaElec = static_cast<float>(polePairs) * thetaMech.Value();
-        const float cosTheta = foc::FastTrigonometry::Cosine(thetaElec);
-        const float sinTheta = foc::FastTrigonometry::Sine(thetaElec);
+        const float cosTheta = math::FastCosine(thetaElec);
+        const float sinTheta = math::FastSine(thetaElec);
 
         const foc::TwoPhase iAlphaBeta = clarke.Forward({ currents.a.Value(), currents.b.Value(), currents.c.Value() });
         const foc::RotatingFrame idq = park.Forward(iAlphaBeta, cosTheta, sinTheta);
@@ -37,7 +37,6 @@ namespace simulator
             return;
 
         const float count = static_cast<float>(samplesInWindow);
-        // The model's currents carry no sensor noise, so the window's own mean current serves as the instrument.
         estimator.Update(foc::ElectricalWindow{ foc::Volts{ sumVd / count }, foc::Ampere{ sumId / count }, foc::Ampere{ idq.d }, sumSpeedTimesIq / count, foc::Ampere{ sumId / count } });
         Started();
 
@@ -45,7 +44,7 @@ namespace simulator
             estimator.CurrentInductance().Value() * 0.001f);
     }
 
-    void OnlineElectricalRls::StatorVoltages(foc::ThreePhase /*phaseVoltages*/, foc::TwoPhase alphaBeta)
+    void OnlineElectricalRls::StatorVoltages(foc::ThreePhase, foc::TwoPhase alphaBeta)
     {
         lastVAlphaBeta = alphaBeta;
     }

@@ -1,6 +1,6 @@
 #include "core/foc/model/MechanicalPlant.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <cmath>
 
 namespace foc
@@ -116,6 +116,6 @@ namespace foc
         if (coggingTorqueNm == 0.0f)
             return 0.0f;
 
-        return coggingTorqueNm * foc::FastTrigonometry::Sine(static_cast<float>(coggingCyclesPerRevolution) * thetaMech.Value());
+        return coggingTorqueNm * math::FastSine(static_cast<float>(coggingCyclesPerRevolution) * thetaMech.Value());
     }
 }
