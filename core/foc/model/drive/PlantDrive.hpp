@@ -55,7 +55,6 @@ namespace sil
         foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaults{};
         foc::ThreePhaseMotorModel::FaultInjectionConfig activeFaults{};
 
-        // Written by the control tick, read from the event loop.
         std::atomic<uint32_t> tickCount{ 0 };
         bool indexLatched{ false };
 

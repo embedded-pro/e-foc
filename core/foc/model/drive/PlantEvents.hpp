@@ -12,7 +12,6 @@ namespace sil
 
     foc::PlantResponseSample PlantSampleAt(foc::ThreePhaseMotorModel& model, uint32_t tick);
 
-    // The disturbances and wiring faults a plant description schedules, counted from Start.
     class PlantEvents
     {
     public:
