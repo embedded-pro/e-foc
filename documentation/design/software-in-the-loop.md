@@ -1192,10 +1192,10 @@ also carries the scheduled cable disconnect, supply step and shaft grip and the 
 which the host tests did not step before; with those left out of a description, the host tests step the
 plant exactly as they did.
 
-Moving the plant drive out of the emulated platform and the host tests changed neither: every
-`[METRIC]` line of the host suite, and the plant record of every emulated scenario of the disturbance,
-encoder index, disconnected motor, supply limit, plant characteristic and fault supervision features,
-less the CAN arrival stamps that follow the host's clock, read the same before and after.
+Moving the plant drive out of the emulated platform and the host tests left every `[METRIC]` line of
+the host suite as it was. The emulated scenarios still pass, but their plant records cannot show the
+same: a command reaches the emulated target when the host sends it, so two runs of one binary already
+record different trajectories.
 
 ---
 
