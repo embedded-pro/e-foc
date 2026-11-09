@@ -4,6 +4,7 @@
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TravelLimits.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -218,7 +219,7 @@ namespace can
     void FocMotorCanBridge::ApplyTorqueSetpoint(uint8_t commandId, foc::Ampere value, const infra::Function<void()>& onDone)
     {
         if (SetpointRejected(commandId, state_machine::ControlMode::torque,
-                std::fabs(value.Value()) <= inverter.MaxCurrentSupported().Value()))
+                math::Abs(value.Value()) <= inverter.MaxCurrentSupported().Value()))
             return;
 
         if (controlMode.TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, value }))
@@ -233,7 +234,7 @@ namespace can
     void FocMotorCanBridge::ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone)
     {
         if (SetpointRejected(commandId, state_machine::ControlMode::speed,
-                std::fabs(value.Value()) <= maxSpeedSetpoint))
+                math::Abs(value.Value()) <= maxSpeedSetpoint))
             return;
 
         if (controlMode.TrySetSpeed(value))
@@ -249,7 +250,7 @@ namespace can
     {
         const foc::TravelLimits limits{ foc::Radians{ controlMode.Config().limits.positionMinimum }, foc::Radians{ controlMode.Config().limits.positionMaximum } };
         if (SetpointRejected(commandId, state_machine::ControlMode::position,
-                std::fabs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
+                math::Abs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
             return;
 
         if (controlMode.TrySetPosition(value))

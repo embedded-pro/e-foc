@@ -272,7 +272,9 @@ stateDiagram-v2
 A fourth watch, the overspeed monitor, reads the speed the active drive measures every 1 ms on the event loop
 while the drive is `Enabled`, in every mode. An evaluation counts when the magnitude of that speed exceeds
 110 % of the overspeed limit; five evaluations that count in a row raise `overspeed` once, and the monitor stays
-silent until the drive leaves `Enabled`. An evaluation that does not count starts the count again.
+silent until the drive leaves `Enabled`. An evaluation that does not count starts the count again. The count and the
+report-once latch are the counting form of `SustainedCondition`, the class the following-error, over-temperature and
+target-reached monitors share for their time spans.
 
 The overspeed limit is one drive-wide setting of the configuration record (`service-nvm.md`), read at every
 evaluation, so a value written over CAN (`service-can.md`, contract 2.9) is in force from the next one:
@@ -310,7 +312,8 @@ half a turn, the same error Part A judges; only position mode has one, the other
 never faulted. An evaluation counts when the magnitude of the error exceeds the following-error window. The span
 starts at the first evaluation that counts; when the evaluations have counted without a break for the
 following-error time, the monitor raises `followingError` once and stays silent until the drive leaves
-`Enabled`. An evaluation that does not count ends the span.
+`Enabled`. An evaluation that does not count ends the span. The span and the report-once latch are a
+`SustainedCondition` (`core/supervision/SustainedCondition.hpp`), reset whenever the drive is not `Enabled`.
 
 | Setting                | Default | Range        | Meaning                                           |
 |------------------------|---------|--------------|---------------------------------------------------|
@@ -353,7 +356,8 @@ measures:
 time. While θ stays below i_cont² the drive may carry the peak current; once θ reaches i_cont² the current limit
 folds back to the continuous rating, and it is released to the peak again only once θ has fallen below half of
 i_cont², so the limit does not chatter at the threshold. A motor that keeps carrying its continuous rating holds
-θ at i_cont² and stays folded back, as it should.
+θ at i_cont² and stays folded back, as it should. The update of θ is the class `I2tThermalModel`; `MotorOverload` keeps
+the fold-back and release policy and reads θ from it.
 
 | Setting            | Default         | Range      | Meaning                                                   |
 |--------------------|-----------------|------------|-----------------------------------------------------------|
@@ -429,7 +433,8 @@ estimate is the read-only parameter `windingTemperature` of contract 2.13 (`serv
 it is unknown.
 
 **Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRO-002) and
-acts on it through a first-order filter with a 1 s time constant, started from the first known value. A winding cannot
+acts on it through a first-order filter with a 1 s time constant (the toolbox's `filters::passive::ExponentialMovingAverage`),
+started from the first known value. A winding cannot
 move noticeably within a second; an estimate that does is not heat. A cable pulled from a running drive is one: the open
 phase reads as a resistance 1.6 times the calibrated one at once, about 170 °C, and the phase-loss monitor (Part E)
 answers it within its 50 ms span, before the filter has carried the derating anywhere near it. While the filtered
@@ -440,7 +445,8 @@ the overload model. At or above T_max, while the drive is `Enabled`, the monitor
 stays silent until the drive leaves `Enabled`; the drive cuts its power stage and coasts, as for the board's own
 over-temperature trip.
 
-The trip waits 5 s after each entry to `Enabled`, one excitation burst and a margin: the estimate a stop left behind
+The trip waits 5 s after each entry to `Enabled`, one excitation burst and a margin (a `SustainedCondition` timed from
+the entry to `Enabled`, not from the temperature crossing the limit): the estimate a stop left behind
 is the winding's temperature at the stop, and a motor that cooled since would otherwise be faulted again before the
 first burst had measured it. The derating applies from the first evaluation, on the estimate as it stands, which is
 the cautious side. Where the temperature is unknown — torque mode, or no calibrated resistance — the monitor neither

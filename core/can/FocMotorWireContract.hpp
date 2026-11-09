@@ -7,6 +7,7 @@
 #include "core/foc/math/ParameterValidation.hpp"
 #include "generated/Boards.hpp"
 #include "hal/interfaces/Can.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -383,7 +384,7 @@ namespace can
         if (!foc::IsWithinInclusive(value, descriptor.minimum, descriptor.maximum))
             return false;
 
-        if (descriptor.integer && std::round(value) != value)
+        if (descriptor.integer && math::Round(value) != value)
             return false;
 
         if (descriptor.id != FocParameter::canBitrate)
@@ -407,6 +408,6 @@ namespace can
 
     inline bool IsFiniteWireValue(float value)
     {
-        return std::isfinite(value);
+        return math::IsFinite(value);
     }
 }

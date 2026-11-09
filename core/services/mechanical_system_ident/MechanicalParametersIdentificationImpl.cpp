@@ -4,6 +4,7 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -31,11 +32,11 @@ namespace
 
     std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
     {
-        if (!std::isfinite(countAngle))
+        if (!math::IsFinite(countAngle))
             return 1;
 
-        const auto seconds = std::sqrt(countAngle / accelerationQuantumTarget);
-        const auto samples = static_cast<std::size_t>(std::ceil(seconds / samplingPeriod));
+        const auto seconds = math::Sqrt(countAngle / accelerationQuantumTarget);
+        const auto samples = static_cast<std::size_t>(math::Ceil(seconds / samplingPeriod));
         return std::clamp<std::size_t>(samples, 1, maximumObservationWindow);
     }
 }
@@ -140,14 +141,14 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::TrackInertiaSettling(uint32_t observedWindowSamples)
     {
-        const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
-        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(observedWindowSamples))));
+        const auto memoryInSamples = updateForgetting < 1.0f ? math::Ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
+        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(math::Ceil(memoryInSamples / static_cast<float>(observedWindowSamples))));
 
         if (++updatesSinceReference < memoryInUpdates)
             return;
 
         const auto inertia = rls->Coefficients().at(1, 0);
-        inertiaSettled = hasInertiaReference && std::abs(inertia - inertiaReference) <= inertiaSettlingTolerance * std::abs(inertia);
+        inertiaSettled = hasInertiaReference && math::Abs(inertia - inertiaReference) <= inertiaSettlingTolerance * math::Abs(inertia);
         inertiaReference = inertia;
         hasInertiaReference = true;
         updatesSinceReference = 0;
@@ -164,7 +165,7 @@ namespace services
         const auto step = currentConfig.speedSlewRate * tickPeriodSeconds;
         const auto remaining = levelSpeed - commandedSpeed;
 
-        commandedSpeed = std::abs(remaining) <= step ? levelSpeed : commandedSpeed + std::copysign(step, remaining);
+        commandedSpeed = math::Abs(remaining) <= step ? levelSpeed : commandedSpeed + math::Copysign(step, remaining);
         controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
     }
 
@@ -274,7 +275,7 @@ namespace services
         positionSum += math::WrapToPi(mechanicalPos - previousPosition);
 
         const auto signedStep = math::WrapToPi(mechanicalPos - lastSamplePosition);
-        const auto step = std::abs(signedStep);
+        const auto step = math::Abs(signedStep);
         lastSamplePosition = mechanicalPos;
 
         if (samplesSinceStart > 1)
@@ -328,7 +329,7 @@ namespace services
 
         const auto countKnown = countSteps >= minimumCountSteps;
 
-        const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * std::sqrt(stepChangeEnergy) : 0.0f;
+        const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * math::Sqrt(stepChangeEnergy) : 0.0f;
         const auto wanted = countKnown ? WindowSamplesFor(std::max(countAngle, stepChangeResolution), samplingPeriod) : windowSamples;
 
         const auto windowDifference = wanted > windowSamples ? wanted - windowSamples : windowSamples - wanted;
@@ -342,7 +343,7 @@ namespace services
             return;
         }
 
-        if (countKnown && hadMean && std::abs(speed) > currentConfig.maxSpeed.Value())
+        if (countKnown && hadMean && math::Abs(speed) > currentConfig.maxSpeed.Value())
         {
             FailEnvelope();
             return;

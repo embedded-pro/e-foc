@@ -1,5 +1,6 @@
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -41,7 +42,7 @@ namespace services
     {
         const auto position = encoder.Read();
 
-        if (std::abs(math::WrapToPi((position - anchor).Value())) < bandRadians)
+        if (math::Abs(math::WrapToPi((position - anchor).Value())) < bandRadians)
             ++pollsInBand;
         else
         {

@@ -25,12 +25,14 @@ target_sources(e_foc.supervision_test PRIVATE
     TestEncoderFreezeMonitor.cpp
     TestEncoderPlausibilityMonitor.cpp
     TestFollowingErrorMonitor.cpp
+    TestI2tThermalModel.cpp
     TestMotorOverload.cpp
     TestOverTemperature.cpp
     TestOverspeedMonitor.cpp
     TestPeakCurrent.cpp
     TestPhaseLossMonitor.cpp
     TestPositionLimitMonitor.cpp
+    TestSustainedCondition.cpp
     TestTargetReachedMonitor.cpp
 )
 

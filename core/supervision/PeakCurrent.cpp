@@ -1,4 +1,5 @@
 #include "core/supervision/PeakCurrent.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -17,7 +18,7 @@ namespace supervision
     {
         const auto largest = std::ranges::max_element(samples, [](float left, float right)
             {
-                return std::abs(left) < std::abs(right);
+                return math::Abs(left) < math::Abs(right);
             });
         return foc::Ampere{ *largest };
     }

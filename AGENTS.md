@@ -64,6 +64,7 @@ with it enabled the macro's own `inline` would be a duplicate.
 - **Decoupling**: −ω·Lq·Iq feedforward on Vd; +ω·(Ld·Id + ψf) on Vq. The Vd term is negative and the Vq term positive — these cancel the coupling the plant adds, so getting the signs backwards doubles it
 - **SVM**: min-max common-mode injection; duty cycles bounded to [0, 1]
 - Reuse `Clarke`, `Park`, `ClarkePark` (`TransformsClarkePark.hpp`) and `SpaceVectorModulation` from `core/foc/transforms/`, and PID, filters and math from `infra/numerical-toolbox/` — do not reimplement
+- Math functions through the toolbox wrappers in `numerical/math/Math.hpp` (`math::Abs`, `math::Sqrt`, `math::Sin`, `math::Exp`, `math::Round`, `math::IsFinite`, ...), never `std::abs`, `std::sqrt` and the like: each wrapper can be overridden with a faster target implementation. `std::min`, `std::max` and `std::clamp` stay; tests may use `std::` as the reference
 - Unit types, never a raw `float` where one exists: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
 ## Style

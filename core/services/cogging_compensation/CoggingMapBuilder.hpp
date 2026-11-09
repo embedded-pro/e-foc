@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include "numerical/math/Math.hpp"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -58,7 +59,7 @@ namespace services
         {
             constexpr float perPeriod{ 0.5f * std::numbers::inv_pi_v<float> };
             const auto turns = electricalAngle * perPeriod;
-            const auto fraction = turns - std::floor(turns);
+            const auto fraction = turns - math::Floor(turns);
             const auto bin = static_cast<std::size_t>(fraction * static_cast<float>(bins));
             return bin < bins ? bin : bins - 1;
         }

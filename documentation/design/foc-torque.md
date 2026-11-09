@@ -92,7 +92,7 @@ flowchart LR
 Two independent incremental PID controllers regulate the direct (d) and quadrature (q) current components independently. Both PIDs share the same structural properties:
 
 - **Output clamping**: the output magnitude is limited to the modulation circle, 1 at the configured DC bus voltage and r at a measured one (Bus Voltage Tracking).
-- **Anti-windup**: the integrator is clamped whenever the output reaches the saturation boundary, preventing integrator wind-up during transients.
+- **Anti-windup**: back-calculation. Each axis is the toolbox `controllers::PiIncremental<float>`: `Propose` returns the unlimited demand, the modulation-circle limit is applied to the d/q vector, and `CommitRealized` writes the realised voltage back, so the next increment starts from what was applied and the integrator cannot wind up.
 - **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth, normalised by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
 - **Incrementalism**: the PID uses the incremental (velocity) form, accumulating output from step to step, which naturally limits abrupt changes at Enable transitions.
 

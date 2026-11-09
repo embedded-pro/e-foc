@@ -1,5 +1,5 @@
 #pragma once
-
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -49,7 +49,7 @@ namespace services
     {
         constexpr float pi = std::numbers::pi_v<float>;
 
-        if (!std::isfinite(data.encoderIndexAngle) || data.encoderIndexAngle < -pi || data.encoderIndexAngle > pi)
+        if (!math::IsFinite(data.encoderIndexAngle) || data.encoderIndexAngle < -pi || data.encoderIndexAngle > pi)
             return std::nullopt;
 
         return data.encoderIndexAngle;

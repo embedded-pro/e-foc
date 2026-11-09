@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/supervision/I2tThermalModel.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
@@ -41,7 +42,7 @@ namespace supervision
         infra::Function<const state_machine::FocStateMachineBase&()> activeDrive;
         infra::Function<Ratings()> ratings;
         infra::TimerRepeating evaluationTimer;
-        float squaredCurrentState{ 0.0f };
+        I2tThermalModel thermalModel;
         float continuousSquared{ 0.0f };
         bool foldedBack{ false };
         foc::Ampere applied;

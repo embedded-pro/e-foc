@@ -34,11 +34,11 @@ namespace services
             return;
         }
 
-        if (std::abs(reference) < minimumDirectCurrent)
+        if (math::Abs(reference) < minimumDirectCurrent)
             return;
 
-        if (std::abs(referenceChange) < minimumDirectCurrent)
-            following = std::abs(window.meanId.Value()) >= minimumFollowedFraction * std::abs(reference);
+        if (math::Abs(referenceChange) < minimumDirectCurrent)
+            following = math::Abs(window.meanId.Value()) >= minimumFollowedFraction * math::Abs(reference);
 
         if (!following)
             return;

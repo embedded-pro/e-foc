@@ -4,8 +4,11 @@
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/supervision/SustainedCondition.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
+#include "numerical/filters/passive/ExponentialMovingAverage.hpp"
+#include "numerical/math/Math.hpp"
 #include <chrono>
 #include <optional>
 
@@ -15,10 +18,7 @@ namespace supervision
     {
     public:
         static constexpr infra::Duration evaluationPeriod{ std::chrono::milliseconds(100) };
-        // One excitation burst and a margin: until then the estimate may be the one a stop left behind.
         static constexpr infra::Duration tripHoldOff{ std::chrono::seconds(5) };
-        // A winding cannot move noticeably within a second; an estimate that does, such as the resistance an open phase
-        // shows, is left to the phase-loss monitor, which answers within 50 ms.
         static constexpr infra::Duration filterTimeConstant{ std::chrono::seconds(1) };
         static constexpr float reportStep{ 0.01f };
 
@@ -51,10 +51,9 @@ namespace supervision
         infra::Function<Settings()> settings;
         infra::TimerRepeating evaluationTimer;
         foc::Ampere limit;
-        float smoothing;
-        std::optional<float> filteredCelsius;
-        std::optional<infra::TimePoint> enabledSince;
-        bool reported{ false };
+        filters::passive::ExponentialMovingAverage<float> filter{ 1.0f - math::Exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) };
+        bool filterSeeded{ false };
+        SustainedCondition enabledFor;
     };
 
     OverTemperature::Settings OverTemperatureSettingsFrom(const services::ConfigData& config);

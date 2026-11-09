@@ -4,6 +4,7 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -79,7 +80,7 @@ namespace services
         tripCurrent = foc::Ampere{ std::min(tripFactor * current, driver.MaxCurrentSupported().Value()) };
         stepPerSample = 2.0f * std::numbers::pi_v<float> * searchRevolutionsPerSecond * static_cast<float>(config.polePairs) / sampleRate;
         holdSamples = static_cast<std::size_t>(std::chrono::duration<float>(holdDuration).count() * sampleRate);
-        travelSamples = static_cast<std::size_t>(std::ceil(travelRevolutions / searchRevolutionsPerSecond * sampleRate));
+        travelSamples = static_cast<std::size_t>(math::Ceil(travelRevolutions / searchRevolutionsPerSecond * sampleRate));
         samples = 0;
         electricalAngle = 0.0f;
         phase = Phase::holding;

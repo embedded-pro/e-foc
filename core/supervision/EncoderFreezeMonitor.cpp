@@ -1,5 +1,6 @@
 #include "core/supervision/EncoderFreezeMonitor.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -60,7 +61,7 @@ namespace supervision
         if (now - anchorTime < evaluationPeriod)
             return;
 
-        const auto travel = std::abs(math::WrapToPi(reading - *anchor));
+        const auto travel = math::Abs(math::WrapToPi(reading - *anchor));
 
         if (travel >= 0.5f * armedLimits.encoderStep.Value())
             NoteTravel(reading, travel, now);
@@ -116,7 +117,7 @@ namespace supervision
     bool EncoderFreezeMonitor::CouldNotHaveStopped() const
     {
         const auto alpha = armedLimits.maximumDeceleration.Value();
-        const auto stopping = std::sqrt(alpha * armedLimits.encoderStep.Value());
+        const auto stopping = math::Sqrt(alpha * armedLimits.encoderStep.Value());
         const auto last = Seconds(lastSpan);
 
         return Exceeds(lastSpeed, stopping + alpha * last * 0.5f) ||

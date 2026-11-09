@@ -1,5 +1,6 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -86,7 +87,7 @@ namespace services
         fit.outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - fit.outputPower);
 
         fit.excitation.CountAcceleration(observation->acceleration);
-        if (std::abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
+        if (math::Abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
             fit.excitation.CountSpeed(observation->speed);
         fit.periods = static_cast<uint16_t>(std::min<uint32_t>(fit.periods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
 
@@ -95,12 +96,12 @@ namespace services
 
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInDirection(float acceleration, float speed) const
     {
-        return IsMechanicallyObservable(speed) && std::abs(speed) > std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
+        return IsMechanicallyObservable(speed) && math::Abs(speed) > math::Abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
     }
 
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, const DirectionalFit& fit) const
     {
-        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
+        return math::Abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
     }
 
     bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled(const DirectionalFit& fit) const

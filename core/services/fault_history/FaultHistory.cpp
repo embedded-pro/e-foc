@@ -1,4 +1,5 @@
 #include "core/services/fault_history/FaultHistory.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -10,7 +11,7 @@ namespace services
         int16_t Hundredths(float value)
         {
             constexpr float limit{ static_cast<float>(std::numeric_limits<int16_t>::max()) };
-            return static_cast<int16_t>(std::lround(std::clamp(value * 100.0f, -limit, limit)));
+            return static_cast<int16_t>(math::Round(std::clamp(value * 100.0f, -limit, limit)));
         }
 
         bool Older(const FaultRecord& left, const FaultRecord& right)

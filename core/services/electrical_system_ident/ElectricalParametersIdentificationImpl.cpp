@@ -5,6 +5,7 @@
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -191,7 +192,7 @@ namespace services
                 if (currentSampleIndex > leadInSteps)
                 {
                     auto delta = currentPosition.Value() - previousPosition.Value();
-                    accumulatedRotation += delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);
+                    accumulatedRotation += delta - twoPi * math::Floor((delta + std::numbers::pi_v<float>) / twoPi);
                 }
 
                 previousPosition = currentPosition;
@@ -207,7 +208,7 @@ namespace services
         if (!onPolePairsDone || polePairsFinishing)
             return;
 
-        const float mechanicalRotation = std::abs(accumulatedRotation);
+        const float mechanicalRotation = math::Abs(accumulatedRotation);
         polePairsRunning = false;
 
         if (mechanicalRotation <= minRotationThreshold)
@@ -217,9 +218,9 @@ namespace services
         }
 
         const float ratio = static_cast<float>(polePairsConfig.electricalRevolutions) * twoPi / mechanicalRotation;
-        const float polePairs = std::round(ratio);
+        const float polePairs = math::Round(ratio);
 
-        if (polePairs >= 1.0f && std::abs(ratio - polePairs) <= maxPolePairsDeviation)
+        if (polePairs >= 1.0f && math::Abs(ratio - polePairs) <= maxPolePairsDeviation)
             onPolePairsDone(std::make_optional<std::size_t>(static_cast<std::size_t>(polePairs)));
         else
             onPolePairsDone(std::nullopt);

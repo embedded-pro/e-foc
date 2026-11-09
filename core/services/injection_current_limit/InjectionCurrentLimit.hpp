@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -10,8 +11,8 @@ namespace services
     {
         const auto maximum = limit.Value();
 
-        return std::fabs(currents.a.Value()) > maximum ||
-               std::fabs(currents.b.Value()) > maximum ||
-               std::fabs(currents.c.Value()) > maximum;
+        return math::Abs(currents.a.Value()) > maximum ||
+               math::Abs(currents.b.Value()) > maximum ||
+               math::Abs(currents.c.Value()) > maximum;
     }
 }

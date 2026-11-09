@@ -8,6 +8,7 @@ target_include_directories(e_foc.services.non_volatile_memory PUBLIC
 target_link_libraries(e_foc.services.non_volatile_memory PUBLIC
     infra.util
     hal.interfaces
+    numerical.math
     services.util
 )
 

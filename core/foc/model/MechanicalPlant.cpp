@@ -1,6 +1,7 @@
 #include "core/foc/model/MechanicalPlant.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace foc
@@ -105,7 +106,7 @@ namespace foc
         if (coulombFrictionNm > 0.0f)
         {
             const float frictionStep = coulombFrictionNm * dt / inertia;
-            speed = std::fabs(speed) <= frictionStep ? 0.0f : speed - std::copysign(frictionStep, speed);
+            speed = math::Abs(speed) <= frictionStep ? 0.0f : speed - math::Copysign(frictionStep, speed);
         }
 
         return speed;

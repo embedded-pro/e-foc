@@ -44,12 +44,12 @@ namespace services
 
     inline bool EstimatesAgree(float first, float second)
     {
-        return std::abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(std::abs(first), std::abs(second));
+        return math::Abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(math::Abs(first), math::Abs(second));
     }
 
     inline bool IsMechanicallyObservable(float speed)
     {
-        return std::abs(speed) >= mechanical_estimate::minimumSpeed;
+        return math::Abs(speed) >= mechanical_estimate::minimumSpeed;
     }
 
     class MechanicalExcitation
@@ -68,13 +68,13 @@ namespace services
 
         void CountAcceleration(float acceleration)
         {
-            if (std::abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
+            if (math::Abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
                 ++accelerating;
         }
 
         void CountSpeed(float speed)
         {
-            const auto magnitude = std::abs(speed);
+            const auto magnitude = math::Abs(speed);
             slowest = seen ? std::min(slowest, magnitude) : magnitude;
             fastest = seen ? std::max(fastest, magnitude) : magnitude;
             seen = true;
