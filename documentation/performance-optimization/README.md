@@ -452,6 +452,14 @@ inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`
 no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
 a multiply-add per sample in the speed and position cascades.
 
+The sampling-skew correction (`documentation/design/platform-sampling-skew.md`) costs each cascade four
+multiply-adds for the zero-vector rates in rotor coordinates, the same small-angle rotation turned one period ahead,
+and an inverse Park and Clarke: about 25 floating-point operations, inlined into `Calculate`. The Runner then hands
+the three rates down the inverter chain, one indirect call per decorator (dead-time compensation, the decimating
+inverter, the platform), and the platform multiplies each by its delay; the shunt readout subtracts the three
+products from the next sample before the rebuild. `ZeroVectorSlope::Next`, the cascades' `ZeroVectorSlopes` and
+the three inverter hops are listed in the cycle-gate configurations.
+
 ### Key Performance Sensitivities
 
 | Code Pattern           | Cycle Impact       | Recommendation                      |

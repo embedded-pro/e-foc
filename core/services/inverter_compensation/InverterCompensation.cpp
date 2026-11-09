@@ -22,6 +22,11 @@ namespace services
         PassOffsetsDown();
     }
 
+    void InverterCompensation::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        inverter.ZeroVectorSlopes(slopes);
+    }
+
     void InverterCompensation::PassOffsetsDown()
     {
         inverter.CurrentOffsets(foc::PhaseCurrents{

@@ -19,6 +19,7 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
     private:
         void Decimate(foc::PhaseCurrents currents);

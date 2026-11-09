@@ -96,7 +96,8 @@ namespace foc
     {
         lastPhaseVoltages = StepPlant(Plant{ electrical, mechanical, thermal, supply }, dutyPhases, Winding(), parameters.p, period);
 
-        currentSensor.Measure(dutyPhases, electrical.Currents(), electrical.PowerStage(), period);
+        const auto slopes = currentSensor.ChainEnabled() ? electrical.ZeroVectorSlopes(mechanical.ElectricalAngle(), mechanical.ElectricalSpeed(), Winding()) : foc::PhaseCurrentSlopes{};
+        currentSensor.Measure(dutyPhases, electrical.Currents(), slopes, electrical.PowerStage(), period);
         encoder.Sample();
 
         const auto measured = currentSensor.Last();
@@ -150,6 +151,9 @@ namespace foc
     }
 
     void ThreePhaseMotorModel::CurrentOffsets(const foc::PhaseCurrents&)
+    {}
+
+    void ThreePhaseMotorModel::ZeroVectorSlopes(const foc::PhaseCurrentSlopes&)
     {}
 
     void InjectFaults(ThreePhaseMotorModel& model, const ThreePhaseMotorModel::FaultInjectionConfig& config)

@@ -9,6 +9,7 @@
 #include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
 #include "infra/util/TripleBuffer.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
@@ -33,6 +34,12 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
+
+        PhaseCurrentSlopes ZeroVectorSlopes() const final
+        {
+            return slopes;
+        }
+
         MotionObservation ObserveMotion() const override;
         void SetCurrentStream(CurrentStream& stream);
 
@@ -94,6 +101,9 @@ namespace foc
         DriveLimits limits;
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
+        ZeroVectorSlope zeroVectorSlope;
+        // Written by Calculate(), read by the Runner after it, both in the control interrupt.
+        PhaseCurrentSlopes slopes{};
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };
     };

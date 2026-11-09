@@ -21,9 +21,10 @@ namespace foc
     public:
         void SetNoise(const CurrentNoiseConfig& config);
         void SetChain(const CurrentSenseConfig& config);
+        bool ChainEnabled() const;
         void Seed(uint32_t seed);
 
-        void Measure(const foc::PhasePwmDutyCycles& duties, const foc::PhaseCurrents& actual, const PowerStageConfig& powerStage, float period);
+        void Measure(const foc::PhasePwmDutyCycles& duties, const foc::PhaseCurrents& actual, const foc::PhaseCurrentSlopes& slopes, const PowerStageConfig& powerStage, float period);
         foc::PhaseCurrents Last() const;
 
     private:

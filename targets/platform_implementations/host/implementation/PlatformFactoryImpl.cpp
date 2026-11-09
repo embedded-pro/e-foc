@@ -68,6 +68,9 @@ namespace application
     void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents&)
     {}
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes&)
+    {}
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return simpleLowPriorityInterrupt;

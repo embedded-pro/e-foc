@@ -67,6 +67,9 @@
         "CurrentStream::Publish",
         "SpeedDifferentiator::CloseWindow",
         "DecouplingFeedforward::Apply",
+        "ZeroVectorSlope::Next",
+        "TorqueCascade::ZeroVectorSlopes",
+        "SpeedLoopDrive<.*>::ZeroVectorSlopes",
         "PidCurrentController::CommitRealized",
         "PidCurrentController::Propose",
         "PiIncremental<float>::CommitRealized",
@@ -94,7 +97,10 @@
         "PwmStmBase::SetDutyCycle",
         "Pwm::Start.*Percent.*Percent.*Percent",
         "PlatformFactoryImpl::ThreePhasePwmOutput",
-        "InverterCompensation::ThreePhasePwmOutput"
+        "InverterCompensation::ThreePhasePwmOutput",
+        "InverterCompensation::ZeroVectorSlopes",
+        "DecimatingThreePhaseInverter::ZeroVectorSlopes",
+        "PlatformFactoryImpl::ZeroVectorSlopes"
       ]
     },
     {

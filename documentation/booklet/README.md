@@ -79,6 +79,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample            |
 | [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures          |
 | [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for    |
+| [Platform: Phase-Current Sampling Skew](../design/platform-sampling-skew.md)           | Each phase brought back to the window centre along its zero-vector slope               |
 | [Service: Cogging Compensation](../design/service-cogging-compensation.md)             | Cogging torque map at calibration, current feed-forward in the cascades                |
 | [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step      |
 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                                  |

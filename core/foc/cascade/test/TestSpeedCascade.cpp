@@ -479,6 +479,7 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
 
     focSpeed->SetOnlineMechanicalEstimator(mechanicalEstimator);
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
@@ -503,6 +504,7 @@ TEST_F(TestSpeedCascade, the_electrical_window_carries_the_direct_axis_reference
     };
 
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
     focSpeed->Enable();
 
     testing::InSequence sequence;
@@ -1112,4 +1114,61 @@ TEST_F(TestSpeedCascade, the_current_algorithm_is_selectable_while_disabled)
 {
     EXPECT_EQ(focSpeed->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
     EXPECT_EQ(focSpeed->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
+}
+
+TEST_F(TestSpeedCascade, at_standstill_the_zero_vector_slopes_are_each_current_decaying_through_the_resistance)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    const auto slopes = focSpeed->ZeroVectorSlopes();
+
+    EXPECT_NEAR(slopes.a.Value(), 0.0f, 1.0f);
+    EXPECT_NEAR(slopes.b.Value(), -1000.0f * 1.5f, 1.0f);
+    EXPECT_NEAR(slopes.c.Value(), 1000.0f * 1.5f, 1.0f);
+}
+
+TEST_F(TestSpeedCascade, a_settled_online_inductance_inside_the_band_sets_the_zero_vector_slopes)
+{
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(Return(true));
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(Return(foc::Ohm{ 1.0f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(Return(foc::MilliHenry{ 1.25f }));
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    const auto slopes = focSpeed->ZeroVectorSlopes();
+
+    EXPECT_NEAR(slopes.b.Value(), -800.0f * 1.5f, 1.0f);
+    EXPECT_NEAR(slopes.c.Value(), 800.0f * 1.5f, 1.0f);
+}
+
+TEST_F(TestSpeedCascade, an_enable_returns_the_zero_vector_slopes_to_the_configured_model)
+{
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(Return(true));
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(Return(foc::Ohm{ 1.0f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(Return(foc::MilliHenry{ 1.25f }));
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    focSpeed->Disable();
+    focSpeed->Enable();
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    EXPECT_NEAR(focSpeed->ZeroVectorSlopes().b.Value(), -1000.0f * 1.5f, 1.0f);
 }

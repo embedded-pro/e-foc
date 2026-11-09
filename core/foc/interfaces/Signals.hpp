@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include <chrono>
 
 namespace foc
 {
@@ -10,6 +11,22 @@ namespace foc
         Ampere a;
         Ampere b;
         Ampere c;
+    };
+
+    // Rate of each phase current while all low sides conduct (the zero vector)
+    struct PhaseCurrentSlopes
+    {
+        AmperePerSecond a;
+        AmperePerSecond b;
+        AmperePerSecond c;
+    };
+
+    // Hold instant of each phase after the centre of the low-side window
+    struct PhaseSampleDelays
+    {
+        std::chrono::duration<float> a;
+        std::chrono::duration<float> b;
+        std::chrono::duration<float> c;
     };
 
     struct PhasePwmDutyCycles

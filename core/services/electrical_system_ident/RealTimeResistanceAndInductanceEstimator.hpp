@@ -28,7 +28,7 @@ namespace services
 
         foc::Ohm CurrentResistance() const override;
         foc::MilliHenry CurrentInductance() const override;
-        bool HasSettled() const;
+        bool HasSettled() const override;
 
     private:
         using Estimator = estimators::RecursiveInstrumentalVariables<float, 2>;

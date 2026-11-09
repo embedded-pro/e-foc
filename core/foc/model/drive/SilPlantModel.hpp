@@ -2,6 +2,7 @@
 
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/model/drive/SilPlantConfig.hpp"
+#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include <cstdint>
 #include <optional>
 
@@ -44,6 +45,17 @@ namespace sil
             .fullScaleAmpere = config.currentFullScaleAmpere,
             .resolutionBits = config.adcResolutionBits,
         };
+    }
+
+    inline foc::PhaseSampleDelays SampleDelays(const foc::CurrentSenseConfig& chain)
+    {
+        return foc::SequentialPhaseSampleDelays({
+            .converterClockHertz = chain.adcClockHertz,
+            .sampleHoldClocks = chain.sampleHoldClocks,
+            .conversionClocks = chain.conversionClocks,
+            .averagedConversions = chain.averagedConversions,
+            .triggerDelay = std::chrono::duration<float>{ chain.triggerDelaySeconds },
+        });
     }
 
     inline void ConfigureModel(foc::ThreePhaseMotorModel& model, const SilPlantConfig& config)

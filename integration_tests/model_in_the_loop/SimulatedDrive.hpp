@@ -24,6 +24,7 @@ namespace mil
         foc::Volts PowerSupplyVoltage() const;
         drivers::DeadTimeLoss InverterDeadTimeLoss() const;
         uint32_t DutyUpdateDelayPeriods() const;
+        void IgnoreSampleDelays();
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -32,6 +33,7 @@ namespace mil
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;

@@ -168,6 +168,11 @@ namespace application
         shuntReadout.Offsets(offsets);
     }
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        shuntReadout.ZeroVectorSlopes(slopes);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
     {
         if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
@@ -218,6 +223,12 @@ namespace application
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
+        shuntReadout.SampleDelays(foc::SequentialPhaseSampleDelays({
+            .converterClockHertz = AdcForPhaseCurrentMeasurementImpl::converterClockHertz,
+            .sampleHoldClocks = impl.sampleHoldClocks.at(static_cast<std::size_t>(sampleAndHold)),
+            .conversionClocks = AdcForPhaseCurrentMeasurementImpl::conversionClocks,
+            .averagedConversions = AdcForPhaseCurrentMeasurementImpl::averagedConversions,
+        }));
         if constexpr (Peripheral::hasFaultComparators)
             adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
 
@@ -355,6 +366,7 @@ namespace application
             {
                 pwm.Stop();
             });
+        shuntReadout.ClearSlopes();
         overCurrentTripped = false;
         pwmFaultAsserted = false;
     }

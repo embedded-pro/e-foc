@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/timer/Timer.hpp"
@@ -52,14 +53,10 @@ namespace state_machine
         static constexpr infra::Duration dwell{ std::chrono::seconds(5) };
         static constexpr std::size_t quantities{ 4 };
 
-        struct Band
-        {
-            float minimum;
-            float maximum;
-        };
+        using Band = foc::EstimateBand;
 
         // Resistance, inductance, inertia and viscous friction, as ratios to the commissioned value.
-        static constexpr std::array<Band, quantities> bands{ { { 0.7f, 2.0f }, { 0.5f, 1.5f }, { 0.5f, 5.0f }, { 0.2f, 5.0f } } };
+        static constexpr std::array<Band, quantities> bands{ { foc::resistanceEstimateBand, foc::inductanceEstimateBand, { 0.5f, 5.0f }, { 0.2f, 5.0f } } };
 
         struct Outcome
         {

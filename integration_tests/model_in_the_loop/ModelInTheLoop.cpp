@@ -129,6 +129,12 @@ namespace mil
         return *this;
     }
 
+    Scenario& Scenario::WithoutSamplingSkewCorrection()
+    {
+        samplingSkewCorrected = false;
+        return *this;
+    }
+
     void ModelInTheLoop::DeferredLowPriorityInterrupt::Trigger()
     {
         pending = true;
@@ -208,6 +214,9 @@ namespace mil
         , indexSearch{ inverterCompensation, drive, noEncoderIndex }
         , rotorStandstill{ drive }
     {
+        if (!scenario.samplingSkewCorrected)
+            drive.IgnoreSampleDelays();
+
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)

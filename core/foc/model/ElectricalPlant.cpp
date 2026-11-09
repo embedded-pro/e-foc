@@ -80,6 +80,27 @@ namespace foc
         return { ia, ib, ic };
     }
 
+    foc::PhaseCurrentSlopes ElectricalPlant::ZeroVectorSlopes(foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding) const
+    {
+        const auto cosTheta = math::FastCosine(theta.Value());
+        const auto sinTheta = math::FastSine(theta.Value());
+        const auto current = park.Forward(clarke.Forward(foc::ThreePhase{ ia.Value(), ib.Value(), ic.Value() }), cosTheta, sinTheta);
+        const auto speed = omega.Value();
+
+        // The rotor-frame equations with no applied voltage, plus the frame's own rotation, give the stationary rate.
+        const foc::RotatingFrame rate{
+            (-winding.resistance * current.d + speed * winding.inductanceQ * current.q) / winding.inductanceD - speed * current.q,
+            (-winding.resistance * current.q - speed * winding.inductanceD * current.d - speed * winding.fluxLinkage) / winding.inductanceQ + speed * current.d
+        };
+        const auto phases = clarke.Inverse(park.Inverse(rate, cosTheta, sinTheta));
+
+        return {
+            foc::AmperePerSecond{ openPhases.a ? 0.0f : phases.a },
+            foc::AmperePerSecond{ openPhases.b ? 0.0f : phases.b },
+            foc::AmperePerSecond{ openPhases.c ? 0.0f : phases.c }
+        };
+    }
+
     foc::RotatingFrame ElectricalPlant::LastDqCurrents() const
     {
         return lastDqCurrents;

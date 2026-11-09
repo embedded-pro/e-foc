@@ -72,6 +72,7 @@ namespace foc
         motor.polePairs = static_cast<float>(parameters.polePairs);
         UpdateSpeedLimit();
         const bool ok = currentLoop.Configure(parameters);
+        zeroVectorSlope.Configure(parameters);
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
         speedMeasurement.scale = motor.polePairs * samplingFrequency;
@@ -198,6 +199,7 @@ namespace foc
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
+        slopes = zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta);
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
         if (currentStream != nullptr)

@@ -121,6 +121,7 @@ namespace foc
     {
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
+        inverter.ZeroVectorSlopes(foc.ZeroVectorSlopes());
 
         phaseCurrentsObserver(currentPhases);
     }

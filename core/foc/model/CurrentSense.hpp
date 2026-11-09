@@ -23,6 +23,8 @@ namespace foc
         ConductionWindow window;
         float current;
         float offset;
+        // A/s from the window centre on, while all low sides conduct
+        float slope{ 0.0f };
     };
 
     bool CurrentSenseEnabled(const CurrentSenseConfig& config);

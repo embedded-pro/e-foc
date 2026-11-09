@@ -255,14 +255,16 @@ per-phase software check is the protection that works ([power stage](power-stage
 One ADC converts the three phases one after another; on E-FOC-HARDWARE the last holds 5.25 µs after the first is
 triggered. During 000 each current moves at $-(e_k + R_s i_k)/L_s$, so a phase read late is off its period mean by
 that slope times the delay: up to 71 mA on the Anaheim and 0.40 A on the Teknic at rated speed
-([sensing chain](sensing-chain.md) §6). Remedies, none of them in e-foc today:
+([sensing chain](sensing-chain.md) §6). Remedies:
 
 - **Sample two phases at once** on two converters (the TM4C1294 has ADC0 and ADC1; e-foc uses ADC1 for the bus
   voltage) and rebuild the third.
 - **Centre the burst** on the window: trigger from a compare event slightly before the counter's zero, so the
   conversions straddle the centre. This also halves the time the last conversion needs after the centre, which
   raises the readable duty.
-- **Correct the skew** with the known slope: the back-EMF and the measured currents give it.
+- **Correct the skew** with the known slope: the back-EMF and the measured currents give it. This is what
+  e-foc does: the platform subtracts each phase's zero-vector slope times its delay before it rebuilds a
+  hidden phase ([sampling skew](../design/platform-sampling-skew.md)).
 
 ### 9. Configuration Checklist
 
@@ -339,7 +341,8 @@ went from stopping near 356 rad/s to holding 460 rad/s once the shift and the re
   options.
 - **Derived**: the readable ranges per strategy are computed from the duty laws, the 70 % limit and the 95 % cap;
   the speeds in the worked example are steady-state estimates.
-- **Not implemented**: simultaneous sampling, a centred conversion burst, and skew correction.
+- **Not implemented**: simultaneous sampling and a centred conversion burst. Skew is corrected from the motor
+  model instead ([sampling skew](../design/platform-sampling-skew.md)).
 
 ## References
 

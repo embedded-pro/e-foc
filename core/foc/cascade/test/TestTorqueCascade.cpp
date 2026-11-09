@@ -855,3 +855,40 @@ TEST(TestTorqueCascadeFriction, the_torque_cascade_has_no_friction_feed_forward)
     static_assert(!std::is_base_of_v<foc::FrictionCompensable, foc::TorqueCascade>);
     SUCCEED();
 }
+
+TEST_F(TestTorqueCascade, before_the_first_sample_the_zero_vector_slopes_are_zero)
+{
+    const auto slopes = focTorque->ZeroVectorSlopes();
+
+    EXPECT_EQ(slopes.a.Value(), 0.0f);
+    EXPECT_EQ(slopes.b.Value(), 0.0f);
+    EXPECT_EQ(slopes.c.Value(), 0.0f);
+}
+
+TEST(TestTorqueCascadeZeroVectorSlopes, after_each_sample_the_slopes_follow_the_model_at_the_measured_speed)
+{
+    constexpr float mechanicalStep{ 0.01f };
+    const auto parameters = MotorParameters(2);
+    foc::TorqueCascade cascade{ foc::Ampere{ 10.0f } };
+    cascade.Configure(parameters);
+    cascade.Enable();
+
+    float angle{ 0.0f };
+    for (int sample = 0; sample != 400; ++sample)
+    {
+        angle = static_cast<float>(sample) * mechanicalStep;
+        foc::Radians position{ angle };
+        cascade.Calculate(ZeroCurrents(), position);
+    }
+
+    foc::ZeroVectorSlope reference;
+    reference.Configure(parameters);
+    const auto electricalAngle = math::WrapToPi(2.0f * angle);
+    const auto expected = reference.Next({ 0.0f, 0.0f }, 2.0f * mechanicalStep * 20000.0f, std::cos(electricalAngle), std::sin(electricalAngle));
+    const auto slopes = cascade.ZeroVectorSlopes();
+
+    EXPECT_NEAR(slopes.a.Value(), expected.a.Value(), 20.0f);
+    EXPECT_NEAR(slopes.b.Value(), expected.b.Value(), 20.0f);
+    EXPECT_NEAR(slopes.c.Value(), expected.c.Value(), 20.0f);
+    EXPECT_GT(std::abs(expected.a.Value()) + std::abs(expected.b.Value()), 1000.0f);
+}

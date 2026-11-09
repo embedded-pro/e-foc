@@ -52,7 +52,9 @@
         "ToDutyCycles",
         "CurrentStream::Accumulate",
         "CurrentStream::Reopen",
-        "CurrentStream::Publish"
+        "CurrentStream::Publish",
+        "ZeroVectorSlope::Next",
+        "SpeedLoopDrive<.*>::ZeroVectorSlopes"
       ]
     },
     {

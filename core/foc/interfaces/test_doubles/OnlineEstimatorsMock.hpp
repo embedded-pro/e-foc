@@ -24,5 +24,6 @@ namespace foc
         MOCK_METHOD(void, Update, (const ElectricalWindow& window), (override));
         MOCK_METHOD(Ohm, CurrentResistance, (), (const, override));
         MOCK_METHOD(MilliHenry, CurrentInductance, (), (const, override));
+        MOCK_METHOD(bool, HasSettled, (), (const, override));
     };
 }

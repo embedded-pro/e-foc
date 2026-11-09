@@ -43,6 +43,7 @@ namespace mil
         std::string plantName{ "nominal" };
         sil::NvmImageSpec nvm{ .includeCalibration = false, .includeConfig = false };
         std::optional<std::vector<uint8_t>> nvmImage;
+        bool samplingSkewCorrected{ true };
 
         Scenario& Plant(const std::string& preset);
         Scenario& Calibrated();
@@ -54,6 +55,7 @@ namespace mil
         Scenario& PositionLoop(foc::PositionAlgorithm algorithm);
         Scenario& Recorded(uint32_t sampleRateHz, uint32_t maxSamples);
         Scenario& TorqueStep(float torqueNm, uint32_t delayMs);
+        Scenario& WithoutSamplingSkewCorrection();
     };
 
     struct ElectricalIdentification

@@ -93,6 +93,7 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
@@ -168,11 +169,17 @@ namespace application
                 hal::tiva::Adc::SampleAndHold::sampleAndHold32,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold256 } };
+            static constexpr std::array<uint32_t, 5> sampleHoldClocks{ { 4, 16, 32, 64, 256 } };
+            // TM4C1294 datasheet: a 16 MHz conversion clock and 12 clocks per conversion after the hold.
+            static constexpr float converterClockHertz{ 16.0e6f };
+            static constexpr uint32_t conversionClocks{ 12 };
+            static constexpr uint32_t averagedConversions{ 2 };
             static constexpr float adcToAmpereSlope = application::BoardCharacteristics::AdcToAmpereSlope(adcReferenceVoltage, adcResolution);
             static constexpr float adcToAmpereOffset = application::BoardCharacteristics::AdcToAmpereOffset(adcReferenceVoltage);
 
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
+            static_assert(currentSensingOversampling == hal::tiva::Adc::Oversampling::oversampling2 && averagedConversions == 2);
 
             static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
                 {},

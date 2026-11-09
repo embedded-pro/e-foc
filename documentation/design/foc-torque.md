@@ -70,6 +70,9 @@ The sequence executed each cycle is:
 10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The sampled cos/sin pair is rotated through the delay angle (`foc-transforms.md`, *Delay compensation*), with ωe the filtered electrical speed of step 8's limiter and n the platform's duty delay in periods.
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
 12. Return `PhasePwmDutyCycles` to the Runner for immediate PWM register update.
+13. Zero-vector rates: from Id, Iq and ωe, the rate of each phase current while all low sides conduct, turned
+    one period ahead; the Runner hands them to the inverter after the duties
+    (`platform-sampling-skew.md` Part B). Zero until the model has an inductance.
 
 ```mermaid
 flowchart LR
@@ -224,6 +227,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 | Speed limit       | Sets the overspeed limit, in mechanical rad/s, that the speed limiter folds the q-axis setpoint against.        | Callable in any state, also while Enabled; in force from the next sample. A limit of zero folds nothing.                                |
 | Current limit     | Sets the current limit, in amperes, that the q-axis setpoint is clamped to below the envelope.                  | Callable in any state, also while Enabled; in force from the next sample. Capped at the envelope.                                       |
+| Zero-vector rates | The rate of each phase current during the zero vector, for the next sample (step 13).                           | Read by the Runner after every `Calculate()`; zero before the first.                                                                    |
 
 ### Required
 

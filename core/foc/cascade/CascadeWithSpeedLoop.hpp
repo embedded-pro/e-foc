@@ -17,6 +17,7 @@
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -38,6 +39,11 @@ namespace foc
         void EnableSpeedLoop();
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
+
+        PhaseCurrentSlopes ZeroVectorSlopesImpl() const
+        {
+            return slopes;
+        }
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
@@ -130,5 +136,8 @@ namespace foc
         DirectAxisExcitation directAxisExcitation;
         FeedForwards feedForward;
         CurrentStream* currentStream{ nullptr };
+        ZeroVectorSlope zeroVectorSlope;
+        // Written by the inner loop, read by the Runner after it, both in the control interrupt.
+        PhaseCurrentSlopes slopes{};
     };
 }
