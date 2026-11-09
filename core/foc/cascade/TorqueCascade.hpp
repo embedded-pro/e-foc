@@ -102,7 +102,6 @@ namespace foc
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
         ZeroVectorSlope zeroVectorSlope;
-        // Written by Calculate(), read by the Runner after it, both in the control interrupt.
         PhaseCurrentSlopes slopes{};
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };

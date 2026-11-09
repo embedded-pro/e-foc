@@ -137,7 +137,6 @@ namespace foc
         FeedForwards feedForward;
         CurrentStream* currentStream{ nullptr };
         ZeroVectorSlope zeroVectorSlope;
-        // Written by the inner loop, read by the Runner after it, both in the control interrupt.
         PhaseCurrentSlopes slopes{};
     };
 }

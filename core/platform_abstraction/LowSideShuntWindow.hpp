@@ -54,7 +54,6 @@ namespace foc
         std::chrono::duration<float> triggerDelay{ 0.0f };
     };
 
-    // One converter reading A, B, C in turn from the window centre; a step behaves as held at the mean of its conversions.
     constexpr PhaseSampleDelays SequentialPhaseSampleDelays(const SequentialConverter& converter)
     {
         if (converter.converterClockHertz <= 0.0f)
@@ -96,7 +95,6 @@ namespace foc
             delays = sampleDelays;
         }
 
-        // From the control interrupt, for the next sample; see documentation/design/platform-sampling-skew.md.
         ALWAYS_INLINE_HOT void ZeroVectorSlopes(const PhaseCurrentSlopes& slopes)
         {
             shift.a = slopes.a.Value() * delays.a.count();
@@ -131,7 +129,6 @@ namespace foc
         // Written from the event loop, read in the control interrupt.
         float offsetSum{ 0.0f };
         PhaseSampleDelays delays{};
-        // Written in the control interrupt; cleared from the event loop once the bridge has stopped.
         ThreePhase shift{};
         PhasePwmDutyCycles previous{};
         PhasePwmDutyCycles latest{};

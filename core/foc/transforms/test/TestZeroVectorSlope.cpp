@@ -16,7 +16,6 @@ namespace
         return foc::MotorModelParameters{ foc::Ohm{ r }, foc::MilliHenry{ lMilliHenry }, foc::Weber{ psi }, foc::Volts{ 24.0f }, hal::Hertz{ 20000 }, 4, 1 };
     }
 
-    // Each phase from its own winding equation L·di/dt = −R·i − e, the rotor one period on
     std::array<float, 3> PhaseRates(float id, float iq, float omega, float theta)
     {
         const auto next = theta + omega / samplingFrequency;

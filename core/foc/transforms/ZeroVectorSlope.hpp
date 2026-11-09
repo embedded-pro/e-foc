@@ -11,7 +11,6 @@
 
 namespace foc
 {
-    // Rate of each phase current while all low sides conduct; documentation/design/platform-sampling-skew.md Part B.
     class ZeroVectorSlope
     {
     public:
@@ -27,13 +26,11 @@ namespace foc
             Restart();
         }
 
-        // From the event loop, while the cascade is stopped: back to the configured model.
         void Restart()
         {
             gains.Publish(model.ToGains());
         }
 
-        // From the outer loop, with a settled online estimate; followed only inside the recalibration bands.
         void Track(Ohm resistance, MilliHenry inductance)
         {
             if (!model.Usable() || !Within(resistanceEstimateBand, resistance.Value(), model.resistance) || !Within(inductanceEstimateBand, inductance.Value(), model.inductanceMilliHenry))
@@ -42,7 +39,6 @@ namespace foc
             gains.Publish(Model{ resistance.Value(), inductance.Value(), model.fluxLinkage }.ToGains());
         }
 
-        // From the rotor-frame currents just measured, for the sample one period on; the speed is electrical.
         OPTIMIZE_FOR_SPEED PhaseCurrentSlopes Next(const RotatingFrame& current, float electricalSpeed, float cosTheta, float sinTheta)
         {
             const auto& gain = gains.Acquire();
@@ -92,7 +88,6 @@ namespace foc
         [[no_unique_address]] Park park;
         Model model;
         float samplePeriod{ 0.0f };
-        // Published by the event loop (Configure, Restart) or the outer loop (Track), never both at once; read by the inner loop.
         infra::TripleBuffer<Gains> gains;
     };
 }

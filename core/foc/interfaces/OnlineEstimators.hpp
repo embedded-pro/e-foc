@@ -17,7 +17,6 @@ namespace foc
         bool first{ true };
     };
 
-    // Ratios to the model in use inside which an online estimate is believed (documentation/design/online-recalibration.md).
     struct EstimateBand
     {
         float minimum;

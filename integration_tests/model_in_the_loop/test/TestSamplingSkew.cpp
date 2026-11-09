@@ -72,7 +72,6 @@ namespace
         return count == 0 ? Means{} : Means{ sums.id / static_cast<float>(count), sums.iq / static_cast<float>(count), sums.speed / static_cast<float>(count) };
     }
 
-    // Measured minus true current while the rotor runs at the overspeed limit
     Error MeasuredAgainstTrue(bool corrected)
     {
         mil::ModelInTheLoop mil{ TeknicThroughTheBenchSenseChain(corrected) };

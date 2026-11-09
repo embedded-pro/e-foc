@@ -170,7 +170,6 @@ namespace application
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold256 } };
             static constexpr std::array<uint32_t, 5> sampleHoldClocks{ { 4, 16, 32, 64, 256 } };
-            // TM4C1294 datasheet: a 16 MHz conversion clock and 12 clocks per conversion after the hold.
             static constexpr float converterClockHertz{ 16.0e6f };
             static constexpr uint32_t conversionClocks{ 12 };
             static constexpr uint32_t averagedConversions{ 2 };

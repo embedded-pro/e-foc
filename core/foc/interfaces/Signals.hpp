@@ -13,7 +13,6 @@ namespace foc
         Ampere c;
     };
 
-    // Rate of each phase current while all low sides conduct (the zero vector)
     struct PhaseCurrentSlopes
     {
         AmperePerSecond a;
@@ -21,7 +20,6 @@ namespace foc
         AmperePerSecond c;
     };
 
-    // Hold instant of each phase after the centre of the low-side window
     struct PhaseSampleDelays
     {
         std::chrono::duration<float> a;
