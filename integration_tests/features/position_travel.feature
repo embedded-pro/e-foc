@@ -1,6 +1,7 @@
 Feature: Position Travel
   Position mode reports its target reached once the position error has stayed within the
-  position window for the window time (REQ-CTL-003). A host that sequences moves sends a
+  position window for the window time (REQ-CTL-003). The setpoint is a single-turn angle: with
+  no travel limits set the rotor takes the shorter way round to it (REQ-CTL-003). A host that sequences moves sends a
   setpoint and reads targetReached until it reads 1; a read that follows the setpoint is
   answered from the error against that setpoint, so it never carries the previous move's flag.
   The window defaults to four counts of the default 4000-count encoder and its time to 20 ms;
@@ -49,6 +50,22 @@ Feature: Position Travel
     And the motor is enabled
     And a torque setpoint of 0 A is applied
     Then the targetReached read over CAN shall stay 0 for 1000 ms
+
+  @sil @REQ-CTL-003 @REQ-COM-001
+  Scenario: Without travel limits a move across the seam turns the shorter way round
+    Given a nominal motor plant
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the motor boots in position mode
+    When the target boots
+    And the rotor is aligned
+    And a position setpoint of 2.5 rad is applied
+    And the motor is enabled
+    Then the targetReached read over CAN shall become 1 within 1000 ms
+    When a position setpoint of -2.5 rad is applied
+    Then the targetReached read over CAN shall become 1 within 1100 ms
+    When the response is captured for 3000 ms after the last setpoint
+    Then the rotor shall travel less than 2.0 rad after the last setpoint
 
   @sil @REQ-CTL-007 @REQ-COM-001
   Scenario: Within the travel limits a move across the seam turns the direct way

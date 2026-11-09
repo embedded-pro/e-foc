@@ -27,11 +27,12 @@
   status: verified
   verification: [sil, mil, hil, unit]
   shall: >
-    In position mode the drive shall move the rotor to the operator's position setpoint and hold
-    it with every selectable position law, within the step and disturbance envelopes its
-    acceptance criteria give, also against cogging and dry friction. It shall report the target
-    reached once the error has stayed within the position window for the position-window time, and
-    shall report the position in the setpoint's own turn.
+    In position mode the drive shall move the rotor to the operator's position setpoint, a
+    single-turn mechanical angle, and hold it with every selectable position law, within the step
+    and disturbance envelopes its acceptance criteria give, also against cogging and dry friction.
+    Without software position limits it shall take the shorter way round. It shall report the
+    target reached once the error has stayed within the position window for the position-window
+    time, and shall report the position in the setpoint's own turn.
 
 - id: REQ-CTL-004
   title: The control laws stay stable on motors other than the nominal one
