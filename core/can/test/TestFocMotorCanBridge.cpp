@@ -1,3 +1,4 @@
+#include "can-lite/categories/firmware_upgrade/test_doubles/FirmwareUpgradeControlMock.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
@@ -13,7 +14,6 @@
 #include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/fault_history/test_doubles/FaultLogMock.hpp"
-#include "core/services/firmware_upgrade/test_doubles/FirmwareUpgradeControlMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
@@ -392,6 +392,12 @@ namespace
         infra::Function<void(bool)> standstillDone;
         StrictMock<services::FirmwareUpgradeControlMock> firmwareUpgradeMock;
         bool bridgeHasFirmwareUpgrade{ false };
+
+        void ExpectLoaded()
+        {
+            EXPECT_CALL(faultLogMock, WhenLoaded(_)).WillOnce(InvokeArgument<0>());
+        }
+
         StrictMock<services::FaultLogMock> faultLogMock;
         bool bridgeHasFaultHistory{ false };
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
@@ -412,7 +418,7 @@ namespace
         AcknowledgerSpy ackSpy;
 
         std::optional<state_machine::ControlModeStateMachine> coordinator;
-        application::ControlLoopMetrics loopMetrics;
+        infra::ExecutionTimeStatistics loopMetrics;
         application::PlatformDiagnostics diagnostics{ loopMetrics };
         std::optional<can::FocMotorCanBridge> bridge;
 
@@ -2337,7 +2343,7 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_LoopStatistics_ReportTheMeasuredCyc
     DispatchQueryParameter(can::FocParameter::loopMinimumCycles);
     ExpectAnswered(1000.0f, false);
     DispatchQueryParameter(can::FocParameter::loopAverageCycles);
-    ExpectAnswered(static_cast<float>(loopMetrics.Read().averageCycles), false);
+    ExpectAnswered(static_cast<float>(loopMetrics.Read().average), false);
     DispatchQueryParameter(can::FocParameter::loopMaximumCycles);
     ExpectAnswered(5000.0f, false);
     DispatchQueryParameter(can::FocParameter::loopOverruns);
@@ -2589,7 +2595,7 @@ TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_EndsAFirmwareDownload)
     ConstructFixture();
     ResetCaptures();
 
-    EXPECT_CALL(firmwareUpgradeMock, EmergencyStop());
+    EXPECT_CALL(firmwareUpgradeMock, CancelDownload());
     DispatchCommand(can::focEmergencyStopId);
 
     ASSERT_TRUE(ackSpy.last.has_value());
@@ -2621,6 +2627,7 @@ TEST_F(FocMotorCanBridgeTest, QueryFaultHistory_AnswersTheRecordOfThatAgeInWireU
 {
     bridgeHasFaultHistory = true;
     ConstructFixture();
+    ExpectLoaded();
     EXPECT_CALL(faultLogMock, OfAge(1)).WillOnce(Return(services::FaultRecord{ static_cast<uint8_t>(can::FocFaultCode::stall), static_cast<uint8_t>(can::FocMotorMode::position), 7, 2500, 4123, -250 }));
 
     std::optional<can::FocFaultRecord> answer;
@@ -2639,10 +2646,52 @@ TEST_F(FocMotorCanBridgeTest, QueryFaultHistory_AnswersTheRecordOfThatAgeInWireU
     EXPECT_NEAR(-2.5f, answer->peakCurrent.Value(), 1e-4f);
 }
 
+TEST_F(FocMotorCanBridgeTest, QueryFaultHistory_BeforeTheHistoryIsLoaded_AnswersOnceItIs)
+{
+    bridgeHasFaultHistory = true;
+    ConstructFixture();
+    services::FaultLog::LoadedAction loaded;
+    EXPECT_CALL(faultLogMock, WhenLoaded(_)).WillOnce(SaveArg<0>(&loaded));
+
+    std::optional<can::FocFaultRecord> answer;
+    bridge->OnQueryFaultHistory(0, [&answer](const can::FocFaultRecord& record)
+        {
+            answer = record;
+        });
+    EXPECT_FALSE(answer.has_value());
+
+    EXPECT_CALL(faultLogMock, OfAge(0)).WillOnce(Return(services::FaultRecord{ static_cast<uint8_t>(can::FocFaultCode::stall), static_cast<uint8_t>(can::FocMotorMode::torque), 3, 10, 4000, 100 }));
+    loaded();
+
+    ASSERT_TRUE(answer.has_value());
+    EXPECT_EQ(can::FocFaultCode::stall, answer->code);
+    EXPECT_EQ(3, answer->powerUp);
+}
+
+TEST_F(FocMotorCanBridgeTest, ClearFaultHistory_BeforeTheHistoryIsLoaded_ClearsOnceItIs)
+{
+    bridgeHasFaultHistory = true;
+    ConstructFixture();
+    services::FaultLog::LoadedAction loaded;
+    EXPECT_CALL(faultLogMock, WhenLoaded(_)).WillOnce(SaveArg<0>(&loaded));
+
+    std::optional<bool> stored;
+    bridge->OnClearFaultHistory([&stored](bool result)
+        {
+            stored = result;
+        });
+
+    EXPECT_CALL(faultLogMock, Clear(_)).WillOnce(InvokeArgument<0>(true));
+    loaded();
+
+    EXPECT_EQ(true, stored);
+}
+
 TEST_F(FocMotorCanBridgeTest, QueryFaultHistory_PastTheRecordsHeld_AnswersNoFault)
 {
     bridgeHasFaultHistory = true;
     ConstructFixture();
+    ExpectLoaded();
     EXPECT_CALL(faultLogMock, OfAge(5)).WillOnce(Return(std::nullopt));
 
     std::optional<can::FocFaultRecord> answer;
@@ -2677,6 +2726,7 @@ TEST_F(FocMotorCanBridgeTest, ClearFaultHistory_AnswersOnceTheHistoryIsStored)
     bridgeHasFaultHistory = true;
     ConstructFixture();
     infra::Function<void(bool)> storeDone;
+    ExpectLoaded();
     EXPECT_CALL(faultLogMock, Clear(_)).WillOnce(SaveArg<0>(&storeDone));
 
     std::optional<bool> stored;

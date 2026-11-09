@@ -24,8 +24,9 @@
         "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
         "InverterCompensation::PhaseCurrentsReady.*lambda",
         "Runner.*::OnPhaseCurrents",
-        "ControlLoopMetrics::Record",
-        "ControlLoopMetrics::RecordReentry"
+        "ExecutionTimeStatistics::Record",
+        "ExecutionTimeStatistics::RecordReentry",
+        "detail::SaturatingIncrement"
       ]
     },
     {

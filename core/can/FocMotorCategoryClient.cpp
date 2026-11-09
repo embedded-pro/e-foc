@@ -75,7 +75,7 @@ namespace can
             return false;
 
         services::CanPayloadWriter payload;
-        WriteFloat32(payload, setpoint.value);
+        payload.WriteFloat32(setpoint.value);
         return SendCommand(targetNodeId, SetpointCommandId(setpoint.kind), payload);
     }
 
@@ -143,7 +143,7 @@ namespace can
 
         services::CanPayloadWriter payload;
         payload.WriteUInt8(static_cast<uint8_t>(parameter));
-        WriteFloat32(payload, value);
+        payload.WriteFloat32(value);
         return SendCommand(targetNodeId, focSetParameterId, payload);
     }
 
@@ -292,8 +292,8 @@ namespace can
             return false;
 
         services::CanPayloadReader reader{ data };
-        const foc::RadiansPerSecond speed{ ReadFloat32(reader) };
-        const foc::Radians position{ ReadFloat32(reader) };
+        const foc::RadiansPerSecond speed{ reader.ReadFloat32() };
+        const foc::Radians position{ reader.ReadFloat32() };
 
         if (!IsFiniteWireValue(speed.Value()) || !IsFiniteWireValue(position.Value()))
             return false;
@@ -359,7 +359,7 @@ namespace can
         services::CanPayloadReader reader{ data };
         const auto descriptor = FindParameter(reader.ReadUInt8());
         const auto flags = std::byte{ reader.ReadUInt8() };
-        const auto value = ReadFloat32(reader);
+        const auto value = reader.ReadFloat32();
 
         if (!descriptor.has_value())
             return false;

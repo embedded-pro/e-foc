@@ -83,7 +83,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
-        std::optional<FirmwareStaging> Staging() override;
+        std::optional<services::FirmwareStaging> Staging() override;
         std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -311,7 +311,7 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         uint8_t boardId{ 0 };
         hal::cortex::DataWatchpointAndTrace cycleCounter;
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool overCurrentTripped{ false };
         volatile bool pwmFaultAsserted{ false };

@@ -7,7 +7,7 @@ namespace application
         constexpr services::CanBusErrorCounters noBus{};
     }
 
-    PlatformDiagnostics::PlatformDiagnostics(ControlLoopMetrics& metrics)
+    PlatformDiagnostics::PlatformDiagnostics(infra::ExecutionTimeStatistics& metrics)
         : metrics(metrics)
     {}
 
@@ -16,7 +16,7 @@ namespace application
         canBus = &bus;
     }
 
-    ControlLoopMetrics::Snapshot PlatformDiagnostics::ControlLoopStatistics() const
+    infra::ExecutionTimeStatistics::Snapshot PlatformDiagnostics::ControlLoopStatistics() const
     {
         return metrics.Read();
     }

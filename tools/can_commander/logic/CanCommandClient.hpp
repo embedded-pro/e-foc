@@ -1,13 +1,13 @@
 #pragma once
 
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeCategoryClient.hpp"
+#include "can-lite/categories/firmware_upgrade/FirmwareVersion.hpp"
 #include "can-lite/client/CanProtocolClient.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/drivers/interface/CanBusAdapter.hpp"
 #include "core/can/FocMotorCanClient.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "core/can/FocMotorMessages.hpp"
-#include "core/services/firmware_upgrade/FirmwareVersion.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Observer.hpp"
 #include <array>

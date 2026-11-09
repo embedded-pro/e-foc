@@ -10,6 +10,7 @@ namespace services
     {
     public:
         MOCK_METHOD(std::optional<FaultRecord>, OfAge, (std::size_t age), (const, override));
+        MOCK_METHOD(void, WhenLoaded, (const LoadedAction& action), (override));
         MOCK_METHOD(void, Clear, (const infra::Function<void(bool stored)>& onDone), (override));
     };
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeCategoryServer.hpp"
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeSession.hpp"
 #include "can-lite/server/CanProtocolServer.hpp"
 #include "can-lite/tracing/TracingBypassCan.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
@@ -24,7 +25,6 @@
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/fault_history/FaultHistory.hpp"
-#include "core/services/firmware_upgrade/FirmwareUpgrade.hpp"
 #include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/leds/StatusLeds.hpp"
@@ -126,7 +126,7 @@ namespace application
         std::optional<ControlMode> controlMode;
         std::optional<services::FaultHistory> faultHistory;
         std::optional<can::FirmwareUpgradeInterlock> firmwareUpgradeInterlock;
-        std::optional<services::FirmwareUpgrade> firmwareUpgrade;
+        std::optional<services::FirmwareUpgradeSession> firmwareUpgrade;
         std::optional<can::FocMotorCanBridge> canBridge;
         std::optional<can::CanLivenessWatchdog> canLivenessWatchdog;
         std::optional<can::FocMotorCurrentStreamer> currentStreamer;

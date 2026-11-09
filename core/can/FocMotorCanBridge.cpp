@@ -150,7 +150,7 @@ namespace can
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
         if (firmwareUpgrade)
-            firmwareUpgrade->get().EmergencyStop();
+            firmwareUpgrade->get().CancelDownload();
 
         ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
@@ -292,8 +292,22 @@ namespace can
 
     void FocMotorCanBridge::OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone)
     {
+        if (!faultHistory.has_value())
+        {
+            onDone(FocFaultRecord{ .age = age });
+            return;
+        }
+
+        faultHistory->get().WhenLoaded([this, age, onDone]()
+            {
+                AnswerFaultHistory(age, onDone);
+            });
+    }
+
+    void FocMotorCanBridge::AnswerFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone)
+    {
         FocFaultRecord answer{ .age = age };
-        const auto record = faultHistory.has_value() ? faultHistory->get().OfAge(age) : std::nullopt;
+        const auto record = faultHistory->get().OfAge(age);
 
         if (record.has_value())
             answer = FocFaultRecord{ age, static_cast<FocFaultCode>(record->code), static_cast<FocMotorMode>(record->mode), record->uptimeMs,
@@ -304,10 +318,16 @@ namespace can
 
     void FocMotorCanBridge::OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone)
     {
-        if (faultHistory.has_value())
-            faultHistory->get().Clear(onDone);
-        else
+        if (!faultHistory.has_value())
+        {
             onDone(true);
+            return;
+        }
+
+        faultHistory->get().WhenLoaded([this, onDone]()
+            {
+                faultHistory->get().Clear(onDone);
+            });
     }
 
     void FocMotorCanBridge::OnRecalibrate(const infra::Function<void()>& onAccepted)

@@ -106,7 +106,9 @@ stateDiagram-v2
 
 A record is read by its age: 0 is the newest, 7 the oldest, ordered by power-up and then uptime; an age past the
 records held answers that there is none. Clearing empties the eight records, keeps the power-up count and is
-answered once stored. The history is read and cleared over CAN (`service-can.md`, contract 2.16).
+answered once stored. The non-volatile memory completes a load after the event loop has started, so a read or a clear
+that arrives before the stored faults are known waits for the load (`WhenLoaded`) and is answered then; at most four
+wait, and a fifth releases the oldest at once. The history is read and cleared over CAN (`service-can.md`, contract 2.16).
 
 ---
 
@@ -117,7 +119,7 @@ answered once stored. The history is read and cleared over CAN (`service-can.md`
 | Interface | Purpose                          | Contract                                                                  |
 |-----------|----------------------------------|---------------------------------------------------------------------------|
 | Record    | Capture an entry into `Fault`    | Called from the event loop; kept in memory at once, stored within 1 s     |
-| Read      | Return the record of a given age | 0 the newest; none past the records held                                  |
+| Read      | Return the record of a given age | 0 the newest; none past the records held; waits for the load to complete  |
 | Clear     | Empty the history                | Answered once stored, or with a failure when the memory refuses the write |
 
 ### Required

@@ -15,7 +15,7 @@ namespace
     hal::Can::Message EncodeFloat32(float value)
     {
         services::CanPayloadWriter payload;
-        can::WriteFloat32(payload, value);
+        payload.WriteFloat32(value);
         return payload.Message();
     }
 }
@@ -25,7 +25,6 @@ WHEN(R"(the motor is enabled)")
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId))
         << "Enable (focStartId) command rejected";
-    // Check if the motor immediately goes back to ready (fault/emergency stop)
     const bool isReady = fixture.WaitForMotorState(can::FocMotorState::ready, std::chrono::milliseconds{ 500 });
     EXPECT_FALSE(isReady) << "Motor immediately returned to ready after enable (fault or emergency stop?)";
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))
@@ -35,7 +34,6 @@ WHEN(R"(the motor is enabled)")
 WHEN(R"(the motor is started from the encoder index)")
 {
     auto& fixture = context.Get<Fixture>();
-    // The Start is acknowledged once the offsets are measured and the index search has passed the index
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId, {}, std::chrono::seconds{ 30 }))
         << "Start refused: the index search did not restore the rotor reference";
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))

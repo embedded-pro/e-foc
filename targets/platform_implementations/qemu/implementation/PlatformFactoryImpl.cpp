@@ -2,10 +2,10 @@
 #include "bootloader/ImageFormat.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "generated/Boards.hpp"
+#include "hal/cortex_m/Semihosting.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/Math.hpp"
 #include "services/tracer/GlobalTracer.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantModel.hpp"
 #include <algorithm>
 #include <array>
@@ -40,23 +40,23 @@ namespace
 
     void WriteWatchdogResetMarker(uint8_t value)
     {
-        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::writeBinary);
+        const auto handle = hal::cortex::SemihostingOpenFile(watchdogResetMarkerPath, hal::cortex::SemihostingOpenMode::writeBinary);
         if (handle < 0)
             return;
 
-        application::semihosting::FileWrite(handle, &value, 1);
-        application::semihosting::FileClose(handle);
+        hal::cortex::SemihostingWriteFile(handle, infra::MakeConstByteRange(value));
+        hal::cortex::SemihostingCloseFile(handle);
     }
 
     application::ResetCause TakeWatchdogResetMarker()
     {
-        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::readBinary);
+        const auto handle = hal::cortex::SemihostingOpenFile(watchdogResetMarkerPath, hal::cortex::SemihostingOpenMode::readBinary);
         if (handle < 0)
             return application::ResetCause::powerUp;
 
         uint8_t value{ 0 };
-        const bool read = application::semihosting::FileRead(handle, &value, 1) == 0;
-        application::semihosting::FileClose(handle);
+        const bool read = hal::cortex::SemihostingReadFile(handle, infra::MakeByteRange(value)) == 0;
+        hal::cortex::SemihostingCloseFile(handle);
 
         if (!read || value != watchdogResetMarker)
             return application::ResetCause::powerUp;
@@ -180,8 +180,8 @@ namespace application
               {
                   FocTimerIsr();
               })
-        , stagingFlash("staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
-        , journalFlash("journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
+        , stagingFlash(fileSystem, "staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
+        , journalFlash(fileSystem, "journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
         , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig), std::nullopt, false)
         , baseFrequency(BaseFrequencyFrom(plantConfig))
     {
@@ -289,10 +289,10 @@ namespace application
         }
     }
 
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    std::optional<services::FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return services::FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const

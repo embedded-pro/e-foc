@@ -79,6 +79,7 @@ namespace can
         void OnResetModel(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
+        void AnswerFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone);
         void ApplyTorqueSetpoint(uint8_t commandId, foc::Ampere value, const infra::Function<void()>& onDone);
         void ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone);
         void ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone);

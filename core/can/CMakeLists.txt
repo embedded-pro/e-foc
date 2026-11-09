@@ -14,7 +14,7 @@ target_link_libraries(e_foc.can PUBLIC
     e_foc.boards
     e_foc.foc.math
     e_foc.services.fault_history
-    e_foc.services.firmware_upgrade.interfaces
+    can_lite.categories.firmware_upgrade.session
     e_foc.state_machine
     services.tracer
 )

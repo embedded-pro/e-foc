@@ -10,6 +10,11 @@
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/qemu/async/WatchdogQemu.hpp"
+#include "hal/qemu/semihosting/SemihostingAsyncFlash.hpp"
+#include "hal/qemu/semihosting/SemihostingEeprom.hpp"
+#include "hal/qemu/semihosting/SemihostingFileFlash.hpp"
+#include "hal/qemu/semihosting/SemihostingFileSystemCortex.hpp"
+#include "hal/qemu/semihosting/SemihostingRecordFile.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/HotSwapFunction.hpp"
@@ -25,11 +30,7 @@
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuCycleCounter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingAsyncFlash.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFileFlash.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingRecordFile.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilWatchdogStall.hpp"
 #include <atomic>
@@ -70,7 +71,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
-        std::optional<FirmwareStaging> Staging() override;
+        std::optional<services::FirmwareStaging> Staging() override;
         std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
@@ -193,7 +194,7 @@ namespace application
         const ResetCause resetCause;
         infra::Function<void()> onInitialized;
         QemuCycleCounter cycleCounter;
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
@@ -203,16 +204,17 @@ namespace application
         sil::CmsdkUartLines terminalPort{ kTerminalUartBase };
         TerminalAndTracerBlock terminalAndTracer{ serial };
         SilWatchdogStall watchdogStall{ terminalAndTracer.tracer };
-        SemihostingEeprom eeprom{ "eeprom.bin" };
-        SemihostingAsyncFlash stagingFlash;
-        SemihostingFileFlash journalFlash;
+        hal::SemihostingFileSystemCortex fileSystem;
+        hal::SemihostingEeprom::WithStorage<512> eeprom{ fileSystem, "eeprom.bin" };
+        hal::SemihostingAsyncFlash stagingFlash;
+        hal::SemihostingFileFlash journalFlash;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;
-        SemihostingRecordFile plantRecord{ "plant.rec" };
+        hal::SemihostingRecordFile::WithBuffer<1024> plantRecord{ fileSystem, "plant.rec" };
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
         foc::OneShotDelay encoderFreeze;

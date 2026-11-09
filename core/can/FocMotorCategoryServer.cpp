@@ -332,7 +332,7 @@ namespace can
         services::CanPayloadReader reader{ data };
         reader.Skip(1);
         const auto descriptor = FindParameter(reader.ReadUInt8());
-        const auto value = ReadFloat32(reader);
+        const auto value = reader.ReadFloat32();
 
         if (!reader.Valid() || !descriptor.has_value() || !IsAcceptableParameterValue(*descriptor, value))
             return false;
@@ -388,7 +388,7 @@ namespace can
         services::CanPayloadWriter payload;
         payload.WriteUInt8(static_cast<uint8_t>(parameter));
         payload.WriteUInt8(value.automatic ? focParameterAutomaticFlag : 0);
-        WriteFloat32(payload, value.value);
+        payload.WriteFloat32(value.value);
         SendResponse(focParameterResponseId, payload);
     }
 
@@ -403,8 +403,8 @@ namespace can
     void FocMotorCategoryServer::BroadcastTelemetryMotion(foc::RadiansPerSecond speed, foc::Radians position)
     {
         services::CanPayloadWriter payload;
-        WriteFloat32(payload, speed.Value());
-        WriteFloat32(payload, position.Value());
+        payload.WriteFloat32(speed.Value());
+        payload.WriteFloat32(position.Value());
         SendTelemetry(focTelemetryMotionId, payload);
     }
 
@@ -447,7 +447,7 @@ namespace can
 
         services::CanPayloadReader reader{ data };
         reader.Skip(1);
-        const FocSetpoint setpoint{ kind, ReadFloat32(reader) };
+        const FocSetpoint setpoint{ kind, reader.ReadFloat32() };
 
         if (!reader.Valid() || !IsFiniteWireValue(setpoint.value))
             return false;

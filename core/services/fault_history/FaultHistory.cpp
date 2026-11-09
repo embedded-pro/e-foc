@@ -68,6 +68,35 @@ namespace services
 
         dirty = true;
         ScheduleStore();
+        ReleaseWaiting();
+    }
+
+    void FaultHistory::WhenLoaded(const LoadedAction& action)
+    {
+        if (loaded)
+        {
+            action();
+            return;
+        }
+
+        if (waiting.full())
+        {
+            const auto oldest = waiting.front();
+            waiting.erase(waiting.begin());
+            oldest();
+        }
+
+        waiting.push_back(action);
+    }
+
+    void FaultHistory::ReleaseWaiting()
+    {
+        while (!waiting.empty())
+        {
+            const auto action = waiting.front();
+            waiting.erase(waiting.begin());
+            action();
+        }
     }
 
     void FaultHistory::Record(uint8_t code, const Conditions& conditions)

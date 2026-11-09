@@ -242,7 +242,7 @@ the map was added) makes every stored calibration invalid and forces a new one (
 | Watchdog             | A stalled event loop or interrupt                                                 | 25 ms early warning, 100 ms expiry                                                                                             | Event-loop stall: power stage cut, then reset; a hung interrupt starves the lowest-priority early warning: reset only      |
 | Fault clearing       | Repeated faults                                                                   | At most 3 clears, budget restored after 10 s (a 250 ms dwell where the platform reports protection status; TI reports unknown) | Stays in `Fault`                                                                                                           |
 
-Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `core/platform_abstraction/ControlLoopMetrics.hpp`,
+Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `infra/util/ExecutionTimeStatistics.hpp`,
 `documentation/design/fault-supervision.md`, `documentation/design/watchdog.md`, `documentation/design/error-handling.md`. The hardware protection paths are in
 [power stage](power-stage.md) §7.
 

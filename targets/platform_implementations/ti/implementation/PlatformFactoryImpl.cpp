@@ -460,13 +460,13 @@ namespace application
         return diagnostics;
     }
 
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    std::optional<services::FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         if (StagingRegion().empty())
             return std::nullopt;
 
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return services::FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
