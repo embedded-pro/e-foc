@@ -163,3 +163,12 @@ TEST_F(TestRecoveryAdvice, names_every_action_like_its_button)
     EXPECT_EQ("Open Motor Parameters", RecoveryActionName(RecoveryAction::showMotorParameters));
     EXPECT_TRUE(RecoveryActionName(RecoveryAction::none).empty());
 }
+
+TEST(TestRecoveryAdviceEquality, advice_is_equal_only_with_the_same_text_and_action)
+{
+    const tool::RecoveryAdvice align{ "Align the rotor first.", tool::RecoveryAction::alignRotor };
+
+    EXPECT_TRUE(align == (tool::RecoveryAdvice{ "Align the rotor first.", tool::RecoveryAction::alignRotor }));
+    EXPECT_FALSE(align == (tool::RecoveryAdvice{ "Align the rotor first.", tool::RecoveryAction::clearFault }));
+    EXPECT_FALSE(align == (tool::RecoveryAdvice{ "Clear the fault first.", tool::RecoveryAction::alignRotor }));
+}

@@ -38,6 +38,8 @@ target_sources(e_foc.state_machine_test PRIVATE
     TestRecalibrationStore.cpp
     TestFaultNotifier.cpp
     TestCommissioningCommands.cpp
+    TestDefaultModeHooks.cpp
+    TestFocStateMachineBaseDefaults.cpp
     TestFocStateMachineTable.cpp
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp

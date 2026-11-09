@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <utility>
+#include <vector>
 
 using namespace testing;
 
@@ -1972,4 +1973,88 @@ TEST_F(ControlModeStateMachineTest, A_Speed_Setpoint_Is_Clamped_To_The_Overspeed
     EXPECT_TRUE(subject->Commands().TrySetSpeed(foc::RadiansPerSecond{ 1.0e6f }));
     EXPECT_FALSE(subject->Commands().TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
     EXPECT_FALSE(subject->Commands().TrySetPosition(foc::Radians{ 1.0f }));
+}
+
+TEST_F(ControlModeStateMachineExtTest, A_Current_Algorithm_Selected_Once_Calibrated_Is_Stored_And_Running)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+
+    std::optional<state_machine::SettingResult> result;
+    subject->Algorithms().SelectCurrentAlgorithm(foc::CurrentAlgorithm::slidingMode, [&result](state_machine::SettingResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SettingResult::ok);
+    EXPECT_EQ(subject->Algorithms().ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::slidingMode);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Torque_Mode_Has_No_Speed_Or_Position_Loop_To_Select)
+{
+    GivenNvmValid();
+    ConstructSubject();
+
+    std::optional<state_machine::SettingResult> result;
+    subject->Algorithms().SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi, [&result](state_machine::SettingResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SettingResult::wrongMode);
+    EXPECT_EQ(subject->Algorithms().SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidAlgorithm);
+    EXPECT_EQ(subject->Algorithms().SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
+    EXPECT_EQ(subject->Algorithms().ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::pid);
+    EXPECT_EQ(subject->Algorithms().ActivePositionAlgorithm(), foc::PositionAlgorithm::pid);
+}
+
+TEST_F(ControlModeStateMachineExtTest, A_Failed_Save_Reports_The_Algorithm_Selection_As_Not_Stored)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigFails();
+    ConstructSubject();
+
+    std::optional<state_machine::SettingResult> result;
+    subject->Algorithms().SelectCurrentAlgorithm(foc::CurrentAlgorithm::slidingMode, [&result](state_machine::SettingResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SettingResult::nvmFailed);
+}
+
+TEST_F(ControlModeStateMachineExtTest, A_Position_Algorithm_Is_Refused_In_Torque_Mode)
+{
+    GivenNvmValid();
+    ConstructSubject();
+
+    std::optional<state_machine::SettingResult> result;
+    subject->Algorithms().SelectPositionAlgorithm(foc::PositionAlgorithm::lqr, [&result](state_machine::SettingResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SettingResult::wrongMode);
+}
+
+TEST_F(ControlModeStateMachineExtTest, An_Algorithm_Selection_Waits_For_A_Mode_Switch_In_Flight)
+{
+    GivenNvmAlwaysInvalid();
+    infra::Function<void(services::NvmStatus)> saved;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _)).WillOnce(Invoke([&saved](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+        {
+            saved = onDone;
+        }));
+    ConstructSubject();
+    subject->Modes().Select(state_machine::ControlMode::speed, [](auto) {});
+
+    std::optional<state_machine::SettingResult> result;
+    subject->Algorithms().SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi, [&result](state_machine::SettingResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SettingResult::busy);
+    saved(services::NvmStatus::Ok);
 }
