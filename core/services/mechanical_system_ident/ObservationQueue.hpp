@@ -16,7 +16,6 @@ namespace services
         uint32_t windowSamples{ 1 };
     };
 
-    // Single producer (sampling interrupt) posts, single consumer (event loop) takes.
     class ObservationQueue
     {
     public:

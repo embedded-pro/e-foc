@@ -5,7 +5,6 @@
 
 namespace services
 {
-    // Compares the inertia estimate once per estimator memory; it has settled when two comparisons agree.
     class InertiaSettling
     {
     public:

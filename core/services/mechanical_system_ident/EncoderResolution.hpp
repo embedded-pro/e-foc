@@ -4,7 +4,6 @@
 
 namespace services
 {
-    // Sizes the observation window from the encoder step; see Speed and Acceleration Estimation in service-mechanical-ident.md.
     class EncoderResolution
     {
     public:

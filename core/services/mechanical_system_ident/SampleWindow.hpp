@@ -19,7 +19,6 @@ namespace services
         uint32_t windowSamples{ 1 };
     };
 
-    // Runs in the sampling interrupt: merges samples into windows and centres speed and torque on one instant.
     class SampleWindow
     {
     public:

@@ -14,7 +14,6 @@ namespace services
         float inertia{ 0.0f };
     };
 
-    // Event-loop side of the identification; the sampling interrupt reads only IsRunning and IsFinishedAt.
     class MechanicalFit
     {
     public:
@@ -42,7 +41,6 @@ namespace services
         InertiaSettling settling;
         std::size_t dwellSamples{ 1 };
         std::size_t minimumRunSamples{ 0 };
-        // Written by the event loop, read by the sampling interrupt.
         volatile std::size_t finishAtSample{ 0 };
     };
 }

@@ -4,7 +4,6 @@
 
 namespace services
 {
-    // Alternates the speed command between a dwell and a target level every dwell time, slewing between them.
     class TwoLevelSpeedProfile
     {
     public:
