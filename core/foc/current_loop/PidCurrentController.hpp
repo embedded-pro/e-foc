@@ -1,9 +1,10 @@
 #pragma once
 
-#include "core/foc/current_loop/AntiWindupPi.hpp"
 #include "core/foc/current_loop/CurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <limits>
 
 namespace foc
 {
@@ -27,20 +28,24 @@ namespace foc
 
         ALWAYS_INLINE_HOT RotatingFrame Propose(const CurrentControlContext& context)
         {
-            return { dPi.Propose(context.reference.d, context.measured.d), qPi.Propose(context.reference.q, context.measured.q) };
+            dPi.SetPoint(context.reference.d);
+            qPi.SetPoint(context.reference.q);
+            return { dPi.Process(context.measured.d), qPi.Process(context.measured.q) };
         }
 
         ALWAYS_INLINE_HOT void CommitRealized(const RotatingFrame& applied)
         {
-            dPi.CommitRealized(applied.d);
-            qPi.CommitRealized(applied.q);
+            dPi.SetPreviousOutput(applied.d);
+            qPi.SetPreviousOutput(applied.q);
         }
 
     private:
         bool ApplyGains();
 
-        AntiWindupPi dPi;
-        AntiWindupPi qPi;
+        static constexpr controllers::PidLimits<float> unbounded{ std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max() };
+
+        controllers::PidIncrementalSynchronous<float> dPi{ { 0.0f, 0.0f, 0.0f }, unbounded };
+        controllers::PidIncrementalSynchronous<float> qPi{ { 0.0f, 0.0f, 0.0f }, unbounded };
         MotorModelParameters parameters{};
         float bandwidth{ CurrentLoopTunings{}.bandwidth };
     };

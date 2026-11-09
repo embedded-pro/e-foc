@@ -14,7 +14,6 @@ target_link_libraries(e_foc.foc.current_loop PUBLIC
 )
 
 target_sources(e_foc.foc.current_loop PRIVATE
-    AntiWindupPi.hpp
     CurrentController.hpp
     CurrentControllerSelector.cpp
     CurrentControllerSelector.hpp

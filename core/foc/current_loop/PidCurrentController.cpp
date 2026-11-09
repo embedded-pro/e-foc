@@ -25,8 +25,8 @@ namespace foc
     {
         if (!AreElectricalParametersValid(parameters))
         {
-            dPi.SetTunings(0.0f, 0.0f);
-            qPi.SetTunings(0.0f, 0.0f);
+            dPi.SetTunings({ 0.0f, 0.0f, 0.0f });
+            qPi.SetTunings({ 0.0f, 0.0f, 0.0f });
             return false;
         }
 
@@ -34,8 +34,8 @@ namespace foc
         const auto kp = InductanceInHenry(parameters.inductance) * bandwidth * scale;
         const auto ki = parameters.resistance.Value() * bandwidth * scale * SamplePeriod(parameters.samplingFrequency);
 
-        dPi.SetTunings(kp, ki);
-        qPi.SetTunings(kp, ki);
+        dPi.SetTunings({ kp, ki, 0.0f });
+        qPi.SetTunings({ kp, ki, 0.0f });
         return true;
     }
 }
