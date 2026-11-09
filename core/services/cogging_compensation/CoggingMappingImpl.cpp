@@ -49,9 +49,9 @@ namespace services
         this->onDone = onDone;
 
         builder.Restart();
-        previousPosition = encoder.Read().Value();
-        turned = 0.0f;
-        mark = 0.0f;
+        travel.previousPosition = encoder.Read().Value();
+        travel.turned = 0.0f;
+        travel.mark = 0.0f;
         commandedSpeed = 0.0f;
         ++run;
         phase = Phase::forwardSettle;
@@ -106,9 +106,9 @@ namespace services
         }
 
         const auto position = encoder.Read().Value();
-        const auto rotation = math::WrapToPi(position - previousPosition);
-        previousPosition = position;
-        turned += rotation;
+        const auto rotation = math::WrapToPi(position - travel.previousPosition);
+        travel.previousPosition = position;
+        travel.turned += rotation;
 
         const auto electricalAngle = position * static_cast<float>(mechanics.polePairs);
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
@@ -121,31 +121,31 @@ namespace services
         switch (phase)
         {
             case Phase::forwardSettle:
-                if (turned >= config.settleTurns * turn)
+                if (travel.turned >= config.settleTurns * turn)
                 {
-                    mark = turned;
+                    travel.mark = travel.turned;
                     phase = Phase::forwardMeasure;
                 }
                 break;
             case Phase::forwardMeasure:
                 builder.Add(CoggingMapBuilder::Direction::forward, electricalAngle, quadratureCurrent, rotation);
-                if (turned - mark >= config.measuredTurns * turn)
+                if (travel.turned - travel.mark >= config.measuredTurns * turn)
                     phase = Phase::reversing;
                 break;
             case Phase::backwardStart:
-                mark = turned;
+                travel.mark = travel.turned;
                 phase = Phase::backwardSettle;
                 break;
             case Phase::backwardSettle:
-                if (mark - turned >= config.settleTurns * turn)
+                if (travel.mark - travel.turned >= config.settleTurns * turn)
                 {
-                    mark = turned;
+                    travel.mark = travel.turned;
                     phase = Phase::backwardMeasure;
                 }
                 break;
             case Phase::backwardMeasure:
                 builder.Add(CoggingMapBuilder::Direction::backward, electricalAngle, quadratureCurrent, rotation);
-                if (mark - turned >= config.measuredTurns * turn)
+                if (travel.mark - travel.turned >= config.measuredTurns * turn)
                 {
                     phase = Phase::complete;
                     ScheduleFinish();

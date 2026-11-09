@@ -67,6 +67,51 @@ namespace foc
         void TrackBusVoltageImpl(Volts measured);
 
     private:
+        struct OuterLoopSchedule
+        {
+            hal::Hertz frequency;
+            uint32_t prescaler;
+            uint32_t triggerCounter;
+        };
+
+        struct OuterLoopOutputs
+        {
+            volatile float speedLoopOutput;
+            volatile float frictionCurrent;
+            volatile float directCurrentReference;
+            volatile float speedReference;
+            volatile float electricalSpeed;
+            volatile float mechanicalSpeed;
+        };
+
+        struct CurrentCommand
+        {
+            volatile float current;
+            volatile float quadratureLimit;
+            volatile bool active;
+            QuadratureVoltageWindow voltageWindow;
+        };
+
+        struct MotorScaling
+        {
+            float polePairs;
+            float vdcInvScale;
+            float dutyDelay;
+        };
+
+        struct Estimation
+        {
+            EstimatorChannel channel;
+            EstimatorWindowAccumulator window;
+            volatile float meanIq;
+        };
+
+        struct FeedForwards
+        {
+            CoggingFeedForward cogging;
+            FrictionFeedForward friction;
+        };
+
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         CurrentControllerSelector currentLoop;
@@ -74,34 +119,16 @@ namespace foc
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         LowPriorityInterrupt& lowPriorityInterrupt;
         Ampere maxCurrent;
-        hal::Hertz outerLoopFrequency;
+        OuterLoopSchedule schedule;
         SpeedDifferentiator speedDifferentiator;
-        volatile float lastSpeedLoopOutput{ 0.0f };
-        // Written by the outer loop, read by the control interrupt.
-        volatile float frictionCurrent{ 0.0f };
-        volatile float directCurrentReference{ 0.0f };
-        volatile float lastElectricalSpeed{ 0.0f };
-        volatile float lastMechanicalSpeed{ 0.0f };
-        volatile float lastMeanIq{ 0.0f };
-        volatile float speedReference{ 0.0f };
-        volatile float commandedCurrent{ 0.0f };
-        // Written by the event loop, read by the control interrupt; never above maxCurrent.
-        volatile float quadratureLimit;
-        volatile bool currentCommandActive{ false };
-        uint32_t prescaler;
-        uint32_t triggerCounter{ 0 };
-        float polePairs{ 0.0f };
-        float vdcInvScale{ 1.0f };
-        float dutyDelay{ 0.0f };
+        OuterLoopOutputs outer{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+        CurrentCommand command;
+        MotorScaling scaling{ 0.0f, 1.0f, 0.0f };
         BusVoltageRatio busRatio;
         volatile bool enabled{ false };
-
-        EstimatorChannel estimators;
-        EstimatorWindowAccumulator estimatorWindow;
+        Estimation estimation;
         DirectAxisExcitation directAxisExcitation;
-        CoggingFeedForward coggingFeedForward;
-        FrictionFeedForward frictionFeedForward;
-        QuadratureVoltageWindow voltageWindow;
+        FeedForwards feedForward;
         CurrentStream* currentStream{ nullptr };
     };
 }
