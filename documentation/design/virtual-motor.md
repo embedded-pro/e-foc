@@ -168,7 +168,7 @@ sequenceDiagram
     participant Plant as Plant drive
     participant ISR as Control interrupt
     participant LPI as Low-priority interrupt
-    participant Loop as Event loop and timers
+    participant Events as Event loop and timers
     Pacer->>Pacer: wall clock passed the next virtual millisecond
     loop each control period of the millisecond
         Pacer->>Plant: advance one period, apply pending disturbance commands
@@ -176,7 +176,7 @@ sequenceDiagram
         ISR->>Plant: duties
     end
     Pacer->>LPI: run if triggered
-    Pacer->>Loop: advance timers by 1 ms, run until idle
+    Pacer->>Events: advance timers by 1 ms, run until idle
     Pacer->>Pacer: publish plant samples, CAN frames leave
 ```
 
