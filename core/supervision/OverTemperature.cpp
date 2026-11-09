@@ -10,7 +10,7 @@ namespace supervision
         , onLimit{ onLimit }
         , onFault{ onFault }
         , limit{ boardLimit }
-        , smoothing{ 1.0f - std::exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
+        , filter{ 1.0f - std::exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
     {}
 
     void OverTemperature::Enable(const infra::Function<Settings()>& settings)
@@ -49,13 +49,19 @@ namespace supervision
     std::optional<foc::Celsius> OverTemperature::Filtered(const std::optional<foc::Celsius>& measured)
     {
         if (!measured.has_value())
-            filteredCelsius.reset();
-        else if (!filteredCelsius.has_value())
-            filteredCelsius = measured->Value();
-        else
-            *filteredCelsius += smoothing * (measured->Value() - *filteredCelsius);
+        {
+            filterSeeded = false;
+            return std::nullopt;
+        }
 
-        return filteredCelsius.has_value() ? std::optional{ foc::Celsius{ *filteredCelsius } } : std::nullopt;
+        if (!filterSeeded)
+        {
+            filter.Reset(measured->Value());
+            filterSeeded = true;
+            return measured;
+        }
+
+        return foc::Celsius{ filter.Filter(measured->Value()) };
     }
 
     void OverTemperature::Derate(const std::optional<foc::Celsius>& measured, const Settings& current)
@@ -75,20 +81,15 @@ namespace supervision
     {
         if (!enabled)
         {
-            enabledSince.reset();
-            reported = false;
+            enabledFor.Reset();
             return;
         }
 
-        const auto now = infra::Now();
-        if (!enabledSince.has_value())
-            enabledSince = now;
+        const auto settled = enabledFor.Held(true, infra::Now(), tripHoldOff);
+        const auto beyondLimit = measured.has_value() && measured->Value() >= current.limit.Value();
 
-        if (reported || !measured.has_value() || measured->Value() < current.limit.Value() || now - *enabledSince < tripHoldOff)
-            return;
-
-        reported = true;
-        onFault(state_machine::FaultCode::overtemperature);
+        if (enabledFor.ReportOnce(settled && beyondLimit))
+            onFault(state_machine::FaultCode::overtemperature);
     }
 
     OverTemperature::Settings OverTemperatureSettingsFrom(const services::ConfigData& config)

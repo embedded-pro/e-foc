@@ -27,16 +27,12 @@ namespace supervision
     {
         if (!WithinWindow())
         {
-            withinSince.reset();
+            within.Reset();
             reached = false;
             return;
         }
 
-        const auto now = infra::Now();
-        if (!withinSince.has_value())
-            withinSince = now;
-
-        reached = now - *withinSince >= settings().time;
+        reached = within.Held(true, infra::Now(), settings().time);
     }
 
     bool TargetReachedMonitor::WithinWindow() const

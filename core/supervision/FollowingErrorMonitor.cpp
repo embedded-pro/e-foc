@@ -31,27 +31,15 @@ namespace supervision
 
         if (!std::holds_alternative<state_machine::Enabled>(drive.CurrentState()))
         {
-            beyondSince.reset();
-            reported = false;
+            beyond.Reset();
             return;
         }
 
         const auto current = settings();
-        if (reported || current.window.Value() <= 0.0f || std::abs(drive.ObserveMotion().positionError.Value()) <= current.window.Value())
-        {
-            beyondSince.reset();
-            return;
-        }
+        const auto counts = !beyond.Reported() && current.window.Value() > 0.0f && std::abs(drive.ObserveMotion().positionError.Value()) > current.window.Value();
 
-        const auto now = infra::Now();
-        if (!beyondSince.has_value())
-            beyondSince = now;
-
-        if (now - *beyondSince < current.time)
-            return;
-
-        reported = true;
-        onFault(state_machine::FaultCode::followingError);
+        if (beyond.ReportOnce(beyond.Held(counts, infra::Now(), current.time)))
+            onFault(state_machine::FaultCode::followingError);
     }
 
     FollowingErrorMonitor::Settings FollowingErrorSettingsFrom(const services::ConfigData& config)

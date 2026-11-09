@@ -12,6 +12,7 @@ target_link_libraries(e_foc.supervision PUBLIC
     e_foc.services.non_volatile_memory
     e_foc.state_machine
     infra.timer
+    numerical.filters.passive
     services.tracer
 )
 
@@ -24,6 +25,8 @@ target_sources(e_foc.supervision PRIVATE
     EncoderPlausibilityMonitor.cpp
     FollowingErrorMonitor.hpp
     FollowingErrorMonitor.cpp
+    I2tThermalModel.hpp
+    I2tThermalModel.cpp
     MotorOverload.hpp
     MotorOverload.cpp
     OverTemperature.hpp
@@ -36,6 +39,8 @@ target_sources(e_foc.supervision PRIVATE
     PhaseLossMonitor.cpp
     PositionLimitMonitor.hpp
     PositionLimitMonitor.cpp
+    SustainedCondition.hpp
+    SustainedCondition.cpp
     TargetReachedMonitor.hpp
     TargetReachedMonitor.cpp
 )

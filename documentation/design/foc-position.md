@@ -128,7 +128,7 @@ stateDiagram-v2
 A host that sequences moves needs to know when one is done. The drive reports the target reached once the
 position error — the wrapped difference between the setpoint and θm that the loop works on — has stayed
 within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
-1 ms keeps that count, and the error is read again when a host asks: a setpoint the drive has accepted is
+1 ms keeps that count in a `SustainedCondition` (`core/supervision/`), and the error is read again when a host asks: a setpoint the drive has accepted is
 never answered with the previous move's flag, because a target outside the window clears it at once, and the
 count starts over when the rotor arrives.
 
