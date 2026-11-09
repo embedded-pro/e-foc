@@ -34,10 +34,10 @@ namespace simulator
         const auto& motorParams = foc::M_2310P_LN_04K::parameters;
 
         infra::WithSharedAccess<foc::ThreePhaseMotorModel> model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
-        model->SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
+        model->Mechanics().SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
         infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
-        foc::FocSpeedController controller{ *model, *model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
+        foc::FocSpeedController controller{ *model, model->Encoder(), foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
             *lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
 
         auto motorModel = foc::MotorModelParameters{};
@@ -78,9 +78,9 @@ namespace simulator
         GuiSimulation simulation{ *model, controller, eventDispatcher,
             motorParams, pidParameters, setpointConfig, vdc };
 
-        infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ *model, *model };
-        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ *model, *model, vdc };
-        infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> mechanicalIdent{ controller, controller, controller, *model, *model };
+        infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ *model, model->Encoder() };
+        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ *model, model->Encoder(), vdc };
+        infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> mechanicalIdent{ controller, controller, controller, *model, model->Encoder() };
         const auto torqueConstant = foc::TorqueConstantFor(motorParams.p, motorParams.psi_f);
 
         auto& gui = simulation.GetGui();

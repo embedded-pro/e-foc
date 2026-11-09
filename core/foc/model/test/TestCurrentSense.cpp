@@ -154,7 +154,7 @@ TEST_F(TestCurrentSense, each_conversion_draws_its_own_noise_and_the_step_averag
 
 TEST_F(TestMotorModelCurrentSense, the_model_converts_the_phases_in_order_inside_the_windows_of_their_own_duties)
 {
-    sensed.SetCurrentSense({ 16e6f, 16, 12, 2, 0.0f, 0.0f, 0.0f, 0 });
+    sensed.CurrentSensor().SetChain({ 16e6f, 16, 12, 2, 0.0f, 0.0f, 0.0f, 0 });
     const foc::PhasePwmDutyCycles duties{ hal::DutyCycle::FromPercent(75), hal::DutyCycle::FromPercent(70), hal::DutyCycle::FromPercent(65) };
 
     for (auto cycle = 0; cycle != 20; ++cycle)
@@ -163,8 +163,8 @@ TEST_F(TestMotorModelCurrentSense, the_model_converts_the_phases_in_order_inside
         sensed.StepForTest(duties);
     }
 
-    const auto actual = ideal.LastMeasuredCurrents();
-    const auto measured = sensed.LastMeasuredCurrents();
+    const auto actual = ideal.CurrentSensor().Last();
+    const auto measured = sensed.CurrentSensor().Last();
 
     ASSERT_GT(actual.a.Value(), 0.1f);
     EXPECT_NEAR(measured.a.Value(), actual.a.Value(), 1e-6f);

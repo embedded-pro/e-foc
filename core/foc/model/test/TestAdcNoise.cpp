@@ -61,7 +61,7 @@ namespace
 
 TEST_F(TestAdcNoise, zero_sigma_produces_finite_currents)
 {
-    model.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{});
+    model.CurrentSensor().SetNoise(foc::ThreePhaseMotorModel::NoiseConfig{});
 
     CurrentCollector collector{ model };
     DriveModelCycles(model, 200);
@@ -96,7 +96,7 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
         std::optional<std::size_t>{}
     };
     constexpr float sigma = 1.0f;
-    model2.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
+    model2.CurrentSensor().SetNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
 
     CurrentCollector noisyCollector{ model2 };
     const foc::PhasePwmDutyCycles duty{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(40) };

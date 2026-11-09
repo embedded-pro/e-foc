@@ -23,6 +23,8 @@ target_sources(e_foc.foc.model PRIVATE
     SupplyModel.hpp
     ThermalModel.cpp
     ThermalModel.hpp
+    SimulatedEncoder.cpp
+    SimulatedEncoder.hpp
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp
 )

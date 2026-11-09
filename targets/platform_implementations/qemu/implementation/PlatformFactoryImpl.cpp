@@ -255,7 +255,7 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        return model.EffectiveSupplyVoltage();
+        return model.Supply().Voltage();
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -322,7 +322,7 @@ namespace application
 
         static constexpr std::array<uint32_t, 5> sampleHoldClocks{ 4, 16, 32, 64, 256 };
 
-        model.SetCurrentSense(sil::CurrentSense(*plantConfig, sampleHoldClocks.at(static_cast<std::size_t>(requested))));
+        model.CurrentSensor().SetChain(sil::CurrentSense(*plantConfig, sampleHoldClocks.at(static_cast<std::size_t>(requested))));
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold sampleAndHold)
@@ -371,43 +371,43 @@ namespace application
 
         if (torqueStep.Fire(tick))
         {
-            model.SetExternalTorque(torqueStepTorque);
+            model.Mechanics().SetExternalTorque(torqueStepTorque);
             responseRecorder.Note(foc::PlantResponseKind::torqueStep, PlantSampleAt(tick));
         }
 
         if (encoderFreeze.Fire(tick))
         {
             activeFaultInjection.encoderStuck = true;
-            model.SetFaultInjection(activeFaultInjection);
+            foc::InjectFaults(model, activeFaultInjection);
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
         if (cableDisconnect.Fire(tick))
         {
             activeFaultInjection.openPhaseA = activeFaultInjection.openPhaseB = activeFaultInjection.openPhaseC = true;
-            model.SetFaultInjection(activeFaultInjection);
+            foc::InjectFaults(model, activeFaultInjection);
         }
 
         if (supplyStep.Fire(tick))
         {
             activeFaultInjection.supplyVoltageScale = plantConfig->supplyStepScale;
-            model.SetFaultInjection(activeFaultInjection);
+            foc::InjectFaults(model, activeFaultInjection);
         }
 
         if (shaftGrip.Fire(tick))
-            model.GripShaft(shaftTurnSpeed);
+            model.Mechanics().Grip(shaftTurnSpeed);
 
         if (shaftHold.Fire(tick))
-            model.GripShaft(foc::RadiansPerSecond{ 0.0f });
+            model.Mechanics().Grip(foc::RadiansPerSecond{ 0.0f });
 
         const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
         model.StepForTest(stepDuty);
-        indexLatched = indexLatched || model.EncoderIndexAsserted();
+        indexLatched = indexLatched || model.Encoder().IndexAsserted();
         shuntReadout.Applied(stepDuty);
         appliedDutyPhases = lastDutyPhases;
         responseRecorder.Capture(PlantSampleAt(tick));
 
-        lastCurrents = model.LastMeasuredCurrents();
+        lastCurrents = model.CurrentSensor().Last();
 
         if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
@@ -422,7 +422,7 @@ namespace application
         else if (onPhaseCurrentsReady.IsSet() && controlLoopEntered)
             controlLoopMetrics.RecordReentry();
 
-        boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
+        boardProtection.Evaluate(lastCurrents, model.Supply().Voltage().Value(), model.Thermal().Temperature());
     }
 
     void PlatformFactoryImpl::Start()
@@ -442,17 +442,17 @@ namespace application
     {
         boardProtection.SetArmed(false);
         model.Stop();
-        model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
-        model.GripShaft(std::nullopt);
+        model.Mechanics().SetExternalTorque(foc::NewtonMeter{ 0.0f });
+        model.Mechanics().Grip(std::nullopt);
         activeFaultInjection = bootFaultInjection;
-        model.SetFaultInjection(activeFaultInjection);
+        foc::InjectFaults(model, activeFaultInjection);
         responseRecorder.End();
     }
 
     foc::PlantResponseSample PlatformFactoryImpl::PlantSampleAt(uint32_t tick) const
     {
-        const auto dq = model.LastDqCurrents();
-        return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
+        const auto dq = plantElectrical.LastDqCurrents();
+        return foc::PlantResponseSample{ tick, plantMechanics.Speed().Value(), plantMechanics.Angle().Value(), dq.q, dq.d, plantMechanics.ExternalTorque().Value() };
     }
 
     void PlatformFactoryImpl::PollPorts()
@@ -559,17 +559,17 @@ namespace application
 
     foc::Radians PlatformFactoryImpl::Read()
     {
-        return model.Read();
+        return model.Encoder().Read();
     }
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
-        model.Set(value);
+        model.Encoder().Set(value);
     }
 
     void PlatformFactoryImpl::SetZero()
     {
-        model.SetZero();
+        model.Encoder().SetZero();
     }
 
     std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
@@ -579,7 +579,7 @@ namespace application
 
     bool PlatformFactoryImpl::HasIndex() const
     {
-        return model.HasEncoderIndex();
+        return plantEncoder.HasIndex();
     }
 
     void PlatformFactoryImpl::ArmIndex()

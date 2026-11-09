@@ -71,7 +71,7 @@ namespace simulator
 
         connect(controlPanel, &ControlPanel::loadChanged, this, [this](double torqueNm)
             {
-                this->model.SetLoad(foc::NewtonMeter{ static_cast<float>(torqueNm) });
+                this->model.Mechanics().SetLoad(foc::NewtonMeter{ static_cast<float>(torqueNm) });
             });
 
         connect(controlPanel, &ControlPanel::alignClicked, this, &Gui::alignRequested);
@@ -81,34 +81,34 @@ namespace simulator
         connect(parametersPanel, &ParametersPanel::noiseConfigChanged, this,
             [this](foc::ThreePhaseMotorModel::NoiseConfig c)
             {
-                this->model.SetAdcNoise(c);
+                this->model.CurrentSensor().SetNoise(c);
             });
 
         connect(parametersPanel, &ParametersPanel::encoderNoiseConfigChanged, this,
             [this](foc::ThreePhaseMotorModel::EncoderNoiseConfig c)
             {
-                this->model.SetEncoderNoise(c);
+                this->model.Encoder().SetNoise(c);
             });
 
         connect(parametersPanel, &ParametersPanel::thermalConfigChanged, this,
             [this](foc::ThreePhaseMotorModel::ThermalConfig c)
             {
-                this->model.SetThermalConfig(c);
+                this->model.Thermal().Configure(c);
             });
 
         connect(parametersPanel, &ParametersPanel::thermalResetRequested, this,
             [this]()
             {
-                this->model.ResetTemperature();
+                this->model.Thermal().Reset();
             });
 
         thermalTimer = QtOwned<QTimer>(this);
         connect(thermalTimer, &QTimer::timeout, this, [this]()
             {
                 parametersPanel->UpdateLiveThermal(
-                    this->model.WindingTemperatureCelsius(),
-                    this->model.EffectiveResistance(),
-                    this->model.EffectiveInductanceD());
+                    this->model.Thermal().Temperature(),
+                    foc::Ohm{ this->model.Winding().resistance },
+                    foc::Henry{ this->model.Winding().inductanceD });
             });
         thermalTimer->start(100);
     }

@@ -8,6 +8,7 @@
 #include "core/foc/model/MechanicalPlant.hpp"
 #include "core/foc/model/PhaseCurrentSensor.hpp"
 #include "core/foc/model/PowerStage.hpp"
+#include "core/foc/model/SimulatedEncoder.hpp"
 #include "core/foc/model/SupplyModel.hpp"
 #include "core/foc/model/ThermalModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
@@ -39,7 +40,6 @@ namespace foc
 
     class ThreePhaseMotorModel
         : public drivers::ThreePhaseInverter
-        , public drivers::Encoder
         , public infra::Subject<ThreePhaseMotorModelObserver>
         , public infra::EnableSharedFromThis<ThreePhaseMotorModel>
     {
@@ -74,38 +74,13 @@ namespace foc
 
         ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
 
-        void SetLoad(foc::NewtonMeter load);
-        void SetExternalTorque(foc::NewtonMeter torque);
-        foc::NewtonMeter ExternalTorque() const;
-        void GripShaft(std::optional<foc::RadiansPerSecond> handSpeed);
-        foc::RadiansPerSecond MechanicalSpeed() const;
-        foc::Radians MechanicalAngle() const;
-        foc::RotatingFrame LastDqCurrents() const;
-        void SetAdcNoise(const NoiseConfig& config);
-        void SetEncoderNoise(const EncoderNoiseConfig& config);
-        void SetThermalConfig(const ThermalConfig& config);
-        void SetFaultInjection(const FaultInjectionConfig& config);
-        void SetSupply(const SupplyConfig& config);
-        void SetPowerStage(const PowerStageConfig& config);
-        void SetCurrentSense(const CurrentSenseConfig& config);
-        void SetCoulombFriction(foc::NewtonMeter friction);
-        void SetCogging(foc::NewtonMeter amplitude, uint32_t cyclesPerRevolution);
-        void SetEncoderResolution(uint32_t countsPerRevolution);
-        void SetEncoderIndex(std::optional<foc::Radians> angle, uint32_t widthCounts);
-        bool HasEncoderIndex() const;
-        bool EncoderIndexAsserted() const;
-        void SetRandomSeed(uint32_t seed);
-        void ResetTemperature();
-        float WindingTemperatureCelsius() const;
-        foc::PhaseCurrents LastMeasuredCurrents() const;
-        foc::Volts EffectiveSupplyVoltage() const;
-        foc::Ampere SupplyCurrent() const;
-        foc::Ohm EffectiveResistance() const;
-        foc::Henry EffectiveInductanceD() const;
-        foc::Henry EffectiveInductanceQ() const;
-        void SetWindingTemperatureForTest(float celsius);
-
-        void EnableSelfDriving();
+        MechanicalPlant& Mechanics();
+        ElectricalPlant& Electrical();
+        ThermalModel& Thermal();
+        SupplyModel& Supply();
+        PhaseCurrentSensor& CurrentSensor();
+        SimulatedEncoder& Encoder();
+        WindingParameters Winding() const;
 
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -115,20 +90,13 @@ namespace foc
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
 
-        foc::Radians Read() override;
-        void Set(foc::Radians value) override;
-        void SetZero() override;
-
         void StepForTest(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:
-        void Model(const foc::PhasePwmDutyCycles& dutyPhases);
         void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
+        void EnableSelfDriving();
         void ScheduleNextCycle();
-        float Period() const;
-        WindingParameters Winding() const;
 
-    private:
         struct SelfDriveState
         {
             bool driving{ false };
@@ -138,6 +106,7 @@ namespace foc
 
         Parameters parameters;
         hal::Hertz baseFrequency;
+        float period;
 
         [[no_unique_address]] foc::Clarke clarke;
 
@@ -151,9 +120,12 @@ namespace foc
         MechanicalPlant mechanical;
         ThermalModel thermal;
         SupplyModel supply;
-        EncoderModel encoder;
+        SimulatedEncoder encoder{ mechanical };
         PhaseCurrentSensor currentSensor;
         foc::ThreePhase lastPhaseVoltages{};
         SelfDriveState selfDrive;
     };
+
+    void InjectFaults(ThreePhaseMotorModel& model, const ThreePhaseMotorModel::FaultInjectionConfig& config);
+    void SeedNoise(ThreePhaseMotorModel& model, uint32_t seed);
 }

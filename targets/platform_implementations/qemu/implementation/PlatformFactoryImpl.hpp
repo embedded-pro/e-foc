@@ -213,6 +213,9 @@ namespace application
         GpioPinStub failurePin;
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
+        const foc::MechanicalPlant& plantMechanics{ model.Mechanics() };
+        const foc::ElectricalPlant& plantElectrical{ model.Electrical() };
+        const foc::SimulatedEncoder& plantEncoder{ model.Encoder() };
         foc::PlantResponseRecorder<1024> responseRecorder;
         hal::SemihostingRecordFile::WithBuffer<1024> plantRecord{ fileSystem, "plant.rec" };
         foc::OneShotDelay torqueStep;

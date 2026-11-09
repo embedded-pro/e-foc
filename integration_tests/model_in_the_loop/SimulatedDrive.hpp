@@ -47,6 +47,9 @@ namespace mil
         const sil::SilPlantConfig plant;
         const hal::Hertz baseFrequency;
         foc::ThreePhaseMotorModel model;
+        const foc::MechanicalPlant& mechanics{ model.Mechanics() };
+        const foc::ElectricalPlant& electrical{ model.Electrical() };
+        const foc::SupplyModel& supply{ model.Supply() };
         foc::PlantResponseRecorder<1024> responseRecorder;
         foc::OneShotDelay torqueStep;
         foc::NewtonMeter torqueStepTorque{ 0.0f };
