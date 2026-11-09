@@ -150,7 +150,7 @@ namespace can
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
         if (firmwareUpgrade)
-            firmwareUpgrade->get().EmergencyStop();
+            firmwareUpgrade->get().CancelDownload();
 
         ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }

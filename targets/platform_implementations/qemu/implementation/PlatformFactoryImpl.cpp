@@ -289,10 +289,10 @@ namespace application
         }
     }
 
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    std::optional<services::FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return services::FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const

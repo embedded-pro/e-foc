@@ -1,8 +1,8 @@
 #pragma once
 
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
-#include "core/services/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>

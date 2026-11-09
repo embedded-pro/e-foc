@@ -1,7 +1,7 @@
-#include "core/services/firmware_upgrade/test_doubles/TestPack.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/FirmwarePack.hpp"
+#include "tools/can_commander/logic/test/TestPack.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <string>
@@ -13,7 +13,7 @@ namespace
     using namespace tool;
 
     struct PackShape
-        : services::test::TestPackDescription
+        : tool::test::TestPackDescription
     {
         PackShape()
         {
@@ -24,7 +24,7 @@ namespace
 
     std::vector<uint8_t> MakePack(const PackShape& shape = {})
     {
-        return services::test::MakeTestPack(shape);
+        return tool::test::MakeTestPack(shape);
     }
 
     FirmwareBoard Board(uint8_t kind)

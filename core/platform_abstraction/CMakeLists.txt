@@ -10,6 +10,7 @@ target_include_directories(e_foc.platform_abstraction PUBLIC
 
 target_link_libraries(e_foc.platform_abstraction PUBLIC
     can_lite.core
+    can_lite.categories.firmware_upgrade.session
     services.util
     hal.interfaces
     hal.synchronous_interfaces
@@ -32,7 +33,6 @@ target_sources(e_foc.platform_abstraction PRIVATE
     EncoderZero.hpp
     NoEncoderIndex.hpp
     LowSideShuntWindow.hpp
-    FirmwareStaging.hpp
     PlatformDiagnostics.hpp
     PlatformDiagnostics.cpp
     PlatformFactory.hpp

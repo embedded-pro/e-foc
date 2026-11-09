@@ -40,6 +40,14 @@ two steps, and the user starts each of them, separately, while the motor is stop
 The CAN Commander offers both steps (`tool-can-commander.md` Part M). The service never starts either on its
 own.
 
+The service is `services::FirmwareUpgradeSession` of `can-lite`
+(`infra/can-lite/can-lite/categories/firmware_upgrade/`); this application supplies what it needs. The platform
+returns a `services::FirmwareStaging` (staging flash, journal flash, product name, capacity, page size). The
+CAN bridge's `FirmwareUpgradeInterlock` implements `services::FirmwareUpgradeHold` (`IsStoppedAndIdle`, `Hold`,
+`Release`) on the control-mode state machine. The emergency stop ends a download through
+`services::FirmwareUpgradeControl::CancelDownload()`. The pack header names its destination `app`
+(`FirmwareUpgradeSession::applicationTargetName`), as `bootloader.md` requires.
+
 **Is responsible for:**
 - Answering the `can-lite` firmware-upgrade category (`0x1`) on the drive's CAN node: Begin Upgrade, Data
   Block, Verify, Activate, Abort and Query Progress, as the `can-lite` firmware-upgrade specification defines

@@ -6,7 +6,7 @@ target_link_libraries(e_foc.tool.can_commander.logic_test PUBLIC
     gmock_main
     infra.timer_test_helper
     e_foc.tool.can_commander.logic
-    e_foc.services.firmware_upgrade.test_pack
+    upgrade.staging
 )
 
 target_sources(e_foc.tool.can_commander.logic_test PRIVATE
@@ -21,4 +21,6 @@ target_sources(e_foc.tool.can_commander.logic_test PRIVATE
     TestMotorSettings.cpp
     TestRecoveryAdvice.cpp
     TestSetpointAxis.cpp
+    TestPack.cpp
+    TestPack.hpp
 )

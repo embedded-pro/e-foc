@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace services::test
+namespace tool::test
 {
     inline constexpr const char* testPackProductName = "e-foc test board";
     inline constexpr uint32_t testPackSignatureLength = 64;

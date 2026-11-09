@@ -14,8 +14,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
-- `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, fault history (`fault_history/`), firmware upgrade (download and staging of an upgrade pack, `firmware_upgrade/`), `injection_current_limit/`, status LEDs (`leds/`)
-- `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
+- `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, fault history (`fault_history/`), `injection_current_limit/`, status LEDs (`leds/`)
+- `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`); `FirmwareUpgradeInterlock` holds the drive for can-lite's `services::FirmwareUpgradeSession` (download and staging of an upgrade pack)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)

@@ -17,7 +17,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.services.inverter_compensation
     e_foc.services.electrical_system_ident
     e_foc.services.fault_history
-    e_foc.services.firmware_upgrade
+    can_lite.categories.firmware_upgrade.session
     e_foc.services.alignment
     e_foc.services.index_search
     e_foc.services.non_volatile_memory

@@ -1,3 +1,4 @@
+#include "can-lite/categories/firmware_upgrade/test_doubles/FirmwareUpgradeControlMock.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
@@ -13,7 +14,6 @@
 #include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/fault_history/test_doubles/FaultLogMock.hpp"
-#include "core/services/firmware_upgrade/test_doubles/FirmwareUpgradeControlMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
@@ -2589,7 +2589,7 @@ TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_EndsAFirmwareDownload)
     ConstructFixture();
     ResetCaptures();
 
-    EXPECT_CALL(firmwareUpgradeMock, EmergencyStop());
+    EXPECT_CALL(firmwareUpgradeMock, CancelDownload());
     DispatchCommand(can::focEmergencyStopId);
 
     ASSERT_TRUE(ackSpy.last.has_value());

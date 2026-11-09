@@ -28,7 +28,7 @@ namespace
     hal::Can::Message EncodeFloat32(float value)
     {
         services::CanPayloadWriter payload;
-        can::WriteFloat32(payload, value);
+        payload.WriteFloat32(value);
         return payload.Message();
     }
 
@@ -128,8 +128,6 @@ namespace
             setup.trace.Consume(line);
     }
 
-    // Guest time, not wall-clock: the plant's own samples say how far its clock has advanced, which is
-    // what makes the excitation the same length on every host.
     bool WaitForGuestTicks(ScenarioSetup& setup, uint32_t ticks)
     {
         FeedTrace(setup);

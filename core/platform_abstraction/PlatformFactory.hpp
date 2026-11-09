@@ -1,8 +1,8 @@
 #pragma once
 
+#include "can-lite/categories/firmware_upgrade/FirmwareStaging.hpp"
 #include "can-lite/core/MonitoredCan.hpp"
 #include "core/foc/interfaces/Execution.hpp"
-#include "core/platform_abstraction/FirmwareStaging.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
@@ -108,7 +108,7 @@ namespace application
         virtual ResetCause GetResetCause() const = 0;
         virtual infra::BoundedConstString FaultStatus() const = 0;
 
-        virtual std::optional<FirmwareStaging> Staging()
+        virtual std::optional<services::FirmwareStaging> Staging()
         {
             return std::nullopt;
         }

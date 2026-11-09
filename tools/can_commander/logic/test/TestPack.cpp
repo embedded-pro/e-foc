@@ -1,7 +1,7 @@
-#include "core/services/firmware_upgrade/test_doubles/TestPack.hpp"
+#include "tools/can_commander/logic/test/TestPack.hpp"
 #include <cstring>
 
-namespace services::test
+namespace tool::test
 {
     namespace
     {

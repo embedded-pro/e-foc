@@ -10,7 +10,6 @@
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -362,7 +361,6 @@ namespace can
         return std::nullopt;
     }
 
-    // Numbered alike since contract 2.6, so a client can offer a firmware update to a node of any other version.
     constexpr bool IsFirmwareIdentity(FocParameter parameter)
     {
         return parameter >= FocParameter::firmwareVersionMajor && parameter <= FocParameter::stagedVersionPatch;
@@ -394,16 +392,6 @@ namespace can
             {
                 return static_cast<float>(bitrate) == value;
             });
-    }
-
-    inline void WriteFloat32(services::CanPayloadWriter& payload, float value)
-    {
-        payload.WriteUInt32(std::bit_cast<uint32_t>(value));
-    }
-
-    inline float ReadFloat32(services::CanPayloadReader& reader)
-    {
-        return std::bit_cast<float>(reader.ReadUInt32());
     }
 
     inline bool IsFiniteWireValue(float value)

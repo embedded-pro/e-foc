@@ -70,7 +70,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
-        std::optional<FirmwareStaging> Staging() override;
+        std::optional<services::FirmwareStaging> Staging() override;
         std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
