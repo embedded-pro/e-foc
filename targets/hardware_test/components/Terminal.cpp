@@ -1,18 +1,16 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/services/cli/DecimalToken.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Tokenizer.hpp"
+#include "services/util/DecimalToken.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
 #include <chrono>
 #include <optional>
-#include <type_traits>
 
 namespace
 {
@@ -31,24 +29,6 @@ namespace
             return longest;
         else
             std::abort();
-    }
-
-    template<typename T>
-    std::optional<T> ParseInput(const infra::BoundedConstString& data, T min, T max)
-    {
-        constexpr bool isFloat = std::is_floating_point_v<T>;
-        if (!services::IsDecimalToken(data, isFloat || std::is_signed_v<T>, isFloat))
-            return {};
-
-        using Parsed = std::conditional_t<isFloat, float, int64_t>;
-        infra::StringInputStream stream(data, infra::softFail);
-        Parsed value{};
-        stream >> value;
-
-        if (!stream.ErrorPolicy().Failed() && value >= static_cast<Parsed>(min) && value <= static_cast<Parsed>(max))
-            return std::make_optional(static_cast<T>(value));
-        else
-            return {};
     }
 
     std::optional<infra::BoundedConstString> ParseInput(const infra::BoundedConstString& data, const infra::BoundedVector<infra::BoundedConstString>& acceptedValues)
@@ -193,11 +173,11 @@ namespace application
         if (tokenizer.Size() != 2)
             return { error, "invalid number of arguments" };
 
-        auto deadTime = ParseInput<uint32_t>(tokenizer.Token(0), 500.0f, 2000.0f);
+        auto deadTime = services::ParseDecimal<uint32_t>(tokenizer.Token(0), 500, 2000);
         if (!deadTime.has_value())
             return { error, "invalid value. It should be a float between 500 and 2000." };
 
-        auto frequency = ParseInput<uint32_t>(tokenizer.Token(1), 10000.0f, 20000.0f);
+        auto frequency = services::ParseDecimal<uint32_t>(tokenizer.Token(1), 10000, 20000);
         if (!frequency.has_value())
             return { error, "invalid value. It should be a float between 10000 and 20000." };
 
@@ -284,15 +264,15 @@ namespace application
         if (tokenizer.Size() != 3)
             return { error, "invalid number of arguments" };
 
-        auto dutyA = ParseInput<uint8_t>(tokenizer.Token(0), 1, 99);
+        auto dutyA = services::ParseDecimal<uint8_t>(tokenizer.Token(0), 1, 99);
         if (!dutyA.has_value())
             return { error, "invalid value for phase A. It should be a float between 1 and 99." };
 
-        auto dutyB = ParseInput<uint8_t>(tokenizer.Token(1), 1, 99);
+        auto dutyB = services::ParseDecimal<uint8_t>(tokenizer.Token(1), 1, 99);
         if (!dutyB.has_value())
             return { error, "invalid value for phase B. It should be a float between 1 and 99." };
 
-        auto dutyC = ParseInput<uint8_t>(tokenizer.Token(2), 1, 99);
+        auto dutyC = services::ParseDecimal<uint8_t>(tokenizer.Token(2), 1, 99);
         if (!dutyC.has_value())
             return { error, "invalid value for phase C. It should be a float between 1 and 99." };
 
@@ -325,7 +305,7 @@ namespace application
         if (tokenizer.Size() < 1 || tokenizer.Size() > 2)
             return { error, "invalid number of arguments" };
 
-        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 100000, 1000000);
+        auto bitRate = services::ParseDecimal<uint32_t>(tokenizer.Token(0), 100000, 1000000);
         if (!bitRate.has_value())
             return { error, "invalid bitrate. It should be between 100000 and 1000000." };
 
@@ -368,14 +348,14 @@ namespace application
         if (tokenizer.Size() < 2 || tokenizer.Size() > 9)
             return { error, "invalid number of arguments. Usage: can_send <id> <b0> ... <b7>" };
 
-        auto id = ParseInput<uint32_t>(tokenizer.Token(0), 0, 0x1FFFFFFF);
+        auto id = services::ParseDecimal<uint32_t>(tokenizer.Token(0), 0, 0x1FFFFFFF);
         if (!id.has_value())
             return { error, "invalid CAN ID. It should be between 0 and 0x1FFFFFFF." };
 
         hal::Can::Message message;
         for (std::size_t i = 1; i < tokenizer.Size(); ++i)
         {
-            auto byte = ParseInput<uint32_t>(tokenizer.Token(i), 0, 255);
+            auto byte = services::ParseDecimal<uint32_t>(tokenizer.Token(i), 0, 255);
             if (!byte.has_value())
                 return { error, "invalid data byte. It should be between 0 and 255." };
             message.push_back(static_cast<uint8_t>(*byte));
@@ -421,7 +401,7 @@ namespace application
             return;
         }
 
-        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0u, 65535u);
+        auto addr = services::ParseDecimal<uint32_t>(tokenizer.Token(0), 0u, 65535u);
         if (!addr.has_value())
         {
             terminal.ProcessResult({ error, "invalid address" });
@@ -437,7 +417,7 @@ namespace application
 
         for (std::size_t i = 0; i < byteCount; ++i)
         {
-            auto byte = ParseInput<uint32_t>(tokenizer.Token(i + 1), 0.0f, 255.0f);
+            auto byte = services::ParseDecimal<uint32_t>(tokenizer.Token(i + 1), 0, 255);
             if (!byte.has_value())
             {
                 terminal.ProcessResult({ error, "invalid byte value" });
@@ -471,14 +451,14 @@ namespace application
             return;
         }
 
-        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0u, 65535u);
+        auto addr = services::ParseDecimal<uint32_t>(tokenizer.Token(0), 0u, 65535u);
         if (!addr.has_value())
         {
             terminal.ProcessResult({ error, "invalid address" });
             return;
         }
 
-        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1u, static_cast<uint32_t>(eepromBuffer.size()));
+        auto size = services::ParseDecimal<uint32_t>(tokenizer.Token(1), 1u, static_cast<uint32_t>(eepromBuffer.size()));
         if (!size.has_value())
         {
             terminal.ProcessResult({ error, "invalid size" });

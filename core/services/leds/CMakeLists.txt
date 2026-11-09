@@ -8,12 +8,13 @@ target_include_directories(e_foc.services.leds PUBLIC
 target_link_libraries(e_foc.services.leds PUBLIC
     hal.interfaces
     infra.timer
+    services.peripheral
     infra.util
 )
 
 target_sources(e_foc.services.leds PRIVATE
-    LedPattern.cpp
-    LedPattern.hpp
+    LedPatterns.cpp
+    LedPatterns.hpp
     LedStatusSource.hpp
     StatusLeds.cpp
     StatusLeds.hpp

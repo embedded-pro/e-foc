@@ -1,4 +1,4 @@
-#include "core/services/leds/LedPattern.hpp"
+#include "core/services/leds/LedPatterns.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <string>
@@ -30,25 +30,7 @@ namespace
     }
 }
 
-TEST(LedPatternTest, off_is_never_lit)
-{
-    EXPECT_EQ(std::string(8, '.'), Render(services::LedPattern::Off(), 8));
-}
-
-TEST(LedPatternTest, steady_is_always_lit)
-{
-    EXPECT_EQ(std::string(8, '#'), Render(services::LedPattern::Steady(), 8));
-}
-
-TEST(LedPatternTest, a_flash_group_is_followed_by_its_pause_and_repeats)
-{
-    const auto pattern = services::LedPattern::Flashes(2, 2, 1, 3);
-
-    EXPECT_EQ(9u, pattern.PeriodTicks());
-    EXPECT_EQ("##.##....##.##....", Render(pattern, 18));
-}
-
-TEST(LedPatternTest, the_heartbeat_is_50_ms_on_every_2_s)
+TEST(LedPatternsTest, the_heartbeat_is_50_ms_on_every_2_s)
 {
     const auto pattern = services::PatternsFor({ services::LedLifecycle::ready, FaultCode::none }).green;
 
@@ -59,7 +41,7 @@ TEST(LedPatternTest, the_heartbeat_is_50_ms_on_every_2_s)
     EXPECT_TRUE(pattern.LevelAt(40));
 }
 
-TEST(LedPatternTest, the_slow_blink_is_half_a_second_on_and_off)
+TEST(LedPatternsTest, the_slow_blink_is_half_a_second_on_and_off)
 {
     const auto amber = services::PatternsFor({ services::LedLifecycle::idle, FaultCode::none }).amber;
 
@@ -70,7 +52,7 @@ TEST(LedPatternTest, the_slow_blink_is_half_a_second_on_and_off)
     EXPECT_TRUE(amber.LevelAt(20));
 }
 
-TEST(LedPatternTest, a_fault_code_flashes_250_ms_on_and_off_then_pauses_1_5_s)
+TEST(LedPatternsTest, a_fault_code_flashes_250_ms_on_and_off_then_pauses_1_5_s)
 {
     const auto red = services::PatternsFor({ services::LedLifecycle::fault, FaultCode::overcurrent }).red;
 
@@ -78,13 +60,13 @@ TEST(LedPatternTest, a_fault_code_flashes_250_ms_on_and_off_then_pauses_1_5_s)
     EXPECT_EQ(50u, red.PeriodTicks());
 }
 
-TEST(LedPatternTest, no_fault_leaves_red_off_in_every_state_but_fault)
+TEST(LedPatternsTest, no_fault_leaves_red_off_in_every_state_but_fault)
 {
     for (auto lifecycle : { services::LedLifecycle::idle, services::LedLifecycle::calibrating, services::LedLifecycle::ready, services::LedLifecycle::enabled })
         EXPECT_EQ(services::LedPattern::Off(), services::PatternsFor({ lifecycle, FaultCode::none }).red);
 }
 
-TEST(LedPatternTest, every_fault_class_flashes_its_own_count)
+TEST(LedPatternsTest, every_fault_class_flashes_its_own_count)
 {
     EXPECT_EQ(2u, FlashesOf(FaultCode::overcurrent));
     EXPECT_EQ(3u, FlashesOf(FaultCode::overvoltage));
@@ -94,19 +76,19 @@ TEST(LedPatternTest, every_fault_class_flashes_its_own_count)
     EXPECT_EQ(8u, FlashesOf(FaultCode::commandTimeout));
 }
 
-TEST(LedPatternTest, the_motion_supervision_faults_share_seven_flashes)
+TEST(LedPatternsTest, the_motion_supervision_faults_share_seven_flashes)
 {
     for (auto code : { FaultCode::stall, FaultCode::phaseMissing, FaultCode::overspeed, FaultCode::followingError, FaultCode::positionLimit })
         EXPECT_EQ(7u, FlashesOf(code));
 }
 
-TEST(LedPatternTest, a_fault_without_a_code_of_its_own_is_steady_red)
+TEST(LedPatternsTest, a_fault_without_a_code_of_its_own_is_steady_red)
 {
     for (auto code : { FaultCode::hardwareFault, FaultCode::calibrationFailed, FaultCode::none, static_cast<FaultCode>(200) })
         EXPECT_EQ(services::LedPattern::Steady(), services::PatternsFor({ services::LedLifecycle::fault, code }).red);
 }
 
-TEST(LedPatternTest, a_latched_fault_never_leaves_red_dark_longer_than_the_pause)
+TEST(LedPatternsTest, a_latched_fault_never_leaves_red_dark_longer_than_the_pause)
 {
     for (auto code : { FaultCode::overcurrent, FaultCode::commandTimeout, FaultCode::stall })
     {
@@ -122,7 +104,7 @@ TEST(LedPatternTest, a_latched_fault_never_leaves_red_dark_longer_than_the_pause
     }
 }
 
-TEST(LedPatternTest, green_follows_the_state)
+TEST(LedPatternsTest, green_follows_the_state)
 {
     const auto green = [](services::LedLifecycle lifecycle)
     {
@@ -136,7 +118,7 @@ TEST(LedPatternTest, green_follows_the_state)
     EXPECT_EQ(services::LedPattern::Off(), services::PatternsFor({ services::LedLifecycle::fault, FaultCode::overcurrent }).green);
 }
 
-TEST(LedPatternTest, amber_follows_the_state)
+TEST(LedPatternsTest, amber_follows_the_state)
 {
     const auto amber = [](services::LedLifecycle lifecycle)
     {

@@ -16,8 +16,6 @@ target_link_libraries(e_foc.services.cli PUBLIC
 target_sources(e_foc.services.cli PRIVATE
     StartupBanner.cpp
     StartupBanner.hpp
-    DecimalToken.hpp
-    TerminalHelper.hpp
     TerminalWithBanner.cpp
     TerminalWithBanner.hpp
 )
