@@ -31,8 +31,18 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
 add_version_header_dependency(e_foc.sync_foc_sensored.main.inst e_foc.version_header)
 
 target_sources(e_foc.sync_foc_sensored.main.inst PRIVATE
+    CalibrationParts.cpp
+    CalibrationParts.hpp
+    CanServices.cpp
+    CanServices.hpp
+    CanStack.cpp
+    CanStack.hpp
     ControlModeLedStatus.cpp
     ControlModeLedStatus.hpp
+    DriveSupervision.cpp
+    DriveSupervision.hpp
     Logic.cpp
     Logic.hpp
+    NvmStorage.cpp
+    NvmStorage.hpp
 )
