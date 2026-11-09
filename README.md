@@ -326,6 +326,8 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 | [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
 | [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
 | [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
+| [Virtual Motor](documentation/design/virtual-motor.md)                                   | Application on the host, on a virtual CAN    |
+| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                          | Plant views, disturbances and faults         |
 
 ### Requirements
 

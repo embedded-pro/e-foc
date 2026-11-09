@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.14.0
+version: 1.15.0
 component: "software-in-the-loop"
-date: 2026-11-06
+date: 2026-11-09
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.14.0                      |
+| Version   | 1.15.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-06                  |
+| Date      | 2026-11-09                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1182,6 +1182,13 @@ The random draws come in that sequence, three for the current sensor and one for
 seeded scenario replays exactly. Splitting the plant into these parts changed none of its outputs:
 a trace of 18,000 periods with every non-ideality, fault and noise source enabled matched the single
 class it replaced bit for bit.
+
+One plant drive steps the plant for every user of it: the emulated platform, the host
+model-in-the-loop tests (Part N) and the virtual motor (`virtual-motor.md` Part D). It owns the plant,
+steps it once per control period, applies the duties a period late when the description says so, keeps
+the low-side shunts readable, fires the scheduled torque step and encoder freeze, and records the
+trajectory, all from the one plant description, so the three cannot step the plant differently. The
+same 18,000-period trace guards it.
 
 ---
 
