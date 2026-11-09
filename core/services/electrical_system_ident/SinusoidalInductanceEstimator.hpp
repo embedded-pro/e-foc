@@ -71,14 +71,24 @@ namespace services
         bool measurementComplete{ false };
         uint32_t run{ 0 };
 
-        float injectionPhase{ 0.0f };
-        float phaseIncrement{ 0.0f };
-        float injectionAmplitude{ 0.0f };
+        struct Injection
+        {
+            float phase{ 0.0f };
+            float phaseIncrement{ 0.0f };
+            float amplitude{ 0.0f };
+        };
+
+        struct SampleBudget
+        {
+            std::size_t warmup{ 0 };
+            std::size_t measurement{ 0 };
+        };
+
+        Injection injection;
         float vTerminalAmplitude{ 0.0f };
         float omega{ 0.0f };
         float terminalFactor{ wyeTerminalFactor };
-        std::size_t warmupSamples{ 0 };
-        std::size_t measurementSamples{ 0 };
+        SampleBudget samples;
         std::size_t sampleCount{ 0 };
         float sumSquared{ 0.0f };
 

@@ -9,6 +9,7 @@
 #include "services/util/DecimalToken.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <optional>
 
@@ -529,9 +530,10 @@ namespace application
         tracer.Trace() << "[WDT] stalling event loop";
         eventLoopStallTimer.Start(eventLoopStallDelay, []()
             {
-                volatile bool stalled{ true };
-                while (stalled)
+                const std::atomic<bool> stalled{ true };
+                while (stalled.load())
                 {
+                    // Spin until the watchdog resets the controller.
                 }
             });
         return { success };

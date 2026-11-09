@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <format>
 #include <sstream>
 
 namespace tool
@@ -138,6 +139,6 @@ namespace tool
 
     std::string VersionText(const services::FirmwareVersion& version)
     {
-        return std::to_string(version.major) + "." + std::to_string(version.minor) + "." + std::to_string(version.patch);
+        return std::format("{}.{}.{}", static_cast<uint32_t>(version.major), static_cast<uint32_t>(version.minor), static_cast<uint32_t>(version.patch));
     }
 }

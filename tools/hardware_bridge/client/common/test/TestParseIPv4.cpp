@@ -79,4 +79,17 @@ namespace
     {
         EXPECT_THROW(tool::ParseIPv4("   "), tool::BridgeArgumentException);
     }
+
+    TEST(TestParseIPv4, try_parse_returns_address_for_valid_input)
+    {
+        const auto addr = tool::TryParseIPv4("10.1.2.3");
+        ASSERT_TRUE(addr.has_value());
+        EXPECT_EQ((*addr)[0], 10u);
+        EXPECT_EQ((*addr)[3], 3u);
+    }
+
+    TEST(TestParseIPv4, try_parse_returns_nothing_for_hostname)
+    {
+        EXPECT_FALSE(tool::TryParseIPv4("localhost").has_value());
+    }
 }

@@ -34,7 +34,7 @@ namespace services
         }
     }
 
-    FluxLinkageIdentificationImpl::FluxLinkageIdentificationImpl(foc::CurrentCommandable& controller, foc::Controllable& drive, const foc::FocBase& motion, drivers::ThreePhaseInverter& inverter)
+    FluxLinkageIdentificationImpl::FluxLinkageIdentificationImpl(foc::CurrentCommandable& controller, foc::Controllable& drive, const foc::FocBase& motion, const drivers::ThreePhaseInverter& inverter)
         : controller(controller)
         , drive(drive)
         , motion(motion)

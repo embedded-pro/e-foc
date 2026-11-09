@@ -8,19 +8,33 @@ namespace tool
 {
     namespace
     {
-        std::atomic<IssueLog*> capturedLog{ nullptr };
-        QtMessageHandler previousHandler{ nullptr };
+        struct Capture
+        {
+            std::atomic<IssueLog*> log{ nullptr };
+            QtMessageHandler previousHandler{ nullptr };
+        };
 
-        thread_local bool writing{ false };
+        Capture& CaptureState()
+        {
+            constinit static Capture capture;
+            return capture;
+        }
+
+        bool& WritingOnThisThread()
+        {
+            constinit thread_local bool writing{ false };
+            return writing;
+        }
 
         void ForwardQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& message)
         {
-            auto* log = capturedLog.load();
-            if (log != nullptr && !writing && type != QtDebugMsg && type != QtInfoMsg)
+            const auto& capture = CaptureState();
+            auto* log = capture.log.load();
+            if (log != nullptr && !WritingOnThisThread() && type != QtDebugMsg && type != QtInfoMsg)
                 log->Write(type == QtWarningMsg ? IssueSeverity::warning : IssueSeverity::error, "Qt: " + message);
 
-            if (previousHandler != nullptr)
-                previousHandler(type, context, message);
+            if (capture.previousHandler != nullptr)
+                capture.previousHandler(type, context, message);
         }
     }
 
@@ -49,9 +63,10 @@ namespace tool
     {
         if (capturing)
         {
-            capturedLog = nullptr;
-            qInstallMessageHandler(previousHandler);
-            previousHandler = nullptr;
+            auto& capture = CaptureState();
+            capture.log = nullptr;
+            qInstallMessageHandler(capture.previousHandler);
+            capture.previousHandler = nullptr;
         }
     }
 
@@ -61,7 +76,7 @@ namespace tool
                         .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), ToString(severity), message.simplified());
 
         std::scoped_lock lock{ mutex };
-        writing = true;
+        WritingOnThisThread() = true;
         Remember(line);
 
         if (file.isOpen())
@@ -73,7 +88,7 @@ namespace tool
             file.flush();
         }
 
-        writing = false;
+        WritingOnThisThread() = false;
     }
 
     bool IssueLog::IsWritable() const
@@ -103,12 +118,13 @@ namespace tool
 
     void IssueLog::CaptureQtMessages()
     {
-        if (capturing || capturedLog.load() != nullptr)
+        auto& capture = CaptureState();
+        if (capturing || capture.log.load() != nullptr)
             return;
 
         capturing = true;
-        previousHandler = qInstallMessageHandler(ForwardQtMessage);
-        capturedLog = this;
+        capture.previousHandler = qInstallMessageHandler(ForwardQtMessage);
+        capture.log = this;
     }
 
     QString IssueLog::RotatedPath(int index) const

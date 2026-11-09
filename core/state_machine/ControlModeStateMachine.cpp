@@ -412,6 +412,8 @@ namespace state_machine
     void ControlModeStateMachine::Activate(ControlMode mode)
     {
         const auto rotorReference = RotorReferenceToKeep();
+        auto activationArgs = outerLoopArgs;
+        activationArgs.rotorReference = rotorReference;
         if (!std::holds_alternative<std::monostate>(activeSm))
             ActiveStateMachine().CmdEmergencyStop();
         recalibration.ranSinceStop = false;
@@ -424,9 +426,8 @@ namespace state_machine
                 nvm,
                 calibServices,
                 faultNotifier,
-                outerLoopArgs,
-                nvmActivity,
-                rotorReference));
+                activationArgs,
+                nvmActivity));
         else if (mode == ControlMode::position)
             AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
                 tracer,
@@ -434,9 +435,8 @@ namespace state_machine
                 nvm,
                 calibServices,
                 faultNotifier,
-                outerLoopArgs,
-                nvmActivity,
-                rotorReference));
+                activationArgs,
+                nvmActivity));
         else
             AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
                 tracer,

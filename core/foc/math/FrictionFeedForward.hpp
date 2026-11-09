@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
+#include <algorithm>
 
 namespace foc
 {
@@ -27,7 +28,7 @@ namespace foc
         {
             constexpr float perRadianPerSecond{ 1.0f / rampWidth };
             const auto sign = speedReference * perRadianPerSecond;
-            const auto ramped = sign > 1.0f ? 1.0f : (sign < -1.0f ? -1.0f : sign);
+            const auto ramped = std::clamp(sign, -1.0f, 1.0f);
 
             return amplitude * ramped;
         }

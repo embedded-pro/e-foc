@@ -202,10 +202,10 @@ namespace foc
         lastIq = idAndIq.q;
         if (currentStream != nullptr)
             currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
-        const auto& setPoint = setPointBuffer.Acquire();
+        const auto& [directSetPoint, quadratureSetPoint] = setPointBuffer.Acquire();
         const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);
-        const auto quadrature = LimitedQuadrature(setPoint.second.Value(), electricalSpeed, coggingCurrent);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
+        const auto quadrature = LimitedQuadrature(quadratureSetPoint.Value(), electricalSpeed, coggingCurrent);
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directSetPoint.Value(), quadrature }, electricalSpeed, busRatio.Ratio() });
         voltageWindow.Accumulate(voltage.q);
         const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, motor.dutyDelay);
         return spaceVectorModulator.Generate(park.Inverse(voltage, applied.cosine, applied.sine), busRatio.Inverse());

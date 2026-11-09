@@ -1107,3 +1107,9 @@ TEST_F(TestSpeedCascade, a_friction_beyond_the_current_envelope_adds_no_current)
 
     ExpectSameDuty(FirstDutyAfterSpeedStep(implausible, 50.0f), FirstDutyAfterSpeedStep(reference, 50.0f));
 }
+
+TEST_F(TestSpeedCascade, the_current_algorithm_is_selectable_while_disabled)
+{
+    EXPECT_EQ(focSpeed->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    EXPECT_EQ(focSpeed->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
+}

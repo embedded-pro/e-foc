@@ -35,9 +35,9 @@ namespace foc
     PositionOutput LqrPositionController::Compute(const PositionControlContext& context)
     {
         const auto deviation = -PositionDifference(context.reference, context.measured, context.direct);
-        const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
-        const auto command = design.ComputeControl(Design::StateVector{ deviation, scaledSpeed });
-        const auto action = LimitToCurrentEnvelope(command.at(0, 0) * currentPerNormalizedInput, parameters.maxCurrent).Value();
+        const auto scaledSpeed = context.measuredSpeed.Value() * SamplePeriod();
+        const auto command = ControlDesign().ComputeControl(Design::StateVector{ deviation, scaledSpeed });
+        const auto action = LimitToCurrentEnvelope(command.at(0, 0) * CurrentPerNormalizedInput(), MaxCurrent()).Value();
 
         return { PositionOutputKind::currentReference, action };
     }

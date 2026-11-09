@@ -1,4 +1,5 @@
 #include "tools/can_commander/logic/FirmwareRefusal.hpp"
+#include <format>
 
 namespace tool
 {
@@ -23,7 +24,7 @@ namespace tool
             case services::FwuError::sessionTimeout:
                 return "it ended the download after 30 s without a block, and nothing was staged.";
             default:
-                return "it answered with code " + std::to_string(static_cast<int>(error)) + ".";
+                return std::format("it answered with code {}.", static_cast<int>(error));
         }
     }
 }

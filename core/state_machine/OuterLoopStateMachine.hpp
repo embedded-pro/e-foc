@@ -20,6 +20,7 @@ namespace application
         hal::Hertz baseFrequency;
         foc::LowPriorityInterrupt& lowPriorityInterrupt;
         hal::Hertz outerLoopFrequency{ 1000 };
+        RotorReference rotorReference{ RotorReference::lost };
     };
 
     class OuterLoopStateMachine

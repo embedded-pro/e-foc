@@ -21,8 +21,7 @@ namespace application
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
             const OuterLoopArgs& outerLoopArgs,
-            NvmActivity& nvmActivity,
-            RotorReference rotorReference = RotorReference::lost)
+            NvmActivity& nvmActivity)
             : OuterLoopStateMachine(tracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
@@ -36,7 +35,7 @@ namespace application
             if (hardware.currentStream != nullptr)
                 focController.SetCurrentStream(*hardware.currentStream);
             RegisterFaultHandler(faultNotifier);
-            Boot(rotorReference);
+            Boot(outerLoopArgs.rotorReference);
         }
 
         ~OuterLoopStateMachineFor()

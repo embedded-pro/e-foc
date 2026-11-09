@@ -23,7 +23,7 @@ namespace services
         {
             if (!record.has_value())
             {
-                std::fill(slot.begin(), slot.end(), uint8_t{ 0xFF });
+                std::ranges::fill(slot, uint8_t{ 0xFF });
                 return;
             }
 

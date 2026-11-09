@@ -175,6 +175,26 @@ TEST_F(TestCoggingMappingImpl, a_phase_current_beyond_the_envelope_stops_the_bri
     EXPECT_EQ(frictionCoulomb, 0.0f);
 }
 
+TEST_F(TestCoggingMappingImpl, a_slew_step_after_the_run_failed_ramps_the_speed_towards_standstill)
+{
+    ExpectRunStarted();
+    Start();
+    Run(1.0f, 100);
+    const auto speedBeforeFailure = commandedSpeed;
+    ASSERT_GT(speedBeforeFailure, 0.0f);
+
+    EXPECT_CALL(inverterMock, Stop());
+    observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
+    systemTimerService.TimeProgressed(std::chrono::milliseconds{ 1 });
+
+    EXPECT_LT(commandedSpeed, speedBeforeFailure);
+    EXPECT_GE(commandedSpeed, 0.0f);
+
+    ExpectDriveReleased();
+    ExecuteAllActions();
+    EXPECT_TRUE(reported);
+}
+
 TEST_F(TestCoggingMappingImpl, a_rotor_that_does_not_turn_runs_into_the_timeout_without_a_map)
 {
     ExpectRunStarted();

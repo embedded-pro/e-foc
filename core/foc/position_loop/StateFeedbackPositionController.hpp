@@ -46,6 +46,27 @@ namespace foc
             return solved.has_value();
         }
 
+        Design& ControlDesign()
+        {
+            return design;
+        }
+
+        float CurrentPerNormalizedInput() const
+        {
+            return currentPerNormalizedInput;
+        }
+
+        float SamplePeriod() const
+        {
+            return samplePeriod;
+        }
+
+        Ampere MaxCurrent() const
+        {
+            return parameters.maxCurrent;
+        }
+
+    private:
         MechanicalModelParameters parameters{};
         PositionLoopTunings tunings{};
         float currentPerNormalizedInput{ 0.0f };

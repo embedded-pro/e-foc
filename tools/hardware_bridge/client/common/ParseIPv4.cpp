@@ -4,7 +4,7 @@
 
 namespace tool
 {
-    services::IPv4Address ParseIPv4(const std::string& host)
+    std::optional<services::IPv4Address> TryParseIPv4(const std::string& host)
     {
         unsigned int o0 = 0;
         unsigned int o1 = 0;
@@ -12,7 +12,7 @@ namespace tool
         unsigned int o3 = 0;
         int consumed = 0;
         if (std::sscanf(host.c_str(), "%u.%u.%u.%u%n", &o0, &o1, &o2, &o3, &consumed) != 4 || o0 > 255 || o1 > 255 || o2 > 255 || o3 > 255 || consumed != static_cast<int>(host.size()))
-            throw BridgeArgumentException("invalid IP address: " + host);
+            return std::nullopt;
 
         return services::IPv4Address{
             static_cast<uint8_t>(o0),
@@ -20,5 +20,14 @@ namespace tool
             static_cast<uint8_t>(o2),
             static_cast<uint8_t>(o3)
         };
+    }
+
+    services::IPv4Address ParseIPv4(const std::string& host)
+    {
+        const auto address = TryParseIPv4(host);
+        if (!address.has_value())
+            throw BridgeArgumentException("invalid IP address: " + host);
+
+        return *address;
     }
 }

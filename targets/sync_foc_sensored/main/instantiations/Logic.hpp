@@ -72,6 +72,14 @@ namespace application
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
 
         void ApplyCurrentLimit();
+        void OnConfigLoaded(services::NvmStatus status);
+        void StartCan();
+        void StartControl();
+        void StartFirmwareUpgradeAndBridge();
+        void SuperviseDrive();
+        void SuperviseEncoder();
+        void SuperviseMotion();
+        void BroadcastFaults();
         void RecordFault(state_machine::FaultCode code);
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;

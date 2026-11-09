@@ -49,7 +49,7 @@ namespace services
         NonVolatileMemory& nvm;
         infra::Function<void()> holdWork;
         infra::Function<void()> releaseWork;
-        const infra::TimePoint powerUpTime;
+        const infra::TimePoint powerUpTime{ infra::Now() };
         FaultHistoryData history;
         infra::BoundedVector<FaultRecord>::WithMaxSize<FaultHistoryData::capacity> early;
         infra::BoundedVector<LoadedAction>::WithMaxSize<waitingCapacity> waiting;
