@@ -12,7 +12,6 @@
 #include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
-#include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/supervision/PeakCurrent.hpp"
@@ -28,6 +27,7 @@
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
 #include "services/tracer/Tracer.hpp"
+#include "services/util/NvmEepromRegion.hpp"
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -48,7 +48,6 @@ namespace mil
         Scenario& Calibrated();
         Scenario& StoredCalibrationOffBy(const std::string& quantity, float factor);
         Scenario& BootsIn(state_machine::ControlMode mode);
-        // A power cycle: the image another run left in its EEPROM replaces the one built from nvm.
         Scenario& BootsFrom(std::vector<uint8_t> image);
         Scenario& CurrentLoop(foc::CurrentAlgorithm algorithm);
         Scenario& SpeedLoop(foc::SpeedAlgorithm algorithm);
