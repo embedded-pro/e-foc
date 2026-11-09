@@ -89,11 +89,11 @@ namespace can
         };
 
         if (loop == FocControlLoop::current)
-            controlMode.SelectCurrentAlgorithm(ToCurrentAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectCurrentAlgorithm(ToCurrentAlgorithm(algorithm), completed);
         else if (loop == FocControlLoop::speed)
-            controlMode.SelectSpeedAlgorithm(ToSpeedAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectSpeedAlgorithm(ToSpeedAlgorithm(algorithm), completed);
         else
-            controlMode.SelectPositionAlgorithm(ToPositionAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectPositionAlgorithm(ToPositionAlgorithm(algorithm), completed);
     }
 
     void FocMotorSettingsBridge::SetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone)
@@ -113,7 +113,7 @@ namespace can
         };
 
         if (GroupOf(parameter) == ParameterGroup::motor)
-            controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
+            controlMode.Tunings().SetMotorParameter(ToMotorParameter(parameter), value, completed);
         else if (IsStoredSetting(parameter))
             SetStoredSetting(parameter, value);
         else
@@ -123,10 +123,10 @@ namespace can
     FocAlgorithms FocMotorSettingsBridge::ActiveAlgorithms() const
     {
         return FocAlgorithms{
-            state_machine::ToCanMode(controlMode.Active()),
-            ToCanAlgorithm(controlMode.ActiveCurrentAlgorithm()),
-            ToCanAlgorithm(controlMode.ActiveSpeedAlgorithm()),
-            ToCanAlgorithm(controlMode.ActivePositionAlgorithm())
+            state_machine::ToCanMode(controlMode.Drive().Active()),
+            ToCanAlgorithm(controlMode.Algorithms().ActiveCurrentAlgorithm()),
+            ToCanAlgorithm(controlMode.Algorithms().ActiveSpeedAlgorithm()),
+            ToCanAlgorithm(controlMode.Algorithms().ActivePositionAlgorithm())
         };
     }
 
@@ -169,7 +169,7 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldCalibrationReading(FocParameter parameter) const
     {
-        const auto& record = controlMode.CalibrationRecord();
+        const auto& record = controlMode.Drive().CalibrationRecord();
 
         switch (parameter)
         {
@@ -189,7 +189,7 @@ namespace can
         if (IsRecalibrationReading(parameter))
             return HeldRecalibrationReading(parameter);
 
-        const auto estimates = controlMode.ActiveStateMachine().CurrentOnlineEstimates();
+        const auto estimates = controlMode.Drive().ActiveStateMachine().CurrentOnlineEstimates();
         if (!estimates.has_value())
             return FocParameterValue{ 0.0f, false };
 
@@ -209,13 +209,13 @@ namespace can
     FocParameterValue FocMotorSettingsBridge::HeldRecalibrationReading(FocParameter parameter) const
     {
         if (parameter == FocParameter::recalibrationsApplied)
-            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsApplied()), false };
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsApplied()), false };
         if (parameter == FocParameter::recalibrationsRejected)
-            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsRejected()), false };
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsRejected()), false };
         if (parameter == FocParameter::recalibrationsStored)
-            return FocParameterValue{ static_cast<float>(controlMode.RecalibrationsStored()), false };
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsStored()), false };
 
-        const auto model = controlMode.ModelInUse();
+        const auto model = controlMode.Recalibration().ModelInUse();
         if (!model.has_value())
             return FocParameterValue{ 0.0f, false };
 
@@ -234,7 +234,7 @@ namespace can
 
     void FocMotorSettingsBridge::Recalibrate(const infra::Function<void()>& onAccepted)
     {
-        const auto result = controlMode.CmdRecalibrate();
+        const auto result = controlMode.Recalibration().CmdRecalibrate();
         if (result == state_machine::SettingResult::ok)
             onAccepted();
         else
@@ -243,20 +243,20 @@ namespace can
 
     void FocMotorSettingsBridge::ResetModel(const infra::Function<void(bool stored)>& onDone)
     {
-        const auto result = controlMode.CmdResetModel(onDone);
+        const auto result = controlMode.Recalibration().CmdResetModel(onDone);
         if (result != state_machine::SettingResult::ok)
             ReportSettingFailure(focResetModelId, result);
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldMotionReading(FocParameter parameter) const
     {
-        const bool value = parameter == FocParameter::homed ? controlMode.IsHomed() : targetReached != nullptr && targetReached();
+        const bool value = parameter == FocParameter::homed ? controlMode.Drive().IsHomed() : targetReached != nullptr && targetReached();
         return FocParameterValue{ value ? 1.0f : 0.0f, false };
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const
     {
-        const auto temperature = controlMode.WindingTemperature();
+        const auto temperature = controlMode.Drive().WindingTemperature();
         return FocParameterValue{ temperature.has_value() ? temperature->Value() : std::numeric_limits<float>::quiet_NaN(), false };
     }
 
@@ -299,11 +299,11 @@ namespace can
     void FocMotorSettingsBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
     {
         if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            controlMode.SetCurrentTunings(WithSetting(controlMode.StoredCurrentTunings(), parameter, value), completed);
+            controlMode.Tunings().SetCurrentTunings(WithSetting(controlMode.Tunings().StoredCurrentTunings(), parameter, value), completed);
         else if (GroupOf(parameter) == ParameterGroup::speedLoop)
-            controlMode.SetSpeedTunings(WithSetting(controlMode.StoredSpeedTunings(), parameter, value), completed);
+            controlMode.Tunings().SetSpeedTunings(WithSetting(controlMode.Tunings().StoredSpeedTunings(), parameter, value), completed);
         else
-            controlMode.SetPositionTunings(WithSetting(controlMode.StoredPositionTunings(), parameter, value), completed);
+            controlMode.Tunings().SetPositionTunings(WithSetting(controlMode.Tunings().StoredPositionTunings(), parameter, value), completed);
     }
 
     void FocMotorSettingsBridge::SetStoredSetting(FocParameter parameter, float value)
@@ -373,22 +373,22 @@ namespace can
     FocParameterValue FocMotorSettingsBridge::HeldLoopSetting(FocParameter parameter) const
     {
         if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            return FocParameterValue{ SettingOf(controlMode.EffectiveCurrentTunings(), parameter),
-                IsBandwidth(parameter) && controlMode.StoredCurrentTunings().bandwidth == 0.0f };
+            return FocParameterValue{ SettingOf(controlMode.Tunings().EffectiveCurrentTunings(), parameter),
+                IsBandwidth(parameter) && controlMode.Tunings().StoredCurrentTunings().bandwidth == 0.0f };
 
         if (GroupOf(parameter) == ParameterGroup::speedLoop)
         {
-            const auto stored = controlMode.StoredSpeedTunings();
-            return FocParameterValue{ SettingOf(controlMode.EffectiveSpeedTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
+            const auto stored = controlMode.Tunings().StoredSpeedTunings();
+            return FocParameterValue{ SettingOf(controlMode.Tunings().EffectiveSpeedTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
         }
 
-        const auto stored = controlMode.StoredPositionTunings();
-        return FocParameterValue{ SettingOf(controlMode.EffectivePositionTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
+        const auto stored = controlMode.Tunings().StoredPositionTunings();
+        return FocParameterValue{ SettingOf(controlMode.Tunings().EffectivePositionTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldMotorParameter(FocParameter parameter) const
     {
-        const auto& record = controlMode.CalibrationRecord();
+        const auto& record = controlMode.Drive().CalibrationRecord();
 
         if (parameter == FocParameter::fluxLinkage && !foc::IsFinitePositive(record.fluxLinkage))
             return FocParameterValue{ controlMode.DefaultFluxLinkage().Value(), true };

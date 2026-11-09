@@ -13,7 +13,7 @@ namespace can
 
     void CanLivenessWatchdog::Offline()
     {
-        auto& stateMachine = controlMode.ActiveStateMachine();
+        auto& stateMachine = controlMode.Drive().ActiveStateMachine();
         const auto& state = stateMachine.CurrentState();
 
         if (std::holds_alternative<state_machine::Enabled>(state))

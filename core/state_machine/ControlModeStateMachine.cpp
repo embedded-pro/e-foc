@@ -1,13 +1,5 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
-#include "core/foc/math/WindingTemperature.hpp"
-#include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
-#include "infra/util/ReallyAssert.hpp"
-#include <algorithm>
-#include <cmath>
-#include <optional>
-#include <type_traits>
 #include <variant>
 
 namespace state_machine
@@ -29,425 +21,80 @@ namespace state_machine
         , configData(configData)
         , configWriter(nvm, this->configData, tracer, nvmActivity)
         , algorithmPersistence(configWriter, this->configData, tracer)
-        , recalibration(nvm, nvmActivity)
+        , drive(this->configData)
+        , commands(drive, this->configData)
+        , modes(drive, nvm, this->configData, nvmActivity, configWriter, [this](ControlMode mode)
+              {
+                  Activate(mode);
+              })
+        , transaction(drive, configWriter, modes)
+        , tunings(drive, this->configData, configWriter, transaction, tracer)
+        , algorithms(drive, algorithmPersistence, transaction, modes)
+        , recalibration(drive, this->configData, nvm, nvmActivity, transaction, tunings, tracer)
     {
         SanitizeTunings(this->configData);
         SanitizeSupervision(this->configData);
         SanitizeLimits(this->configData);
         Activate(ControlModeFromRaw(configData.defaultControlMode));
-        recalibration.timer.Start(Recalibration::observationPeriod, [this]()
-            {
-                ObserveOnlineEstimates();
-            });
     }
 
-    ControlModeStateMachine::RecalibrationState::RecalibrationState(services::NonVolatileMemory& nvm, application::NvmActivity& nvmActivity)
-        : store(nvm, nvmActivity)
-    {}
-
-    void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
+    ActiveDrive& ControlModeStateMachine::Drive()
     {
-        if (pendingSelectCallback != nullptr || configWriter.HasPendingPersist())
-        {
-            onDone(SelectResult::busy);
-            return;
-        }
-
-        if (!CanActivatePendingSelect())
-        {
-            onDone(SelectResult::busy);
-            return;
-        }
-
-        previousDefaultControlMode = configData.defaultControlMode;
-        configData.defaultControlMode = static_cast<uint8_t>(mode);
-        pendingSelectMode = mode;
-        pendingSelectCallback = onDone;
-        nvmActivity.Begin();
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                OnSaveConfigDone(status);
-            });
+        return drive;
     }
 
-    bool ControlModeStateMachine::CanActivatePendingSelect() const
+    const ActiveDrive& ControlModeStateMachine::Drive() const
     {
-        return IsStopped(ActiveStateMachine().CurrentState()) && !ActiveStateMachine().HasPendingAsyncWork();
+        return drive;
     }
 
-    void ControlModeStateMachine::OnSaveConfigDone(services::NvmStatus status)
+    DriveCommands& ControlModeStateMachine::Commands()
     {
-        nvmActivity.End();
-
-        if (status != services::NvmStatus::Ok)
-        {
-            configData.defaultControlMode = previousDefaultControlMode;
-            pendingSelectCallback(status == services::NvmStatus::Busy ? SelectResult::busy : SelectResult::nvmFailed);
-            return;
-        }
-
-        if (CanActivatePendingSelect())
-        {
-            Activate(pendingSelectMode);
-            pendingSelectCallback(SelectResult::ok);
-            return;
-        }
-
-        configData.defaultControlMode = previousDefaultControlMode;
-        nvmActivity.Begin();
-        nvm.SaveConfig(configData, [this](services::NvmStatus rollbackStatus)
-            {
-                OnRollbackSaveConfigDone(rollbackStatus);
-            });
+        return commands;
     }
 
-    void ControlModeStateMachine::OnRollbackSaveConfigDone(services::NvmStatus)
+    ModeSelection& ControlModeStateMachine::Modes()
     {
-        nvmActivity.End();
-        pendingSelectCallback(SelectResult::busy);
+        return modes;
     }
 
-    ControlMode ControlModeStateMachine::Active() const
+    SettingTransaction& ControlModeStateMachine::Settings()
     {
-        if (std::holds_alternative<application::SpeedStateMachine>(activeSm))
-            return ControlMode::speed;
-        if (std::holds_alternative<application::PositionStateMachine>(activeSm))
-            return ControlMode::position;
-        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
-        return ControlMode::torque;
+        return transaction;
     }
 
-    FocStateMachineBase& ControlModeStateMachine::ActiveStateMachine()
+    TuningSettings& ControlModeStateMachine::Tunings()
     {
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return *sm;
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return *sm;
-        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
-        return std::get<application::TorqueStateMachine>(activeSm);
+        return tunings;
     }
 
-    const FocStateMachineBase& ControlModeStateMachine::ActiveStateMachine() const
+    AlgorithmSettings& ControlModeStateMachine::Algorithms()
     {
-        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return *sm;
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return *sm;
-        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
-        return std::get<application::TorqueStateMachine>(activeSm);
+        return algorithms;
     }
 
-    bool ControlModeStateMachine::TrySetTorque(foc::IdAndIqPoint setpoint)
+    ModelRecalibration& ControlModeStateMachine::Recalibration()
     {
-        auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm);
-        if (sm == nullptr)
-            return false;
-        sm->GetController().SetPoint(setpoint);
-        return true;
-    }
-
-    bool ControlModeStateMachine::TrySetSpeed(foc::RadiansPerSecond setpoint)
-    {
-        auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm);
-        if (sm == nullptr)
-            return false;
-        const auto limit = configData.limits.overspeedLimit;
-        sm->GetController().SetPoint(foc::RadiansPerSecond{ std::clamp(setpoint.Value(), -limit, limit) });
-        return true;
-    }
-
-    bool ControlModeStateMachine::TrySetPosition(foc::Radians setpoint)
-    {
-        auto* sm = std::get_if<application::PositionStateMachine>(&activeSm);
-        if (sm == nullptr)
-            return false;
-        sm->GetController().SetPoint(setpoint);
-        return true;
-    }
-
-    SettingResult ControlModeStateMachine::CmdRecalibrate()
-    {
-        if (ActiveOuterLoop() == nullptr)
-            return SettingResult::wrongMode;
-
-        if (RecalibrationModeSetting() == services::RecalibrationMode::off)
-            return SettingResult::invalidState;
-
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-            return gate;
-
-        CommissionModel();
-        Conclude(recalibration.model.Decide(RecalibrationTrigger::command));
-        ApplyModelInUse();
-        return SettingResult::ok;
-    }
-
-    void ControlModeStateMachine::RestoreStoredModel()
-    {
-        recalibration.store.Start([this]()
-            {
-                if (!std::holds_alternative<std::monostate>(activeSm) && std::holds_alternative<Ready>(ActiveStateMachine().CurrentState()))
-                    RecalibrateOnReady();
-            });
-    }
-
-    SettingResult ControlModeStateMachine::CmdResetModel(const infra::Function<void(bool stored)>& onStored)
-    {
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-            return gate;
-
-        recalibration.store.Reset(onStored);
-        recalibration.model.Revert();
-        ApplyModelInUse();
-        return SettingResult::ok;
-    }
-
-    uint16_t ControlModeStateMachine::RecalibrationsStored() const
-    {
-        return recalibration.store.Stores();
-    }
-
-    std::optional<MotorModel> ControlModeStateMachine::ModelInUse() const
-    {
-        if (ActiveOuterLoop() == nullptr)
-            return std::nullopt;
-
-        const auto commissioned = CommissionedModel();
-        const auto stored = StoredFor(commissioned);
-        if (recalibration.model.IsCommissionedFrom(commissioned, stored))
-            return recalibration.model.InUse();
-
-        // Not yet commissioned since power-up or a new record: report what the next Ready designs the loops from.
-        Recalibration next;
-        next.Commission(commissioned, stored);
-        return next.InUse();
-    }
-
-    uint16_t ControlModeStateMachine::RecalibrationsApplied() const
-    {
-        return recalibration.model.Applied();
-    }
-
-    uint16_t ControlModeStateMachine::RecalibrationsRejected() const
-    {
-        return recalibration.model.Rejected();
-    }
-
-    void ControlModeStateMachine::ObserveOnlineEstimates()
-    {
-        if (std::holds_alternative<std::monostate>(activeSm) || !std::holds_alternative<Enabled>(ActiveStateMachine().CurrentState()))
-            return;
-
-        const auto estimates = ActiveStateMachine().CurrentOnlineEstimates();
-        if (!estimates.has_value())
-            return;
-
-        recalibration.ranSinceStop = true;
-        recalibration.model.Observe(*estimates);
-    }
-
-    void ControlModeStateMachine::RecalibrateOnReady()
-    {
-        if (ActiveOuterLoop() == nullptr)
-            return;
-
-        CommissionModel();
-        if (recalibration.ranSinceStop && RecalibrationModeSetting() == services::RecalibrationMode::automatic)
-            Conclude(recalibration.model.Decide(RecalibrationTrigger::automatic));
-
-        recalibration.ranSinceStop = false;
-        if (RecalibrationModeSetting() != services::RecalibrationMode::off)
-            recalibration.store.StoreIfDue();
-        ApplyModelInUse();
-    }
-
-    void ControlModeStateMachine::CommissionModel()
-    {
-        const auto commissioned = CommissionedModel();
-        // A changed record has already redesigned the loops from itself.
-        if (commissioned != recalibration.model.Commissioned())
-            recalibration.loopsRecalibrated = false;
-
-        recalibration.model.Commission(commissioned, StoredFor(commissioned));
-    }
-
-    StoredModel ControlModeStateMachine::StoredFor(const MotorModel& commissioned) const
-    {
-        return RecalibrationModeSetting() != services::RecalibrationMode::off ? recalibration.store.Restored(commissioned) : StoredModel{};
-    }
-
-    void ControlModeStateMachine::Conclude(const Recalibration::Outcome& outcome)
-    {
-        Report(outcome);
-
-        const bool mechanicsOrInductance = outcome.verdicts[1] == RecalibrationVerdict::applied || outcome.verdicts[2] == RecalibrationVerdict::applied || outcome.verdicts[3] == RecalibrationVerdict::applied;
-        if (mechanicsOrInductance)
-            recalibration.store.Store(recalibration.model.Learned(), recalibration.model.Commissioned());
-    }
-
-    void ControlModeStateMachine::ApplyModelInUse()
-    {
-        auto* outerLoop = ActiveOuterLoop();
-        const bool commissioned = recalibration.model.InUse() == recalibration.model.Commissioned();
-        if (outerLoop == nullptr || (commissioned && !recalibration.loopsRecalibrated))
-            return;
-
-        if (outerLoop->ApplyModel(recalibration.model.InUse()))
-        {
-            recalibration.loopsRecalibrated = !commissioned;
-            ApplyOperatorTunings();
-        }
-    }
-
-    void ControlModeStateMachine::Report(const Recalibration::Outcome& outcome)
-    {
-        constexpr std::array<const char*, Recalibration::quantities> names{ "resistance", "inductance", "inertia", "viscous friction" };
-        const auto& commissioned = recalibration.model.Commissioned();
-        const std::array<float, Recalibration::quantities> references{ commissioned.resistance.Value(), commissioned.inductance.Value(), commissioned.inertia.Value(), commissioned.viscousFriction.Value() };
-
-        for (std::size_t quantity = 0; quantity != Recalibration::quantities; ++quantity)
-        {
-            if (outcome.verdicts[quantity] == RecalibrationVerdict::applied)
-                tracer.Trace() << "[SM] Recalibrated " << names[quantity] << ": " << outcome.readings[quantity] << " (commissioned " << references[quantity] << ")";
-            else if (outcome.verdicts[quantity] == RecalibrationVerdict::rejected)
-                tracer.Trace() << "[SM] Rejected " << names[quantity] << " reading " << outcome.readings[quantity] << ": outside its band around " << references[quantity];
-        }
-    }
-
-    MotorModel ControlModeStateMachine::CommissionedModel() const
-    {
-        const auto& record = CalibrationRecord();
-        return MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } };
-    }
-
-    services::RecalibrationMode ControlModeStateMachine::RecalibrationModeSetting() const
-    {
-        return static_cast<services::RecalibrationMode>(configData.recalibrationMode);
-    }
-
-    TuningResult ControlModeStateMachine::CheckRedesignPreconditions() const
-    {
-        if (std::holds_alternative<std::monostate>(activeSm))
-            return TuningResult::wrongMode;
-
-        if (!IsStopped(ActiveStateMachine().CurrentState()))
-            return TuningResult::notStopped;
-
-        return TuningResult::ok;
-    }
-
-    TuningResult ControlModeStateMachine::TrySetCurrentBandwidth(float bandwidth)
-    {
-        if (!foc::IsAcceptableCurrentBandwidth(bandwidth))
-            return TuningResult::outOfRange;
-
-        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
-            return rejection;
-
-        auto tunings = StoredCurrentTunings();
-        tunings.bandwidth = bandwidth;
-
-        StoreTunings(configData, tunings);
-        CurrentTunable()->SetCurrentTunings(EffectiveCurrentTunings());
-        configWriter.Persist();
-        return TuningResult::ok;
-    }
-
-    TuningResult ControlModeStateMachine::TrySetSpeedBandwidth(float bandwidth)
-    {
-        if (!foc::IsAcceptableSpeedBandwidth(bandwidth))
-            return TuningResult::outOfRange;
-
-        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
-            return rejection;
-
-        auto* tunable = SpeedTunable();
-        if (tunable == nullptr)
-            return TuningResult::wrongMode;
-
-        auto tunings = StoredSpeedTunings();
-        tunings.bandwidth = bandwidth;
-        if (tunable->SetSpeedTunings(tunings) != foc::SelectResult::ok)
-            return TuningResult::outOfRange;
-
-        StoreTunings(configData, tunings);
-        configWriter.Persist();
-        return TuningResult::ok;
-    }
-
-    TuningResult ControlModeStateMachine::TrySetPositionBandwidth(float bandwidth)
-    {
-        if (!foc::IsAcceptablePositionBandwidth(bandwidth))
-            return TuningResult::outOfRange;
-
-        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
-            return rejection;
-
-        auto* tunable = PositionTunable();
-        if (tunable == nullptr)
-            return TuningResult::wrongMode;
-
-        auto tunings = StoredPositionTunings();
-        tunings.bandwidth = bandwidth;
-        if (tunable->SetPositionTunings(tunings) != foc::SelectResult::ok)
-            return TuningResult::outOfRange;
-
-        StoreTunings(configData, tunings);
-        configWriter.Persist();
-        return TuningResult::ok;
-    }
-
-    application::RotorReference ControlModeStateMachine::RotorReferenceToKeep() const
-    {
-        if (std::holds_alternative<std::monostate>(activeSm))
-            return application::RotorReference::lost;
-
-        const auto* ready = std::get_if<Ready>(&ActiveStateMachine().CurrentState());
-        if (ready == nullptr || !ready->rotorReferenceValid)
-            return application::RotorReference::lost;
-
-        return ready->homed ? application::RotorReference::keptHomed : application::RotorReference::kept;
+        return recalibration;
     }
 
     void ControlModeStateMachine::Activate(ControlMode mode)
     {
-        const auto rotorReference = RotorReferenceToKeep();
+        const auto rotorReference = drive.RotorReferenceToKeep();
         auto activationArgs = outerLoopArgs;
         activationArgs.rotorReference = rotorReference;
-        if (!std::holds_alternative<std::monostate>(activeSm))
-            ActiveStateMachine().CmdEmergencyStop();
-        recalibration.ranSinceStop = false;
-        recalibration.loopsRecalibrated = false;
+        if (drive.HasMachine())
+            drive.ActiveStateMachine().CmdEmergencyStop();
+        recalibration.OnActivated();
 
         if (mode == ControlMode::speed)
-            AttachAlgorithmRestore(activeSm.emplace<application::SpeedStateMachine>(
-                tracer,
-                hardware,
-                nvm,
-                calibServices,
-                faultNotifier,
-                activationArgs,
-                nvmActivity));
+            AttachAlgorithmRestore(drive.Emplace<application::SpeedStateMachine>(tracer, hardware, nvm, calibServices, faultNotifier, activationArgs, nvmActivity));
         else if (mode == ControlMode::position)
-            AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
-                tracer,
-                hardware,
-                nvm,
-                calibServices,
-                faultNotifier,
-                activationArgs,
-                nvmActivity));
+            AttachAlgorithmRestore(drive.Emplace<application::PositionStateMachine>(tracer, hardware, nvm, calibServices, faultNotifier, activationArgs, nvmActivity));
         else
-            AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
-                tracer,
-                hardware,
-                nvm,
-                calibServices,
-                faultNotifier,
-                nvmActivity,
-                rotorReference));
+            AttachAlgorithmRestore(drive.Emplace<application::TorqueStateMachine>(tracer, hardware, nvm, calibServices, faultNotifier, nvmActivity, rotorReference));
 
-        ApplyLimits();
+        commands.ApplyLimits();
     }
 
     void ControlModeStateMachine::OnFaultEntered(const infra::Function<void(FaultCode)>& onFaultEntered)
@@ -465,487 +112,17 @@ namespace state_machine
 
         stateMachine.RegisterReadyHandler([this]()
             {
-                algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
-                ApplyOperatorTunings();
-                RecalibrateOnReady();
+                algorithms.ApplyPersistedAlgorithms();
+                tunings.ApplyOperatorTunings();
+                recalibration.RecalibrateOnReady();
             });
 
         if (std::holds_alternative<Ready>(stateMachine.CurrentState()))
         {
-            algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
-            ApplyOperatorTunings();
-            RecalibrateOnReady();
+            algorithms.ApplyPersistedAlgorithms();
+            tunings.ApplyOperatorTunings();
+            recalibration.RecalibrateOnReady();
         }
-    }
-
-    foc::CurrentLoopTunable* ControlModeStateMachine::CurrentTunable()
-    {
-        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    foc::SpeedLoopTunable* ControlModeStateMachine::SpeedTunable()
-    {
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    foc::PositionLoopTunable* ControlModeStateMachine::PositionTunable()
-    {
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    const application::OuterLoopStateMachine* ControlModeStateMachine::ActiveOuterLoop() const
-    {
-        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return sm;
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return sm;
-        return nullptr;
-    }
-
-    foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable()
-    {
-        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    foc::SpeedLoopSelectable* ControlModeStateMachine::SpeedSelectable()
-    {
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    foc::PositionLoopSelectable* ControlModeStateMachine::PositionSelectable()
-    {
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    const foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable() const
-    {
-        if (const auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    const foc::SpeedLoopSelectable* ControlModeStateMachine::SpeedSelectable() const
-    {
-        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return &sm->GetController();
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    const foc::PositionLoopSelectable* ControlModeStateMachine::PositionSelectable() const
-    {
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return &sm->GetController();
-        return nullptr;
-    }
-
-    foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
-    {
-        if (!CanActivatePendingSelect())
-            return foc::SelectResult::busy;
-        return algorithmPersistence.SelectCurrentAlgorithm(algorithm, CurrentSelectable());
-    }
-
-    foc::SelectResult ControlModeStateMachine::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm)
-    {
-        if (!CanActivatePendingSelect())
-            return foc::SelectResult::busy;
-        return algorithmPersistence.SelectSpeedAlgorithm(algorithm, SpeedSelectable());
-    }
-
-    foc::SelectResult ControlModeStateMachine::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm)
-    {
-        if (!CanActivatePendingSelect())
-            return foc::SelectResult::busy;
-        return algorithmPersistence.SelectPositionAlgorithm(algorithm, PositionSelectable());
-    }
-
-    foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const
-    {
-        return algorithmPersistence.ActiveCurrentAlgorithm(CurrentSelectable());
-    }
-
-    foc::SpeedAlgorithm ControlModeStateMachine::ActiveSpeedAlgorithm() const
-    {
-        return algorithmPersistence.ActiveSpeedAlgorithm(SpeedSelectable());
-    }
-
-    foc::PositionAlgorithm ControlModeStateMachine::ActivePositionAlgorithm() const
-    {
-        return algorithmPersistence.ActivePositionAlgorithm(PositionSelectable());
-    }
-
-    application::OuterLoopStateMachine* ControlModeStateMachine::ActiveOuterLoop()
-    {
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return sm;
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return sm;
-        return nullptr;
-    }
-
-    application::FocStateMachineCommon& ControlModeStateMachine::ActiveCommon()
-    {
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return *sm;
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return *sm;
-        return std::get<application::TorqueStateMachine>(activeSm);
-    }
-
-    const application::FocStateMachineCommon& ControlModeStateMachine::ActiveCommon() const
-    {
-        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-            return *sm;
-        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-            return *sm;
-        return std::get<application::TorqueStateMachine>(activeSm);
-    }
-
-    CommandResult ControlModeStateMachine::CmdReserveExternalCalibration()
-    {
-        return ActiveCommon().CmdReserveExternalCalibration();
-    }
-
-    CommandResult ControlModeStateMachine::CmdReleaseExternalCalibration()
-    {
-        return ActiveCommon().CmdReleaseExternalCalibration();
-    }
-
-    void ControlModeStateMachine::CmdCompleteExternalCalibration(const services::CalibrationData& data,
-        const infra::Function<void(CommandResult)>& onDone)
-    {
-        ActiveCommon().CmdCompleteExternalCalibration(data, onDone);
-    }
-
-    void ControlModeStateMachine::CmdReAlign(const infra::Function<void(CommandResult)>& onDone)
-    {
-        ActiveCommon().CmdReAlign(onDone);
-    }
-
-    std::optional<services::CalibrationData> ControlModeStateMachine::ActiveCalibrationData() const
-    {
-        const auto& state = ActiveStateMachine().CurrentState();
-        if (const auto* ready = std::get_if<state_machine::Ready>(&state))
-            return ready->loadedData;
-        return std::nullopt;
-    }
-
-    foc::Weber ControlModeStateMachine::ActiveFluxLinkage() const
-    {
-        return ActiveCommon().ActiveFluxLinkage();
-    }
-
-    foc::CurrentLoopTunings ControlModeStateMachine::StoredCurrentTunings() const
-    {
-        return state_machine::StoredCurrentTunings(configData);
-    }
-
-    foc::SpeedLoopTunings ControlModeStateMachine::StoredSpeedTunings() const
-    {
-        return state_machine::StoredSpeedTunings(configData);
-    }
-
-    foc::PositionLoopTunings ControlModeStateMachine::StoredPositionTunings() const
-    {
-        return state_machine::StoredPositionTunings(configData);
-    }
-
-    foc::CurrentLoopTunings ControlModeStateMachine::EffectiveCurrentTunings() const
-    {
-        auto tunings = StoredCurrentTunings();
-        if (tunings.bandwidth == 0.0f)
-            tunings.bandwidth = ActiveCommon().AutomaticCurrentLoopBandwidth();
-        return tunings;
-    }
-
-    std::optional<foc::SpeedLoopTunings> ControlModeStateMachine::EffectiveSpeedTunings() const
-    {
-        const auto* outerLoop = ActiveOuterLoop();
-        if (outerLoop == nullptr)
-            return std::nullopt;
-
-        auto tunings = StoredSpeedTunings();
-        if (tunings.bandwidth == 0.0f)
-            tunings.bandwidth = outerLoop->AutomaticSpeedLoopBandwidth();
-        return tunings;
-    }
-
-    std::optional<foc::PositionLoopTunings> ControlModeStateMachine::EffectivePositionTunings() const
-    {
-        if (Active() != ControlMode::position)
-            return std::nullopt;
-
-        auto tunings = StoredPositionTunings();
-        if (tunings.bandwidth == 0.0f)
-            tunings.bandwidth = foc::PositionLoopTunings{}.bandwidth;
-        return tunings;
-    }
-
-    SettingResult ControlModeStateMachine::SettingGate() const
-    {
-        if (!IsStopped(ActiveStateMachine().CurrentState()))
-            return SettingResult::invalidState;
-
-        if (pendingSettingCallback != nullptr || pendingSelectCallback != nullptr || ActiveStateMachine().HasPendingAsyncWork() || configWriter.HasPendingPersist())
-            return SettingResult::busy;
-
-        return SettingResult::ok;
-    }
-
-    void ControlModeStateMachine::ApplyOperatorTunings()
-    {
-        if (auto* tunable = CurrentTunable())
-            tunable->SetCurrentTunings(EffectiveCurrentTunings());
-
-        if (auto* tunable = SpeedTunable(); tunable != nullptr && tunable->SetSpeedTunings(*EffectiveSpeedTunings()) != foc::SelectResult::ok)
-            tracer.Trace() << "[SM] Speed settings not applied: the active law cannot be designed with them";
-
-        if (auto* tunable = PositionTunable(); tunable != nullptr && tunable->SetPositionTunings(*EffectivePositionTunings()) != foc::SelectResult::ok)
-            tracer.Trace() << "[SM] Position settings not applied: the active law cannot be designed with them";
-    }
-
-    void ControlModeStateMachine::StoreAndPersist(const OnSetting& onDone)
-    {
-        pendingSettingCallback = onDone;
-        configWriter.Persist([this](services::NvmStatus status)
-            {
-                CompleteSetting(status == services::NvmStatus::Ok ? SettingResult::ok : SettingResult::nvmFailed);
-            });
-    }
-
-    void ControlModeStateMachine::CompleteSetting(SettingResult result)
-    {
-        auto onDone = pendingSettingCallback;
-        pendingSettingCallback = nullptr;
-        onDone(result);
-    }
-
-    SettingResult ControlModeStateMachine::ToSettingResult(CommandResult result)
-    {
-        switch (result)
-        {
-            case CommandResult::nvmFailed:
-                return SettingResult::nvmFailed;
-            case CommandResult::abortedByFault:
-                return SettingResult::aborted;
-            default:
-                return SettingResult::busy;
-        }
-    }
-
-    SettingResult ControlModeStateMachine::ToSettingResult(foc::SelectResult result)
-    {
-        switch (result)
-        {
-            case foc::SelectResult::ok:
-                return SettingResult::ok;
-            case foc::SelectResult::busy:
-                return SettingResult::busy;
-            case foc::SelectResult::invalidAlgorithm:
-                return SettingResult::wrongMode;
-            default:
-                return SettingResult::invalidParameters;
-        }
-    }
-
-    void ControlModeStateMachine::SetCurrentTunings(const foc::CurrentLoopTunings& tunings, const OnSetting& onDone)
-    {
-        if (!IsAcceptable(tunings))
-            onDone(SettingResult::outOfRange);
-        else if (!IsDesignable(tunings))
-            onDone(SettingResult::invalidParameters);
-        else if (const auto gate = SettingGate(); gate != SettingResult::ok)
-            onDone(gate);
-        else
-        {
-            StoreTunings(configData, tunings);
-            CurrentTunable()->SetCurrentTunings(EffectiveCurrentTunings());
-            StoreAndPersist(onDone);
-        }
-    }
-
-    void ControlModeStateMachine::SetSpeedTunings(const foc::SpeedLoopTunings& tunings, const OnSetting& onDone)
-    {
-        if (!IsAcceptable(tunings))
-            onDone(SettingResult::outOfRange);
-        else if (const auto gate = SettingGate(); gate != SettingResult::ok)
-            onDone(gate);
-        else if (SpeedTunable() == nullptr)
-            onDone(SettingResult::wrongMode);
-        else
-        {
-            const auto previous = StoredSpeedTunings();
-            StoreTunings(configData, tunings);
-
-            if (SpeedTunable()->SetSpeedTunings(*EffectiveSpeedTunings()) != foc::SelectResult::ok)
-            {
-                StoreTunings(configData, previous);
-                onDone(SettingResult::invalidParameters);
-                return;
-            }
-
-            StoreAndPersist(onDone);
-        }
-    }
-
-    void ControlModeStateMachine::SetPositionTunings(const foc::PositionLoopTunings& tunings, const OnSetting& onDone)
-    {
-        if (!IsAcceptable(tunings))
-            onDone(SettingResult::outOfRange);
-        else if (const auto gate = SettingGate(); gate != SettingResult::ok)
-            onDone(gate);
-        else if (PositionTunable() == nullptr)
-            onDone(SettingResult::wrongMode);
-        else
-        {
-            const auto previous = StoredPositionTunings();
-            StoreTunings(configData, tunings);
-
-            if (const auto result = PositionTunable()->SetPositionTunings(*EffectivePositionTunings()); result != foc::SelectResult::ok)
-            {
-                StoreTunings(configData, previous);
-                onDone(ToSettingResult(result));
-                return;
-            }
-
-            StoreAndPersist(onDone);
-        }
-    }
-
-    void ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm, const OnSetting& onDone)
-    {
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-        {
-            onDone(gate);
-            return;
-        }
-
-        pendingSettingCallback = onDone;
-        const auto result = algorithmPersistence.SelectCurrentAlgorithm(algorithm, CurrentSelectable(), [this](services::NvmStatus status)
-            {
-                CompleteSetting(status == services::NvmStatus::Ok ? SettingResult::ok : SettingResult::nvmFailed);
-            });
-
-        if (result != foc::SelectResult::ok)
-            CompleteSetting(ToSettingResult(result));
-    }
-
-    void ControlModeStateMachine::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm, const OnSetting& onDone)
-    {
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-        {
-            onDone(gate);
-            return;
-        }
-
-        pendingSettingCallback = onDone;
-        const auto result = algorithmPersistence.SelectSpeedAlgorithm(algorithm, SpeedSelectable(), [this](services::NvmStatus status)
-            {
-                CompleteSetting(status == services::NvmStatus::Ok ? SettingResult::ok : SettingResult::nvmFailed);
-            });
-
-        if (result != foc::SelectResult::ok)
-            CompleteSetting(ToSettingResult(result));
-    }
-
-    void ControlModeStateMachine::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm, const OnSetting& onDone)
-    {
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-        {
-            onDone(gate);
-            return;
-        }
-
-        pendingSettingCallback = onDone;
-        const auto result = algorithmPersistence.SelectPositionAlgorithm(algorithm, PositionSelectable(), [this](services::NvmStatus status)
-            {
-                CompleteSetting(status == services::NvmStatus::Ok ? SettingResult::ok : SettingResult::nvmFailed);
-            });
-
-        if (result != foc::SelectResult::ok)
-            CompleteSetting(ToSettingResult(result));
-    }
-
-    void ControlModeStateMachine::SetMotorParameter(services::MotorParameter parameter, float value, const OnSetting& onDone)
-    {
-        if (!IsAcceptableMotorParameter(parameter, value))
-        {
-            onDone(SettingResult::outOfRange);
-            return;
-        }
-
-        if (const auto gate = SettingGate(); gate != SettingResult::ok)
-        {
-            onDone(gate);
-            return;
-        }
-
-        pendingSettingCallback = onDone;
-        ActiveCommon().CmdSetMotorParameter(parameter, value, [this](CommandResult result)
-            {
-                if (result != CommandResult::ok)
-                {
-                    CompleteSetting(ToSettingResult(result));
-                    return;
-                }
-
-                ApplyOperatorTunings();
-                CompleteSetting(SettingResult::ok);
-            });
-    }
-
-    const services::CalibrationData& ControlModeStateMachine::CalibrationRecord() const
-    {
-        return ActiveCommon().CalibrationRecord();
-    }
-
-    std::optional<foc::Celsius> ControlModeStateMachine::WindingTemperature()
-    {
-        const auto estimates = ActiveStateMachine().CurrentOnlineEstimates();
-        if (!estimates.has_value())
-            return std::nullopt;
-
-        return foc::WindingTemperatureFromResistance(estimates->resistance, foc::Ohm{ CalibrationRecord().rPhase }, foc::Celsius{ configData.limits.calibrationTemperature });
-    }
-
-    bool ControlModeStateMachine::IsHomed() const
-    {
-        return !std::holds_alternative<std::monostate>(activeSm) && ActiveCommon().IsHomed();
-    }
-
-    foc::Weber ControlModeStateMachine::DefaultFluxLinkage() const
-    {
-        return calibServices.fluxLinkage;
     }
 
     services::ConfigData& ControlModeStateMachine::Config()
@@ -960,87 +137,13 @@ namespace state_machine
 
     void ControlModeStateMachine::PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone)
     {
-        ApplyLimits();
+        commands.ApplyLimits();
         configWriter.Persist(onDone);
-    }
-
-    void ControlModeStateMachine::LimitCurrent(foc::Ampere limit)
-    {
-        currentLimit = limit;
-        ApplyCurrentLimit();
-    }
-
-    void ControlModeStateMachine::ApplyLimits()
-    {
-        const foc::RadiansPerSecond overspeedLimit{ configData.limits.overspeedLimit };
-        const foc::RadiansPerSecondSquared acceleration{ configData.limits.speedAcceleration };
-        const foc::RadiansPerSecondSquared deceleration{ configData.limits.speedDeceleration };
-        const foc::Radians positionMinimum{ configData.limits.positionMinimum };
-        const foc::Radians positionMaximum{ configData.limits.positionMaximum };
-        const bool homingRequired = configData.homingRequired != 0;
-
-        std::visit([&]<class Machine>(Machine& sm)
-            {
-                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
-                    sm.SpeedLimiter().LimitSpeed(overspeedLimit);
-                else if constexpr (!std::is_same_v<Machine, std::monostate>)
-                {
-                    sm.RampSpeed(acceleration, deceleration);
-                    sm.LimitTravel(positionMinimum, positionMaximum);
-                    if constexpr (std::is_same_v<Machine, application::PositionStateMachine>)
-                        sm.RequireHoming(homingRequired);
-                }
-            },
-            activeSm);
-
-        ApplyCurrentLimit();
-        ApplyBusVoltage();
-    }
-
-    void ControlModeStateMachine::TrackBusVoltage(foc::Volts measured)
-    {
-        busVoltage = measured;
-        ApplyBusVoltage();
-    }
-
-    void ControlModeStateMachine::ApplyBusVoltage()
-    {
-        if (!busVoltage.has_value())
-            return;
-
-        std::visit([measured = *busVoltage]<class Machine>(Machine& sm)
-            {
-                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
-                    sm.BusVoltageTracker().TrackBusVoltage(measured);
-                else if constexpr (!std::is_same_v<Machine, std::monostate>)
-                    sm.TrackBusVoltage(measured);
-            },
-            activeSm);
-    }
-
-    void ControlModeStateMachine::ApplyCurrentLimit()
-    {
-        if (!currentLimit.has_value())
-            return;
-
-        std::visit([limit = *currentLimit]<class Machine>(Machine& sm)
-            {
-                if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
-                    sm.CurrentLimiter().LimitCurrent(limit);
-                else if constexpr (!std::is_same_v<Machine, std::monostate>)
-                    sm.LimitCurrent(limit);
-            },
-            activeSm);
     }
 
     bool ControlModeStateMachine::HasPendingConfigWrite() const
     {
-        return pendingSelectCallback != nullptr || configWriter.HasPendingPersist();
-    }
-
-    bool ControlModeStateMachine::IsStoppedAndIdle() const
-    {
-        return SettingGate() == SettingResult::ok;
+        return modes.IsPending() || configWriter.HasPendingPersist();
     }
 
     void ControlModeStateMachine::HoldAsyncWork()
@@ -1053,4 +156,8 @@ namespace state_machine
         nvmActivity.End();
     }
 
+    foc::Weber ControlModeStateMachine::DefaultFluxLinkage() const
+    {
+        return calibServices.fluxLinkage;
+    }
 }

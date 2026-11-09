@@ -975,6 +975,21 @@ supported control mode (`TorqueStateMachine`, `SpeedStateMachine`, `PositionStat
 idle. This section documents three behavioral invariants introduced to make runtime mode switching safe and
 predictable.
 
+The coordinator delegates each concern to one part and exposes it through an accessor:
+
+| Part (accessor)                          | Concern                                                                                           |
+|------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `ActiveDrive` (`Drive()`)                | The variant of mode machines, the active machine and its controller interfaces, calibration reads |
+| `DriveCommands` (`Commands()`)           | Setpoints for the active mode, and the current, bus-voltage and configured limits applied to it   |
+| `ModeSelection` (`Modes()`)              | `Select()`: the persisted default mode, the activation and the rollback (C2)                      |
+| `SettingTransaction` (`Settings()`)      | The gate every setting passes and the one setting whose callback is pending                       |
+| `TuningSettings` (`Tunings()`)           | Loop bandwidths and tunings, stored and effective, and motor parameters                           |
+| `AlgorithmSettings` (`Algorithms()`)     | Selection and persistence of the current, speed and position laws                                 |
+| `ModelRecalibration` (`Recalibration()`) | Online observation, commissioning, the recalibration decision, its storage and the redesign       |
+
+`ControlModeStateMachine` itself owns the configuration record and its writer, activates a mode (keeping the rotor
+reference, re-applying limits) and restores the persisted algorithms, tunings and model when the new machine is Ready.
+
 #### C1 — CAN Wire-Scale Convention
 
 `ControlModeStateMachine` receives setpoints from the CAN bridge in physical unit types (`foc::Ampere`,
@@ -1001,7 +1016,7 @@ save or invalidation still outstanding after an emergency stop keeps the machine
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant CSM as ControlModeStateMachine
+    participant CSM as ModeSelection
     participant NVM
 
     Caller->>CSM: Select(Speed, cb1)
@@ -1074,7 +1089,7 @@ new one unlatched. `OnSaveConfigDone` therefore decides:
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant CSM as ControlModeStateMachine
+    participant CSM as ModeSelection
     participant NVM
 
     Caller->>CSM: Select(Speed, cb)

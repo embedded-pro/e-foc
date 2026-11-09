@@ -118,7 +118,7 @@ namespace application
             [this](foc::Volts measured)
             {
                 filteredBusVoltage = measured;
-                controlMode->TrackBusVoltage(measured);
+                controlMode->Commands().TrackBusVoltage(measured);
                 busVoltageLimits.Evaluate(measured);
             } }
     {
@@ -179,7 +179,7 @@ namespace application
                 .maxCurrent = hardware.MaxCurrentSupported(),
                 .baseFrequency = hardware.BaseFrequency(),
                 .lowPriorityInterrupt = hardware.LowPriorityInterrupt() });
-        controlMode->RestoreStoredModel();
+        controlMode->Recalibration().RestoreStoredModel();
         faultHistory.emplace(nvm, [this]()
             {
                 controlMode->HoldAsyncWork();
@@ -190,7 +190,7 @@ namespace application
             });
         peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         controlMode->OnFaultEntered([this](state_machine::FaultCode code)
             {
@@ -221,11 +221,11 @@ namespace application
     {
         commandTimeout.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         motorOverload.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         motorOverload.Enable([this]()
             {
@@ -233,11 +233,11 @@ namespace application
             });
         overTemperature.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             },
             [this]()
             {
-                return controlMode->WindingTemperature();
+                return controlMode->Drive().WindingTemperature();
             });
         overTemperature.Enable([this]()
             {
@@ -245,7 +245,7 @@ namespace application
             });
         busVoltageLimits.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         busVoltageLimits.Enable([this]()
             {
@@ -262,7 +262,7 @@ namespace application
     {
         encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         encoderPlausibility.Enable([this]()
             {
@@ -270,15 +270,15 @@ namespace application
             });
         encoderFreeze.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         encoderFreeze.Enable([this]()
             {
-                return supervision::LimitsFrom(controlMode->CalibrationRecord(), controlMode->Config().encoderResolution, hardware.MaxCurrentSupported());
+                return supervision::LimitsFrom(controlMode->Drive().CalibrationRecord(), controlMode->Config().encoderResolution, hardware.MaxCurrentSupported());
             });
         phaseLoss.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         phaseLoss.Enable([this]()
             {
@@ -290,7 +290,7 @@ namespace application
     {
         overspeed.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         overspeed.Enable([this]()
             {
@@ -298,7 +298,7 @@ namespace application
             });
         followingError.Attach([this]() -> const state_machine::FocStateMachineBase&
             {
-                return controlMode->ActiveStateMachine();
+                return controlMode->Drive().ActiveStateMachine();
             });
         followingError.Enable([this]()
             {
@@ -306,7 +306,7 @@ namespace application
             });
         targetReached.Attach([this]() -> const state_machine::FocStateMachineBase*
             {
-                return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+                return controlMode->Drive().Active() == state_machine::ControlMode::position ? &controlMode->Drive().ActiveStateMachine() : nullptr;
             });
         targetReached.Enable([this]()
             {
@@ -314,7 +314,7 @@ namespace application
             });
         positionLimit.Attach([this]() -> const state_machine::FocStateMachineBase*
             {
-                return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+                return controlMode->Drive().Active() == state_machine::ControlMode::position ? &controlMode->Drive().ActiveStateMachine() : nullptr;
             },
             [this]()
             {
@@ -344,13 +344,13 @@ namespace application
     void Logic::RecordFault(state_machine::FaultCode code)
     {
         faultHistory->Record(static_cast<uint8_t>(can::FocMotorCanBridge::ToCanFaultCode(code)),
-            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Active())), filteredBusVoltage, peakCurrent.Peak() });
+            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Drive().Active())), filteredBusVoltage, peakCurrent.Peak() });
     }
 
     void Logic::ApplyCurrentLimit()
     {
         const auto limit = foc::Ampere{ std::min(overloadLimit.Value(), thermalLimit.Value()) };
         hardware.Tracer().Trace() << "[PRT] Current limit " << limit.Value() << " A";
-        controlMode->LimitCurrent(limit);
+        controlMode->Commands().LimitCurrent(limit);
     }
 }

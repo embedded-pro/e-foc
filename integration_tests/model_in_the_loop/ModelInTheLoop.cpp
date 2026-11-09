@@ -224,7 +224,7 @@ namespace mil
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
                         .lowPriorityInterrupt = lowPriorityInterrupt });
-                controlMode->RestoreStoredModel();
+                controlMode->Recalibration().RestoreStoredModel();
                 faultHistory.emplace(nvm, [this]()
                     {
                         controlMode->HoldAsyncWork();
@@ -235,12 +235,12 @@ namespace mil
                     });
                 peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {
-                        return controlMode->ActiveStateMachine();
+                        return controlMode->Drive().ActiveStateMachine();
                     });
                 controlMode->OnFaultEntered([this](state_machine::FaultCode code)
                     {
                         faultHistory->Record(static_cast<uint8_t>(can::FocMotorCanBridge::ToCanFaultCode(code)),
-                            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Active())), filteredBusVoltage, peakCurrent.Peak() });
+                            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Drive().Active())), filteredBusVoltage, peakCurrent.Peak() });
                     });
                 faultHistory->Start();
                 busVoltage.Start();
@@ -314,7 +314,7 @@ namespace mil
     {
         return RunUntil([this, &predicate]()
             {
-                return predicate(controlMode->ActiveStateMachine().CurrentState());
+                return predicate(controlMode->Drive().ActiveStateMachine().CurrentState());
             },
             limit);
     }
@@ -323,7 +323,7 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->CmdReAlign(onDone);
+                controlMode->Drive().ActiveCommon().CmdReAlign(onDone);
             },
             kCommandTimeout);
     }
@@ -332,7 +332,7 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->ActiveStateMachine().CmdCalibrate(onDone);
+                controlMode->Drive().ActiveStateMachine().CmdCalibrate(onDone);
             },
             kCalibrationTimeout);
     }
@@ -341,14 +341,14 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->ActiveStateMachine().CmdClearCalibration(onDone);
+                controlMode->Drive().ActiveStateMachine().CmdClearCalibration(onDone);
             },
             kCommandTimeout);
     }
 
     std::optional<ElectricalIdentification> ModelInTheLoop::IdentifyElectrical()
     {
-        if (controlMode->CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveCommon().CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
             return std::nullopt;
 
         using Result = services::ElectricalParametersIdentification::ResistanceInductanceResult;
@@ -368,7 +368,7 @@ namespace mil
         const auto& measured = **resistanceAndInductance;
         if (!measured.resistance.has_value() || !measured.inductance.has_value() || measured.fitQuality < 0.5f)
         {
-            controlMode->CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
@@ -385,7 +385,7 @@ namespace mil
                 kCalibrationTimeout) ||
             !polePairs->value().has_value())
         {
-            controlMode->CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
@@ -393,11 +393,11 @@ namespace mil
         data.rPhase = measured.resistance->Value();
         data.lD = measured.inductance->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs->value());
-        data.fluxLinkage = controlMode->ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode->Drive().ActiveCommon().ActiveFluxLinkage().Value();
 
         if (!Command([this, &data](const auto& onDone)
                 {
-                    controlMode->CmdCompleteExternalCalibration(data, onDone);
+                    controlMode->Drive().ActiveCommon().CmdCompleteExternalCalibration(data, onDone);
                 },
                 kCommandTimeout))
             return std::nullopt;
@@ -407,7 +407,7 @@ namespace mil
 
     bool ModelInTheLoop::Enable()
     {
-        if (controlMode->ActiveStateMachine().CmdEnable() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveStateMachine().CmdEnable() != state_machine::CommandResult::ok)
             return false;
 
         if (!RunUntilState(Holds<state_machine::Enabled>, kStateTimeout))
@@ -419,7 +419,7 @@ namespace mil
 
     bool ModelInTheLoop::Disable()
     {
-        if (controlMode->ActiveStateMachine().CmdDisable() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveStateMachine().CmdDisable() != state_machine::CommandResult::ok)
             return false;
 
         const bool ready = RunUntilState(Holds<state_machine::Ready>, kStateTimeout);
@@ -430,7 +430,7 @@ namespace mil
     bool ModelInTheLoop::Select(state_machine::ControlMode mode)
     {
         auto result = std::make_shared<std::optional<state_machine::SelectResult>>();
-        controlMode->Select(mode, [result](state_machine::SelectResult outcome)
+        controlMode->Modes().Select(mode, [result](state_machine::SelectResult outcome)
             {
                 *result = outcome;
             });
@@ -447,7 +447,7 @@ namespace mil
     bool ModelInTheLoop::SetTorque(float ampere)
     {
         StampSetpoint(ampere);
-        const bool accepted = controlMode->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ ampere } });
+        const bool accepted = controlMode->Commands().TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ ampere } });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -455,7 +455,7 @@ namespace mil
     bool ModelInTheLoop::SetSpeed(float radiansPerSecond)
     {
         StampSetpoint(radiansPerSecond);
-        const bool accepted = controlMode->TrySetSpeed(foc::RadiansPerSecond{ radiansPerSecond });
+        const bool accepted = controlMode->Commands().TrySetSpeed(foc::RadiansPerSecond{ radiansPerSecond });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -463,7 +463,7 @@ namespace mil
     bool ModelInTheLoop::SetPosition(float radians)
     {
         StampSetpoint(radians);
-        const bool accepted = controlMode->TrySetPosition(foc::Radians{ radians });
+        const bool accepted = controlMode->Commands().TrySetPosition(foc::Radians{ radians });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -521,17 +521,17 @@ namespace mil
 
     bool ModelInTheLoop::IsRunning() const
     {
-        return Holds<state_machine::Enabled>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Enabled>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     bool ModelInTheLoop::HasFault() const
     {
-        return Holds<state_machine::Fault>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Fault>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     bool ModelInTheLoop::IsReady() const
     {
-        return Holds<state_machine::Ready>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Ready>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     state_machine::ControlModeStateMachine& ModelInTheLoop::ControlMode()
@@ -546,12 +546,12 @@ namespace mil
 
     std::optional<state_machine::OnlineEstimates> ModelInTheLoop::OnlineEstimates()
     {
-        return controlMode->ActiveStateMachine().CurrentOnlineEstimates();
+        return controlMode->Drive().ActiveStateMachine().CurrentOnlineEstimates();
     }
 
     const services::CalibrationData& ModelInTheLoop::CalibrationRecord() const
     {
-        return controlMode->CalibrationRecord();
+        return controlMode->Drive().CalibrationRecord();
     }
 
     const Scenario& ModelInTheLoop::Setup() const

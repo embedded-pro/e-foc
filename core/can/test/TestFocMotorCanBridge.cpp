@@ -1010,7 +1010,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_ReleasesTheR
 
     DispatchCommand(can::focIdentifyElectricalId);
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_PoorFitWithAValidCalibration_ReturnsToReady)
@@ -1029,7 +1029,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_PoorFitWithAValidCalibration_
 
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_NoPolePairs_ReleasesTheReservation)
@@ -1053,7 +1053,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_NoPolePairs_ReleasesTheReserv
     DispatchCommand(can::focIdentifyElectricalId);
 
     EXPECT_TRUE(categoryErrorSent);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AfterAnEmergencyStopAbandonedTheRun_IsAcceptedAgain)
@@ -1069,7 +1069,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AfterAnEmergencyStopAbandoned
     DispatchCommand(can::focIdentifyElectricalId);
 
     EXPECT_FALSE(categoryErrorSent);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_MeasuresTheOffsetsAtRestBeforeTheResistanceAndStoresThem)
@@ -1148,7 +1148,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_RotorNotAtRest_FailsAndReleas
 
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedOffsetMeasurement_FailsAndReleasesTheReservation)
@@ -1170,7 +1170,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedOffsetMeasurement_Fails
 
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InIdle_BroadcastsIdleStatus)
@@ -1790,7 +1790,7 @@ TEST_F(FocMotorCanBridgeTest, SelectAlgorithm_InReady_SwitchesTheLoopStoresItAnd
     ExpectConfigSaved();
     DispatchSelectAlgorithm(can::FocControlLoop::current, static_cast<uint8_t>(can::FocCurrentAlgorithm::decoupledPid));
 
-    EXPECT_EQ(coordinator->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
+    EXPECT_EQ(coordinator->Algorithms().ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
     ASSERT_TRUE(savedConfig.has_value());
     EXPECT_EQ(savedConfig->currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::decoupledPid));
     EXPECT_EQ(lastSentMsgType, can::focAlgorithmsResponseId);
@@ -1809,7 +1809,7 @@ TEST_F(FocMotorCanBridgeTest, SelectAlgorithm_NeedingAMotorModel_IsRefusedWithIn
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryErrorOriginCmd, can::focSelectAlgorithmId);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::invalidParameters);
-    EXPECT_EQ(coordinator->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+    EXPECT_EQ(coordinator->Algorithms().ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
 }
 
 TEST_F(FocMotorCanBridgeTest, SelectAlgorithm_ForALoopTheModeDoesNotRun_IsAModeMismatch)
@@ -1833,7 +1833,7 @@ TEST_F(FocMotorCanBridgeTest, SelectAlgorithm_WhileEnabled_IsAnInvalidState)
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    EXPECT_EQ(coordinator->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+    EXPECT_EQ(coordinator->Algorithms().ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_AnUntouchedBandwidth_ReportsTheDerivedValueAsAutomatic)
@@ -1908,7 +1908,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_ASwitchingGainReachingTheBoundaryLaye
     EXPECT_EQ(lastCategoryErrorOriginCmd, can::focSetParameterId);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::invalidParameters);
     EXPECT_FALSE(savedConfig.has_value());
-    EXPECT_NEAR(coordinator->StoredCurrentTunings().switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
+    EXPECT_NEAR(coordinator->Tunings().StoredCurrentTunings().switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_ASpeedSettingInTorqueMode_IsAModeMismatch)
@@ -1958,7 +1958,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_AMotorParameter_IsWrittenToTheCalibra
     EXPECT_NEAR(savedCalibration->rPhase, 0.36f, 1e-6f);
     EXPECT_EQ(savedCalibration->stage, services::CalibrationStage::complete);
     ExpectAnswered(0.36f, false);
-    EXPECT_NEAR(coordinator->CalibrationRecord().rPhase, 0.36f, 1e-6f);
+    EXPECT_NEAR(coordinator->Drive().CalibrationRecord().rPhase, 0.36f, 1e-6f);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_TheCoulombFriction_IsWrittenToTheCalibrationRecordAndRead)
@@ -1972,7 +1972,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_TheCoulombFriction_IsWrittenToTheCali
     ASSERT_TRUE(savedCalibration.has_value());
     EXPECT_NEAR(savedCalibration->frictionCoulomb, 0.004f, 1e-9f);
     ExpectAnswered(0.004f, false);
-    EXPECT_NEAR(coordinator->CalibrationRecord().frictionCoulomb, 0.004f, 1e-9f);
+    EXPECT_NEAR(coordinator->Drive().CalibrationRecord().frictionCoulomb, 0.004f, 1e-9f);
 
     ResetCaptures();
     DispatchQueryParameter(can::FocParameter::frictionCoulomb);
@@ -1989,7 +1989,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_TheCoulombFrictionWhileEnabled_IsAnIn
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    EXPECT_EQ(coordinator->CalibrationRecord().frictionCoulomb, 0.0f);
+    EXPECT_EQ(coordinator->Drive().CalibrationRecord().frictionCoulomb, 0.0f);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_PolePairs_RequiresAnotherAlignmentBeforeStart)
@@ -2006,7 +2006,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_PolePairs_RequiresAnotherAlignmentBef
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_AnUnsetFluxLinkage_ReportsThePlatformDefaultAsAutomatic)
@@ -2125,8 +2125,8 @@ TEST_F(FocMotorCanBridgeTest, Start_InPositionMode_WithRequiredHomingAfterAPlain
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_NE(ackSpy.last->status, services::CanAckStatus::success);
-    EXPECT_FALSE(coordinator->ActiveStateMachine().HasPendingAsyncWork());
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_FALSE(coordinator->Drive().ActiveStateMachine().HasPendingAsyncWork());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_TheOverspeedLimit_IsStoredAndInForceWhileTheDriveRuns)
@@ -2240,7 +2240,7 @@ TEST_F(FocMotorCanBridgeTest, Calibrate_WhileARunIsInProgress_IsBusy)
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryErrorOriginCmd, can::focCalibrateId);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, Calibrate_ThatFails_ReportsCalibrationFailed)
@@ -2278,7 +2278,7 @@ TEST_F(FocMotorCanBridgeTest, ClearCalibration_InReady_DropsTheRecordAndReturnsT
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->commandType, can::focClearCalibrationId);
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->Drive().ActiveStateMachine().CurrentState()));
 }
 
 TEST_F(FocMotorCanBridgeTest, ClearCalibration_ThatCannotBeStored_ReportsPersistenceFailed)
@@ -2438,9 +2438,9 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_WindingTemperature_InSpeedMode_Foll
     coordinator->Config().limits.calibrationTemperature = 40.0f;
     ResetCaptures();
 
-    const auto estimates = coordinator->ActiveStateMachine().CurrentOnlineEstimates();
+    const auto estimates = coordinator->Drive().ActiveStateMachine().CurrentOnlineEstimates();
     ASSERT_TRUE(estimates.has_value());
-    const auto calibrated = coordinator->CalibrationRecord().rPhase;
+    const auto calibrated = coordinator->Drive().CalibrationRecord().rPhase;
     ASSERT_GT(calibrated, 0.0f);
 
     DispatchQueryParameter(can::FocParameter::windingTemperature);
@@ -2464,7 +2464,7 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_OnlineEstimates_InSpeedMode_ReportT
     GivenModeSelected(can::FocMotorMode::speed);
     ResetCaptures();
 
-    const auto estimates = coordinator->ActiveStateMachine().CurrentOnlineEstimates();
+    const auto estimates = coordinator->Drive().ActiveStateMachine().CurrentOnlineEstimates();
     ASSERT_TRUE(estimates.has_value());
 
     DispatchQueryParameter(can::FocParameter::estimatedResistance);
@@ -2745,7 +2745,7 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InSpeedMode_IsTheCalibra
     ConstructFixtureInReady();
     GivenModeSelected(can::FocMotorMode::speed);
     ResetCaptures();
-    const auto& record = coordinator->CalibrationRecord();
+    const auto& record = coordinator->Drive().CalibrationRecord();
 
     DispatchQueryParameter(can::FocParameter::modelResistance);
     ExpectAnswered(record.rPhase, false);

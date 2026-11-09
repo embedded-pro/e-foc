@@ -127,7 +127,7 @@ namespace can
         }
 
         pendingStartCallback = onDone;
-        controlMode.ActiveStateMachine().CmdEnableAsync([this](state_machine::CommandResult result)
+        controlMode.Drive().ActiveStateMachine().CmdEnableAsync([this](state_machine::CommandResult result)
             {
                 auto callback = pendingStartCallback;
                 pendingStartCallback = nullptr;
@@ -139,12 +139,12 @@ namespace can
 
     void FocMotorCanBridge::OnStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(server, can::focStopId, controlMode.ActiveStateMachine().CmdDisable(), onDone);
+        ReportCommandOutcome(server, can::focStopId, controlMode.Drive().ActiveStateMachine().CmdDisable(), onDone);
     }
 
     void FocMotorCanBridge::OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        ReportCommandOutcome(server, can::focClearFaultId, controlMode.ActiveStateMachine().CmdClearFault(), onDone);
+        ReportCommandOutcome(server, can::focClearFaultId, controlMode.Drive().ActiveStateMachine().CmdClearFault(), onDone);
     }
 
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -152,7 +152,7 @@ namespace can
         if (firmwareUpgrade)
             firmwareUpgrade->get().CancelDownload();
 
-        ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
+        ReportCommandOutcome(server, can::focEmergencyStopId, controlMode.Drive().ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
 
     void FocMotorCanBridge::OnSelectControlMode(FocMotorMode mode,
@@ -172,12 +172,12 @@ namespace can
         }
 
         pendingSelectCallback = onActivated;
-        controlMode.Select(*mapped, [this](state_machine::SelectResult result)
+        controlMode.Modes().Select(*mapped, [this](state_machine::SelectResult result)
             {
                 auto callback = pendingSelectCallback;
                 pendingSelectCallback = nullptr;
                 if (result == state_machine::SelectResult::ok)
-                    callback(state_machine::ToCanMode(controlMode.Active()));
+                    callback(state_machine::ToCanMode(controlMode.Drive().Active()));
                 else
                     ReportSelectFailure(server, result);
             });
@@ -206,7 +206,7 @@ namespace can
 
     void FocMotorCanBridge::ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone)
     {
-        const auto torqueConstant = foc::TorqueConstantFor(controlMode.CalibrationRecord().polePairs, controlMode.ActiveFluxLinkage());
+        const auto torqueConstant = foc::TorqueConstantFor(controlMode.Drive().CalibrationRecord().polePairs, controlMode.Drive().ActiveCommon().ActiveFluxLinkage());
         if (!foc::IsFinitePositive(torqueConstant.Value()))
         {
             server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
@@ -222,7 +222,7 @@ namespace can
                 math::Abs(value.Value()) <= inverter.MaxCurrentSupported().Value()))
             return;
 
-        if (controlMode.TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, value }))
+        if (controlMode.Commands().TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, value }))
         {
             NotifyCommandAccepted();
             onDone();
@@ -237,7 +237,7 @@ namespace can
                 math::Abs(value.Value()) <= maxSpeedSetpoint))
             return;
 
-        if (controlMode.TrySetSpeed(value))
+        if (controlMode.Commands().TrySetSpeed(value))
         {
             NotifyCommandAccepted();
             onDone();
@@ -253,7 +253,7 @@ namespace can
                 math::Abs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
             return;
 
-        if (controlMode.TrySetPosition(value))
+        if (controlMode.Commands().TrySetPosition(value))
         {
             NotifyCommandAccepted();
             onDone();
@@ -342,13 +342,13 @@ namespace can
 
     void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>& onDone)
     {
-        const auto& state = controlMode.ActiveStateMachine().CurrentState();
+        const auto& state = controlMode.Drive().ActiveStateMachine().CurrentState();
         const auto faultCode = std::holds_alternative<state_machine::Fault>(state)
-                                   ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
+                                   ? ToCanFaultCode(controlMode.Drive().ActiveStateMachine().LastFaultCode())
                                    : FocFaultCode::none;
 
-        server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()), faultCode);
-        server.BroadcastTelemetryMotion(controlMode.ActiveStateMachine().MeasuredSpeed(), encoder.Read());
+        server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.Drive().ActiveStateMachine().HasPartialCalibration()), faultCode);
+        server.BroadcastTelemetryMotion(controlMode.Drive().ActiveStateMachine().MeasuredSpeed(), encoder.Read());
         onDone();
     }
 
@@ -375,7 +375,7 @@ namespace can
     bool FocMotorCanBridge::SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode,
         bool withinRange)
     {
-        if (controlMode.Active() != requiredMode)
+        if (controlMode.Drive().Active() != requiredMode)
         {
             server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
             return true;
@@ -387,7 +387,7 @@ namespace can
             return true;
         }
 
-        if (!SetpointAllowed(controlMode.ActiveStateMachine().CurrentState()))
+        if (!SetpointAllowed(controlMode.Drive().ActiveStateMachine().CurrentState()))
         {
             server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
             return true;

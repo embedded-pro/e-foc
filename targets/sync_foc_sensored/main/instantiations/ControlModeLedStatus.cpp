@@ -29,7 +29,7 @@ namespace application
         if (!controlMode)
             return services::LedStatus{};
 
-        const auto& stateMachine = controlMode->ActiveStateMachine();
+        const auto& stateMachine = controlMode->Drive().ActiveStateMachine();
         const auto lifecycle = LifecycleOf(stateMachine.CurrentState());
         const auto fault = lifecycle == services::LedLifecycle::fault ? stateMachine.LastFaultCode() : state_machine::FaultCode::none;
         return services::LedStatus{ lifecycle, fault };
