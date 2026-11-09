@@ -1,4 +1,5 @@
 #include "core/supervision/TargetReachedMonitor.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -45,7 +46,7 @@ namespace supervision
             return false;
 
         const auto window = settings().window.Value();
-        return window > 0.0f && std::abs(drive->ObserveMotion().positionError.Value()) <= window;
+        return window > 0.0f && math::Abs(drive->ObserveMotion().positionError.Value()) <= window;
     }
 
     TargetReachedMonitor::Settings TargetReachedSettingsFrom(const services::ConfigData& config)

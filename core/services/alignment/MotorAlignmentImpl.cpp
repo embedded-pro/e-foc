@@ -4,6 +4,7 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -83,7 +84,7 @@ namespace services
     void MotorAlignmentImpl::ProcessPosition(const foc::PhaseCurrents& currents)
     {
         auto currentPosition = encoder.Read();
-        auto positionChange = std::abs(math::WrapToPi((currentPosition - previousPosition).Value()));
+        auto positionChange = math::Abs(math::WrapToPi((currentPosition - previousPosition).Value()));
         previousPosition = currentPosition;
         ++samplesInHold;
 
@@ -181,8 +182,8 @@ namespace services
 
         if (!finalCurrent.has_value())
         {
-            const auto floor = missingFraction * 0.5f * std::abs(a);
-            return std::abs(b) < floor || std::abs(c) < floor;
+            const auto floor = missingFraction * 0.5f * math::Abs(a);
+            return math::Abs(b) < floor || math::Abs(c) < floor;
         }
 
         const auto risen = SettledShareOfFinalCurrent();
@@ -197,10 +198,10 @@ namespace services
         const auto expected = finalCurrent * risen + starting * (1.0f - risen);
         const auto crossing = starting * finalCurrent < 0.0f;
 
-        if (crossing && std::abs(expected) < missingFraction * std::abs(finalCurrent))
+        if (crossing && math::Abs(expected) < missingFraction * math::Abs(finalCurrent))
             return false;
 
-        return std::abs(measured) < missingFraction * std::abs(expected);
+        return math::Abs(measured) < missingFraction * math::Abs(expected);
     }
 
     std::optional<float> MotorAlignmentImpl::ExpectedPhaseACurrent() const
@@ -228,7 +229,7 @@ namespace services
         float share = 0.0f;
 
         for (auto sample = firstSample; sample <= settledEndSample; ++sample)
-            share += 1.0f - std::exp(-static_cast<float>(sample) / samplesPerTimeConstant);
+            share += 1.0f - math::Exp(-static_cast<float>(sample) / samplesPerTimeConstant);
 
         return share / static_cast<float>(consecutiveSettledSamples);
     }

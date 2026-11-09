@@ -1,5 +1,6 @@
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -59,14 +60,14 @@ namespace supervision
 
     float EncoderPlausibilityMonitor::PushDirection(const foc::MotionObservation& observation) const
     {
-        if (std::abs(observation.measuredTorqueCurrent.Value()) < config.minimumCurrentFraction * maxCurrent.Value())
+        if (math::Abs(observation.measuredTorqueCurrent.Value()) < config.minimumCurrentFraction * maxCurrent.Value())
             return 0.0f;
 
-        if (std::abs(observation.positionError.Value()) >= config.minimumPositionError.Value())
-            return std::copysign(1.0f, observation.positionError.Value());
+        if (math::Abs(observation.positionError.Value()) >= config.minimumPositionError.Value())
+            return math::Copysign(1.0f, observation.positionError.Value());
 
-        if (std::abs(observation.demandedSpeed.Value()) >= config.minimumDemandedSpeed.Value())
-            return std::copysign(1.0f, observation.demandedSpeed.Value());
+        if (math::Abs(observation.demandedSpeed.Value()) >= config.minimumDemandedSpeed.Value())
+            return math::Copysign(1.0f, observation.demandedSpeed.Value());
 
         return 0.0f;
     }
@@ -80,7 +81,7 @@ namespace supervision
         }
 
         const auto travel = math::WrapToPi(reading - *travelAnchor);
-        if (std::abs(travel) < config.maximumStillExcursion.Value())
+        if (math::Abs(travel) < config.maximumStillExcursion.Value())
             return;
 
         travelAnchor = reading;
@@ -89,7 +90,7 @@ namespace supervision
 
     bool EncoderPlausibilityMonitor::StillForWholeWindow(float reading)
     {
-        if (!tracking || std::abs(math::WrapToPi(reading - anchor)) >= config.maximumStillExcursion.Value())
+        if (!tracking || math::Abs(math::WrapToPi(reading - anchor)) >= config.maximumStillExcursion.Value())
         {
             anchor = reading;
             stillFor = infra::Duration{};

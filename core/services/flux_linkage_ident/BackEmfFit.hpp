@@ -1,6 +1,7 @@
 #pragma once
 
 #include "numerical/estimators/online/RunningLinearFit.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -15,9 +16,9 @@ namespace services
         {
             line.Add(electricalSpeed, voltage);
 
-            lowestSpeed = std::min(lowestSpeed, std::abs(electricalSpeed));
-            highestSpeed = std::max(highestSpeed, std::abs(electricalSpeed));
-            largestVoltage = std::max(largestVoltage, std::abs(voltage));
+            lowestSpeed = std::min(lowestSpeed, math::Abs(electricalSpeed));
+            highestSpeed = std::max(highestSpeed, math::Abs(electricalSpeed));
+            largestVoltage = std::max(largestVoltage, math::Abs(voltage));
         }
 
         uint32_t Count() const

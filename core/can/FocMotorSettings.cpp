@@ -1,4 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
+#include "numerical/math/Math.hpp"
 #include <array>
 #include <cmath>
 #include <optional>
@@ -297,7 +298,7 @@ namespace can
                 config.stallDetection = value != 0.0f ? 1 : 0;
                 break;
             case FocParameter::recalibrationMode:
-                config.recalibrationMode = static_cast<uint8_t>(std::lround(value));
+                config.recalibrationMode = static_cast<uint8_t>(math::Round(value));
                 break;
             default:
                 config.supervision.window = value;

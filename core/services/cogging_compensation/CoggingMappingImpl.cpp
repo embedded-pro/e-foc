@@ -168,7 +168,7 @@ namespace services
 
         const auto step = config.speedSlewRate * slewPeriodSeconds;
         const auto remaining = target - commandedSpeed;
-        commandedSpeed = std::abs(remaining) <= step ? target : commandedSpeed + std::copysign(step, remaining);
+        commandedSpeed = math::Abs(remaining) <= step ? target : commandedSpeed + math::Copysign(step, remaining);
         controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
 
         if (current == Phase::reversing && commandedSpeed == target)

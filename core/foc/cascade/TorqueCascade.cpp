@@ -20,7 +20,7 @@ namespace foc
             if (quadrature * electricalSpeed <= 0.0f)
                 return quadrature;
 
-            return quadrature * std::clamp(speedFoldGain * (1.0f - std::abs(electricalSpeed) * inverseElectricalSpeedLimit), 0.0f, 1.0f);
+            return quadrature * std::clamp(speedFoldGain * (1.0f - math::Abs(electricalSpeed) * inverseElectricalSpeedLimit), 0.0f, 1.0f);
         }
     }
 

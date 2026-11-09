@@ -60,7 +60,7 @@ namespace services
         const auto fs = static_cast<float>(samplingFrequency.Value());
         const auto fInj = static_cast<float>(activeConfig.injectionFrequency.Value());
         const auto samplesPerPeriod = fInj > 0.0f
-                                          ? static_cast<std::size_t>(std::round(fs / fInj))
+                                          ? static_cast<std::size_t>(math::Round(fs / fInj))
                                           : std::size_t{ 0 };
 
         if (samplesPerPeriod == 0)

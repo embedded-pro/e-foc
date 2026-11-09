@@ -1,4 +1,5 @@
 #include "core/supervision/FollowingErrorMonitor.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -36,7 +37,7 @@ namespace supervision
         }
 
         const auto current = settings();
-        const auto counts = !beyond.Reported() && current.window.Value() > 0.0f && std::abs(drive.ObserveMotion().positionError.Value()) > current.window.Value();
+        const auto counts = !beyond.Reported() && current.window.Value() > 0.0f && math::Abs(drive.ObserveMotion().positionError.Value()) > current.window.Value();
 
         if (beyond.ReportOnce(beyond.Held(counts, infra::Now(), current.time)))
             onFault(state_machine::FaultCode::followingError);

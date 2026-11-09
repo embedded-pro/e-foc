@@ -20,7 +20,7 @@ namespace services
             {
                 const auto t = static_cast<float>(step) / static_cast<float>(peakSamplesPerBin);
                 const auto counts = foc::CatmullRom(torque[(bin + bins - 1) % bins], torque[bin], torque[(bin + 1) % bins], torque[(bin + 2) % bins], t);
-                peak = std::max(peak, std::abs(counts));
+                peak = std::max(peak, math::Abs(counts));
             }
 
         return foc::NewtonMeter{ peak * torqueScale };
@@ -60,7 +60,7 @@ namespace services
         for (auto& torque : cogging)
         {
             torque -= mean;
-            largestBin = std::max(largestBin, std::abs(torque));
+            largestBin = std::max(largestBin, math::Abs(torque));
         }
 
         if (!math::IsFinite(largestBin) || largestBin <= 0.0f)
@@ -69,7 +69,7 @@ namespace services
         CoggingMap map{};
         map.torqueScale = largestBin / countsPerHalfRange;
         for (std::size_t bin = 0; bin != bins; ++bin)
-            map.torque[bin] = static_cast<int8_t>(std::lround(cogging[bin] / map.torqueScale));
+            map.torque[bin] = static_cast<int8_t>(math::Round(cogging[bin] / map.torqueScale));
         map.peak = CoggingPeak(map.torque, map.torqueScale);
         map.agreement = agreement;
 
@@ -133,7 +133,7 @@ namespace services
             return 0.0f;
 
         constexpr float largestAgreementSquared{ 1.0e6f };
-        return std::sqrt(shared / std::max(differing, shared / largestAgreementSquared));
+        return math::Sqrt(shared / std::max(differing, shared / largestAgreementSquared));
     }
 
     std::optional<CoggingMapBuilder::DirectionResult> CoggingMapBuilder::DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const

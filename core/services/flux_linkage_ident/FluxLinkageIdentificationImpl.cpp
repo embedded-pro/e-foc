@@ -1,6 +1,7 @@
 #include "core/services/flux_linkage_ident/FluxLinkageIdentificationImpl.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -94,7 +95,7 @@ namespace services
         const auto observation = motion.ObserveMotion();
         const auto speed = observation.measuredSpeed.Value();
 
-        if (std::abs(speed) > config.maxSpeed.Value())
+        if (math::Abs(speed) > config.maxSpeed.Value())
         {
             Result result{};
             result.outcome = Outcome::overspeed;
@@ -135,7 +136,7 @@ namespace services
 
     void FluxLinkageIdentificationImpl::Spin(float speed)
     {
-        const auto magnitude = std::abs(speed);
+        const auto magnitude = math::Abs(speed);
         const auto gainPerTick = std::max(magnitude - previousSpeed, 0.0f);
         previousSpeed = magnitude;
 
@@ -162,7 +163,7 @@ namespace services
 
     void FluxLinkageIdentificationImpl::Record(float speed, const foc::MotionObservation& observation)
     {
-        if (std::abs(speed) < config.lowestSpeed.Value() || phaseTicks >= TicksIn(config.coastLimit))
+        if (math::Abs(speed) < config.lowestSpeed.Value() || phaseTicks >= TicksIn(config.coastLimit))
         {
             EndCoast(speed);
             return;
@@ -179,7 +180,7 @@ namespace services
     void FluxLinkageIdentificationImpl::AddPoint()
     {
         const auto scale = 1.0f / static_cast<float>(pointTicks);
-        const auto meanSpeed = std::abs(pointSpeed * scale);
+        const auto meanSpeed = math::Abs(pointSpeed * scale);
         fit.Add(polePairs * pointSpeed * scale, pointVoltage * scale);
         pointSpeed = 0.0f;
         pointVoltage = 0.0f;
@@ -198,7 +199,7 @@ namespace services
 
         if (coasts >= config.maxCoasts || (fit.Count() >= config.requiredSamples && SpansSpeeds()))
             StartBraking();
-        else if (std::abs(speed) > recordingCeiling || !SpansSpeeds())
+        else if (math::Abs(speed) > recordingCeiling || !SpansSpeeds())
             phase = Phase::slowing;
         else
             Accelerate();
@@ -206,7 +207,7 @@ namespace services
 
     void FluxLinkageIdentificationImpl::Slow(float speed)
     {
-        if (std::abs(speed) <= slowingMargin * config.lowestSpeed.Value())
+        if (math::Abs(speed) <= slowingMargin * config.lowestSpeed.Value())
             Settle();
         else
             controller.CommandCurrent(foc::Ampere{ speed > 0.0f ? -spinCurrent : spinCurrent });
@@ -219,7 +220,7 @@ namespace services
 
     void FluxLinkageIdentificationImpl::Brake(float speed)
     {
-        if (std::abs(speed) <= config.stoppedSpeed.Value() || ++phaseTicks >= TicksIn(config.brakeLimit))
+        if (math::Abs(speed) <= config.stoppedSpeed.Value() || ++phaseTicks >= TicksIn(config.brakeLimit))
         {
             Finish(Evaluate());
             return;
@@ -262,7 +263,7 @@ namespace services
         const bool enoughSamples = fit.Count() >= minimumSamples;
         const bool spansSpeeds = SpansSpeeds();
         const bool precise = result.relativeError <= config.maxRelativeError;
-        const bool smallOffset = std::abs(result.intercept.Value()) <= config.maxInterceptFraction * fit.LargestVoltage();
+        const bool smallOffset = math::Abs(result.intercept.Value()) <= config.maxInterceptFraction * fit.LargestVoltage();
         const bool plausible = foc::IsWithinInclusive(result.fluxLinkage.Value(), foc::CommandLimits::minFluxLinkage, foc::CommandLimits::maxFluxLinkage);
 
         result.outcome = enoughSamples && spansSpeeds && precise && smallOffset && plausible ? Outcome::identified : Outcome::notIdentified;

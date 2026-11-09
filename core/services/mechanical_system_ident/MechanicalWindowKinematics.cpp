@@ -1,4 +1,5 @@
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -58,8 +59,8 @@ namespace services
         if (movingWindows < minimumMovingWindows)
             return;
 
-        const auto seconds = std::sqrt(countAngle / accelerationQuantumTarget);
-        const auto wanted = std::clamp(static_cast<uint32_t>(std::ceil(seconds / windowPeriod)), minimumWindowsPerObservation, maximumWindowsPerObservation);
+        const auto seconds = math::Sqrt(countAngle / accelerationQuantumTarget);
+        const auto wanted = std::clamp(static_cast<uint32_t>(math::Ceil(seconds / windowPeriod)), minimumWindowsPerObservation, maximumWindowsPerObservation);
 
         if (wanted == windowsPerObservation)
             return;

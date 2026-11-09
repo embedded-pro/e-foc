@@ -1,5 +1,6 @@
 #include "core/foc/model/EncoderModel.hpp"
 #include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -47,7 +48,7 @@ namespace foc
             return false;
 
         const float twoPi = 2.0f * std::numbers::pi_v<float>;
-        const float past = std::fmod(std::fmod(rotorAngle.Value() - indexAngle->Value(), twoPi) + twoPi, twoPi);
+        const float past = math::Fmod(math::Fmod(rotorAngle.Value() - indexAngle->Value(), twoPi) + twoPi, twoPi);
 
         return past < static_cast<float>(indexWidthCounts) * CountWidth();
     }
@@ -86,7 +87,7 @@ namespace foc
         if (countsPerRevolution != 0)
         {
             const float step = 2.0f * std::numbers::pi_v<float> / static_cast<float>(countsPerRevolution);
-            measured = std::floor(measured / step) * step;
+            measured = math::Floor(measured / step) * step;
         }
 
         return math::WrapToPi(measured);

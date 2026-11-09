@@ -1,4 +1,5 @@
 #include "core/supervision/OverTemperature.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <variant>
@@ -10,7 +11,7 @@ namespace supervision
         , onLimit{ onLimit }
         , onFault{ onFault }
         , limit{ boardLimit }
-        , filter{ 1.0f - std::exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
+        , filter{ 1.0f - math::Exp(-std::chrono::duration<float>(evaluationPeriod).count() / std::chrono::duration<float>(filterTimeConstant).count()) }
     {}
 
     void OverTemperature::Enable(const infra::Function<Settings()>& settings)
@@ -70,7 +71,7 @@ namespace supervision
         const auto derated = boardLimit.Value() * headroom;
 
         const auto reachedAnEnd = (headroom == 1.0f || headroom == 0.0f) && derated != limit.Value();
-        if (!reachedAnEnd && std::abs(derated - limit.Value()) < reportStep * boardLimit.Value())
+        if (!reachedAnEnd && math::Abs(derated - limit.Value()) < reportStep * boardLimit.Value())
             return;
 
         limit = foc::Ampere{ derated };

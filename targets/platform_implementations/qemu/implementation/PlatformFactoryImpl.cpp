@@ -3,6 +3,7 @@
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "numerical/math/Math.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantModel.hpp"
@@ -66,12 +67,12 @@ namespace
 
     long Milli(float value)
     {
-        return std::lround(value * 1000.0f);
+        return static_cast<long>(math::Round(value * 1000.0f));
     }
 
     long Micro(float value)
     {
-        return std::lround(value * 1000000.0f);
+        return static_cast<long>(math::Round(value * 1000000.0f));
     }
 
     template<std::size_t Size>

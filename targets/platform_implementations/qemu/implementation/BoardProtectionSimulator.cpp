@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace application
@@ -39,7 +40,7 @@ namespace application
     {
         if (trips.overCurrentAmpere > 0.0f)
         {
-            const auto peak = std::fmax(std::fmax(std::fabs(currents.a.Value()), std::fabs(currents.b.Value())), std::fabs(currents.c.Value()));
+            const auto peak = std::fmax(std::fmax(math::Abs(currents.a.Value()), math::Abs(currents.b.Value())), math::Abs(currents.c.Value()));
             if (peak > trips.overCurrentAmpere)
             {
                 reason = PlatformFactory::BoardProtectionReason::overCurrent;

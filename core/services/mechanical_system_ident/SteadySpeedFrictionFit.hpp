@@ -2,6 +2,7 @@
 
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "numerical/estimators/online/RunningLinearFit.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <cstdint>
 
@@ -16,7 +17,7 @@ namespace services
 
         void Add(float speed, float torque, float forgettingFactor)
         {
-            if (runObservations != 0 && std::abs(speed - RunSpeed()) > speedBand * std::abs(RunSpeed()))
+            if (runObservations != 0 && math::Abs(speed - RunSpeed()) > speedBand * math::Abs(RunSpeed()))
                 EndRun();
 
             runSpeed += speed;
@@ -40,7 +41,7 @@ namespace services
 
         bool SpansDistinctSpeeds() const
         {
-            const auto spread = 0.5f * mechanical_estimate::minimumSpeedSpan * std::abs(line.MeanX());
+            const auto spread = 0.5f * mechanical_estimate::minimumSpeedSpan * math::Abs(line.MeanX());
 
             return line.Weight() != 0.0f && line.SumSquaredDeviationsX() >= spread * spread * line.Weight();
         }

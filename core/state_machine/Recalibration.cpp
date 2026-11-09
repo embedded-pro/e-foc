@@ -1,5 +1,6 @@
 #include "core/state_machine/Recalibration.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -148,7 +149,7 @@ namespace state_machine
     {
         const auto& entry = tracked[quantity];
         const auto current = QuantityOf(inUse, quantity);
-        return entry.settled && foc::IsFinitePositive(current) && std::abs(entry.reading - current) > deviationThreshold * current;
+        return entry.settled && foc::IsFinitePositive(current) && math::Abs(entry.reading - current) > deviationThreshold * current;
     }
 
     RecalibrationVerdict Recalibration::Judge(std::size_t quantity, RecalibrationTrigger trigger)
