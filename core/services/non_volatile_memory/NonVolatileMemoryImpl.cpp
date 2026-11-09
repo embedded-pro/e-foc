@@ -67,9 +67,9 @@ namespace services
             return;
 
         Serialize(data, image.Contents());
-        image.Write([this](NvmStatus status)
+        image.Write([this](bool verified)
             {
-                Complete(status);
+                Complete(verified ? NvmStatus::Ok : NvmStatus::HardwareFault);
             });
     }
 

@@ -29,7 +29,6 @@
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/leds/StatusLeds.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
-#include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
@@ -45,6 +44,7 @@
 #include "core/supervision/PositionLimitMonitor.hpp"
 #include "core/supervision/TargetReachedMonitor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
+#include "services/util/NvmEepromRegion.hpp"
 #include "targets/sync_foc_sensored/main/instantiations/ControlModeLedStatus.hpp"
 #include <optional>
 

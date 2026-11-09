@@ -8,6 +8,7 @@ target_include_directories(e_foc.services.non_volatile_memory PUBLIC
 target_link_libraries(e_foc.services.non_volatile_memory PUBLIC
     infra.util
     hal.interfaces
+    services.util
 )
 
 target_sources(e_foc.services.non_volatile_memory PRIVATE
@@ -19,11 +20,7 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
     LearnedModelData.cpp
     NonVolatileMemory.hpp
     NvmBytes.hpp
-    NvmImage.hpp
     NvmRecord.hpp
-    NvmRegion.hpp
-    NvmEepromRegion.hpp
-    NvmEepromRegion.cpp
     NonVolatileMemoryImpl.hpp
     NonVolatileMemoryImpl.cpp
 )

@@ -42,7 +42,7 @@ date: 2026-11-08
 - Providing non-blocking, callback-based operations — no operation may block the calling context
 
 **Is NOT responsible for:**
-- Raw EEPROM hardware access — all erase, read, and write operations are delegated to injected `NvmRegion` instances
+- Raw EEPROM hardware access — all erase, read, and write operations are delegated to injected EmIL `services::NvmRegion` instances (`services/util/NvmRegion.hpp`); on the board each is an EmIL `services::NvmEepromRegion`
 - Computing the calibration or configuration values themselves — those are produced by the identification services and the application
 - Providing wear-levelling or journaling — a single record per region is maintained without historical versioning
 
@@ -234,10 +234,10 @@ No journaling or wear-levelling is implemented. Each write operation overwrites 
 
 ### Buffer Management — No Heap
 
-Each region owns two statically allocated byte arrays:
+Each region is held in an EmIL `services::NvmImage<Size>` (`services/util/NvmImage.hpp`), which owns two statically allocated byte arrays:
 
 - **Write buffer** — sized to hold one complete image; populated before the `NvmRegion::Write` call.
-- **Read-back buffer** — same size; populated by the `NvmRegion::Read` call, compared after a write and decoded after a load.
+- **Read-back buffer** — same size; populated by the `NvmRegion::Read` call, compared after a write and decoded after a load. `NvmImage` reports the comparison as `bool verified`; the service maps `false` to `NvmStatus::HardwareFault`.
 
 Both buffers are `std::array<uint8_t, recordSize>` members of the service object. They are reused across invocations. No heap is used at any point.
 

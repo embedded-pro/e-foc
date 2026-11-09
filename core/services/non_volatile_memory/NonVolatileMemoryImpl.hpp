@@ -1,10 +1,10 @@
 #pragma once
 
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
-#include "core/services/non_volatile_memory/NvmImage.hpp"
 #include "core/services/non_volatile_memory/NvmRecord.hpp"
-#include "core/services/non_volatile_memory/NvmRegion.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include "services/util/NvmImage.hpp"
+#include "services/util/NvmRegion.hpp"
 #include <cstddef>
 
 namespace services
