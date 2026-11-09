@@ -531,7 +531,7 @@ namespace application
         eventLoopStallTimer.Start(eventLoopStallDelay, []()
             {
                 const std::atomic<bool> stalled{ true };
-                while (stalled.load(std::memory_order_relaxed))
+                while (stalled.load())
                 {
                     // Spin until the watchdog resets the controller.
                 }

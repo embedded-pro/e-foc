@@ -808,3 +808,75 @@ TEST_F(TestPositionCascade, a_cleared_friction_adds_no_current)
 
     ExpectSameDuty(DutyAfterOuterCycles(cleared, 0.5f, 0.0f), DutyAfterOuterCycles(reference, 0.5f, 0.0f));
 }
+
+TEST_F(TestPositionCascade, the_current_and_speed_algorithms_are_selectable_while_disabled)
+{
+    EXPECT_EQ(focPosition->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    EXPECT_EQ(focPosition->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
+    EXPECT_EQ(focPosition->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::ok);
+    EXPECT_EQ(focPosition->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
+}
+
+TEST_F(TestPositionCascade, selecting_the_current_algorithm_is_refused_while_enabled)
+{
+    focPosition->Enable();
+
+    EXPECT_EQ(focPosition->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::busy);
+    EXPECT_EQ(focPosition->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(TestPositionCascade, a_current_command_reports_the_mean_q_axis_voltage_it_applies)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+
+    focPosition->EnableCurrentCommand();
+    focPosition->CommandCurrent(foc::Ampere{ 2.0f });
+
+    for (int window = 0; window != 3; ++window)
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ 0.0f };
+            focPosition->Calculate(ZeroCurrents(), held);
+        }
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    EXPECT_GT(focPosition->QuadratureVoltage().Value(), 0.0f);
+
+    focPosition->DisableCurrentCommand();
+    EXPECT_NEAR(focPosition->QuadratureVoltage().Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestPositionCascade, a_zero_current_limit_demands_no_torque_current)
+{
+    PositionCascadeUnderTest limited{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(limited.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    limited.cascade->LimitCurrent(foc::Ampere{ 0.0f });
+
+    const auto duty = DutyAfterOuterCycles(limited, 1.0f, 0.0f, 5);
+
+    EXPECT_NEAR(limited.cascade->ObserveMotion().demandedTorqueCurrent.Value(), 0.0f, 1e-6f);
+    ExpectCentredDuty(duty);
+}
+
+TEST_F(TestPositionCascade, a_bus_below_the_configured_voltage_raises_the_inner_loop_duty)
+{
+    PositionCascadeUnderTest nominal{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    PositionCascadeUnderTest lowBus{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(nominal.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    EXPECT_CALL(lowBus.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    lowBus.cascade->TrackBusVoltage(foc::Volts{ 12.0f });
+
+    const auto expected = DutyAfterOuterCycles(nominal, 0.1f, 0.0f);
+    const auto raised = DutyAfterOuterCycles(lowBus, 0.1f, 0.0f);
+
+    const auto deviation = [](const foc::PhasePwmDutyCycles& duty)
+    {
+        return std::abs(DutyPercent(duty.a) - 50.0f) + std::abs(DutyPercent(duty.b) - 50.0f) + std::abs(DutyPercent(duty.c) - 50.0f);
+    };
+
+    ExpectOffCentreDuty(expected);
+    EXPECT_GT(deviation(raised), deviation(expected));
+}

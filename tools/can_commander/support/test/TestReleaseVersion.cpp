@@ -39,6 +39,27 @@ TEST_F(TestReleaseVersion, orders_by_major_then_minor_then_patch)
     EXPECT_EQ((ReleaseVersion{ 1, 2, 3 }), (ReleaseVersion{ 1, 2, 3 }));
 }
 
+TEST_F(TestReleaseVersion, compares_each_component_in_both_directions)
+{
+    const ReleaseVersion base{ 1, 2, 3 };
+
+    for (const auto& higher : { ReleaseVersion{ 2, 0, 0 }, ReleaseVersion{ 1, 3, 0 }, ReleaseVersion{ 1, 2, 4 } })
+    {
+        EXPECT_TRUE(base < higher);
+        EXPECT_TRUE(higher > base);
+        EXPECT_TRUE(base <= higher);
+        EXPECT_TRUE(higher >= base);
+        EXPECT_FALSE(base == higher);
+        EXPECT_TRUE(base != higher);
+        EXPECT_FALSE(higher < base);
+    }
+
+    EXPECT_TRUE(base <= base);
+    EXPECT_TRUE(base >= base);
+    EXPECT_FALSE(base < base);
+    EXPECT_FALSE(base != base);
+}
+
 TEST_F(TestReleaseVersion, formats_without_prefix)
 {
     EXPECT_EQ("3.14.159", (ReleaseVersion{ 3, 14, 159 }).ToString());

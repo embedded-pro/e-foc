@@ -16,19 +16,19 @@ namespace tool
 
         Capture& CaptureState()
         {
-            static Capture capture;
+            constinit static Capture capture;
             return capture;
         }
 
         bool& WritingOnThisThread()
         {
-            thread_local bool writing{ false };
+            constinit thread_local bool writing{ false };
             return writing;
         }
 
         void ForwardQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& message)
         {
-            auto& capture = CaptureState();
+            const auto& capture = CaptureState();
             auto* log = capture.log.load();
             if (log != nullptr && !WritingOnThisThread() && type != QtDebugMsg && type != QtInfoMsg)
                 log->Write(type == QtWarningMsg ? IssueSeverity::warning : IssueSeverity::error, "Qt: " + message);

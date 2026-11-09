@@ -1,7 +1,7 @@
 #include "tools/hardware_bridge/client/common/ResolveIPv4.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
-#include <cstring>
+#include <bit>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -30,8 +30,7 @@ namespace tool
             throw BridgeArgumentException("cannot resolve host '" + host + "'");
         }
 
-        sockaddr_in in{};
-        std::memcpy(&in, result->ai_addr, sizeof(in));
+        const auto in = std::bit_cast<sockaddr_in>(*result->ai_addr);
         const uint32_t addr = ntohl(in.sin_addr.s_addr);
         ::freeaddrinfo(result);
 

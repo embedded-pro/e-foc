@@ -56,4 +56,7 @@ namespace tool
     {
         return std::format("{}.{}.{}", major, minor, patch);
     }
+
+    bool operator==(const ReleaseVersion& lhs, const ReleaseVersion& rhs) = default;
+    std::strong_ordering operator<=>(const ReleaseVersion& lhs, const ReleaseVersion& rhs) = default;
 }
