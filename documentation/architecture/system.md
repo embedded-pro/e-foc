@@ -498,7 +498,7 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` for debuggability.                 |
 | Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                     |
 | Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                     |
-| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                                                 |
+| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                     |
 
 ---
 

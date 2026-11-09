@@ -62,7 +62,7 @@ without a display:
 
 ### Part B — the manager window
 
-```
+```text
 +----------------------------------------------------------------------------------+
 |  e-foc Virtual Motor                                   [ Open CAN Commander ]    |
 |  Bus: default  ● hub running   1 Mbit/s   load 12 %   commanders: 1              |
@@ -95,7 +95,7 @@ without a display:
 One window per motor, titled with node and plant, and marked **VIRTUAL** in its header, so it is never
 mistaken for a bench instrument on real hardware.
 
-```
+```text
 +------------------------------------------------------------------------------------------+
 | VIRTUAL  Node 1 · Teknic M-2310P   Running  t = 00:01:42.315  RT 1.00   LEDs ● ○ ○  Prot: ok |
 | [Pause] [Step ▸] [Power Cycle] [Power Off]          Active disturbances: 2  [Clear All]    |
@@ -117,15 +117,15 @@ The header is always in view: motor state, virtual time, real-time factor, the t
 would light them (with their meaning in text: operational, warning, failure), the board protection
 state, and the number of active disturbances with **Clear All** beside it.
 
-| View        | Shows                                                                                                                                         |
-|-------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| Currents    | True phase currents a, b, c with the measured ones overlaid, so the sensor's noise and bias are visible; true Id and Iq below                   |
-| Voltages    | Duties and leg voltages a, b, c; the modulation hexagon with the stator voltage vector and its trail                                          |
-| Rotor       | The animated motor of Part E                                                                                                                  |
-| Encoder     | The monitor of Part F                                                                                                                         |
-| Mechanics   | Speed, true angle, electrical torque against load and external torque                                                                         |
-| Supply      | Bus voltage and current, winding temperature                                                                                                  |
-| Log         | The debug log, timestamped in virtual time, bounded, with filter, Clear and Save                                                              |
+| View      | Shows                                                                                                                         |
+|-----------|-------------------------------------------------------------------------------------------------------------------------------|
+| Currents  | True phase currents a, b, c with the measured ones overlaid, so the sensor's noise and bias are visible; true Id and Iq below |
+| Voltages  | Duties and leg voltages a, b, c; the modulation hexagon with the stator voltage vector and its trail                          |
+| Rotor     | The animated motor of Part E                                                                                                  |
+| Encoder   | The monitor of Part F                                                                                                         |
+| Mechanics | Speed, true angle, electrical torque against load and external torque                                                         |
+| Supply    | Bus voltage and current, winding temperature                                                                                  |
+| Log       | The debug log, timestamped in virtual time, bounded, with filter, Clear and Save                                              |
 
 ### Part D — scopes
 
@@ -196,33 +196,33 @@ finds them as before.
 
 ### Provided
 
-| Interface         | Purpose                                         | Contract                                                         |
-|-------------------|-------------------------------------------------|------------------------------------------------------------------|
-| Virtual CAN hub   | Buses for virtual motors and CAN Commanders     | `virtual-motor.md` Part G, while the app is open                 |
-| Persisted motors  | The rig reopens with its motors                 | Node, plant, start mode and memory file per motor, per user      |
+| Interface        | Purpose                                     | Contract                                                    |
+|------------------|---------------------------------------------|-------------------------------------------------------------|
+| Virtual CAN hub  | Buses for virtual motors and CAN Commanders | `virtual-motor.md` Part G, while the app is open            |
+| Persisted motors | The rig reopens with its motors             | Node, plant, start mode and memory file per motor, per user |
 
 ### Required
 
-| Interface           | Purpose                                     | Contract                                       |
-|---------------------|---------------------------------------------|------------------------------------------------|
-| Virtual motor       | The motors themselves                       | `virtual-motor.md`: start options, plant port  |
-| Theme and scopes    | Look, status colours, scope and hexagon views | The shared tool UI library, as the CAN Commander |
+| Interface        | Purpose                                       | Contract                                         |
+|------------------|-----------------------------------------------|--------------------------------------------------|
+| Virtual motor    | The motors themselves                         | `virtual-motor.md`: start options, plant port    |
+| Theme and scopes | Look, status colours, scope and hexagon views | The shared tool UI library, as the CAN Commander |
 
 ---
 
 ## Constraints & Limitations
 
-| Constraint            | Value / Description                                                               |
-|-----------------------|-----------------------------------------------------------------------------------|
-| Motors                | Eight per bus                                                                     |
-| Repaint rate          | At most 25 Hz per view; only the visible view of each window repaints             |
-| Log                   | Bounded per motor; the full log stays in the motor's folder                       |
-| Bus commands          | None: the app never sends a CAN frame                                             |
+| Constraint   | Value / Description                                                   |
+|--------------|-----------------------------------------------------------------------|
+| Motors       | Eight per bus                                                         |
+| Repaint rate | At most 25 Hz per view; only the visible view of each window repaints |
+| Log          | Bounded per motor; the full log stays in the motor's folder           |
+| Bus commands | None: the app never sends a CAN frame                                 |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                      | Options                                                         | Status |
-|---|---------------------------------------------------------------|-----------------------------------------------------------------|--------|
-| 1 | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later            | open, leaning no |
+| # | Question                                                           | Options                                           | Status           |
+|---|--------------------------------------------------------------------|---------------------------------------------------|------------------|
+| 1 | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |
