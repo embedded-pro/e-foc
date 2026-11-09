@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.25)
 
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
-option(E_FOC_BUILD_SIMULATOR "Enable build of the Qt simulator applications" Off)
 option(E_FOC_EMBEDDED_BUILD "Building for an embedded target" Off)
 
 if (E_FOC_BUILD_TESTS)

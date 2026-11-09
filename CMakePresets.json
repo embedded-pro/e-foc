@@ -27,7 +27,6 @@
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
         "E_FOC_TARGET_PLATFORM": "host",
         "E_FOC_BUILD_TESTS": true,
-        "E_FOC_BUILD_SIMULATOR": true,
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
       },
       "generator": "Ninja Multi-Config"
@@ -151,7 +150,6 @@
         "TARGET_CORTEX": "m4",
         "E_FOC_TARGET_PLATFORM": "qemu",
         "E_FOC_BUILD_TESTS": "Off",
-        "E_FOC_BUILD_SIMULATOR": "Off",
         "E_FOC_EMBEDDED_BUILD": "On",
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
         "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an386;-nographic;-semihosting-config;enable=on,target=native;-kernel",

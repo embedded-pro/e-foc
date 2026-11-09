@@ -28,7 +28,8 @@ This project provides a production-ready motor control implementation designed f
 - **Platform Abstraction**: `PlatformFactory` interface with ST and TI implementations
 
 ### Simulation & Testing
-- **C++ Simulator**: Mathematical models for motor evaluation and curve plotting
+- **Software-in-the-Loop**: The shipping firmware under an emulator against a simulated motor plant
+- **Model-in-the-Loop**: The control-mode state machine and calibration services against the same plant on the host
 - **Unit Tests**: Comprehensive GoogleTest coverage for control algorithms
 - **Hardware-in-the-Loop Ready**: Mockable interfaces for testability
 
@@ -107,7 +108,6 @@ e-foc/
 │       ├── st/                      # STM32 platform implementation
 │       └── ti/                      # TI Tiva C platform implementation
 ├── tools/                           # Host-side developer tools
-│   ├── simulator/                   # C++ motor simulators (torque, speed, position control)
 │   ├── can_commander/               # CAN bus command interface tool
 │   └── hardware_bridge/             # Terminal/CAN/serial bridge client (Qt) for HIL tests
 ├── infra/                           # Infrastructure submodules
@@ -136,9 +136,9 @@ e-foc/
 - **Platform Abstraction**: Clean separation between application logic and hardware
 - **Interface-Driven Design**: Pure virtual interfaces enable mocking and testing
 
-## How to Run the Simulator
+## How to Run the Desktop Tools
 
-The simulator includes a Qt-based GUI for real-time visualization. Since the development environment runs inside a Dev Container, an X server on the host machine is required to display the GUI.
+The CAN Commander and the hardware bridge have Qt-based GUIs. Since the development environment runs inside a Dev Container, an X server on the host machine is required to display the GUI.
 
 ### Host Setup
 
@@ -171,19 +171,14 @@ cmake --preset host
 cmake --build --preset host-Debug
 ```
 
-Run the simulator:
+Run the CAN Commander:
 ```bash
-./build/host/bin/Debug/e_foc.tool.simulator
+./build/host/tools/can_commander/main/Debug/e-foc-can-commander
 ```
-
-On launch, a dialog asks which controller to simulate (Torque, Speed, or Position).
-The chosen controller assembles the corresponding loops; the main window provides
-tabbed Parameters/Configuration and Phase Signals/RLS Estimates panels around an
-always-visible SVPWM hexagon.
 
 ### The shared UI library
 
-The three desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
+The desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
 fetched at configure time and pinned in `CMakeLists.txt` to an exact commit. Consuming a
 newer ui-cpp is a deliberate edit to that pin, reviewed like any other change, rather than
 something a fresh configure does on its own; changing it re-fetches on the next configure.
@@ -212,7 +207,7 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 | `e_foc-firmware-<board>-<tag>.tar.gz`                          | `.elf` and `.hex` of every application built for the board                                                                                                                                          |
 | `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex`         | ready-to-flash images for the EK-TM4C1294XL: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed |
 | `e_foc-source-<tag>.tar.gz`                                    | the complete source with every submodule (GitHub's own source archives omit them)                                                                                                                   |
-| `e_foc-can_commander-*`, `e_foc-simulator-*`                   | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
+| `e_foc-can_commander-*`                                        | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
 | `eFocDesign.pdf`                                               | the complete design booklet                                                                                                                                                                         |
 | `e_foc-documentation-<tag>.zip`                                | the individual design, theory and requirements documents as PDFs                                                                                                                                    |
 | `e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-<tag>.upgrade` | the signed upgrade pack the CAN Commander sends to an EK-TM4C1294XL over CAN                                                                                                                        |
