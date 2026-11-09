@@ -67,18 +67,18 @@ namespace services
             return false;
 
         omega = twoPi * fs / static_cast<float>(samplesPerPeriod);
-        phaseIncrement = omega / fs;
-        injectionPhase = 0.0f;
-        injectionAmplitude = foc::DutyFraction(activeConfig.injectionVoltage);
+        injection.phaseIncrement = omega / fs;
+        injection.phase = 0.0f;
+        injection.amplitude = foc::DutyFraction(activeConfig.injectionVoltage);
         terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                              ? deltaTerminalFactor
                              : wyeTerminalFactor;
-        warmupSamples = activeConfig.warmupPeriods * samplesPerPeriod;
-        measurementSamples = activeConfig.measurementPeriods * samplesPerPeriod;
+        samples.warmup = activeConfig.warmupPeriods * samplesPerPeriod;
+        samples.measurement = activeConfig.measurementPeriods * samplesPerPeriod;
         sampleCount = 0;
         sumSquared = 0.0f;
-        const auto binPhasor = math::AccurateSineAndCosine(phaseIncrement);
-        goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, measurementSamples);
+        const auto binPhasor = math::AccurateSineAndCosine(injection.phaseIncrement);
+        goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, samples.measurement);
 
         return true;
     }
@@ -134,7 +134,7 @@ namespace services
     void SinusoidalInductanceEstimator::Complete()
     {
         noSampleTimer.Cancel();
-        vTerminalAmplitude = injectionAmplitude * 0.75f * 0.5f * (busAtInjectionStart + busVoltage().Value());
+        vTerminalAmplitude = injection.amplitude * 0.75f * 0.5f * (busAtInjectionStart + busVoltage().Value());
 
         if (onDone)
             onDone(measurementComplete ? ComputeResult() : Result{});
@@ -168,13 +168,13 @@ namespace services
     {
         sampleSeen = true;
 
-        const float vNorm = injectionAmplitude * math::FastSine(injectionPhase);
+        const float vNorm = injection.amplitude * math::FastSine(injection.phase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));
 
-        injectionPhase += phaseIncrement;
-        if (injectionPhase >= twoPi)
-            injectionPhase -= twoPi;
+        injection.phase += injection.phaseIncrement;
+        if (injection.phase >= twoPi)
+            injection.phase -= twoPi;
 
         ++sampleCount;
     }
@@ -192,7 +192,7 @@ namespace services
 
         AdvanceInjection();
 
-        if (sampleCount <= warmupSamples)
+        if (sampleCount <= samples.warmup)
             return;
 
         const float iAlpha = currents.a.Value();
@@ -216,7 +216,7 @@ namespace services
         if (magSquared < 1e-20f)
             return Result{};
 
-        const auto N = static_cast<float>(measurementSamples);
+        const auto N = static_cast<float>(samples.measurement);
         const float zImag = -vTerminalAmplitude * N / 2.0f * iRe / magSquared;
 
         const float fitQuality = (sumSquared > 0.0f)

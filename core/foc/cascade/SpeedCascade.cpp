@@ -26,18 +26,13 @@ namespace foc
     }
 
     SpeedCascade::SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
-        : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
+        : SpeedLoopDrive(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
         , outerLoopFrequency(lowPriorityFrequency)
     {
         GetLowPriorityInterrupt().Register([this]()
             {
                 LowPriorityHandler();
             });
-    }
-
-    bool SpeedCascade::Configure(const MotorModelParameters& parameters)
-    {
-        return ConfigureImpl(parameters);
     }
 
     bool SpeedCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
@@ -82,46 +77,6 @@ namespace foc
             ApplyReference(RampTowards(reference, target, accelerationStep, decelerationStep));
     }
 
-    void SpeedCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
-    {
-        SetCurrentTuningsImpl(tunings);
-    }
-
-    SelectResult SpeedCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
-    {
-        return SetSpeedTuningsImpl(tunings);
-    }
-
-    SelectResult SpeedCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
-    {
-        return SelectCurrentAlgorithmImpl(algorithm);
-    }
-
-    CurrentAlgorithm SpeedCascade::ActiveCurrentAlgorithm() const
-    {
-        return ActiveCurrentAlgorithmImpl();
-    }
-
-    SelectResult SpeedCascade::SelectSpeedAlgorithm(SpeedAlgorithm algorithm)
-    {
-        return SelectSpeedAlgorithmImpl(algorithm);
-    }
-
-    SpeedAlgorithm SpeedCascade::ActiveSpeedAlgorithm() const
-    {
-        return ActiveSpeedAlgorithmImpl();
-    }
-
-    void SpeedCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
-    {
-        SetOnlineMechanicalEstimatorImpl(estimator);
-    }
-
-    void SpeedCascade::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
-    {
-        SetOnlineElectricalEstimatorImpl(estimator);
-    }
-
     void SpeedCascade::Enable()
     {
         EnableSpeedLoop();
@@ -160,16 +115,6 @@ namespace foc
         Disable();
     }
 
-    void SpeedCascade::CommandCurrent(Ampere quadrature)
-    {
-        CommandCurrentImpl(quadrature);
-    }
-
-    Volts SpeedCascade::QuadratureVoltage() const
-    {
-        return QuadratureVoltageImpl();
-    }
-
     MotionObservation SpeedCascade::ObserveMotion() const
     {
         return ObserveSpeedLoopMotion();
@@ -206,33 +151,4 @@ namespace foc
         return CalculateInnerLoop(currentPhases, position);
     }
 
-    void SpeedCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
-    {
-        LoadCoggingMapImpl(torque, torqueScale, torqueConstant);
-    }
-
-    void SpeedCascade::ClearCoggingMap()
-    {
-        ClearCoggingMapImpl();
-    }
-
-    void SpeedCascade::LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant)
-    {
-        LoadFrictionFeedForwardImpl(coulomb, torqueConstant);
-    }
-
-    void SpeedCascade::ClearFrictionFeedForward()
-    {
-        ClearFrictionFeedForwardImpl();
-    }
-
-    void SpeedCascade::TrackBusVoltage(Volts measured)
-    {
-        TrackBusVoltageImpl(measured);
-    }
-
-    void SpeedCascade::LimitCurrent(Ampere limit)
-    {
-        LimitCurrentImpl(limit);
-    }
 }

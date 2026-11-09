@@ -83,14 +83,9 @@ namespace state_machine
 
     inline can::FocMotorCategoryError ToCategoryError(SelectResult result)
     {
-        switch (result)
-        {
-            case SelectResult::nvmFailed:
-                return can::FocMotorCategoryError::persistenceFailed;
-            case SelectResult::busy:
-            default:
-                return can::FocMotorCategoryError::busy;
-        }
+        if (result == SelectResult::nvmFailed)
+            return can::FocMotorCategoryError::persistenceFailed;
+        return can::FocMotorCategoryError::busy;
     }
 
     inline can::FocMotorCategoryError ToCategoryError(CommandResult result)

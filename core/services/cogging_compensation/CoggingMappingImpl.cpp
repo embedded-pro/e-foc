@@ -44,10 +44,7 @@ namespace services
         }
 
         this->config = config;
-        this->torqueConstant = torqueConstant;
-        this->inertia = inertia;
-        this->viscousFriction = viscousFriction;
-        this->polePairs = polePairs;
+        mechanics = Mechanics{ torqueConstant, inertia, viscousFriction, polePairs };
         this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
 
@@ -113,7 +110,7 @@ namespace services
         previousPosition = position;
         turned += rotation;
 
-        const auto electricalAngle = position * static_cast<float>(polePairs);
+        const auto electricalAngle = position * static_cast<float>(mechanics.polePairs);
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
 
         Advance(electricalAngle, rotatingFrame.q, rotation);
@@ -159,12 +156,19 @@ namespace services
         }
     }
 
+    float CoggingMappingImpl::TargetSpeedIn(Phase current) const
+    {
+        if (current == Phase::forwardSettle || current == Phase::forwardMeasure)
+            return config.speed.Value();
+        if (current == Phase::reversing || current == Phase::backwardStart || current == Phase::backwardSettle || current == Phase::backwardMeasure)
+            return -config.speed.Value();
+        return 0.0f;
+    }
+
     void CoggingMappingImpl::StepSpeedCommand()
     {
         const Phase current = phase;
-        const bool forward = current == Phase::forwardSettle || current == Phase::forwardMeasure;
-        const bool backward = current == Phase::reversing || current == Phase::backwardStart || current == Phase::backwardSettle || current == Phase::backwardMeasure;
-        const auto target = forward ? config.speed.Value() : (backward ? -config.speed.Value() : 0.0f);
+        const auto target = TargetSpeedIn(current);
 
         const auto step = config.speedSlewRate * slewPeriodSeconds;
         const auto remaining = target - commandedSpeed;
@@ -209,8 +213,8 @@ namespace services
         CoggingMeasurement measurement{};
         if (complete)
         {
-            measurement.map = builder.Build(torqueConstant, inertia, polePairs, samplePeriod);
-            measurement.frictionCoulomb = builder.FrictionCoulomb(torqueConstant, inertia, viscousFriction, polePairs, samplePeriod).value_or(foc::NewtonMeter{ 0.0f });
+            measurement.map = builder.Build(mechanics.torqueConstant, mechanics.inertia, mechanics.polePairs, samplePeriod);
+            measurement.frictionCoulomb = builder.FrictionCoulomb(mechanics.torqueConstant, mechanics.inertia, mechanics.viscousFriction, mechanics.polePairs, samplePeriod).value_or(foc::NewtonMeter{ 0.0f });
         }
 
         if (onDone)

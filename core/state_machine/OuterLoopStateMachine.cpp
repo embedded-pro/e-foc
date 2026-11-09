@@ -231,7 +231,7 @@ namespace application
     void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
-        const auto pending = calibrating.pendingData;
+        const auto& pending = calibrating.pendingData;
         ClearFeedForwards();
 
         if (!ApplyIdentificationControl(pending))

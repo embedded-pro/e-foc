@@ -35,6 +35,7 @@ target_sources(e_foc.foc.cascade PRIVATE
     SpeedCascade.hpp
     SpeedDifferentiator.cpp
     SpeedDifferentiator.hpp
+    SpeedLoopDrive.hpp
     TorqueCascade.cpp
     TorqueCascade.hpp
 )

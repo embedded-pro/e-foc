@@ -40,7 +40,6 @@ namespace application
         state_machine::Fault EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
         bool IsFaultConditionAsserted() const;
         ClearRefusal EvaluateClearFault();
-        bool CanClearFault();
         void TraceFaultClearRefused(ClearRefusal refusal) const;
         state_machine::Ready ClearFaultToReady();
         state_machine::Idle ClearFaultToIdle();

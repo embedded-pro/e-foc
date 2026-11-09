@@ -39,6 +39,7 @@ namespace services
 
         void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases);
         void Advance(float electricalAngle, float quadratureCurrent, float rotation);
+        float TargetSpeedIn(Phase current) const;
         void StepSpeedCommand();
         void StopMotion();
         void ScheduleFinish();
@@ -52,11 +53,16 @@ namespace services
         float samplePeriod;
         foc::Ampere supportedCurrent;
 
+        struct Mechanics
+        {
+            foc::NewtonMeter torqueConstant{ 0.0f };
+            foc::NewtonMeterSecondSquared inertia{ 0.0f };
+            foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
+            std::size_t polePairs{ 0 };
+        };
+
         Config config;
-        foc::NewtonMeter torqueConstant{ 0.0f };
-        foc::NewtonMeterSecondSquared inertia{ 0.0f };
-        foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
-        std::size_t polePairs{ 0 };
+        Mechanics mechanics;
         foc::Ampere currentEnvelope{ 0.0f };
         infra::AutoResetFunction<void(const CoggingMeasurement&)> onDone;
 

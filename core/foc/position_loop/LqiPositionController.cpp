@@ -37,17 +37,17 @@ namespace foc
 
     PositionOutput LqiPositionController::Compute(const PositionControlContext& context)
     {
-        if (currentPerNormalizedInput == 0.0f)
+        if (CurrentPerNormalizedInput() == 0.0f)
             return { PositionOutputKind::currentReference, 0.0f };
 
         const auto deviation = -PositionDifference(context.reference, context.measured, context.direct);
-        const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
+        const auto scaledSpeed = context.measuredSpeed.Value() * SamplePeriod();
 
         accumulatedDeviation += deviation;
 
-        const auto command = design.ComputeControl(Design::StateVector{ accumulatedDeviation, deviation, scaledSpeed });
-        const auto unlimited = command.at(0, 0) * currentPerNormalizedInput;
-        const auto limited = LimitToCurrentEnvelope(unlimited, parameters.maxCurrent);
+        const auto command = ControlDesign().ComputeControl(Design::StateVector{ accumulatedDeviation, deviation, scaledSpeed });
+        const auto unlimited = command.at(0, 0) * CurrentPerNormalizedInput();
+        const auto limited = LimitToCurrentEnvelope(unlimited, MaxCurrent());
 
         if (limited.Value() != unlimited)
             accumulatedDeviation -= deviation;

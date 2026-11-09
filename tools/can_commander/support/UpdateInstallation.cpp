@@ -14,8 +14,15 @@ namespace tool
 
         QString EncodedPowerShellCommand(const QString& script)
         {
-            const auto* utf16 = reinterpret_cast<const char*>(script.utf16());
-            return QString::fromLatin1(QByteArray{ utf16, script.size() * static_cast<qsizetype>(sizeof(char16_t)) }.toBase64());
+            QByteArray utf16LittleEndian;
+            utf16LittleEndian.reserve(script.size() * 2);
+            for (const auto character : script)
+            {
+                const auto unit = character.unicode();
+                utf16LittleEndian.append(static_cast<char>(unit & 0xffu));
+                utf16LittleEndian.append(static_cast<char>(unit >> 8u));
+            }
+            return QString::fromLatin1(utf16LittleEndian.toBase64());
         }
     }
 

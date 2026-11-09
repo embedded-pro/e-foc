@@ -17,7 +17,7 @@ namespace services
     public:
         static constexpr float spinCurrentFraction{ 0.25f };
 
-        FluxLinkageIdentificationImpl(foc::CurrentCommandable& controller, foc::Controllable& drive, const foc::FocBase& motion, drivers::ThreePhaseInverter& inverter);
+        FluxLinkageIdentificationImpl(foc::CurrentCommandable& controller, foc::Controllable& drive, const foc::FocBase& motion, const drivers::ThreePhaseInverter& inverter);
 
         void Identify(std::size_t polePairs, foc::Ohm resistance, const Config& config, const infra::Function<void(const Result& result)>& onDone) override;
         bool IsRunning() const override;

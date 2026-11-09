@@ -76,6 +76,28 @@ namespace can
                     return std::nullopt;
             }
         }
+
+        std::optional<ParameterGroup> ConfigurationGroupOf(FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::encoderResolution:
+                case FocParameter::canNodeId:
+                case FocParameter::canBitrate:
+                case FocParameter::telemetryRate:
+                    return ParameterGroup::startup;
+                case FocParameter::supervisionWindow:
+                case FocParameter::supervisionCurrentFraction:
+                case FocParameter::supervisionDemandedSpeed:
+                case FocParameter::supervisionPositionError:
+                case FocParameter::supervisionStillExcursion:
+                case FocParameter::stallDetection:
+                case FocParameter::recalibrationMode:
+                    return ParameterGroup::supervision;
+                default:
+                    return std::nullopt;
+            }
+        }
     }
 
     ParameterGroup GroupOf(FocParameter parameter)
@@ -84,22 +106,11 @@ namespace can
             return *reading;
         if (const auto loop = LoopGroupOf(parameter))
             return *loop;
+        if (const auto configuration = ConfigurationGroupOf(parameter))
+            return *configuration;
 
         switch (parameter)
         {
-            case FocParameter::encoderResolution:
-            case FocParameter::canNodeId:
-            case FocParameter::canBitrate:
-            case FocParameter::telemetryRate:
-                return ParameterGroup::startup;
-            case FocParameter::supervisionWindow:
-            case FocParameter::supervisionCurrentFraction:
-            case FocParameter::supervisionDemandedSpeed:
-            case FocParameter::supervisionPositionError:
-            case FocParameter::supervisionStillExcursion:
-            case FocParameter::stallDetection:
-            case FocParameter::recalibrationMode:
-                return ParameterGroup::supervision;
             case FocParameter::overspeedLimit:
             case FocParameter::followingErrorWindow:
             case FocParameter::followingErrorTime:

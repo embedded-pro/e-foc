@@ -209,11 +209,6 @@ namespace application
         return faultController.EvaluateClear();
     }
 
-    bool OperationFlow::CanClearFault()
-    {
-        return EvaluateClearFault() == ClearRefusal::none;
-    }
-
     void OperationFlow::TraceFaultClearRefused(ClearRefusal refusal) const
     {
         switch (refusal)

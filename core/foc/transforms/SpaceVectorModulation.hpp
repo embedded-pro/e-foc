@@ -12,7 +12,8 @@ namespace foc
     {
         const auto toDutyCycle = [](float value)
         {
-            const auto bounded = value > 0.0f ? (value < 1.0f ? value : 1.0f) : 0.0f;
+            // max(0, value) and not max(value, 0): it maps a NaN modulation to 0.
+            const auto bounded = std::min(std::max(0.0f, value), 1.0f);
 
             return hal::DutyCycle{ static_cast<uint32_t>(bounded * static_cast<float>(hal::DutyCycle::fullScale) + 0.5f) };
         };

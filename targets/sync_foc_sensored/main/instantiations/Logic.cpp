@@ -127,177 +127,216 @@ namespace application
 
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
-                if (status != services::NvmStatus::Ok)
-                    configData = services::ConfigData{};
-                this->hardware.SetEncoderResolution(this->configData.encoderResolution);
-                this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
+                OnConfigLoaded(status);
+            });
+    }
 
-                const auto nodeId = services::MakeCanNodeId(this->configData.canNodeId, boardId);
-                this->hardware.Tracer().Trace() << "[CAN] node " << nodeId << " = base " << this->configData.canNodeId << " + board ID " << boardId;
+    void Logic::OnConfigLoaded(services::NvmStatus status)
+    {
+        if (status != services::NvmStatus::Ok)
+            configData = services::ConfigData{};
+        hardware.SetEncoderResolution(configData.encoderResolution);
+        hardware.ConfigureCanBus(configData.canBaudrate, false);
 
-                tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
-                canBus.emplace(*tracingCan, this->hardware.CanBus(), [](hal::Can::Id id)
-                    {
-                        return can::FocMotorCurrentStreamer::IsStreamFrame(id);
-                    });
-                canServer.emplace(*canBus, services::CanProtocolServer::Config{ .nodeId = nodeId });
-                tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
-                motorCanServer.emplace(canServer->Transport());
-                canServer->RegisterCategory(*motorCanServer);
-                firmwareUpgradeServer.emplace(canServer->Transport());
-                canServer->RegisterCategory(*firmwareUpgradeServer);
+        StartCan();
+        StartControl();
+        StartFirmwareUpgradeAndBridge();
+        SuperviseDrive();
+        currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
+        SuperviseEncoder();
+        SuperviseMotion();
+        BroadcastFaults();
+    }
 
-                controlMode.emplace(
-                    this->hardware.Tracer(),
-                    MotorHardware{ inverterCompensation, this->hardware, vdc, this->hardware.DutyUpdateDelayPeriods(), &currentStream },
-                    nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
-                    *platformFaultNotifier,
-                    configData,
-                    ControlMode::OuterLoopArgs{
-                        .maxCurrent = this->hardware.MaxCurrentSupported(),
-                        .baseFrequency = this->hardware.BaseFrequency(),
-                        .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt() });
-                controlMode->RestoreStoredModel();
-                faultHistory.emplace(nvm, [this]()
+    void Logic::StartCan()
+    {
+        const auto nodeId = services::MakeCanNodeId(configData.canNodeId, boardId);
+        hardware.Tracer().Trace() << "[CAN] node " << nodeId << " = base " << configData.canNodeId << " + board ID " << boardId;
+
+        tracingCan.emplace(hardware.CanBus(), hardware.Tracer());
+        canBus.emplace(*tracingCan, hardware.CanBus(), [](hal::Can::Id id)
+            {
+                return can::FocMotorCurrentStreamer::IsStreamFrame(id);
+            });
+        canServer.emplace(*canBus, services::CanProtocolServer::Config{ .nodeId = nodeId });
+        tracingServerObserver.emplace(*canServer, hardware.Tracer());
+        motorCanServer.emplace(canServer->Transport());
+        canServer->RegisterCategory(*motorCanServer);
+        firmwareUpgradeServer.emplace(canServer->Transport());
+        canServer->RegisterCategory(*firmwareUpgradeServer);
+    }
+
+    void Logic::StartControl()
+    {
+        controlMode.emplace(
+            hardware.Tracer(),
+            MotorHardware{ inverterCompensation, hardware, vdc, hardware.DutyUpdateDelayPeriods(), &currentStream },
+            nvm,
+            CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
+            *platformFaultNotifier,
+            configData,
+            ControlMode::OuterLoopArgs{
+                .maxCurrent = hardware.MaxCurrentSupported(),
+                .baseFrequency = hardware.BaseFrequency(),
+                .lowPriorityInterrupt = hardware.LowPriorityInterrupt() });
+        controlMode->RestoreStoredModel();
+        faultHistory.emplace(nvm, [this]()
+            {
+                controlMode->HoldAsyncWork();
+            },
+            [this]()
+            {
+                controlMode->ReleaseAsyncWork();
+            });
+        peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        controlMode->OnFaultEntered([this](state_machine::FaultCode code)
+            {
+                RecordFault(code);
+            });
+        faultHistory->Start();
+    }
+
+    void Logic::StartFirmwareUpgradeAndBridge()
+    {
+        firmwareUpgradeInterlock.emplace(*controlMode);
+        firmwareUpgrade.emplace(*firmwareUpgradeServer, hardware.Staging(), *firmwareUpgradeInterlock, [this]()
+            {
+                hardware.Reset();
+            });
+        canBridge.emplace(*motorCanServer, *controlMode,
+            can::FocMotorCanBridge::Platform{ inverter, hardware, hardware.Diagnostics(), ToCanResetCause(hardware.GetResetCause()), FirmwareIdentityOf(hardware.GetBoardKind()) },
+            can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade, *faultHistory },
+            hardware.Tracer());
+        canLivenessWatchdog.emplace(*canServer, *controlMode, hardware.Tracer());
+        canBridge->ObserveCommands([this]()
+            {
+                commandTimeout.CommandAccepted();
+            });
+    }
+
+    void Logic::SuperviseDrive()
+    {
+        commandTimeout.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        motorOverload.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        motorOverload.Enable([this]()
+            {
+                return supervision::OverloadRatingsFrom(controlMode->Config());
+            });
+        overTemperature.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            },
+            [this]()
+            {
+                return controlMode->WindingTemperature();
+            });
+        overTemperature.Enable([this]()
+            {
+                return supervision::OverTemperatureSettingsFrom(controlMode->Config());
+            });
+        busVoltageLimits.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        busVoltageLimits.Enable([this]()
+            {
+                return supervision::BusVoltageLimitSettingsFrom(controlMode->Config());
+            });
+        busVoltage.Start();
+        commandTimeout.Enable([this]()
+            {
+                return std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(controlMode->Config().limits.commandTimeout));
+            });
+    }
+
+    void Logic::SuperviseEncoder()
+    {
+        encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        encoderPlausibility.Enable([this]()
+            {
+                return supervision::ConfigFrom(controlMode->Config());
+            });
+        encoderFreeze.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        encoderFreeze.Enable([this]()
+            {
+                return supervision::LimitsFrom(controlMode->CalibrationRecord(), controlMode->Config().encoderResolution, hardware.MaxCurrentSupported());
+            });
+        phaseLoss.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        phaseLoss.Enable([this]()
+            {
+                return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
+            });
+    }
+
+    void Logic::SuperviseMotion()
+    {
+        overspeed.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        overspeed.Enable([this]()
+            {
+                return foc::RadiansPerSecond{ controlMode->Config().limits.overspeedLimit };
+            });
+        followingError.Attach([this]() -> const state_machine::FocStateMachineBase&
+            {
+                return controlMode->ActiveStateMachine();
+            });
+        followingError.Enable([this]()
+            {
+                return supervision::FollowingErrorSettingsFrom(controlMode->Config());
+            });
+        targetReached.Attach([this]() -> const state_machine::FocStateMachineBase*
+            {
+                return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+            });
+        targetReached.Enable([this]()
+            {
+                return supervision::TargetReachedSettingsFrom(controlMode->Config());
+            });
+        positionLimit.Attach([this]() -> const state_machine::FocStateMachineBase*
+            {
+                return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
+            },
+            [this]()
+            {
+                return static_cast<drivers::Encoder&>(hardware).Read();
+            });
+        positionLimit.Enable([this]()
+            {
+                return supervision::PositionLimitSettingsFrom(controlMode->Config());
+            });
+        canBridge->ReportTargetReached([this]()
+            {
+                return targetReached.IsReached();
+            });
+    }
+
+    void Logic::BroadcastFaults()
+    {
+        platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
+            {
+                infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()
                     {
-                        controlMode->HoldAsyncWork();
-                    },
-                    [this]()
-                    {
-                        controlMode->ReleaseAsyncWork();
-                    });
-                peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                controlMode->OnFaultEntered([this](state_machine::FaultCode code)
-                    {
-                        RecordFault(code);
-                    });
-                faultHistory->Start();
-                firmwareUpgradeInterlock.emplace(*controlMode);
-                firmwareUpgrade.emplace(*firmwareUpgradeServer, this->hardware.Staging(), *firmwareUpgradeInterlock, [this]()
-                    {
-                        this->hardware.Reset();
-                    });
-                canBridge.emplace(*motorCanServer, *controlMode,
-                    can::FocMotorCanBridge::Platform{ inverter, this->hardware, this->hardware.Diagnostics(), ToCanResetCause(this->hardware.GetResetCause()), FirmwareIdentityOf(this->hardware.GetBoardKind()) },
-                    can::FocMotorCanBridge::Services{ *electricalIdent, confirmedCurrentOffsets, rotorStandstill, *firmwareUpgrade, *faultHistory },
-                    this->hardware.Tracer());
-                canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
-                canBridge->ObserveCommands([this]()
-                    {
-                        commandTimeout.CommandAccepted();
-                    });
-                commandTimeout.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                motorOverload.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                motorOverload.Enable([this]()
-                    {
-                        return supervision::OverloadRatingsFrom(controlMode->Config());
-                    });
-                overTemperature.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    },
-                    [this]()
-                    {
-                        return controlMode->WindingTemperature();
-                    });
-                overTemperature.Enable([this]()
-                    {
-                        return supervision::OverTemperatureSettingsFrom(controlMode->Config());
-                    });
-                busVoltageLimits.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                busVoltageLimits.Enable([this]()
-                    {
-                        return supervision::BusVoltageLimitSettingsFrom(controlMode->Config());
-                    });
-                busVoltage.Start();
-                commandTimeout.Enable([this]()
-                    {
-                        return std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(controlMode->Config().limits.commandTimeout));
-                    });
-                currentStreamer.emplace(*canServer, *motorCanServer, currentStream, controlMode->Config(), inverterCompensation.BaseFrequency());
-                encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                encoderPlausibility.Enable([this]()
-                    {
-                        return supervision::ConfigFrom(controlMode->Config());
-                    });
-                encoderFreeze.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                encoderFreeze.Enable([this]()
-                    {
-                        return supervision::LimitsFrom(controlMode->CalibrationRecord(), controlMode->Config().encoderResolution, this->hardware.MaxCurrentSupported());
-                    });
-                phaseLoss.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                phaseLoss.Enable([this]()
-                    {
-                        return foc::RadiansPerSecond{ controlMode->Config().currentLoop.bandwidth };
-                    });
-                overspeed.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                overspeed.Enable([this]()
-                    {
-                        return foc::RadiansPerSecond{ controlMode->Config().limits.overspeedLimit };
-                    });
-                followingError.Attach([this]() -> const state_machine::FocStateMachineBase&
-                    {
-                        return controlMode->ActiveStateMachine();
-                    });
-                followingError.Enable([this]()
-                    {
-                        return supervision::FollowingErrorSettingsFrom(controlMode->Config());
-                    });
-                targetReached.Attach([this]() -> const state_machine::FocStateMachineBase*
-                    {
-                        return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
-                    });
-                targetReached.Enable([this]()
-                    {
-                        return supervision::TargetReachedSettingsFrom(controlMode->Config());
-                    });
-                positionLimit.Attach([this]() -> const state_machine::FocStateMachineBase*
-                    {
-                        return controlMode->Active() == state_machine::ControlMode::position ? &controlMode->ActiveStateMachine() : nullptr;
-                    },
-                    [this]()
-                    {
-                        return static_cast<drivers::Encoder&>(this->hardware).Read();
-                    });
-                positionLimit.Enable([this]()
-                    {
-                        return supervision::PositionLimitSettingsFrom(controlMode->Config());
-                    });
-                canBridge->ReportTargetReached([this]()
-                    {
-                        return targetReached.IsReached();
-                    });
-                platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
-                    {
-                        infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()
-                            {
-                                canBridge->BroadcastFault(code);
-                            });
+                        canBridge->BroadcastFault(code);
                     });
             });
     }

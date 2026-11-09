@@ -24,7 +24,6 @@ namespace services
         : nvm{ nvm }
         , holdWork{ holdWork }
         , releaseWork{ releaseWork }
-        , powerUpTime{ infra::Now() }
     {}
 
     void FaultHistory::Start()

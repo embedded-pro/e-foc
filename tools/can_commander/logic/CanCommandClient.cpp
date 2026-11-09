@@ -163,7 +163,7 @@ namespace tool
 
     bool CanCommandClient::SendStartMotor(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focStartId, [&]()
+        return Tracked(nodeId, can::focStartId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendStart(nodeId);
             });
@@ -171,7 +171,7 @@ namespace tool
 
     bool CanCommandClient::SendStopMotor(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focStopId, [&]()
+        return Tracked(nodeId, can::focStopId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendStop(nodeId);
             });
@@ -179,7 +179,7 @@ namespace tool
 
     bool CanCommandClient::SendEmergencyStop(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focEmergencyStopId, [&]()
+        return Tracked(nodeId, can::focEmergencyStopId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendEmergencyStop(nodeId);
             });
@@ -187,7 +187,7 @@ namespace tool
 
     bool CanCommandClient::SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode)
     {
-        return Tracked(nodeId, can::focSelectControlModeId, [&]()
+        return Tracked(nodeId, can::focSelectControlModeId, [this, nodeId, mode]()
             {
                 return focClient.CategoryClient().SendSelectControlMode(nodeId, mode);
             });
@@ -693,7 +693,7 @@ namespace tool
         if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
             return false;
 
-        const auto nodeId = static_cast<uint16_t>(ExtractCanNodeId(id));
+        const auto nodeId = ExtractCanNodeId(id);
         const uint8_t ackCategory = data[0];
         const uint8_t ackMsgType = data[1];
         const auto ackStatus = static_cast<CanAckStatus>(data[2]);
@@ -724,7 +724,7 @@ namespace tool
         bool consumed{ false };
         if (!transmitted)
         {
-            MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
+            MarkOnline(ExtractCanNodeId(id));
 
             const uint8_t msgType = ExtractCanMessageType(id);
             consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryMotionId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
@@ -754,7 +754,7 @@ namespace tool
             while (!onlineNodes.empty())
                 MarkOffline(*onlineNodes.begin());
 
-            for (auto& [nodeId, command] : commands)
+            for (const auto& [nodeId, command] : commands)
                 ClearBusy(nodeId);
         }
 

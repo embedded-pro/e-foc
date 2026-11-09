@@ -170,7 +170,7 @@ namespace application
     {
         return {
             Machine::InternalRow<state_machine::Ready, state_machine::Enable>(
-                [](LifecycleContext& context, state_machine::Ready& ready, const state_machine::Enable& command)
+                [](LifecycleContext& context, const state_machine::Ready& ready, const state_machine::Enable& command)
                 {
                     context.operation.BeginEnablePreparation(ready, command);
                 },
@@ -283,7 +283,7 @@ namespace application
                 Machine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Ready>(
                     [](const LifecycleContext& context, const state_machine::Fault&, const state_machine::ClearFault&)
                     {
-                        return context.operation.CanClearFault() && !context.operation.HasPendingFault() && context.calibration.HasValidCalibration();
+                        return context.operation.EvaluateClearFault() == ClearRefusal::none && !context.operation.HasPendingFault() && context.calibration.HasValidCalibration();
                     },
                     [](LifecycleContext& context, state_machine::Fault&, const state_machine::ClearFault&)
                     {
@@ -292,7 +292,7 @@ namespace application
                 Machine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Idle>(
                     [](const LifecycleContext& context, const state_machine::Fault&, const state_machine::ClearFault&)
                     {
-                        return context.operation.CanClearFault() && !context.operation.HasPendingFault();
+                        return context.operation.EvaluateClearFault() == ClearRefusal::none && !context.operation.HasPendingFault();
                     },
                     [](LifecycleContext& context, state_machine::Fault&, const state_machine::ClearFault&)
                     {

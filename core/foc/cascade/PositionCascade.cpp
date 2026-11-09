@@ -4,18 +4,13 @@
 namespace foc
 {
     PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
-        : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
+        : SpeedLoopDrive(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
         , outerLoopFrequency(lowPriorityFrequency)
     {
         GetLowPriorityInterrupt().Register([this]()
             {
                 LowPriorityHandler();
             });
-    }
-
-    bool PositionCascade::Configure(const MotorModelParameters& parameters)
-    {
-        return ConfigureImpl(parameters);
     }
 
     bool PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
@@ -36,42 +31,12 @@ namespace foc
         travelLimits = TravelLimits{ minimum, maximum };
     }
 
-    void PositionCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
-    {
-        SetCurrentTuningsImpl(tunings);
-    }
-
-    SelectResult PositionCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
-    {
-        return SetSpeedTuningsImpl(tunings);
-    }
-
     SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
     {
         if (enabled)
             return SelectResult::busy;
 
         return positionLoop.TrySetTunings(tunings);
-    }
-
-    SelectResult PositionCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
-    {
-        return SelectCurrentAlgorithmImpl(algorithm);
-    }
-
-    CurrentAlgorithm PositionCascade::ActiveCurrentAlgorithm() const
-    {
-        return ActiveCurrentAlgorithmImpl();
-    }
-
-    SelectResult PositionCascade::SelectSpeedAlgorithm(SpeedAlgorithm algorithm)
-    {
-        return SelectSpeedAlgorithmImpl(algorithm);
-    }
-
-    SpeedAlgorithm PositionCascade::ActiveSpeedAlgorithm() const
-    {
-        return ActiveSpeedAlgorithmImpl();
     }
 
     SelectResult PositionCascade::SelectPositionAlgorithm(PositionAlgorithm algorithm)
@@ -85,16 +50,6 @@ namespace foc
     PositionAlgorithm PositionCascade::ActivePositionAlgorithm() const
     {
         return positionLoop.Active();
-    }
-
-    void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
-    {
-        SetOnlineMechanicalEstimatorImpl(estimator);
-    }
-
-    void PositionCascade::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
-    {
-        SetOnlineElectricalEstimatorImpl(estimator);
     }
 
     void PositionCascade::Enable()
@@ -123,9 +78,7 @@ namespace foc
 
     void PositionCascade::DisableSpeedCommand()
     {
-        enabled = false;
-        speedCommandActive = false;
-        DisableSpeedLoop();
+        Disable();
     }
 
     void PositionCascade::EnableCurrentCommand()
@@ -138,16 +91,6 @@ namespace foc
     void PositionCascade::DisableCurrentCommand()
     {
         Disable();
-    }
-
-    void PositionCascade::CommandCurrent(Ampere quadrature)
-    {
-        CommandCurrentImpl(quadrature);
-    }
-
-    Volts PositionCascade::QuadratureVoltage() const
-    {
-        return QuadratureVoltageImpl();
     }
 
     void PositionCascade::CommandSpeed(RadiansPerSecond speed)
@@ -214,33 +157,4 @@ namespace foc
         return CalculateInnerLoop(currentPhases, position);
     }
 
-    void PositionCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
-    {
-        LoadCoggingMapImpl(torque, torqueScale, torqueConstant);
-    }
-
-    void PositionCascade::ClearCoggingMap()
-    {
-        ClearCoggingMapImpl();
-    }
-
-    void PositionCascade::LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant)
-    {
-        LoadFrictionFeedForwardImpl(coulomb, torqueConstant);
-    }
-
-    void PositionCascade::ClearFrictionFeedForward()
-    {
-        ClearFrictionFeedForwardImpl();
-    }
-
-    void PositionCascade::TrackBusVoltage(Volts measured)
-    {
-        TrackBusVoltageImpl(measured);
-    }
-
-    void PositionCascade::LimitCurrent(Ampere limit)
-    {
-        LimitCurrentImpl(limit);
-    }
 }

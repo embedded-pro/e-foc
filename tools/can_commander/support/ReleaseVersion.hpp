@@ -17,8 +17,7 @@ namespace tool
 
         std::string ToString() const;
 
-        friend bool operator==(const ReleaseVersion& lhs, const ReleaseVersion& rhs);
-        friend bool operator<(const ReleaseVersion& lhs, const ReleaseVersion& rhs);
-        friend bool operator>(const ReleaseVersion& lhs, const ReleaseVersion& rhs);
+        friend bool operator==(const ReleaseVersion& lhs, const ReleaseVersion& rhs) = default;
+        friend auto operator<=>(const ReleaseVersion& lhs, const ReleaseVersion& rhs) = default;
     };
 }
