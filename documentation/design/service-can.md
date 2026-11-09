@@ -828,7 +828,7 @@ All tracing is applied via `can-lite`'s decorator classes:
 | `TracingCanProtocolServerObserver` | `CanProtocolServer` | Server online/offline events                                        |
 | `TracingCanProtocolClientObserver` | `CanProtocolClient` | Server online/offline, ACK timeouts per node                        |
 
-These are composed in the instantiation layer (`Logic.hpp`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
+These are composed in the instantiation layer (`CanStack.hpp`, owned by `Logic`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
 
 can-lite's `TracingBypassCan` sits between the protocol server and `TracingCan`. Its predicate is
 `FocMotorCurrentStreamer::IsStreamFrame`, so it sends `TelemetryCurrents` frames straight to the bus. One traced frame is a line of about 120 characters, so a 1 kHz stream alone would need
