@@ -74,7 +74,6 @@ namespace foc
             uint32_t triggerCounter;
         };
 
-        // Written by the outer loop, read by the control interrupt and the event loop.
         struct OuterLoopOutputs
         {
             volatile float speedLoopOutput;
@@ -85,7 +84,6 @@ namespace foc
             volatile float mechanicalSpeed;
         };
 
-        // Written by the event loop; quadratureLimit is never above maxCurrent.
         struct CurrentCommand
         {
             volatile float current;
@@ -105,7 +103,6 @@ namespace foc
         {
             EstimatorChannel channel;
             EstimatorWindowAccumulator window;
-            // Written by the control interrupt, read by the outer loop.
             volatile float meanIq;
         };
 
