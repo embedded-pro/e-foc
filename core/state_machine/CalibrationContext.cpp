@@ -153,6 +153,11 @@ namespace application
         return EffectiveFluxLinkage();
     }
 
+    float CalibrationContext::AutomaticCurrentLoopBandwidth() const
+    {
+        return DefaultCurrentLoopBandwidth(foc::MilliHenry{ Data().lD }, foc::Ampere{ services::CurrentNoiseAmpere(Data().currentNoiseMilliAmpere) });
+    }
+
     float CalibrationContext::DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const
     {
         const auto switchingBound = (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;

@@ -19,7 +19,7 @@ namespace application
 
     foc::NewtonMeter OuterLoopStateMachine::TorqueConstantFor(const services::CalibrationData& data) const
     {
-        return foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        return foc::TorqueConstantFor(data.polePairs, Calibration().EffectiveFluxLinkage(data));
     }
 
     bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant)
@@ -40,7 +40,7 @@ namespace application
 
     float OuterLoopStateMachine::AutomaticSpeedLoopBandwidth() const
     {
-        const auto bandwidth = GetCalibration().speedLoopBandwidth;
+        const auto bandwidth = Calibration().Data().speedLoopBandwidth;
         return foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
     }
 
@@ -85,7 +85,7 @@ namespace application
 
     void OuterLoopStateMachine::PrepareForEnabled()
     {
-        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(GetCalibration()));
+        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(Calibration().Data()));
     }
 
     std::optional<state_machine::OnlineEstimates> OuterLoopStateMachine::CurrentOnlineEstimates()
@@ -105,9 +105,9 @@ namespace application
         if (!state_machine::IsStopped(CurrentState()))
             return false;
 
-        const auto& calibration = GetCalibration();
+        const auto& calibration = Calibration().Data();
         ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, TorqueConstantFor(calibration));
-        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, EffectiveFluxLinkage(calibration),
+        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, Calibration().EffectiveFluxLinkage(calibration),
             foc::Ampere{ services::CurrentNoiseAmpere(calibration.currentNoiseMilliAmpere) });
         return true;
     }
@@ -207,7 +207,7 @@ namespace application
 
         MarkProvisionalControlApplied();
 
-        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
+        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, Calibration().EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
             return false;
 
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);

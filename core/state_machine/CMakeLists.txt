@@ -43,6 +43,8 @@ target_sources(e_foc.state_machine PRIVATE
     CalibrationOrchestrator.hpp
     CommandRejections.cpp
     CommandRejections.hpp
+    CommissioningCommands.cpp
+    CommissioningCommands.hpp
     ConfigWriter.cpp
     ConfigWriter.hpp
     ControlMode.hpp
@@ -50,11 +52,15 @@ target_sources(e_foc.state_machine PRIVATE
     ControlModeStateMachine.hpp
     CurrentOffsetRefresh.cpp
     CurrentOffsetRefresh.hpp
+    DefaultModeHooks.cpp
+    DefaultModeHooks.hpp
     DriveCommands.cpp
     DriveCommands.hpp
     FaultController.cpp
     FaultController.hpp
     FaultNotifier.hpp
+    FluxLinkageIdentResolution.cpp
+    FluxLinkageIdentResolution.hpp
     FocLifecycleTable.cpp
     FocLifecycleTable.hpp
     FocStateMachine.hpp

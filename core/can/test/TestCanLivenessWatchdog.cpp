@@ -122,7 +122,7 @@ namespace
                     {
                         cb(foc::Radians{ 0.0f });
                     }));
-            controlMode->Drive().ActiveCommon().CmdReAlign([](state_machine::CommandResult) {});
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
 
         bool IsEnabled() const
@@ -173,7 +173,7 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientDuringItsIdentificationStopsTheDr
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->Drive().ActiveCommon().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
 
     watchdog->Offline();
 

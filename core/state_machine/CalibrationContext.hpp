@@ -54,6 +54,7 @@ namespace application
         foc::Weber ActiveFluxLinkage() const;
 
         float DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const;
+        float AutomaticCurrentLoopBandwidth() const;
 
     private:
         drivers::ThreePhaseInverter& inverter;

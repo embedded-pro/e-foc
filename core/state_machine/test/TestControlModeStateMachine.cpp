@@ -542,7 +542,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            subject->Drive().ActiveCommon().CmdReAlign([](state_machine::CommandResult) {});
+            subject->Drive().ActiveCommon().Commissioning().CmdReAlign([](state_machine::CommandResult) {});
             ExecuteAllActions();
         }
 
@@ -600,7 +600,7 @@ TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfigure
 
     ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
 
-    EXPECT_NEAR(subject->Drive().ActiveCommon().ActiveFluxLinkage().Value(), 0.02f, 1e-6f);
+    EXPECT_NEAR(subject->Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value(), 0.02f, 1e-6f);
 }
 
 TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)
@@ -830,8 +830,8 @@ TEST_F(ControlModeStateMachineExtTest, A_Mode_Left_Idle_By_A_Switch_Has_No_Rotor
             }));
     subject->Tunings().SetMotorParameter(services::MotorParameter::inertia, 1.0e-5f, [](state_machine::SettingResult) {});
     subject->Tunings().SetMotorParameter(services::MotorParameter::viscousFriction, 1.0e-4f, [](state_machine::SettingResult) {});
-    ASSERT_EQ(subject->Drive().ActiveCommon().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
-    ASSERT_EQ(subject->Drive().ActiveCommon().CmdReleaseExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(subject->Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(subject->Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration(), state_machine::CommandResult::ok);
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(subject->Drive().ActiveStateMachine().CurrentState()));
     EXPECT_FALSE(IsReadyWithRotorReference());
@@ -1889,7 +1889,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, A_Re_Alignment_After_A_Calibration_
             {
                 onDone(services::NvmStatus::Ok);
             }));
-    subject->Drive().ActiveCommon().CmdReAlign([](state_machine::CommandResult) {});
+    subject->Drive().ActiveCommon().Commissioning().CmdReAlign([](state_machine::CommandResult) {});
     ExecuteAllActions();
 
     EXPECT_TRUE(IsReadyWithRotorReference());
