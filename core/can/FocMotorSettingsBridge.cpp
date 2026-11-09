@@ -8,20 +8,20 @@ namespace can
 {
     namespace
     {
-        uint32_t LoopStatistic(const application::ControlLoopMetrics::Snapshot& statistics, FocParameter parameter)
+        uint32_t LoopStatistic(const infra::ExecutionTimeStatistics::Snapshot& statistics, FocParameter parameter)
         {
             switch (parameter)
             {
                 case FocParameter::loopSamples:
                     return statistics.samples;
                 case FocParameter::loopBudgetCycles:
-                    return statistics.budgetCycles;
+                    return statistics.budget;
                 case FocParameter::loopMinimumCycles:
-                    return statistics.minimumCycles;
+                    return statistics.minimum;
                 case FocParameter::loopAverageCycles:
-                    return statistics.averageCycles;
+                    return statistics.average;
                 case FocParameter::loopMaximumCycles:
-                    return statistics.maximumCycles;
+                    return statistics.maximum;
                 case FocParameter::loopOverruns:
                     return statistics.overruns;
                 case FocParameter::loopDeadlineMisses:

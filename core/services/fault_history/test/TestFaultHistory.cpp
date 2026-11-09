@@ -118,6 +118,70 @@ TEST_F(FaultHistoryTest, a_load_refused_as_busy_is_retried_10_ms_later)
     EXPECT_EQ(1u, stores.size());
 }
 
+TEST_F(FaultHistoryTest, a_request_made_after_the_load_runs_at_once)
+{
+    Started();
+    uint32_t runs{ 0 };
+
+    history.WhenLoaded([&runs]()
+        {
+            ++runs;
+        });
+
+    EXPECT_EQ(1u, runs);
+}
+
+TEST_F(FaultHistoryTest, a_request_made_before_the_load_completes_runs_once_the_stored_faults_are_known)
+{
+    infra::Function<void(services::NvmStatus)> loadDone;
+    services::FaultHistoryData loaded;
+    loaded.powerUps = 1;
+    loaded.records[0] = services::FaultRecord{ overvoltage, speedMode, 1, 100, 4000, 125 };
+    EXPECT_CALL(nvm, LoadFaultHistory(_, _)).WillOnce(Invoke([&loadDone, &loaded](services::FaultHistoryData& history, const infra::Function<void(services::NvmStatus)>& onDone)
+        {
+            history = loaded;
+            loadDone = onDone;
+        }));
+    ExpectStores();
+    history.Start();
+
+    std::optional<uint8_t> seenCode;
+    history.WhenLoaded([this, &seenCode]()
+        {
+            seenCode = history.OfAge(0)->code;
+        });
+    EXPECT_FALSE(seenCode.has_value());
+
+    loadDone(services::NvmStatus::Ok);
+
+    EXPECT_EQ(overvoltage, seenCode);
+}
+
+TEST_F(FaultHistoryTest, requests_beyond_the_waiting_capacity_release_the_oldest_at_once)
+{
+    infra::Function<void(services::NvmStatus)> loadDone;
+    EXPECT_CALL(nvm, LoadFaultHistory(_, _)).WillOnce(Invoke([&loadDone](services::FaultHistoryData&, const infra::Function<void(services::NvmStatus)>& onDone)
+        {
+            loadDone = onDone;
+        }));
+    ExpectStores();
+    history.Start();
+
+    std::vector<std::size_t> order;
+    for (std::size_t request = 0; request != services::FaultHistory::waitingCapacity + 1; ++request)
+        history.WhenLoaded([&order, request]()
+            {
+                order.push_back(request);
+            });
+    ASSERT_EQ(1u, order.size());
+    EXPECT_EQ(0u, order.front());
+
+    loadDone(services::NvmStatus::Ok);
+
+    ASSERT_EQ(services::FaultHistory::waitingCapacity + 1, order.size());
+    EXPECT_EQ(services::FaultHistory::waitingCapacity, order.back());
+}
+
 TEST_F(FaultHistoryTest, a_fault_is_read_at_once_with_its_conditions)
 {
     services::FaultHistoryData stored;

@@ -1,10 +1,11 @@
 #pragma once
 
 #include "bootloader/BootSequence.hpp"
+#include "hal/qemu/semihosting/SemihostingFileFlash.hpp"
+#include "hal/qemu/semihosting/SemihostingFileSystemCortex.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include "targets/platform_implementations/cortex_m_common/ImageTarget.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFileFlash.hpp"
 
 namespace bootloader
 {
@@ -23,8 +24,9 @@ namespace bootloader
         void Halt() override;
 
     private:
-        application::SemihostingFileFlash packFlash;
-        application::SemihostingFileFlash journalFlash;
+        hal::SemihostingFileSystemCortex fileSystem;
+        hal::SemihostingFileFlash packFlash;
+        hal::SemihostingFileFlash journalFlash;
         services::SynchronousFlashMemory slotFlash;
     };
 }

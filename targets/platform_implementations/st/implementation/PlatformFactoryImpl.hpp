@@ -202,7 +202,7 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         uint8_t boardId{ 0 };
         hal::cortex::DataWatchpointAndTrace cycleCounter;
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool protectionTripped{ false };
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };

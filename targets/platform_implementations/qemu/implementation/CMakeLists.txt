@@ -1,22 +1,3 @@
-add_library(e_foc.qemu.semihosting STATIC)
-emil_build_for(e_foc.qemu.semihosting BOOL EMIL_BUILD_QEMU)
-
-target_sources(e_foc.qemu.semihosting PRIVATE
-    SemihostingFile.cpp
-    SemihostingFile.hpp
-    SemihostingFileFlash.cpp
-    SemihostingFileFlash.hpp
-)
-
-target_include_directories(e_foc.qemu.semihosting PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
-)
-
-target_link_libraries(e_foc.qemu.semihosting PUBLIC
-    hal.cortex_m
-    services.synchronous_flash
-)
-
 add_library(e_foc.platform_abstraction_qemu)
 emil_build_for(e_foc.platform_abstraction_qemu ALL All BOOL EMIL_BUILD_QEMU)
 
@@ -29,18 +10,12 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     EmulatedCan.hpp
     EmulatedCanBusAdapter.cpp
     EmulatedCanBusAdapter.hpp
-    SemihostingEeprom.cpp
-    SemihostingEeprom.hpp
     SemihostingPlantConfig.cpp
     SemihostingPlantConfig.hpp
-    SemihostingRecordFile.cpp
-    SemihostingRecordFile.hpp
     SilPlantConfig.hpp
     SilPlantModel.hpp
     QemuTimer.cpp
     QemuTimer.hpp
-    SemihostingAsyncFlash.cpp
-    SemihostingAsyncFlash.hpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
     QemuConstants.hpp
@@ -76,5 +51,6 @@ target_link_libraries(e_foc.platform_abstraction_qemu PUBLIC
     services.util.watchdog
     e_foc.platform_abstraction_cortex_m_common
     e_foc.platform_abstraction_qemu_board
-    e_foc.qemu.semihosting
+    hal.qemu.semihosting
+    hal.qemu.semihosting_cortex
 )
