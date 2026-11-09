@@ -17,7 +17,6 @@ namespace tool
 
         std::string ToString() const;
 
-        friend bool operator==(const ReleaseVersion& lhs, const ReleaseVersion& rhs);
-        friend std::strong_ordering operator<=>(const ReleaseVersion& lhs, const ReleaseVersion& rhs);
+        friend auto operator<=>(const ReleaseVersion& lhs, const ReleaseVersion& rhs) = default;
     };
 }
