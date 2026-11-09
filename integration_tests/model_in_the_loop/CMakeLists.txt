@@ -13,6 +13,7 @@ target_link_libraries(e_foc.model_in_the_loop PUBLIC
     e_foc.can
     e_foc.foc.cascade
     e_foc.foc.model
+    e_foc.foc.model.drive
     e_foc.state_machine
     e_foc.services.alignment
     e_foc.services.index_search

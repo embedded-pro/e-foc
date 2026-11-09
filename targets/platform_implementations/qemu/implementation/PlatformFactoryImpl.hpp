@@ -1,10 +1,7 @@
 #pragma once
 
 #include "can-lite/core/MonitoredCan.hpp"
-#include "core/foc/model/OneShotDelay.hpp"
-#include "core/foc/model/PlantResponseRecorder.hpp"
-#include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "core/platform_abstraction/LowSideShuntWindow.hpp"
+#include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -33,7 +30,6 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilWatchdogStall.hpp"
-#include <atomic>
 #include <optional>
 
 namespace application
@@ -173,22 +169,15 @@ namespace application
         };
 
         void FocTimerIsr();
-        foc::PlantResponseSample PlantSampleAt(uint32_t tick) const;
         void PollPorts();
         void DrainResponseRecords();
         void RecordResponse(const foc::PlantResponseRecord& record);
         void StampReceivedFrame(uint32_t tick, const sil::EmulatedCan::Frame& frame);
 
     private:
-        static foc::ThreePhaseMotorModel::Parameters MotorParametersFrom(
-            const std::optional<sil::SilPlantConfig>& config,
-            const foc::ThreePhaseMotorModel::Parameters& fallback);
-        static foc::Volts SupplyVoltageFrom(const std::optional<sil::SilPlantConfig>& config);
         static hal::Hertz BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config);
 
         void ApplyPlantConfig();
-        void ConfigureShaftGrip(uint32_t baseHz);
-        void ApplyCurrentSense(SampleAndHold requested);
 
         const std::optional<sil::SilPlantConfig> plantConfig;
         const ResetCause resetCause;
@@ -212,36 +201,14 @@ namespace application
         GpioPinStub warningPin;
         GpioPinStub failurePin;
         BoardProtectionSimulator boardProtection;
-        foc::ThreePhaseMotorModel model;
-        const foc::MechanicalPlant& plantMechanics{ model.Mechanics() };
-        const foc::ElectricalPlant& plantElectrical{ model.Electrical() };
-        const foc::SimulatedEncoder& plantEncoder{ model.Encoder() };
-        foc::PlantResponseRecorder<1024> responseRecorder;
+        sil::PlantDrive drive;
+        const foc::ThreePhaseMotorModel& plantModel{ drive.Model() };
+        const foc::SimulatedEncoder& plantEncoder{ drive.Model().Encoder() };
         hal::SemihostingRecordFile::WithBuffer<1024> plantRecord{ fileSystem, "plant.rec" };
-        foc::OneShotDelay torqueStep;
-        foc::NewtonMeter torqueStepTorque{ 0.0f };
-        foc::OneShotDelay encoderFreeze;
-        bool indexLatched{ false };
-        foc::OneShotDelay cableDisconnect;
-        foc::OneShotDelay supplyStep;
-        foc::OneShotDelay shaftGrip;
-        foc::OneShotDelay shaftHold;
-        foc::RadiansPerSecond shaftTurnSpeed{ 0.0f };
-        foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
-        foc::ThreePhaseMotorModel::FaultInjectionConfig activeFaultInjection{};
-        std::atomic<uint32_t> controlTick{ 0 };
         std::optional<EmulatedCanBusAdapter> canBusAdapter;
         infra::TimerRepeating portPollTimer;
         infra::TimerRepeating protectionPollTimer;
         infra::TimerRepeating responseDrainTimer;
-        hal::Hertz baseFrequency;
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
-        foc::PhasePwmDutyCycles lastDutyPhases{};
-        foc::PhasePwmDutyCycles appliedDutyPhases{};
-        bool dutyDelayed{ false };
-        hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
-        hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(100) };
-        foc::LowSideShuntReadout shuntReadout{ maxReadableDuty };
-        foc::PhaseCurrents lastCurrents{};
     };
 }

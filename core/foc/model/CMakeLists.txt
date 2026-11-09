@@ -40,4 +40,5 @@ target_link_libraries(e_foc.foc.model PUBLIC
     numerical.math
 )
 
+add_subdirectory(drive)
 add_subdirectory(test)

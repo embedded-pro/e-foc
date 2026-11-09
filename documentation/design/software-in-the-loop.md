@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.15.0
+version: 1.16.0
 component: "software-in-the-loop"
 date: 2026-11-09
 ---
@@ -12,7 +12,7 @@ date: 2026-11-09
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.15.0                      |
+| Version   | 1.16.0                      |
 | Component | software-in-the-loop        |
 | Date      | 2026-11-09                  |
 
@@ -1187,8 +1187,15 @@ One plant drive steps the plant for every user of it: the emulated platform, the
 model-in-the-loop tests (Part N) and the virtual motor (`virtual-motor.md` Part D). It owns the plant,
 steps it once per control period, applies the duties a period late when the description says so, keeps
 the low-side shunts readable, fires the scheduled torque step and encoder freeze, and records the
-trajectory, all from the one plant description, so the three cannot step the plant differently. The
-same 18,000-period trace guards it.
+trajectory, all from the one plant description, so the three cannot step the plant differently. It
+also carries the scheduled cable disconnect, supply step and shaft grip and the latched encoder index,
+which the host tests did not step before; with those left out of a description, the host tests step the
+plant exactly as they did.
+
+Moving the plant drive out of the emulated platform and the host tests left every `[METRIC]` line of
+the host suite as it was. The emulated scenarios still pass, but their plant records cannot show the
+same: a command reaches the emulated target when the host sends it, so two runs of one binary already
+record different trajectories.
 
 ---
 

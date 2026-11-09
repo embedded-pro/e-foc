@@ -1,6 +1,6 @@
 #pragma once
 
-#include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
+#include "core/foc/model/drive/SilPlantConfig.hpp"
 #include <cstdint>
 #include <vector>
 
