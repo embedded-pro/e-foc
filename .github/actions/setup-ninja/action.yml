@@ -1,0 +1,20 @@
+name: Set up Ninja
+description: Install Ninja, retrying when the release download fails
+runs:
+  using: composite
+  steps:
+    - id: first
+      continue-on-error: true
+      uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+    - if: ${{ steps.first.outcome == 'failure' }}
+      shell: bash
+      run: sleep 20
+    - id: second
+      if: ${{ steps.first.outcome == 'failure' }}
+      continue-on-error: true
+      uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+    - if: ${{ steps.second.outcome == 'failure' }}
+      shell: bash
+      run: sleep 60
+    - if: ${{ steps.second.outcome == 'failure' }}
+      uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
