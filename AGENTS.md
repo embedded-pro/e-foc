@@ -160,6 +160,9 @@ run behavioral tests — never recompile. Do not add cmake build steps to them. 
 every feature with an `@sil` scenario exactly once; a new feature goes into the shard that keeps the three balanced. `software_in_the_loop_tests` gathers the shards' reports into the one
 `Software-in-the-Loop Test Results` check and fails unless every shard passed; a re-run shard replaces its report, so the check follows the latest attempt.
 
+**ccache**: every configure preset inherits `defaults`, which sets `ccache` as the C/C++ compiler launcher both as cache variables and in the environment (so the native `_native_bootloader_image` sub-build is cached too), with `CCACHE_BASEDIR` at the source tree.
+Every CI job that compiles restores a cache with `hendrikmuhs/ccache-action` (saved from `main` only); a job that configures without a preset, like the Windows tools build, passes the launcher itself. A new compiling job does the same.
+
 Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `static-analysis.yml` (SonarCloud), `requirements-validation.yml` and
 `submodule-check.yml` (submodules point to `main`), plus `documentation-validation.yml` and `build-booklet.yml` when `documentation/` changes.
 
