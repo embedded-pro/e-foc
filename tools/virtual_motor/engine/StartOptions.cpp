@@ -80,6 +80,11 @@ namespace virtual_motor
                         options.hubPort = port.value_or(0);
                         return port.has_value() ? std::string{} : std::string{ "--hub-port must be a number from 1 to 65535" };
                     } },
+                { "--plant-port", [](StartOptions& options, std::string_view value)
+                    {
+                        options.plantPort = Number<uint16_t>(value, 1, UINT16_MAX);
+                        return options.plantPort.has_value() ? std::string{} : std::string{ "--plant-port must be a number from 1 to 65535" };
+                    } },
             };
             return readers;
         }
@@ -142,6 +147,7 @@ namespace virtual_motor
                "  --seed <n>          seed of every noise source\n"
                "  --host-bus          host the virtual CAN hub when none is listening\n"
                "  --hub-port <n>      loopback port of the hub (default: 29536)\n"
+               "  --plant-port <n>    loopback port of the Virtual Motor app's plant port to connect to\n"
                "  --help              show this text\n";
     }
 }

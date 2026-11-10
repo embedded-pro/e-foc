@@ -48,11 +48,18 @@ namespace virtual_motor
     {
         std::fwrite(data.begin(), 1, data.size(), stdout);
         std::fflush(stdout);
+        if (mirror)
+            mirror(data);
         infra::EventDispatcher::Instance().Schedule(actionOnCompletion);
     }
 
     void StandardOutputSerial::ReceiveData(infra::Function<void(infra::ConstByteRange data)>)
     {}
+
+    void StandardOutputSerial::Mirror(const infra::Function<void(infra::ConstByteRange data)>& sink)
+    {
+        mirror = sink;
+    }
 
     void DeferredLowPriorityInterrupt::Trigger()
     {

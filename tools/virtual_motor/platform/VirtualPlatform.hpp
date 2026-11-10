@@ -9,6 +9,7 @@
 #include "tools/virtual_motor/platform/BoardPeripherals.hpp"
 #include "tools/virtual_motor/platform/FileEeprom.hpp"
 #include "tools/virtual_motor/platform/PlantPowerStage.hpp"
+#include "tools/virtual_motor/platform/RunLoop.hpp"
 #include "tools/virtual_motor/platform/VirtualCanPort.hpp"
 #include <string>
 
@@ -23,16 +24,27 @@ namespace virtual_motor
         uint16_t hubPort{ services::loopback::virtualCanHubPort };
         bool restarted{ false };
         infra::Function<void()> onReset;
+        std::string plantName;
     };
 
     class VirtualPlatform
         : public PlantPowerStage
+        , public Stepper
     {
     public:
         explicit VirtualPlatform(const BoardOptions& options);
 
-        void AdvanceOneMillisecond();
+        void AdvanceOnePeriod() override;
+        void AdvanceOneMillisecond() override;
+        void Mute(bool muted) override;
         void EachMillisecond(const infra::Function<void()>& action);
+        void EachIteration(const infra::Function<void()>& action);
+        void MirrorLog(const infra::Function<void(infra::ConstByteRange text)>& sink);
+
+        RunLoop& Runner();
+        const BoardOptions& Options() const;
+        uint64_t ControlPeriods() const;
+        uint8_t LedStates() const;
 
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         services::MonitoredCan& CanBus() override;
@@ -54,6 +66,8 @@ namespace virtual_motor
         infra::BoundedConstString FaultStatus() const override;
 
     private:
+        void MillisecondTail();
+
         struct Execution
         {
             infra::EventDispatcherWithWeakPtr::WithSize<256> eventDispatcher;
@@ -86,5 +100,12 @@ namespace virtual_motor
         infra::ExecutionTimeStatistics controlLoopMetrics;
         application::PlatformDiagnostics diagnostics{ controlLoopMetrics };
         infra::Function<void()> eachMillisecond;
+        infra::Function<void()> eachIteration;
+        RunLoop runLoop{ *this, []()
+            {
+                return Pacer::Clock::now();
+            } };
+        uint64_t controlPeriods{ 0 };
+        uint32_t periodInMillisecond{ 0 };
     };
 }

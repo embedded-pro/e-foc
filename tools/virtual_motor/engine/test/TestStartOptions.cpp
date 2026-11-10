@@ -25,11 +25,12 @@ TEST(TestStartOptions, defaults_to_node_zero_on_the_default_bus_with_the_teknic_
     EXPECT_FALSE(parsed.options->hostBus);
     EXPECT_FALSE(parsed.options->restarted);
     EXPECT_FALSE(parsed.options->seed.has_value());
+    EXPECT_FALSE(parsed.options->plantPort.has_value());
 }
 
 TEST(TestStartOptions, reads_every_option)
 {
-    const auto parsed = Parse({ "--bus", "bench", "--node", "3", "--plant", "anaheim", "--memory", "m.nvm", "--seed", "42", "--hub-port", "4000", "--factory-fresh", "--host-bus", "--restarted" });
+    const auto parsed = Parse({ "--bus", "bench", "--node", "3", "--plant", "anaheim", "--memory", "m.nvm", "--seed", "42", "--hub-port", "4000", "--plant-port", "41000", "--factory-fresh", "--host-bus", "--restarted" });
 
     ASSERT_TRUE(parsed.options.has_value());
     EXPECT_EQ(parsed.options->bus, "bench");
@@ -38,6 +39,7 @@ TEST(TestStartOptions, reads_every_option)
     EXPECT_EQ(parsed.options->memoryFile, "m.nvm");
     EXPECT_EQ(parsed.options->seed, 42u);
     EXPECT_EQ(parsed.options->hubPort, 4000);
+    EXPECT_EQ(parsed.options->plantPort, 41000);
     EXPECT_TRUE(parsed.options->factoryFresh);
     EXPECT_TRUE(parsed.options->hostBus);
     EXPECT_TRUE(parsed.options->restarted);
@@ -72,6 +74,7 @@ TEST(TestStartOptions, refuses_a_node_or_port_out_of_range)
     EXPECT_EQ(Parse({ "--node", "256" }).error, "--node must be a number from 0 to 255");
     EXPECT_EQ(Parse({ "--node", "x" }).error, "--node must be a number from 0 to 255");
     EXPECT_EQ(Parse({ "--hub-port", "70000" }).error, "--hub-port must be a number from 1 to 65535");
+    EXPECT_EQ(Parse({ "--plant-port", "0" }).error, "--plant-port must be a number from 1 to 65535");
 }
 
 TEST(TestStartOptions, refuses_a_bus_name_a_join_line_cannot_carry)

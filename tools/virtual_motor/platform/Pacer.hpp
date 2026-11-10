@@ -17,7 +17,10 @@ namespace virtual_motor
 
         Pacer(const infra::Function<TimePoint()>& now, const infra::Function<void()>& advance);
 
+        void Begin();
         void Service();
+        void Suspend();
+        void Resume();
         TimePoint NextDue() const;
         std::chrono::milliseconds VirtualTime() const;
         uint32_t Overruns() const;
@@ -28,6 +31,7 @@ namespace virtual_motor
         infra::Function<void()> advance;
         TimePoint start;
         TimePoint origin;
+        TimePoint suspendedAt;
         uint64_t stepsSinceOrigin{ 0 };
         uint64_t stepsRun{ 0 };
         uint32_t overruns{ 0 };

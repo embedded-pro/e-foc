@@ -23,7 +23,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
   with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
 - `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,
-  a `virtual:` CAN port, a wall-clock `Pacer`), `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it
+  a `virtual:` CAN port, a wall-clock `Pacer` under a pausable `RunLoop`, `PlantDisturbances` for live torque and noise, the motor side of the plant port),
+  `port/` the plant port's frames and messages, shared with the Virtual Motor app, `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it
 - `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)

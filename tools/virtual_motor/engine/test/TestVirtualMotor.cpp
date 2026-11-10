@@ -129,13 +129,13 @@ namespace
     }
 }
 
-TEST(TestVirtualMotor, a_client_on_the_virtual_bus_calibrates_starts_and_spins_a_factory_fresh_motor)
+TEST(TestVirtualMotor, a_client_on_the_virtual_bus_spins_a_factory_fresh_motor_that_goes_silent_while_paused)
 {
     const auto port = TestHubPort();
     const auto memory = MemoryFile();
     std::filesystem::remove(memory);
 
-    platform.Construct(virtual_motor::BoardOptions{ "test", 0, sil::NominalPlant(), memory, port, false, {} });
+    platform.Construct(virtual_motor::BoardOptions{ "test", 0, sil::NominalPlant(), memory, port, false, {}, "nominal" });
     hub.Construct();
     ASSERT_TRUE(hub->Listen(port));
     platform->EachMillisecond([]()
@@ -216,6 +216,22 @@ TEST(TestVirtualMotor, a_client_on_the_virtual_bus_calibrates_starts_and_spins_a
         },
         1000));
     EXPECT_NEAR(*responses.speed, 100.0f, 5.0f);
+
+    platform->Runner().Pause();
+    for (int millisecond = 0; millisecond != 10000 && servers.online.has_value(); ++millisecond)
+    {
+        platform->Runner().Step(virtual_motor::port::StepUnit::millisecond, 1);
+        clientPort->Poll();
+    }
+    EXPECT_FALSE(servers.online.has_value()) << "a paused motor kept talking on the bus";
+
+    platform->Runner().Resume();
+    EXPECT_TRUE(RunUntil([&servers]()
+        {
+            return servers.online.has_value();
+        },
+        5000))
+        << "the resumed motor did not come back online";
 
     std::filesystem::remove(memory);
 }
