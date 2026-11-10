@@ -416,7 +416,7 @@ namespace virtual_motor::app
                 continue;
             if (Full())
             {
-                skipped += (skipped.empty() ? "" : ", ") + std::to_string(spec.node);
+                skipped += std::format("{}{}", skipped.empty() ? "" : ", ", static_cast<uint32_t>(spec.node));
                 continue;
             }
             motors.push_back(std::make_unique<RigMotor>(spec, *this));
