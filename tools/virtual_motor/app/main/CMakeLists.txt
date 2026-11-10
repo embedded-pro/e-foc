@@ -10,6 +10,7 @@ target_link_libraries(e_foc.tool.virtual_motor.app PRIVATE
 
 target_sources(e_foc.tool.virtual_motor.app PRIVATE
     Main.cpp
+    ../resources/virtual_motor.qrc
 )
 
 target_compile_definitions(e_foc.tool.virtual_motor.app PRIVATE
@@ -19,6 +20,7 @@ target_compile_definitions(e_foc.tool.virtual_motor.app PRIVATE
 
 set_target_properties(e_foc.tool.virtual_motor.app PROPERTIES
     OUTPUT_NAME e-foc-virtual-motor-app
+    AUTORCC ON
     WIN32_EXECUTABLE ON
 )
 
@@ -28,4 +30,17 @@ if(MSVC)
     target_compile_options(e_foc.tool.virtual_motor.app PRIVATE /W4)
 else()
     target_compile_options(e_foc.tool.virtual_motor.app PRIVATE -Wno-error)
+endif()
+
+if(NOT WIN32)
+    include(GNUInstallDirs)
+    set(resources "${CMAKE_CURRENT_LIST_DIR}/../resources")
+    install(TARGETS e_foc.tool.virtual_motor.app e_foc.tool.virtual_motor
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT can_commander
+        EXCLUDE_FROM_ALL
+    )
+    install(FILES "${resources}/e-foc-virtual-motor.desktop" DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT can_commander EXCLUDE_FROM_ALL)
+    install(FILES "${resources}/e-foc-virtual-motor.svg" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps COMPONENT can_commander EXCLUDE_FROM_ALL)
+    install(FILES "${resources}/e-foc-virtual-motor.png" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps COMPONENT can_commander EXCLUDE_FROM_ALL)
 endif()

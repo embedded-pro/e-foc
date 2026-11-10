@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=e-foc Virtual Motor
+GenericName=Virtual Motor Rig
+Comment=Run and disturb virtual e-foc motors on a virtual CAN bus
+Exec=e-foc-virtual-motor-app
+Icon=e-foc-virtual-motor
+Terminal=false
+Categories=Development;Electronics;
+Keywords=FOC;motor;simulation;virtual;CAN;e-foc;

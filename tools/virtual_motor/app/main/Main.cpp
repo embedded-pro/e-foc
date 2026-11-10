@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QIcon>
 #include <QMessageBox>
 #include <QStandardPaths>
 #include <QTimer>
@@ -48,6 +49,7 @@ int main(int argc, char* argv[])
     QApplication app{ argc, argv };
     QApplication::setOrganizationName("embedded-pro");
     QApplication::setApplicationName("e-foc Virtual Motor");
+    QApplication::setWindowIcon(QIcon{ ":/icons/e-foc-virtual-motor.png" });
     ui::backend::qt::ApplyTheme(ui::theme::Instrument());
 
     tool::QtEventDispatcher::WithSize<256> eventDispatcher;

@@ -299,6 +299,10 @@ The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation 
 `sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
 version without opening a window (on Windows, run it from a console).
 
+The `.deb` also installs the e-foc Virtual Motor app (`e-foc-virtual-motor-app`, *e-foc Virtual Motor* in
+the applications menu) and its virtual motor program (`e-foc-virtual-motor`); the CAN Commander starts the
+app from Motor → Launch Virtual Motor…. The Windows installer does not include them yet.
+
 ### Issue log, bug reports and updates
 
 - Every session writes an issue log (UTC timestamps, rotated at 1 MiB, three files) to

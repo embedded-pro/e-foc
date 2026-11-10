@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>e-foc-virtual-motor.png</file>
+    </qresource>
+</RCC>
