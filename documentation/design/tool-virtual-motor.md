@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.1.1
+version: 0.2.0
 component: "tool-virtual-motor"
 date: 2026-11-09
 ---
@@ -12,7 +12,7 @@ date: 2026-11-09
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.1                    |
+| Version   | 0.2.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-09               |
 
@@ -54,8 +54,12 @@ As in the CAN Commander (`tool-can-commander.md` Part A), everything but widget 
 without a display:
 
 - **Engine client** — starts and stops virtual motor processes, holds each one's plant port, and turns
-  the port's stream and captures into per-signal sample buffers.
-- **Hub** — the virtual CAN hub, run in this process while the app is open.
+  the port's stream and captures into per-signal sample buffers. The app listens for plant ports on one
+  loopback port it picks itself; each motor runs as an `e-foc-virtual-motor` process, installed next to
+  the app, in a folder of its own under the user's application data (`<bus>-<node>`), which keeps its
+  memory file. It joins the app's hub and connects to the app's plant port.
+- **Hub** — the virtual CAN hub, run in this process while the app is open. When another hub already
+  holds the port, the app's motors join that one and the header says so.
 - **Logic** — the motor list and its persistence, the active-disturbance list per motor, capture
   requests and trigger settings, profile files.
 - **Presentation** — the manager window and one window per motor. Widgets only display.
@@ -65,7 +69,7 @@ without a display:
 ```text
 +----------------------------------------------------------------------------------+
 |  e-foc Virtual Motor                                   [ Open CAN Commander ]    |
-|  Bus: default  ● hub running   1 Mbit/s   load 12 %   commanders: 1              |
+|  Bus: default   ● hub running on port 29536                                       |
 +----------------------------------------------------------------------------------+
 |  Node | Plant    | State    | Real time | Disturbances | LEDs      |             |
 |  1    | Teknic   | Running  | 1.00      | 2 active     | ● ○ ○     | [Open]      |
@@ -77,14 +81,20 @@ without a display:
 ```
 
 - **Add Motor** asks for the node, the plant (Teknic, Anaheim, or a description file, which is where
-  non-idealities and wiring faults are set) and how it starts: keep its memory, factory-fresh, or
-  calibrated for the plant. A node already on the bus is refused with the reason.
+  non-idealities and wiring faults are set) and how it starts: keep its memory or factory-fresh. Starting
+  calibrated for the plant is offered once a virtual motor can (`virtual-motor.md` Open Question 4). A
+  node already in the list is refused with the reason.
 - **State** is the process's (`virtual-motor.md` Part H), never what the user last clicked: *Starting…*
-  until the motor has joined the bus. A crashed motor keeps its row with its last log lines one click
-  away; the row explains that the CAN Commander will report it offline.
+  until the motor introduces itself on the plant port, then *Running* or *Paused* as its status says;
+  *Restarting* while a motor that reset reconnects; *Stopped* once powered off; *Crashed* when its process
+  ends unasked. A crashed motor keeps its row with its last log lines one click away; the row explains that
+  the CAN Commander will report it offline.
 - **Real time** shows the real-time factor; below 0.98 it is a warning with the overrun count in the
   tooltip, because the drive is then running late.
-- **Open CAN Commander** starts the CAN Commander with the bus's interface name filled in.
+- **Open CAN Commander** starts the CAN Commander installed next to the app; its Interface box lists
+  `virtual:default` while the hub runs (`tool-can-commander.md` Part N).
+- The motor list, with each motor's node, plant and start mode, is restored on the next start; restored
+  motors start again, keeping their memory.
 - The bus row offers drop probability, added latency and taking a node off the bus (`virtual-motor.md`
   Part G), each listed under *Disturbances* while active.
 - Closing the app powers every motor off, after a confirmation that names the motors and says the CAN

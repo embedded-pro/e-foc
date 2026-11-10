@@ -203,8 +203,16 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 ### Virtual motors
 
 A virtual motor runs the e-foc application on the development machine against the simulated motor plant,
-as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). Start one that also
-hosts the bus, then connect the CAN Commander to `virtual:default`:
+as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). The e-foc Virtual
+Motor app ([design](documentation/design/tool-virtual-motor.md)) hosts the bus, starts and stops motors,
+and changes their load, disturbance torque and sensor noise while they run:
+
+```bash
+./build/host/tools/virtual_motor/app/main/Debug/e-foc-virtual-motor-app
+```
+
+Add a motor, then connect the CAN Commander to `virtual:default` and command it as a board. A motor can
+also run headless, hosting the bus itself:
 
 ```bash
 ./build/host/tools/virtual_motor/engine/Debug/e-foc-virtual-motor --host-bus --node 1 --plant teknic
