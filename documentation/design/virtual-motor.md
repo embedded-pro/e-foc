@@ -108,16 +108,16 @@ and the CAN Commander reports it offline after its usual timeout. Nothing else o
 
 A virtual motor is started with:
 
-| Start option | Meaning                                                                    | Default                    |
-|--------------|----------------------------------------------------------------------------|----------------------------|
-| Bus          | Name of the virtual CAN bus to join: letters, digits, `-` and `_`          | `default`                  |
-| Node         | The board ID the CAN node address is built from (`service-can.md` Part I)  | 0                          |
-| Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file | `teknic`                   |
-| Memory       | The file holding its non-volatile memory, a name in the working directory  | one file per bus and node  |
-| Start from   | Keep the memory file, or start factory-fresh                               | keep                       |
-| Seed         | Seed of every noise source, so a run replays exactly                       | fixed                      |
-| Host the bus | Open the hub for the named bus if no hub is listening yet                  | off                        |
-| Plant port   | The loopback port the Virtual Motor app's plant port listens on (Part F)   | none: no plant port        |
+| Start option | Meaning                                                                    | Default                   |
+|--------------|----------------------------------------------------------------------------|---------------------------|
+| Bus          | Name of the virtual CAN bus to join: letters, digits, `-` and `_`          | `default`                 |
+| Node         | The board ID the CAN node address is built from (`service-can.md` Part I)  | 0                         |
+| Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file | `teknic`                  |
+| Memory       | The file holding its non-volatile memory, a name in the working directory  | one file per bus and node |
+| Start from   | Keep the memory file, or start factory-fresh                               | keep                      |
+| Seed         | Seed of every noise source, so a run replays exactly                       | fixed                     |
+| Host the bus | Open the hub for the named bus if no hub is listening yet                  | off                       |
+| Plant port   | The loopback port the Virtual Motor app's plant port listens on (Part F)   | none: no plant port       |
 
 ### Part B — The virtual board
 
