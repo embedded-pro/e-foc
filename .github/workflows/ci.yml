@@ -104,8 +104,7 @@ jobs:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       # The action installs the analyser with pip, so its own pin does not fix the analyser's version: this does.
-      # The commit is embedded-pro/cortex-cycle-budget#65 (worst-path model); replace it with "==<version>" once released.
-      CYCLE_BUDGET_PACKAGE: "@git+https://github.com/embedded-pro/cortex-cycle-budget@977e2b4ce00075d0ef6df43db655cfd975e60d70"
+      CYCLE_BUDGET_PACKAGE: "==1.0.0"
     steps:
       - name: Configure Git
         run: |

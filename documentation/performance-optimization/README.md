@@ -398,7 +398,8 @@ the *Analysis Notes* of each report list what is left open.
   names: the interrupt vector, the three `Runner` callbacks (so the inner loop is charged its costliest control
   mode, the speed and position cascade), a function and its thunk, the speed and position low-priority handlers,
   and the two calibration observers.
-- **Loops need a bound.** `loop_bounds` gives every loop of a function its iteration count; nested loops multiply.
+- **Loops need a bound.** `loop_bounds` charges every loop body of a function that many times. The analyser does
+  not multiply it through nested loops, so the bound is the count of the innermost body.
 
 | `loop_bounds` entry                                                       |  Bound | Why                                                          |
 |---------------------------------------------------------------------------|-------:|--------------------------------------------------------------|
@@ -408,13 +409,13 @@ the *Analysis Notes* of each report list what is left open.
 | `SpeedDifferentiator::Measure`                                            |      2 | One retry when the control interrupt lands mid-read          |
 | `__ieee754_fmodf`                                                         |      3 | `remainder` of the difference of two single-turn angles      |
 | `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                         |
-| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |      9 | Element loops over a 3×3 matrix                              |
-| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Element loops over a 2×2 matrix                              |
+| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |      9 | Nine elements of a 3×3 matrix, in one loop or in a 3×3 nest  |
+| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                                |
 | `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                                   |
 | `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record              |
 
-A bound holds for every loop of its function, so the 3×3 product nested inside the mechanical estimator is charged
-81 inner iterations where it runs 27. The outer-loop estimate is an upper bound with that slack in it.
+A bound holds for every loop of its function, so the outer loop of a 3×3 nest is charged nine times where it runs
+three. The outer-loop estimate is an upper bound with that slack in it.
 
 `cold_calls` removes the paths that end an iteration instead of being one: the over-current and protection trips
 with `CutPowerStage`, the ST HAL's `assert_failed`, `ADC_Disable` (single-shot DMA only; this converter runs
@@ -430,11 +431,11 @@ With the worst-path model the estimates at this revision are:
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
 | Inner loop          |          3290 |   4500 |          3130 |   6375 |
-| Outer loop          |         12685 |  20000 |         12685 |  28333 |
+| Outer loop          |         10647 |  20000 |         10647 |  28333 |
 | Identification path |          5274 |   6000 |          5114 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
-`CYCLE_BUDGET_PACKAGE` in `ci.yml` does.
+`CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.0.0.
 
 The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
 runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
