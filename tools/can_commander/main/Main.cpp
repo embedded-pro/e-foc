@@ -10,6 +10,7 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QIcon>
 #include <QNetworkProxyFactory>
 #include <QStandardPaths>
@@ -33,6 +34,20 @@
 
 namespace
 {
+    QString VirtualMotorApp()
+    {
+#if defined(_WIN32)
+        const QString name{ "e-foc-virtual-motor-app.exe" };
+#else
+        const QString name{ "e-foc-virtual-motor-app" };
+#endif
+        if (const auto beside = QDir{ QCoreApplication::applicationDirPath() }.filePath(name); QFileInfo::exists(beside))
+            return beside;
+        if (QFileInfo::exists(E_FOC_VIRTUAL_MOTOR_APP))
+            return E_FOC_VIRTUAL_MOTOR_APP;
+        return {};
+    }
+
     using ui::backend::qt::ToQt;
 
     bool HasArgument(std::span<char* const> arguments, std::initializer_list<const char*> names)
@@ -162,6 +177,7 @@ int main(int argc, char* argv[])
 
 #if defined(__linux__) || defined(_WIN32)
     tool::MainWindow window(adapter, issueLog);
+    window.SetVirtualMotorApp(VirtualMotorApp());
     window.show();
 
     if (!parser.isSet(noUpdateCheck))

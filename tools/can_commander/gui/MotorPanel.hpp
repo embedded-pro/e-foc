@@ -104,6 +104,7 @@ namespace tool
         const uint16_t nodeId;
         Reporter reporter;
 
+        QLabel* virtualBadge{ nullptr };
         QLabel* onlineLabel{ nullptr };
         QLabel* firmwareLabel{ nullptr };
         QLabel* activityLabel{ nullptr };
