@@ -98,6 +98,8 @@ namespace virtual_motor::app
             observer->CaptureEventReceived(*event);
         else if (auto chunk = port::Decode<port::CaptureChunk>(frame))
             observer->CaptureChunkReceived(*chunk);
+        else if (auto profile = port::Decode<port::ProfileState>(frame))
+            observer->ProfileStateReceived(*profile);
         else
             return false;
         return true;

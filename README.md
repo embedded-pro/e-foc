@@ -207,7 +207,8 @@ as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md
 Motor app ([design](documentation/design/tool-virtual-motor.md)) hosts the bus, starts and stops motors,
 changes their load, disturbance torque and sensor noise while they run, and shows their currents,
 voltages, mechanics and supply on scopes, with full-rate triggered captures that save as CSV, along
-with the modulation hexagon, the turning rotor and the encoder's error:
+with the modulation hexagon, the turning rotor and the encoder's error, and runs disturbance profiles
+written in its Profile editor or loaded from a file:
 
 ```bash
 ./build/host/tools/virtual_motor/app/main/Debug/e-foc-virtual-motor-app

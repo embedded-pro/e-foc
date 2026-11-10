@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.5.0                    |
+| Version   | 0.6.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -248,8 +248,33 @@ dragged but **apply only on Apply** or Enter, never while typing; each group sho
 Every active change appears in the header count and in a list with its own remove button; **Clear All**
 returns the plant to its description.
 
-**Profiles** are loaded, saved, started and stopped from the panel; a running profile shows its time
-and next step, and stopping it clears what it applied.
+**Profiles** (`virtual-motor.md` Part E) are written, loaded, saved, started and stopped from the
+panel's Profile group. The profile is plain text in an editor there, so a profile is written by hand or
+loaded from a file and changed before it starts. **Start** reads it and sends it to the motor; a line it
+cannot read is reported with its number and nothing is sent, and a profile the motor refuses is reported
+as a refused change is. The group reads what the motor reports: *Armed, waiting for the trigger*;
+*Running* with the changes applied, the time since the trigger and the next change; *Finished*, its changes
+staying in force; or *Stopped*, the plant back to its description. **Stop** stops it.
+
+A profile file holds one statement per line; blank lines and lines starting with `#` are skipped:
+
+| Statement                                         | Meaning                                                                                                                     |
+|---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `trigger immediately`                             | Start at once; the default when no trigger is given                                                                         |
+| `trigger rising` / `falling` / `either` *n level* | Start when Data Model signal *n* (1 to 25, in the order of `virtual-motor.md`'s Data Model) crosses *level* in its own unit |
+| `trigger protection`                              | Start when the board protection asserts                                                                                     |
+| `trigger leds` *names*                            | Start when one of the named LEDs lights: `operational`, `warning`, `failure`, separated by commas                           |
+| `at` *s* `load` *N·m*                             | Set the load torque *s* seconds after the trigger                                                                           |
+| `at` *s* `external none`                          | Remove the external torque                                                                                                  |
+| `at` *s* `external constant` *N·m*                | A constant external torque                                                                                                  |
+| `at` *s* `external step` *from to delay*          | A step, the delay in seconds                                                                                                |
+| `at` *s* `external ramp` *from to duration*       | A ramp, the duration in seconds                                                                                             |
+| `at` *s* `external sine` *offset amplitude hz*    | A sine                                                                                                                      |
+| `at` *s* `current-noise` *A*                      | Set the current noise                                                                                                       |
+| `at` *s* `encoder-noise` *rad*                    | Set the encoder noise                                                                                                       |
+
+Times count from the trigger, are rounded to the control period, and never go back; a profile holds up
+to 1,024 changes. **Save** writes the editor's text as it stands, so a saved file loads back unchanged.
 
 ### Part H — the CAN Commander side
 

@@ -393,3 +393,21 @@ TEST_F(TestRig, a_motor_speaking_another_protocol_is_powered_off_and_says_why)
     EXPECT_THAT(rig.Find(2)->Log(), testing::Contains(testing::HasSubstr("plant port protocol 1 and this app 2")));
     EXPECT_NE(rig.Find(2)->State(), MotorState::running);
 }
+
+TEST_F(TestRig, the_profile_state_follows_the_motor_and_a_restart_forgets_it)
+{
+    rig.Add(MotorSpec{ "default", 2 });
+    auto engine = Introduce(2);
+    const auto updates = observer.updates;
+
+    engine->Send(port::ProfileState{ port::ProfileStateKind::running, 1, 3, 200 });
+    PollFor(30);
+    ASSERT_TRUE(rig.Find(2)->Profile().has_value());
+    EXPECT_EQ(rig.Find(2)->Profile()->applied, 1);
+    EXPECT_GT(observer.updates, updates);
+
+    engine->Close();
+    PollFor(30);
+    auto restarted = Introduce(2);
+    EXPECT_FALSE(rig.Find(2)->Profile().has_value());
+}

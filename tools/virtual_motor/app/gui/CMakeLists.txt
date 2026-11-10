@@ -23,6 +23,8 @@ target_sources(e_foc.tool.virtual_motor.app.gui PRIVATE
     ManagerWindow.hpp
     MotorWindow.cpp
     MotorWindow.hpp
+    ProfilePanel.cpp
+    ProfilePanel.hpp
     QtEngineProcesses.cpp
     QtEngineProcesses.hpp
     QtRigStore.cpp

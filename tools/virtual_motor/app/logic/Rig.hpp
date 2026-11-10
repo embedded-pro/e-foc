@@ -47,6 +47,7 @@ namespace virtual_motor::app
         const TraceHistory& History() const;
         const CaptureAssembly& Captures() const;
         bool Streaming() const;
+        const std::optional<port::ProfileState>& Profile() const;
         void Stream(bool on);
 
         template<class Request>
@@ -71,6 +72,7 @@ namespace virtual_motor::app
         void WindowReceived(const port::Window& window) override;
         void CaptureEventReceived(const port::CaptureEvent& event) override;
         void CaptureChunkReceived(const port::CaptureChunk& chunk) override;
+        void ProfileStateReceived(const port::ProfileState& state) override;
         void LinkClosed() override;
         void Captured();
 
@@ -87,6 +89,7 @@ namespace virtual_motor::app
         TraceHistory history{ historyWindows };
         CaptureAssembly captures;
         bool streaming{ false };
+        std::optional<port::ProfileState> profile;
     };
 
     class Rig

@@ -13,6 +13,7 @@ target_sources(e_foc.tool.virtual_motor.app.logic_test PRIVATE
     TestCaptureCsv.cpp
     TestEncoderView.cpp
     TestModulationView.cpp
+    TestProfileFile.cpp
     TestMotorText.cpp
     TestRig.cpp
     TestRotorView.cpp

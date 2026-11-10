@@ -30,6 +30,8 @@ target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
     MotorSpec.cpp
     MotorSpec.hpp
     PortListener.cpp
+    ProfileFile.cpp
+    ProfileFile.hpp
     PortListener.hpp
     Rig.cpp
     Rig.hpp

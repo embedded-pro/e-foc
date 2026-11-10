@@ -1,6 +1,7 @@
 #include "tools/virtual_motor/app/gui/MotorWindow.hpp"
 #include "tools/virtual_motor/app/gui/CaptureBar.hpp"
 #include "tools/virtual_motor/app/gui/LogView.hpp"
+#include "tools/virtual_motor/app/gui/ProfilePanel.hpp"
 #include "tools/virtual_motor/app/gui/ScopeArea.hpp"
 #include "tools/virtual_motor/app/gui/TorqueNoisePanel.hpp"
 #include "tools/virtual_motor/app/logic/MotorText.hpp"
@@ -11,6 +12,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -69,8 +71,16 @@ namespace virtual_motor::app
         viewsLayout->setContentsMargins(0, 0, 0, 0);
         viewsLayout->addWidget(scope, 1);
         viewsLayout->addWidget(captureBar);
+        profile = new ProfilePanel(motor, this);
+        auto* sideContent = new QWidget(this);
+        auto* sideLayout = new QVBoxLayout(sideContent);
+        sideLayout->setContentsMargins(0, 0, 0, 0);
+        sideLayout->addWidget(panel);
+        sideLayout->addWidget(profile);
         auto* side = new QScrollArea(this);
-        side->setWidget(panel);
+        side->setWidget(sideContent);
+        side->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        side->setMinimumWidth(sideContent->minimumSizeHint().width() + side->verticalScrollBar()->sizeHint().width() + 2 * side->frameWidth());
         side->setWidgetResizable(true);
         auto* splitter = new QSplitter(this);
         splitter->addWidget(views);
@@ -183,6 +193,7 @@ namespace virtual_motor::app
         RefreshStatus(*motor);
         RefreshControls(*motor);
         panel->Refresh();
+        profile->Refresh();
         captureBar->Refresh();
         scope->Refresh();
         UpdateStreaming();
@@ -279,6 +290,9 @@ namespace virtual_motor::app
 
     void MotorWindow::ShowRefusal(const port::Refused& refused)
     {
-        panel->ShowRefusal(refused);
+        if (refused.request == static_cast<uint8_t>(port::MessageType::profile))
+            profile->ShowRefusal(refused);
+        else
+            panel->ShowRefusal(refused);
     }
 }

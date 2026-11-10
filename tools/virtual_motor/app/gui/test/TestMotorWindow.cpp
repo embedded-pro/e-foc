@@ -1,6 +1,7 @@
 #include "can-lite/drivers/implementation/LoopbackSocket.hpp"
 #include "tools/virtual_motor/app/gui/CaptureBar.hpp"
 #include "tools/virtual_motor/app/gui/MotorWindow.hpp"
+#include "tools/virtual_motor/app/gui/ProfilePanel.hpp"
 #include "tools/virtual_motor/app/gui/ScopeArea.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -8,9 +9,11 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QLabel>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTabWidget>
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <thread>
@@ -77,6 +80,29 @@ namespace
             loopback::Send(engine, infra::ConstByteRange{ bytes.data(), bytes.data() + bytes.size() });
         }
 
+        std::vector<port::Frame> Received()
+        {
+            std::vector<port::Frame> frames;
+            std::array<uint8_t, 4096> buffer{};
+            for (int attempt = 0; attempt != 50; ++attempt)
+            {
+                if (auto size = loopback::Receive(engine, infra::ByteRange{ buffer.data(), buffer.data() + buffer.size() }); size.value_or(0) != 0)
+                    assembler.Append(buffer.data(), *size);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            while (auto frame = assembler.Next())
+                frames.push_back(*frame);
+            return frames;
+        }
+
+        bool Shows(const QString& text)
+        {
+            for (auto* label : window->findChildren<QLabel*>())
+                if (label->text().startsWith(text))
+                    return true;
+            return false;
+        }
+
         void PollFor(int milliseconds)
         {
             for (int millisecond = 0; millisecond != milliseconds; ++millisecond)
@@ -109,6 +135,7 @@ namespace
         FakeStore store;
         Rig rig{ processes, store, folder, 29997 };
         intptr_t engine{ loopback::invalidSocket };
+        port::FrameAssembler assembler;
         std::optional<MotorWindow> window;
     };
 }
@@ -212,4 +239,40 @@ TEST_F(TestMotorWindow, the_modulation_rotor_and_encoder_views_follow_the_traces
     tabs->setCurrentIndex(5);
     EXPECT_EQ(window->findChild<ScopeArea*>()->CurrentView()->Name(), "Rotor");
     EXPECT_TRUE(rig.Find(3)->Streaming());
+}
+
+TEST_F(TestMotorWindow, a_profile_with_an_unreadable_line_is_not_sent_and_says_which_line)
+{
+    auto* panel = window->findChild<ProfilePanel*>();
+    panel->SetText("at 0 load 0.1\nat 1 lode 0.2\n");
+    Received();
+
+    Button("Start")->click();
+
+    EXPECT_TRUE(Shows("Not started: Line 2: unknown change"));
+    EXPECT_TRUE(Received().empty());
+}
+
+TEST_F(TestMotorWindow, a_started_profile_reaches_the_motor_and_its_state_is_shown)
+{
+    auto* panel = window->findChild<ProfilePanel*>();
+    panel->SetText("trigger immediately\nat 0 load 0.1\nat 0.5 current-noise 0.02\n");
+    Received();
+
+    Button("Start")->click();
+    const auto frames = Received();
+    ASSERT_EQ(frames.size(), 1u);
+    const auto request = port::Decode<port::ProfileRequest>(frames[0]);
+    ASSERT_TRUE(request.has_value());
+    ASSERT_EQ(request->steps.size(), 2u);
+    EXPECT_EQ(request->steps[1].at, 10000u);
+
+    Send(port::ProfileState{ port::ProfileStateKind::running, 1, 2, 2000 });
+    PollFor(30);
+    window->Refresh();
+    EXPECT_TRUE(Shows("Running: 1 of 2 changes applied, 0.1 s since the trigger; next at 0.5 s: current noise 0.02 A"));
+    EXPECT_TRUE(Button("Stop")->isEnabled());
+
+    window->ShowRefusal(port::Refused{ static_cast<uint8_t>(port::MessageType::profile), port::RefusalReason::outOfRange });
+    EXPECT_TRUE(Shows("Not started: a change in the profile is out of range"));
 }

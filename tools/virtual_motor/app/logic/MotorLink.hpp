@@ -18,6 +18,7 @@ namespace virtual_motor::app
         virtual void WindowReceived(const port::Window& window) = 0;
         virtual void CaptureEventReceived(const port::CaptureEvent& event) = 0;
         virtual void CaptureChunkReceived(const port::CaptureChunk& chunk) = 0;
+        virtual void ProfileStateReceived(const port::ProfileState& state) = 0;
         virtual void LinkClosed() = 0;
 
     protected:
