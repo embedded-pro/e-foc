@@ -3,9 +3,7 @@
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/transforms/DelayCompensation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
-#include "infra/util/TripleBuffer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
 
@@ -28,7 +26,7 @@ namespace foc
 
         void Restart()
         {
-            gains.Publish(model.ToGains());
+            Publish(model.ToGains());
         }
 
         void Track(Ohm resistance, MilliHenry inductance)
@@ -36,15 +34,17 @@ namespace foc
             if (!model.Usable() || !Within(resistanceEstimateBand, resistance.Value(), model.resistance) || !Within(inductanceEstimateBand, inductance.Value(), model.inductanceMilliHenry))
                 return;
 
-            gains.Publish(Model{ resistance.Value(), inductance.Value(), model.fluxLinkage }.ToGains());
+            Publish(Model{ resistance.Value(), inductance.Value(), model.fluxLinkage }.ToGains());
         }
 
         OPTIMIZE_FOR_SPEED PhaseCurrentSlopes Next(const RotatingFrame& current, float electricalSpeed, float cosTheta, float sinTheta)
         {
-            const auto& gain = gains.Acquire();
-            const RotatingFrame rate{ -gain.resistanceOverInductance * current.d, -gain.resistanceOverInductance * current.q - electricalSpeed * gain.fluxOverInductance };
-            const auto next = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, samplePeriod);
-            const auto phases = clarke.Inverse(park.Inverse(rate, next.cosine, next.sine));
+            const float decay = resistanceOverInductance;
+            const float d = -decay * current.d;
+            const float q = -decay * current.q - electricalSpeed * fluxOverInductance;
+            const float advance = electricalSpeed * samplePeriod;
+            const float keep = 1.0f - 0.5f * advance * advance;
+            const auto phases = clarke.Inverse(park.Inverse(RotatingFrame{ keep * d - advance * q, keep * q + advance * d }, cosTheta, sinTheta));
 
             return { AmperePerSecond{ phases.a }, AmperePerSecond{ phases.b }, AmperePerSecond{ phases.c } };
         }
@@ -78,6 +78,12 @@ namespace foc
             }
         };
 
+        void Publish(const Gains& gains)
+        {
+            resistanceOverInductance = gains.resistanceOverInductance;
+            fluxOverInductance = gains.fluxOverInductance;
+        }
+
         static bool Within(const EstimateBand& band, float value, float reference)
         {
             const auto ratio = value / reference;
@@ -88,6 +94,7 @@ namespace foc
         [[no_unique_address]] Park park;
         Model model;
         float samplePeriod{ 0.0f };
-        infra::TripleBuffer<Gains> gains;
+        volatile float resistanceOverInductance{ 0.0f };
+        volatile float fluxOverInductance{ 0.0f };
     };
 }

@@ -57,11 +57,6 @@ namespace application
         powerStage.CurrentOffsets(offsets);
     }
 
-    void DecimatingThreePhaseInverter::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
-    {
-        powerStage.ZeroVectorSlopes(slopes);
-    }
-
     void DecimatingThreePhaseInverter::Decimate(foc::PhaseCurrents currents)
     {
         if (++samplesSinceCallback < samplesPerCallback)

@@ -452,13 +452,15 @@ inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`
 no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
 a multiply-add per sample in the speed and position cascades.
 
-The sampling-skew correction (`documentation/design/platform-sampling-skew.md`) costs each cascade four
-multiply-adds for the zero-vector rates in rotor coordinates, the same small-angle rotation turned one period ahead,
-and an inverse Park and Clarke: about 25 floating-point operations, inlined into `Calculate`. The Runner then hands
-the three rates down the inverter chain, one indirect call per decorator (dead-time compensation, the decimating
-inverter, the platform), and the platform multiplies each by its delay; the shunt readout subtracts the three
-products from the next sample before the rebuild. `ZeroVectorSlope::Next`, the cascades' `ZeroVectorSlopes` and
-the three inverter hops are listed in the cycle-gate configurations.
+The sampling-skew correction (`documentation/design/platform-sampling-skew.md`) costs each cascade the zero-vector
+rates in rotor coordinates, a second-order turn by $\omega_e T_s$ there (no separate `AdvanceRotation`) and an inverse
+Park and Clarke: about 20 floating-point operations, inlined into `Calculate` (about 32 instructions per cascade on
+the TM4C). The cascade then hands the three rates straight to the platform's shunt readout in one indirect call; a
+first version that sent them through the Runner and down the dead-time compensation and decimating inverter cost
+some 360 cycles in all and took the inner loop past its 4500-cycle budget. The gains are two single-word values, not
+a triple buffer. The platform multiplies each rate by its delay, and the readout subtracts the three products from
+the next sample before the rebuild. `ZeroVectorSlope::Next` and `PlatformFactoryImpl::ZeroVectorSlopes` are listed in
+the cycle-gate configurations.
 
 ### Key Performance Sensitivities
 

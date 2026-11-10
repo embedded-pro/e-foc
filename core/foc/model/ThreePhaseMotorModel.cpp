@@ -153,9 +153,6 @@ namespace foc
     void ThreePhaseMotorModel::CurrentOffsets(const foc::PhaseCurrents&)
     {}
 
-    void ThreePhaseMotorModel::ZeroVectorSlopes(const foc::PhaseCurrentSlopes&)
-    {}
-
     void InjectFaults(ThreePhaseMotorModel& model, const ThreePhaseMotorModel::FaultInjectionConfig& config)
     {
         model.Electrical().SetOpenPhases({ config.openPhaseA, config.openPhaseB, config.openPhaseC });

@@ -18,6 +18,8 @@ namespace application
     {
         if (hardware.currentStream != nullptr)
             focController.SetCurrentStream(*hardware.currentStream);
+        if (hardware.zeroVectorSlopes != nullptr)
+            focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
         RegisterFaultHandler(faultNotifier);
         Boot(rotorReference);
     }

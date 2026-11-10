@@ -56,7 +56,6 @@ namespace drivers
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
         MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
-        MOCK_METHOD(void, ZeroVectorSlopes, (const foc::PhaseCurrentSlopes& slopes), (override));
 
         void StorePhaseCurrentsCallback(const infra::Function<void(foc::PhaseCurrents phaseCurrents)>& onDone)
         {

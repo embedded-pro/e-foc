@@ -135,42 +135,12 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
         EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.5f }));
         EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(expectedDuties));
         EXPECT_CALL(inverterMock, ThreePhasePwmOutput(DutiesEqual(expectedDuties)));
-        EXPECT_CALL(focMock, ZeroVectorSlopes()).WillOnce(Return(foc::PhaseCurrentSlopes{}));
-        EXPECT_CALL(inverterMock, ZeroVectorSlopes(_));
         EXPECT_CALL(inverterMock, Stop());
         EXPECT_CALL(focMock, Disable());
     }
 
     runner.Enable();
     inverterMock.TriggerPhaseCurrentsCallback(testCurrents);
-}
-
-TEST_F(TestRunner, AfterTheDutiesTheControllersZeroVectorSlopesGoToTheInverter)
-{
-    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
-
-    const foc::PhaseCurrentSlopes slopes{ foc::AmperePerSecond{ 4.0e4f }, foc::AmperePerSecond{ -1.0e4f }, foc::AmperePerSecond{ -3.0e4f } };
-    foc::PhaseCurrentSlopes told{};
-
-    {
-        testing::InSequence seq;
-        EXPECT_CALL(focMock, Enable());
-        EXPECT_CALL(inverterMock, Start());
-        EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.5f }));
-        EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{}));
-        EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
-        EXPECT_CALL(focMock, ZeroVectorSlopes()).WillOnce(Return(slopes));
-        EXPECT_CALL(inverterMock, ZeroVectorSlopes(_)).WillOnce(testing::SaveArg<0>(&told));
-        EXPECT_CALL(inverterMock, Stop());
-        EXPECT_CALL(focMock, Disable());
-    }
-
-    runner.Enable();
-    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{});
-
-    EXPECT_NEAR(told.a.Value(), 4.0e4f, 1e-2f);
-    EXPECT_NEAR(told.b.Value(), -1.0e4f, 1e-2f);
-    EXPECT_NEAR(told.c.Value(), -3.0e4f, 1e-2f);
 }
 
 TEST_F(TestRunner, DestructorCallsDisable)
@@ -301,8 +271,6 @@ TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
-    EXPECT_CALL(focMock, ZeroVectorSlopes()).WillOnce(Return(foc::PhaseCurrentSlopes{}));
-    EXPECT_CALL(inverterMock, ZeroVectorSlopes(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 
@@ -348,8 +316,6 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
         {
             dutiesWritten = true;
         });
-    EXPECT_CALL(focMock, ZeroVectorSlopes()).WillOnce(Return(foc::PhaseCurrentSlopes{}));
-    EXPECT_CALL(inverterMock, ZeroVectorSlopes(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 
@@ -378,8 +344,6 @@ TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
-    EXPECT_CALL(focMock, ZeroVectorSlopes()).WillOnce(Return(foc::PhaseCurrentSlopes{}));
-    EXPECT_CALL(inverterMock, ZeroVectorSlopes(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 

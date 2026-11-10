@@ -1118,12 +1118,14 @@ TEST_F(TestSpeedCascade, the_current_algorithm_is_selectable_while_disabled)
 
 TEST_F(TestSpeedCascade, at_standstill_the_zero_vector_slopes_are_each_current_decaying_through_the_resistance)
 {
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
     EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
     focSpeed->Enable();
     foc::Radians position{ 0.0f };
     focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
-
-    const auto slopes = focSpeed->ZeroVectorSlopes();
 
     EXPECT_NEAR(slopes.a.Value(), 0.0f, 1.0f);
     EXPECT_NEAR(slopes.b.Value(), -1000.0f * 1.5f, 1.0f);
@@ -1132,6 +1134,10 @@ TEST_F(TestSpeedCascade, at_standstill_the_zero_vector_slopes_are_each_current_d
 
 TEST_F(TestSpeedCascade, a_settled_online_inductance_inside_the_band_sets_the_zero_vector_slopes)
 {
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
     testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
     EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
@@ -1146,14 +1152,16 @@ TEST_F(TestSpeedCascade, a_settled_online_inductance_inside_the_band_sets_the_ze
     lowPriorityInterruptMock.TriggerHandler();
     focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
 
-    const auto slopes = focSpeed->ZeroVectorSlopes();
-
     EXPECT_NEAR(slopes.b.Value(), -800.0f * 1.5f, 1.0f);
     EXPECT_NEAR(slopes.c.Value(), 800.0f * 1.5f, 1.0f);
 }
 
 TEST_F(TestSpeedCascade, an_enable_returns_the_zero_vector_slopes_to_the_configured_model)
 {
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
     testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
     EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
@@ -1170,5 +1178,5 @@ TEST_F(TestSpeedCascade, an_enable_returns_the_zero_vector_slopes_to_the_configu
     focSpeed->Enable();
     focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
 
-    EXPECT_NEAR(focSpeed->ZeroVectorSlopes().b.Value(), -1000.0f * 1.5f, 1.0f);
+    EXPECT_NEAR(slopes.b.Value(), -1000.0f * 1.5f, 1.0f);
 }

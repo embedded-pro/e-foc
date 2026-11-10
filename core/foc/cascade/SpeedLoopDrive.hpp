@@ -34,12 +34,8 @@ namespace foc
         void LimitCurrent(Ampere limit) override;
         void TrackBusVoltage(Volts measured) override;
 
-        PhaseCurrentSlopes ZeroVectorSlopes() const final
-        {
-            return CascadeWithSpeedLoop::ZeroVectorSlopesImpl();
-        }
-
         using CascadeWithSpeedLoop::SetCurrentStream;
+        using CascadeWithSpeedLoop::SetZeroVectorSlopeSink;
 
     protected:
         using CascadeWithSpeedLoop::CascadeWithSpeedLoop;

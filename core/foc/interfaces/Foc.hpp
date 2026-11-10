@@ -34,7 +34,6 @@ namespace foc
         virtual void Enable() = 0;
         virtual void Disable() = 0;
         virtual PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) = 0;
-        virtual PhaseCurrentSlopes ZeroVectorSlopes() const = 0;
     };
 
     class CurrentLoopTunable

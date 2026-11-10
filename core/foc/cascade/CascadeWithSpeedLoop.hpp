@@ -40,11 +40,6 @@ namespace foc
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
 
-        PhaseCurrentSlopes ZeroVectorSlopesImpl() const
-        {
-            return slopes;
-        }
-
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
 
@@ -69,6 +64,7 @@ namespace foc
         void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
         void ClearFrictionFeedForwardImpl();
         void SetCurrentStream(CurrentStream& stream);
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
 
@@ -137,6 +133,6 @@ namespace foc
         FeedForwards feedForward;
         CurrentStream* currentStream{ nullptr };
         ZeroVectorSlope zeroVectorSlope;
-        PhaseCurrentSlopes slopes{};
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
     };
 }

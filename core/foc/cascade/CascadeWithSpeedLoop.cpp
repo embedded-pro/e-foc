@@ -140,7 +140,8 @@ namespace foc
         const float limit = command.quadratureLimit;
         const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.frictionCurrent + coggingCurrent, -limit, limit);
         const float electricalSpeed = outer.electricalSpeed;
-        slopes = zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta);
+        if (slopeSink != nullptr)
+            slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ outer.directCurrentReference, quadratureReference }, electricalSpeed, busRatio.Ratio() });
 
         const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, scaling.dutyDelay);
@@ -293,5 +294,10 @@ namespace foc
     void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)
     {
         currentStream = &stream;
+    }
+
+    void CascadeWithSpeedLoop::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
+    {
+        slopeSink = &sink;
     }
 }

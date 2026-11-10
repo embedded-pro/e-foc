@@ -216,15 +216,3 @@ TEST_F(TestInverterCompensation, through_a_stage_that_loses_the_dead_time_the_co
     EXPECT_GT(std::abs(uncorrected - target), 30e-3f);
     EXPECT_NEAR(corrected, target, 1e-3f);
 }
-
-TEST_F(TestInverterCompensation, the_zero_vector_slopes_pass_to_the_stage_below_unchanged)
-{
-    foc::PhaseCurrentSlopes told{};
-    EXPECT_CALL(inverterMock, ZeroVectorSlopes(_)).WillOnce(SaveArg<0>(&told));
-
-    compensation.ZeroVectorSlopes(foc::PhaseCurrentSlopes{ foc::AmperePerSecond{ 4.0e4f }, foc::AmperePerSecond{ -1.0e4f }, foc::AmperePerSecond{ -3.0e4f } });
-
-    EXPECT_NEAR(told.a.Value(), 4.0e4f, 1e-2f);
-    EXPECT_NEAR(told.b.Value(), -1.0e4f, 1e-2f);
-    EXPECT_NEAR(told.c.Value(), -3.0e4f, 1e-2f);
-}

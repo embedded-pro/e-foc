@@ -54,7 +54,7 @@
         "CurrentStream::Reopen",
         "CurrentStream::Publish",
         "ZeroVectorSlope::Next",
-        "SpeedLoopDrive<.*>::ZeroVectorSlopes"
+        "PlatformFactoryImpl::ZeroVectorSlopes"
       ]
     },
     {

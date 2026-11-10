@@ -34,6 +34,8 @@ namespace application
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
             if (hardware.currentStream != nullptr)
                 focController.SetCurrentStream(*hardware.currentStream);
+            if (hardware.zeroVectorSlopes != nullptr)
+                focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
             RegisterFaultHandler(faultNotifier);
             Boot(outerLoopArgs.rotorReference);
         }

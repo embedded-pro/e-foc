@@ -104,15 +104,3 @@ TEST_F(TestDecimatingThreePhaseInverter, the_current_offsets_pass_to_the_power_s
     EXPECT_NEAR(told.b.Value(), -0.018f, 1e-6f);
     EXPECT_NEAR(told.c.Value(), 0.054f, 1e-6f);
 }
-
-TEST_F(TestDecimatingThreePhaseInverter, the_zero_vector_slopes_pass_to_the_power_stage)
-{
-    foc::PhaseCurrentSlopes told{};
-    EXPECT_CALL(powerStage, ZeroVectorSlopes(_)).WillOnce(SaveArg<0>(&told));
-
-    inverter.ZeroVectorSlopes(foc::PhaseCurrentSlopes{ foc::AmperePerSecond{ 4.0e4f }, foc::AmperePerSecond{ -1.0e4f }, foc::AmperePerSecond{ -3.0e4f } });
-
-    EXPECT_NEAR(told.a.Value(), 4.0e4f, 1e-2f);
-    EXPECT_NEAR(told.b.Value(), -1.0e4f, 1e-2f);
-    EXPECT_NEAR(told.c.Value(), -3.0e4f, 1e-2f);
-}

@@ -88,9 +88,12 @@ $$\dot{i}_d = -\frac{R}{L}\,i_d, \qquad \dot{i}_q = -\frac{R}{L}\,i_q - \omega_e
 
 which the inverse Park and Clarke transforms turn into one rate per phase. The FOC cascade computes it
 every period from the currents it has just measured, the electrical speed it already tracks and the
-motor model it was configured with, and hands it to the inverter after the duties. The rate is used
-at the next sample, one period later, so the cascade turns it by the angle the rotor covers in one
-period first; at speed that is the larger part of its change between two samples. With the inductance
+motor model it was configured with, and hands it straight to the platform's shunt readout, past the
+dead-time compensation and the decimating inverter, which have no use for it: one indirect call a
+period. The rate is used at the next sample, one period later, so the cascade turns it by the angle
+$\delta = \omega_e T_s$ the rotor covers in one period first, in rotor coordinates and to second order
+($\cos\delta \approx 1 - \delta^2/2$, $\sin\delta \approx \delta$); at speed that is the larger part of its
+change between two samples. With the inductance
 unknown (zero), the rates are zero.
 
 ### Part C — Which model
@@ -103,7 +106,8 @@ every enable, and in speed and position mode follow the online electrical estima
 estimator reports it settled. The outer loop hands each settled resistance and inductance to the cascade,
 which takes them only inside the bands online recalibration believes (resistance 0.7–2×, inductance
 0.5–1.5× of the model in use; [online recalibration](online-recalibration.md) Part B) and publishes the two
-gains to the inner loop through a triple buffer. Unlike the loop gains, the rates are not a controller
+gains to the inner loop as two single-word values; a sample that reads one gain old and one new
+moves by a fraction of a milliampere for that one period. Unlike the loop gains, the rates are not a controller
 design: following an estimate while the drive is enabled changes only how far each sample is moved, so it
 needs no stop. Torque mode runs no estimator and keeps the model in use.
 
@@ -124,7 +128,7 @@ flowchart LR
     RB -->|yes| REB[Rebuild the hidden phase from the corrected two] --> OUT
     OUT --> CAS[FOC cascade]
     CAS -->|duties| INV[Inverter]
-    CAS -->|zero-vector rates for the next sample| INV
+    CAS -->|zero-vector rates for the next sample| RB
 ```
 
 ### Part E — When no controller runs
@@ -139,9 +143,9 @@ until its first period.
 
 ### Provided
 
-| Interface         | Purpose                                                         | Contract                                                                                        |
-|-------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| Zero-vector rates | Take the rate of each phase current while all low sides conduct | Called from the control interrupt after the duties; applies to the next sample; cleared by Stop |
+| Interface         | Purpose                                                         | Contract                                                                                     |
+|-------------------|-----------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| Zero-vector rates | Take the rate of each phase current while all low sides conduct | Called from the control interrupt once a period; applies to the next sample; cleared by Stop |
 
 ### Required
 
@@ -162,9 +166,8 @@ sequenceDiagram
     ADC->>RO: A, B, C as read
     RO->>RO: subtract rate × delay, rebuild a hidden phase
     RO->>FOC: phase currents at the window centre
-    FOC->>FOC: duties, then the rates turned one period ahead
+    FOC->>RO: zero-vector rates, turned one period ahead
     FOC->>RO: duties
-    FOC->>RO: zero-vector rates
 ```
 
 ---
@@ -186,8 +189,7 @@ sequenceDiagram
 
 Unit tests check the delays derived from the converter settings, that the readout subtracts rate ×
 delay from every phase it reads and rebuilds a hidden phase from the corrected two, that Stop clears
-the rates, that each cascade hands the inverter the rates of Part B, and that the inverter decorators
-pass them on, and that a settled online estimate inside the bands moves the rates and an enable restores
+the rates, that each cascade hands its sink the rates of Part B once a sample, and that a settled online estimate inside the bands moves the rates and an enable restores
 the configured model. The plant's current-sense chain samples each phase along its zero-vector rate, so the
 model-in-the-loop suite compares the currents the drive measures with those the plant carries on the
 low-inductance Teknic, read through the bench sense chain at the 600 rad/s overspeed limit. Without the

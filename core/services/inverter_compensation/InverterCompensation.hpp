@@ -24,7 +24,6 @@ namespace services
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsetsRemovedAbove) override;
-        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
     private:
         void PassOffsetsDown();

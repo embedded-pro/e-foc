@@ -4,6 +4,7 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
@@ -35,13 +36,9 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
-        PhaseCurrentSlopes ZeroVectorSlopes() const final
-        {
-            return slopes;
-        }
-
         MotionObservation ObserveMotion() const override;
         void SetCurrentStream(CurrentStream& stream);
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
 
         void EnableCurrentCommand() override;
         void DisableCurrentCommand() override;
@@ -102,7 +99,7 @@ namespace foc
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
         ZeroVectorSlope zeroVectorSlope;
-        PhaseCurrentSlopes slopes{};
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };
     };
