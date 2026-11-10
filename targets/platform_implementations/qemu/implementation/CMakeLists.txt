@@ -2,8 +2,6 @@ add_library(e_foc.platform_abstraction_qemu)
 emil_build_for(e_foc.platform_abstraction_qemu ALL All BOOL EMIL_BUILD_QEMU)
 
 target_sources(e_foc.platform_abstraction_qemu PRIVATE
-    BoardProtectionSimulator.cpp
-    BoardProtectionSimulator.hpp
     CmsdkUartLines.cpp
     CmsdkUartLines.hpp
     EmulatedCan.cpp

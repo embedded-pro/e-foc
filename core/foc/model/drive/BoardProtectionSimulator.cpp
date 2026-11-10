@@ -1,4 +1,4 @@
-#include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
+#include "core/foc/model/drive/BoardProtectionSimulator.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "integration_tests/support/nvm/NvmImageBuilder.hpp"
-#include "integration_tests/support/plant/PlantPresets.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
+#include "motor_parameters/PlantPresets.hpp"
 #include <chrono>
 #include <cstddef>
 #include <optional>

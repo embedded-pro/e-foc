@@ -127,7 +127,7 @@ namespace tool
             { FocParameter::firmwareVersionMajor, "Firmware major version", "Firmware major:", {}, "Major number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionMinor, "Firmware minor version", "Firmware minor:", {}, "Minor number of the release version of the running firmware.", {} },
             { FocParameter::firmwareVersionPatch, "Firmware patch version", "Firmware patch:", {}, "Patch number of the release version of the running firmware.", {} },
-            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on; emulated is the QEMU software-in-the-loop target.", {} },
+            { FocParameter::boardKind, "Board", "Board:", {}, "Board the controller runs on; emulated is the QEMU software-in-the-loop target, virtual a virtual motor on this machine.", {} },
             { FocParameter::stagedVersionMajor, "Staged major version", "Staged major:", {}, "Major number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionMinor, "Staged minor version", "Staged minor:", {}, "Minor number of the release version of the pack staged for an update; 0 when none is staged.", {} },
             { FocParameter::stagedVersionPatch, "Staged patch version", "Staged patch:", {}, "Patch number of the release version of the pack staged for an update; 0 when none is staged.", {} },

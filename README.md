@@ -30,6 +30,7 @@ This project provides a production-ready motor control implementation designed f
 ### Simulation & Testing
 - **Software-in-the-Loop**: The shipping firmware under an emulator against a simulated motor plant
 - **Model-in-the-Loop**: The control-mode state machine and calibration services against the same plant on the host
+- **Virtual Motors**: The application on the host against the same plant, one node on a virtual CAN bus the CAN Commander connects to
 - **Unit Tests**: Comprehensive GoogleTest coverage for control algorithms
 - **Hardware-in-the-Loop Ready**: Mockable interfaces for testability
 
@@ -109,6 +110,7 @@ e-foc/
 │       └── ti/                      # TI Tiva C platform implementation
 ├── tools/                           # Host-side developer tools
 │   ├── can_commander/               # CAN bus command interface tool
+│   ├── virtual_motor/               # Virtual motors: the application on the host on a virtual CAN bus
 │   └── hardware_bridge/             # Terminal/CAN/serial bridge client (Qt) for HIL tests
 ├── infra/                           # Infrastructure submodules
 │   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
@@ -198,6 +200,21 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
 | Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
+### Virtual motors
+
+A virtual motor runs the e-foc application on the development machine against the simulated motor plant,
+as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). Start one that also
+hosts the bus, then connect the CAN Commander to `virtual:default`:
+
+```bash
+./build/host/tools/virtual_motor/engine/Debug/e-foc-virtual-motor --host-bus --node 1 --plant teknic
+```
+
+Further motors join the same bus with their own `--node`; `--plant anaheim` selects the other reference
+motor, and `--factory-fresh` starts with erased memory. `--help` lists every option. A virtual motor keeps
+its memory in `virtual-motor-<bus>-<node>.nvm` in its working directory, so it stays calibrated between
+runs; `--memory` names another file in that directory.
+
 ## Releases
 
 Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
@@ -253,6 +270,7 @@ boards jumpered 0–7 become nodes 1–8. Jumpers are read at reset only.
 | candleLight (gs_usb firmware)    | Through SocketCAN | Yes, no driver to install          | `candleLight:1`                    |
 | PEAK PCAN-USB                    | Through SocketCAN | Yes, with the PEAK driver package  | `PCAN:1`                           |
 | Kvaser                           | Through SocketCAN | Yes, with the Kvaser CANlib driver | `Kvaser:0`                         |
+| Virtual motors on this machine   | Yes               | Yes                                | `virtual:default`                  |
 
 On Linux, slcan needs the user in the `dialout` group (`sudo usermod -aG dialout $USER`, then log in again).
 
