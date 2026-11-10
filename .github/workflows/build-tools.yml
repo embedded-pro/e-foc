@@ -59,7 +59,11 @@ jobs:
           staging="staging/can_commander"
           mkdir -p "$staging"
           find build/host/tools/can_commander -name "e-foc-can-commander" -type f -executable -path "*/Release/*" -exec cp {} "$staging/" \;
+          find build/host/tools/virtual_motor -name "e-foc-virtual-motor-app" -type f -executable -path "*/Release/*" -exec cp {} "$staging/" \;
+          find build/host/tools/virtual_motor -name "e-foc-virtual-motor" -type f -executable -path "*/Release/*" -exec cp {} "$staging/" \;
           test -x "$staging/e-foc-can-commander"
+          test -x "$staging/e-foc-virtual-motor-app"
+          test -x "$staging/e-foc-virtual-motor"
           tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
       - name: Package CAN Commander installer
         run: |
@@ -83,8 +87,16 @@ jobs:
           status=0
           QT_QPA_PLATFORM=offscreen timeout 10 e-foc-can-commander --no-update-check || status=$?
           test "$status" -eq 124 || { echo "::error::CAN Commander exited with $status instead of running"; exit 1; }
+          desktop-file-validate /usr/share/applications/e-foc-virtual-motor.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/e-foc-virtual-motor.svg
+          e-foc-virtual-motor --help
+          status=0
+          QT_QPA_PLATFORM=offscreen timeout 10 e-foc-virtual-motor-app || status=$?
+          test "$status" -eq 124 || { echo "::error::e-foc Virtual Motor exited with $status instead of running"; exit 1; }
           sudo apt-get remove -y e-foc-can-commander
           test ! -e /usr/bin/e-foc-can-commander
+          test ! -e /usr/bin/e-foc-virtual-motor-app
+          test ! -e /usr/bin/e-foc-virtual-motor
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-can-commander

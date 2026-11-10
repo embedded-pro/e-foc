@@ -50,7 +50,7 @@ function(e_foc_can_commander_package)
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins")
-    set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Desktop tool to command and monitor e-foc motor controllers over CAN.\n Connects through SocketCAN, keeps an issue log and checks for new releases.")
+    set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Desktop tool to command and monitor e-foc motor controllers over CAN.\n Connects through SocketCAN, keeps an issue log and checks for new releases.\n Includes the e-foc Virtual Motor app: e-foc against simulated motors on a virtual CAN bus.")
 
     set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "e-foc CAN Commander")

@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.6.0                    |
+| Version   | 0.7.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -287,6 +287,16 @@ The CAN Commander needs no knowledge of the plant. A node whose board kind is *v
 The app and the virtual motor program ship in the CAN Commander's Windows and Debian installers, with
 their own start-menu entry and icon. The installers' asset names stay unchanged, so the update check
 finds them as before.
+
+- **Debian package.** `e-foc-virtual-motor-app` and `e-foc-virtual-motor` install beside
+  `e-foc-can-commander`, so the app finds the virtual motor program and the CAN Commander's Launch
+  Virtual Motor… finds the app. The menu entry *e-foc Virtual Motor* carries its own icon: the CAN
+  Commander's motor inside a dashed ring, which also marks the app's windows. The release's install test
+  installs the package, checks both entries and icons, asks the virtual motor program for its usage,
+  runs the app, and removes the package.
+- **Windows installer.** The app and the virtual motor program join it once both build and run on
+  Windows; until then the Windows installer holds the CAN Commander alone, whose Launch Virtual Motor…
+  stays disabled and says the app is not installed.
 
 ### Part J — modulation
 
