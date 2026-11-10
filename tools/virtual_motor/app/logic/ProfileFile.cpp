@@ -196,7 +196,7 @@ namespace virtual_motor::app
                 return profile.entries.empty() ? ReadTrigger(words, profile.trigger) : std::optional<LineError>{ LineError{ "the trigger comes before the changes" } };
             if (words.front() == "at")
                 return ReadEntry(words, profile);
-            return LineError{ "a line starts with \"trigger\" or \"at\"" };
+            return LineError{ R"(a line starts with "trigger" or "at")" };
         }
 
         std::string ChangeText(const ProfileEntry& entry)
@@ -249,7 +249,7 @@ namespace virtual_motor::app
     {
         port::ProfileRequest request{ profile.trigger, {}, true };
         for (const auto& entry : profile.entries)
-            request.steps.push_back({ static_cast<uint32_t>(math::Round(entry.seconds * controlRateHz)), entry.change, entry.value, entry.torque });
+            request.steps.emplace_back(static_cast<uint32_t>(math::Round(entry.seconds * controlRateHz)), entry.change, entry.value, entry.torque);
         return request;
     }
 
