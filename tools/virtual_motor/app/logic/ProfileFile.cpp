@@ -1,10 +1,10 @@
 #include "tools/virtual_motor/app/logic/ProfileFile.hpp"
 #include "numerical/math/Math.hpp"
 #include "tools/virtual_motor/app/logic/MotorText.hpp"
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <format>
-#include <map>
 #include <span>
 
 namespace virtual_motor::app
@@ -12,6 +12,57 @@ namespace virtual_motor::app
     namespace
     {
         using Words = std::vector<std::string_view>;
+
+        template<class Value>
+        struct Named
+        {
+            std::string_view name;
+            Value value;
+        };
+
+        template<class Value, std::size_t Size>
+        std::optional<Value> Lookup(const std::array<Named<Value>, Size>& table, std::string_view name)
+        {
+            const auto found = std::ranges::find(table, name, &Named<Value>::name);
+            return found != table.end() ? std::optional<Value>{ found->value } : std::nullopt;
+        }
+
+        struct FormSpec
+        {
+            port::TorqueForm form;
+            std::size_t parameters;
+            std::string_view usage;
+        };
+
+        constexpr std::array<Named<FormSpec>, 5> forms{ {
+            { "none", { port::TorqueForm::none, 0, "external none takes nothing more" } },
+            { "constant", { port::TorqueForm::constant, 1, "external constant takes the torque" } },
+            { "step", { port::TorqueForm::step, 3, "external step takes from, to and delay" } },
+            { "ramp", { port::TorqueForm::ramp, 3, "external ramp takes from, to and duration" } },
+            { "sine", { port::TorqueForm::sine, 3, "external sine takes offset, amplitude and frequency" } },
+        } };
+
+        constexpr std::array<Named<port::MessageType>, 4> changes{ {
+            { "load", port::MessageType::loadTorque },
+            { "external", port::MessageType::externalTorque },
+            { "current-noise", port::MessageType::currentNoise },
+            { "encoder-noise", port::MessageType::encoderNoise },
+        } };
+
+        constexpr std::array<Named<uint8_t>, 3> ledNames{ {
+            { "operational", port::led::operational },
+            { "warning", port::led::warning },
+            { "failure", port::led::failure },
+        } };
+
+        constexpr std::array<Named<port::TriggerKind>, 6> triggerKinds{ {
+            { "immediately", port::TriggerKind::immediately },
+            { "rising", port::TriggerKind::rising },
+            { "falling", port::TriggerKind::falling },
+            { "either", port::TriggerKind::either },
+            { "protection", port::TriggerKind::protection },
+            { "leds", port::TriggerKind::leds },
+        } };
 
         struct LineError
         {
@@ -57,39 +108,21 @@ namespace virtual_motor::app
 
         std::optional<LineError> ReadExternal(const Words& words, ProfileEntry& entry)
         {
-            static const std::map<std::string_view, std::pair<port::TorqueForm, std::size_t>, std::less<>> forms{
-                { "none", { port::TorqueForm::none, 0 } },
-                { "constant", { port::TorqueForm::constant, 1 } },
-                { "step", { port::TorqueForm::step, 3 } },
-                { "ramp", { port::TorqueForm::ramp, 3 } },
-                { "sine", { port::TorqueForm::sine, 3 } },
-            };
-            static const std::map<std::string_view, std::string_view, std::less<>> usages{
-                { "none", "external none takes nothing more" },
-                { "constant", "external constant takes the torque" },
-                { "step", "external step takes from, to and delay" },
-                { "ramp", "external ramp takes from, to and duration" },
-                { "sine", "external sine takes offset, amplitude and frequency" },
-            };
-            const auto form = words.size() > 3 ? forms.find(words[3]) : forms.end();
-            if (form == forms.end())
+            const auto form = words.size() > 3 ? Lookup(forms, words[3]) : std::nullopt;
+            if (!form.has_value())
                 return LineError{ "external is followed by none, constant, step, ramp or sine" };
-            entry.torque.form = form->second.first;
-            return ReadFloats(words, 4, std::span{ entry.torque.parameters }.first(form->second.second), usages.find(words[3])->second);
+            entry.torque.form = form->form;
+            return ReadFloats(words, 4, std::span{ entry.torque.parameters }.first(form->parameters), form->usage);
         }
 
         std::optional<LineError> ReadChange(const Words& words, ProfileEntry& entry)
         {
-            static const std::map<std::string_view, port::MessageType, std::less<>> changes{
-                { "load", port::MessageType::loadTorque },
-                { "external", port::MessageType::externalTorque },
-                { "current-noise", port::MessageType::currentNoise },
-                { "encoder-noise", port::MessageType::encoderNoise },
-            };
-            const auto change = words.size() > 2 ? changes.find(words[2]) : changes.end();
-            if (change == changes.end())
-                return LineError{ words.size() > 2 ? std::format("unknown change \"{}\"", words[2]) : std::string{ "a change follows the time" } };
-            entry.change = change->second;
+            if (words.size() < 3)
+                return LineError{ "a change follows the time" };
+            const auto change = Lookup(changes, words[2]);
+            if (!change.has_value())
+                return LineError{ std::format("unknown change \"{}\"", words[2]) };
+            entry.change = *change;
             if (entry.change == port::MessageType::externalTorque)
                 return ReadExternal(words, entry);
             return ReadFloats(words, 3, std::span{ &entry.value, 1 }, std::format("{} takes one value", words[2]));
@@ -97,17 +130,12 @@ namespace virtual_motor::app
 
         std::optional<LineError> ReadLeds(std::string_view names, port::Trigger& trigger)
         {
-            static const std::map<std::string_view, uint8_t, std::less<>> leds{
-                { "operational", port::led::operational },
-                { "warning", port::led::warning },
-                { "failure", port::led::failure },
-            };
             for (const auto name : Split(names, ','))
             {
-                const auto led = leds.find(name);
-                if (led == leds.end())
+                const auto led = Lookup(ledNames, name);
+                if (!led.has_value())
                     return LineError{ std::format("unknown LED \"{}\"", name) };
-                trigger.leds = static_cast<uint8_t>(trigger.leds + led->second);
+                trigger.leds = static_cast<uint8_t>(trigger.leds + *led);
             }
             return std::nullopt;
         }
@@ -129,23 +157,21 @@ namespace virtual_motor::app
 
         std::optional<LineError> ReadTrigger(const Words& words, port::Trigger& trigger)
         {
-            static const std::map<std::string_view, port::TriggerKind, std::less<>> kinds{
-                { "immediately", port::TriggerKind::immediately },
-                { "rising", port::TriggerKind::rising },
-                { "falling", port::TriggerKind::falling },
-                { "either", port::TriggerKind::either },
-                { "protection", port::TriggerKind::protection },
-                { "leds", port::TriggerKind::leds },
-            };
-            const auto kind = words.size() > 1 ? kinds.find(words[1]) : kinds.end();
-            if (kind == kinds.end())
+            const auto kind = words.size() > 1 ? Lookup(triggerKinds, words[1]) : std::nullopt;
+            if (!kind.has_value())
                 return LineError{ "trigger is followed by immediately, rising, falling, either, protection or leds" };
-            trigger = port::Trigger{ kind->second, 0, 0.0f, 0 };
+            trigger = port::Trigger{ *kind, 0, 0.0f, 0 };
             if (trigger.kind == port::TriggerKind::leds)
-                return words.size() == 3 ? ReadLeds(words[2], trigger) : std::optional<LineError>{ LineError{ "trigger leds takes the LEDs, separated by commas" } };
+            {
+                if (words.size() != 3)
+                    return LineError{ "trigger leds takes the LEDs, separated by commas" };
+                return ReadLeds(words[2], trigger);
+            }
             if (trigger.kind == port::TriggerKind::rising || trigger.kind == port::TriggerKind::falling || trigger.kind == port::TriggerKind::either)
                 return ReadEdge(words, trigger);
-            return words.size() == 2 ? std::nullopt : std::optional<LineError>{ LineError{ std::format("trigger {} takes nothing more", words[1]) } };
+            if (words.size() != 2)
+                return LineError{ std::format("trigger {} takes nothing more", words[1]) };
+            return std::nullopt;
         }
 
         std::optional<LineError> ReadEntry(const Words& words, Profile& profile)
