@@ -34,8 +34,6 @@ namespace virtual_motor
     {
         disturbances.Apply();
         drive.Tick();
-        if (streamSink)
-            SampleStream();
 
         if (onPhaseCurrentsReady && !controlLoopEntered)
         {
@@ -53,25 +51,9 @@ namespace virtual_motor
         return disturbances;
     }
 
-    void PlantPowerStage::Stream(const infra::Function<void(const port::Window&)>& sink)
+    SignalSample PlantPowerStage::SamplePlant()
     {
-        streamWindow.Begin();
-        streamSink = sink;
-    }
-
-    void PlantPowerStage::StopStream()
-    {
-        streamSink = nullptr;
-    }
-
-    void PlantPowerStage::SampleStream()
-    {
-        const auto sample = signals.Sample(drive.AppliedDuties(), foc::NewtonMeter{ disturbances.InForce().loadTorque });
-        if (auto window = streamWindow.Add(drive.TickCount() - 1, sample))
-        {
-            auto sink = streamSink;
-            sink(*window);
-        }
+        return signals.Sample(drive.AppliedDuties(), foc::NewtonMeter{ disturbances.InForce().loadTorque });
     }
 
     void PlantPowerStage::DeliverPendingProtection()

@@ -37,6 +37,9 @@ namespace virtual_motor
         std::optional<port::RefusalReason> SetEncoderNoise(float radians);
         void ClearAll();
 
+        std::optional<port::RefusalReason> Check(const port::ProfileStep& step) const;
+        void Apply(const port::ProfileStep& step);
+
         void Apply();
         port::Changes InForce() const;
 

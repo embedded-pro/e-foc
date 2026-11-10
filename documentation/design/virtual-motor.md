@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.5.0                |
+| Version   | 0.6.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -248,7 +248,13 @@ plant to its description.
 **Disturbance profiles.** A profile is a timed list of torque and noise changes, relative to its start
 or to a trigger (a speed or current threshold, the drive entering a state the LEDs show). It is the bench
 counterpart of the scheduled disturbances of the scenarios (`software-in-the-loop.md` Part H): with
-the same seed and profile a run replays exactly. Profiles are files the app loads and saves.
+the same seed and profile a run replays exactly. Profiles are files the app loads and saves; the virtual
+motor runs them, so each change lands on the control period its time names, whatever the wall clock or
+the connection does. A profile holds up to 1,024 changes, each timed in control periods after the trigger
+and none before the one listed ahead of it; every change is checked as Part E checks a single one, and a
+profile with one change out of range is refused whole. A new profile replaces a running one. Stopping a
+profile returns the plant to its description; a profile that finishes, or whose app goes away, stops, and
+what it applied stays in force, as the changes the app made do.
 
 ### Part F — The plant port
 
@@ -265,6 +271,27 @@ it shows a trace and off when it shows none, so a motor nobody watches samples n
 periods, around a trigger: a signal crossing a level in a direction, a protection trip, a fault the LEDs
 show, or immediately. The request names the share of the capture before the trigger. A capture is
 delivered once complete.
+
+**Triggers.** Captures and profiles share one kind of trigger:
+
+| Trigger     | Fires in the control period that                                           |
+|-------------|----------------------------------------------------------------------------|
+| Immediately | follows the request                                                        |
+| Rising      | takes a Data Model signal from below a level to the level or above         |
+| Falling     | takes the signal from above the level to the level or below                |
+| Either      | does either                                                                |
+| Protection  | finds the board protection asserted where the period before found it clear |
+| LEDs        | lights any LED of a mask that was dark in the period before                |
+
+A trigger watches only the periods after the request: a level already crossed, or an LED already lit,
+does not fire it.
+
+**Capture delivery.** A capture keeps the periods before the trigger, up to its pre-trigger share,
+from those it saw since it was armed, so a trigger that fires early yields a capture with fewer periods
+before it. Once complete it travels as chunks of at most 512 control periods, every chunk naming the
+capture, so the app can place each one and knows the capture is whole once every period has come. Chunks
+are queued like every frame but windows: a capture is never dropped. A new capture request replaces an
+armed or recording one, and the connection ending cancels it.
 
 **Control and status.** Pause, resume, step, the torque and noise changes of Part E, profiles, and the
 status: virtual time, real-time factor, overruns, LED states, board protection state and the debug log
@@ -283,33 +310,42 @@ ends the connection.
 
 Motor to app:
 
-| Type   | Message  | Payload                                                                                                                                                                   | Sent                                                                       |
-|--------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
-| `0x01` | Hello    | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                                                   | Once, first                                                                |
-| `0x02` | Status   | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                                              | Every 100 ms of virtual time, and on every pause, resume and finished step |
-| `0x03` | Changes  | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description                              | Once after Hello, and after every accepted change                          |
-| `0x04` | Refused  | The type of the refused request, the reason                                                                                                                               | For every refused request                                                  |
-| `0x05` | Log line | The text of one debug log line                                                                                                                                            | For every line the debug log writes                                        |
-| `0x10` | Window   | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order | Every 10 control periods while the stream is on, unless dropped            |
+| Type   | Message       | Payload                                                                                                                                                                                                                                                 | Sent                                                                       |
+|--------|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `0x01` | Hello         | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                                                                                                                                 | Once, first                                                                |
+| `0x02` | Status        | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                                                                                                                            | Every 100 ms of virtual time, and on every pause, resume and finished step |
+| `0x03` | Changes       | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description                                                                                                            | Once after Hello, and after every accepted change                          |
+| `0x04` | Refused       | The type of the refused request, the reason                                                                                                                                                                                                             | For every refused request                                                  |
+| `0x05` | Log line      | The text of one debug log line                                                                                                                                                                                                                          | For every line the debug log writes                                        |
+| `0x10` | Window        | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order                                                                               | Every 10 control periods while the stream is on, unless dropped            |
+| `0x11` | Capture event | Capture number (2 bytes), event (armed, triggered, cancelled), the control period it happened in (8 bytes)                                                                                                                                              | When a capture is armed, triggered or cancelled                            |
+| `0x12` | Capture chunk | Capture number (2 bytes), its length and its periods before the trigger (2 bytes each), its first control period (8 bytes), this chunk's first index and length (2 bytes each), then every signal of every period, period by period in Data Model order | Once a capture is complete, until all of it is sent                        |
+| `0x13` | Profile state | State (armed, running, finished, stopped), changes applied and changes in all (2 bytes each), control periods since the trigger (4 bytes)                                                                                                               | When a profile is armed, starts, applies a change, finishes or stops       |
 
 App to motor:
 
-| Type   | Request         | Payload                                                                                    |
-|--------|-----------------|--------------------------------------------------------------------------------------------|
-| `0x81` | Pause           | None                                                                                       |
-| `0x82` | Resume          | None                                                                                       |
-| `0x83` | Step            | Unit (control period or millisecond), count (2 bytes); only while paused                   |
-| `0x84` | Load torque     | Torque in N·m                                                                              |
-| `0x85` | External torque | Form (none, constant, step, ramp, sine) and four parameters in the order of Part E's table |
-| `0x86` | Current noise   | Standard deviation in A                                                                    |
-| `0x87` | Encoder noise   | Standard deviation in rad                                                                  |
-| `0x88` | Clear all       | None: the plant returns to its description                                                 |
-| `0x90` | Stream          | On (1) or off (0)                                                                          |
+| Type   | Request         | Payload                                                                                                                                                                              |
+|--------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `0x81` | Pause           | None                                                                                                                                                                                 |
+| `0x82` | Resume          | None                                                                                                                                                                                 |
+| `0x83` | Step            | Unit (control period or millisecond), count (2 bytes); only while paused                                                                                                             |
+| `0x84` | Load torque     | Torque in N·m                                                                                                                                                                        |
+| `0x85` | External torque | Form (none, constant, step, ramp, sine) and four parameters in the order of Part E's table                                                                                           |
+| `0x86` | Current noise   | Standard deviation in A                                                                                                                                                              |
+| `0x87` | Encoder noise   | Standard deviation in rad                                                                                                                                                            |
+| `0x88` | Clear all       | None: the plant returns to its description                                                                                                                                           |
+| `0x90` | Stream          | On (1) or off (0)                                                                                                                                                                    |
+| `0x91` | Capture         | Trigger, pre-trigger share in percent, length in control periods (2 bytes, 1 to 16,384)                                                                                              |
+| `0x92` | Cancel capture  | None                                                                                                                                                                                 |
+| `0x93` | Profile         | Trigger, number of changes (2 bytes), then each change: its control period after the trigger (4 bytes), the type of the change request (`0x84` to `0x87`) and that request's payload |
+| `0x94` | Stop profile    | None: the profile stops and the plant returns to its description                                                                                                                     |
 
 The run state is running or paused; the LEDs are one bit each, operational, warning and failure from the
 lowest; the board protection state is clear, asserted or unknown, as the drive reads it. A refusal names
-one reason: a value out of range, a step while running, or a form the motor does not know. The capture
-frames take the types from `0x11` up, and their requests from `0x91` up.
+one reason: a value out of range, a step while running, or a form the motor does not know. A trigger
+is its kind (immediately, rising, falling, either, protection, LEDs), the signal's place in the Data
+Model, the level, and the LED mask, each sent whatever the kind uses. Every accepted profile change is
+followed by the changes in force, as a change the app asked for is.
 
 **Windows and dropping.** Windows are consecutive runs of 10 control periods counted from the period the
 stream was turned on in; a step while paused completes them as it goes. The sequence counts every window
@@ -443,6 +479,7 @@ Signals of the continuous stream and of a capture, per control period, in the or
 | Catch-up limit        | 50 ms behind the wall clock, beyond which the backlog is dropped and counted as an overrun |
 | Continuous stream     | 2 kHz windows with minimum and maximum per signal                                          |
 | Capture length        | Up to 16,384 control periods (0.82 s at 20 kHz)                                            |
+| Profile length        | Up to 1,024 changes                                                                        |
 | Network               | Loopback only; a virtual bus never reaches another machine                                 |
 | Firmware update       | Not offered (Part B)                                                                       |
 | Changes while running | Torque and sensor noise only (Part E)                                                      |

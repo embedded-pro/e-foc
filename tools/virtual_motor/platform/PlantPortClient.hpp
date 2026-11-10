@@ -1,7 +1,7 @@
 #pragma once
 
 #include "infra/util/ByteRange.hpp"
-#include "infra/util/Function.hpp"
+#include "tools/virtual_motor/platform/InstrumentReports.hpp"
 #include "tools/virtual_motor/port/PlantPortCodec.hpp"
 #include <cstdint>
 #include <optional>
@@ -26,14 +26,20 @@ namespace virtual_motor
         virtual std::optional<port::RefusalReason> SetEncoderNoise(float radians) = 0;
         virtual void ClearAll() = 0;
 
-        virtual void Stream(const infra::Function<void(const port::Window&)>& sink) = 0;
-        virtual void StopStream() = 0;
+        virtual void Attach(InstrumentReports& reports) = 0;
+        virtual void Detach() = 0;
+        virtual void Stream(bool on) = 0;
+        virtual std::optional<port::RefusalReason> Capture(const port::CaptureRequest& request) = 0;
+        virtual void CancelCapture() = 0;
+        virtual std::optional<port::RefusalReason> RunProfile(const port::ProfileRequest& profile) = 0;
+        virtual void StopProfile() = 0;
 
     protected:
         ~PlantPortTarget() = default;
     };
 
     class PlantPortClient
+        : public InstrumentReports
     {
     public:
         explicit PlantPortClient(PlantPortTarget& target);
@@ -48,12 +54,17 @@ namespace virtual_motor
         void Millisecond();
         void PublishStatus();
         void Log(infra::ConstByteRange text);
-        void PublishWindow(const port::Window& window);
+
+        void ReportWindow(const port::Window& window) override;
+        void ReportCaptureEvent(const port::CaptureEvent& event) override;
+        void ReportCaptureChunk(const port::CaptureChunk& chunk) override;
+        void ReportProfileState(const port::ProfileState& state) override;
 
     private:
         void Dispatch(const port::Frame& frame);
         bool HandleRun(const port::Frame& frame);
         bool HandleChange(const port::Frame& frame);
+        bool HandleInstruments(const port::Frame& frame);
         bool HandleStream(const port::Frame& frame);
         void Answer(port::MessageType request, std::optional<port::RefusalReason> refusal, bool withStatus);
         void Send(const std::vector<uint8_t>& bytes);

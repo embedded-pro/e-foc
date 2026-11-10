@@ -70,13 +70,38 @@ namespace virtual_motor
         platform.Disturbances().ClearAll();
     }
 
-    void PlatformPortTarget::Stream(const infra::Function<void(const port::Window&)>& sink)
+    void PlatformPortTarget::Attach(InstrumentReports& reports)
     {
-        platform.Stream(sink);
+        platform.Instruments().Attach(reports);
     }
 
-    void PlatformPortTarget::StopStream()
+    void PlatformPortTarget::Detach()
     {
-        platform.StopStream();
+        platform.Instruments().Detach(platform.ControlPeriods());
+    }
+
+    void PlatformPortTarget::Stream(bool on)
+    {
+        platform.Instruments().Stream(on);
+    }
+
+    std::optional<port::RefusalReason> PlatformPortTarget::Capture(const port::CaptureRequest& request)
+    {
+        return platform.Instruments().Capture(request, platform.ControlPeriods());
+    }
+
+    void PlatformPortTarget::CancelCapture()
+    {
+        platform.Instruments().CancelCapture(platform.ControlPeriods());
+    }
+
+    std::optional<port::RefusalReason> PlatformPortTarget::RunProfile(const port::ProfileRequest& profile)
+    {
+        return platform.Instruments().RunProfile(profile);
+    }
+
+    void PlatformPortTarget::StopProfile()
+    {
+        platform.Instruments().StopProfile();
     }
 }

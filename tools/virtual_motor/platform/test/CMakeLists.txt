@@ -11,15 +11,20 @@ target_link_libraries(e_foc.tool.virtual_motor.platform_test PUBLIC
 )
 
 target_sources(e_foc.tool.virtual_motor.platform_test PRIVATE
+    InstrumentReportsMock.hpp
+    TestCaptureRecorder.cpp
     TestFileEeprom.cpp
     TestPacer.cpp
     TestPlantDescription.cpp
     TestPlantDisturbances.cpp
+    TestPlantInstruments.cpp
     TestPlantPortClient.cpp
     TestPlantSignals.cpp
     TestPortSocket.cpp
+    TestProfileRunner.cpp
     TestRunLoop.cpp
     TestStreamWindow.cpp
+    TestTriggerWatch.cpp
     TestVirtualCanPort.cpp
 )
 

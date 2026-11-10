@@ -88,6 +88,43 @@ namespace virtual_motor
         SetExternalTorque(port::ExternalTorque{});
     }
 
+    std::optional<port::RefusalReason> PlantDisturbances::Check(const port::ProfileStep& step) const
+    {
+        switch (step.change)
+        {
+            case port::MessageType::loadTorque:
+                return FiniteOrRefused(step.value);
+            case port::MessageType::externalTorque:
+                return Validate(step.torque);
+            case port::MessageType::currentNoise:
+            case port::MessageType::encoderNoise:
+                return DeviationOrRefused(step.value);
+            default:
+                return port::RefusalReason::outOfRange;
+        }
+    }
+
+    void PlantDisturbances::Apply(const port::ProfileStep& step)
+    {
+        switch (step.change)
+        {
+            case port::MessageType::loadTorque:
+                SetLoadTorque(step.value);
+                break;
+            case port::MessageType::externalTorque:
+                SetExternalTorque(step.torque);
+                break;
+            case port::MessageType::currentNoise:
+                SetCurrentNoise(step.value);
+                break;
+            case port::MessageType::encoderNoise:
+                SetEncoderNoise(step.value);
+                break;
+            default:
+                break;
+        }
+    }
+
     void PlantDisturbances::Apply()
     {
         if (releaseExternalTorque)

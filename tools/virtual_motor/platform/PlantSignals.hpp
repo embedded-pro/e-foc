@@ -36,7 +36,7 @@ namespace virtual_motor
         windingTemperature,
     };
 
-    using SignalSample = std::array<float, port::signalCount>;
+    using SignalSample = port::Sample;
 
     class PlantSignals
         : public foc::ThreePhaseMotorModelObserver

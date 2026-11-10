@@ -29,8 +29,13 @@ namespace
         MOCK_METHOD(std::optional<RefusalReason>, SetCurrentNoise, (float ampere), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetEncoderNoise, (float radians), (override));
         MOCK_METHOD(void, ClearAll, (), (override));
-        MOCK_METHOD(void, Stream, (const infra::Function<void(const Window&)>& sink), (override));
-        MOCK_METHOD(void, StopStream, (), (override));
+        MOCK_METHOD(void, Attach, (virtual_motor::InstrumentReports & reports), (override));
+        MOCK_METHOD(void, Detach, (), (override));
+        MOCK_METHOD(void, Stream, (bool on), (override));
+        MOCK_METHOD(std::optional<RefusalReason>, Capture, (const CaptureRequest& request), (override));
+        MOCK_METHOD(void, CancelCapture, (), (override));
+        MOCK_METHOD(std::optional<RefusalReason>, RunProfile, (const ProfileRequest& profile), (override));
+        MOCK_METHOD(void, StopProfile, (), (override));
     };
 
     class TestPlantPortClient
@@ -52,6 +57,7 @@ namespace
 
         void Attach()
         {
+            EXPECT_CALL(target, Attach(testing::Ref(client)));
             ASSERT_TRUE(client.Connect(loopback::LocalPort(listener).value_or(0)));
             app = loopback::Accept(listener);
             ASSERT_NE(app, loopback::invalidSocket);
@@ -95,6 +101,7 @@ namespace
 
 TEST_F(TestPlantPortClient, the_motor_introduces_itself_then_its_changes_and_status)
 {
+    EXPECT_CALL(target, Attach(testing::Ref(client)));
     ASSERT_TRUE(client.Connect(loopback::LocalPort(listener).value_or(0)));
     app = loopback::Accept(listener);
 
@@ -217,7 +224,7 @@ TEST_F(TestPlantPortClient, losing_the_app_resumes_the_motor_stops_the_stream_an
 {
     Attach();
 
-    EXPECT_CALL(target, StopStream());
+    EXPECT_CALL(target, Detach());
     EXPECT_CALL(target, Resume());
     loopback::Close(app);
     app = loopback::invalidSocket;
@@ -234,7 +241,7 @@ TEST_F(TestPlantPortClient, a_request_shorter_than_its_fields_ends_the_port)
 {
     Attach();
 
-    EXPECT_CALL(target, StopStream());
+    EXPECT_CALL(target, Detach());
     EXPECT_CALL(target, Resume());
     SendToMotor(EncodeFrame(static_cast<uint8_t>(MessageType::loadTorque), { 0 }));
 
@@ -244,18 +251,16 @@ TEST_F(TestPlantPortClient, a_request_shorter_than_its_fields_ends_the_port)
 TEST_F(TestPlantPortClient, the_stream_request_turns_the_motors_windows_on_and_off)
 {
     Attach();
-    infra::Function<void(const Window&)> sink;
 
-    EXPECT_CALL(target, Stream(testing::_)).WillOnce(testing::SaveArg<0>(&sink));
+    EXPECT_CALL(target, Stream(true));
     SendToMotor(Encode(StreamRequest{ 1 }));
-    ASSERT_TRUE(static_cast<bool>(sink));
 
-    sink(Window{ 3, 30, 10 });
+    client.ReportWindow(Window{ 3, 30, 10 });
     const auto window = Decode<Window>(Received(1).at(0));
     ASSERT_TRUE(window.has_value());
     EXPECT_EQ(window->sequence, 3u);
 
-    EXPECT_CALL(target, StopStream());
+    EXPECT_CALL(target, Stream(false));
     SendToMotor(Encode(StreamRequest{ 0 }));
 }
 
@@ -274,14 +279,11 @@ TEST_F(TestPlantPortClient, a_stream_request_that_is_neither_on_nor_off_is_refus
 TEST_F(TestPlantPortClient, windows_are_dropped_while_earlier_frames_wait_and_every_other_frame_arrives_whole)
 {
     Attach();
-    infra::Function<void(const Window&)> sink;
-    EXPECT_CALL(target, Stream(testing::_)).WillOnce(testing::SaveArg<0>(&sink));
-    SendToMotor(Encode(StreamRequest{ 1 }));
 
     constexpr uint32_t windows{ 100000 };
     for (uint32_t sequence = 0; sequence != windows; ++sequence)
     {
-        sink(Window{ sequence, sequence * 10ull, 10 });
+        client.ReportWindow(Window{ sequence, sequence * 10ull, 10 });
         if (sequence % 1000 == 0)
             client.Log(infra::MakeStringByteRange("tick\n"));
     }
@@ -316,4 +318,56 @@ TEST_F(TestPlantPortClient, windows_are_dropped_while_earlier_frames_wait_and_ev
     EXPECT_EQ(logLines, windows / 1000);
     ASSERT_FALSE(frames.empty());
     EXPECT_EQ(frames.back().type, static_cast<uint8_t>(MessageType::status));
+}
+
+TEST_F(TestPlantPortClient, a_capture_request_reaches_the_motor_and_a_refusal_comes_back)
+{
+    Attach();
+
+    EXPECT_CALL(target, Capture(testing::Field(&CaptureRequest::length, 1000))).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(CaptureRequest{ Trigger{ TriggerKind::immediately }, 10, 1000 }));
+
+    EXPECT_CALL(target, Capture(testing::_)).WillOnce(testing::Return(RefusalReason::outOfRange));
+    SendToMotor(Encode(CaptureRequest{ Trigger{ TriggerKind::immediately }, 10, 0 }));
+    const auto refused = Decode<Refused>(Received(1).at(0));
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_EQ(refused->request, static_cast<uint8_t>(MessageType::capture));
+
+    EXPECT_CALL(target, CancelCapture());
+    SendToMotor(Encode(CancelCapture{}));
+}
+
+TEST_F(TestPlantPortClient, capture_events_and_chunks_travel_to_the_app_whole)
+{
+    Attach();
+
+    CaptureChunk chunk{ 1, 512, 0, 0, 0, {} };
+    chunk.periods.resize(512);
+    chunk.periods[511][3] = 7.0f;
+    client.ReportCaptureEvent(CaptureEvent{ 1, CaptureEventKind::triggered, 99 });
+    client.ReportCaptureChunk(chunk);
+
+    const auto frames = Received(2);
+    ASSERT_EQ(frames.size(), 2u);
+    EXPECT_EQ(Decode<CaptureEvent>(frames[0])->period, 99u);
+    const auto received = Decode<CaptureChunk>(frames[1]);
+    ASSERT_TRUE(received.has_value());
+    EXPECT_FLOAT_EQ(received->periods[511][3], 7.0f);
+}
+
+TEST_F(TestPlantPortClient, a_profile_reaches_the_motor_and_its_states_come_back_with_the_changes_in_force)
+{
+    Attach();
+
+    EXPECT_CALL(target, RunProfile(testing::Field(&ProfileRequest::steps, testing::SizeIs(1)))).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(ProfileRequest{ Trigger{ TriggerKind::immediately }, { ProfileStep{ 10, MessageType::loadTorque, 0.1f, {} } } }));
+
+    client.ReportProfileState(ProfileState{ ProfileStateKind::running, 1, 1, 10 });
+    const auto frames = Received(2);
+    ASSERT_EQ(frames.size(), 2u);
+    EXPECT_EQ(Decode<ProfileState>(frames[0])->applied, 1);
+    EXPECT_TRUE(Decode<Changes>(frames[1]).has_value());
+
+    EXPECT_CALL(target, StopProfile());
+    SendToMotor(Encode(StopProfile{}));
 }
