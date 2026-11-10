@@ -22,10 +22,7 @@
     {
       "label": "Interrupt Vector",
       "combine": "max",
-      "patterns": [
-        "^Adc0Sequence[0-3]_Handler$",
-        "^Default_Handler_Forwarded$"
-      ]
+      "patterns": ["^Adc0Sequence[0-3]_Handler$", "^Default_Handler_Forwarded$"]
     },
     {
       "label": "ADC ISR + Callback Dispatch",
@@ -52,9 +49,7 @@
     {
       "label": "Encoder Read",
       "combine": "max",
-      "patterns": [
-        "application::PlatformFactoryImpl::Read\\(\\)$"
-      ]
+      "patterns": ["application::PlatformFactoryImpl::Read\\(\\)$"]
     },
     {
       "label": "FOC Inner Loop (Calculate)",
