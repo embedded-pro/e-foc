@@ -2,9 +2,11 @@
 
 #include "tools/virtual_motor/app/logic/MotorSpec.hpp"
 #include <QDialog>
+#include <array>
 #include <set>
 
 class QComboBox;
+class QDoubleSpinBox;
 class QDialogButtonBox;
 class QLabel;
 class QRadioButton;
@@ -26,6 +28,7 @@ namespace virtual_motor::app
         QString Problem() const;
 
     private:
+        QWidget* BuildCurrentOffset();
         void PlantChosen(int index);
         void Validate();
 
@@ -34,6 +37,7 @@ namespace virtual_motor::app
         QComboBox* plant;
         QRadioButton* keepMemory;
         QRadioButton* factoryFresh;
+        std::array<QDoubleSpinBox*, 3> currentOffset{};
         QLabel* problem;
         QDialogButtonBox* buttons;
         QString descriptionFile;

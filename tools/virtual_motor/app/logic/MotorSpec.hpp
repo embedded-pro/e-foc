@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -18,6 +19,7 @@ namespace virtual_motor::app
         uint8_t node{ 0 };
         std::string plant{ "teknic" };
         StartMode start{ StartMode::keepMemory };
+        std::array<float, 3> currentOffset{};
     };
 
     enum class MotorState : uint8_t
@@ -38,5 +40,6 @@ namespace virtual_motor::app
 
     std::vector<std::string> EngineArguments(const MotorSpec& spec, const EnginePorts& ports, bool factoryFresh);
     std::string MotorFolderName(const MotorSpec& spec);
+    std::string CurrentOffsetText(const std::array<float, 3>& offset);
     std::string StateText(MotorState state);
 }

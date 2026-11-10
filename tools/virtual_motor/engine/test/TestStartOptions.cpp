@@ -61,6 +61,28 @@ TEST(TestStartOptions, refuses_an_unknown_option)
     EXPECT_EQ(parsed.error, "unknown option --speed");
 }
 
+TEST(TestStartOptions, reads_a_current_offset_for_each_phase)
+{
+    const auto parsed = Parse({ "--current-offset", "0.02,-0.015,0" });
+
+    ASSERT_TRUE(parsed.options.has_value());
+    ASSERT_TRUE(parsed.options->currentOffset.has_value());
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[0], 0.02f);
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[1], -0.015f);
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[2], 0.0f);
+    EXPECT_FALSE(Parse({}).options->currentOffset.has_value());
+}
+
+TEST(TestStartOptions, refuses_a_current_offset_without_three_amperes_in_range)
+{
+    const std::string error{ "--current-offset must be three currents from -10 to 10 A, as a,b,c" };
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,0.2" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,0.2,0.3,0.4" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,x,0.3" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,11,0.3" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,nan,0.3" }).error, error);
+}
+
 TEST(TestStartOptions, refuses_an_option_without_its_value)
 {
     const auto parsed = Parse({ "--bus" });

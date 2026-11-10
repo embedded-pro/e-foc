@@ -1,6 +1,7 @@
 #pragma once
 
 #include "can-lite/drivers/implementation/LoopbackSocket.hpp"
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -15,6 +16,7 @@ namespace virtual_motor
         std::string plant{ "teknic" };
         std::string memoryFile;
         std::optional<uint32_t> seed;
+        std::optional<std::array<float, 3>> currentOffset;
         uint16_t hubPort{ services::loopback::virtualCanHubPort };
         std::optional<uint16_t> plantPort;
         bool factoryFresh{ false };

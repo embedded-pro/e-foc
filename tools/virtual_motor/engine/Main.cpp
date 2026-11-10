@@ -53,6 +53,12 @@ namespace
         auto plant = virtual_motor::PlantDescription(options.plant);
         if (plant && options.seed.has_value())
             plant->randomSeed = *options.seed;
+        if (plant && options.currentOffset.has_value())
+        {
+            plant->noiseBiasAmpereA = (*options.currentOffset)[0];
+            plant->noiseBiasAmpereB = (*options.currentOffset)[1];
+            plant->noiseBiasAmpereC = (*options.currentOffset)[2];
+        }
         return plant;
     }
 

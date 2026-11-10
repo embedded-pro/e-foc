@@ -185,6 +185,17 @@ TEST_F(TestRig, adding_a_motor_starts_its_engine_in_its_own_folder_on_the_rigs_p
     EXPECT_EQ(rig.Find(3)->State(), MotorState::starting);
 }
 
+TEST_F(TestRig, a_current_offset_starts_the_engine_with_it_and_none_leaves_the_plants_own)
+{
+    rig.Add(MotorSpec{ "default", 3, "teknic", StartMode::keepMemory, { 0.02f, -0.015f, 0.0f } });
+    rig.Add(MotorSpec{ "default", 4 });
+
+    EXPECT_THAT(processes.started[0], testing::IsSupersetOf({ "--current-offset", "0.02,-0.015,0" }));
+    EXPECT_THAT(processes.started[1], testing::Not(testing::Contains("--current-offset")));
+    EXPECT_FLOAT_EQ(store.stored[0].currentOffset[1], -0.015f);
+    EXPECT_EQ(CurrentOffsetText(store.stored[0].currentOffset), "a 0.02 A · b -0.015 A · c 0 A");
+}
+
 TEST_F(TestRig, a_node_already_in_the_list_is_refused_with_the_reason)
 {
     rig.Add(MotorSpec{ "default", 3 });

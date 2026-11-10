@@ -14,7 +14,8 @@ namespace virtual_motor::app
             motors.push_back(MotorSpec{ settings.value("bus", "default").toString().toStdString(),
                 static_cast<uint8_t>(settings.value("node").toUInt()),
                 settings.value("plant", "teknic").toString().toStdString(),
-                StartMode::keepMemory });
+                StartMode::keepMemory,
+                { settings.value("currentOffsetA", 0.0).toFloat(), settings.value("currentOffsetB", 0.0).toFloat(), settings.value("currentOffsetC", 0.0).toFloat() } });
         }
         settings.endArray();
         return motors;
@@ -30,6 +31,9 @@ namespace virtual_motor::app
             settings.setValue("bus", QString::fromStdString(motors[index].bus));
             settings.setValue("node", motors[index].node);
             settings.setValue("plant", QString::fromStdString(motors[index].plant));
+            settings.setValue("currentOffsetA", motors[index].currentOffset[0]);
+            settings.setValue("currentOffsetB", motors[index].currentOffset[1]);
+            settings.setValue("currentOffsetC", motors[index].currentOffset[2]);
         }
         settings.endArray();
     }
