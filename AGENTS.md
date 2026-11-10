@@ -191,7 +191,12 @@ QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebIn
 
 Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build, on EK-TM4C1294XL (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000 at 120 MHz)
 and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). Each MCU gets one cycle banner and one memory banner on the PR.
-It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
+It charges each path its worst case: the costliest path through the functions a config names and through everything they call directly.
+A call through a pointer (an `infra::Function` callback, a virtual call) is not followed, so a new one on a hot path means naming its target in
+`targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json`
+(inner loop plus the calibration observer). Alternatives of which one runs share a stage with `"combine": "max"`; a new loop needs a `loop_bounds`
+entry. The report's *Analysis Notes* list every call not followed and every loop without a bound: read them after changing a hot path.
+`CYCLE_BUDGET_PACKAGE` in `ci.yml` pins the analyser; `documentation/performance-optimization/README.md` (*What the static estimate charges*) has the rules.
 
 **Warnings**: EmIL's `emil_enable_warnings()` (`infra/embedded-infra-lib/cmake/emil_compiler_warnings.cmake`) enables
 `-Wall -Wextra`, minus the GCC/Clang false positives on EmIL and GoogleTest code; with `CMAKE_COMPILE_WARNING_AS_ERROR`

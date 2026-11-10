@@ -1,85 +1,96 @@
 {
-  "path_name": "ADC ISR -> FOC inner loop -> mechanical identification observer (window)",
+  "path_name": "ADC ISR -> FOC inner loop -> PWM output -> calibration observer",
   "loop_rates_khz": [20],
+  "loop_bounds": {
+    "StaticInvoke<hal::tiva::Adc::Adc\\(": 6,
+    "^hal::PwmStmBase::StartImpl\\(": 3,
+    "^services::InverterCompensation::ThreePhasePwmOutput\\(": 1,
+    "^services::MechanicalParametersIdentificationImpl::ScheduleFit\\(": 2,
+    "^memmove$": 12,
+    "^memset$": 32
+  },
+  "cold_calls": [
+    "PlatformFactoryImpl::TripOverCurrent",
+    "PlatformFactoryImpl::TripProtection",
+    "^application::CutPowerStage",
+    "^assert_failed$",
+    "^ADC_Disable$",
+    "^HAL_TIM_GenerateEvent$",
+    "MechanicalParametersIdentificationImpl::FailEnvelope"
+  ],
   "path_stages": [
     {
       "label": "ISR Entry (exception overhead)",
       "type": "exception_entry"
     },
     {
-      "label": "ADC ISR + Callback Dispatch",
-      "required": false,
+      "label": "Interrupt Vector",
+      "combine": "max",
       "patterns": [
-        "Adc0Sequence.*Handler",
-        "InterruptTable::Invoke",
-        "ImmediateInterruptHandler::Invoke",
-        "Default_Handler_Forwarded",
-        "DmaStm::StreamInterruptHandler::OnInterrupt",
-        "DmaStm::StreamInterruptHandler::StreamInterruptHandler.*lambda",
-        "AdcDmaMultiChannelStmBase::TransferDone",
-        "AdcDmaMultiChannelStmBase::AdcDmaMultiChannelStmBase.*lambda",
-        "AdcTriggeredByPwmStm.*::Measure.*lambda",
-        "AdcPhaseCurrentMeasurementImpl.*lambda",
-        "PlatformFactoryImpl::ReconfigureAdc.*lambda",
-        "PlatformFactoryImpl::MonitorBoard",
-        "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
-        "InverterCompensation::PhaseCurrentsReady.*lambda",
-        "Runner.*::OnPhaseCurrents",
-        "ExecutionTimeStatistics::Record",
-        "ExecutionTimeStatistics::RecordReentry",
-        "detail::SaturatingIncrement"
+        "^Adc0Sequence[0-3]_Handler$",
+        "^Default_Handler_Forwarded$"
+      ]
+    },
+    {
+      "label": "ADC ISR + Callback Dispatch",
+      "patterns": [
+        "^hal::cortex::ImmediateInterruptHandler::Invoke\\(",
+        "StaticInvoke<hal::tiva::Adc::Adc\\(",
+        "StaticInvoke<hal::DmaStm::CircularStreamInterruptHandler::CircularStreamInterruptHandler\\(",
+        "^hal::DmaStm::CircularStreamInterruptHandler::OnInterrupt\\(",
+        "StaticInvoke<hal::AdcDmaMultiChannelStmBase::AdcDmaMultiChannelStmBase\\(",
+        "StaticInvoke<application::AdcTriggeredByPwmStm<.*>::Measure\\(",
+        "StaticInvoke<application::PlatformFactoryImpl::ReconfigureAdc\\(",
+        "StaticInvoke<application::AdcPhaseCurrentMeasurementImpl<.*>::Measure\\(",
+        "StaticInvoke<application::PlatformFactoryImpl::PhaseCurrentsReady\\(",
+        "StaticInvoke<services::InverterCompensation::PhaseCurrentsReady\\("
+      ]
+    },
+    {
+      "label": "Control Mode Dispatch",
+      "combine": "max",
+      "patterns": [
+        "StaticInvoke<foc::Runner<foc::(Torque|Speed|Position)Cascade>::RegisterPhaseCurrents\\("
+      ]
+    },
+    {
+      "label": "Encoder Read",
+      "combine": "max",
+      "patterns": [
+        "application::PlatformFactoryImpl::Read\\(\\)$"
       ]
     },
     {
       "label": "FOC Inner Loop (Calculate)",
-      "required": false,
       "patterns": [
-        "SpeedCascade::Calculate",
-        "PositionCascade::Calculate",
-        "CascadeWithSpeedLoop::CalculateInnerLoop",
-        "Clarke::Forward",
-        "Park::Forward",
-        "Park::Inverse",
-        "SpaceVectorModulation::Generate",
-        "SpaceVectorModulation::Clip",
-        "math::FastSine",
-        "math::FastCosine",
-        "PidCurrentController::Compute",
-        "DecoupledPidCurrentController::Compute",
-        "DeadbeatCurrentController::Compute",
-        "SlidingModeCurrentController::Compute",
-        "LimitToModulationCircle",
-        "ToDutyCycles",
-        "CurrentStream::Accumulate",
-        "CurrentStream::Reopen",
-        "CurrentStream::Publish"
+        "^foc::TorqueCascade::Calculate\\(",
+        "^foc::SpeedCascade::Calculate\\(",
+        "^foc::PositionCascade::Calculate\\(",
+        "^application::FocLowPriorityInterruptAdapter::Trigger\\("
       ]
     },
     {
-      "label": "Mechanical Identification Observer (window)",
-      "required": false,
+      "label": "PWM Output",
       "patterns": [
-        "MechanicalParametersIdentificationImpl::OnSamplingUpdate",
-        "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
-        "ClarkePark::Forward",
-        "ExceedsInjectionLimit",
-        "math::WrapToPi",
-        "infra::TripleBuffer<.*>::Publish",
-        "infra::TripleBuffer<.*>::Acquire",
-        "math::IsFinite",
-        "MechanicalParametersIdentificationImpl::OnWindowClosed",
-        "MechanicalParametersIdentificationImpl::Post",
-        "SampleWindow::Add",
-        "SampleWindow::Accumulate",
-        "SampleWindow::Close",
-        "SampleWindow::Resize",
-        "EncoderResolution::Sample",
-        "EncoderResolution::Known",
-        "EncoderResolution::WindowSamples",
-        "ObservationQueue::Post",
-        "MechanicalFit::IsRunning",
-        "MechanicalFit::IsFinishedAt",
-        "IsMechanicallyObservable"
+        "^services::InverterCompensation::ThreePhasePwmOutput\\(",
+        "^application::DecimatingThreePhaseInverter::ThreePhasePwmOutput\\(",
+        "application::PlatformFactoryImpl::ThreePhasePwmOutput\\("
+      ]
+    },
+    {
+      "label": "PWM Register Update",
+      "combine": "max",
+      "patterns": [
+        "hal::tiva::Pwm::Start\\(hal::DutyCycle, hal::DutyCycle, hal::DutyCycle\\)$",
+        "hal::PwmStm::Start\\(hal::DutyCycle, hal::DutyCycle, hal::DutyCycle\\)$"
+      ]
+    },
+    {
+      "label": "Calibration Observer (costliest)",
+      "combine": "max",
+      "patterns": [
+        "InvokerFunctions<void \\(foc::PhaseCurrents const&\\), 8u>::StaticInvoke<services::MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia\\(",
+        "InvokerFunctions<void \\(foc::PhaseCurrents const&\\), 8u>::StaticInvoke<services::CoggingMappingImpl::Measure\\("
       ]
     },
     {

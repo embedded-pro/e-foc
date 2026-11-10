@@ -1,100 +1,84 @@
 {
   "path_name": "ADC ISR -> FOC inner loop (Clarke/Park/current loop/SVM) -> PWM output",
   "loop_rates_khz": [20],
+  "loop_bounds": {
+    "StaticInvoke<hal::tiva::Adc::Adc\\(": 6,
+    "^hal::PwmStmBase::StartImpl\\(": 3,
+    "^services::InverterCompensation::ThreePhasePwmOutput\\(": 1
+  },
+  "cold_calls": [
+    "PlatformFactoryImpl::TripOverCurrent",
+    "PlatformFactoryImpl::TripProtection",
+    "^application::CutPowerStage",
+    "^assert_failed$",
+    "^ADC_Disable$",
+    "^HAL_TIM_GenerateEvent$"
+  ],
   "path_stages": [
     {
       "label": "ISR Entry (exception overhead)",
       "type": "exception_entry"
     },
     {
+      "label": "Interrupt Vector",
+      "combine": "max",
+      "patterns": [
+        "^Adc0Sequence[0-3]_Handler$",
+        "^Default_Handler_Forwarded$"
+      ]
+    },
+    {
       "label": "ADC ISR + Callback Dispatch",
       "patterns": [
-        "Adc0Sequence.*Handler",
-        "InterruptTable::Invoke",
-        "ImmediateInterruptHandler::Invoke",
-        "Default_Handler_Forwarded",
-        "DmaStm::StreamInterruptHandler::OnInterrupt",
-        "DmaStm::StreamInterruptHandler::StreamInterruptHandler.*lambda",
-        "AdcDmaMultiChannelStmBase::TransferDone",
-        "AdcDmaMultiChannelStmBase::AdcDmaMultiChannelStmBase.*lambda",
-        "AdcTriggeredByPwmStm.*::Measure.*lambda",
-        "AdcPhaseCurrentMeasurementImpl.*lambda",
-        "PlatformFactoryImpl::ReconfigureAdc.*lambda",
-        "PlatformFactoryImpl::MonitorBoard",
-        "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
-        "InverterCompensation::PhaseCurrentsReady.*lambda",
-        "Runner.*::OnPhaseCurrents",
-        "ExecutionTimeStatistics::Record",
-        "ExecutionTimeStatistics::RecordReentry",
-        "detail::SaturatingIncrement"
+        "^hal::cortex::ImmediateInterruptHandler::Invoke\\(",
+        "StaticInvoke<hal::tiva::Adc::Adc\\(",
+        "StaticInvoke<hal::DmaStm::CircularStreamInterruptHandler::CircularStreamInterruptHandler\\(",
+        "^hal::DmaStm::CircularStreamInterruptHandler::OnInterrupt\\(",
+        "StaticInvoke<hal::AdcDmaMultiChannelStmBase::AdcDmaMultiChannelStmBase\\(",
+        "StaticInvoke<application::AdcTriggeredByPwmStm<.*>::Measure\\(",
+        "StaticInvoke<application::PlatformFactoryImpl::ReconfigureAdc\\(",
+        "StaticInvoke<application::AdcPhaseCurrentMeasurementImpl<.*>::Measure\\(",
+        "StaticInvoke<application::PlatformFactoryImpl::PhaseCurrentsReady\\(",
+        "StaticInvoke<services::InverterCompensation::PhaseCurrentsReady\\("
+      ]
+    },
+    {
+      "label": "Control Mode Dispatch",
+      "combine": "max",
+      "patterns": [
+        "StaticInvoke<foc::Runner<foc::(Torque|Speed|Position)Cascade>::RegisterPhaseCurrents\\("
       ]
     },
     {
       "label": "Encoder Read",
+      "combine": "max",
       "patterns": [
-        "QuadratureEncoderDecorator.*::Read",
-        "PlatformFactoryImpl::Read\\(\\)",
-        "QuadratureEncoder::Position",
-        "QuadratureEncoder::Resolution",
-        "SynchronousQuadratureEncoderStm::Position",
-        "SynchronousQuadratureEncoderStm::Resolution"
+        "application::PlatformFactoryImpl::Read\\(\\)$"
       ]
     },
     {
       "label": "FOC Inner Loop (Calculate)",
       "patterns": [
-        "TorqueCascade::Calculate",
-        "SpeedCascade::Calculate",
-        "PositionCascade::Calculate",
-        "CascadeWithSpeedLoop::CalculateInnerLoop",
-        "Clarke::Forward",
-        "Park::Forward",
-        "Park::Inverse",
-        "SpaceVectorModulation::Generate",
-        "SpaceVectorModulation::Clip",
-        "math::FastSine",
-        "math::FastCosine",
-        "PidCurrentController::Compute",
-        "DecoupledPidCurrentController::Compute",
-        "DeadbeatCurrentController::Compute",
-        "SlidingModeCurrentController::Compute",
-        "LimitToModulationCircle",
-        "ToDutyCycles",
-        "EstimatorWindowAccumulator::Accumulate",
-        "EstimatorWindowAccumulator::Close",
-        "CurrentStream::Accumulate",
-        "CurrentStream::Reopen",
-        "CurrentStream::Publish",
-        "SpeedDifferentiator::CloseWindow",
-        "DecouplingFeedforward::Apply",
-        "PidCurrentController::CommitRealized",
-        "PidCurrentController::Propose",
-        "PiIncremental<float>::CommitRealized",
-        "PiIncremental<float>::Propose",
-        "math::WrapToPi",
-        "infra::TripleBuffer<.*>::Publish",
-        "infra::TripleBuffer<.*>::Acquire",
-        "LowPriorityInterrupt::Trigger",
-        "FocLowPriorityInterruptAdapter::Trigger",
-        "std::array<float.*>::operator\\[\\]",
-        "std::clamp",
-        "std::max<float>",
-        "std::min<float>"
+        "^foc::TorqueCascade::Calculate\\(",
+        "^foc::SpeedCascade::Calculate\\(",
+        "^foc::PositionCascade::Calculate\\(",
+        "^application::FocLowPriorityInterruptAdapter::Trigger\\("
       ]
     },
     {
       "label": "PWM Output",
       "patterns": [
-        "SynchronousPwm::Start.*Percent.*Percent.*Percent",
-        "SynchronousPwm::SetComparator",
-        "SynchronousPwm::Sync",
-        "hal::tiva::Pwm::Start",
-        "hal::PwmStm::Start",
-        "PwmStmBase::StartImpl",
-        "PwmStmBase::SetDutyCycle",
-        "Pwm::Start.*Percent.*Percent.*Percent",
-        "PlatformFactoryImpl::ThreePhasePwmOutput",
-        "InverterCompensation::ThreePhasePwmOutput"
+        "^services::InverterCompensation::ThreePhasePwmOutput\\(",
+        "^application::DecimatingThreePhaseInverter::ThreePhasePwmOutput\\(",
+        "application::PlatformFactoryImpl::ThreePhasePwmOutput\\("
+      ]
+    },
+    {
+      "label": "PWM Register Update",
+      "combine": "max",
+      "patterns": [
+        "hal::tiva::Pwm::Start\\(hal::DutyCycle, hal::DutyCycle, hal::DutyCycle\\)$",
+        "hal::PwmStm::Start\\(hal::DutyCycle, hal::DutyCycle, hal::DutyCycle\\)$"
       ]
     },
     {
