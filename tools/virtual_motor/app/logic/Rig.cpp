@@ -7,6 +7,22 @@
 
 namespace virtual_motor::app
 {
+    namespace
+    {
+        std::string RefusalText(port::RefusalReason reason)
+        {
+            switch (reason)
+            {
+                case port::RefusalReason::stepWhileRunning:
+                    return "stepping needs a paused motor";
+                case port::RefusalReason::unknownForm:
+                    return "the motor does not know that form";
+                default:
+                    return "a value is out of range";
+            }
+        }
+    }
+
     RigMotor::RigMotor(const MotorSpec& spec, Rig& rig)
         : spec(spec)
         , rig(rig)
@@ -129,6 +145,7 @@ namespace virtual_motor::app
 
     void RigMotor::RequestRefused(const port::Refused& refused)
     {
+        rig.Report(IssueLevel::warning, std::format("Node {} refused a change: {}", static_cast<uint32_t>(spec.node), RefusalText(refused.reason)));
         if (rig.observer != nullptr)
             rig.observer->MotorRefused(spec.node, refused);
     }
@@ -176,7 +193,10 @@ namespace virtual_motor::app
             Captured();
         }
         if (process.has_value() && !stopping)
+        {
+            rig.Report(IssueLevel::info, std::format("Node {} reset; waiting for it to reconnect", static_cast<uint32_t>(spec.node)));
             SetState(MotorState::restarting);
+        }
     }
 
     Rig::Rig(EngineProcesses& processes, RigStore& store, std::string dataFolder, uint16_t hubPort)
@@ -201,13 +221,7 @@ namespace virtual_motor::app
         if (!listener.Listen())
             return false;
 
-        for (const auto& spec : store.Load())
-            if (!Find(spec.node))
-            {
-                motors.push_back(std::make_unique<RigMotor>(spec, *this));
-                Start(*motors.back(), false);
-            }
-
+        Restore(store.Load());
         if (observer != nullptr)
             observer->MotorsChanged();
         return true;
@@ -227,11 +241,20 @@ namespace virtual_motor::app
 
     std::optional<std::string> Rig::Add(const MotorSpec& spec)
     {
+        std::optional<std::string> refusal;
         if (Find(spec.node) != nullptr)
-            return std::format("Node {} is already in the list; pick another node or remove that motor first.", static_cast<uint32_t>(spec.node));
+            refusal = std::format("Node {} is already in the list; pick another node or remove that motor first.", static_cast<uint32_t>(spec.node));
+        else if (Full())
+            refusal = "A virtual bus carries at most eight motors, the number the CAN Commander follows; remove one first.";
+        if (refusal)
+        {
+            Report(IssueLevel::warning, *refusal);
+            return refusal;
+        }
 
         motors.push_back(std::make_unique<RigMotor>(spec, *this));
         auto& motor = *motors.back();
+        Report(IssueLevel::info, std::format("Node {} added with the {} plant", static_cast<uint32_t>(spec.node), spec.plant));
         motor.spec.start = StartMode::keepMemory;
         Save();
         if (observer != nullptr)
@@ -240,8 +263,15 @@ namespace virtual_motor::app
         return std::nullopt;
     }
 
+    bool Rig::Full() const
+    {
+        return motors.size() >= maxMotors;
+    }
+
     void Rig::Remove(uint8_t node)
     {
+        if (Find(node) != nullptr)
+            Report(IssueLevel::info, std::format("Node {} removed", static_cast<uint32_t>(node)));
         PowerOff(node);
         std::erase_if(motors, [node](const auto& motor)
             {
@@ -317,6 +347,8 @@ namespace virtual_motor::app
         motor->process.reset();
         motor->link.reset();
         motor->status.reset();
+        if (!motor->stopping)
+            Report(IssueLevel::error, std::format("Node {} crashed: the virtual motor program ended unexpectedly{}", static_cast<uint32_t>(motor->spec.node), motor->log.empty() ? std::string{} : "; its last output: " + motor->log.back()));
         motor->SetState(motor->stopping ? MotorState::stopped : MotorState::crashed);
         motor->stopping = false;
     }
@@ -336,6 +368,7 @@ namespace virtual_motor::app
         else
         {
             motor.Append("The virtual motor program could not be started.");
+            Report(IssueLevel::error, std::format("Node {}: the virtual motor program could not be started", static_cast<uint32_t>(motor.spec.node)));
             motor.SetState(MotorState::crashed);
         }
     }
@@ -349,7 +382,9 @@ namespace virtual_motor::app
 
         if (hello.version != port::protocolVersion)
         {
-            motor->Append(std::format("The virtual motor speaks plant port protocol {} and this app {}: install the virtual motor program that came with this app", hello.version, port::protocolVersion));
+            const auto mismatch = std::format("The virtual motor speaks plant port protocol {} and this app {}: install the virtual motor program that came with this app", hello.version, port::protocolVersion);
+            motor->Append(mismatch);
+            Report(IssueLevel::error, std::format("Node {}: {}", static_cast<uint32_t>(hello.node), mismatch));
             PowerOff(hello.node);
             return;
         }
@@ -364,6 +399,32 @@ namespace virtual_motor::app
                 return motor->process == process;
             });
         return found != motors.end() ? found->get() : nullptr;
+    }
+
+    void Rig::Report(IssueLevel level, const std::string& text) const
+    {
+        if (observer != nullptr)
+            observer->Reported(level, text);
+    }
+
+    void Rig::Restore(const std::vector<MotorSpec>& specs)
+    {
+        std::string skipped;
+        for (const auto& spec : specs)
+        {
+            if (Find(spec.node) != nullptr)
+                continue;
+            if (Full())
+            {
+                skipped += (skipped.empty() ? "" : ", ") + std::to_string(spec.node);
+                continue;
+            }
+            motors.push_back(std::make_unique<RigMotor>(spec, *this));
+            Start(*motors.back(), false);
+        }
+
+        if (!skipped.empty())
+            Report(IssueLevel::warning, std::format("The saved list holds more than eight motors; nodes {} were not started", skipped));
     }
 
     void Rig::Save()

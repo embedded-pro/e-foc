@@ -2,6 +2,7 @@
 #include "tools/virtual_motor/app/logic/Rig.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <thread>
@@ -81,11 +82,25 @@ namespace
             ++captures;
         }
 
+        void Reported(IssueLevel level, const std::string& text) override
+        {
+            issues.emplace_back(level, text);
+        }
+
+        bool HasIssue(IssueLevel level, const std::string& part) const
+        {
+            return std::ranges::any_of(issues, [level, &part](const auto& issue)
+                {
+                    return issue.first == level && issue.second.find(part) != std::string::npos;
+                });
+        }
+
         int listChanges{ 0 };
         int updates{ 0 };
         int captures{ 0 };
         std::vector<std::string> lines;
         std::vector<port::Refused> refusals;
+        std::vector<std::pair<IssueLevel, std::string>> issues;
     };
 
     class FakeEngine
@@ -410,4 +425,82 @@ TEST_F(TestRig, the_profile_state_follows_the_motor_and_a_restart_forgets_it)
     PollFor(30);
     auto restarted = Introduce(2);
     EXPECT_FALSE(rig.Find(2)->Profile().has_value());
+}
+
+TEST_F(TestRig, a_ninth_motor_is_refused_with_the_reason)
+{
+    for (uint8_t node = 1; node != 9; ++node)
+        EXPECT_FALSE(rig.Add(MotorSpec{ "default", node }).has_value());
+    EXPECT_TRUE(rig.Full());
+
+    const auto refusal = rig.Add(MotorSpec{ "default", 9 });
+
+    ASSERT_TRUE(refusal.has_value());
+    EXPECT_THAT(*refusal, testing::HasSubstr("at most eight"));
+    EXPECT_EQ(processes.started.size(), 8u);
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::warning, "at most eight"));
+}
+
+TEST_F(TestRig, a_restored_list_starts_its_first_eight_and_reports_the_rest)
+{
+    for (uint8_t node = 1; node != 11; ++node)
+        store.stored.push_back(MotorSpec{ "default", node });
+
+    FakeProcesses again;
+    RecordingObserver restoredObserver;
+    Rig restored{ again, store, folder, 29999 };
+    restored.Observe(restoredObserver);
+    EXPECT_TRUE(restored.Open());
+
+    EXPECT_EQ(again.started.size(), 8u);
+    EXPECT_EQ(restored.Find(9), nullptr);
+    EXPECT_TRUE(restoredObserver.HasIssue(IssueLevel::warning, "nodes 9, 10"));
+}
+
+TEST_F(TestRig, motors_added_removed_and_reset_are_logged_as_information)
+{
+    rig.Add(MotorSpec{ "default", 2, "anaheim" });
+    auto engine = Introduce(2);
+    engine->Close();
+    PollFor(30);
+    rig.Remove(2);
+
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::info, "Node 2 added with the anaheim plant"));
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::info, "Node 2 reset"));
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::info, "Node 2 removed"));
+}
+
+TEST_F(TestRig, a_crash_is_an_error_with_the_motors_last_output)
+{
+    rig.Add(MotorSpec{ "default", 1 });
+    rig.ProcessOutput(1, "e-foc-virtual-motor: no plant port is listening");
+
+    rig.ProcessEnded(1);
+
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "Node 1 crashed"));
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "no plant port is listening"));
+}
+
+TEST_F(TestRig, a_program_that_cannot_start_and_a_refusal_are_reported_as_issues)
+{
+    rig.Add(MotorSpec{ "default", 2 });
+    auto engine = Introduce(2);
+    engine->Send(port::Refused{ static_cast<uint8_t>(port::MessageType::currentNoise), port::RefusalReason::outOfRange });
+    PollFor(30);
+    processes.refuse = true;
+    rig.Add(MotorSpec{ "default", 3 });
+
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::warning, "Node 2 refused a change: a value is out of range"));
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "Node 3: the virtual motor program could not be started"));
+}
+
+TEST_F(TestRig, a_motor_speaking_another_protocol_is_an_error)
+{
+    rig.Add(MotorSpec{ "default", 4 });
+    FakeEngine engine{ rig.PlantPort().value_or(0) };
+    engine.Send(port::Hello{ static_cast<uint16_t>(port::protocolVersion + 1), 4, "default", "teknic", 20000 });
+    PollFor(30);
+
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "Node 4"));
+    EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "plant port protocol"));
 }

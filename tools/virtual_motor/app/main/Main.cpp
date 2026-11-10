@@ -1,5 +1,7 @@
 #include "can-lite/drivers/hub/VirtualCanHub.hpp"
 #include "hal/generic/TimerServiceGeneric.hpp"
+#include "tools/can_commander/support/ApplicationInfo.hpp"
+#include "tools/can_commander/support/IssueLog.hpp"
 #include "tools/can_commander/support/QtEventDispatcher.hpp"
 #include "tools/virtual_motor/app/gui/ManagerWindow.hpp"
 #include "tools/virtual_motor/app/gui/QtEngineProcesses.hpp"
@@ -13,6 +15,7 @@
 #include <QIcon>
 #include <QMessageBox>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QTimer>
 
 namespace
@@ -36,6 +39,20 @@ namespace
         return {};
     }
 
+    tool::IssueLog::Config IssueLogConfig()
+    {
+        tool::IssueLog::Config config;
+        config.directory = QDir{ QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) }.filePath("logs");
+        config.baseName = "virtual_motor";
+        return config;
+    }
+
+    void Fail(tool::IssueLog& issueLog, QWidget& window, const QString& title, const QString& text)
+    {
+        issueLog.Write(tool::IssueSeverity::error, text);
+        QMessageBox::critical(&window, title, text);
+    }
+
     QString HubStatus(services::VirtualCanHub& hub)
     {
         if (hub.Listen())
@@ -51,6 +68,12 @@ int main(int argc, char* argv[])
     QApplication::setApplicationName("e-foc Virtual Motor");
     QApplication::setWindowIcon(QIcon{ ":/icons/e-foc-virtual-motor.png" });
     ui::backend::qt::ApplyTheme(ui::theme::Instrument());
+
+    tool::IssueLog issueLog{ IssueLogConfig() };
+    issueLog.CaptureQtMessages();
+    issueLog.Write(tool::IssueSeverity::info, QString("Session started: e-foc Virtual Motor %1 on %2 (%3), Qt %4")
+                                                  .arg(QString::fromUtf8(tool::application::version.data(), static_cast<qsizetype>(tool::application::version.size())), QSysInfo::prettyProductName(),
+                                                      QSysInfo::currentCpuArchitecture(), QString::fromUtf8(qVersion())));
 
     tool::QtEventDispatcher::WithSize<256> eventDispatcher;
     hal::TimerServiceGeneric timerService;
@@ -71,13 +94,13 @@ int main(int argc, char* argv[])
         rig.ProcessOutput(process, line);
     };
 
-    virtual_motor::app::ManagerWindow window{ rig, hubStatus, Installed("e-foc-can-commander", E_FOC_CAN_COMMANDER) };
+    virtual_motor::app::ManagerWindow window{ rig, issueLog, hubStatus, Installed("e-foc-can-commander", E_FOC_CAN_COMMANDER) };
     rig.Observe(window);
     window.show();
     if (engine.isEmpty())
-        QMessageBox::critical(&window, "Virtual Motor Program Missing", "e-foc-virtual-motor was not found next to this app; no motor can start. Reinstall the e-foc tools.");
+        Fail(issueLog, window, "Virtual Motor Program Missing", "e-foc-virtual-motor was not found next to this app; no motor can start. Reinstall the e-foc tools.");
     if (!rig.Open())
-        QMessageBox::critical(&window, "Plant Port Unavailable", "The app could not open its plant port on this machine's loopback interface; motors cannot be watched.");
+        Fail(issueLog, window, "Plant Port Unavailable", "The app could not open its plant port on this machine's loopback interface; motors cannot be watched.");
 
     QTimer poll;
     QObject::connect(&poll, &QTimer::timeout, [&rig, &hub]()

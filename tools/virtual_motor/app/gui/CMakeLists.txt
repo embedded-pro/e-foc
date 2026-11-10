@@ -8,6 +8,7 @@ target_link_libraries(e_foc.tool.virtual_motor.app.gui PUBLIC
     Qt6::Widgets
     ui.theme
     ui.backend.qt
+    e_foc.tool.can_commander.support
     e_foc.tool.virtual_motor.app.logic
     e_foc.tool.virtual_motor.platform
 )
