@@ -5,7 +5,7 @@ Feature: FOC Control Modes Against a Simulated Plant
   runs and stops on the nominal plant is covered by the control performance
   scenarios.
 
-  @sil @REQ-LCY-004
+  @sil @virtual @REQ-LCY-004
   Scenario: A mode switch out of an aligned Ready runs without a new alignment
     Given a nominal motor plant
     And the motor is already calibrated
@@ -19,7 +19,7 @@ Feature: FOC Control Modes Against a Simulated Plant
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
-  @sil @REQ-LCY-004
+  @sil @virtual @REQ-LCY-004
   Scenario: A mode switch out of an unaligned Idle still needs an alignment
     Given a nominal motor plant
     And the motor is already calibrated
