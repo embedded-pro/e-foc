@@ -68,7 +68,7 @@ configured:
 | Platform                       | Phase A                    | Phase B | Phase C | Source                                                                             |
 |--------------------------------|----------------------------|---------|---------|------------------------------------------------------------------------------------|
 | EK-TM4C1294XL + E-FOC-HARDWARE | 0.75 µs                    | 2.75 µs | 4.75 µs | 16 MHz, 4-clock sample-and-hold, 12 conversion clocks, two averaged                |
-| Emulator and MIL drive         | from the plant description |         |         | The converter fields of the current-sense chain (`software-in-the-loop.md` Part M) |
+| Emulator, MIL, virtual motor   | from the plant description |         |         | The converter fields of the current-sense chain (`software-in-the-loop.md` Part M) |
 | ST boards                      | 0                          | 0       | 0       | Not characterised; no correction                                                   |
 
 The TM4C's phase-delay setting shifts the trigger by a fraction of one converter clock, under 63 ns,
