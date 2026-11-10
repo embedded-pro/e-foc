@@ -5,9 +5,14 @@ emil_add_test(e_foc.tool.virtual_motor.app.logic_test)
 target_link_libraries(e_foc.tool.virtual_motor.app.logic_test PUBLIC
     gmock_main
     e_foc.tool.virtual_motor.app.logic
+    ui.backend.recording
 )
 
 target_sources(e_foc.tool.virtual_motor.app.logic_test PRIVATE
+    TestCaptureAssembly.cpp
+    TestCaptureCsv.cpp
     TestMotorText.cpp
     TestRig.cpp
+    TestTraceHistory.cpp
+    TestTraceView.cpp
 )

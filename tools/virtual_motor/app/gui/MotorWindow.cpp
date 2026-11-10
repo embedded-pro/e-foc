@@ -1,15 +1,17 @@
 #include "tools/virtual_motor/app/gui/MotorWindow.hpp"
+#include "tools/virtual_motor/app/gui/CaptureBar.hpp"
 #include "tools/virtual_motor/app/gui/LogView.hpp"
+#include "tools/virtual_motor/app/gui/ScopeArea.hpp"
 #include "tools/virtual_motor/app/gui/TorqueNoisePanel.hpp"
 #include "tools/virtual_motor/app/logic/MotorText.hpp"
 #include "tools/virtual_motor/platform/PlantDescription.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSplitter>
-#include <QTabWidget>
 #include <QVBoxLayout>
 
 namespace virtual_motor::app
@@ -54,8 +56,17 @@ namespace virtual_motor::app
             lines << Text(line);
         log->SetLines(lines);
 
-        auto* views = new QTabWidget(this);
-        views->addTab(log, "Log");
+        scope = new ScopeArea(motor, this);
+        scope->AddPage(log, "Log");
+        connect(scope, &ScopeArea::TraceShownChanged, this, &MotorWindow::UpdateStreaming);
+        captureBar = new CaptureBar(motor, this);
+        if (const auto& last = motor.Captures().Last())
+            shownCapture = last->number;
+        auto* views = new QWidget(this);
+        auto* viewsLayout = new QVBoxLayout(views);
+        viewsLayout->setContentsMargins(0, 0, 0, 0);
+        viewsLayout->addWidget(scope, 1);
+        viewsLayout->addWidget(captureBar);
         auto* side = new QScrollArea(this);
         side->setWidget(panel);
         side->setWidgetResizable(true);
@@ -69,8 +80,14 @@ namespace virtual_motor::app
         layout->addWidget(BuildHeader());
         layout->addWidget(BuildControls());
         layout->addWidget(splitter, 1);
-        resize(1100, 700);
+        resize(1280, 820);
         Refresh();
+    }
+
+    MotorWindow::~MotorWindow()
+    {
+        if (auto* motor = rig.Find(node))
+            motor->Stream(false);
     }
 
     QWidget* MotorWindow::BuildHeader()
@@ -98,6 +115,7 @@ namespace virtual_motor::app
         auto* controls = new QWidget(this);
         auto* layout = new QHBoxLayout(controls);
         pause = new QPushButton("Pause", controls);
+        stepPeriod = new QPushButton("Step 1 period", controls);
         step = new QPushButton("Step 1 ms", controls);
         powerOn = new QPushButton("Power On", controls);
         powerCycle = new QPushButton("Power Cycle", controls);
@@ -106,7 +124,7 @@ namespace virtual_motor::app
         disturbances = new QLabel(controls);
         clearAll = new QPushButton("Clear All", controls);
         clearAll->setToolTip("Return the plant to its description: remove every torque and noise change");
-        for (auto* button : { pause, step, powerOn, powerCycle, powerOff })
+        for (auto* button : { pause, stepPeriod, step, powerOn, powerCycle, powerOff })
             layout->addWidget(button);
         layout->addStretch(1);
         layout->addWidget(disturbances);
@@ -125,6 +143,10 @@ namespace virtual_motor::app
                     motor->Send(port::Resume{});
                 else
                     motor->Send(port::Pause{});
+            });
+        connect(stepPeriod, &QPushButton::clicked, this, [this]()
+            {
+                rig.Find(node)->Send(port::Step{ port::StepUnit::controlPeriod, 1 });
             });
         connect(step, &QPushButton::clicked, this, [this]()
             {
@@ -159,6 +181,49 @@ namespace virtual_motor::app
         RefreshStatus(*motor);
         RefreshControls(*motor);
         panel->Refresh();
+        captureBar->Refresh();
+        scope->Refresh();
+        UpdateStreaming();
+    }
+
+    void MotorWindow::RefreshCapture()
+    {
+        const auto* motor = rig.Find(node);
+        if (motor == nullptr)
+            return;
+        captureBar->Refresh();
+        const auto& last = motor->Captures().Last();
+        if (motor->Captures().State() == CaptureState::complete && last && last->number != shownCapture)
+        {
+            shownCapture = last->number;
+            scope->ShowCapture(captureBar->ArmedSignal());
+        }
+        scope->Refresh();
+    }
+
+    void MotorWindow::showEvent(QShowEvent* event)
+    {
+        QWidget::showEvent(event);
+        UpdateStreaming();
+    }
+
+    void MotorWindow::hideEvent(QHideEvent* event)
+    {
+        QWidget::hideEvent(event);
+        UpdateStreaming();
+    }
+
+    void MotorWindow::changeEvent(QEvent* event)
+    {
+        QWidget::changeEvent(event);
+        if (event->type() == QEvent::WindowStateChange)
+            UpdateStreaming();
+    }
+
+    void MotorWindow::UpdateStreaming()
+    {
+        if (auto* motor = rig.Find(node))
+            motor->Stream(isVisible() && !isMinimized() && scope->ShowsTrace());
     }
 
     void MotorWindow::RefreshStatus(const RigMotor& motor)
@@ -192,6 +257,8 @@ namespace virtual_motor::app
         pause->setText(motor.State() == MotorState::paused ? "Resume" : "Pause");
         pause->setEnabled(connected);
         pause->setToolTip(connected ? "Pausing stops virtual time; the CAN Commander sees the motor go offline" : notConnected);
+        stepPeriod->setEnabled(motor.State() == MotorState::paused);
+        stepPeriod->setToolTip(motor.State() == MotorState::paused ? "Advance virtual time by one control period" : "Pause the motor to step it");
         step->setEnabled(motor.State() == MotorState::paused);
         step->setToolTip(motor.State() == MotorState::paused ? "Advance virtual time by one millisecond" : "Pause the motor to step it");
         clearAll->setEnabled(connected && motor.ActiveDisturbances() != 0);

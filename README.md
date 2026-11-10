@@ -205,7 +205,8 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 A virtual motor runs the e-foc application on the development machine against the simulated motor plant,
 as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). The e-foc Virtual
 Motor app ([design](documentation/design/tool-virtual-motor.md)) hosts the bus, starts and stops motors,
-and changes their load, disturbance torque and sensor noise while they run:
+changes their load, disturbance torque and sensor noise while they run, and shows their currents,
+voltages, mechanics and supply on scopes, with full-rate triggered captures that save as CSV:
 
 ```bash
 ./build/host/tools/virtual_motor/app/main/Debug/e-foc-virtual-motor-app

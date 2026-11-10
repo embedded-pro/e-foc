@@ -47,9 +47,35 @@ namespace virtual_motor::app
         return changes ? static_cast<uint8_t>(std::popcount(changes->differs)) : uint8_t{ 0 };
     }
 
+    const TraceHistory& RigMotor::History() const
+    {
+        return history;
+    }
+
+    const CaptureAssembly& RigMotor::Captures() const
+    {
+        return captures;
+    }
+
+    bool RigMotor::Streaming() const
+    {
+        return streaming;
+    }
+
+    void RigMotor::Stream(bool on)
+    {
+        if (on == streaming)
+            return;
+        streaming = on;
+        Send(port::StreamRequest{ static_cast<uint8_t>(on ? 1 : 0) });
+    }
+
     void RigMotor::Attach(std::unique_ptr<MotorLink> newLink)
     {
         link = std::move(newLink);
+        history.Clear();
+        if (streaming)
+            link->Send(port::StreamRequest{ 1 });
         identity = link->Identity();
         status = link->LastStatus();
         changes = link->LastChanges();
@@ -106,8 +132,36 @@ namespace virtual_motor::app
         Append(line);
     }
 
+    void RigMotor::WindowReceived(const port::Window& window)
+    {
+        history.Add(window);
+    }
+
+    void RigMotor::CaptureEventReceived(const port::CaptureEvent& event)
+    {
+        captures.Event(event);
+        Captured();
+    }
+
+    void RigMotor::CaptureChunkReceived(const port::CaptureChunk& chunk)
+    {
+        captures.Chunk(chunk);
+        Captured();
+    }
+
+    void RigMotor::Captured()
+    {
+        if (rig.observer != nullptr)
+            rig.observer->MotorCaptured(spec.node);
+    }
+
     void RigMotor::LinkClosed()
     {
+        if (captures.InFlight())
+        {
+            captures.Interrupted();
+            Captured();
+        }
         if (process.has_value() && !stopping)
             SetState(MotorState::restarting);
     }
