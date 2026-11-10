@@ -29,6 +29,8 @@ namespace
         MOCK_METHOD(std::optional<RefusalReason>, SetCurrentNoise, (float ampere), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetEncoderNoise, (float radians), (override));
         MOCK_METHOD(void, ClearAll, (), (override));
+        MOCK_METHOD(void, Stream, (const infra::Function<void(const Window&)>& sink), (override));
+        MOCK_METHOD(void, StopStream, (), (override));
     };
 
     class TestPlantPortClient
@@ -211,10 +213,11 @@ TEST_F(TestPlantPortClient, an_unknown_request_is_skipped)
     EXPECT_TRUE(client.IsConnected());
 }
 
-TEST_F(TestPlantPortClient, losing_the_app_resumes_the_motor_and_ends_the_port)
+TEST_F(TestPlantPortClient, losing_the_app_resumes_the_motor_stops_the_stream_and_ends_the_port)
 {
     Attach();
 
+    EXPECT_CALL(target, StopStream());
     EXPECT_CALL(target, Resume());
     loopback::Close(app);
     app = loopback::invalidSocket;
@@ -231,8 +234,86 @@ TEST_F(TestPlantPortClient, a_request_shorter_than_its_fields_ends_the_port)
 {
     Attach();
 
+    EXPECT_CALL(target, StopStream());
     EXPECT_CALL(target, Resume());
     SendToMotor(EncodeFrame(static_cast<uint8_t>(MessageType::loadTorque), { 0 }));
 
     EXPECT_FALSE(client.IsConnected());
+}
+
+TEST_F(TestPlantPortClient, the_stream_request_turns_the_motors_windows_on_and_off)
+{
+    Attach();
+    infra::Function<void(const Window&)> sink;
+
+    EXPECT_CALL(target, Stream(testing::_)).WillOnce(testing::SaveArg<0>(&sink));
+    SendToMotor(Encode(StreamRequest{ 1 }));
+    ASSERT_TRUE(static_cast<bool>(sink));
+
+    sink(Window{ 3, 30, 10 });
+    const auto window = Decode<Window>(Received(1).at(0));
+    ASSERT_TRUE(window.has_value());
+    EXPECT_EQ(window->sequence, 3u);
+
+    EXPECT_CALL(target, StopStream());
+    SendToMotor(Encode(StreamRequest{ 0 }));
+}
+
+TEST_F(TestPlantPortClient, a_stream_request_that_is_neither_on_nor_off_is_refused)
+{
+    Attach();
+
+    SendToMotor(Encode(StreamRequest{ 2 }));
+
+    const auto refused = Decode<Refused>(Received(1).at(0));
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_EQ(refused->request, static_cast<uint8_t>(MessageType::stream));
+    EXPECT_EQ(refused->reason, RefusalReason::outOfRange);
+}
+
+TEST_F(TestPlantPortClient, windows_are_dropped_while_earlier_frames_wait_and_every_other_frame_arrives_whole)
+{
+    Attach();
+    infra::Function<void(const Window&)> sink;
+    EXPECT_CALL(target, Stream(testing::_)).WillOnce(testing::SaveArg<0>(&sink));
+    SendToMotor(Encode(StreamRequest{ 1 }));
+
+    constexpr uint32_t windows{ 100000 };
+    for (uint32_t sequence = 0; sequence != windows; ++sequence)
+    {
+        sink(Window{ sequence, sequence * 10ull, 10 });
+        if (sequence % 1000 == 0)
+            client.Log(infra::MakeStringByteRange("tick\n"));
+    }
+    client.PublishStatus();
+
+    std::vector<Frame> frames;
+    for (int attempt = 0; attempt != 2000; ++attempt)
+    {
+        client.Poll();
+        auto more = Received(1);
+        frames.insert(frames.end(), more.begin(), more.end());
+        if (!frames.empty() && frames.back().type == static_cast<uint8_t>(MessageType::status))
+            break;
+    }
+
+    std::size_t delivered{ 0 };
+    std::size_t logLines{ 0 };
+    uint32_t previous{ 0 };
+    for (const auto& frame : frames)
+    {
+        if (const auto window = Decode<Window>(frame))
+        {
+            EXPECT_TRUE(delivered == 0 || window->sequence > previous);
+            previous = window->sequence;
+            ++delivered;
+        }
+        else if (Decode<LogLine>(frame))
+            ++logLines;
+    }
+    EXPECT_LT(delivered, windows);
+    EXPECT_GT(delivered, 0u);
+    EXPECT_EQ(logLines, windows / 1000);
+    ASSERT_FALSE(frames.empty());
+    EXPECT_EQ(frames.back().type, static_cast<uint8_t>(MessageType::status));
 }

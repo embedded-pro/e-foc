@@ -1,5 +1,6 @@
 #include "tools/virtual_motor/platform/PlantPortClient.hpp"
 #include "can-lite/drivers/implementation/LoopbackSocket.hpp"
+#include "tools/virtual_motor/platform/PortSocket.hpp"
 #include <array>
 
 namespace virtual_motor
@@ -46,6 +47,8 @@ namespace virtual_motor
 
     void PlantPortClient::Poll()
     {
+        Flush();
+
         std::array<uint8_t, 1024> buffer{};
         while (IsConnected())
         {
@@ -97,10 +100,38 @@ namespace virtual_motor
         }
     }
 
+    void PlantPortClient::PublishWindow(const port::Window& window)
+    {
+        auto bytes = port::Encode(window);
+        if (outgoing.size() < bytes.size())
+            Send(bytes);
+    }
+
     void PlantPortClient::Dispatch(const port::Frame& frame)
     {
-        if (!HandleRun(frame) || !HandleChange(frame))
+        if (!HandleRun(frame) || !HandleChange(frame) || !HandleStream(frame))
             Disconnect();
+    }
+
+    bool PlantPortClient::HandleStream(const port::Frame& frame)
+    {
+        if (frame.type != static_cast<uint8_t>(port::MessageType::stream))
+            return true;
+
+        bool valid{ false };
+        if (auto request = Read<port::StreamRequest>(frame, valid))
+        {
+            if (request->on > 1)
+                Answer(port::MessageType::stream, port::RefusalReason::outOfRange, false);
+            else if (request->on == 1)
+                target.Stream([this](const port::Window& window)
+                    {
+                        PublishWindow(window);
+                    });
+            else
+                target.StopStream();
+        }
+        return valid;
     }
 
     bool PlantPortClient::HandleRun(const port::Frame& frame)
@@ -170,8 +201,25 @@ namespace virtual_motor
 
     void PlantPortClient::Send(const std::vector<uint8_t>& bytes)
     {
-        if (IsConnected() && !services::loopback::Send(socket, infra::ConstByteRange{ bytes.data(), bytes.data() + bytes.size() }))
-            Disconnect();
+        if (!IsConnected())
+            return;
+
+        outgoing.insert(outgoing.end(), bytes.begin(), bytes.end());
+        Flush();
+    }
+
+    void PlantPortClient::Flush()
+    {
+        while (IsConnected() && !outgoing.empty())
+        {
+            const auto sent = SendWithoutWaiting(socket, infra::ConstByteRange{ outgoing.data(), outgoing.data() + outgoing.size() });
+            if (!sent.has_value())
+                Disconnect();
+            else if (*sent == 0)
+                break;
+            else
+                outgoing.erase(outgoing.begin(), outgoing.begin() + static_cast<std::ptrdiff_t>(*sent));
+        }
     }
 
     void PlantPortClient::Disconnect()
@@ -179,6 +227,8 @@ namespace virtual_motor
         services::loopback::Close(socket);
         socket = services::loopback::invalidSocket;
         partialLine.clear();
+        outgoing.clear();
+        target.StopStream();
         target.Resume();
     }
 }

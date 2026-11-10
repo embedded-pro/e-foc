@@ -156,4 +156,40 @@ namespace virtual_motor::port
     {
         return { reader.F32() };
     }
+
+    void Window::WriteTo(PayloadWriter& writer) const
+    {
+        writer.U32(sequence);
+        writer.U64(firstPeriod);
+        writer.U8(periods);
+        for (std::size_t signal = 0; signal != signalCount; ++signal)
+        {
+            writer.F32(minimum[signal]);
+            writer.F32(maximum[signal]);
+        }
+    }
+
+    Window Window::ReadFrom(PayloadReader& reader)
+    {
+        Window window;
+        window.sequence = reader.U32();
+        window.firstPeriod = reader.U64();
+        window.periods = reader.U8();
+        for (std::size_t signal = 0; signal != signalCount; ++signal)
+        {
+            window.minimum[signal] = reader.F32();
+            window.maximum[signal] = reader.F32();
+        }
+        return window;
+    }
+
+    void StreamRequest::WriteTo(PayloadWriter& writer) const
+    {
+        writer.U8(on);
+    }
+
+    StreamRequest StreamRequest::ReadFrom(PayloadReader& reader)
+    {
+        return { reader.U8() };
+    }
 }

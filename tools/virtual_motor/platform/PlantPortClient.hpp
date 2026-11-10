@@ -1,6 +1,7 @@
 #pragma once
 
 #include "infra/util/ByteRange.hpp"
+#include "infra/util/Function.hpp"
 #include "tools/virtual_motor/port/PlantPortCodec.hpp"
 #include <cstdint>
 #include <optional>
@@ -25,6 +26,9 @@ namespace virtual_motor
         virtual std::optional<port::RefusalReason> SetEncoderNoise(float radians) = 0;
         virtual void ClearAll() = 0;
 
+        virtual void Stream(const infra::Function<void(const port::Window&)>& sink) = 0;
+        virtual void StopStream() = 0;
+
     protected:
         ~PlantPortTarget() = default;
     };
@@ -44,19 +48,23 @@ namespace virtual_motor
         void Millisecond();
         void PublishStatus();
         void Log(infra::ConstByteRange text);
+        void PublishWindow(const port::Window& window);
 
     private:
         void Dispatch(const port::Frame& frame);
         bool HandleRun(const port::Frame& frame);
         bool HandleChange(const port::Frame& frame);
+        bool HandleStream(const port::Frame& frame);
         void Answer(port::MessageType request, std::optional<port::RefusalReason> refusal, bool withStatus);
         void Send(const std::vector<uint8_t>& bytes);
+        void Flush();
         void Disconnect();
 
         PlantPortTarget& target;
         intptr_t socket;
         port::FrameAssembler assembler;
         std::string partialLine;
+        std::vector<uint8_t> outgoing;
         uint32_t millisecondsSinceStatus{ 0 };
     };
 }

@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.4.0                |
+| Version   | 0.5.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -255,10 +255,11 @@ the same seed and profile a run replays exactly. Profiles are files the app load
 The plant port is a local connection between one virtual motor and the Virtual Motor app. It carries
 three things.
 
-**Continuous stream.** Every 10 control periods (2 kHz at 20 kHz) the virtual motor publishes, for each
-signal of the Data Model, the minimum and the maximum over the window, so a 2 kHz trace still shows the
-PWM ripple's envelope and the noise's spread. A reader that falls behind loses whole windows, counted in
-a sequence number, and never delays the pacer.
+**Continuous stream.** While the app asks for it, every 10 control periods (2 kHz at 20 kHz) the virtual
+motor publishes, for each signal of the Data Model, the minimum and the maximum over the window, so a
+2 kHz trace still shows the PWM ripple's envelope and the noise's spread. A reader that falls behind loses
+whole windows, counted in a sequence number, and never delays the pacer. The app turns the stream on while
+it shows a trace and off when it shows none, so a motor nobody watches samples nothing.
 
 **Captures.** On request the virtual motor records every control period's signals, up to 16,384
 periods, around a trigger: a signal crossing a level in a direction, a protection trip, a fault the LEDs
@@ -282,13 +283,14 @@ ends the connection.
 
 Motor to app:
 
-| Type   | Message  | Payload                                                                                                                                      | Sent                                                                       |
-|--------|----------|----------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
-| `0x01` | Hello    | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                      | Once, first                                                                |
-| `0x02` | Status   | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                 | Every 100 ms of virtual time, and on every pause, resume and finished step |
-| `0x03` | Changes  | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description | Once after Hello, and after every accepted change                          |
-| `0x04` | Refused  | The type of the refused request, the reason                                                                                                  | For every refused request                                                  |
-| `0x05` | Log line | The text of one debug log line                                                                                                               | For every line the debug log writes                                        |
+| Type   | Message  | Payload                                                                                                                                                                   | Sent                                                                       |
+|--------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `0x01` | Hello    | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                                                   | Once, first                                                                |
+| `0x02` | Status   | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                                              | Every 100 ms of virtual time, and on every pause, resume and finished step |
+| `0x03` | Changes  | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description                              | Once after Hello, and after every accepted change                          |
+| `0x04` | Refused  | The type of the refused request, the reason                                                                                                                               | For every refused request                                                  |
+| `0x05` | Log line | The text of one debug log line                                                                                                                                            | For every line the debug log writes                                        |
+| `0x10` | Window   | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order | Every 10 control periods while the stream is on, unless dropped            |
 
 App to motor:
 
@@ -302,11 +304,19 @@ App to motor:
 | `0x86` | Current noise   | Standard deviation in A                                                                    |
 | `0x87` | Encoder noise   | Standard deviation in rad                                                                  |
 | `0x88` | Clear all       | None: the plant returns to its description                                                 |
+| `0x90` | Stream          | On (1) or off (0)                                                                          |
 
 The run state is running or paused; the LEDs are one bit each, operational, warning and failure from the
 lowest; the board protection state is clear, asserted or unknown, as the drive reads it. A refusal names
-one reason: a value out of range, a step while running, or a form the motor does not know. The stream
-and capture frames take the types from `0x10` up, and their requests from `0x90` up.
+one reason: a value out of range, a step while running, or a form the motor does not know. The capture
+frames take the types from `0x11` up, and their requests from `0x91` up.
+
+**Windows and dropping.** Windows are consecutive runs of 10 control periods counted from the period the
+stream was turned on in; a step while paused completes them as it goes. The sequence counts every window
+the motor closed since the stream was turned on, sent or not. Frames the connection cannot take at once
+wait in the motor in their order; a window is dropped instead of queued while a whole window's worth is
+still waiting, so a slow reader sees gaps in the sequence and the motor never waits for it. Every other
+frame is queued, never dropped. The stream stops when it is turned off or the connection ends.
 
 ### Part G — The virtual CAN bus
 
@@ -387,10 +397,27 @@ so that the virtual board cannot drift from the emulated one unnoticed.
 
 ## Data Model
 
-Signals of the continuous stream and of a capture, per control period:
+Signals of the continuous stream and of a capture, per control period, in the order the frames carry them:
 
-| Signal                   | Unit  | Notes                                                                     |
-|--------------------------|-------|---------------------------------------------------------------------------|
+| Order | Signal                          | Unit  | Notes                                                                     |
+|-------|---------------------------------|-------|---------------------------------------------------------------------------|
+| 1–3   | Phase currents a, b, c          | A     | True winding currents                                                     |
+| 4–6   | Measured phase currents a, b, c | A     | What the current-sense chain reports, with its noise, bias and conversion |
+| 7–9   | Duties a, b, c                  | 1     | As applied to the legs, after the duty delay                              |
+| 10–12 | Leg voltages a, b, c            | V     | From the middle of the bus, after dead time                               |
+| 13–14 | Stator voltage α, β             | V     | Amplitude-invariant Clarke of the leg voltages                            |
+| 15–16 | True d, q currents              | A     | Park of the true currents at the true electrical angle                    |
+| 17    | Rotor angle                     | rad   | True mechanical angle                                                     |
+| 18    | Encoder angle                   | rad   | What the encoder reports, with its resolution, noise, bias or stuck state |
+| 19    | Rotor speed                     | rad/s | Mechanical                                                                |
+| 20    | Electrical torque               | N·m   | From the true d and q currents                                            |
+| 21    | Load torque                     | N·m   | In force; it opposes the rotation                                         |
+| 22    | External torque                 | N·m   | On the shaft, with its own sign                                           |
+| 23    | Bus voltage                     | V     | From the supply model                                                     |
+| 24    | Bus current                     | A     | From the supply model                                                     |
+| 25    | Winding temperature             | °C    | From the thermal model                                                    |
+
+--------------------------|-------|---------------------------------------------------------------------------|
 | Phase currents a, b, c   | A     | True winding currents                                                     |
 | Measured phase currents  | A     | What the current-sense chain reports, with its noise, bias and conversion |
 | Duties a, b, c           | 1     | As applied to the legs, after the duty delay                              |
