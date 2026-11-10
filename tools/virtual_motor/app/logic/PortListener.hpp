@@ -21,10 +21,10 @@ namespace virtual_motor::app
         bool Listen();
         std::optional<uint16_t> Port() const;
         void Poll();
-
-        std::function<void(std::unique_ptr<MotorLink>)> onIntroduced;
+        void OnIntroduced(const std::function<void(std::unique_ptr<MotorLink>)>& callback);
 
     private:
+        std::function<void(std::unique_ptr<MotorLink>)> onIntroduced;
         intptr_t listener{ services::loopback::invalidSocket };
         std::vector<std::unique_ptr<MotorLink>> pending;
     };

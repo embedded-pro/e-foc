@@ -22,6 +22,11 @@ namespace virtual_motor::app
         return services::loopback::LocalPort(listener);
     }
 
+    void PortListener::OnIntroduced(const std::function<void(std::unique_ptr<MotorLink>)>& callback)
+    {
+        onIntroduced = callback;
+    }
+
     void PortListener::Poll()
     {
         if (listener == services::loopback::invalidSocket)

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <bit>
 #include <filesystem>
+#include <format>
 
 namespace virtual_motor::app
 {
@@ -117,10 +118,10 @@ namespace virtual_motor::app
         , dataFolder(std::move(dataFolder))
         , hubPort(hubPort)
     {
-        listener.onIntroduced = [this](std::unique_ptr<MotorLink> link)
-        {
-            Introduced(std::move(link));
-        };
+        listener.OnIntroduced([this](std::unique_ptr<MotorLink> link)
+            {
+                Introduced(std::move(link));
+            });
     }
 
     void Rig::Observe(RigObserver& rigObserver)
@@ -153,14 +154,14 @@ namespace virtual_motor::app
     void Rig::Poll()
     {
         listener.Poll();
-        for (auto& motor : motors)
+        for (const auto& motor : motors)
             motor->Poll();
     }
 
     std::optional<std::string> Rig::Add(const MotorSpec& spec)
     {
         if (Find(spec.node) != nullptr)
-            return "Node " + std::to_string(spec.node) + " is already in the list; pick another node or remove that motor first.";
+            return std::format("Node {} is already in the list; pick another node or remove that motor first.", static_cast<uint32_t>(spec.node));
 
         motors.push_back(std::make_unique<RigMotor>(spec, *this));
         auto& motor = *motors.back();
@@ -216,7 +217,7 @@ namespace virtual_motor::app
 
     void Rig::PowerOffAll()
     {
-        for (auto& motor : motors)
+        for (const auto& motor : motors)
             PowerOff(motor->spec.node);
     }
 

@@ -17,6 +17,13 @@ namespace virtual_motor::app
         {
             return std::format("{:.4f} N·m", newtonMeter);
         }
+
+        std::size_t EscapeSequenceEnd(const std::string& line, std::size_t index)
+        {
+            while (index < line.size() && (line[index] < 0x40 || line[index] > 0x7e))
+                ++index;
+            return index;
+        }
     }
 
     RealTime RealTimeText(const port::Status& status)
@@ -89,32 +96,30 @@ namespace virtual_motor::app
     {
         std::vector<ActiveChange> active;
         if (Has(changes.differs, port::differs::loadTorque))
-            active.push_back({ ChangeKind::loadTorque, "Load torque " + Torque(changes.loadTorque) });
+            active.emplace_back(ChangeKind::loadTorque, "Load torque " + Torque(changes.loadTorque));
         if (Has(changes.differs, port::differs::externalTorque))
-            active.push_back({ ChangeKind::externalTorque, "External torque: " + ExternalTorqueText(changes.externalTorque) });
+            active.emplace_back(ChangeKind::externalTorque, "External torque: " + ExternalTorqueText(changes.externalTorque));
         if (Has(changes.differs, port::differs::currentNoise))
-            active.push_back({ ChangeKind::currentNoise, std::format("Current noise {:.4f} A", changes.currentNoise) });
+            active.emplace_back(ChangeKind::currentNoise, std::format("Current noise {:.4f} A", changes.currentNoise));
         if (Has(changes.differs, port::differs::encoderNoise))
-            active.push_back({ ChangeKind::encoderNoise, std::format("Encoder noise {:.5f} rad", changes.encoderNoise) });
+            active.emplace_back(ChangeKind::encoderNoise, std::format("Encoder noise {:.5f} rad", changes.encoderNoise));
         return active;
     }
 
     std::string PrintableLogLine(const std::string& line)
     {
         std::string printable;
-        for (std::size_t index = 0; index < line.size(); ++index)
+        std::size_t index{ 0 };
+        while (index < line.size())
         {
             const auto character = static_cast<unsigned char>(line[index]);
             if (character == 0x1b && index + 1 < line.size() && line[index + 1] == '[')
-            {
-                index += 2;
-                while (index < line.size() && (line[index] < 0x40 || line[index] > 0x7e))
-                    ++index;
-            }
+                index = EscapeSequenceEnd(line, index + 2);
             else if (character == '\t')
                 printable += ' ';
             else if (character >= 0x20)
                 printable += static_cast<char>(character);
+            ++index;
         }
         return printable;
     }

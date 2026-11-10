@@ -1,4 +1,5 @@
 #include "tools/virtual_motor/app/logic/MotorSpec.hpp"
+#include <format>
 
 namespace virtual_motor::app
 {
@@ -23,7 +24,7 @@ namespace virtual_motor::app
 
     std::string MotorFolderName(const MotorSpec& spec)
     {
-        return spec.bus + "-" + std::to_string(spec.node);
+        return std::format("{}-{}", spec.bus, static_cast<uint32_t>(spec.node));
     }
 
     std::string StateText(MotorState state)
