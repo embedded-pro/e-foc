@@ -1,48 +1,71 @@
 {
   "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
   "loop_rates_khz": [1],
-  "loop_bounds": {
-    "^foc::SpeedDifferentiator::Measure\\(": 2,
-    "^__ieee754_fmodf$": 3,
-    "^services::RealTimeFrictionAndInertiaEstimator::SteadyFriction\\(": 2,
-    "^services::RealTimeFrictionAndInertiaEstimator::Update\\(": 9,
-    "^estimators::RecursiveLeastSquares<float, 3u>::Update\\(": 9,
-    "^services::RealTimeResistanceAndInductanceEstimator::ComputeEstimate\\(": 4,
-    "^estimators::RecursiveLeastSquares<float, 2u>::Update\\(": 4
-  },
   "path_stages": [
     {
       "label": "LPI Entry (exception overhead)",
       "type": "exception_entry"
     },
     {
-      "label": "Interrupt Vector",
-      "patterns": [
-        "^Default_Handler_Forwarded$",
-        "^hal::cortex::LowPriorityInterrupt::Invoke\\(",
-        "StaticInvoke<hal::cortex::LowPriorityInterrupt::onInvoke"
-      ]
-    },
-    {
       "label": "FOC Outer Loop (LowPriorityHandler)",
-      "combine": "max",
       "patterns": [
-        "StaticInvoke<foc::(Speed|Position)Cascade::(Speed|Position)Cascade\\(",
-        "^foc::(Speed|Position)Cascade::LowPriorityHandler\\("
+        "PositionCascade::LowPriorityHandler",
+        "SpeedCascade::LowPriorityHandler",
+        "CascadeWithSpeedLoop::RunSpeedLoop",
+        "FrictionFeedForward::CurrentFor",
+        "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
+        "CascadeWithSpeedLoop::SetSpeedReference",
+        "CascadeWithSpeedLoop::SetDirectCurrentReference",
+        "CascadeWithSpeedLoop::CurrentMechanicalAngle",
+        "SpeedDifferentiator::Measure",
+        "PidSpeedController::Compute",
+        "LqiSpeedController::Compute",
+        "AdrcSpeedController::Compute",
+        "TwoDofSpeedController::Compute",
+        "PidPositionController::Compute",
+        "CascadePPositionController::Compute",
+        "LqrPositionController::Compute",
+        "LqiPositionController::Compute",
+        "TwoDofPositionController::Compute",
+        "PidIncrementalSynchronous.*::Process",
+        "PidIncrementalSynchronous.*::SetPoint",
+        "OuterSamplePeriod",
+        "WrappedPositionError",
+        "math::WrapToPi",
+        "infra::TripleBuffer<.*>::Publish",
+        "infra::TripleBuffer<.*>::Acquire",
+        "LimitToCurrentEnvelope"
       ]
     },
     {
       "label": "Online Mechanical Estimator (RLS)",
+      "required": false,
       "patterns": [
-        "^services::RealTimeFrictionAndInertiaEstimator::Update\\(",
-        "^estimators::RecursiveLeastSquares<float, 3u>::(Update|Coefficients)\\("
+        "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
+        "EstimatorChannel::UpdateMechanical",
+        "RealTimeFrictionAndInertiaEstimator::Update",
+        "ClarkePark::Forward",
+        "RecursiveLeastSquares<float, 3u>::Update",
+        "RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative",
+        "RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled",
+        "RealTimeFrictionAndInertiaEstimator::PublishOnlineEstimate",
+        "MechanicalExcitation::Count",
+        "IsMechanicallyObservable",
+        "IsPlausibleMechanics",
+        "math::IsFinite"
       ]
     },
     {
       "label": "Online Electrical Estimator (RLS)",
+      "required": false,
       "patterns": [
-        "^services::RealTimeResistanceAndInductanceEstimator::(Update|HasSettled|CurrentResistance|CurrentInductance)\\(",
-        "^estimators::RecursiveLeastSquares<float, 2u>::(Update|Coefficients)\\("
+        "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
+        "EstimatorChannel::UpdateElectrical",
+        "RealTimeResistanceAndInductanceEstimator::Update",
+        "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
+        "RealTimeResistanceAndInductanceEstimator::Publish",
+        "RecursiveLeastSquares<float, 2u>::Update",
+        "DirectAxisExcitation::Advance"
       ]
     },
     {
