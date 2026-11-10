@@ -103,6 +103,8 @@ jobs:
     env:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+      # The action installs the analyser with pip, so its own pin does not fix the analyser's version: this does.
+      CYCLE_BUDGET_PACKAGE: "==1.0.0"
     steps:
       - name: Configure Git
         run: |
@@ -160,6 +162,7 @@ jobs:
           build-config: ${{ matrix.configuration }}
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
+          package-version: ${{ env.CYCLE_BUDGET_PACKAGE }}
           output-dir: cycle-analysis/inner
           fail-over-max-cycles: ${{ matrix.inner-max-cycles }}
           post-comment: "false"
@@ -174,6 +177,7 @@ jobs:
           build-config: ${{ matrix.configuration }}
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
+          package-version: ${{ env.CYCLE_BUDGET_PACKAGE }}
           output-dir: cycle-analysis/outer
           fail-over-max-cycles: ${{ matrix.outer-max-cycles }}
           post-comment: "false"
@@ -188,6 +192,7 @@ jobs:
           build-config: ${{ matrix.configuration }}
           clock-mhz: ${{ matrix.clock-mhz }}
           cortex: "m4"
+          package-version: ${{ env.CYCLE_BUDGET_PACKAGE }}
           output-dir: cycle-analysis/identification
           fail-over-max-cycles: ${{ matrix.identification-max-cycles }}
           post-comment: "false"
