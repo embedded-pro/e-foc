@@ -38,6 +38,8 @@ namespace tool
                 return "check that the candleLight adapter is plugged in and not used by another program";
             if (interfaceName.startsWith("PCAN:", Qt::CaseInsensitive) || interfaceName.startsWith("Kvaser:", Qt::CaseInsensitive))
                 return "check that the adapter is plugged in and the vendor driver is installed";
+            if (interfaceName.startsWith("virtual:", Qt::CaseInsensitive))
+                return "check that a virtual CAN hub is running on this machine and that every node on the bus uses the same bitrate";
             return "check that the interface exists and is up, e.g. sudo ip link set can0 up type can bitrate 1000000";
         }
 

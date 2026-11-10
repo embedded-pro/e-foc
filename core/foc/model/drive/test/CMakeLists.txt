@@ -8,5 +8,6 @@ target_link_libraries(e_foc.foc.model.drive_test PUBLIC
 )
 
 target_sources(e_foc.foc.model.drive_test PRIVATE
+    TestBoardProtectionSimulator.cpp
     TestPlantDrive.cpp
 )

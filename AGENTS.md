@@ -10,7 +10,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
 - `core/foc/math/` — `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
-- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); `drive/` holds the plant description (`SilPlantConfig`) and the `PlantDrive` that steps the plant once per control period for the QEMU platform and the model-in-the-loop tests (`PlantEvents` for its scheduled disturbances); host and QEMU only
+- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`);
+  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), and the `BoardProtectionSimulator`; host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
@@ -21,6 +22,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
   with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
+- `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,
+  a `virtual:` CAN port, a wall-clock `Pacer`), `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it
 - `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
@@ -239,7 +242,7 @@ a shaft torque step is scheduled in the plant description, and `integration_test
 
 Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
 
-**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The SIL presets `teknic` and `anaheim` select them; `nominal` is the Teknic.
+**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The plant presets (`motor_parameters/PlantPresets.hpp`) `teknic` and `anaheim` select them for SIL, MIL and the virtual motor; `nominal` is the Teknic.
 
 **Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (the CAN electrical response, and the calibration record and online estimates read as contract 2.2 parameters) against the plant the scenario configured.
 

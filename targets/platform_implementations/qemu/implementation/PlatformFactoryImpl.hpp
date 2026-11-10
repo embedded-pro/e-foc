@@ -1,6 +1,7 @@
 #pragma once
 
 #include "can-lite/core/MonitoredCan.hpp"
+#include "core/foc/model/drive/BoardProtectionSimulator.hpp"
 #include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
@@ -21,7 +22,6 @@
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
 #include "targets/platform_implementations/qemu/implementation/CmsdkUartLines.hpp"
 #include "targets/platform_implementations/qemu/implementation/EmulatedCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"

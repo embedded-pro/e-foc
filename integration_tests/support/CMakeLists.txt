@@ -8,7 +8,6 @@ add_library(e_foc.integration_tests.plant STATIC
     nvm/NvmImageBuilder.cpp
     plant/PlantConfigWriter.hpp
     plant/PlantConfigWriter.cpp
-    plant/PlantPresets.hpp
 )
 
 target_include_directories(e_foc.integration_tests.plant PUBLIC

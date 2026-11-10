@@ -36,6 +36,7 @@ namespace application
         nucleoG474re = 2,
         nucleoH563zi = 3,
         emulated = 5,
+        virtualBoard = 6,
     };
 
     class PlatformFactory

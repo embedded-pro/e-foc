@@ -22,10 +22,10 @@
 #include "infra/util/WithSharedAccess.hpp"
 #include "integration_tests/model_in_the_loop/SimulatedDrive.hpp"
 #include "integration_tests/support/nvm/NvmImageBuilder.hpp"
-#include "integration_tests/support/plant/PlantPresets.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
+#include "motor_parameters/PlantPresets.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/NvmEepromRegion.hpp"
 #include <chrono>
