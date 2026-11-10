@@ -167,6 +167,8 @@ namespace virtual_motor::port
             writer.F32(minimum[signal]);
             writer.F32(maximum[signal]);
         }
+        for (const auto value : last)
+            writer.F32(value);
     }
 
     Window Window::ReadFrom(PayloadReader& reader)
@@ -180,6 +182,8 @@ namespace virtual_motor::port
             window.minimum[signal] = reader.F32();
             window.maximum[signal] = reader.F32();
         }
+        for (auto& value : window.last)
+            value = reader.F32();
         return window;
     }
 

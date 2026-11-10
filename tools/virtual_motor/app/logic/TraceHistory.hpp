@@ -15,6 +15,7 @@ namespace virtual_motor::app
         bool afterGap{ false };
         port::Sample minimum{};
         port::Sample maximum{};
+        port::Sample last{};
     };
 
     class TraceHistory

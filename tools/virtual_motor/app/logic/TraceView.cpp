@@ -50,6 +50,11 @@ namespace virtual_motor::app
         : spec(spec)
     {}
 
+    std::string_view TraceView::Name() const
+    {
+        return spec.name;
+    }
+
     void TraceView::Show(const TraceSource* newSource, TimeRange newRange, double newOrigin)
     {
         source = newSource;
@@ -232,13 +237,10 @@ namespace virtual_motor::app
     {
         if (source == nullptr || source->Count() == 0)
             return std::nullopt;
-        auto index = source->FirstAtOrAfter(time);
-        const bool exact = index != source->Count() && source->Time(index) == time;
-        if (!exact && index == 0)
+        const auto index = source->LastAtOrBefore(time);
+        if (!index.has_value())
             return std::nullopt;
-        if (!exact)
-            --index;
-        return (source->Minimum(index, signal) + source->Maximum(index, signal)) / 2.0f;
+        return (source->Minimum(*index, signal) + source->Maximum(*index, signal)) / 2.0f;
     }
 
     void TraceView::PaintPanel(ui::Canvas& canvas, const PanelSpec& panel, const ui::Rect& area) const

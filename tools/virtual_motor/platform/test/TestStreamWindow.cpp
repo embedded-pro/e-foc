@@ -28,6 +28,7 @@ TEST(TestStreamWindow, closes_a_window_every_ten_periods_with_each_signals_extre
     EXPECT_EQ(closed->periods, 10);
     EXPECT_FLOAT_EQ(closed->minimum[0], -2.0f);
     EXPECT_FLOAT_EQ(closed->maximum[signalCount - 1], 6.0f);
+    EXPECT_FLOAT_EQ(closed->last[3], -2.0f);
 }
 
 TEST(TestStreamWindow, each_closed_window_takes_the_next_sequence_number)

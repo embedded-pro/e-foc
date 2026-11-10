@@ -10,6 +10,7 @@ target_link_libraries(e_foc.tool.virtual_motor.app.logic PUBLIC
     numerical.math
     ui.core
     ui.theme
+    ui.widgets
 )
 
 target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
@@ -17,7 +18,11 @@ target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
     CaptureAssembly.hpp
     CaptureCsv.cpp
     CaptureCsv.hpp
+    EncoderView.cpp
+    EncoderView.hpp
     EngineProcesses.hpp
+    ModulationView.cpp
+    ModulationView.hpp
     MotorLink.cpp
     MotorLink.hpp
     MotorText.cpp
@@ -28,6 +33,10 @@ target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
     PortListener.hpp
     Rig.cpp
     Rig.hpp
+    RotorView.cpp
+    RotorView.hpp
+    SourceView.cpp
+    SourceView.hpp
     TimeAxis.cpp
     TimeAxis.hpp
     TraceHistory.cpp

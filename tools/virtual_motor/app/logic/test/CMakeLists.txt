@@ -11,8 +11,11 @@ target_link_libraries(e_foc.tool.virtual_motor.app.logic_test PUBLIC
 target_sources(e_foc.tool.virtual_motor.app.logic_test PRIVATE
     TestCaptureAssembly.cpp
     TestCaptureCsv.cpp
+    TestEncoderView.cpp
+    TestModulationView.cpp
     TestMotorText.cpp
     TestRig.cpp
+    TestRotorView.cpp
     TestTraceHistory.cpp
     TestTraceView.cpp
 )

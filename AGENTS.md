@@ -25,7 +25,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,
   a `virtual:` CAN port, a wall-clock `Pacer` under a pausable `RunLoop`, `PlantDisturbances` for live torque and noise, the motor side of the plant port),
   `port/` the plant port's frames and messages, shared with the Virtual Motor app, `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it,
-  `app/` the e-foc Virtual Motor app (`documentation/design/tool-virtual-motor.md`): `logic/` the rig of motor processes and their plant ports, trace history, captures and the trace view, `gui/` the manager and motor windows
+  `app/` the e-foc Virtual Motor app (`documentation/design/tool-virtual-motor.md`): `logic/` the rig of motor processes and their plant ports, trace history, captures, the trace view and the modulation, rotor and encoder views, `gui/` the manager and motor windows
 - `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)

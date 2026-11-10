@@ -4,6 +4,7 @@
 #include "tools/virtual_motor/app/logic/TraceHistory.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace virtual_motor::app
 {
@@ -15,8 +16,10 @@ namespace virtual_motor::app
         virtual float Minimum(std::size_t index, uint8_t signal) const = 0;
         virtual float Maximum(std::size_t index, uint8_t signal) const = 0;
         virtual bool BreakBefore(std::size_t index) const = 0;
+        virtual const port::Sample& Last(std::size_t index) const = 0;
 
         std::size_t FirstAtOrAfter(double time) const;
+        std::optional<std::size_t> LastAtOrBefore(double time) const;
 
     protected:
         ~TraceSource() = default;
@@ -33,6 +36,7 @@ namespace virtual_motor::app
         float Minimum(std::size_t index, uint8_t signal) const override;
         float Maximum(std::size_t index, uint8_t signal) const override;
         bool BreakBefore(std::size_t index) const override;
+        const port::Sample& Last(std::size_t index) const override;
 
     private:
         const TraceHistory& history;
@@ -50,6 +54,7 @@ namespace virtual_motor::app
         float Minimum(std::size_t index, uint8_t signal) const override;
         float Maximum(std::size_t index, uint8_t signal) const override;
         bool BreakBefore(std::size_t index) const override;
+        const port::Sample& Last(std::size_t index) const override;
 
     private:
         const Capture& capture;

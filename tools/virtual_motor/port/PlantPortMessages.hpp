@@ -9,7 +9,7 @@
 
 namespace virtual_motor::port
 {
-    constexpr uint16_t protocolVersion{ 1 };
+    constexpr uint16_t protocolVersion{ 2 };
     constexpr std::size_t signalCount{ 25 };
     constexpr uint16_t maxCapturePeriods{ 16384 };
     constexpr uint16_t captureChunkPeriods{ 512 };
@@ -264,6 +264,7 @@ namespace virtual_motor::port
         uint8_t periods{ 0 };
         std::array<float, signalCount> minimum{};
         std::array<float, signalCount> maximum{};
+        std::array<float, signalCount> last{};
 
         void WriteTo(PayloadWriter& writer) const;
         static Window ReadFrom(PayloadReader& reader);
