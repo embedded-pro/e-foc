@@ -12,7 +12,7 @@ namespace virtual_motor::port
     std::vector<uint8_t> EncodeFrame(uint8_t type, const std::vector<uint8_t>& payload)
     {
         const auto size = std::min(payload.size(), static_cast<std::size_t>(std::numeric_limits<uint16_t>::max()));
-        std::vector<uint8_t> frame{ type, static_cast<uint8_t>(size), static_cast<uint8_t>(size >> 8) };
+        std::vector frame{ type, static_cast<uint8_t>(size), static_cast<uint8_t>(size >> 8) };
         frame.insert(frame.end(), payload.begin(), payload.begin() + static_cast<std::ptrdiff_t>(size));
         return frame;
     }
