@@ -1,8 +1,17 @@
 #include "tools/virtual_motor/platform/TriggerWatch.hpp"
 #include "numerical/math/Math.hpp"
+#include <cstddef>
 
 namespace virtual_motor
 {
+    namespace
+    {
+        bool AnyLit(uint8_t leds, uint8_t mask)
+        {
+            return (std::byte{ leds } & std::byte{ mask }) != std::byte{ 0 };
+        }
+    }
+
     std::optional<port::RefusalReason> TriggerWatch::Check(const port::Trigger& trigger)
     {
         if (trigger.kind > port::TriggerKind::leds || trigger.signal >= port::signalCount || !math::IsFinite(trigger.level))
@@ -29,7 +38,7 @@ namespace virtual_motor
         else if (watchedBefore && trigger.kind == port::TriggerKind::protection)
             fired = protection && !previousProtection;
         else if (watchedBefore && trigger.kind == port::TriggerKind::leds)
-            fired = (leds & trigger.leds) != 0 && (previousLeds & trigger.leds) == 0;
+            fired = AnyLit(leds, trigger.leds) && !AnyLit(previousLeds, trigger.leds);
         else if (watchedBefore)
             fired = Crossed(value);
 
