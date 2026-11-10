@@ -77,7 +77,7 @@ with it enabled the macro's own `inline` would be a duplicate.
 - Allman braces, 4-space indent, `.clang-format` authoritative
 - `{}` init everywhere. PascalCase types/methods, camelCase members, lowercase namespaces. `public:` before `private:`
 - Fixed-width ints (`uint8_t`, `int32_t`). Functions ≤ ~30 lines (hard limit ~50)
-- No tautological names: a name states the role or meaning, not the kind of thing it is — no `data`, `manager`, `label1`, `TestFoo.Works`
+- No tautological names: a name says each thing once — no word repeating the type, the unit type or the enclosing scope (`currentValue`, `ConfigData`, `speedRpm` of type `RevPerMinute`, `TestPid.PidTestWorks`)
 - `const`/`constexpr`-correct. Non-trivial logic in `.cpp` — small `inline`/`constexpr` helpers in headers ok
 - **No comments** except non-obvious *why* (hardware quirk, datasheet constraint, ordering requirement, deliberate deviation from the obvious implementation), unit/frame/convention types don't carry (electrical vs mechanical, per-unit vs volts, per-sample vs continuous gain), concurrency contract (which context writes a field, which reads it). One short line max
 - No `TODO`/`FIXME`/`HACK`/`XXX` (raise an issue instead), no commented-out code, no comment restating the next line or describing the change for a reviewer, no section banners, no docstrings on self-explanatory methods
@@ -111,7 +111,7 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
 - **TDD** — Red: a failing test for one behavior, before any production code. Green: the minimum code that passes it. Refactor with every test green. Repeat per behavior
 - GoogleTest. `TEST_F` for fixture tests; `TYPED_TEST` for typed; plain `TEST()` for simple stateless matching existing patterns
 - **`StrictMock` only** (`NiceMock`/`NaggyMock` forbidden). Fixture in anonymous namespace; macros outside
-- **No tautological tests** — a test must fail when the behaviour under test is broken. Never assert only what the test's own mock or setup supplied, and never recompute the expected value with the production formula
+- **No tautological tests** — each test covers one behaviour no other test covers. No test repeating another under a different name, no assertion restating an earlier one or what the test's own mock or setup supplied
 - `EXPECT_NEAR` with explicit tolerance for float assertions. Heap is allowed in tests (see Memory scope).
 - Test files: `test/Test{ComponentName}.cpp` inside the library under test, added with `add_subdirectory(test)` in the library's `CMakeLists.txt`
 - Host stubs: `targets/platform_implementations/host/`
