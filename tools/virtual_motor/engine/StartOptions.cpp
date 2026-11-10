@@ -132,6 +132,8 @@ namespace virtual_motor
                 options.hostBus = true;
             else if (argument == "--restarted")
                 options.restarted = true;
+            else if (argument == "--supervised")
+                options.supervised = true;
             else
                 return false;
             return true;

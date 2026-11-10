@@ -9,6 +9,7 @@ target_link_libraries(e_foc.tool.virtual_motor.options_test PUBLIC
 
 target_sources(e_foc.tool.virtual_motor.options_test PRIVATE
     TestStartOptions.cpp
+    TestSupervisor.cpp
 )
 
 if(UNIX)

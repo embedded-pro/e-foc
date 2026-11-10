@@ -24,6 +24,7 @@ TEST(TestStartOptions, defaults_to_node_zero_on_the_default_bus_with_the_teknic_
     EXPECT_FALSE(parsed.options->factoryFresh);
     EXPECT_FALSE(parsed.options->hostBus);
     EXPECT_FALSE(parsed.options->restarted);
+    EXPECT_FALSE(parsed.options->supervised);
     EXPECT_FALSE(parsed.options->seed.has_value());
     EXPECT_FALSE(parsed.options->plantPort.has_value());
 }
@@ -129,4 +130,13 @@ TEST(TestStartOptions, help_is_asked_for_not_an_error)
     EXPECT_FALSE(parsed.options.has_value());
     EXPECT_TRUE(parsed.help);
     EXPECT_TRUE(parsed.error.empty());
+}
+
+TEST(TestStartOptions, reads_the_flags_a_restart_and_a_supervisor_add)
+{
+    const auto parsed = Parse({ "--restarted", "--supervised" });
+
+    ASSERT_TRUE(parsed.options.has_value());
+    EXPECT_TRUE(parsed.options->restarted);
+    EXPECT_TRUE(parsed.options->supervised);
 }
