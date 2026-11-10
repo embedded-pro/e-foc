@@ -1,5 +1,6 @@
 #include "tools/virtual_motor/engine/StartOptions.hpp"
 #include "can-lite/drivers/codec/SlcanCommandDecoder.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <charconv>
 #include <format>
@@ -41,6 +42,35 @@ namespace virtual_motor
             return !name.empty() && name.front() != '.' && std::ranges::all_of(name, IsFileNameCharacter);
         }
 
+        constexpr float largestCurrentOffset{ 10.0f };
+
+        std::optional<float> Ampere(std::string_view text)
+        {
+            float value{ 0.0f };
+            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+            if (error != std::errc{} || end != text.data() + text.size() || !math::IsFinite(value) || math::Abs(value) > largestCurrentOffset)
+                return std::nullopt;
+            return value;
+        }
+
+        std::optional<std::array<float, 3>> CurrentOffset(std::string_view text)
+        {
+            std::array<float, 3> offset{};
+            for (std::size_t phase = 0; phase != offset.size(); ++phase)
+            {
+                const auto comma = text.find(',');
+                const auto last = phase + 1 == offset.size();
+                if (last == (comma != std::string_view::npos))
+                    return std::nullopt;
+                const auto value = Ampere(text.substr(0, comma));
+                if (!value.has_value())
+                    return std::nullopt;
+                offset[phase] = *value;
+                text = last ? std::string_view{} : text.substr(comma + 1);
+            }
+            return offset;
+        }
+
         using ValueReader = std::function<std::string(StartOptions&, std::string_view)>;
 
         const std::map<std::string, ValueReader, std::less<>>& ValueOptions()
@@ -73,6 +103,11 @@ namespace virtual_motor
                     {
                         options.seed = Number<uint32_t>(value, 0, UINT32_MAX);
                         return options.seed.has_value() ? std::string{} : std::string{ "--seed must be a number from 0 to 4294967295" };
+                    } },
+                { "--current-offset", [](StartOptions& options, std::string_view value)
+                    {
+                        options.currentOffset = CurrentOffset(value);
+                        return options.currentOffset.has_value() ? std::string{} : std::string{ "--current-offset must be three currents from -10 to 10 A, as a,b,c" };
                     } },
                 { "--hub-port", [](StartOptions& options, std::string_view value)
                     {
@@ -145,6 +180,8 @@ namespace virtual_motor
                "  --memory <file>     file in the working directory holding the non-volatile memory (default: virtual-motor-<bus>-<node>.nvm)\n"
                "  --factory-fresh     start with erased memory, as a new board\n"
                "  --seed <n>          seed of every noise source\n"
+               "  --current-offset <a>,<b>,<c>\n"
+               "                      offset in A the current-sense chain adds to each measured phase current\n"
                "  --host-bus          host the virtual CAN hub when none is listening\n"
                "  --hub-port <n>      loopback port of the hub (default: 29536)\n"
                "  --plant-port <n>    loopback port of the Virtual Motor app's plant port to connect to\n"

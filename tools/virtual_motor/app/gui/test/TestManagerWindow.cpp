@@ -2,6 +2,7 @@
 #include "tools/virtual_motor/app/gui/ManagerWindow.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <QDoubleSpinBox>
 #include <QPushButton>
 #include <QTableWidget>
 #include <filesystem>
@@ -120,4 +121,16 @@ TEST(TestAddMotorDialog, a_node_already_in_the_list_cannot_be_added_and_the_dial
     EXPECT_EQ(dialog.Spec().node, 3);
     EXPECT_EQ(dialog.Spec().plant, "teknic");
     EXPECT_EQ(dialog.Spec().start, StartMode::keepMemory);
+    EXPECT_FLOAT_EQ(dialog.Spec().currentOffset[0], 0.0f);
+}
+
+TEST(TestAddMotorDialog, takes_a_current_offset_for_each_phase)
+{
+    AddMotorDialog dialog{ {} };
+
+    dialog.findChildren<QDoubleSpinBox*>()[1]->setValue(-0.02);
+
+    EXPECT_FLOAT_EQ(dialog.Spec().currentOffset[0], 0.0f);
+    EXPECT_FLOAT_EQ(dialog.Spec().currentOffset[1], -0.02f);
+    EXPECT_EQ(dialog.findChildren<QDoubleSpinBox*>()[2]->accessibleName(), "Current offset c");
 }

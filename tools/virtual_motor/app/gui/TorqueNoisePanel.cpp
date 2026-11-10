@@ -223,6 +223,7 @@ namespace virtual_motor::app
         layout->addRow("Lq", new QLabel(QString("%1 mH").arg(plant->qAxisInductanceHenry * 1000.0, 0, 'g', 4), group));
         layout->addRow("ψf", new QLabel(QString("%1 Wb").arg(plant->fluxLinkageWeber, 0, 'g', 4), group));
         layout->addRow("Pole pairs", new QLabel(QString::number(plant->polePairs), group));
+        layout->addRow("Current offset", new QLabel(QString::fromStdString(CurrentOffsetText(motor.Spec().currentOffset)), group));
         layout->addRow("J", new QLabel(QString("%1 kg·m²").arg(plant->rotorInertiaKgM2, 0, 'g', 4), group));
         layout->addRow("B", new QLabel(QString("%1 N·m·s/rad").arg(plant->viscousDampingNmSPerRad, 0, 'g', 4), group));
         auto* note = new QLabel("Another motor means another plant description and a restart.", group);

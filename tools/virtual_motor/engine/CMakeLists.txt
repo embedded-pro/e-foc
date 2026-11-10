@@ -7,6 +7,7 @@ target_include_directories(e_foc.tool.virtual_motor.options PUBLIC
 target_link_libraries(e_foc.tool.virtual_motor.options PUBLIC
     can_lite.drivers.codec
     can_lite.drivers.virtual
+    numerical.math
 )
 
 target_sources(e_foc.tool.virtual_motor.options PRIVATE
