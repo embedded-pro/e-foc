@@ -274,11 +274,7 @@ namespace virtual_motor::app
         }
 
         ShowInForce(*changes);
-        inForce->setText(QString("In force: load %1 N·m · external %2 · current σ %3 A · encoder σ %4 rad")
-                             .arg(changes->loadTorque, 0, 'f', 4)
-                             .arg(QString::fromStdString(ExternalTorqueText(changes->externalTorque)))
-                             .arg(changes->currentNoise, 0, 'f', 4)
-                             .arg(changes->encoderNoise, 0, 'f', 5));
+        inForce->setText(QString::fromStdString(InForceText(*changes)));
         for (const auto& change : ActiveChanges(*changes))
         {
             auto* item = new QListWidgetItem(QString::fromStdString(change.text), active);

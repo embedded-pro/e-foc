@@ -64,3 +64,10 @@ TEST(TestMotorText, a_log_line_loses_terminal_escape_sequences_and_control_chara
     EXPECT_EQ(PrintableLogLine("fsm: \x1b[1;31mfault\x1b[0m\t!"), "fsm: fault !");
     EXPECT_EQ(PrintableLogLine("plain"), "plain");
 }
+
+TEST(TestMotorText, what_is_in_force_reads_as_one_line)
+{
+    const port::Changes changes{ 0.05f, port::ExternalTorque{ port::TorqueForm::constant, { 0.2f } }, 0.02f, 0.001f, 0 };
+
+    EXPECT_EQ(InForceText(changes), "In force: load 0.0500 N·m · external constant 0.2000 N·m · current σ 0.0200 A · encoder σ 0.00100 rad");
+}

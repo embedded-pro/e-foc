@@ -35,4 +35,5 @@ namespace virtual_motor::app
     std::string ExternalTorqueText(const port::ExternalTorque& torque);
     std::vector<ActiveChange> ActiveChanges(const port::Changes& changes);
     std::string PrintableLogLine(const std::string& line);
+    std::string InForceText(const port::Changes& changes);
 }

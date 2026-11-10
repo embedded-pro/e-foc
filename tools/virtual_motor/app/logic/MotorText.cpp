@@ -118,4 +118,9 @@ namespace virtual_motor::app
         }
         return printable;
     }
+
+    std::string InForceText(const port::Changes& changes)
+    {
+        return std::format("In force: load {} · external {} · current σ {:.4f} A · encoder σ {:.5f} rad", Torque(changes.loadTorque), ExternalTorqueText(changes.externalTorque), changes.currentNoise, changes.encoderNoise);
+    }
 }
