@@ -86,3 +86,45 @@ TEST_F(TestPacer, virtual_time_counts_the_steps_run)
 
     EXPECT_EQ(pacer.VirtualTime(), 7ms);
 }
+
+TEST_F(TestPacer, resuming_continues_from_the_suspended_instant_without_catching_up)
+{
+    now += 2ms;
+    pacer.Service();
+    pacer.Suspend();
+
+    now += 500ms;
+    pacer.Resume();
+    pacer.Service();
+    EXPECT_EQ(steps, 2u);
+    EXPECT_EQ(pacer.Overruns(), 0u);
+
+    now += 1ms;
+    pacer.Service();
+    EXPECT_EQ(steps, 3u);
+}
+
+TEST_F(TestPacer, suspended_time_does_not_lower_the_real_time_factor)
+{
+    now += 10ms;
+    pacer.Service();
+    pacer.Suspend();
+    now += 90ms;
+    pacer.Resume();
+    now += 10ms;
+    pacer.Service();
+
+    EXPECT_FLOAT_EQ(pacer.RealTimeFactor(), 1.0f);
+}
+
+TEST_F(TestPacer, beginning_counts_time_from_then)
+{
+    now += 400ms;
+    pacer.Begin();
+    now += 2ms;
+    pacer.Service();
+
+    EXPECT_EQ(steps, 2u);
+    EXPECT_EQ(pacer.Overruns(), 0u);
+    EXPECT_FLOAT_EQ(pacer.RealTimeFactor(), 1.0f);
+}

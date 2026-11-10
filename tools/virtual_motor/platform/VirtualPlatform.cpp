@@ -1,7 +1,6 @@
 #include "tools/virtual_motor/platform/VirtualPlatform.hpp"
 #include "generated/Boards.hpp"
 #include "services/tracer/GlobalTracer.hpp"
-#include "tools/virtual_motor/platform/Pacer.hpp"
 #include <cstdlib>
 #include <thread>
 
@@ -17,15 +16,28 @@ namespace virtual_motor
         diagnostics.AttachCanBus(canPort);
     }
 
+    void VirtualPlatform::AdvanceOnePeriod()
+    {
+        StepPlant();
+        execution.lowPriorityInterrupt.RunIfTriggered();
+        ++controlPeriods;
+
+        if (++periodInMillisecond == BaseFrequency().Value() / 1000)
+        {
+            periodInMillisecond = 0;
+            MillisecondTail();
+        }
+    }
+
     void VirtualPlatform::AdvanceOneMillisecond()
     {
-        const auto ticks = BaseFrequency().Value() / 1000;
-        for (uint32_t tick = 0; tick != ticks; ++tick)
-        {
-            StepPlant();
-            execution.lowPriorityInterrupt.RunIfTriggered();
-        }
+        do
+            AdvanceOnePeriod();
+        while (periodInMillisecond != 0);
+    }
 
+    void VirtualPlatform::MillisecondTail()
+    {
         DeliverPendingProtection();
         execution.timerService.SystemTickInterrupt();
         if (eachMillisecond)
@@ -34,26 +46,55 @@ namespace virtual_motor
         execution.eventDispatcher.ExecuteAllActions();
     }
 
+    void VirtualPlatform::Mute(bool muted)
+    {
+        canPort.Mute(muted);
+    }
+
     void VirtualPlatform::EachMillisecond(const infra::Function<void()>& action)
     {
         eachMillisecond = action;
     }
 
+    void VirtualPlatform::EachIteration(const infra::Function<void()>& action)
+    {
+        eachIteration = action;
+    }
+
+    void VirtualPlatform::MirrorLog(const infra::Function<void(infra::ConstByteRange text)>& sink)
+    {
+        console.serial.Mirror(sink);
+    }
+
+    RunLoop& VirtualPlatform::Runner()
+    {
+        return runLoop;
+    }
+
+    const BoardOptions& VirtualPlatform::Options() const
+    {
+        return options;
+    }
+
+    uint64_t VirtualPlatform::ControlPeriods() const
+    {
+        return controlPeriods;
+    }
+
+    uint8_t VirtualPlatform::LedStates() const
+    {
+        return static_cast<uint8_t>((leds.operational.Get() ? port::led::operational : 0) | (leds.warning.Get() ? port::led::warning : 0) | (leds.failure.Get() ? port::led::failure : 0));
+    }
+
     void VirtualPlatform::Run()
     {
-        Pacer pacer{ []()
-            {
-                return Pacer::Clock::now();
-            },
-            [this]()
-            {
-                AdvanceOneMillisecond();
-            } };
-
+        runLoop.Begin();
         while (true)
         {
-            pacer.Service();
-            std::this_thread::sleep_until(pacer.NextDue());
+            if (eachIteration)
+                eachIteration();
+            runLoop.Service();
+            std::this_thread::sleep_until(runLoop.NextWake());
         }
     }
 

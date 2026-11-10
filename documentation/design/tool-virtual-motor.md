@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: "tool-virtual-motor"
 date: 2026-11-09
 ---
@@ -12,7 +12,7 @@ date: 2026-11-09
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.0                    |
+| Version   | 0.1.1                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-09               |
 
@@ -168,7 +168,7 @@ instead, and says so, rather than drawing an aliased rotation.
 ### Part G — torque and noise
 
 The side panel holds the changes of `virtual-motor.md` Part E: **Torque** (load torque, and external
-torque as a constant, a step, a ramp or a sine) and **Noise** (current noise per phase, encoder noise).
+torque as a constant, a step, a ramp or a sine) and **Noise** (current noise, encoder noise).
 Below them, the motor's parameters are shown read-only from its plant description, with a note that
 another motor means another description and a restart. Values are typed or
 dragged but **apply only on Apply** or Enter, never while typing; each group shows what is in force.

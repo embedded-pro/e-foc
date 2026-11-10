@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.3.1                |
+| Version   | 0.4.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -117,7 +117,7 @@ A virtual motor is started with:
 | Start from   | Keep the memory file, or start factory-fresh                               | keep                       |
 | Seed         | Seed of every noise source, so a run replays exactly                       | fixed                      |
 | Host the bus | Open the hub for the named bus if no hub is listening yet                  | off                        |
-| Plant port   | Open the plant port for the Virtual Motor app                              | on when started by the app |
+| Plant port   | The loopback port the Virtual Motor app's plant port listens on (Part F)   | none: no plant port        |
 
 ### Part B — The virtual board
 
@@ -189,9 +189,10 @@ than 50 ms behind it does not try to catch up: it drops the backlog, counts an o
 from the present, so a slow machine produces a motor that runs late, never one that runs in bursts.
 The plant port publishes the real-time factor and the overrun count.
 
-**Pause and step.** Pausing stops virtual time. A paused motor sends nothing, so the CAN Commander sees
-it go offline after its liveness timeout, exactly as when a board's cable is pulled; resuming continues
-from the paused instant without catching up. While paused, the app can advance one control period or
+**Pause and step.** Pausing stops virtual time. A paused motor sends nothing and discards the frames that
+reach it, so the CAN Commander sees it go offline after its liveness timeout, exactly as when a board's
+cable is pulled; resuming continues from the paused instant without catching up and without counting an
+overrun. While paused, the app can advance one control period or
 one millisecond at a time to inspect a capture. There is no slow motion or fast forward while on a
 bus: the CAN Commander's timeouts run on the wall clock, and a motor whose clock ran at another rate
 would read as faulty.
@@ -217,8 +218,23 @@ never inside one; the pacer is the only writer of the plant's state.
 | Group         | Change                                                               | Plant part       |
 |---------------|----------------------------------------------------------------------|------------------|
 | Torque        | Load torque; external torque as a constant, a step, a ramp or a sine | Mechanical plant |
-| Current noise | Noise standard deviation per phase                                   | Current sensor   |
+| Current noise | Noise standard deviation, the same on the three phases               | Current sensor   |
 | Encoder noise | Noise standard deviation                                             | Encoder          |
+
+Load torque opposes the rotation, whichever way the rotor turns; external torque has a sign of its own.
+The forms of external torque, each timed from the control period it takes effect in:
+
+| Form     | Torque over time                                                                      |
+|----------|---------------------------------------------------------------------------------------|
+| Constant | The value, from then on                                                               |
+| Step     | The initial value until the delay has passed, then the final value                    |
+| Ramp     | From the start value to the end value, linearly over the duration, then the end value |
+| Sine     | The offset plus the amplitude times the sine of 2π times the frequency times the time |
+
+A change is refused, and the plant left as it was, when a value is not finite, a standard deviation is
+negative, a delay is negative, a duration is not positive, or a frequency is not between zero and a
+tenth of the control rate. While an external torque is in force it replaces the torque steps the plant
+description schedules.
 
 The motor's intrinsic parameters — resistance, inductances, flux linkage, pole pairs, inertia,
 friction, cogging — and its non-idealities and wiring faults (sensor bias, encoder resolution, a stuck
@@ -253,6 +269,45 @@ delivered once complete.
 status: virtual time, real-time factor, overruns, LED states, board protection state and the debug log
 lines.
 
+**Connection.** The app listens on one loopback port for all its motors. A virtual motor started with a
+plant port connects to it before it joins the bus and introduces itself; one it cannot reach does not
+start. When the connection ends, the motor carries on without it, and a paused motor resumes, so a
+motor whose app has gone never hangs.
+
+**Frames.** Each message is one frame: its type in one byte, the length of its payload in two bytes, then
+the payload. Numbers are little-endian, reals are single-precision IEEE 754, and a text is its length in
+one byte followed by that many characters. A frame of a type the reader does not know is skipped by its
+length, so either side may add types; a frame of a known type whose payload is shorter than its fields
+ends the connection.
+
+Motor to app:
+
+| Type   | Message  | Payload                                                                                                                                      | Sent                                                                       |
+|--------|----------|----------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `0x01` | Hello    | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                      | Once, first                                                                |
+| `0x02` | Status   | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                 | Every 100 ms of virtual time, and on every pause, resume and finished step |
+| `0x03` | Changes  | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description | Once after Hello, and after every accepted change                          |
+| `0x04` | Refused  | The type of the refused request, the reason                                                                                                  | For every refused request                                                  |
+| `0x05` | Log line | The text of one debug log line                                                                                                               | For every line the debug log writes                                        |
+
+App to motor:
+
+| Type   | Request         | Payload                                                                                    |
+|--------|-----------------|--------------------------------------------------------------------------------------------|
+| `0x81` | Pause           | None                                                                                       |
+| `0x82` | Resume          | None                                                                                       |
+| `0x83` | Step            | Unit (control period or millisecond), count (2 bytes); only while paused                   |
+| `0x84` | Load torque     | Torque in N·m                                                                              |
+| `0x85` | External torque | Form (none, constant, step, ramp, sine) and four parameters in the order of Part E's table |
+| `0x86` | Current noise   | Standard deviation in A                                                                    |
+| `0x87` | Encoder noise   | Standard deviation in rad                                                                  |
+| `0x88` | Clear all       | None: the plant returns to its description                                                 |
+
+The run state is running or paused; the LEDs are one bit each, operational, warning and failure from the
+lowest; the board protection state is clear, asserted or unknown, as the drive reads it. A refusal names
+one reason: a value out of range, a step while running, or a form the motor does not know. The stream
+and capture frames take the types from `0x10` up, and their requests from `0x90` up.
+
 ### Part G — The virtual CAN bus
 
 A hub on the local machine carries the frames of every virtual bus. It listens on the loopback
@@ -283,7 +338,7 @@ so the CAN Commander reaches a virtual bus as `virtual:<bus name>` in its Interf
 stateDiagram-v2
     [*] --> Starting : started with options
     Starting --> Running : memory read, bus joined
-    Starting --> Stopped : bus or memory file unavailable
+    Starting --> Stopped : bus, memory file or plant port unavailable
     Running --> Paused : pause
     Paused --> Running : resume
     Paused --> Paused : step

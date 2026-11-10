@@ -16,6 +16,7 @@ namespace virtual_motor
         std::string memoryFile;
         std::optional<uint32_t> seed;
         uint16_t hubPort{ services::loopback::virtualCanHubPort };
+        std::optional<uint16_t> plantPort;
         bool factoryFresh{ false };
         bool hostBus{ false };
         bool restarted{ false };

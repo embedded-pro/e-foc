@@ -8,6 +8,7 @@ target_link_libraries(e_foc.tool.virtual_motor.platform PUBLIC
     e_foc.boards
     e_foc.foc.model.drive
     e_foc.platform_abstraction
+    e_foc.tool.virtual_motor.port
     can_lite.drivers.slcan
     can_lite.drivers.virtual
     infra.event
@@ -23,10 +24,18 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     FileEeprom.hpp
     Pacer.cpp
     Pacer.hpp
+    PlatformPortTarget.cpp
+    PlatformPortTarget.hpp
     PlantDescription.cpp
     PlantDescription.hpp
+    PlantDisturbances.cpp
+    PlantDisturbances.hpp
+    PlantPortClient.cpp
+    PlantPortClient.hpp
     PlantPowerStage.cpp
     PlantPowerStage.hpp
+    RunLoop.cpp
+    RunLoop.hpp
     VirtualCanPort.cpp
     VirtualCanPort.hpp
     VirtualPlatform.cpp

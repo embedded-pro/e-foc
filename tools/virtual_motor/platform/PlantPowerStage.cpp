@@ -17,6 +17,8 @@ namespace virtual_motor
 
     PlantPowerStage::PlantPowerStage(const sil::SilPlantConfig& plant)
         : drive(plant, Defaults())
+        , plant(plant)
+        , disturbances(modelInputs, { foc::NewtonMeter{ plant.loadTorqueNm }, foc::Ampere{ plant.noiseSigmaAmpere }, foc::Radians{ plant.encoderSigmaRadians } }, drive.BaseFrequency().Value())
     {
         boardProtection.Configure({
             .overCurrentAmpere = plant.overCurrentTripAmpere,
@@ -28,6 +30,7 @@ namespace virtual_motor
 
     void PlantPowerStage::StepPlant()
     {
+        disturbances.Apply();
         drive.Tick();
 
         if (onPhaseCurrentsReady && !controlLoopEntered)
@@ -39,6 +42,11 @@ namespace virtual_motor
 
         auto& model = drive.Model();
         boardProtection.Evaluate(model.CurrentSensor().Last(), model.Supply().Voltage().Value(), model.Thermal().Temperature());
+    }
+
+    PlantDisturbances& PlantPowerStage::Disturbances()
+    {
+        return disturbances;
     }
 
     void PlantPowerStage::DeliverPendingProtection()
@@ -149,5 +157,38 @@ namespace virtual_motor
     bool PlantPowerStage::IndexSeen()
     {
         return drive.IndexSeen();
+    }
+
+    PlantPowerStage::ModelInputs::ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant)
+        : model(model)
+        , plant(plant)
+    {}
+
+    void PlantPowerStage::ModelInputs::SetLoadTorque(foc::NewtonMeter torque)
+    {
+        model.Mechanics().SetLoad(torque);
+    }
+
+    void PlantPowerStage::ModelInputs::SetExternalTorque(foc::NewtonMeter torque)
+    {
+        model.Mechanics().SetExternalTorque(torque);
+    }
+
+    void PlantPowerStage::ModelInputs::SetCurrentNoise(foc::Ampere sigma)
+    {
+        model.CurrentSensor().SetNoise({
+            .sigmaAmpere = sigma.Value(),
+            .biasAmpereA = plant.noiseBiasAmpereA,
+            .biasAmpereB = plant.noiseBiasAmpereB,
+            .biasAmpereC = plant.noiseBiasAmpereC,
+        });
+    }
+
+    void PlantPowerStage::ModelInputs::SetEncoderNoise(foc::Radians sigma)
+    {
+        model.Encoder().SetNoise({
+            .sigmaRadians = sigma.Value(),
+            .biasRadians = plant.encoderBiasRadians,
+        });
     }
 }

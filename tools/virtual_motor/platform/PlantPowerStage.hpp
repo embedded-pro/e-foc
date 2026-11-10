@@ -3,6 +3,7 @@
 #include "core/foc/model/drive/BoardProtectionSimulator.hpp"
 #include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "tools/virtual_motor/platform/PlantDisturbances.hpp"
 
 namespace virtual_motor
 {
@@ -38,6 +39,8 @@ namespace virtual_motor
         void ArmIndex() override;
         bool IndexSeen() override;
 
+        PlantDisturbances& Disturbances();
+
     protected:
         ~PlantPowerStage() = default;
 
@@ -45,10 +48,29 @@ namespace virtual_motor
         void DeliverPendingProtection();
 
     private:
+        class ModelInputs
+            : public DisturbanceInputs
+        {
+        public:
+            ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant);
+
+            void SetLoadTorque(foc::NewtonMeter torque) override;
+            void SetExternalTorque(foc::NewtonMeter torque) override;
+            void SetCurrentNoise(foc::Ampere sigma) override;
+            void SetEncoderNoise(foc::Radians sigma) override;
+
+        private:
+            foc::ThreePhaseMotorModel& model;
+            const sil::SilPlantConfig& plant;
+        };
+
         sil::PlantDrive drive;
         const foc::ThreePhaseMotorModel& plantModel{ drive.Model() };
         const foc::SimulatedEncoder& plantEncoder{ drive.Model().Encoder() };
         application::BoardProtectionSimulator boardProtection;
+        sil::SilPlantConfig plant;
+        ModelInputs modelInputs{ drive.Model(), plant };
+        PlantDisturbances disturbances;
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         bool controlLoopEntered{ false };
     };

@@ -129,3 +129,66 @@ TEST_F(TestVirtualCanPort, without_a_hub_the_connection_is_refused)
 
     EXPECT_FALSE(port.Connect("bench", 1000000));
 }
+
+TEST_F(TestVirtualCanPort, a_muted_port_discards_frames_from_the_bus)
+{
+    ConnectBoth();
+    std::optional<uint32_t> receivedId;
+    port.ReceiveData([&receivedId](hal::Can::Id id, const hal::Can::Message&)
+        {
+            receivedId = id.Get29BitId();
+        });
+    port.Mute(true);
+
+    hal::Can::Message data;
+    peer.SendData(hal::Can::Id::Create29BitId(0x0abcdef), data, [](bool) {});
+    PollUntil([]()
+        {
+            return false;
+        });
+    ForwardTime(std::chrono::milliseconds(1));
+    PollUntil([]()
+        {
+            return false;
+        });
+    EXPECT_FALSE(receivedId.has_value());
+
+    port.Mute(false);
+    peer.SendData(hal::Can::Id::Create29BitId(0x0123456), data, [](bool) {});
+    PollUntil([]()
+        {
+            return false;
+        });
+    ForwardTime(std::chrono::milliseconds(1));
+    ASSERT_TRUE(PollUntil([&receivedId]()
+        {
+            return receivedId.has_value();
+        }));
+    EXPECT_EQ(*receivedId, 0x0123456u);
+}
+
+TEST_F(TestVirtualCanPort, a_muted_port_sends_nothing_but_completes_the_send)
+{
+    ConnectBoth();
+    std::optional<uint32_t> receivedId;
+    peer.ReceiveData([&receivedId](hal::Can::Id id, const hal::Can::Message&)
+        {
+            receivedId = id.Get29BitId();
+        });
+    port.Mute(true);
+
+    bool completed{ false };
+    hal::Can::Message data;
+    port.SendData(hal::Can::Id::Create29BitId(0x1020304), data, [&completed](bool)
+        {
+            completed = true;
+        });
+    ForwardTime(std::chrono::milliseconds(1));
+    PollUntil([]()
+        {
+            return false;
+        });
+
+    EXPECT_TRUE(completed);
+    EXPECT_FALSE(receivedId.has_value());
+}
