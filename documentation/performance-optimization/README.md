@@ -2,9 +2,9 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.2.3
+version: 1.3.0
 component: "foc"
-date: 2026-11-08
+date: 2026-11-10
 ---
 
 | Field     | Value                             |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Embedded Performance Optimization |
 | Type      | theory                            |
 | Status    | approved                          |
-| Version   | 1.2.3                             |
+| Version   | 1.3.0                             |
 | Component | foc                               |
-| Date      | 2026-11-08                        |
+| Date      | 2026-11-10                        |
 
 ## Overview
 
@@ -57,7 +57,7 @@ unit.  Key throughput properties:
 
 | Instruction         | Description             | Latency (cycles) | Throughput (cycles/inst) |
 |---------------------|-------------------------|------------------|--------------------------|
-| `vfma.f32`          | Fused multiply-add      | 1                | 1                        |
+| `vfma.f32`          | Fused multiply-add      | 3                | 3                        |
 | `vmul.f32`          | Float multiply          | 1                | 1                        |
 | `vadd.f32`          | Float add               | 1                | 1                        |
 | `vdiv.f32`          | Float divide            | 14               | 14                       |
@@ -67,8 +67,9 @@ unit.  Key throughput properties:
 | `bl <addr>`         | Direct call             | 1+N              | 1+N                      |
 | `push/pop (4 regs)` | Stack save/restore      | 2                | 2                        |
 
-**Implication for FOC**: All hot-path arithmetic should use FMA-capable patterns. Division and sqrt
-must be avoided in the ISR where possible; use reciprocals or LUT-based approximations instead.
+**Implication for FOC**: a fused multiply-add costs what a multiply and an add cost and rounds once, so
+FMA-capable patterns lose nothing. Division and sqrt must be avoided in the ISR where possible; use
+reciprocals or LUT-based approximations instead.
 
 ### Compiler Optimisation Theory
 
@@ -203,7 +204,7 @@ With `-ffast-math`, the compiler emits `vfma.f32` for `a * b + c` patterns:
 ```cpp
 // This single expression:
 result = a * b + c;
-// Becomes: vfma.f32 s0, s1, s2  (1 cycle, full precision)
+// Becomes: vfma.f32 s0, s1, s2  (3 cycles, one rounding)
 ```
 
 ### 8. One Set of Optimisation Options per Build
@@ -260,12 +261,12 @@ The 20 kHz path should do only the work that changes from one sample to the next
 
 The 1 kHz outer loop follows the same rules. The software position limits (`documentation/design/foc-position.md`) add
 a compare to the cascade and to each difference the position law takes, and a wrap and a clamp of the reference while
-they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate put at 976–1295
-cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
+they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate of the time, a sum over the whole function, put at
+976–1295 cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
 
 The Coulomb friction feed-forward (`documentation/theory/disturbances-and-noise.md`, *Friction*) is computed in the outer
 loop, not in the interrupt: one scaled, clamped multiply of the speed reference per period, inlined into
-`CascadeWithSpeedLoop::RunSpeedLoop` and listed in `cycle-analysis-outer.json` as `FrictionFeedForward::CurrentFor`. The
+`CascadeWithSpeedLoop::RunSpeedLoop`, which the outer-loop gate charges through the low-priority handler. The
 20 kHz path gains one load and one addition of the stored current, before the clamp that was already there.
 
 ---
@@ -345,7 +346,7 @@ push   {r4, r5, lr}
 sub    sp, #16
 
 ; FMA instruction
-vfma.f32  s0, s1, s2   ; 1 cycle
+vfma.f32  s0, s1, s2   ; 3 cycles, one rounding
 
 ; Conditional execution — no branch
 vcmpe.f32  s0, s1
@@ -365,10 +366,9 @@ Three complementary approaches verify cycle budgets. Tier 2 runs the software-in
 | 2 — QEMU SIL        | `qemu-system-arm -icount` + free-running timer  | Regression signal | ARM ISA correctness, instruction-count delta |
 | 3 — On-silicon DWT  | `PlatformFactory::ElapsedCycles()` via TIVA HIL | Ground truth      | Absolute silicon timing                      |
 
-Tier 1 gates three paths on two MCUs and reports them on a third, each path with one configuration under
-`targets/sync_foc_sensored/main/` that all of them share. A stage lists the TI and the ST symbols side by side and fails only when none of them is in the
-binary, so a stage that matches on one MCU can still miss the other's half unnoticed. Each budget is the same
-slice of time on every MCU, in cycles of its clock:
+Tier 1 gates three paths on two MCUs, each path with one configuration under `targets/sync_foc_sensored/main/`
+that both share. A stage lists the TI and the ST symbols side by side and fails only when none of them is in the
+binary. Each budget is the same slice of time on every MCU, in cycles of its clock:
 
 | Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
 |-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
@@ -381,6 +381,60 @@ On a pull request each MCU gets one cycle banner and one memory banner. The cycl
 share of the loop period, and whether the path is within budget) and collapses the per-stage breakdowns. All three
 paths are analysed even when one is over budget, so the banner always has every row. The full reports,
 annotated disassembly and JSON metrics are in the `cycle-analysis-<MCU>-<path>` workflow artifacts.
+
+### What the static estimate charges
+
+The analyser charges a path its worst case: the costliest path through each function a configuration names, and
+through every function that path calls directly, once per call. Three things are the configuration's job, and
+the *Analysis Notes* of each report list what is left open.
+
+- **Calls through a pointer are not followed.** Every `infra::Function` callback and every virtual call on a path
+  hands over to a function the configuration names: the HAL's interrupt lambda, each callback of the
+  phase-current chain, `PlatformFactoryImpl::Read`, the three `ThreePhasePwmOutput` stages, the PWM driver's
+  `Start`, `ZeroVectorSlopes`, the low-priority trigger, and in the outer loop the online estimators and their
+  `RecursiveLeastSquares`. A new callback or virtual call on a path needs its target named, or the note
+  "calls through a register are not followed" grows by one.
+- **Alternatives are charged once.** A stage with `"combine": "max"` charges the costliest of the functions it
+  names: the interrupt vector, the three `Runner` callbacks (so the inner loop is charged its costliest control
+  mode, the speed and position cascade), a function and its thunk, the speed and position low-priority handlers,
+  and the two calibration observers.
+- **Loops need a bound.** `loop_bounds` gives every loop of a function its iteration count; nested loops multiply.
+
+| `loop_bounds` entry                                                       |  Bound | Why                                                          |
+|---------------------------------------------------------------------------|-------:|--------------------------------------------------------------|
+| TI ADC interrupt lambda                                                   |      6 | Six channels in the sequence: the sample buffer and the FIFO |
+| `PwmStmBase::StartImpl`                                                   |      3 | Three channels                                               |
+| `InverterCompensation::ThreePhasePwmOutput`                               |      1 | The loop walks nested compensation stages; there is one      |
+| `SpeedDifferentiator::Measure`                                            |      2 | One retry when the control interrupt lands mid-read          |
+| `__ieee754_fmodf`                                                         |      3 | `remainder` of the difference of two single-turn angles      |
+| `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                         |
+| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |      9 | Element loops over a 3×3 matrix                              |
+| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Element loops over a 2×2 matrix                              |
+| `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                                   |
+| `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record              |
+
+A bound holds for every loop of its function, so the 3×3 product nested inside the mechanical estimator is charged
+81 inner iterations where it runs 27. The outer-loop estimate is an upper bound with that slack in it.
+
+`cold_calls` removes the paths that end an iteration instead of being one: the over-current and protection trips
+with `CutPowerStage`, the ST HAL's `assert_failed`, `ADC_Disable` (single-shot DMA only; this converter runs
+circular), `HAL_TIM_GenerateEvent` (the timer start-up branch; `Start()` has run from the event loop before the
+interrupt is registered) and, on the identification path, `FailEnvelope`.
+
+Not charged: the encoder read the mechanical identification observer makes is the second call of a function
+already charged once, about 90 cycles. Not modelled: flash wait states, five on the TM4C at 120 MHz, which make
+taken branches and literal loads dearer on silicon than any table says. Tier 3 is the figure for that.
+
+With the worst-path model the estimates at this revision are:
+
+| Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
+|---------------------|--------------:|-------:|--------------:|-------:|
+| Inner loop          |          3290 |   4500 |          3130 |   6375 |
+| Outer loop          |         12685 |  20000 |         12685 |  28333 |
+| Identification path |          5274 |   6000 |          5114 |   8500 |
+
+The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
+`CYCLE_BUDGET_PACKAGE` in `ci.yml` does.
 
 The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
 runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
@@ -428,9 +482,9 @@ GPIO_ClearPin(DEBUG_PIN);
 | 40 kHz       | 3 000         | 2 250                    | High performance, tight budget |
 | 100 kHz      | 1 200         | 900                      | Requires fixed-point or DSP    |
 
-**Measured inner-loop cost** (`EK-TM4C1294XL`, `-O3`, `fast-math`, LUT sin/cos): **1074–1353 cycles**,
-of which the FOC calculation itself is 739–860 — roughly 23 % of the 20 kHz period. A non-optimised
-build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
+**Estimated inner-loop cost** (`EK-TM4C1294XL`, `RelWithDebInfo`, `fast-math`, LUT sin/cos): **1174–3290 cycles**,
+best to worst path, of which the FOC calculation itself is 541–1272 — at worst 21 % of the 20 kHz period. A
+non-optimised build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
 
 The torque cascade's speed limiter (`foc-torque.md`) adds a sign test, an absolute value, a multiply-add, a
 clamp and a multiply on the q-axis setpoint each sample, about ten cycles, with no division: the limit reaches
@@ -447,9 +501,8 @@ a second time. One multiply gives the angle, a clamp keeps it inside the band wh
 one multiply squares it, three fused multiply-adds give $\cos\delta$ and $\sin\delta$, and four more
 multiplications and additions rotate the pair: about ten floating-point operations and the clamp, 20 to 25 cycles
 against well over 60 for a second interpolated lookup with its wrap. $(n + \tfrac12)\,T_s$ is settled at
-configuration time. The helper is an `ALWAYS_INLINE_HOT` function defined in a header, so the cycle gate measures it
-inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`, which are already listed; it adds
-no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
+configuration time. The helper is an `ALWAYS_INLINE_HOT` function defined in a header, so the cycle gate charges it
+inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`; it adds no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
 a multiply-add per sample in the speed and position cascades.
 
 The sampling-skew correction (`documentation/design/platform-sampling-skew.md`) costs each cascade the zero-vector
@@ -459,8 +512,8 @@ the TM4C). The cascade then hands the three rates straight to the platform's shu
 first version that sent them through the Runner and down the dead-time compensation and decimating inverter cost
 some 360 cycles in all and took the inner loop past its 4500-cycle budget. The gains are two single-word values, not
 a triple buffer. The platform multiplies each rate by its delay, and the readout subtracts the three products from
-the next sample before the rebuild. `ZeroVectorSlope::Next` and `PlatformFactoryImpl::ZeroVectorSlopes` are listed in
-the cycle-gate configurations.
+the next sample before the rebuild. `ZeroVectorSlope::Next` is inlined into `Calculate`;
+`PlatformFactoryImpl::ZeroVectorSlopes` is reached through a pointer, so the cycle-gate configurations name it.
 
 ### Key Performance Sensitivities
 
