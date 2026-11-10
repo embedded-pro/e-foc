@@ -72,6 +72,9 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 - Title Case for buttons/menus, sentence case for messages. One verb per action ("Apply", not
   "Set"/"Send"/"Apply" mixed). Product name is always **e-foc CAN Commander** (lower-case "e-foc").
 - Units: SI with the symbol in the suffix (`A`, `V`, `rad/s`, `rad`, `Ω`, `mH`).
+- No tautological labels or components: a label names the quantity, unit or action for the operator,
+  never the widget or itself ("Value", "Status label", "Panel"); no component whose only content is
+  its own title.
 
 ### Polish and accessibility (POLISH)
 
