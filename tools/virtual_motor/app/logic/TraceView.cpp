@@ -22,6 +22,11 @@ namespace virtual_motor::app
             return std::format("{:.4g}", value);
         }
 
+        std::string Reading(std::optional<float> value)
+        {
+            return value.has_value() ? Number(*value) : std::string{ "—" };
+        }
+
         std::string AxisNumber(float value, float step)
         {
             const auto decimals = std::clamp(static_cast<int>(math::Ceil(-math::Log10(step))) + 1, 0, 6);
@@ -62,7 +67,7 @@ namespace virtual_motor::app
 
     void TraceView::ClearCursors()
     {
-        if (!cursorA && !cursorB)
+        if (!cursorA.has_value() && !cursorB.has_value())
             return;
         cursorA.reset();
         cursorB.reset();
@@ -94,25 +99,25 @@ namespace virtual_motor::app
     std::vector<TraceReading> TraceView::Readings(std::size_t panel) const
     {
         std::vector<TraceReading> readings;
-        for (const auto signal : spec.panels.at(panel).traces)
-            readings.push_back({ signal, cursorA ? ValueAt(signal, *cursorA) : std::nullopt, cursorB ? ValueAt(signal, *cursorB) : std::nullopt });
+        for (const auto signal : spec.panels[panel].traces)
+            readings.push_back({ signal, cursorA.has_value() ? ValueAt(signal, *cursorA) : std::nullopt, cursorB.has_value() ? ValueAt(signal, *cursorB) : std::nullopt });
         return readings;
     }
 
     std::string TraceView::CursorSummary() const
     {
-        if (!cursorA && !cursorB)
+        if (!cursorA.has_value() && !cursorB.has_value())
             return cursorsEnabled ? "Cursors: left click places A, right click B, double click removes them" : "";
 
         std::string summary;
-        if (cursorA)
+        if (cursorA.has_value())
             summary += "A " + TimeText(*cursorA - origin);
-        if (cursorB)
+        if (cursorB.has_value())
             summary += (summary.empty() ? "" : "   ") + std::string{ "B " } + TimeText(*cursorB - origin);
-        if (cursorA && cursorB && *cursorB != *cursorA)
+        if (cursorA.has_value() && cursorB.has_value() && *cursorB != *cursorA)
         {
             const auto delta = *cursorB - *cursorA;
-            summary += "   Δt " + TimeText(delta) + std::format("   1/Δt {:.4g} Hz", 1.0 / math::Abs(delta));
+            summary += std::format("   Δt {}   1/Δt {:.4g} Hz", TimeText(delta), 1.0 / math::Abs(delta));
         }
         return summary;
     }
@@ -250,7 +255,7 @@ namespace virtual_motor::app
         PaintLegend(canvas, panel, area);
     }
 
-    void TraceView::PaintGrid(ui::Canvas& canvas, const ui::Rect& area, Range vertical, const std::string& unit) const
+    void TraceView::PaintGrid(ui::Canvas& canvas, const ui::Rect& area, Range vertical, std::string_view unit) const
     {
         const auto& theme = ui::theme::Current();
         canvas.SetPen({ theme.Get(ui::theme::ColorRole::GridMinor), 1.0f, ui::LineStyle::Dot });
@@ -267,7 +272,7 @@ namespace virtual_motor::app
             canvas.SetPen({ theme.Get(ui::theme::ColorRole::TextMuted) });
             const auto value = vertical.low + fraction * (vertical.high - vertical.low);
             const auto step = (vertical.high - vertical.low) / static_cast<float>(horizontalDivisions);
-            canvas.DrawText({ area.Left() - leftMargin, y - 8.0f, leftMargin - 6.0f, 16.0f }, ui::TextAlign::Right, ui::TextVerticalAlign::Middle, AxisNumber(value, step) + (unit == "1" ? std::string{} : " " + unit));
+            canvas.DrawText({ area.Left() - leftMargin, y - 8.0f, leftMargin - 6.0f, 16.0f }, ui::TextAlign::Right, ui::TextVerticalAlign::Middle, AxisNumber(value, step) + (unit == "1" ? std::string{} : std::format(" {}", unit)));
         }
         canvas.SetPen({ theme.Get(ui::theme::ColorRole::Axis) });
         canvas.DrawRect(area);
@@ -317,7 +322,7 @@ namespace virtual_motor::app
         x += canvas.MeasureText(panel.title).width + 16.0f;
         for (std::size_t index = 0; index != panel.traces.size(); ++index)
         {
-            const auto& name = Signals()[panel.traces[index]].name;
+            const auto name = Signals()[panel.traces[index]].name;
             canvas.SetPen({ theme.Series(index) });
             canvas.DrawText({ x, baseline }, name);
             x += canvas.MeasureText(name).width + 12.0f;
@@ -330,7 +335,7 @@ namespace virtual_motor::app
         canvas.SetFont(theme.Get(ui::theme::FontRole::Small));
         for (const auto& [cursor, name, style] : { std::tuple{ cursorA, "A", ui::LineStyle::Solid }, std::tuple{ cursorB, "B", ui::LineStyle::Dash } })
         {
-            if (!cursor || *cursor < range.start || *cursor > range.end)
+            if (!cursor.has_value() || *cursor < range.start || *cursor > range.end)
                 continue;
             const auto x = X(*cursor, area);
             canvas.SetPen({ theme.Get(ui::theme::ColorRole::Crosshair), 1.0f, style });
@@ -341,7 +346,7 @@ namespace virtual_motor::app
 
     void TraceView::PaintReadings(ui::Canvas& canvas, std::size_t panel, const ui::Rect& area) const
     {
-        if (!cursorA && !cursorB)
+        if (!cursorA.has_value() && !cursorB.has_value())
             return;
         const auto& theme = ui::theme::Current();
         canvas.SetFont(theme.Get(ui::theme::FontRole::Small));
@@ -350,10 +355,8 @@ namespace virtual_motor::app
         for (std::size_t index = 0; index != readings.size(); ++index)
         {
             const auto& reading = readings[index];
-            auto text = Signals()[reading.signal].name;
-            text += "  A " + (reading.atA ? Number(*reading.atA) : std::string{ "—" });
-            text += "  B " + (reading.atB ? Number(*reading.atB) : std::string{ "—" });
-            if (reading.atA && reading.atB)
+            auto text = std::format("{}  A {}  B {}", Signals()[reading.signal].name, Reading(reading.atA), Reading(reading.atB));
+            if (reading.atA.has_value() && reading.atB.has_value())
                 text += "  Δ " + Number(*reading.atB - *reading.atA);
             canvas.SetPen({ theme.Series(index) });
             canvas.DrawText({ area.Left(), y - 12.0f, area.width - 6.0f, 14.0f }, ui::TextAlign::Right, ui::TextVerticalAlign::Middle, text);

@@ -6,32 +6,32 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <vector>
+#include <string_view>
 
 namespace virtual_motor::app
 {
     struct SignalInfo
     {
-        std::string name;
-        std::string unit;
-        std::string description;
+        std::string_view name;
+        std::string_view unit;
+        std::string_view description;
     };
 
     struct PanelSpec
     {
-        std::string title;
-        std::string unit;
-        std::vector<uint8_t> traces;
+        std::string_view title;
+        std::string_view unit;
+        std::span<const uint8_t> traces;
     };
 
     struct ViewSpec
     {
-        std::string name;
-        std::vector<PanelSpec> panels;
+        std::string_view name;
+        std::span<const PanelSpec> panels;
     };
 
-    const std::array<SignalInfo, port::signalCount>& Signals();
-    const std::vector<ViewSpec>& TraceViews();
+    std::span<const SignalInfo, port::signalCount> Signals();
+    std::span<const ViewSpec> TraceViews();
     std::optional<std::size_t> ViewOfSignal(uint8_t signal);
     std::string SignalLabel(uint8_t signal);
 }

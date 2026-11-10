@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace virtual_motor::app
@@ -66,7 +67,7 @@ namespace virtual_motor::app
         std::optional<float> ValueAt(uint8_t signal, double time) const;
 
         void PaintPanel(ui::Canvas& canvas, const PanelSpec& panel, const ui::Rect& area) const;
-        void PaintGrid(ui::Canvas& canvas, const ui::Rect& area, Range range, const std::string& unit) const;
+        void PaintGrid(ui::Canvas& canvas, const ui::Rect& area, Range range, std::string_view unit) const;
         void PaintTrace(ui::Canvas& canvas, uint8_t signal, std::size_t index, const ui::Rect& area, Range range) const;
         void PaintLegend(ui::Canvas& canvas, const PanelSpec& panel, const ui::Rect& area) const;
         void PaintCursors(ui::Canvas& canvas, const ui::Rect& area) const;

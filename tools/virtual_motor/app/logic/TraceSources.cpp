@@ -1,5 +1,6 @@
 #include "tools/virtual_motor/app/logic/TraceSources.hpp"
 #include "tools/virtual_motor/app/logic/CaptureCsv.hpp"
+#include <numeric>
 
 namespace virtual_motor::app
 {
@@ -9,7 +10,7 @@ namespace virtual_motor::app
         std::size_t high{ Count() };
         while (low != high)
         {
-            const auto middle = low + (high - low) / 2;
+            const auto middle = std::midpoint(low, high);
             if (Time(middle) < time)
                 low = middle + 1;
             else

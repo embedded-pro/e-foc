@@ -115,3 +115,14 @@ TEST(TestCaptureAssembly, the_state_reads_in_plain_words)
     assembly.Event(Event(2, port::CaptureEventKind::cancelled));
     EXPECT_EQ(assembly.StatusText(), "Cancelled");
 }
+
+TEST(TestCaptureAssembly, a_period_received_twice_is_counted_once)
+{
+    app::CaptureAssembly assembly;
+    assembly.Event(Event(1, port::CaptureEventKind::armed));
+
+    EXPECT_FALSE(assembly.Chunk(Chunk(1, 3, 0, 2)));
+    EXPECT_FALSE(assembly.Chunk(Chunk(1, 3, 1, 1)));
+    EXPECT_EQ(assembly.Received(), 2u);
+    EXPECT_TRUE(assembly.Chunk(Chunk(1, 3, 2, 1)));
+}

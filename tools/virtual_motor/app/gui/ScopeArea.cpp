@@ -53,8 +53,9 @@ namespace virtual_motor::app
             auto& view = *views.emplace_back(std::make_unique<TraceView>(spec));
             auto* widget = new ui::backend::qt::QtPaintedWidget(view, tabs);
             widget->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
-            widget->setAccessibleName(QString::fromStdString(spec.name) + " traces");
-            tabs->addTab(widget, QString::fromStdString(spec.name));
+            const auto name = QString::fromUtf8(spec.name.data(), static_cast<qsizetype>(spec.name.size()));
+            widget->setAccessibleName(name + " traces");
+            tabs->addTab(widget, name);
             view.OnCursorsChanged([this]()
                 {
                     RefreshToolbar();

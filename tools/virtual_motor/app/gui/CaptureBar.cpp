@@ -28,6 +28,11 @@ namespace virtual_motor::app
             { "LEDs", port::TriggerKind::leds },
         } };
 
+        QString Text(std::string_view text)
+        {
+            return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
+        }
+
         constexpr std::array<const char*, 3> ledNames{ "Operational", "Warning", "Failure" };
         constexpr std::array<uint8_t, 3> ledBits{ port::led::operational, port::led::warning, port::led::failure };
     }
@@ -54,7 +59,7 @@ namespace virtual_motor::app
         signal = new QComboBox(this);
         signal->setAccessibleName("Trigger signal");
         for (const auto& info : Signals())
-            signal->addItem(QString::fromStdString(info.name), QString::fromStdString(info.description));
+            signal->addItem(Text(info.name), Text(info.description));
         level = new QDoubleSpinBox(this);
         level->setAccessibleName("Trigger level");
         level->setRange(-1e6, 1e6);
@@ -108,7 +113,7 @@ namespace virtual_motor::app
     void CaptureBar::SignalChanged()
     {
         const auto& info = Signals()[static_cast<std::size_t>(signal->currentIndex())];
-        level->setSuffix(info.unit == "1" ? QString{} : " " + QString::fromStdString(info.unit));
+        level->setSuffix(info.unit == "1" ? QString{} : " " + Text(info.unit));
         signal->setToolTip(signal->currentData().toString());
     }
 
