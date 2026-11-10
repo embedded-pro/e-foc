@@ -37,6 +37,7 @@ namespace virtual_motor
         Send(port::Encode(target.Identity()));
         Send(port::Encode(target.ChangesInForce()));
         PublishStatus();
+        target.Attach(*this);
         return IsConnected();
     }
 
@@ -100,36 +101,73 @@ namespace virtual_motor
         }
     }
 
-    void PlantPortClient::PublishWindow(const port::Window& window)
+    void PlantPortClient::ReportWindow(const port::Window& window)
     {
         auto bytes = port::Encode(window);
         if (outgoing.size() < bytes.size())
             Send(bytes);
     }
 
+    void PlantPortClient::ReportCaptureEvent(const port::CaptureEvent& event)
+    {
+        Send(port::Encode(event));
+    }
+
+    void PlantPortClient::ReportCaptureChunk(const port::CaptureChunk& chunk)
+    {
+        Send(port::Encode(chunk));
+    }
+
+    void PlantPortClient::ReportProfileState(const port::ProfileState& state)
+    {
+        Send(port::Encode(state));
+        Send(port::Encode(target.ChangesInForce()));
+    }
+
     void PlantPortClient::Dispatch(const port::Frame& frame)
     {
-        if (!HandleRun(frame) || !HandleChange(frame) || !HandleStream(frame))
+        if (!HandleRun(frame) || !HandleChange(frame) || !HandleInstruments(frame))
             Disconnect();
+    }
+
+    bool PlantPortClient::HandleInstruments(const port::Frame& frame)
+    {
+        bool valid{ true };
+        switch (static_cast<port::MessageType>(frame.type))
+        {
+            case port::MessageType::stream:
+                return HandleStream(frame);
+            case port::MessageType::capture:
+                if (auto request = Read<port::CaptureRequest>(frame, valid))
+                    if (auto refusal = target.Capture(*request))
+                        Answer(port::MessageType::capture, refusal, false);
+                break;
+            case port::MessageType::cancelCapture:
+                target.CancelCapture();
+                break;
+            case port::MessageType::profile:
+                if (auto request = Read<port::ProfileRequest>(frame, valid))
+                    if (auto refusal = target.RunProfile(*request))
+                        Answer(port::MessageType::profile, refusal, false);
+                break;
+            case port::MessageType::stopProfile:
+                target.StopProfile();
+                break;
+            default:
+                break;
+        }
+        return valid;
     }
 
     bool PlantPortClient::HandleStream(const port::Frame& frame)
     {
-        if (frame.type != static_cast<uint8_t>(port::MessageType::stream))
-            return true;
-
         bool valid{ false };
         if (auto request = Read<port::StreamRequest>(frame, valid))
         {
             if (request->on > 1)
                 Answer(port::MessageType::stream, port::RefusalReason::outOfRange, false);
-            else if (request->on == 1)
-                target.Stream([this](const port::Window& window)
-                    {
-                        PublishWindow(window);
-                    });
             else
-                target.StopStream();
+                target.Stream(request->on == 1);
         }
         return valid;
     }
@@ -228,7 +266,7 @@ namespace virtual_motor
         socket = services::loopback::invalidSocket;
         partialLine.clear();
         outgoing.clear();
-        target.StopStream();
+        target.Detach();
         target.Resume();
     }
 }

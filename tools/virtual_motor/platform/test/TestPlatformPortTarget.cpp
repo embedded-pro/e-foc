@@ -11,6 +11,36 @@ namespace
 {
     using namespace virtual_motor::port;
 
+    class Reports
+        : public virtual_motor::InstrumentReports
+    {
+    public:
+        void ReportWindow(const Window& window) override
+        {
+            windows.push_back(window);
+        }
+
+        void ReportCaptureEvent(const CaptureEvent& event) override
+        {
+            events.push_back(event);
+        }
+
+        void ReportCaptureChunk(const CaptureChunk& chunk) override
+        {
+            chunks.push_back(chunk);
+        }
+
+        void ReportProfileState(const ProfileState& state) override
+        {
+            states.push_back(state);
+        }
+
+        std::vector<Window> windows;
+        std::vector<CaptureEvent> events;
+        std::vector<CaptureChunk> chunks;
+        std::vector<ProfileState> states;
+    };
+
     class TestPlatformPortTarget
         : public testing::Test
     {
@@ -101,25 +131,58 @@ TEST_F(TestPlatformPortTarget, changes_reach_the_plant_and_are_listed_until_clea
 
 TEST_F(TestPlatformPortTarget, a_stream_closes_a_window_every_ten_control_periods)
 {
-    std::vector<Window> windows;
-
+    Reports reports;
+    target->Attach(reports);
     target->Pause();
     const auto first = target->CurrentStatus().controlPeriods;
-    target->Stream([&windows](const Window& window)
-        {
-            windows.push_back(window);
-        });
+    target->Stream(true);
     target->Step(StepUnit::controlPeriod, 25);
-    target->StopStream();
+    target->Stream(false);
     target->Step(StepUnit::controlPeriod, 10);
+    target->Detach();
 
-    ASSERT_EQ(windows.size(), 2u);
-    EXPECT_EQ(windows[0].sequence, 0u);
-    EXPECT_EQ(windows[0].firstPeriod, first);
-    EXPECT_EQ(windows[1].sequence, 1u);
-    EXPECT_EQ(windows[1].firstPeriod, first + 10);
-    EXPECT_EQ(windows[1].periods, 10);
+    ASSERT_EQ(reports.windows.size(), 2u);
+    EXPECT_EQ(reports.windows[0].sequence, 0u);
+    EXPECT_EQ(reports.windows[0].firstPeriod, first);
+    EXPECT_EQ(reports.windows[1].sequence, 1u);
+    EXPECT_EQ(reports.windows[1].firstPeriod, first + 10);
+    EXPECT_EQ(reports.windows[1].periods, 10);
     const auto busVoltage = static_cast<std::size_t>(virtual_motor::Signal::busVoltage);
-    EXPECT_GT(windows[0].minimum[busVoltage], 0.0f);
-    EXPECT_LE(windows[0].minimum[busVoltage], windows[0].maximum[busVoltage]);
+    EXPECT_GT(reports.windows[0].minimum[busVoltage], 0.0f);
+    EXPECT_LE(reports.windows[0].minimum[busVoltage], reports.windows[0].maximum[busVoltage]);
+}
+
+TEST_F(TestPlatformPortTarget, an_immediate_capture_records_the_periods_that_follow_it)
+{
+    Reports reports;
+    target->Attach(reports);
+    target->Pause();
+    const auto first = target->CurrentStatus().controlPeriods;
+
+    EXPECT_FALSE(target->Capture(CaptureRequest{ Trigger{ TriggerKind::immediately }, 0, 600 }).has_value());
+    target->Step(StepUnit::controlPeriod, 700);
+    target->Detach();
+
+    ASSERT_EQ(reports.events.size(), 2u);
+    EXPECT_EQ(reports.events[1].event, CaptureEventKind::triggered);
+    ASSERT_EQ(reports.chunks.size(), 2u);
+    EXPECT_EQ(reports.chunks[0].firstPeriod, first);
+    EXPECT_EQ(reports.chunks[1].index, 512);
+    EXPECT_EQ(reports.chunks[1].periods.size(), 88u);
+}
+
+TEST_F(TestPlatformPortTarget, a_profile_changes_the_plant_in_the_period_its_time_names)
+{
+    Reports reports;
+    target->Attach(reports);
+    target->Pause();
+
+    EXPECT_FALSE(target->RunProfile(ProfileRequest{ Trigger{ TriggerKind::immediately }, { ProfileStep{ 20, MessageType::loadTorque, 0.05f, {} } } }).has_value());
+    target->Step(StepUnit::controlPeriod, 20);
+    EXPECT_EQ(target->ChangesInForce().differs, 0);
+
+    target->Step(StepUnit::controlPeriod, 1);
+    EXPECT_FLOAT_EQ(target->ChangesInForce().loadTorque, 0.05f);
+    EXPECT_EQ(reports.states.back().state, ProfileStateKind::finished);
+    target->Detach();
 }

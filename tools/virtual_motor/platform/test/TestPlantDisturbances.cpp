@@ -165,3 +165,19 @@ TEST_F(TestPlantDisturbances, refuses_values_out_of_range_and_leaves_the_plant_a
     disturbances.Apply();
     EXPECT_EQ(disturbances.InForce().differs, 0);
 }
+
+TEST_F(TestPlantDisturbances, a_profile_step_is_checked_and_applied_as_the_change_it_names)
+{
+    using virtual_motor::port::MessageType;
+    using virtual_motor::port::ProfileStep;
+
+    EXPECT_FALSE(disturbances.Check(ProfileStep{ 0, MessageType::currentNoise, 0.04f, {} }).has_value());
+    EXPECT_EQ(disturbances.Check(ProfileStep{ 0, MessageType::encoderNoise, -1.0f, {} }), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.Check(ProfileStep{ 0, MessageType::externalTorque, 0.0f, ExternalTorque{ TorqueForm::ramp, { 0.0f, 1.0f, 0.0f } } }), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.Check(ProfileStep{ 0, MessageType::pause, 0.0f, {} }), RefusalReason::outOfRange);
+
+    EXPECT_CALL(inputs, SetCurrentNoise(IsNear(0.04f)));
+    disturbances.Apply(ProfileStep{ 0, MessageType::currentNoise, 0.04f, {} });
+    disturbances.Apply(ProfileStep{ 0, MessageType::externalTorque, 0.0f, ExternalTorque{ TorqueForm::constant, { 0.2f } } });
+    ExpectExternalTorques({ 0.2f });
+}

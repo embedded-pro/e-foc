@@ -20,18 +20,25 @@ target_link_libraries(e_foc.tool.virtual_motor.platform PUBLIC
 target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     BoardPeripherals.cpp
     BoardPeripherals.hpp
+    CaptureRecorder.cpp
+    CaptureRecorder.hpp
     FileEeprom.cpp
     FileEeprom.hpp
+    InstrumentReports.hpp
     Pacer.cpp
     Pacer.hpp
     PlatformPortTarget.cpp
     PlatformPortTarget.hpp
     PortSocket.cpp
     PortSocket.hpp
+    ProfileRunner.cpp
+    ProfileRunner.hpp
     PlantDescription.cpp
     PlantDescription.hpp
     PlantDisturbances.cpp
     PlantDisturbances.hpp
+    PlantInstruments.cpp
+    PlantInstruments.hpp
     PlantPortClient.cpp
     PlantPortClient.hpp
     PlantPowerStage.cpp
@@ -42,6 +49,8 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     RunLoop.hpp
     StreamWindow.cpp
     StreamWindow.hpp
+    TriggerWatch.cpp
+    TriggerWatch.hpp
     VirtualCanPort.cpp
     VirtualCanPort.hpp
     VirtualPlatform.cpp

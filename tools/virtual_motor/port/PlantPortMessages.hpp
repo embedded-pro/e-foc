@@ -5,11 +5,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace virtual_motor::port
 {
     constexpr uint16_t protocolVersion{ 1 };
     constexpr std::size_t signalCount{ 25 };
+    constexpr uint16_t maxCapturePeriods{ 16384 };
+    constexpr uint16_t captureChunkPeriods{ 512 };
+    constexpr uint16_t maxProfileSteps{ 1024 };
+
+    using Sample = std::array<float, signalCount>;
 
     enum class MessageType : uint8_t
     {
@@ -19,6 +25,9 @@ namespace virtual_motor::port
         refused = 0x04,
         logLine = 0x05,
         window = 0x10,
+        captureEvent = 0x11,
+        captureChunk = 0x12,
+        profileState = 0x13,
         pause = 0x81,
         resume = 0x82,
         step = 0x83,
@@ -28,6 +37,10 @@ namespace virtual_motor::port
         encoderNoise = 0x87,
         clearAll = 0x88,
         stream = 0x90,
+        capture = 0x91,
+        cancelCapture = 0x92,
+        profile = 0x93,
+        stopProfile = 0x94,
     };
 
     enum class RunState : uint8_t
@@ -56,6 +69,31 @@ namespace virtual_motor::port
     {
         controlPeriod,
         millisecond,
+    };
+
+    enum class TriggerKind : uint8_t
+    {
+        immediately,
+        rising,
+        falling,
+        either,
+        protection,
+        leds,
+    };
+
+    enum class CaptureEventKind : uint8_t
+    {
+        armed,
+        triggered,
+        cancelled,
+    };
+
+    enum class ProfileStateKind : uint8_t
+    {
+        armed,
+        running,
+        finished,
+        stopped,
     };
 
     namespace led
@@ -163,6 +201,8 @@ namespace virtual_motor::port
     using Pause = EmptyRequest<MessageType::pause>;
     using Resume = EmptyRequest<MessageType::resume>;
     using ClearAll = EmptyRequest<MessageType::clearAll>;
+    using CancelCapture = EmptyRequest<MessageType::cancelCapture>;
+    using StopProfile = EmptyRequest<MessageType::stopProfile>;
 
     struct Step
     {
@@ -237,5 +277,88 @@ namespace virtual_motor::port
 
         void WriteTo(PayloadWriter& writer) const;
         static StreamRequest ReadFrom(PayloadReader& reader);
+    };
+
+    struct Trigger
+    {
+        TriggerKind kind{ TriggerKind::immediately };
+        uint8_t signal{ 0 };
+        float level{ 0.0f };
+        uint8_t leds{ 0 };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static Trigger ReadFrom(PayloadReader& reader);
+    };
+
+    struct CaptureRequest
+    {
+        static constexpr MessageType type{ MessageType::capture };
+
+        Trigger trigger;
+        uint8_t preTriggerPercent{ 0 };
+        uint16_t length{ 0 };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static CaptureRequest ReadFrom(PayloadReader& reader);
+    };
+
+    struct CaptureEvent
+    {
+        static constexpr MessageType type{ MessageType::captureEvent };
+
+        uint16_t capture{ 0 };
+        CaptureEventKind event{ CaptureEventKind::armed };
+        uint64_t period{ 0 };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static CaptureEvent ReadFrom(PayloadReader& reader);
+    };
+
+    struct CaptureChunk
+    {
+        static constexpr MessageType type{ MessageType::captureChunk };
+
+        uint16_t capture{ 0 };
+        uint16_t length{ 0 };
+        uint16_t preTrigger{ 0 };
+        uint64_t firstPeriod{ 0 };
+        uint16_t index{ 0 };
+        std::vector<Sample> periods;
+
+        void WriteTo(PayloadWriter& writer) const;
+        static CaptureChunk ReadFrom(PayloadReader& reader);
+    };
+
+    struct ProfileStep
+    {
+        uint32_t at{ 0 };
+        MessageType change{ MessageType::loadTorque };
+        float value{ 0.0f };
+        ExternalTorque torque;
+    };
+
+    struct ProfileRequest
+    {
+        static constexpr MessageType type{ MessageType::profile };
+
+        Trigger trigger;
+        std::vector<ProfileStep> steps;
+        bool readable{ true };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static ProfileRequest ReadFrom(PayloadReader& reader);
+    };
+
+    struct ProfileState
+    {
+        static constexpr MessageType type{ MessageType::profileState };
+
+        ProfileStateKind state{ ProfileStateKind::armed };
+        uint16_t applied{ 0 };
+        uint16_t total{ 0 };
+        uint32_t elapsed{ 0 };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static ProfileState ReadFrom(PayloadReader& reader);
     };
 }

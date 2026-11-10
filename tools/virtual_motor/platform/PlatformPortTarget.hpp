@@ -25,8 +25,13 @@ namespace virtual_motor
         std::optional<port::RefusalReason> SetEncoderNoise(float radians) override;
         void ClearAll() override;
 
-        void Stream(const infra::Function<void(const port::Window&)>& sink) override;
-        void StopStream() override;
+        void Attach(InstrumentReports& reports) override;
+        void Detach() override;
+        void Stream(bool on) override;
+        std::optional<port::RefusalReason> Capture(const port::CaptureRequest& request) override;
+        void CancelCapture() override;
+        std::optional<port::RefusalReason> RunProfile(const port::ProfileRequest& profile) override;
+        void StopProfile() override;
 
     private:
         VirtualPlatform& platform;

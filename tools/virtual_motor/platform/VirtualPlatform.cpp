@@ -20,6 +20,8 @@ namespace virtual_motor
     {
         StepPlant();
         execution.lowPriorityInterrupt.RunIfTriggered();
+        if (instruments.Active())
+            instruments.Observe(controlPeriods, SamplePlant(), LedStates(), BoardProtectionStatus() == BoardProtectionState::asserted);
         ++controlPeriods;
 
         if (++periodInMillisecond == BaseFrequency().Value() / 1000)
@@ -69,6 +71,11 @@ namespace virtual_motor
     RunLoop& VirtualPlatform::Runner()
     {
         return runLoop;
+    }
+
+    PlantInstruments& VirtualPlatform::Instruments()
+    {
+        return instruments;
     }
 
     const BoardOptions& VirtualPlatform::Options() const

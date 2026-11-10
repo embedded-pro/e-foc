@@ -8,6 +8,7 @@
 #include "services/util/Terminal.hpp"
 #include "tools/virtual_motor/platform/BoardPeripherals.hpp"
 #include "tools/virtual_motor/platform/FileEeprom.hpp"
+#include "tools/virtual_motor/platform/PlantInstruments.hpp"
 #include "tools/virtual_motor/platform/PlantPowerStage.hpp"
 #include "tools/virtual_motor/platform/RunLoop.hpp"
 #include "tools/virtual_motor/platform/VirtualCanPort.hpp"
@@ -42,6 +43,7 @@ namespace virtual_motor
         void MirrorLog(const infra::Function<void(infra::ConstByteRange text)>& sink);
 
         RunLoop& Runner();
+        PlantInstruments& Instruments();
         const BoardOptions& Options() const;
         uint64_t ControlPeriods() const;
         uint8_t LedStates() const;
@@ -105,6 +107,7 @@ namespace virtual_motor
             {
                 return Pacer::Clock::now();
             } };
+        PlantInstruments instruments{ Disturbances() };
         uint64_t controlPeriods{ 0 };
         uint32_t periodInMillisecond{ 0 };
     };

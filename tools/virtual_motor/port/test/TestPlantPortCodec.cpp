@@ -165,3 +165,87 @@ TEST(TestPlantPortCodec, a_stream_request_says_on_or_off)
     EXPECT_THAT(Encode(StreamRequest{ 1 }), testing::ElementsAre(0x90, 1, 0, 1));
     EXPECT_EQ(RoundTrip(StreamRequest{ 0 }).on, 0);
 }
+
+TEST(TestPlantPortCodec, a_trigger_carries_its_kind_signal_level_and_led_mask)
+{
+    const auto request = RoundTrip(CaptureRequest{ Trigger{ TriggerKind::rising, 15, 0.75f, led::failure }, 25, 4096 });
+
+    EXPECT_EQ(request.trigger.kind, TriggerKind::rising);
+    EXPECT_EQ(request.trigger.signal, 15);
+    EXPECT_FLOAT_EQ(request.trigger.level, 0.75f);
+    EXPECT_EQ(request.trigger.leds, led::failure);
+    EXPECT_EQ(request.preTriggerPercent, 25);
+    EXPECT_EQ(request.length, 4096);
+}
+
+TEST(TestPlantPortCodec, a_capture_event_names_the_capture_what_happened_and_when)
+{
+    const auto event = RoundTrip(CaptureEvent{ 9, CaptureEventKind::triggered, 123456789ull });
+
+    EXPECT_EQ(event.capture, 9);
+    EXPECT_EQ(event.event, CaptureEventKind::triggered);
+    EXPECT_EQ(event.period, 123456789ull);
+}
+
+TEST(TestPlantPortCodec, a_capture_chunk_carries_its_place_and_every_signal_of_every_period)
+{
+    CaptureChunk chunk{ 4, 1300, 325, 1000000ull, 512, {} };
+    chunk.periods.resize(3);
+    chunk.periods[2][24] = 42.0f;
+    chunk.periods[0][0] = -1.5f;
+
+    EXPECT_EQ(Encode(chunk).size(), 3u + 18u + 3u * signalCount * 4u);
+
+    const auto decoded = RoundTrip(chunk);
+    EXPECT_EQ(decoded.capture, 4);
+    EXPECT_EQ(decoded.length, 1300);
+    EXPECT_EQ(decoded.preTrigger, 325);
+    EXPECT_EQ(decoded.firstPeriod, 1000000ull);
+    EXPECT_EQ(decoded.index, 512);
+    ASSERT_EQ(decoded.periods.size(), 3u);
+    EXPECT_FLOAT_EQ(decoded.periods[0][0], -1.5f);
+    EXPECT_FLOAT_EQ(decoded.periods[2][24], 42.0f);
+}
+
+TEST(TestPlantPortCodec, a_profile_carries_its_trigger_and_each_change_with_its_own_payload)
+{
+    ProfileRequest profile{ Trigger{ TriggerKind::immediately }, {} };
+    profile.steps.push_back(ProfileStep{ 0, MessageType::loadTorque, 0.2f, {} });
+    profile.steps.push_back(ProfileStep{ 2000, MessageType::externalTorque, 0.0f, ExternalTorque{ TorqueForm::sine, { 0.0f, 0.1f, 5.0f, 0.0f } } });
+    profile.steps.push_back(ProfileStep{ 4000, MessageType::encoderNoise, 0.001f, {} });
+
+    const auto decoded = RoundTrip(profile);
+
+    EXPECT_TRUE(decoded.readable);
+    ASSERT_EQ(decoded.steps.size(), 3u);
+    EXPECT_EQ(decoded.steps[0].change, MessageType::loadTorque);
+    EXPECT_FLOAT_EQ(decoded.steps[0].value, 0.2f);
+    EXPECT_EQ(decoded.steps[1].at, 2000u);
+    EXPECT_EQ(decoded.steps[1].torque.form, TorqueForm::sine);
+    EXPECT_FLOAT_EQ(decoded.steps[1].torque.parameters[2], 5.0f);
+    EXPECT_FLOAT_EQ(decoded.steps[2].value, 0.001f);
+}
+
+TEST(TestPlantPortCodec, a_profile_change_of_another_type_leaves_the_profile_unreadable)
+{
+    const auto profile = Decode<ProfileRequest>(Frame{ static_cast<uint8_t>(MessageType::profile), { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0x81, 0, 0 } });
+
+    ASSERT_TRUE(profile.has_value());
+    EXPECT_FALSE(profile->readable);
+}
+
+TEST(TestPlantPortCodec, a_profile_state_carries_its_progress)
+{
+    const auto state = RoundTrip(ProfileState{ ProfileStateKind::running, 2, 5, 40000 });
+
+    EXPECT_EQ(state.state, ProfileStateKind::running);
+    EXPECT_EQ(state.applied, 2);
+    EXPECT_EQ(state.total, 5);
+    EXPECT_EQ(state.elapsed, 40000u);
+}
+
+TEST(TestPlantPortCodec, cancel_capture_and_stop_profile_carry_nothing)
+{
+    EXPECT_THAT(Encode(CancelCapture{}), testing::ElementsAre(0x92, 0, 0));
+    EXPECT_THAT(Encode(StopProfile{}), testing::ElementsAre(0x94, 0, 0));
+}
