@@ -279,6 +279,6 @@ finds them as before.
 
 ## Open Questions
 
-| #   | Question                                                           | Options                                           | Status           |
-|-----|--------------------------------------------------------------------|---------------------------------------------------|------------------|
-| 1   | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |
+| # | Question                                                           | Options                                           | Status           |
+|---|--------------------------------------------------------------------|---------------------------------------------------|------------------|
+| 1 | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |
