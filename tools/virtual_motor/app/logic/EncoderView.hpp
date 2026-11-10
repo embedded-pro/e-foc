@@ -3,7 +3,6 @@
 #include "tools/virtual_motor/app/logic/SourceView.hpp"
 #include <array>
 #include <cstdint>
-#include <utility>
 #include <vector>
 
 namespace virtual_motor::app
@@ -14,11 +13,17 @@ namespace virtual_motor::app
         uint32_t countsPerRevolution{ 0 };
     };
 
+    struct AngleDifference
+    {
+        double time{ 0.0 };
+        float degrees{ 0.0f };
+    };
+
     struct EncoderStatistics
     {
         static constexpr std::size_t bins{ 41 };
 
-        std::vector<std::pair<double, float>> difference;
+        std::vector<AngleDifference> difference;
         float mean{ 0.0f };
         float deviation{ 0.0f };
         float halfRange{ 1.0f };

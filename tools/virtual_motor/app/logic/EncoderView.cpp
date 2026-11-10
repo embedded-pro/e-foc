@@ -21,16 +21,16 @@ namespace virtual_motor::app
         {
             const auto count = static_cast<float>(statistics.difference.size());
             for (const auto& entry : statistics.difference)
-                statistics.mean += entry.second / count;
+                statistics.mean += entry.degrees / count;
             for (const auto& entry : statistics.difference)
             {
-                statistics.deviation += (entry.second - statistics.mean) * (entry.second - statistics.mean) / count;
-                statistics.halfRange = std::max(statistics.halfRange, math::Abs(entry.second) * 1.1f);
+                statistics.deviation += (entry.degrees - statistics.mean) * (entry.degrees - statistics.mean) / count;
+                statistics.halfRange = std::max(statistics.halfRange, math::Abs(entry.degrees) * 1.1f);
             }
             statistics.deviation = math::Sqrt(statistics.deviation);
             for (const auto& entry : statistics.difference)
             {
-                const auto position = (entry.second + statistics.halfRange) / (2.0f * statistics.halfRange) * static_cast<float>(EncoderStatistics::bins);
+                const auto position = (entry.degrees + statistics.halfRange) / (2.0f * statistics.halfRange) * static_cast<float>(EncoderStatistics::bins);
                 ++statistics.histogram[std::min(EncoderStatistics::bins - 1, static_cast<std::size_t>(std::max(0.0f, position)))];
             }
         }
