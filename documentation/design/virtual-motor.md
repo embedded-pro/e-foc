@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.3.0                |
+| Version   | 0.3.1                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -110,10 +110,10 @@ A virtual motor is started with:
 
 | Start option | Meaning                                                                    | Default                    |
 |--------------|----------------------------------------------------------------------------|----------------------------|
-| Bus          | Name of the virtual CAN bus to join                                        | `default`                  |
+| Bus          | Name of the virtual CAN bus to join: letters, digits, `-` and `_`          | `default`                  |
 | Node         | The board ID the CAN node address is built from (`service-can.md` Part I)  | 0                          |
 | Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file | `teknic`                   |
-| Memory       | The file holding its non-volatile memory                                   | one file per bus and node  |
+| Memory       | The file holding its non-volatile memory, a name in the working directory  | one file per bus and node  |
 | Start from   | Keep the memory file, or start factory-fresh                               | keep                       |
 | Seed         | Seed of every noise source, so a run replays exactly                       | fixed                      |
 | Host the bus | Open the hub for the named bus if no hub is listening yet                  | off                        |
@@ -145,7 +145,9 @@ Part N).
 
 **Memory file.** The memory is 512 bytes, the size the boards' EEPROM regions are laid out in, kept in a
 file named after the bus and the node in the engine's working directory unless the start options name
-another. A missing or short file is a factory-fresh board. *Start factory-fresh* replaces the file with
+another. The memory file is always in the working directory: its name is letters, digits, `.`, `-` and `_`,
+not starting with `.`, and an engine given a path elsewhere refuses to start, so a start option never
+reads, overwrites or deletes a file outside the motor's own folder. A missing or short file is a factory-fresh board. *Start factory-fresh* replaces the file with
 an erased memory, so the motor needs calibrating from the CAN Commander, as a new board does.
 
 ### Part C — Time

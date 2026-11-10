@@ -76,7 +76,25 @@ TEST(TestStartOptions, refuses_a_node_or_port_out_of_range)
 
 TEST(TestStartOptions, refuses_a_bus_name_a_join_line_cannot_carry)
 {
-    EXPECT_EQ(Parse({ "--bus", "a-bus-name-longer-than-twenty-four" }).error, "--bus must be 1 to 24 characters");
+    EXPECT_EQ(Parse({ "--bus", "a-bus-name-longer-than-twenty-four" }).error, "--bus must be 1 to 24 letters, digits, '-' or '_'");
+}
+
+TEST(TestStartOptions, refuses_a_bus_name_that_cannot_name_the_memory_file)
+{
+    EXPECT_EQ(Parse({ "--bus", "../bench" }).error, "--bus must be 1 to 24 letters, digits, '-' or '_'");
+    EXPECT_EQ(Parse({ "--bus", "bench bus" }).error, "--bus must be 1 to 24 letters, digits, '-' or '_'");
+}
+
+TEST(TestStartOptions, refuses_a_memory_file_outside_the_working_directory)
+{
+    const std::string error{ "--memory must name a file in the working directory: letters, digits, '.', '-' and '_', not starting with '.'" };
+
+    EXPECT_EQ(Parse({ "--memory", "../m.nvm" }).error, error);
+    EXPECT_EQ(Parse({ "--memory", "/tmp/m.nvm" }).error, error);
+    EXPECT_EQ(Parse({ "--memory", "folder/m.nvm" }).error, error);
+    EXPECT_EQ(Parse({ "--memory", "folder\\m.nvm" }).error, error);
+    EXPECT_EQ(Parse({ "--memory", ".." }).error, error);
+    EXPECT_EQ(Parse({ "--memory", "" }).error, error);
 }
 
 TEST(TestStartOptions, help_is_asked_for_not_an_error)

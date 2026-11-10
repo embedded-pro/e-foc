@@ -213,7 +213,7 @@ hosts the bus, then connect the CAN Commander to `virtual:default`:
 Further motors join the same bus with their own `--node`; `--plant anaheim` selects the other reference
 motor, and `--factory-fresh` starts with erased memory. `--help` lists every option. A virtual motor keeps
 its memory in `virtual-motor-<bus>-<node>.nvm` in its working directory, so it stays calibrated between
-runs.
+runs; `--memory` names another file in that directory.
 
 ## Releases
 

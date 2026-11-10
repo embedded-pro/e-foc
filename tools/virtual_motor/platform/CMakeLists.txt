@@ -25,6 +25,8 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     Pacer.hpp
     PlantDescription.cpp
     PlantDescription.hpp
+    PlantPowerStage.cpp
+    PlantPowerStage.hpp
     VirtualCanPort.cpp
     VirtualCanPort.hpp
     VirtualPlatform.cpp

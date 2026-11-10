@@ -4,6 +4,7 @@
 #include "tools/virtual_motor/engine/StartOptions.hpp"
 #include "tools/virtual_motor/platform/PlantDescription.hpp"
 #include "tools/virtual_motor/platform/VirtualPlatform.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -19,12 +20,10 @@
 
 namespace
 {
-    std::vector<std::string> arguments;
-
-    [[noreturn]] void Restart()
+    [[noreturn]] void Restart(const std::vector<std::string>& arguments)
     {
         std::vector<std::string> restartArguments{ arguments };
-        if (std::find(restartArguments.begin(), restartArguments.end(), "--restarted") == restartArguments.end())
+        if (std::ranges::find(restartArguments, "--restarted") == restartArguments.end())
             restartArguments.emplace_back("--restarted");
         std::erase(restartArguments, "--factory-fresh");
 
@@ -46,7 +45,7 @@ namespace
     std::optional<sil::SilPlantConfig> Plant(const virtual_motor::StartOptions& options)
     {
         auto plant = virtual_motor::PlantDescription(options.plant);
-        if (plant && options.seed)
+        if (plant && options.seed.has_value())
             plant->randomSeed = *options.seed;
         return plant;
     }
@@ -63,7 +62,7 @@ namespace
 
 int main(int argc, char* argv[])
 {
-    arguments.assign(argv, argv + argc);
+    static const std::vector<std::string> arguments{ argv, argv + argc };
     const auto parsed = virtual_motor::ParseStartOptions({ arguments.begin() + 1, arguments.end() });
     if (parsed.help)
     {
@@ -94,7 +93,7 @@ int main(int argc, char* argv[])
 
     platform.Construct(virtual_motor::BoardOptions{ options.bus, options.node, *plant, options.memoryFile, options.hubPort, options.restarted, []()
         {
-            Restart();
+            Restart(arguments);
         } });
 
     if (options.hostBus)
