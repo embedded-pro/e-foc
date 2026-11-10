@@ -2,6 +2,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/EkTm4c1294xlBoard.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NucleoG474reBoard.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/NucleoH563ziBoard.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/EmulatedBoard.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/VirtualBoard.cmake")
 
 if(E_FOC_TARGET_PLATFORM STREQUAL "qemu")
     set(E_FOC_BOARD EMULATED)

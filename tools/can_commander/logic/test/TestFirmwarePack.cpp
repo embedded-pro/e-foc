@@ -42,7 +42,8 @@ TEST(FirmwarePack, every_board_kind_names_its_board_and_microcontroller)
     EXPECT_EQ("emulated", Board(5).name);
     EXPECT_FALSE(BoardOfKind(0).has_value());
     EXPECT_FALSE(BoardOfKind(4).has_value());
-    EXPECT_FALSE(BoardOfKind(6).has_value());
+    EXPECT_EQ("virtual", Board(6).name);
+    EXPECT_FALSE(BoardOfKind(7).has_value());
 }
 
 TEST(FirmwarePack, every_board_carries_the_identification_its_firmware_is_built_with)
@@ -59,6 +60,7 @@ TEST(FirmwarePack, only_boards_with_a_bootloader_can_be_updated)
     EXPECT_TRUE(CanBeUpdated(Board(5)));
     EXPECT_FALSE(CanBeUpdated(Board(2)));
     EXPECT_FALSE(CanBeUpdated(Board(3)));
+    EXPECT_FALSE(CanBeUpdated(Board(6)));
 }
 
 TEST(FirmwarePack, a_pack_for_the_board_is_offered_with_its_version_and_crc)

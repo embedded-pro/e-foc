@@ -2,9 +2,9 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "virtual-motor"
-date: 2026-11-09
+date: 2026-11-10
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.0                |
+| Version   | 0.3.0                |
 | Component | virtual-motor        |
-| Date      | 2026-11-09           |
+| Date      | 2026-11-10           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -108,45 +108,45 @@ and the CAN Commander reports it offline after its usual timeout. Nothing else o
 
 A virtual motor is started with:
 
-| Start option | Meaning                                                                                   | Default                    |
-|--------------|-------------------------------------------------------------------------------------------|----------------------------|
-| Bus          | Name of the virtual CAN bus to join                                                       | `default`                  |
-| Node         | The board ID the CAN node address is built from (`service-can.md` Part I)                 | 0                          |
-| Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file                | `teknic`                   |
-| Memory       | The file holding its non-volatile memory                                                  | one file per bus and node  |
-| Start from   | Keep the memory file, start factory-fresh, or start from a calibration made for the plant | keep                       |
-| Seed         | Seed of every noise source, so a run replays exactly                                      | fixed                      |
-| Host the bus | Open the hub for the named bus if no hub is listening yet                                 | off                        |
-| Plant port   | Open the plant port for the Virtual Motor app                                             | on when started by the app |
+| Start option | Meaning                                                                    | Default                    |
+|--------------|----------------------------------------------------------------------------|----------------------------|
+| Bus          | Name of the virtual CAN bus to join                                        | `default`                  |
+| Node         | The board ID the CAN node address is built from (`service-can.md` Part I)  | 0                          |
+| Plant        | A reference motor preset (`teknic`, `anaheim`) or a plant description file | `teknic`                   |
+| Memory       | The file holding its non-volatile memory                                   | one file per bus and node  |
+| Start from   | Keep the memory file, or start factory-fresh                               | keep                       |
+| Seed         | Seed of every noise source, so a run replays exactly                       | fixed                      |
+| Host the bus | Open the hub for the named bus if no hub is listening yet                  | off                        |
+| Plant port   | Open the plant port for the Virtual Motor app                              | on when started by the app |
 
 ### Part B — The virtual board
 
 To the application the virtual board is one more platform, behind the same platform interfaces as the
 boards. What each service of the platform is on the virtual board:
 
-| Platform service        | On the virtual board                                                                                                |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------|
-| Power stage and encoder | The shared plant drive (Part D)                                                                                     |
-| Board protection        | The same simulated comparators the emulated target uses (`software-in-the-loop.md` Part E), armed with the inverter |
-| Supply voltage          | The plant's supply model                                                                                            |
-| CAN bus                 | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                           |
-| Non-volatile memory     | The memory file of the start options; every write reaches the file before it completes                              |
-| Status LEDs             | Three pins whose state the plant port publishes                                                                     |
-| Terminal and trace      | The debug log, published through the plant port; there is no command line, as on the board                          |
-| Board ID                | The node of the start options                                                                                       |
-| Board kind              | *virtual*, which no release carries a firmware pack for                                                             |
-| Reset                   | The process ends and is started again with the same options; the memory file survives                               |
-| Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                          |
+| Platform service        | On the virtual board                                                                                                                         |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| Power stage and encoder | The shared plant drive (Part D)                                                                                                              |
+| Board protection        | The same simulated comparators the emulated target uses (`software-in-the-loop.md` Part E), armed with the inverter                          |
+| Supply voltage          | The plant's supply model                                                                                                                     |
+| CAN bus                 | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                                                    |
+| Non-volatile memory     | The memory file of the start options; every write reaches the file before it completes                                                       |
+| Status LEDs             | Three pins whose state the plant port publishes                                                                                              |
+| Terminal and trace      | The debug log, on the engine's standard output and, once the app attaches, through the plant port; there is no command line, as on the board |
+| Board ID                | The node of the start options                                                                                                                |
+| Board kind              | *virtual*, kind 6 (`service-can.md` Part A), which no release carries a firmware pack for                                                    |
+| Reset                   | The process ends and is started again with the same options; the memory file survives                                                        |
+| Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                                                   |
 
 **Firmware update.** Does not apply. A virtual motor's firmware is the application it was built with,
 and a newer one comes with a newer tool; the virtual board has no bootloader and no staging slot. The
 CAN Commander shows its version and board kind and offers no update for it (`tool-can-commander.md`
 Part N).
 
-**Memory file.** A missing or unreadable file is a factory-fresh board. *Start factory-fresh* replaces
-the file with an erased memory; *start from a calibration* writes the calibration and configuration
-records the model-in-the-loop tests build for the chosen plant, so the motor can be aligned and run at
-once.
+**Memory file.** The memory is 512 bytes, the size the boards' EEPROM regions are laid out in, kept in a
+file named after the bus and the node in the engine's working directory unless the start options name
+another. A missing or short file is a factory-fresh board. *Start factory-fresh* replaces the file with
+an erased memory, so the motor needs calibrating from the CAN Commander, as a new board does.
 
 ### Part C — Time
 
@@ -158,7 +158,8 @@ order a board sees:
 1. For each control period of the millisecond (twenty at 20 kHz): the plant drive advances the plant
    one period, then the control interrupt runs with the measured currents and angle, and its duties
    are applied, one period late when the plant description says so.
-2. The low-priority interrupt runs if the control interrupt triggered it.
+2. The low-priority interrupt runs right after the control interrupt that triggered it, as it would on
+   the board, where it pre-empts nothing but runs before the next control period.
 3. The timers due in that millisecond fire.
 4. The event loop runs until it is idle.
 
@@ -174,8 +175,8 @@ sequenceDiagram
         Pacer->>Plant: advance one period, apply pending disturbance commands
         Plant->>ISR: phase currents, angle
         ISR->>Plant: duties
+        Pacer->>LPI: run if this period triggered it
     end
-    Pacer->>LPI: run if triggered
     Pacer->>Events: advance timers by 1 ms, run until idle
     Pacer->>Pacer: publish plant samples, CAN frames leave
 ```
@@ -367,8 +368,9 @@ Signals of the continuous stream and of a capture, per control period:
 
 ## Open Questions
 
-| # | Question                                     | Options                                                              | Status                              |
-|---|----------------------------------------------|----------------------------------------------------------------------|-------------------------------------|
-| 1 | Where does the `virtual:` adapter live?      | In can-lite's host adapter composition; or in the CAN Commander only | resolved: can-lite (Part G)         |
-| 2 | Does a virtual motor take a firmware update? | Refuse a download; or offer none                                     | resolved: none offered (Part B)     |
-| 3 | What may change while the motor runs?        | Torque and noise only; or intrinsic parameters too                   | resolved: torque and noise (Part E) |
+| # | Question                                     | Options                                                                                                     | Status                                                                      |
+|---|----------------------------------------------|-------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| 1 | Where does the `virtual:` adapter live?      | In can-lite's host adapter composition; or in the CAN Commander only                                        | resolved: can-lite (Part G)                                                 |
+| 2 | Does a virtual motor take a firmware update? | Refuse a download; or offer none                                                                            | resolved: none offered (Part B)                                             |
+| 3 | What may change while the motor runs?        | Torque and noise only; or intrinsic parameters too                                                          | resolved: torque and noise (Part E)                                         |
+| 4 | When can a virtual motor start calibrated?   | Once the calibration image builder leaves the test harness for a library the engine can link on Windows too | open: until then a factory-fresh motor is calibrated from the CAN Commander |

@@ -5,6 +5,8 @@ target_include_directories(e_foc.foc.model.drive PUBLIC
 )
 
 target_sources(e_foc.foc.model.drive PRIVATE
+    BoardProtectionSimulator.cpp
+    BoardProtectionSimulator.hpp
     PlantDrive.cpp
     PlantDrive.hpp
     PlantEvents.cpp

@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.24.0
+version: 0.24.1
 component: can-service
-date: 2026-11-08
+date: 2026-11-10
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.24.0                   |
+| Version   | 0.24.1                   |
 | Component | can-service              |
-| Date      | 2026-11-08               |
+| Date      | 2026-11-10               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -322,15 +322,15 @@ tell a client which firmware a node runs, on which board, and which pack waits t
 `SetParameter` with `invalidPayload`, and travel as the float of the number. A client asks for them only when
 the node reports 2.6 or newer.
 
-| ID     | Parameter              | Unit | Value                                                                                           | Automatic |
-|--------|------------------------|------|-------------------------------------------------------------------------------------------------|-----------|
-| `0xB1` | `firmwareVersionMajor` | -    | Major number of the running firmware's release version                                          | no        |
-| `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                          | no        |
-| `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                          | no        |
-| `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `emulated 5`; `0` unknown; `4` retired | no        |
-| `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged   | no        |
-| `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                      | no        |
-| `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                      | no        |
+| ID     | Parameter              | Unit | Value                                                                                                        | Automatic |
+|--------|------------------------|------|--------------------------------------------------------------------------------------------------------------|-----------|
+| `0xB1` | `firmwareVersionMajor` | -    | Major number of the running firmware's release version                                                       | no        |
+| `0xB2` | `firmwareVersionMinor` | -    | Minor number of the running firmware's release version                                                       | no        |
+| `0xB3` | `firmwareVersionPatch` | -    | Patch number of the running firmware's release version                                                       | no        |
+| `0xB4` | `boardKind`            | -    | `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`, `NUCLEO-H563ZI 3`, `emulated 5`, `virtual 6`; `0` unknown; `4` retired | no        |
+| `0xB5` | `stagedVersionMajor`   | -    | Major number of the release version of the pack staged for an update; `0` when none is staged                | no        |
+| `0xB6` | `stagedVersionMinor`   | -    | Minor number of the staged pack's release version; `0` when none is staged                                   | no        |
+| `0xB7` | `stagedVersionPatch`   | -    | Patch number of the staged pack's release version; `0` when none is staged                                   | no        |
 
 This firmware answers all seven. The version numbers are those of the CMake project version the build was
 configured with, and the board kind is the one the platform reports (`application::BoardKind`). The staged

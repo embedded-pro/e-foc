@@ -19,9 +19,10 @@ namespace e_foc::boards
     inline constexpr Board nucleoG474re{ @E_FOC_NUCLEO_G474RE_BOARD_KIND@, "@E_FOC_NUCLEO_G474RE_NAME@", "@E_FOC_NUCLEO_G474RE_MICROCONTROLLER@", "@E_FOC_NUCLEO_G474RE_IDENTIFICATION@", @E_FOC_NUCLEO_G474RE_BOOTLOADER@ };
     inline constexpr Board nucleoH563zi{ @E_FOC_NUCLEO_H563ZI_BOARD_KIND@, "@E_FOC_NUCLEO_H563ZI_NAME@", "@E_FOC_NUCLEO_H563ZI_MICROCONTROLLER@", "@E_FOC_NUCLEO_H563ZI_IDENTIFICATION@", @E_FOC_NUCLEO_H563ZI_BOOTLOADER@ };
     inline constexpr Board emulated{ @E_FOC_EMULATED_BOARD_KIND@, "@E_FOC_EMULATED_NAME@", "@E_FOC_EMULATED_MICROCONTROLLER@", "@E_FOC_EMULATED_IDENTIFICATION@", @E_FOC_EMULATED_BOOTLOADER@ };
+    inline constexpr Board virtualBoard{ @E_FOC_VIRTUAL_BOARD_KIND@, "@E_FOC_VIRTUAL_NAME@", "@E_FOC_VIRTUAL_MICROCONTROLLER@", "@E_FOC_VIRTUAL_IDENTIFICATION@", @E_FOC_VIRTUAL_BOOTLOADER@ };
 
     // Kind 4 was the EK-TM4C123GXL; it is retired and never reused.
-    inline constexpr std::array<Board, 4> all{ ekTm4c1294xl, nucleoG474re, nucleoH563zi, emulated };
+    inline constexpr std::array<Board, 5> all{ ekTm4c1294xl, nucleoG474re, nucleoH563zi, emulated, virtualBoard };
 
     constexpr uint8_t LargestKind()
     {
