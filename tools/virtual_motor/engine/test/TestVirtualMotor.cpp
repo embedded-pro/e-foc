@@ -93,9 +93,12 @@ namespace
         std::optional<float> speed;
     };
 
-    uint16_t TestHubPort()
+    uint16_t FreePort()
     {
-        return static_cast<uint16_t>(40000 + getpid() % 20000);
+        const auto probe = services::loopback::Listen(0);
+        const auto port = services::loopback::LocalPort(probe).value_or(0);
+        services::loopback::Close(probe);
+        return port;
     }
 
     std::string MemoryFile()
@@ -131,7 +134,7 @@ namespace
 
 TEST(TestVirtualMotor, a_client_on_the_virtual_bus_spins_a_factory_fresh_motor_that_goes_silent_while_paused)
 {
-    const auto port = TestHubPort();
+    const auto port = FreePort();
     const auto memory = MemoryFile();
     std::filesystem::remove(memory);
 
