@@ -370,3 +370,15 @@ TEST_F(TestRig, a_capture_is_assembled_and_a_restart_cancels_one_in_flight)
     EXPECT_EQ(rig.Find(2)->Captures().Last()->number, 1u);
     EXPECT_EQ(observer.captures, 5);
 }
+
+TEST_F(TestRig, a_motor_speaking_another_protocol_is_powered_off_and_says_why)
+{
+    rig.Add(MotorSpec{ "default", 2 });
+    auto engine = std::make_unique<FakeEngine>(rig.PlantPort().value_or(0));
+    engine->Send(port::Hello{ 1, 2, "default", "teknic", 20000 });
+    PollFor(30);
+
+    EXPECT_THAT(processes.stopped, testing::ElementsAre(1u));
+    EXPECT_THAT(rig.Find(2)->Log(), testing::Contains(testing::HasSubstr("plant port protocol 1 and this app 2")));
+    EXPECT_NE(rig.Find(2)->State(), MotorState::running);
+}

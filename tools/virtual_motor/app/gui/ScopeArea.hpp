@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tools/virtual_motor/app/logic/EncoderView.hpp"
 #include "tools/virtual_motor/app/logic/Rig.hpp"
 #include "tools/virtual_motor/app/logic/TraceView.hpp"
 #include <QWidget>
@@ -28,12 +29,12 @@ namespace virtual_motor::app
         Q_OBJECT
 
     public:
-        ScopeArea(RigMotor& motor, QWidget* parent = nullptr);
+        ScopeArea(RigMotor& motor, EncoderGeometry geometry, QWidget* parent = nullptr);
 
         void AddPage(QWidget* page, const QString& title);
         bool ShowsTrace() const;
         ScopeMode Mode() const;
-        TraceView* CurrentView() const;
+        SourceView* CurrentView() const;
         void ShowCapture(std::optional<uint8_t> signal);
         void Refresh();
 
@@ -46,8 +47,9 @@ namespace virtual_motor::app
         void SetMode(ScopeMode newMode);
         void ToggleFreeze();
         void SaveCapture();
+        void AddView(std::unique_ptr<SourceView> view);
         void Tick();
-        void ShowOn(TraceView& view);
+        void ShowOn(SourceView& view);
         void RefreshToolbar();
         uint32_t ControlRate() const;
         double SpanSeconds() const;
@@ -61,14 +63,14 @@ namespace virtual_motor::app
         QLabel* modeLabel;
         QLabel* cursors;
         QTimer* timer;
-        std::vector<std::unique_ptr<TraceView>> views;
+        std::vector<std::unique_ptr<SourceView>> views;
         ScopeMode mode{ ScopeMode::live };
         std::optional<TraceHistory> frozen;
         std::optional<HistoryTrace> liveTrace;
         std::optional<HistoryTrace> frozenTrace;
         std::optional<CaptureTrace> captureTrace;
         uint64_t shownRevision{ 0 };
-        const TraceView* shownView{ nullptr };
+        const SourceView* shownView{ nullptr };
         bool stale{ true };
     };
 }

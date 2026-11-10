@@ -8,7 +8,7 @@ namespace virtual_motor::app
 
     void TraceHistory::Add(const port::Window& window)
     {
-        Envelope envelope{ window.firstPeriod, window.periods, false, window.minimum, window.maximum };
+        Envelope envelope{ window.firstPeriod, window.periods, false, window.minimum, window.maximum, window.last };
         if (lastSequence.has_value() && window.sequence != *lastSequence + 1)
         {
             envelope.afterGap = true;

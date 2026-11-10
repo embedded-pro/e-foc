@@ -49,14 +49,16 @@ namespace virtual_motor::app
         auto& motor = *rig.Find(node);
         setWindowTitle(QString("VIRTUAL · Node %1 · %2 — e-foc Virtual Motor").arg(node).arg(Text(motor.Spec().plant)));
 
-        panel = new TorqueNoisePanel(motor, PlantDescription(motor.Spec().plant), this);
+        const auto plant = PlantDescription(motor.Spec().plant);
+        panel = new TorqueNoisePanel(motor, plant, this);
         log = new LogView(this);
         QStringList lines;
         for (const auto& line : motor.Log())
             lines << Text(line);
         log->SetLines(lines);
 
-        scope = new ScopeArea(motor, this);
+        const EncoderGeometry geometry{ plant.has_value() ? plant->polePairs : uint8_t{ 1 }, plant.has_value() ? plant->encoderCountsPerRevolution : 0u };
+        scope = new ScopeArea(motor, geometry, this);
         scope->AddPage(log, "Log");
         connect(scope, &ScopeArea::TraceShownChanged, this, &MotorWindow::UpdateStreaming);
         captureBar = new CaptureBar(motor, this);

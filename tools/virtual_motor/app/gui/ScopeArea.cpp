@@ -1,5 +1,7 @@
 #include "tools/virtual_motor/app/gui/ScopeArea.hpp"
 #include "tools/virtual_motor/app/logic/CaptureCsv.hpp"
+#include "tools/virtual_motor/app/logic/ModulationView.hpp"
+#include "tools/virtual_motor/app/logic/RotorView.hpp"
 #include "ui/backend/qt/QtPaintedWidget.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include <QComboBox>
@@ -43,24 +45,16 @@ namespace virtual_motor::app
         constexpr int defaultSpan{ 4 };
     }
 
-    ScopeArea::ScopeArea(RigMotor& motor, QWidget* parent)
+    ScopeArea::ScopeArea(RigMotor& motor, EncoderGeometry geometry, QWidget* parent)
         : QWidget(parent)
         , motor(motor)
     {
         tabs = new QTabWidget(this);
         for (const auto& spec : TraceViews())
-        {
-            auto& view = *views.emplace_back(std::make_unique<TraceView>(spec));
-            auto* widget = new ui::backend::qt::QtPaintedWidget(view, tabs);
-            widget->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
-            const auto name = QString::fromUtf8(spec.name.data(), static_cast<qsizetype>(spec.name.size()));
-            widget->setAccessibleName(name + " traces");
-            tabs->addTab(widget, name);
-            view.OnCursorsChanged([this]()
-                {
-                    RefreshToolbar();
-                });
-        }
+            AddView(std::make_unique<TraceView>(spec));
+        AddView(std::make_unique<ModulationView>());
+        AddView(std::make_unique<RotorView>(geometry.polePairs));
+        AddView(std::make_unique<EncoderView>(geometry));
 
         auto* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
@@ -73,6 +67,20 @@ namespace virtual_motor::app
         connect(timer, &QTimer::timeout, this, &ScopeArea::Tick);
         timer->start();
         SetMode(ScopeMode::live);
+    }
+
+    void ScopeArea::AddView(std::unique_ptr<SourceView> view)
+    {
+        auto& added = *views.emplace_back(std::move(view));
+        auto* widget = new ui::backend::qt::QtPaintedWidget(added, tabs);
+        widget->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
+        const auto name = QString::fromUtf8(added.Name().data(), static_cast<qsizetype>(added.Name().size()));
+        widget->setAccessibleName(name + " view");
+        tabs->addTab(widget, name);
+        added.OnCursorsChanged([this]()
+            {
+                RefreshToolbar();
+            });
     }
 
     void ScopeArea::AddPage(QWidget* page, const QString& title)
@@ -90,7 +98,7 @@ namespace virtual_motor::app
         return mode;
     }
 
-    TraceView* ScopeArea::CurrentView() const
+    SourceView* ScopeArea::CurrentView() const
     {
         const auto index = tabs->currentIndex();
         return index >= 0 && static_cast<std::size_t>(index) < views.size() ? views[static_cast<std::size_t>(index)].get() : nullptr;
@@ -214,7 +222,7 @@ namespace virtual_motor::app
         RefreshToolbar();
     }
 
-    void ScopeArea::ShowOn(TraceView& view)
+    void ScopeArea::ShowOn(SourceView& view)
     {
         if (mode == ScopeMode::capture && motor.Captures().Last())
         {

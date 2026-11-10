@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.6.0
+version: 0.7.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.6.0                |
+| Version   | 0.7.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -302,6 +302,9 @@ plant port connects to it before it joins the bus and introduces itself; one it 
 start. When the connection ends, the motor carries on without it, and a paused motor resumes, so a
 motor whose app has gone never hangs.
 
+**Version.** Hello names the protocol version: 2, since a window also carries its last control period,
+so a reader can pair signals sampled in the same period, such as the stator voltage α and β.
+
 **Frames.** Each message is one frame: its type in one byte, the length of its payload in two bytes, then
 the payload. Numbers are little-endian, reals are single-precision IEEE 754, and a text is its length in
 one byte followed by that many characters. A frame of a type the reader does not know is skipped by its
@@ -317,7 +320,7 @@ Motor to app:
 | `0x03` | Changes       | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description                                                                                                            | Once after Hello, and after every accepted change                          |
 | `0x04` | Refused       | The type of the refused request, the reason                                                                                                                                                                                                             | For every refused request                                                  |
 | `0x05` | Log line      | The text of one debug log line                                                                                                                                                                                                                          | For every line the debug log writes                                        |
-| `0x10` | Window        | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order                                                                               | Every 10 control periods while the stream is on, unless dropped            |
+| `0x10` | Window        | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order, then every signal in the window's last control period                        | Every 10 control periods while the stream is on, unless dropped            |
 | `0x11` | Capture event | Capture number (2 bytes), event (armed, triggered, cancelled), the control period it happened in (8 bytes)                                                                                                                                              | When a capture is armed, triggered or cancelled                            |
 | `0x12` | Capture chunk | Capture number (2 bytes), its length and its periods before the trigger (2 bytes each), its first control period (8 bytes), this chunk's first index and length (2 bytes each), then every signal of every period, period by period in Data Model order | Once a capture is complete, until all of it is sent                        |
 | `0x13` | Profile state | State (armed, running, finished, stopped), changes applied and changes in all (2 bytes each), control periods since the trigger (4 bytes)                                                                                                               | When a profile is armed, starts, applies a change, finishes or stops       |

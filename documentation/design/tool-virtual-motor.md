@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.0                    |
+| Version   | 0.4.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -89,6 +89,9 @@ without a display:
   *Restarting* while a motor that reset reconnects; *Stopped* once powered off; *Crashed* when its process
   ends unasked. A crashed motor keeps its row with its last log lines one click away; the row explains that
   the CAN Commander will report it offline.
+- A motor that introduces itself with another plant port protocol version (`virtual-motor.md` Part F)
+  is powered off, and its log names both versions: the app and the virtual motor program it starts
+  ship together.
 - **Real time** shows the real-time factor; below 0.98 it is a warning with the overrun count in the
   tooltip, because the drive is then running late.
 - **Open CAN Commander** starts the CAN Commander installed next to the app; its Interface box lists
@@ -110,7 +113,7 @@ mistaken for a bench instrument on real hardware.
 | VIRTUAL  Node 1 · Teknic M-2310P   Running  t = 00:01:42.315  RT 1.00   LEDs ● ○ ○  Prot: ok |
 | [Pause] [Step 1 period] [Step 1 ms] [Power Cycle] [Power Off]  Disturbances: 2 [Clear All] |
 +-----------------------------------------------------------+------------------------------+
-| Tabs: Currents | Voltages | Rotor | Encoder | Mechanics | Supply | Log | Torque & Noise    |
+| Tabs: Currents | Voltages | Mechanics | Supply | Modulation | Rotor | Encoder | Log        |
 |                                                           |  Torque                      |
 |   (selected view)                                         |    load, external            |
 |                                                           |  Noise                       |
@@ -127,15 +130,16 @@ The header is always in view: motor state, virtual time, real-time factor, the t
 would light them (with their meaning in text: operational, warning, failure), the board protection
 state, and the number of active disturbances with **Clear All** beside it.
 
-| View      | Shows                                                                                                                         |
-|-----------|-------------------------------------------------------------------------------------------------------------------------------|
-| Currents  | True phase currents a, b, c with the measured ones overlaid, so the sensor's noise and bias are visible; true Id and Iq below |
-| Voltages  | Duties and leg voltages a, b, c; the modulation hexagon with the stator voltage vector and its trail                          |
-| Rotor     | The animated motor of Part E                                                                                                  |
-| Encoder   | The monitor of Part F                                                                                                         |
-| Mechanics | Speed, true angle, electrical torque against load and external torque                                                         |
-| Supply    | Bus voltage and current, winding temperature                                                                                  |
-| Log       | The debug log, timestamped in virtual time, bounded, with filter, Clear and Save                                              |
+| View       | Shows                                                                                                                         |
+|------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Currents   | True phase currents a, b, c with the measured ones overlaid, so the sensor's noise and bias are visible; true Id and Iq below |
+| Voltages   | Duties and leg voltages a, b, c; stator voltage α and β                                                                       |
+| Modulation | The hexagon of Part J with the stator voltage vector and its trail, beside the current in the d-q plane                       |
+| Rotor      | The animated motor of Part E                                                                                                  |
+| Encoder    | The monitor of Part F                                                                                                         |
+| Mechanics  | Speed, true angle, electrical torque against load and external torque                                                         |
+| Supply     | Bus voltage and current, winding temperature                                                                                  |
+| Log        | The debug log, timestamped in virtual time, bounded, with filter, Clear and Save                                              |
 
 ### Part D — scopes
 
@@ -200,24 +204,36 @@ stateDiagram-v2
 
 A cross-section of the motor, drawn at the true mechanical angle:
 
-- The stator with its three phase axes, each winding shaded by the sign and size of its current.
-- The rotor with its pole pairs, the d axis marked.
-- The current space vector and the voltage space vector, drawn from the centre in the stationary frame,
-  with the d and q axes turning with the rotor, so the angle between current and q shows the field
-  weakening or a misalignment.
+- The stator with its three phase axes, each winding shaded by the sign and size of its current: warm for
+  a current into the winding, cool for one out of it, stronger as it nears the largest current shown.
+- The rotor with the pole pairs of its plant description, alternating north and south, the d axis marked.
+- The current space vector (the amplitude-invariant Clarke of the true phase currents) and the stator
+  voltage vector, drawn from the centre in the stationary frame, each scaled to its own largest magnitude
+  and labelled with it, with the d and q axes turning with the rotor, so the angle between current and q
+  shows field weakening or a misalignment.
 - The encoder's angle as a second marker on the rotor rim, which separates from the true one when the
   encoder is noisy, biased or stuck.
 
-The drawing repaints at most 25 times a second and shows the true speed beside it; above the speed at
-which the rotor would turn more than a quarter turn between frames it shows the angle in the rotor frame
-instead, and says so, rather than drawing an aliased rotation.
+The rotor shows one instant: the newest window's last control period while live, the newest frozen one
+when frozen, and the trigger period of a capture. It repaints at most 25 times a second and shows the
+true speed beside it. Above the speed at which the rotor would turn more than a quarter turn between
+frames it draws the rotor fixed, d axis up, with the vectors in the rotor frame, and says so, rather
+than drawing an aliased rotation.
 
 ### Part F — the encoder monitor
 
-- The true angle and the encoder's angle, and their difference in electrical degrees, over time.
+Over the chosen span, from each window's last control period while live and from every period of a
+capture:
+
+- The difference between the true angle and the encoder's angle, in electrical degrees and wrapped to a
+  half turn, over time.
 - A histogram of the difference, with its mean (bias) and standard deviation (noise).
-- Counts per revolution, the index pulses seen, and a *stuck* indicator when the reported angle stopped
-  while the rotor turns.
+- The encoder's counts per revolution and its resolution in electrical degrees from the plant
+  description, or that it is ideal when the description gives no counts, and a *stuck* indicator when
+  the reported angle has not changed over the last 10 ms while the true angle moved by more than one
+  count, or by a thousandth of a radian for an ideal encoder.
+
+The index pulse is not in the Data Model, so the monitor does not show it.
 
 ### Part G — torque and noise
 
@@ -243,6 +259,19 @@ The CAN Commander needs no knowledge of the plant. A node whose board kind is *v
 The app and the virtual motor program ship in the CAN Commander's Windows and Debian installers, with
 their own start-menu entry and icon. The installers' asset names stay unchanged, so the update check
 finds them as before.
+
+### Part J — modulation
+
+The space-vector hexagon of the shared tool UI library, drawn for the bus voltage of the plant: its six
+switching vectors at two thirds of the bus voltage, the circle of linear modulation at the bus voltage
+over √3, the phase leg voltages a, b and c as phasors, and their resultant, the stator voltage vector,
+with its sector shaded. Over it, the trail of the stator voltage vector across the chosen span, fading
+with age, from each window's last control period while live and from every period of a capture. A
+vector beyond the linear circle reads *Overmodulation*.
+
+Beside the hexagon, the true current in the d-q plane: its trail across the same span and its newest
+point, on axes symmetric about zero and scaled to the largest current shown, so a drive holding Id at
+zero draws a vertical line and noise or a misalignment widens or tilts it.
 
 ---
 

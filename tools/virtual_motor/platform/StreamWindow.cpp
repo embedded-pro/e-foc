@@ -28,6 +28,7 @@ namespace virtual_motor
             return std::nullopt;
 
         collected = 0;
+        window.last = sample;
         window.periods = periodsPerWindow;
         window.sequence = sequence++;
         return window;

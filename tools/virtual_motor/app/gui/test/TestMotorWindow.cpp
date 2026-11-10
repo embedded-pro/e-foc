@@ -177,7 +177,7 @@ TEST_F(TestMotorWindow, a_complete_capture_opens_in_the_view_of_its_trigger_sign
     auto* scope = window->findChild<ScopeArea*>();
     EXPECT_EQ(scope->Mode(), ScopeMode::capture);
     ASSERT_NE(scope->CurrentView(), nullptr);
-    EXPECT_EQ(scope->CurrentView()->Spec().name, "Mechanics");
+    EXPECT_EQ(scope->CurrentView()->Name(), "Mechanics");
     EXPECT_TRUE(Button("Save CSV…")->isEnabled());
 
     Button("Back to Live")->click();
@@ -197,4 +197,19 @@ TEST_F(TestMotorWindow, freezing_keeps_the_traces_and_offers_cursors)
     Button("Run")->click();
     EXPECT_EQ(scope->Mode(), ScopeMode::live);
     EXPECT_TRUE(scope->CurrentView()->CursorSummary().empty());
+}
+
+TEST_F(TestMotorWindow, the_modulation_rotor_and_encoder_views_follow_the_traces)
+{
+    window->show();
+    auto* tabs = window->findChild<ScopeArea*>()->findChild<QTabWidget*>();
+
+    QStringList titles;
+    for (int tab = 0; tab != tabs->count(); ++tab)
+        titles << tabs->tabText(tab);
+    EXPECT_EQ(titles.join(","), "Currents,Voltages,Mechanics,Supply,Modulation,Rotor,Encoder,Log");
+
+    tabs->setCurrentIndex(5);
+    EXPECT_EQ(window->findChild<ScopeArea*>()->CurrentView()->Name(), "Rotor");
+    EXPECT_TRUE(rig.Find(3)->Streaming());
 }

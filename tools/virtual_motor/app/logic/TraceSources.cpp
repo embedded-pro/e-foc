@@ -19,6 +19,16 @@ namespace virtual_motor::app
         return low;
     }
 
+    std::optional<std::size_t> TraceSource::LastAtOrBefore(double time) const
+    {
+        const auto index = FirstAtOrAfter(time);
+        if (index != Count() && Time(index) == time)
+            return index;
+        if (index == 0)
+            return std::nullopt;
+        return index - 1;
+    }
+
     HistoryTrace::HistoryTrace(const TraceHistory& history, uint32_t controlRateHz)
         : history(history)
         , controlRateHz(controlRateHz)
@@ -49,6 +59,11 @@ namespace virtual_motor::app
         return history.At(index).afterGap;
     }
 
+    const port::Sample& HistoryTrace::Last(std::size_t index) const
+    {
+        return history.At(index).last;
+    }
+
     CaptureTrace::CaptureTrace(const Capture& capture, uint32_t controlRateHz)
         : capture(capture)
         , controlRateHz(controlRateHz)
@@ -77,5 +92,10 @@ namespace virtual_motor::app
     bool CaptureTrace::BreakBefore(std::size_t) const
     {
         return false;
+    }
+
+    const port::Sample& CaptureTrace::Last(std::size_t index) const
+    {
+        return capture.periods[index];
     }
 }

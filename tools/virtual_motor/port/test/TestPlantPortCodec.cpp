@@ -131,17 +131,19 @@ TEST(TestPlantPortCodec, a_frame_of_another_type_does_not_decode)
     EXPECT_FALSE(Decode<CurrentNoise>(Frame{ static_cast<uint8_t>(MessageType::encoderNoise), { 0, 0, 0, 0 } }).has_value());
 }
 
-TEST(TestPlantPortCodec, a_window_carries_its_place_and_each_signals_minimum_then_maximum)
+TEST(TestPlantPortCodec, a_window_carries_its_place_each_signals_minimum_then_maximum_and_its_last_period)
 {
     Window window{ 7, 1234567890123ull, 10 };
     for (std::size_t signal = 0; signal != signalCount; ++signal)
     {
         window.minimum[signal] = -static_cast<float>(signal);
         window.maximum[signal] = static_cast<float>(signal) + 0.5f;
+        window.last[signal] = static_cast<float>(signal) + 0.25f;
     }
 
     const auto bytes = Encode(window);
-    EXPECT_EQ(bytes.size(), 3u + 13u + signalCount * 8u);
+    EXPECT_EQ(bytes.size(), 3u + 13u + signalCount * 12u);
+    EXPECT_FLOAT_EQ(RoundTrip(window).last[24], 24.25f);
 
     const auto decoded = RoundTrip(window);
     EXPECT_EQ(decoded.sequence, 7u);

@@ -334,6 +334,13 @@ namespace virtual_motor::app
         if (motor == nullptr || hello.bus != motor->spec.bus || !motor->process.has_value())
             return;
 
+        if (hello.version != port::protocolVersion)
+        {
+            motor->Append(std::format("The virtual motor speaks plant port protocol {} and this app {}: install the virtual motor program that came with this app", hello.version, port::protocolVersion));
+            PowerOff(hello.node);
+            return;
+        }
+
         motor->Attach(std::move(link));
     }
 

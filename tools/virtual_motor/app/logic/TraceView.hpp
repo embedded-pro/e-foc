@@ -1,8 +1,7 @@
 #pragma once
 
+#include "tools/virtual_motor/app/logic/SourceView.hpp"
 #include "tools/virtual_motor/app/logic/TraceSignals.hpp"
-#include "tools/virtual_motor/app/logic/TraceSources.hpp"
-#include "ui/core/PaintedView.hpp"
 #include <functional>
 #include <optional>
 #include <string>
@@ -11,12 +10,6 @@
 
 namespace virtual_motor::app
 {
-    struct TimeRange
-    {
-        double start{ 0.0 };
-        double end{ 0.0 };
-    };
-
     struct TraceReading
     {
         uint8_t signal{ 0 };
@@ -25,21 +18,22 @@ namespace virtual_motor::app
     };
 
     class TraceView
-        : public ui::PaintedView
+        : public SourceView
     {
     public:
         explicit TraceView(const ViewSpec& spec);
 
-        void Show(const TraceSource* source, TimeRange range, double origin);
-        void SetCursorsEnabled(bool enabled);
+        std::string_view Name() const override;
+        void Show(const TraceSource* source, TimeRange range, double origin) override;
+        void SetCursorsEnabled(bool enabled) override;
         void ClearCursors();
-        void OnCursorsChanged(const std::function<void()>& callback);
+        void OnCursorsChanged(const std::function<void()>& callback) override;
 
         const ViewSpec& Spec() const;
         std::optional<double> CursorA() const;
         std::optional<double> CursorB() const;
         std::vector<TraceReading> Readings(std::size_t panel) const;
-        std::string CursorSummary() const;
+        std::string CursorSummary() const override;
 
         void Paint(ui::Canvas& canvas, const ui::Rect& bounds) override;
         ui::Size MinimumSize() const override;
