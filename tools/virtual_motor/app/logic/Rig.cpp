@@ -57,6 +57,11 @@ namespace virtual_motor::app
         return captures;
     }
 
+    const std::optional<port::ProfileState>& RigMotor::Profile() const
+    {
+        return profile;
+    }
+
     bool RigMotor::Streaming() const
     {
         return streaming;
@@ -74,6 +79,7 @@ namespace virtual_motor::app
     {
         link = std::move(newLink);
         history.Clear();
+        profile.reset();
         if (streaming)
             link->Send(port::StreamRequest{ 1 });
         identity = link->Identity();
@@ -147,6 +153,13 @@ namespace virtual_motor::app
     {
         captures.Chunk(chunk);
         Captured();
+    }
+
+    void RigMotor::ProfileStateReceived(const port::ProfileState& state)
+    {
+        profile = state;
+        if (rig.observer != nullptr)
+            rig.observer->MotorUpdated(spec.node);
     }
 
     void RigMotor::Captured()

@@ -11,6 +11,7 @@ namespace virtual_motor::app
 {
     class CaptureBar;
     class LogView;
+    class ProfilePanel;
     class ScopeArea;
     class TorqueNoisePanel;
 
@@ -57,6 +58,7 @@ namespace virtual_motor::app
         QPushButton* powerCycle;
         QPushButton* powerOff;
         TorqueNoisePanel* panel;
+        ProfilePanel* profile;
         LogView* log;
         ScopeArea* scope;
         CaptureBar* captureBar;
