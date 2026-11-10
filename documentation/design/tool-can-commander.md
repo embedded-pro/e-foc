@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.22.0
+version: 0.23.0
 component: "tool-can-commander"
-date: 2026-11-09
+date: 2026-11-10
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.22.0               |
+| Version   | 0.23.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-09           |
+| Date      | 2026-11-10           |
 
 ---
 
@@ -571,8 +571,9 @@ against the simulation plant. The tool reaches it on a virtual CAN bus, named `v
 Interface box, and commands it like any board; it learns nothing about the plant, whose views belong to
 the Virtual Motor app (`tool-virtual-motor.md`).
 
-- **Listing.** The Interface box lists `virtual:<bus>` for every bus the local virtual CAN hub offers.
-  Connecting while no hub runs fails with the advice to start the Virtual Motor app.
+- **Listing.** The Interface box lists `virtual:default` while a virtual CAN hub runs on the machine; any
+  other bus name can be typed. Connecting while no hub runs, or at another bitrate than the bus already
+  runs at, fails with the advice to check that a hub is running and that every node uses the same bitrate.
 - **Marking.** A node that reports the board kind *virtual* is marked **Virtual** on its tab, its overview
   chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
   motor.
