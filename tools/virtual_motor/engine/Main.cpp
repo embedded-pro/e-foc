@@ -111,7 +111,7 @@ namespace
             },
             options.plant });
 
-        if (options.plantPort && !AttachPlantPort(*platform, plantPort, *options.plantPort))
+        if (options.plantPort.has_value() && !AttachPlantPort(*platform, plantPort, *options.plantPort))
         {
             std::cerr << "e-foc-virtual-motor: no plant port is listening on port " << *options.plantPort << "\n";
             return EXIT_FAILURE;

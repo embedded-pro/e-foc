@@ -50,7 +50,7 @@ namespace virtual_motor
         while (IsConnected())
         {
             const auto size = services::loopback::Receive(socket, infra::ByteRange{ buffer.data(), buffer.data() + buffer.size() });
-            if (!size)
+            if (!size.has_value())
                 Disconnect();
             else if (*size == 0)
                 break;

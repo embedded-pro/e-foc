@@ -14,7 +14,7 @@ namespace virtual_motor
 
     port::Status PlatformPortTarget::CurrentStatus() const
     {
-        auto& runner = platform.Runner();
+        const auto& runner = platform.Runner();
         return {
             platform.ControlPeriods(),
             runner.RealTimeFactor(),

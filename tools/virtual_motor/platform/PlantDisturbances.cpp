@@ -23,9 +23,9 @@ namespace virtual_motor
             return std::nullopt;
         }
 
-        uint8_t Differs(bool differs, uint8_t bit)
+        uint32_t Differs(bool differs, uint8_t bit)
         {
-            return differs ? bit : uint8_t{ 0 };
+            return differs ? uint32_t{ bit } : 0u;
         }
     }
 
@@ -107,10 +107,10 @@ namespace virtual_motor
     port::Changes PlantDisturbances::InForce() const
     {
         auto changes = inForce;
-        changes.differs = Differs(inForce.loadTorque != baseline.loadTorque.Value(), port::differs::loadTorque) |
-                          Differs(inForce.externalTorque.form != port::TorqueForm::none, port::differs::externalTorque) |
-                          Differs(inForce.currentNoise != baseline.currentNoise.Value(), port::differs::currentNoise) |
-                          Differs(inForce.encoderNoise != baseline.encoderNoise.Value(), port::differs::encoderNoise);
+        changes.differs = static_cast<uint8_t>(Differs(inForce.loadTorque != baseline.loadTorque.Value(), port::differs::loadTorque) |
+                                               Differs(inForce.externalTorque.form != port::TorqueForm::none, port::differs::externalTorque) |
+                                               Differs(inForce.currentNoise != baseline.currentNoise.Value(), port::differs::currentNoise) |
+                                               Differs(inForce.encoderNoise != baseline.encoderNoise.Value(), port::differs::encoderNoise));
         return changes;
     }
 
