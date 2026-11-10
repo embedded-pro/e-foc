@@ -27,6 +27,7 @@ namespace virtual_motor::app
         void MotorUpdated(uint8_t node) override;
         void MotorLogged(uint8_t node, const std::string& line) override;
         void MotorRefused(uint8_t node, const port::Refused& refused) override;
+        void MotorCaptured(uint8_t node) override;
 
         void AddMotor();
         void OpenMotor(uint8_t node);

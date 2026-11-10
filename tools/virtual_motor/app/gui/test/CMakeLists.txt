@@ -10,4 +10,5 @@ target_link_libraries(e_foc.tool.virtual_motor.app.gui_test PUBLIC
 target_sources(e_foc.tool.virtual_motor.app.gui_test PRIVATE
     Main.cpp
     TestManagerWindow.cpp
+    TestMotorWindow.cpp
 )

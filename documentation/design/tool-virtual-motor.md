@@ -2,9 +2,9 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "tool-virtual-motor"
-date: 2026-11-09
+date: 2026-11-10
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.2.0                    |
+| Version   | 0.3.0                    |
 | Component | tool-virtual-motor       |
-| Date      | 2026-11-09               |
+| Date      | 2026-11-10               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -108,7 +108,7 @@ mistaken for a bench instrument on real hardware.
 ```text
 +------------------------------------------------------------------------------------------+
 | VIRTUAL  Node 1 · Teknic M-2310P   Running  t = 00:01:42.315  RT 1.00   LEDs ● ○ ○  Prot: ok |
-| [Pause] [Step ▸] [Power Cycle] [Power Off]          Active disturbances: 2  [Clear All]    |
+| [Pause] [Step 1 period] [Step 1 ms] [Power Cycle] [Power Off]  Disturbances: 2 [Clear All] |
 +-----------------------------------------------------------+------------------------------+
 | Tabs: Currents | Voltages | Rotor | Encoder | Mechanics | Supply | Log | Torque & Noise    |
 |                                                           |  Torque                      |
@@ -143,14 +143,58 @@ Every trace view is a scope on the continuous stream (`virtual-motor.md` Part F)
 minimum-maximum envelope of each 2 kHz window, so ripple and noise are seen at a glance without a full
 rate stream.
 
-- **Run and freeze.** A frozen scope keeps its traces while the motor runs on; the header says so.
-- **Captures.** The capture bar arms a full-rate capture with a trigger signal, edge, level, pre-trigger
-  share and length. *Armed…* is shown until the trigger fires, then the capture opens in the view of its
-  signals, at every control period, with cursors that read time and value differences.
-- **Pause and step.** While the motor is paused the scopes show the paused instant, and Step advances
-  one control period or one millisecond, so a transient can be walked through.
-- **Export.** A capture saves as a comma-separated file with units in the header.
-- Units in every axis label, SI symbols as in the CAN Commander.
+| View      | Panels, top to bottom, each with its own vertical range and unit                              |
+|-----------|-----------------------------------------------------------------------------------------------|
+| Currents  | Phase currents a, b, c with the measured ones overlaid (A); true d and q currents (A)         |
+| Voltages  | Duties a, b, c (1); leg voltages a, b, c (V); stator voltage α and β (V)                      |
+| Mechanics | Rotor speed (rad/s); true and encoder angle (rad); electrical, load and external torque (N·m) |
+| Supply    | Bus voltage (V); bus current (A); winding temperature (°C)                                    |
+
+- **Stream on demand.** A motor's window asks for the stream while it is open and shows a trace view,
+  and turns it off when it is closed, minimised or shows the log, so a motor nobody watches samples
+  nothing. After a motor restarts the window asks again.
+- **History.** The app keeps the last 10 s of windows per motor. The time axis shows the chosen span,
+  10 ms to 10 s, ending at the newest window and labelled in time before it. A window the motor dropped
+  breaks the trace instead of joining across the gap, and the toolbar counts the windows dropped since
+  the stream was turned on. History starts over when the motor restarts, because its virtual time does.
+- **Drawing.** Each panel fits its vertical range to what it shows, with its unit on the axis and a
+  legend in the trace colours. When the span holds more windows than the panel has pixels, the
+  windows that share a pixel column are drawn as one envelope, their lowest minimum to their highest
+  maximum, so no peak is lost. Only the visible view repaints, at most 25 times a second.
+- **Run and freeze.** **Freeze** keeps the traces on screen while the motor runs on, and the toolbar
+  says *Frozen*; **Run** follows the newest window again.
+- **Cursors.** In a frozen trace or a capture, a left click places cursor A and a right click cursor B;
+  a double click removes both. Each panel reads, for each of its traces, the value at A and at B and
+  their difference, and the toolbar reads both times, their difference and its inverse. A value in a
+  frozen trace is the middle of its envelope at that time; in a capture it is the sample.
+- **Captures.** The capture bar arms a full-rate capture: trigger (immediately, rising, falling, either,
+  board protection, LEDs), the trigger signal and level in that signal's unit for an edge, the LEDs
+  for an LED trigger, the pre-trigger share and the length in control periods. Its state reads *Armed…*
+  until the trigger fires, then *Triggered*, *Receiving n of m* while the chunks arrive, and
+  *Complete*; **Cancel** stops an armed or recording capture, and arming again replaces it. A complete
+  capture opens in the view of its trigger signal, or the current view when the trigger has none, at
+  every control period, with the time axis at zero on the trigger; **Back to Live** returns to the
+  stream. A motor that restarts cancels its capture.
+- **Pause and step.** While the motor is paused the trace stays at the paused instant. **Step 1
+  period** and **Step 1 ms** advance it; the trace moves when a step completes a 10-period window,
+  and a capture armed before stepping records every period stepped through.
+- **Export.** **Save CSV…** writes the capture shown: one row per control period, the first columns
+  the time from the trigger in seconds and the control period, then every Data Model signal in its
+  order, each column headed with its name and unit.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Armed: Arm
+    Armed --> Triggered: capture event triggered
+    Triggered --> Receiving: first chunk
+    Receiving --> Complete: every period received
+    Armed --> Cancelled: Cancel, or the motor restarts
+    Triggered --> Cancelled: Cancel, or the motor restarts
+    Receiving --> Cancelled: the motor restarts
+    Complete --> Armed: Arm
+    Cancelled --> Armed: Arm
+```
 
 ### Part E — the rotor
 
@@ -222,17 +266,19 @@ finds them as before.
 
 ## Constraints & Limitations
 
-| Constraint   | Value / Description                                                   |
-|--------------|-----------------------------------------------------------------------|
-| Motors       | Eight per bus                                                         |
-| Repaint rate | At most 25 Hz per view; only the visible view of each window repaints |
-| Log          | Bounded per motor; the full log stays in the motor's folder           |
-| Bus commands | None: the app never sends a CAN frame                                 |
+| Constraint    | Value / Description                                                   |
+|---------------|-----------------------------------------------------------------------|
+| Motors        | Eight per bus                                                         |
+| Repaint rate  | At most 25 Hz per view; only the visible view of each window repaints |
+| Log           | Bounded per motor; the full log stays in the motor's folder           |
+| Trace history | The last 10 s of stream windows per motor                             |
+| Capture       | One per motor, up to 16,384 control periods, kept until replaced      |
+| Bus commands  | None: the app never sends a CAN frame                                 |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                           | Options                                           | Status           |
-|---|--------------------------------------------------------------------|---------------------------------------------------|------------------|
-| 1 | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |
+| #   | Question                                                           | Options                                           | Status           |
+|-----|--------------------------------------------------------------------|---------------------------------------------------|------------------|
+| 1   | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |

@@ -7,9 +7,16 @@ target_include_directories(e_foc.tool.virtual_motor.app.logic PUBLIC
 target_link_libraries(e_foc.tool.virtual_motor.app.logic PUBLIC
     e_foc.tool.virtual_motor.port
     can_lite.drivers.virtual
+    numerical.math
+    ui.core
+    ui.theme
 )
 
 target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
+    CaptureAssembly.cpp
+    CaptureAssembly.hpp
+    CaptureCsv.cpp
+    CaptureCsv.hpp
     EngineProcesses.hpp
     MotorLink.cpp
     MotorLink.hpp
@@ -21,6 +28,16 @@ target_sources(e_foc.tool.virtual_motor.app.logic PRIVATE
     PortListener.hpp
     Rig.cpp
     Rig.hpp
+    TimeAxis.cpp
+    TimeAxis.hpp
+    TraceHistory.cpp
+    TraceHistory.hpp
+    TraceSignals.cpp
+    TraceSignals.hpp
+    TraceSources.cpp
+    TraceSources.hpp
+    TraceView.cpp
+    TraceView.hpp
 )
 
 add_subdirectory(test)

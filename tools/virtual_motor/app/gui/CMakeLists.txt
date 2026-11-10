@@ -15,6 +15,8 @@ target_link_libraries(e_foc.tool.virtual_motor.app.gui PUBLIC
 target_sources(e_foc.tool.virtual_motor.app.gui PRIVATE
     AddMotorDialog.cpp
     AddMotorDialog.hpp
+    CaptureBar.cpp
+    CaptureBar.hpp
     LogView.cpp
     LogView.hpp
     ManagerWindow.cpp
@@ -25,6 +27,8 @@ target_sources(e_foc.tool.virtual_motor.app.gui PRIVATE
     QtEngineProcesses.hpp
     QtRigStore.cpp
     QtRigStore.hpp
+    ScopeArea.cpp
+    ScopeArea.hpp
     TorqueNoisePanel.cpp
     TorqueNoisePanel.hpp
 )

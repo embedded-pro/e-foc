@@ -1,9 +1,11 @@
 #pragma once
 
+#include "tools/virtual_motor/app/logic/CaptureAssembly.hpp"
 #include "tools/virtual_motor/app/logic/EngineProcesses.hpp"
 #include "tools/virtual_motor/app/logic/MotorLink.hpp"
 #include "tools/virtual_motor/app/logic/MotorSpec.hpp"
 #include "tools/virtual_motor/app/logic/PortListener.hpp"
+#include "tools/virtual_motor/app/logic/TraceHistory.hpp"
 #include <cstddef>
 #include <deque>
 #include <memory>
@@ -20,6 +22,7 @@ namespace virtual_motor::app
         virtual void MotorUpdated(uint8_t node) = 0;
         virtual void MotorLogged(uint8_t node, const std::string& line) = 0;
         virtual void MotorRefused(uint8_t node, const port::Refused& refused) = 0;
+        virtual void MotorCaptured(uint8_t node) = 0;
 
     protected:
         ~RigObserver() = default;
@@ -30,6 +33,7 @@ namespace virtual_motor::app
     {
     public:
         static constexpr std::size_t logLines{ 5000 };
+        static constexpr std::size_t historyWindows{ 20000 };
 
         RigMotor(const MotorSpec& spec, class Rig& rig);
 
@@ -40,6 +44,10 @@ namespace virtual_motor::app
         const std::optional<port::Changes>& Changes() const;
         const std::deque<std::string>& Log() const;
         uint8_t ActiveDisturbances() const;
+        const TraceHistory& History() const;
+        const CaptureAssembly& Captures() const;
+        bool Streaming() const;
+        void Stream(bool on);
 
         template<class Request>
         void Send(const Request& request)
@@ -60,7 +68,11 @@ namespace virtual_motor::app
         void ChangesChanged(const port::Changes& changes) override;
         void RequestRefused(const port::Refused& refused) override;
         void LogLine(const std::string& line) override;
+        void WindowReceived(const port::Window& window) override;
+        void CaptureEventReceived(const port::CaptureEvent& event) override;
+        void CaptureChunkReceived(const port::CaptureChunk& chunk) override;
         void LinkClosed() override;
+        void Captured();
 
         MotorSpec spec;
         Rig& rig;
@@ -72,6 +84,9 @@ namespace virtual_motor::app
         std::optional<port::Status> status;
         std::optional<port::Changes> changes;
         std::deque<std::string> log;
+        TraceHistory history{ historyWindows };
+        CaptureAssembly captures;
+        bool streaming{ false };
     };
 
     class Rig

@@ -149,7 +149,14 @@ namespace virtual_motor::app
         connect(remove, &QPushButton::clicked, this, [this]()
             {
                 if (auto node = SelectedNode())
+                {
+                    if (auto window = windows.find(*node); window != windows.end())
+                    {
+                        delete window->second.data();
+                        windows.erase(window);
+                    }
                     this->rig.Remove(*node);
+                }
             });
     }
 
@@ -195,6 +202,12 @@ namespace virtual_motor::app
     {
         if (auto window = windows.find(node); window != windows.end() && window->second)
             window->second->ShowRefusal(refused);
+    }
+
+    void ManagerWindow::MotorCaptured(uint8_t node)
+    {
+        if (auto window = windows.find(node); window != windows.end() && window->second)
+            window->second->RefreshCapture();
     }
 
     void ManagerWindow::FillRow(int row, const RigMotor& motor)

@@ -76,8 +76,14 @@ namespace
             refusals.push_back(refused);
         }
 
+        void MotorCaptured(uint8_t) override
+        {
+            ++captures;
+        }
+
         int listChanges{ 0 };
         int updates{ 0 };
+        int captures{ 0 };
         std::vector<std::string> lines;
         std::vector<port::Refused> refusals;
     };
@@ -313,4 +319,54 @@ TEST_F(TestRig, removing_a_motor_powers_it_off_and_forgets_it)
     EXPECT_EQ(rig.Find(1), nullptr);
     EXPECT_TRUE(store.stored.empty());
     EXPECT_THAT(processes.stopped, testing::ElementsAre(1u));
+}
+
+TEST_F(TestRig, the_stream_is_asked_for_once_and_again_after_the_motor_restarts)
+{
+    rig.Add(MotorSpec{ "default", 2 });
+    auto engine = Introduce(2);
+
+    rig.Find(2)->Stream(true);
+    rig.Find(2)->Stream(true);
+    auto frames = engine->Received();
+    ASSERT_EQ(frames.size(), 1u);
+    EXPECT_EQ(port::Decode<port::StreamRequest>(frames[0])->on, 1);
+
+    engine->Send(port::Window{ 0, 0, 10, {}, {} });
+    PollFor(30);
+    EXPECT_EQ(rig.Find(2)->History().Count(), 1u);
+
+    engine->Close();
+    PollFor(30);
+    auto restarted = Introduce(2);
+    EXPECT_EQ(rig.Find(2)->History().Count(), 0u);
+    frames = restarted->Received();
+    ASSERT_EQ(frames.size(), 1u);
+    EXPECT_EQ(port::Decode<port::StreamRequest>(frames[0])->on, 1);
+
+    rig.Find(2)->Stream(false);
+    frames = restarted->Received();
+    ASSERT_EQ(frames.size(), 1u);
+    EXPECT_EQ(port::Decode<port::StreamRequest>(frames[0])->on, 0);
+}
+
+TEST_F(TestRig, a_capture_is_assembled_and_a_restart_cancels_one_in_flight)
+{
+    rig.Add(MotorSpec{ "default", 2 });
+    auto engine = Introduce(2);
+
+    engine->Send(port::CaptureEvent{ 1, port::CaptureEventKind::armed, 100 });
+    engine->Send(port::CaptureEvent{ 1, port::CaptureEventKind::triggered, 110 });
+    engine->Send(port::CaptureChunk{ 1, 2, 1, 109, 0, { port::Sample{}, port::Sample{} } });
+    PollFor(30);
+    EXPECT_EQ(rig.Find(2)->Captures().State(), CaptureState::complete);
+    EXPECT_EQ(observer.captures, 3);
+
+    engine->Send(port::CaptureEvent{ 2, port::CaptureEventKind::armed, 200 });
+    PollFor(30);
+    engine->Close();
+    PollFor(30);
+    EXPECT_EQ(rig.Find(2)->Captures().State(), CaptureState::cancelled);
+    EXPECT_EQ(rig.Find(2)->Captures().Last()->number, 1u);
+    EXPECT_EQ(observer.captures, 5);
 }

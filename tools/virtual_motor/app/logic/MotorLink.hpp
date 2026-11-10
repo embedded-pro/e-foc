@@ -15,6 +15,9 @@ namespace virtual_motor::app
         virtual void ChangesChanged(const port::Changes& changes) = 0;
         virtual void RequestRefused(const port::Refused& refused) = 0;
         virtual void LogLine(const std::string& line) = 0;
+        virtual void WindowReceived(const port::Window& window) = 0;
+        virtual void CaptureEventReceived(const port::CaptureEvent& event) = 0;
+        virtual void CaptureChunkReceived(const port::CaptureChunk& chunk) = 0;
         virtual void LinkClosed() = 0;
 
     protected:
@@ -45,6 +48,7 @@ namespace virtual_motor::app
 
     private:
         void Dispatch(const port::Frame& frame);
+        bool DispatchInstrument(const port::Frame& frame);
         void SendBytes(const std::vector<uint8_t>& bytes);
         void Close();
 

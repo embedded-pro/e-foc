@@ -61,6 +61,8 @@ namespace virtual_motor::app
 
     void MotorLink::Dispatch(const port::Frame& frame)
     {
+        if (DispatchInstrument(frame))
+            return;
         if (auto identity = port::Decode<port::Hello>(frame))
             hello = identity;
         else if (auto update = port::Decode<port::Status>(frame))
@@ -84,6 +86,21 @@ namespace virtual_motor::app
             else
                 earlyLog.push_back(line->text);
         }
+    }
+
+    bool MotorLink::DispatchInstrument(const port::Frame& frame)
+    {
+        if (observer == nullptr)
+            return false;
+        if (auto window = port::Decode<port::Window>(frame))
+            observer->WindowReceived(*window);
+        else if (auto event = port::Decode<port::CaptureEvent>(frame))
+            observer->CaptureEventReceived(*event);
+        else if (auto chunk = port::Decode<port::CaptureChunk>(frame))
+            observer->CaptureChunkReceived(*chunk);
+        else
+            return false;
+        return true;
     }
 
     void MotorLink::SendBytes(const std::vector<uint8_t>& bytes)
