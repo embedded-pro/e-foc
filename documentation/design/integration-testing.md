@@ -2,9 +2,9 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.7.0
+version: 1.8.0
 component: integration-testing
-date: 2026-11-06
+date: 2026-11-10
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.7.0                      |
+| Version   | 1.8.0                      |
 | Component | integration-testing        |
-| Date      | 2026-11-06                 |
+| Date      | 2026-11-10                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are
 > structured*. It expands on the architecture by specifying component responsibilities, data flows,
@@ -39,6 +39,7 @@ implements a scenario, and the runner is invoked with that tag.
 | Tag          | Target                                                               | Detailed in                                    |
 |--------------|----------------------------------------------------------------------|------------------------------------------------|
 | `@sil`       | Real firmware under an emulator, simulated motor                     | `documentation/design/software-in-the-loop.md` |
+| `@virtual`   | The application on the host as a virtual motor, simulated motor      | This document, *The virtual motor target*      |
 | `@hil_motor` | The motor-controller firmware on hardware, over the bridge, CAN only | This document                                  |
 | `@hil`       | The bring-up image on hardware, over the bridge, with its terminal   | This document                                  |
 
@@ -88,8 +89,10 @@ graph TD
     TFIXTURE --> TSEAM["Terminal interactor"]
     SEAM --> SIL["Emulator interactor"]
     SEAM --> HIL["Hardware interactor"]
+    SEAM --> VIRTUAL["Virtual motor interactor"]
     TSEAM --> HIL
     SIL --> QEMU["Emulated target"]
+    VIRTUAL --> MOTOR["Virtual motor program"]
     HIL --> BRIDGE["Hardware bridge"]
     BRIDGE --> BOARD["Motor board"]
 ```
@@ -149,6 +152,24 @@ Everything a target prints is its debug log. The emulated target's is kept per s
 report of a failed scenario carries its last lines. Only the bring-up scenarios send terminal
 commands and read traces, through the bring-up terminal fixture. Its lines are cleared per scenario
 and per restart, so an assertion cannot match a line from an earlier boot.
+
+### The virtual motor target
+
+A scenario tagged `@virtual` runs against the virtual motor program (`virtual-motor.md`): the same
+application, compiled for the host, on the same plant model, so the virtual board cannot drift from
+the emulated one unnoticed. The interactor starts one program per scenario in the scenario's own
+directory, hosting its own virtual CAN bus on a free loopback port, and joins that bus at the
+application's default bit rate as the scenario's CAN client. The plant description and the memory
+image the scenario describes are the files the emulated target reads, under the names the program is
+given; a restart stops the program and starts it again on them. Whatever the program prints is the
+scenario's debug log.
+
+The set is small and functional: a calibration over CAN, a calibration restored from memory, mode
+switches and the start-up check of the current sensors. A virtual motor keeps wall-clock time and
+writes no plant record, so the performance and disturbance scenarios, which measure the plant's
+trajectory on the emulator's instruction-counted time, stay `@sil` only, as do the bootloader and
+upgrade scenarios, which need an image to boot. A `@virtual` scenario keeps its `@sil` tag: the
+requirement it verifies is verified on the emulator, and the virtual run guards the virtual board.
 
 ### Isolation
 

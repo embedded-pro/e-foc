@@ -1,5 +1,6 @@
 add_subdirectory(interactor/interfaces)
 add_subdirectory(interactor/qemu)
+add_subdirectory(interactor/virtual_motor)
 add_subdirectory(interactor/hardware)
 add_subdirectory(response)
 

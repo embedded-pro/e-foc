@@ -151,7 +151,7 @@ standalone at the start of flash on every board and replaces the bootloader when
 
 `qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
-**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
+**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.virtual_motor`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
 Its `release_tools_build` job calls `build-tools.yml`, the same workflow the release uses, so every PR
 builds, packages and install-tests the Linux and Windows tools exactly as a release does (MSVC with
 warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubuntu-latest`); signing
@@ -229,7 +229,7 @@ what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. T
 Clang has no `-Wmaybe-uninitialized`: in a Clang build the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
-**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware, and `@virtual` for the virtual motor runner (`--mode virtual`, the host build's `e-foc-virtual-motor`), a small functional set that keeps its `@sil` tag and that `ci.yml`'s `virtual_motor_tests` job runs. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
 model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.
