@@ -22,6 +22,7 @@ namespace virtual_motor
         bool factoryFresh{ false };
         bool hostBus{ false };
         bool restarted{ false };
+        bool supervised{ false };
     };
 
     struct ParsedOptions

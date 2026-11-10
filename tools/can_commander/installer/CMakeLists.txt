@@ -42,7 +42,7 @@ function(e_foc_can_commander_package)
     set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/embedded-pro/e-foc")
     set(CPACK_PACKAGE_FILE_NAME "e_foc-can_commander-v${e_foc_VERSION}-${CMAKE_SYSTEM_NAME}")
     set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
-    set(CPACK_PACKAGE_EXECUTABLES "e-foc-can-commander" "e-foc CAN Commander")
+    set(CPACK_PACKAGE_EXECUTABLES "e-foc-can-commander" "e-foc CAN Commander" "e-foc-virtual-motor-app" "e-foc Virtual Motor")
     set(CPACK_STRIP_FILES ON)
 
     set(CPACK_DEBIAN_PACKAGE_NAME "e-foc-can-commander")

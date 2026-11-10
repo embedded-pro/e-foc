@@ -2,11 +2,11 @@
 #include "infra/util/StaticStorage.hpp"
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include "tools/virtual_motor/engine/StartOptions.hpp"
+#include "tools/virtual_motor/engine/Supervisor.hpp"
 #include "tools/virtual_motor/platform/PlantDescription.hpp"
 #include "tools/virtual_motor/platform/PlantPortClient.hpp"
 #include "tools/virtual_motor/platform/PlatformPortTarget.hpp"
 #include "tools/virtual_motor/platform/VirtualPlatform.hpp"
-#include <algorithm>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
@@ -16,20 +16,71 @@
 #include <vector>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
+#if defined(_WIN32)
 #include <process.h>
+#include <timeapi.h>
 #else
 #include <unistd.h>
 #endif
 
 namespace
 {
+#if defined(_WIN32)
+    [[noreturn]] void Restart(const std::vector<std::string>&)
+    {
+        std::cout.flush();
+        std::cerr.flush();
+        std::_Exit(virtual_motor::restartExitCode);
+    }
+
+    std::string ProgramPath()
+    {
+        std::string path(32768, '\0');
+        path.resize(GetModuleFileNameA(nullptr, path.data(), static_cast<DWORD>(path.size())));
+        return path;
+    }
+
+    int Spawn(const std::vector<std::string>& arguments)
+    {
+        std::vector<std::string> quoted;
+        for (const auto& argument : arguments)
+            quoted.push_back(virtual_motor::WindowsQuoted(argument));
+
+        std::vector<const char*> argv;
+        for (const auto& argument : quoted)
+            argv.push_back(argument.c_str());
+        argv.push_back(nullptr);
+
+        const auto code = _spawnv(_P_WAIT, ProgramPath().c_str(), argv.data());
+        if (code == -1)
+        {
+            std::cerr << "e-foc-virtual-motor: could not start the motor\n";
+            return EXIT_FAILURE;
+        }
+        return static_cast<int>(code);
+    }
+
+    void EndTheMotorWithThisProcess()
+    {
+        auto* job = CreateJobObjectA(nullptr, nullptr);
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (job == nullptr || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)) || !AssignProcessToJobObject(job, GetCurrentProcess()))
+            std::cerr << "e-foc-virtual-motor: the motor may outlive this process\n";
+    }
+#else
     [[noreturn]] void Restart(const std::vector<std::string>& arguments)
     {
-        std::vector<std::string> restartArguments{ arguments };
-        if (std::ranges::find(restartArguments, "--restarted") == restartArguments.end())
-            restartArguments.emplace_back("--restarted");
-        std::erase(restartArguments, "--factory-fresh");
-
+        auto restartArguments = virtual_motor::RestartArguments(arguments);
         std::vector<char*> argv;
         for (auto& argument : restartArguments)
             argv.push_back(argument.data());
@@ -39,14 +90,11 @@ namespace
 #if defined(__linux__)
         ::close_range(3, ~0u, 0);
 #endif
-#if defined(_WIN32)
-        _execv(argv[0], argv.data());
-#else
         execv("/proc/self/exe", argv.data());
-#endif
         std::cerr << "e-foc-virtual-motor: could not restart\n";
         std::exit(EXIT_FAILURE);
     }
+#endif
 
     std::optional<sil::SilPlantConfig> Plant(const virtual_motor::StartOptions& options)
     {
@@ -158,5 +206,13 @@ int main(int argc, char* argv[])
         return 2;
     }
 
+#if defined(_WIN32)
+    if (!parsed.options->supervised)
+    {
+        EndTheMotorWithThisProcess();
+        return virtual_motor::Supervise(arguments, Spawn);
+    }
+    timeBeginPeriod(1);
+#endif
     return Start(*parsed.options, arguments);
 }

@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.8.0                |
+| Version   | 0.9.0                |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -188,7 +188,8 @@ sequenceDiagram
 whole virtual milliseconds until virtual time has caught up with the wall clock. When it falls more
 than 50 ms behind it does not try to catch up: it drops the backlog, counts an overrun and continues
 from the present, so a slow machine produces a motor that runs late, never one that runs in bursts.
-The plant port publishes the real-time factor and the overrun count.
+The plant port publishes the real-time factor and the overrun count. On Windows the program asks for a
+1 ms system timer, so the pacer wakes when it is due rather than on the default 15.6 ms tick.
 
 **Pause and step.** Pausing stops virtual time. A paused motor sends nothing and discards the frames that
 reach it, so the CAN Commander sees it go offline after its liveness timeout, exactly as when a board's
@@ -402,6 +403,13 @@ stateDiagram-v2
 
 A process that ends without being asked to is reported by the app as *crashed*, with the last lines of
 its debug log.
+
+**Restarting.** On Linux a restart replaces the program inside its own process, so the app keeps the
+process it started. Windows cannot replace a running program, so there the virtual motor program runs the
+motor as its child process and waits for it. A motor that asks to restart ends with an exit code kept for
+that, and the program starts it again with the same options, marked as restarted, the memory file kept;
+any other ending becomes the program's own. The child belongs to a job that ends with the program, so
+powering a motor off, which ends the program, never leaves the motor running.
 
 ### Part I — Fidelity, and what a virtual motor is not
 

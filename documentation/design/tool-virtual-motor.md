@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.7.0
+version: 0.8.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.7.0                    |
+| Version   | 0.8.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -294,9 +294,12 @@ finds them as before.
   Commander's motor inside a dashed ring, which also marks the app's windows. The release's install test
   installs the package, checks both entries and icons, asks the virtual motor program for its usage,
   runs the app, and removes the package.
-- **Windows installer.** The app and the virtual motor program join it once both build and run on
-  Windows; until then the Windows installer holds the CAN Commander alone, whose Launch Virtual Motor…
-  stays disabled and says the app is not installed.
+- **Windows installer.** `e-foc-virtual-motor-app.exe` and `e-foc-virtual-motor.exe` install beside
+  `e-foc-can-commander.exe` and share its Qt runtime, and the Start menu gains *e-foc Virtual Motor*
+  beside *e-foc CAN Commander*. The app's executable carries the dashed-ring icon and the release's
+  version. The portable archive holds the same three programs. The release's install test installs
+  silently, checks both programs and the shortcut, asks the virtual motor program for its usage, runs a
+  virtual motor and checks that ending it leaves no motor process behind, runs the app, and uninstalls.
 
 ### Part J — modulation
 

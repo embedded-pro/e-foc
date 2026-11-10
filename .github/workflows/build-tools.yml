@@ -154,7 +154,7 @@ jobs:
           -DE_FOC_BUILD_TESTS=Off
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
-        run: cmake --build build --target e_foc.tool.can_commander
+        run: cmake --build build --target e_foc.tool.can_commander e_foc.tool.virtual_motor.app e_foc.tool.virtual_motor
       - name: Stage CAN Commander executable for signing
         if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
         shell: bash
@@ -194,9 +194,12 @@ jobs:
           version="${{ inputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/tools -name "e-foc-can-commander.exe" -type f -exec cp {} "$staging/" \;
-          test -f "$staging/e-foc-can-commander.exe"
+          for program in e-foc-can-commander e-foc-virtual-motor-app e-foc-virtual-motor; do
+            find build/tools -name "$program.exe" -type f -exec cp {} "$staging/" \;
+            test -f "$staging/$program.exe"
+          done
           windeployqt --release --no-translations "$staging/e-foc-can-commander.exe"
+          windeployqt --release --no-translations "$staging/e-foc-virtual-motor-app.exe"
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
       - name: Package CAN Commander installer
         shell: bash
@@ -272,8 +275,36 @@ jobs:
           if ($app.HasExited) { throw "CAN Commander exited with $($app.ExitCode) instead of running" }
           Stop-Process -Id $app.Id -Force
           Start-Sleep -Seconds 2
+          $bin = Join-Path $target "bin"
+          $engine = Join-Path $bin "e-foc-virtual-motor.exe"
+          $virtualMotorApp = Join-Path $bin "e-foc-virtual-motor-app.exe"
+          foreach ($program in @($engine, $virtualMotorApp)) {
+            if (-not (Test-Path $program)) { throw "installer did not install $program" }
+          }
+          $menus = @([Environment]::GetFolderPath("CommonPrograms"), [Environment]::GetFolderPath("Programs"))
+          if (-not (Get-ChildItem -Path $menus -Recurse -Filter "e-foc Virtual Motor.lnk" -ErrorAction SilentlyContinue)) { throw "installer did not add the e-foc Virtual Motor shortcut" }
+          $info = (Get-Item $virtualMotorApp).VersionInfo
+          if ($info.ProductName -ne "e-foc Virtual Motor" -or $info.ProductVersion -ne $expected) { throw "unexpected Virtual Motor version resource" }
+          $usage = & $engine --help | Out-String
+          if ($LASTEXITCODE -ne 0 -or $usage -notmatch "Usage: e-foc-virtual-motor") { throw "the virtual motor program did not print its usage" }
+          $work = (New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "virtual-motor") -Force).FullName
+          $supervisor = Start-Process -FilePath $engine -ArgumentList "--bus", "install-test", "--host-bus", "--factory-fresh" -WorkingDirectory $work -PassThru
+          Start-Sleep -Seconds 8
+          if ($supervisor.HasExited) { throw "the virtual motor program exited with $($supervisor.ExitCode) instead of running" }
+          $motor = Get-CimInstance Win32_Process -Filter "ParentProcessId = $($supervisor.Id)" | Where-Object Name -eq "e-foc-virtual-motor.exe" | Select-Object -First 1
+          if ($null -eq $motor) { throw "the virtual motor program did not start its motor" }
+          Stop-Process -Id $supervisor.Id -Force
+          Start-Sleep -Seconds 2
+          if (Get-Process -Id $motor.ProcessId -ErrorAction SilentlyContinue) { throw "the motor outlived the virtual motor program" }
+          $rig = Start-Process -FilePath $virtualMotorApp -PassThru
+          Start-Sleep -Seconds 8
+          if ($rig.HasExited) { throw "the Virtual Motor app exited with $($rig.ExitCode) instead of running" }
+          Stop-Process -Id $rig.Id -Force
+          Start-Sleep -Seconds 2
           Start-Process -FilePath (Join-Path $target "Uninstall.exe") -ArgumentList "/S", "_?=$target" -Wait
-          if (Test-Path $exe) { throw "uninstaller left $exe behind" }
+          foreach ($program in @($exe, $engine, $virtualMotorApp)) {
+            if (Test-Path $program) { throw "uninstaller left $program behind" }
+          }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-can-commander
