@@ -130,3 +130,38 @@ TEST(TestPlantPortCodec, a_frame_of_another_type_does_not_decode)
 {
     EXPECT_FALSE(Decode<CurrentNoise>(Frame{ static_cast<uint8_t>(MessageType::encoderNoise), { 0, 0, 0, 0 } }).has_value());
 }
+
+TEST(TestPlantPortCodec, a_window_carries_its_place_and_each_signals_minimum_then_maximum)
+{
+    Window window{ 7, 1234567890123ull, 10 };
+    for (std::size_t signal = 0; signal != signalCount; ++signal)
+    {
+        window.minimum[signal] = -static_cast<float>(signal);
+        window.maximum[signal] = static_cast<float>(signal) + 0.5f;
+    }
+
+    const auto bytes = Encode(window);
+    EXPECT_EQ(bytes.size(), 3u + 13u + signalCount * 8u);
+
+    const auto decoded = RoundTrip(window);
+    EXPECT_EQ(decoded.sequence, 7u);
+    EXPECT_EQ(decoded.firstPeriod, 1234567890123ull);
+    EXPECT_EQ(decoded.periods, 10);
+    EXPECT_FLOAT_EQ(decoded.minimum[24], -24.0f);
+    EXPECT_FLOAT_EQ(decoded.maximum[24], 24.5f);
+
+    const std::vector<uint8_t> payload(bytes.begin() + 3, bytes.end());
+    PayloadReader reader{ payload };
+    reader.U32();
+    reader.U64();
+    reader.U8();
+    EXPECT_FLOAT_EQ(reader.F32(), 0.0f);
+    EXPECT_FLOAT_EQ(reader.F32(), 0.5f);
+    EXPECT_FLOAT_EQ(reader.F32(), -1.0f);
+}
+
+TEST(TestPlantPortCodec, a_stream_request_says_on_or_off)
+{
+    EXPECT_THAT(Encode(StreamRequest{ 1 }), testing::ElementsAre(0x90, 1, 0, 1));
+    EXPECT_EQ(RoundTrip(StreamRequest{ 0 }).on, 0);
+}

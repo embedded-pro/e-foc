@@ -69,4 +69,14 @@ namespace virtual_motor
     {
         platform.Disturbances().ClearAll();
     }
+
+    void PlatformPortTarget::Stream(const infra::Function<void(const port::Window&)>& sink)
+    {
+        platform.Stream(sink);
+    }
+
+    void PlatformPortTarget::StopStream()
+    {
+        platform.StopStream();
+    }
 }

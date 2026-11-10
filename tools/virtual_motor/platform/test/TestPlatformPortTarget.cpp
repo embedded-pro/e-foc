@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -96,4 +97,29 @@ TEST_F(TestPlatformPortTarget, changes_reach_the_plant_and_are_listed_until_clea
 
     target->ClearAll();
     EXPECT_EQ(target->ChangesInForce().differs, 0);
+}
+
+TEST_F(TestPlatformPortTarget, a_stream_closes_a_window_every_ten_control_periods)
+{
+    std::vector<Window> windows;
+
+    target->Pause();
+    const auto first = target->CurrentStatus().controlPeriods;
+    target->Stream([&windows](const Window& window)
+        {
+            windows.push_back(window);
+        });
+    target->Step(StepUnit::controlPeriod, 25);
+    target->StopStream();
+    target->Step(StepUnit::controlPeriod, 10);
+
+    ASSERT_EQ(windows.size(), 2u);
+    EXPECT_EQ(windows[0].sequence, 0u);
+    EXPECT_EQ(windows[0].firstPeriod, first);
+    EXPECT_EQ(windows[1].sequence, 1u);
+    EXPECT_EQ(windows[1].firstPeriod, first + 10);
+    EXPECT_EQ(windows[1].periods, 10);
+    const auto busVoltage = static_cast<std::size_t>(virtual_motor::Signal::busVoltage);
+    EXPECT_GT(windows[0].minimum[busVoltage], 0.0f);
+    EXPECT_LE(windows[0].minimum[busVoltage], windows[0].maximum[busVoltage]);
 }

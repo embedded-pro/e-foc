@@ -37,6 +37,7 @@ namespace sil
         hal::Hertz BaseFrequency() const;
         drivers::DeadTimeLoss InverterDeadTimeLoss() const;
         uint32_t DutyUpdateDelayPeriods() const;
+        foc::PhasePwmDutyCycles AppliedDuties() const;
 
         void ArmIndex();
         bool IndexSeen() const;
@@ -64,5 +65,6 @@ namespace sil
         foc::LowSideShuntReadout shuntReadout{ maxReadableDuty };
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhasePwmDutyCycles appliedDutyPhases{};
+        foc::PhasePwmDutyCycles steppedDutyPhases{};
     };
 }

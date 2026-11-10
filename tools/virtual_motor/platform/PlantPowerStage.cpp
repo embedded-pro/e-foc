@@ -1,4 +1,5 @@
 #include "tools/virtual_motor/platform/PlantPowerStage.hpp"
+#include "core/foc/model/drive/SilPlantModel.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <array>
 
@@ -19,6 +20,7 @@ namespace virtual_motor
         : drive(plant, Defaults())
         , plant(plant)
         , disturbances(modelInputs, { foc::NewtonMeter{ plant.loadTorqueNm }, foc::Ampere{ plant.noiseSigmaAmpere }, foc::Radians{ plant.encoderSigmaRadians } }, drive.BaseFrequency().Value())
+        , signals(drive.Model(), sil::MotorParameters(plant).p)
     {
         boardProtection.Configure({
             .overCurrentAmpere = plant.overCurrentTripAmpere,
@@ -32,6 +34,8 @@ namespace virtual_motor
     {
         disturbances.Apply();
         drive.Tick();
+        if (streamSink)
+            SampleStream();
 
         if (onPhaseCurrentsReady && !controlLoopEntered)
         {
@@ -47,6 +51,27 @@ namespace virtual_motor
     PlantDisturbances& PlantPowerStage::Disturbances()
     {
         return disturbances;
+    }
+
+    void PlantPowerStage::Stream(const infra::Function<void(const port::Window&)>& sink)
+    {
+        streamWindow.Begin();
+        streamSink = sink;
+    }
+
+    void PlantPowerStage::StopStream()
+    {
+        streamSink = nullptr;
+    }
+
+    void PlantPowerStage::SampleStream()
+    {
+        const auto sample = signals.Sample(drive.AppliedDuties(), foc::NewtonMeter{ disturbances.InForce().loadTorque });
+        if (auto window = streamWindow.Add(drive.TickCount() - 1, sample))
+        {
+            auto sink = streamSink;
+            sink(*window);
+        }
     }
 
     void PlantPowerStage::DeliverPendingProtection()

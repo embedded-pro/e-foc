@@ -2,12 +2,14 @@
 
 #include "tools/virtual_motor/port/PlantPortPayload.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 namespace virtual_motor::port
 {
     constexpr uint16_t protocolVersion{ 1 };
+    constexpr std::size_t signalCount{ 25 };
 
     enum class MessageType : uint8_t
     {
@@ -16,6 +18,7 @@ namespace virtual_motor::port
         changes = 0x03,
         refused = 0x04,
         logLine = 0x05,
+        window = 0x10,
         pause = 0x81,
         resume = 0x82,
         step = 0x83,
@@ -24,6 +27,7 @@ namespace virtual_motor::port
         currentNoise = 0x86,
         encoderNoise = 0x87,
         clearAll = 0x88,
+        stream = 0x90,
     };
 
     enum class RunState : uint8_t
@@ -209,5 +213,29 @@ namespace virtual_motor::port
 
         void WriteTo(PayloadWriter& writer) const;
         static EncoderNoise ReadFrom(PayloadReader& reader);
+    };
+
+    struct Window
+    {
+        static constexpr MessageType type{ MessageType::window };
+
+        uint32_t sequence{ 0 };
+        uint64_t firstPeriod{ 0 };
+        uint8_t periods{ 0 };
+        std::array<float, signalCount> minimum{};
+        std::array<float, signalCount> maximum{};
+
+        void WriteTo(PayloadWriter& writer) const;
+        static Window ReadFrom(PayloadReader& reader);
+    };
+
+    struct StreamRequest
+    {
+        static constexpr MessageType type{ MessageType::stream };
+
+        uint8_t on{ 0 };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static StreamRequest ReadFrom(PayloadReader& reader);
     };
 }

@@ -26,6 +26,8 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     Pacer.hpp
     PlatformPortTarget.cpp
     PlatformPortTarget.hpp
+    PortSocket.cpp
+    PortSocket.hpp
     PlantDescription.cpp
     PlantDescription.hpp
     PlantDisturbances.cpp
@@ -34,8 +36,12 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     PlantPortClient.hpp
     PlantPowerStage.cpp
     PlantPowerStage.hpp
+    PlantSignals.cpp
+    PlantSignals.hpp
     RunLoop.cpp
     RunLoop.hpp
+    StreamWindow.cpp
+    StreamWindow.hpp
     VirtualCanPort.cpp
     VirtualCanPort.hpp
     VirtualPlatform.cpp

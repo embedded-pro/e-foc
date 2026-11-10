@@ -16,7 +16,10 @@ target_sources(e_foc.tool.virtual_motor.platform_test PRIVATE
     TestPlantDescription.cpp
     TestPlantDisturbances.cpp
     TestPlantPortClient.cpp
+    TestPlantSignals.cpp
+    TestPortSocket.cpp
     TestRunLoop.cpp
+    TestStreamWindow.cpp
     TestVirtualCanPort.cpp
 )
 

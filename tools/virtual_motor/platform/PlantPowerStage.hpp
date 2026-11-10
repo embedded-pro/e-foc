@@ -4,6 +4,8 @@
 #include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "tools/virtual_motor/platform/PlantDisturbances.hpp"
+#include "tools/virtual_motor/platform/PlantSignals.hpp"
+#include "tools/virtual_motor/platform/StreamWindow.hpp"
 
 namespace virtual_motor
 {
@@ -40,6 +42,8 @@ namespace virtual_motor
         bool IndexSeen() override;
 
         PlantDisturbances& Disturbances();
+        void Stream(const infra::Function<void(const port::Window&)>& sink);
+        void StopStream();
 
     protected:
         ~PlantPowerStage() = default;
@@ -48,6 +52,8 @@ namespace virtual_motor
         void DeliverPendingProtection();
 
     private:
+        void SampleStream();
+
         class ModelInputs
             : public DisturbanceInputs
         {
@@ -71,6 +77,9 @@ namespace virtual_motor
         sil::SilPlantConfig plant;
         ModelInputs modelInputs{ drive.Model(), plant };
         PlantDisturbances disturbances;
+        PlantSignals signals;
+        StreamWindow streamWindow;
+        infra::Function<void(const port::Window&)> streamSink;
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         bool controlLoopEntered{ false };
     };

@@ -300,3 +300,32 @@ TEST(TestPlantDrive, a_longer_sample_and_hold_delays_what_the_sensor_reports)
 
     EXPECT_NE(shortHold.Model().CurrentSensor().Last().a.Value(), longHold.Model().CurrentSensor().Last().a.Value());
 }
+
+TEST(TestPlantDrive, the_applied_duties_are_those_the_legs_ran_in_the_last_period)
+{
+    sil::PlantDrive drive{ Description(), defaults };
+    drive.Start();
+
+    drive.Output(driving);
+    drive.Tick();
+
+    EXPECT_EQ(drive.AppliedDuties().a, driving.a);
+    EXPECT_EQ(drive.AppliedDuties().b, driving.b);
+}
+
+TEST(TestPlantDrive, with_a_duty_delay_the_applied_duties_lag_one_period)
+{
+    auto plant = Description();
+    plant.dutyDelayPeriods = 1;
+    sil::PlantDrive drive{ plant, defaults };
+    drive.Start();
+    drive.Output(neutral);
+    drive.Tick();
+
+    drive.Output(driving);
+    drive.Tick();
+    EXPECT_EQ(drive.AppliedDuties().a, neutral.a);
+
+    drive.Tick();
+    EXPECT_EQ(drive.AppliedDuties().a, driving.a);
+}

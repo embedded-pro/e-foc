@@ -25,6 +25,9 @@ namespace virtual_motor
         std::optional<port::RefusalReason> SetEncoderNoise(float radians) override;
         void ClearAll() override;
 
+        void Stream(const infra::Function<void(const port::Window&)>& sink) override;
+        void StopStream() override;
+
     private:
         VirtualPlatform& platform;
     };
