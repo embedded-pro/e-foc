@@ -16,13 +16,13 @@ namespace
         switch (damage)
         {
             case sil::RecordDamage::badMagic:
-                record[0] = static_cast<uint8_t>(~record[0]);
+                record[0] = static_cast<uint8_t>(0xff - record[0]);
                 break;
             case sil::RecordDamage::staleVersion:
                 record[Record::versionOffset] = static_cast<uint8_t>(record[Record::versionOffset] - 1u);
                 break;
             case sil::RecordDamage::corruptCrc:
-                record[Record::crcOffset] = static_cast<uint8_t>(~record[Record::crcOffset]);
+                record[Record::crcOffset] = static_cast<uint8_t>(0xff - record[Record::crcOffset]);
                 break;
             case sil::RecordDamage::none:
                 break;
