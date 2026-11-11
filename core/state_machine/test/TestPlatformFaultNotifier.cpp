@@ -55,6 +55,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
             } };
 
+        foc::CurrentStream currentStream;
         foc::Volts vdc{ 24.0f };
 
         infra::Execute setupPlatformExpectations{ [this]()
@@ -98,7 +99,7 @@ namespace
         {
             return application::TorqueStateMachine{
                 tracer,
-                application::MotorHardware{ inverter, platformFactory, vdc },
+                application::MotorHardware{ inverter, platformFactory, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 *faultNotifier,

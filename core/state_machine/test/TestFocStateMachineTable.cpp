@@ -113,6 +113,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -137,7 +138,7 @@ namespace
 
         application::TorqueStateMachine stateMachine{
             tracer,
-            application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+            application::MotorHardware{ inverterMock, encoderMock, currentStream, foc::Volts{ 24.0f } },
             nvmMock,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
             faultNotifierMock,

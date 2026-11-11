@@ -187,15 +187,15 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Ident as MechanicalIdent (WithSharedAccess)
+    participant Mapping as CoggingMapping (WithSharedAccess)
     participant ED as EventDispatcherWithWeakPtr
     participant FSM
 
-    Ident->>ED: Schedule(convergenceAction, WeakFromThis())
-    FSM->>Ident: Abort() — clears rls
+    Mapping->>ED: Schedule(finish, WeakFromThis())
+    FSM->>Mapping: Abort()
     FSM->>FSM: CmdEmergencyStop()
     FSM->>FSM: mode switch → destroys WithSharedAccess
-    Note right of Ident: WeakPtr expires
+    Note right of Mapping: WeakPtr expires
     ED->>ED: lock WeakPtr → null
     Note right of ED: action discarded safely ✓
 ```

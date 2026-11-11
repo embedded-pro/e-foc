@@ -34,7 +34,11 @@ namespace foc
         void LimitCurrent(Ampere limit) override;
         void TrackBusVoltage(Volts measured) override;
 
-        using CascadeWithSpeedLoop::SetCurrentStream;
+        Ampere MeasuredQuadratureCurrent() const final
+        {
+            return this->MeasuredQuadratureCurrentImpl();
+        }
+
         using CascadeWithSpeedLoop::SetZeroVectorSlopeSink;
 
     protected:
