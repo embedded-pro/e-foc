@@ -339,9 +339,9 @@ nothing. `EmergencyStop` is always accepted.
 
 ### Provided
 
-| Interface                      | Purpose                                                            | Contract                                                                       |
-|--------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| FocMotorCurrentStreamer        | Sends the current stream while a client is online (Part J)         | Event loop only; reads the rate from the configuration record every tick       |
+| Interface               | Purpose                                                    | Contract                                                                 |
+|-------------------------|------------------------------------------------------------|--------------------------------------------------------------------------|
+| FocMotorCurrentStreamer | Sends the current stream while a client is online (Part J) | Event loop only; reads the rate from the configuration record every tick |
 
 ### Required
 

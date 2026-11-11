@@ -135,7 +135,7 @@ boards. What each service of the platform is on the virtual board:
 | Status LEDs             | Three pins whose state the plant port publishes                                                                                              |
 | Terminal and trace      | The debug log, on the engine's standard output and, once the app attaches, through the plant port; there is no command line, as on the board |
 | Board ID                | The node of the start options                                                                                                                |
-| Board kind              | *virtual*, kind 6 (`cmake/VirtualBoard.cmake`), which no release carries a firmware pack for                                                    |
+| Board kind              | *virtual*, kind 6 (`cmake/VirtualBoard.cmake`), which no release carries a firmware pack for                                                 |
 | Reset                   | The process ends and is started again with the same options; the memory file survives                                                        |
 | Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                                                   |
 
