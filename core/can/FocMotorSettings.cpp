@@ -116,6 +116,10 @@ namespace can
             case FocParameter::followingErrorTime:
             case FocParameter::speedAcceleration:
             case FocParameter::speedDeceleration:
+            case FocParameter::profileVelocity:
+            case FocParameter::profileAcceleration:
+            case FocParameter::profileDeceleration:
+            case FocParameter::profileJerk:
             case FocParameter::commandTimeout:
             case FocParameter::continuousCurrent:
             case FocParameter::peakCurrent:
@@ -329,6 +333,14 @@ namespace can
                 return config.limits.speedAcceleration;
             case FocParameter::speedDeceleration:
                 return config.limits.speedDeceleration;
+            case FocParameter::profileVelocity:
+                return config.limits.profileVelocity;
+            case FocParameter::profileAcceleration:
+                return config.limits.profileAcceleration;
+            case FocParameter::profileDeceleration:
+                return config.limits.profileDeceleration;
+            case FocParameter::profileJerk:
+                return config.limits.profileJerk;
             case FocParameter::commandTimeout:
                 return config.limits.commandTimeout;
             case FocParameter::continuousCurrent:
@@ -377,6 +389,18 @@ namespace can
                 break;
             case FocParameter::speedDeceleration:
                 config.limits.speedDeceleration = value;
+                break;
+            case FocParameter::profileVelocity:
+                config.limits.profileVelocity = value;
+                break;
+            case FocParameter::profileAcceleration:
+                config.limits.profileAcceleration = value;
+                break;
+            case FocParameter::profileDeceleration:
+                config.limits.profileDeceleration = value;
+                break;
+            case FocParameter::profileJerk:
+                config.limits.profileJerk = value;
                 break;
             case FocParameter::commandTimeout:
                 config.limits.commandTimeout = value;

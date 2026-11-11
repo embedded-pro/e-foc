@@ -134,6 +134,21 @@ received, as every configuration write is (Part K).
 |--------|-----------------|------|----------------------------|-----------|--------------|
 | `0x64` | `telemetryRate` | Hz   | 0 stops the stream, 1–1000 | no        | within 1 ms  |
 
+**Contract 3.1 — position motion profile.** Version 3.1 adds four stored settings; nothing in 3.0 changes.
+They are drive-wide limits like those of 2.9: they can be written in any state, are answered once stored, and a
+write that cannot be stored is taken back. Position mode plans a trapezoidal path to each setpoint within them
+(`foc-position.md`, Motion Profile); the profile is on only while `profileVelocity` and `profileAcceleration`
+are both above zero, and with either at zero position mode hands the setpoint to the position loop unchanged. A
+`profileDeceleration` of 0 uses `profileAcceleration`. `profileJerk` is reserved for a later S-curve profile:
+it is accepted, stored and read back, and the trapezoidal profile does not use it yet.
+
+| ID     | Parameter             | Unit   | Range                             | Automatic | Takes effect                                      |
+|--------|-----------------------|--------|-----------------------------------|-----------|---------------------------------------------------|
+| `0x65` | `profileVelocity`     | rad/s  | 0 – 5000, 0 profile off           | no        | at the next outer-loop period (`foc-position.md`) |
+| `0x66` | `profileAcceleration` | rad/s2 | 0 – 100000, 0 profile off         | no        | at the next outer-loop period (`foc-position.md`) |
+| `0x67` | `profileDeceleration` | rad/s2 | 0 – 100000, 0 the acceleration    | no        | at the next outer-loop period (`foc-position.md`) |
+| `0x68` | `profileJerk`         | rad/s3 | 0 – 10000000, reserved, no effect | no        | stored and read back only                         |
+
 **Contract 2.1 — algorithms and parameters.** Version 2.1 adds four commands and two responses; nothing in
 2.0 changes, so a 2.0 client keeps working against a 2.1 server and a 2.1 client can tell from the minor
 version whether a server understands them.

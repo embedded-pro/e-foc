@@ -11,6 +11,7 @@ namespace tool
         BuildStreamGroup();
         BuildSupervisionGroup();
         BuildLimitsGroup();
+        BuildMotionProfileGroup();
         BuildTargetWindowGroup();
         BuildTravelLimitsGroup();
         BuildThermalGroup();
@@ -74,6 +75,20 @@ namespace tool
         auto* note = new QLabel("One set for every control mode, stored at once and in force within 1 ms, also while the motor "
                                 "runs. Above 110 % of the overspeed limit, or beyond the following-error window for its time in "
                                 "position mode, the drive faults and coasts.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
+    void ConfigurationTab::BuildMotionProfileGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Motion Profile", group);
+        AddEditors(form, MotionProfileSettings());
+
+        auto* note = new QLabel("Position mode plans a trapezoidal path to each setpoint within the velocity, acceleration and "
+                                "deceleration, and a new setpoint mid-move continues from the motion under way. The profile is off "
+                                "while the velocity or the acceleration is 0. The jerk is reserved for a later S-curve and has no "
+                                "effect yet. Stored at once and in force from the next control period.");
         note->setWordWrap(true);
         form.addRow(note);
     }

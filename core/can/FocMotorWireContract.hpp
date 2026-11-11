@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 3;
-    static constexpr uint8_t focContractVersionMinor = 0;
+    static constexpr uint8_t focContractVersionMinor = 1;
 
     constexpr bool IsCompatibleContract(uint8_t major, uint8_t minor)
     {
@@ -264,7 +264,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 85> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 89> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -305,6 +305,10 @@ namespace can
         { FocParameter::continuousCurrent, "continuousCurrent", "A", 0.0f, foc::CommandLimits::maxRatedCurrent, false, false },
         { FocParameter::peakCurrent, "peakCurrent", "A", 0.0f, foc::CommandLimits::maxRatedCurrent, false, false },
         { FocParameter::peakCurrentTime, "peakCurrentTime", "s", foc::CommandLimits::minPeakCurrentTime, foc::CommandLimits::maxPeakCurrentTime, false, false },
+        { FocParameter::profileVelocity, "profileVelocity", "rad/s", 0.0f, foc::CommandLimits::maxOverspeedLimit, false, false },
+        { FocParameter::profileAcceleration, "profileAcceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
+        { FocParameter::profileDeceleration, "profileDeceleration", "rad/s2", 0.0f, foc::CommandLimits::maxSpeedRate, false, false },
+        { FocParameter::profileJerk, "profileJerk", "rad/s3", 0.0f, foc::CommandLimits::maxProfileJerk, false, false },
         { FocParameter::positionWindow, "positionWindow", "rad", 0.0f, foc::CommandLimits::maxPositionWindow, false, false },
         { FocParameter::positionWindowTime, "positionWindowTime", "s", 0.0f, foc::CommandLimits::maxPositionWindowTime, false, false },
         { FocParameter::positionMinimum, "positionMinimum", "rad", -foc::CommandLimits::maxPositionLimit, foc::CommandLimits::maxPositionLimit, false, false },
