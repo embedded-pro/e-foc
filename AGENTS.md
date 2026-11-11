@@ -201,7 +201,7 @@ It charges each path its worst case: the costliest path through the functions a 
 A call through a pointer (an `infra::Function` callback, a virtual call) is not followed, so a new one on a hot path means naming its target in
 `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json`
 (inner loop plus the calibration observer). Alternatives of which one runs share a stage with `"combine": "max"`; a new loop needs a `loop_bounds`
-entry. The report's *Analysis Notes* list every call not followed and every loop without a bound: read them after changing a hot path.
+entry, and a change to the loops of a function whose entry is a list (one bound per loop, in address order) needs the list rewritten. The report's *Analysis Notes* list every call not followed and every loop without a bound: read them after changing a hot path.
 `CYCLE_BUDGET_PACKAGE` in `ci.yml` pins the analyser; `documentation/performance-optimization/README.md` (*What the static estimate charges*) has the rules.
 
 **Warnings**: EmIL's `emil_enable_warnings()` (`infra/embedded-infra-lib/cmake/emil_compiler_warnings.cmake`) enables
