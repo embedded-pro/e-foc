@@ -4057,3 +4057,23 @@ TEST_F(FocStateMachineTorqueTest, required_homing_refuses_an_enable_after_an_ali
     ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
     EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
 }
+
+TEST_F(FocStateMachineTorqueTest, the_zero_vector_slopes_of_each_control_period_reach_the_power_stage_sink)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc, 0, nullptr, &sink }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity };
+    AlignAfterBoot(sm);
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+        {
+            inverterMock.StorePhaseCurrentsCallback(onDone);
+        });
+    EXPECT_CALL(inverterMock, Start());
+    ASSERT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(sink, ZeroVectorSlopes(_));
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ -0.5f } });
+}

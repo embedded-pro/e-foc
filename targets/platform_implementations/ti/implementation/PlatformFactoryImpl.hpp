@@ -51,6 +51,14 @@ namespace application
         static constexpr auto watchdogEarlyWarning{ hal::cortex::InterruptPriority::lowest };
     };
 
+    namespace detail
+    {
+        constexpr bool HeldAt(std::chrono::duration<float> delay, float microseconds)
+        {
+            return delay.count() > (microseconds - 0.001f) * 1e-6f && delay.count() < (microseconds + 0.001f) * 1e-6f;
+        }
+    }
+
     class PlatformFactoryImpl
         : public PlatformFactory
         , public drivers::EncoderIndex
@@ -179,6 +187,9 @@ namespace application
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
             static_assert(currentSensingOversampling == hal::tiva::Adc::Oversampling::oversampling2 && averagedConversions == 2);
+
+            static constexpr auto shortestSampleDelays = foc::SequentialPhaseSampleDelays({ .converterClockHertz = converterClockHertz, .sampleHoldClocks = sampleHoldClocks[0], .conversionClocks = conversionClocks, .averagedConversions = averagedConversions });
+            static_assert(detail::HeldAt(shortestSampleDelays.a, 0.75f) && detail::HeldAt(shortestSampleDelays.b, 2.75f) && detail::HeldAt(shortestSampleDelays.c, 4.75f));
 
             static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
                 {},
