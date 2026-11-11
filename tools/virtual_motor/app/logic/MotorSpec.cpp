@@ -4,7 +4,7 @@
 
 namespace virtual_motor::app
 {
-    std::vector<std::string> EngineArguments(const MotorSpec& spec, const EnginePorts& ports, bool factoryFresh)
+    std::vector<std::string> EngineArguments(const MotorSpec& spec, const EnginePorts& ports, StartMode start)
     {
         std::vector<std::string> arguments{
             "--bus",
@@ -18,8 +18,10 @@ namespace virtual_motor::app
             "--hub-port",
             std::to_string(ports.hubPort),
         };
-        if (factoryFresh)
+        if (start == StartMode::factoryFresh)
             arguments.emplace_back("--factory-fresh");
+        else if (start == StartMode::calibrated)
+            arguments.emplace_back("--calibrated");
         if (std::ranges::any_of(spec.currentOffset, [](float offset)
                 {
                     return offset != 0.0f;

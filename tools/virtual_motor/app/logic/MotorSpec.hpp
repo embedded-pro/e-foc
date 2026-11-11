@@ -11,6 +11,7 @@ namespace virtual_motor::app
     {
         keepMemory,
         factoryFresh,
+        calibrated,
     };
 
     struct MotorSpec
@@ -38,7 +39,7 @@ namespace virtual_motor::app
         uint16_t hubPort{ 0 };
     };
 
-    std::vector<std::string> EngineArguments(const MotorSpec& spec, const EnginePorts& ports, bool factoryFresh);
+    std::vector<std::string> EngineArguments(const MotorSpec& spec, const EnginePorts& ports, StartMode start);
     std::string MotorFolderName(const MotorSpec& spec);
     std::string CurrentOffsetText(const std::array<float, 3>& offset);
     std::string StateText(MotorState state);

@@ -7,6 +7,7 @@ target_include_directories(e_foc.tool.virtual_motor.platform PUBLIC
 target_link_libraries(e_foc.tool.virtual_motor.platform PUBLIC
     e_foc.boards
     e_foc.foc.model.drive
+    e_foc.foc.model.drive.memory
     e_foc.platform_abstraction
     e_foc.tool.virtual_motor.port
     can_lite.drivers.slcan
@@ -18,6 +19,8 @@ target_link_libraries(e_foc.tool.virtual_motor.platform PUBLIC
 )
 
 target_sources(e_foc.tool.virtual_motor.platform PRIVATE
+    CalibratedMemory.cpp
+    CalibratedMemory.hpp
     BoardPeripherals.cpp
     BoardPeripherals.hpp
     CaptureRecorder.cpp

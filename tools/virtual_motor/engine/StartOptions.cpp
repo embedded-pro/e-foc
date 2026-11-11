@@ -128,6 +128,8 @@ namespace virtual_motor
         {
             if (argument == "--factory-fresh")
                 options.factoryFresh = true;
+            else if (argument == "--calibrated")
+                options.calibrated = true;
             else if (argument == "--host-bus")
                 options.hostBus = true;
             else if (argument == "--restarted")
@@ -166,6 +168,9 @@ namespace virtual_motor
             if (auto error = Read(options, arguments, index); !error.empty())
                 return { std::nullopt, error, false };
 
+        if (options.calibrated && options.factoryFresh)
+            return { std::nullopt, "--calibrated and --factory-fresh cannot be combined", false };
+
         if (options.memoryFile.empty())
             options.memoryFile = std::format("virtual-motor-{}-{}.nvm", options.bus, static_cast<uint32_t>(options.node));
 
@@ -181,6 +186,7 @@ namespace virtual_motor
                "  --plant <preset>    teknic, anaheim, bench or another preset, or a plant description file (default: teknic)\n"
                "  --memory <file>     file in the working directory holding the non-volatile memory (default: virtual-motor-<bus>-<node>.nvm)\n"
                "  --factory-fresh     start with erased memory, as a new board\n"
+               "  --calibrated        start with the memory a board calibrated on its plant would hold\n"
                "  --seed <n>          seed of every noise source\n"
                "  --current-offset <a>,<b>,<c>\n"
                "                      offset in A the current-sense chain adds to each measured phase current\n"

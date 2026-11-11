@@ -11,7 +11,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/math/` — `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`);
-  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), and the `BoardProtectionSimulator`; host and QEMU only
+  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), the `BoardProtectionSimulator`,
+  and `memory/`, the memory image builder (`BuildNvmImage`) and the calibration a plant would store (`CalibratedFor`) that the harnesses and the virtual motor share; host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
@@ -229,7 +230,9 @@ what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. T
 Clang has no `-Wmaybe-uninitialized`: in a Clang build the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
-**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware, and `@virtual` for the virtual motor runner (`--mode virtual`, the host build's `e-foc-virtual-motor`), a small functional set that keeps its `@sil` tag and that `ci.yml`'s `virtual_motor_tests` job runs. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware,
+and `@virtual` for the virtual motor runner (`--mode virtual`, the host build's `e-foc-virtual-motor`), a small functional set that keeps its `@sil` tag and that `ci.yml`'s `virtual_motor_tests` job runs.
+The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
 model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.

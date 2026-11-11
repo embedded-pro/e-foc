@@ -29,6 +29,7 @@ namespace virtual_motor::app
         , plant(new QComboBox(this))
         , keepMemory(new QRadioButton("Keep its memory", this))
         , factoryFresh(new QRadioButton("Factory-fresh: erased memory, as a new board", this))
+        , calibrated(new QRadioButton("Calibrated for its plant: runs in every mode once aligned", this))
         , problem(new QLabel(this))
         , buttons(new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this))
     {
@@ -47,6 +48,7 @@ namespace virtual_motor::app
         form->addRow("&Plant", plant);
         form->addRow("Start", keepMemory);
         form->addRow("", factoryFresh);
+        form->addRow("", calibrated);
         form->addRow("Current offset", BuildCurrentOffset());
         auto* layout = new QVBoxLayout(this);
         layout->addLayout(form);
@@ -63,8 +65,17 @@ namespace virtual_motor::app
     MotorSpec AddMotorDialog::Spec() const
     {
         const auto plantName = plant->currentIndex() == descriptionFileItem ? descriptionFile : plant->currentData().toString();
-        return MotorSpec{ "default", static_cast<uint8_t>(node->value()), plantName.toStdString(), factoryFresh->isChecked() ? StartMode::factoryFresh : StartMode::keepMemory,
+        return MotorSpec{ "default", static_cast<uint8_t>(node->value()), plantName.toStdString(), Start(),
             { static_cast<float>(currentOffset[0]->value()), static_cast<float>(currentOffset[1]->value()), static_cast<float>(currentOffset[2]->value()) } };
+    }
+
+    StartMode AddMotorDialog::Start() const
+    {
+        if (factoryFresh->isChecked())
+            return StartMode::factoryFresh;
+        if (calibrated->isChecked())
+            return StartMode::calibrated;
+        return StartMode::keepMemory;
     }
 
     QWidget* AddMotorDialog::BuildCurrentOffset()

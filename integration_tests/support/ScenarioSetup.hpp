@@ -1,6 +1,6 @@
 #pragma once
 
-#include "integration_tests/support/nvm/NvmImageBuilder.hpp"
+#include "core/foc/model/drive/memory/NvmImageBuilder.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
 #include "motor_parameters/PlantPresets.hpp"
 #include <chrono>

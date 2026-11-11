@@ -29,6 +29,7 @@ namespace virtual_motor::app
 
     private:
         QWidget* BuildCurrentOffset();
+        StartMode Start() const;
         void PlantChosen(int index);
         void Validate();
 
@@ -37,6 +38,7 @@ namespace virtual_motor::app
         QComboBox* plant;
         QRadioButton* keepMemory;
         QRadioButton* factoryFresh;
+        QRadioButton* calibrated;
         std::array<QDoubleSpinBox*, 3> currentOffset{};
         QLabel* problem;
         QDialogButtonBox* buttons;
