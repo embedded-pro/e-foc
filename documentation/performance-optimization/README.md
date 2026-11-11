@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.4.0
+version: 1.5.0
 component: "foc"
 date: 2026-11-11
 ---
@@ -398,26 +398,35 @@ the *Analysis Notes* of each report list what is left open.
   names: the interrupt vector, the three `Runner` callbacks (so the inner loop is charged its costliest control
   mode, the speed and position cascade), a function and its thunk, the speed and position low-priority handlers,
   and the two calibration observers.
-- **Loops need a bound.** `loop_bounds` gives every loop of a function that many iterations, and nested loops
-  multiply: with a bound of 3 the body of a loop inside a loop is charged 9 times.
+- **Loops need a bound.** `loop_bounds` gives every loop of a function that many iterations, or, as a list, each
+  loop its own in address order. Nested loops multiply: with a bound of 3 the body of a loop inside a loop is
+  charged 9 times.
 
-| `loop_bounds` entry                                                       |  Bound | Why                                                         |
-|---------------------------------------------------------------------------|-------:|-------------------------------------------------------------|
-| TI ADC interrupt lambda                                                   |      6 | Six channels in the sequence, drained from the FIFO         |
-| `PwmStmBase::StartImpl`                                                   |      3 | Three channels                                              |
-| `InverterCompensation::ThreePhasePwmOutput`                               |      1 | The loop walks nested compensation stages; there is one     |
-| `SpeedDifferentiator::Measure`                                            |      2 | One retry when the control interrupt lands mid-read         |
-| `__ieee754_fmodf`                                                         |      3 | `remainder` of the difference of two single-turn angles     |
-| `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                        |
-| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |      9 | Nine elements of a 3×3 matrix, in one loop or in a 3×3 nest |
-| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                               |
-| `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                                  |
-| `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record             |
+| `loop_bounds` entry                                                       |  Bound | Why                                                     |
+|---------------------------------------------------------------------------|-------:|---------------------------------------------------------|
+| TI ADC interrupt lambda                                                   |      6 | Six channels in the sequence, drained from the FIFO     |
+| `PwmStmBase::StartImpl`                                                   |      3 | Three channels                                          |
+| `InverterCompensation::ThreePhasePwmOutput`                               |      1 | The loop walks nested compensation stages; there is one |
+| `SpeedDifferentiator::Measure`                                            |      2 | One retry when the control interrupt lands mid-read     |
+| `__ieee754_fmodf`                                                         |      3 | `remainder` of the difference of two single-turn angles |
+| `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                    |
+| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |   list | One bound per loop, below                               |
+| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                           |
+| `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                              |
+| `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record         |
 
-One bound serves every loop of its function. The mechanical estimator and its `RecursiveLeastSquares` walk a 3×3
-matrix both as one loop of nine elements and as a 3×3 nest, so their bound is nine: the nest's inner body is charged
-81 times where it runs nine, and its outer body nine times where it runs three. The outer-loop estimate is an upper
-bound with that slack in it, about 2,000 cycles.
+The mechanical estimator and its `RecursiveLeastSquares` walk a 3×3 matrix as a 3×3 nest, as a loop over its three
+rows and as loops over its nine elements, so one bound cannot fit them all and each loop has its own:
+
+| Function                                      | Bounds, in address order | Loops                                                            |
+|-----------------------------------------------|--------------------------|------------------------------------------------------------------|
+| `RealTimeFrictionAndInertiaEstimator::Update` | 2, 3, 3, 3, 9, 9, 9      | Two directional fits, the 3×3 nest, three rows, nine elements ×3 |
+| `RecursiveLeastSquares<float, 3u>::Update`    | 3, 3, 3, 9, 9, 9         | The 3×3 nest, three rows, nine elements ×3                       |
+
+The lists follow the loops the compiler generated. When a change to these functions or to the compiler alters the
+number of loops, the analyser charges every loop the largest bound of the list and adds a note: the estimate rises
+by several thousand cycles and stays an upper bound. The *Loops* table of the outer-loop report gives the new
+order to rewrite the list from.
 
 `cold_calls` removes the paths that end an iteration instead of being one: the over-current and protection trips
 with `CutPowerStage`, the ST HAL's `assert_failed`, `ADC_Disable` (single-shot DMA only; this converter runs
@@ -433,11 +442,11 @@ With the worst-path model the estimates at this revision are:
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
 | Inner loop          |          3030 |   4500 |          2851 |   6375 |
-| Outer loop          |         12477 |  20000 |         12477 |  28333 |
+| Outer loop          |          6750 |  20000 |          6750 |  28333 |
 | Identification path |          5014 |   6000 |          4835 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
-`CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.0.1.
+`CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.1.0.
 
 The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
 runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
