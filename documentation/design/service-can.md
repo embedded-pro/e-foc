@@ -58,6 +58,7 @@ date: 2026-11-11
 The category's message catalogue, scale factors, parameter table and contract version are defined by the
 e-foc-protocol library, in `infra/e-foc-protocol/documentation/design/wire-contract.md` Part A. This firmware
 restates none of it.
+
 ### Part B — FocMotorCategoryServer
 
 The server category is part of e-foc-protocol (`wire-contract.md` Part B). The firmware attaches
