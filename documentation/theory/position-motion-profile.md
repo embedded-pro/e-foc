@@ -45,8 +45,9 @@ deceleration to rest on the target. It runs in the 1 kHz outer handler, ahead of
 | $v_{max}$  | Profile velocity                                      | rad/s      |
 | $a_{max}$  | Profile acceleration                                  | rad/s²     |
 | $d_{max}$  | Profile deceleration (the acceleration when set to 0) | rad/s²     |
-| $q_0, v_0$ | Position and velocity the plan starts from            | rad, rad/s |
+| $q_0, v_0, a_0$ | Position, velocity and acceleration the plan starts from | rad, rad/s, rad/s² |
 | $q_f$      | Goal of the plan                                      | rad        |
+| $j_{max}$  | Profile jerk limit (0 → trapezoidal plan)             | rad/s³     |
 | $T_o$      | Outer-loop period                                     | s          |
 | $J$        | Rotor inertia                                         | kg·m²      |
 | $K_t$      | Torque constant, $\tfrac{3}{2} p \psi_f$              | N·m/A      |
@@ -91,6 +92,33 @@ $t \ge T$.
 **Example.** A move of 1.5 rad at $v_{max} = 20$ rad/s and $a_{max} = d_{max} = 400$ rad/s² takes
 $t_{ramp} = 50$ ms (0.5 rad), $t_{brake} = 50$ ms (0.5 rad) and a cruise of $0.5/20 = 25$ ms: $T = 125$ ms.
 
+### Jerk-limited plan from a state (S-curve)
+
+When a jerk limit $j_{max} > 0$ is set alongside $v_{max}$, $a_{max}$ and $d_{max}$, the profile plans an
+S-curve from the state $(q_0, v_0, a_0)$. The seven classical phases are: jerk-up, constant-acceleration,
+jerk-down (reaching $v_{max}$), cruise, jerk-down (braking), constant-deceleration, jerk-up (to rest at $q_f$).
+Not every phase is non-zero for every move.
+
+The direction is determined by the distance the rotor would travel to stop from $(v_0, a_0)$ at the limits,
+the same stopping-distance logic as the trapezoid but accounting for the initial acceleration.
+
+The peak velocity is found by a 32-step binary search over the range $[0, v_{max}]$; each evaluation of
+the distance-to-peak function costs about two ramp simulations (each 3 × polynomial integration steps plus
+3 sqrt and 6 div on a Cortex-M4F). The total plan cost is roughly 35 × (sqrt + div) ≈ **70 sqrt + 300 div**,
+or about 70 × 14 + 300 × 14 = **5 180 cycles** at the M4F latencies, against the 20 000-cycle outer-loop
+budget. With the existing 8 133-cycle baseline the worst-case outer-loop cost is estimated at **13 300 cycles**,
+well inside 20 000.
+
+**Preconditions.** All limits must be positive. The initial acceleration must satisfy
+$|a_0| \le \max(a_{max}, d_{max})$; on reseed (Enable, after jog) the seed acceleration is 0, which
+trivially satisfies this. On replan from the reference state, the last reference acceleration is clamped to
+$[-\max(a_{max}, d_{max}),\ +\max(a_{max}, d_{max})]$ before the plan is called, so a mid-move operator
+reduction of the limits does not violate the precondition.
+
+**Example.** A move of 1.5 rad at $v_{max} = 20$ rad/s, $a_{max} = d_{max} = 400$ rad/s² and
+$j_{max} = 20\,000$ rad/s³ takes a ramp-up of $400/20\,000 = 20$ ms, a constant-acceleration phase, a
+ramp-down, a cruise and the mirror on the deceleration side; total $T \approx 142$ ms (measured).
+
 ### Replanning from the reference state
 
 A new setpoint while a move is under way must not make the reference jump. The plan therefore restarts from
@@ -100,15 +128,18 @@ $$
 q_0 \leftarrow r[k],\quad v_0 \leftarrow \dot r[k],\quad q_f \leftarrow \text{new goal},\quad t \leftarrow 0
 $$
 
-The position and the velocity of the reference are continuous across the replan; the acceleration steps
-between $\pm a_{max}$ and $\pm d_{max}$ as the new plan requires. A reversal brakes at $d_{max}$ to rest, then
-accelerates the other way at $a_{max}$, and the speed never exceeds $v_{max}$ nor the rates their limits.
+For the trapezoidal plan position and velocity are continuous across the replan; the acceleration steps.
+For the jerk-limited plan the third argument is the last reference acceleration $\ddot r[k]$, clamped to
+$[-\max(a_{max}, d_{max}),\ +\max(a_{max}, d_{max})]$, so position, velocity **and acceleration** are
+continuous across a replan (the jerk steps). A reversal and the speed/rate limits are handled inside the
+plan exactly as for the trapezoid.
+
 The plan is sampled once per outer period, at $t = k\,T_o$ with the first sample taken one period after the
 replan, so the reference moves in the very period the setpoint arrives.
 
-The profile **seeds** from the measured position and speed when the drive is enabled, after a speed or current
-command has driven the rotor, and when the profile is switched on; the rotor then starts from where it is
-and not from the last setpoint.
+The profile **seeds** from the measured position and speed (acceleration 0) when the drive is enabled, after a
+speed or current command has driven the rotor, and when the profile is switched on; the rotor then starts from
+where it is and not from the last setpoint.
 
 ### The goal on the circle
 
@@ -165,7 +196,7 @@ measures, so a target is not reported reached while the reference is still on it
 
 ```mermaid
 flowchart LR
-    SP["setpoint θ*"] --> PL["trapezoid from state<br/>(replan on change)"]
+    SP["setpoint θ*"] --> PL["profile from state<br/>(trapezoid or S-curve;<br/>replan on change)"]
     PL -->|"r, ṙ"| LAW["position law"]
     PL -->|"r̈"| FF["i_ff = J·r̈ / Kt"]
     TH["θm"] --> LAW
@@ -179,25 +210,30 @@ flowchart LR
 
 ## Numerical Properties
 
-| Property           | Value                                                              |
-|--------------------|--------------------------------------------------------------------|
-| Plan               | closed form, no loop, once per setpoint change                     |
-| Sample             | closed form, no loop, once per 1 kHz cycle                         |
-| Reference duration | $T$ above; 125 ms for 1.5 rad at 20 rad/s and 400 rad/s²           |
-| Memory             | one plan (about ten floats), no heap                               |
-| Profile off        | velocity or acceleration 0: the setpoint reaches the law unchanged |
+| Property                | Value                                                                                        |
+|-------------------------|----------------------------------------------------------------------------------------------|
+| Trapezoidal plan        | closed form, no loop, once per setpoint change                                               |
+| S-curve plan            | 32-step bisection, ≈ 5 180 cycles (Cortex-M4F); once per setpoint change only               |
+| Sample                  | closed form, no loop, once per 1 kHz cycle                                                   |
+| Reference duration      | 125 ms for 1.5 rad, 20 rad/s, 400 rad/s² (trapezoid); ≈ 142 ms with 20 000 rad/s³ jerk     |
+| Memory                  | one plan variant (≤ 200 bytes), no heap                                                      |
+| Profile off             | velocity or acceleration 0: the setpoint reaches the law unchanged                           |
+| Jerk off (j = 0)        | trapezoidal plan, bit-identical to the behaviour before jerk was introduced                  |
 
 ---
 
 ## Limitations & Assumptions
 
-- The profile is a trapezoid of speed: the acceleration steps. A jerk limit (S-curve) is reserved in the
-  settings and not planned yet.
 - The path is planned in the reference, not the measured, state. A rotor that cannot follow lags behind it;
   the following-error window decides when that is a fault.
 - The acceleration feed-forward uses the inertia the drive was given or identified. A wrong inertia leaves
   a residual that the feedback absorbs.
 - A reversal of a goal exactly half a turn away flips the shorter way; the plan follows the new side.
+- The S-curve plan requires all four limits positive and $|a_0| \le \max(a_{max}, d_{max})$; the firmware
+  enforces these before every plan call.
+- The S-curve plan cannot handle a deceleration limit $d_{max}$ different from $a_{max}$ when the initial
+  acceleration is non-zero and opposite to the travel direction (the bisection still converges, but may
+  produce a slightly longer duration than optimal in that edge case).
 
 ---
 

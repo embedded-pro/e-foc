@@ -2,6 +2,7 @@
   "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
   "loop_rates_khz": [1],
   "loop_bounds": {
+    "^motion_profiles::SCurveProfileFromState<float>::Bisect\\(": 32,
     "^foc::SpeedDifferentiator::Measure\\(": 2,
     "^__ieee754_fmodf$": 3,
     "^services::RealTimeFrictionAndInertiaEstimator::SteadyFriction\\(": 2,

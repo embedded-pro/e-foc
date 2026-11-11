@@ -151,18 +151,18 @@ stateDiagram-v2
 
 A step setpoint asks the loop for the most speed and current it has. Two stored limits shape the move instead:
 the profile velocity and the profile acceleration, with an optional profile deceleration (0 uses the
-acceleration) and a profile jerk. Position mode then plans a trapezoid of speed from the motion already under
-way to the setpoint and hands the position law a moving reference with its velocity and acceleration
-(`documentation/theory/position-motion-profile.md`). The settings are contract 3.1 parameters and drive-wide
-limits (`service-can.md`, `service-nvm.md`); the jerk is reserved for a later S-curve and is stored and read
-back without effect.
+acceleration) and an optional profile jerk. With jerk zero (the default) position mode plans a **trapezoid**
+of speed from the motion already under way. With jerk positive it plans a **jerk-limited S-curve** that also
+keeps the reference acceleration continuous across a replan. The position law receives a moving reference with
+its velocity and acceleration in both cases (`documentation/theory/position-motion-profile.md`). The settings
+are contract 3.1 parameters and drive-wide limits (`service-can.md`, `service-nvm.md`).
 
 - **On and off.** The profile is on only while the velocity and the acceleration are both above zero. Off, the
   setpoint reaches the position law exactly as without the feature, and so do every output and every
   observation.
 - **Replan.** A new setpoint is noticed at the next 1 kHz tick and the plan restarts from the reference's own
-  position and velocity, so both stay continuous. A reversal brakes at the deceleration, then turns round; the
-  speed and rates stay within the limits throughout.
+  position and velocity (and acceleration when jerk is set), so they stay continuous. A reversal brakes at the
+  deceleration, then turns round; the speed and rates stay within the limits throughout.
 - **Seed.** On Enable, after a speed or current command, and when the profile is switched on, the reference
   starts from the measured position and speed.
 - **Circle and limits.** Without travel limits the goal is placed by the wrapped difference, the shorter way
@@ -180,7 +180,7 @@ back without effect.
 flowchart LR
     SP["setpoint"] --> Q{"profile on?"}
     Q -- no --> LAW["position law"]
-    Q -- yes --> TR["trapezoid, replanned on a new setpoint"]
+    Q -- yes --> TR["trapezoid or S-curve,\nreplanned on a new setpoint"]
     TR -->|"reference, velocity"| LAW
     TR -->|"acceleration"| FF["J·a/Kt"]
     FF --> IQ["q-axis current reference"]
@@ -281,7 +281,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | SetPositionTunings      | Sets the position loop bandwidth and cost weights.                                                                          | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live.                                                         |
 | SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                                                                                      |
 | SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle; with a motion profile on it starts a replan.                                                                                                                                                 |
-| ProfileMotion           | Sets the motion profile: velocity, acceleration, deceleration and jerk.                                                     | Applied with the other limits at the next outer-loop period. Off while the velocity or the acceleration is zero; a deceleration of zero uses the acceleration; the jerk has no effect yet.                                                          |
+| ProfileMotion           | Sets the motion profile: velocity, acceleration, deceleration and jerk.                                                     | Applied with the other limits at the next outer-loop period. Off while the velocity or the acceleration is zero; a deceleration of zero uses the acceleration; a jerk of zero uses the trapezoidal plan; a positive jerk switches to the S-curve plan. |
 | Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                              |
 | ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed, the position error to the reference and the target error to the final setpoint, for REQ-PRO-005. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one. |
 | Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                                                                         |

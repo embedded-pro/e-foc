@@ -342,7 +342,7 @@ then the cogging map.
 The limits are the overspeed limit (`fault-supervision.md` Part G), 1–5000 rad/s, default 1000; the
 following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H); the speed
 acceleration and deceleration, 0–100 000 rad/s², 0 (no limit) by default (`foc-speed.md`); the profile velocity, 0–5000 rad/s, the profile
-acceleration and deceleration, 0–100 000 rad/s², and the profile jerk, 0–10 000 000 rad/s³ (reserved, not used yet), all 0 by
+acceleration and deceleration, 0–100 000 rad/s², and the profile jerk, 0–10 000 000 rad/s³ (0 selects the trapezoidal plan), all 0 by
 default, which turns the profile off (`foc-position.md`, Motion Profile); the command timeout,
 0–60 s, 0 (off) by default (`service-can.md` Part F); and the continuous and peak current, 0–100 A, 0 by default
 (off, and the board limit), with the peak time, 0.1–60 s, default 1 (`fault-supervision.md` Part I); and the

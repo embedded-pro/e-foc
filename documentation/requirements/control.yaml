@@ -104,3 +104,13 @@
     limits, starting from the motion already under way when the setpoint changes, and shall
     follow it within the error its acceptance criteria give. With them unset it shall behave as
     without a profile.
+
+- id: REQ-CTL-011
+  title: Position profile limits the rate of change of acceleration
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    With a jerk limit set alongside the profile velocity and acceleration, position mode shall
+    plan the reference so that the rate of change of its acceleration does not exceed the jerk
+    limit throughout the move, starting from the acceleration already under way when the setpoint
+    changes, and shall reach the target within the duration its acceptance criteria give.
