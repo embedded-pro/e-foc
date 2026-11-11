@@ -181,7 +181,26 @@ namespace tool
                 CloseMotor(motorTabs->currentIndex());
             });
         motorMenu->addSeparator();
+        launchVirtualMotorAction = motorMenu->addAction("&Launch Virtual Motor…", this, &MainWindow::LaunchVirtualMotor);
+        SetVirtualMotorApp({});
+        motorMenu->addSeparator();
         emergencyStopAction = motorMenu->addAction("&Emergency Stop All Motors", QKeySequence{ Qt::Key_Escape }, this, &MainWindow::EmergencyStopAll);
+    }
+
+    void MainWindow::SetVirtualMotorApp(const QString& program)
+    {
+        virtualMotorApp = program;
+        launchVirtualMotorAction->setEnabled(!program.isEmpty());
+        launchVirtualMotorAction->setToolTip(program.isEmpty() ? "The e-foc Virtual Motor app is not installed next to this tool" : "Start the e-foc Virtual Motor app; its motors join the bus virtual:default");
+        launchVirtualMotorAction->setStatusTip(launchVirtualMotorAction->toolTip());
+    }
+
+    void MainWindow::LaunchVirtualMotor()
+    {
+        if (QProcess::startDetached(virtualMotorApp, {}))
+            Report(IssueSeverity::info, "e-foc Virtual Motor started; connect to virtual:default once a motor runs");
+        else
+            Report(IssueSeverity::warning, "The e-foc Virtual Motor app could not be started from " + virtualMotorApp);
     }
 
     void MainWindow::BuildHelpMenu()
@@ -667,7 +686,7 @@ namespace tool
     void MainWindow::ReportIssue()
     {
         Report(IssueSeverity::info, "Opening a pre-filled issue report in the browser");
-        const auto environment = CurrentIssueEnvironment(ToQt(application::version), issueLog.FilePath());
+        const auto environment = CurrentIssueEnvironment(IssueProduct{ ToQt(application::displayName), ToQt(application::name) }, ToQt(application::version), issueLog.FilePath());
         const auto url = BuildIssueUrl(QUrl{ ToQt(application::newIssueUrl) }, environment, issueLog.RecentLines(60));
 
         if (!QDesktopServices::openUrl(url))

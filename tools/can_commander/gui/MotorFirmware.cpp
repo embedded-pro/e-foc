@@ -1,4 +1,5 @@
 #include "tools/can_commander/gui/MotorFirmware.hpp"
+#include "generated/Boards.hpp"
 #include "tools/can_commander/logic/FirmwareRefusal.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include <QDir>
@@ -95,6 +96,11 @@ namespace tool
                 tab.HideProgress();
                 Fail(QString("The release pack was not downloaded: %1").arg(reason));
             });
+    }
+
+    bool MotorFirmware::IsVirtual() const
+    {
+        return identity.has_value() && identity->boardKind == e_foc::boards::virtualBoard.kind;
     }
 
     bool MotorFirmware::UpdateAvailable() const
@@ -461,6 +467,8 @@ namespace tool
             return reason;
         if (!identity)
             return QString("Reading the firmware %1 runs…").arg(MotorName());
+        if (IsVirtual())
+            return "A virtual motor runs the firmware it was built with: there is nothing to download or install.";
         if (const auto board = Board(); !board || !CanBeUpdated(*board))
             return board ? QString::fromStdString(DescribePackProblem(PackInspection{ std::nullopt, PackProblem::boardHasNoBootloader, {}, {} }, *board)) : QString("The board %1 reports is unknown to this tool.").arg(MotorName());
         if (!identity->hasUpgradeService)
@@ -518,12 +526,14 @@ namespace tool
             return {};
         if (!board)
             return QString("%1 on an unknown board (%2)").arg(Version(identity->running)).arg(static_cast<int>(identity->boardKind));
+        if (IsVirtual())
+            return QString("%1 on a virtual motor on this machine").arg(Version(identity->running));
         return QString("%1 on the %2 (%3)").arg(Version(identity->running), ToQt(board->name), ToQt(board->microcontroller));
     }
 
     QString MotorFirmware::StagedText() const
     {
-        if (!identity)
+        if (!identity || IsVirtual())
             return {};
         if (!identity->hasUpgradeService)
             return "not reported by this firmware";
@@ -532,6 +542,8 @@ namespace tool
 
     QString MotorFirmware::ReleaseText() const
     {
+        if (IsVirtual())
+            return {};
         if (!latestRelease)
             return "not checked yet (Help, Check for Updates)";
 

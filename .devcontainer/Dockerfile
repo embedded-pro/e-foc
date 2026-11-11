@@ -1,3 +1,3 @@
-FROM gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
+FROM gabrielfrasantos/embedded-devcontainer-cpp:v7.4.0@sha256:80d80475b5609f83ddde34f1e251f7b388779b99c7a308943767a2c8228bdc99
 
 HEALTHCHECK NONE

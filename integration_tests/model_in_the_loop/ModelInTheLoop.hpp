@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/can/FocMotorCanBridge.hpp"
+#include "core/foc/model/drive/memory/NvmImageBuilder.hpp"
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
 #include "core/platform_abstraction/NoEncoderIndex.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
@@ -21,7 +22,6 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "integration_tests/model_in_the_loop/SimulatedDrive.hpp"
-#include "integration_tests/support/nvm/NvmImageBuilder.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"

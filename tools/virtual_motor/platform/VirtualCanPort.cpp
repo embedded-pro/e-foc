@@ -1,4 +1,5 @@
 #include "tools/virtual_motor/platform/VirtualCanPort.hpp"
+#include "infra/event/EventDispatcher.hpp"
 
 namespace virtual_motor
 {
@@ -21,14 +22,34 @@ namespace virtual_motor
         adapter.ProcessReadEvent();
     }
 
+    void VirtualCanPort::Mute(bool mute)
+    {
+        muted = mute;
+    }
+
     void VirtualCanPort::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {
-        adapter.SendData(id, data, actionOnCompletion);
+        if (muted)
+        {
+            mutedSendDone = actionOnCompletion;
+            infra::EventDispatcher::Instance().Schedule([this]()
+                {
+                    auto done = mutedSendDone;
+                    done(true);
+                });
+        }
+        else
+            adapter.SendData(id, data, actionOnCompletion);
     }
 
     void VirtualCanPort::ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction)
     {
-        adapter.ReceiveData(receivedAction);
+        onReceived = receivedAction;
+        adapter.ReceiveData([this](Id id, const Message& data)
+            {
+                if (!muted && onReceived)
+                    onReceived(id, data);
+            });
     }
 
     void VirtualCanPort::SetOnError(const infra::Function<void(services::CanBusError)>& handler)
