@@ -163,6 +163,17 @@ TEST_F(TestPidPositionController, the_first_sample_treats_the_error_as_a_referen
     EXPECT_NEAR(Command(error, 0.0f), ReferenceStepGain(tunings) * error * SpeedEnvelope(tunings), tolerance);
 }
 
+TEST_F(TestPidPositionController, a_profiled_reference_step_is_met_with_the_full_proportional_gain)
+{
+    const auto tunings = foc::PositionLoopTunings{};
+    const float error = 0.1f;
+
+    controller.Configure(ValidParameters());
+    const auto output = controller.Compute({ foc::Radians{ 0.0f }, foc::Radians{ error }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ 0.0f }, true });
+
+    EXPECT_NEAR(output.value, (ProportionalGain() + IntegralGain(tunings)) * error * SpeedEnvelope(tunings), tolerance);
+}
+
 TEST_F(TestPidPositionController, a_measured_move_is_met_with_the_full_proportional_gain)
 {
     const auto tunings = foc::PositionLoopTunings{};

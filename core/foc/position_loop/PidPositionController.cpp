@@ -39,7 +39,8 @@ namespace foc
 
         const auto stationary = math::Abs(context.measuredSpeed.Value()) < stationarySpeedRatio * SpeedEnvelope();
         const auto integral = stationary ? relaxationRate * (proportionalGain * error - output) : integralGain * error;
-        const auto referencePart = heldBackReference + proportionalGain * referenceWeight * referenceStep;
+        const auto weight = context.profiled ? 1.0f : referenceWeight;
+        const auto referencePart = heldBackReference + proportionalGain * weight * referenceStep;
         const auto candidate = output + referencePart - proportionalGain * measuredStep + integral;
         output = std::clamp(candidate, -1.0f, 1.0f);
         heldBackReference = HeldBack(candidate - output, referencePart);

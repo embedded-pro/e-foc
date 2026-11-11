@@ -195,8 +195,10 @@ position integral to hold a stationary rotor.
 While a motion profile is active (`position-motion-profile.md`) the reference is $r$ with velocity $\dot r$.
 The velocity-form PI keeps its state on the normalised error and its clamp as before; $\dot r$ is added to the
 speed reference after the clamped state, so the feed-forward cannot wind the integral up, and the acceleration
-feed-forward $J\ddot r / K_t$ joins the q-axis current. Without a profile $\dot r = 0$ and the output is
-unchanged.
+feed-forward $J\ddot r / K_t$ joins the q-axis current. The reference weight $b = 0.75$ shapes the response to a step the
+loop is given whole; a profiled reference is already shaped and its velocity is fed forward, so $b = 1$ while
+a profile is active, which makes the output $K_p\,e$ plus the integral plus $\dot r$ and leaves no part of the
+reference for the integral to supply. Without a profile $\dot r = 0$, $b = 0.75$ and the output is unchanged.
 
 ### Output Limiting
 
