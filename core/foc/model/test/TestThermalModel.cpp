@@ -28,6 +28,35 @@ TEST_F(TestThermalModel, effective_resistance_scales_with_temperature)
     EXPECT_NEAR(actualR, expectedR, expectedR * 0.005f);
 }
 
+TEST_F(TestThermalModel, a_hot_magnet_carries_less_flux_linkage)
+{
+    foc::ThermalConfig config{};
+    config.magnetFluxTempCoeff = 0.0011f;
+    model.Thermal().Configure(config);
+    model.Thermal().SetTemperature(125.0f);
+
+    const float psiBase = foc::M_2310P_LN_04K::parameters.psi_f.Value();
+
+    EXPECT_NEAR(model.Winding().fluxLinkage, psiBase * (1.0f - 0.0011f * 100.0f), psiBase * 1e-5f);
+}
+
+TEST_F(TestThermalModel, a_magnet_at_the_reference_temperature_keeps_its_flux_linkage)
+{
+    foc::ThermalConfig config{};
+    config.magnetFluxTempCoeff = 0.0011f;
+    model.Thermal().Configure(config);
+    model.Thermal().SetTemperature(config.referenceCelsius);
+
+    EXPECT_NEAR(model.Winding().fluxLinkage, foc::M_2310P_LN_04K::parameters.psi_f.Value(), 1e-9f);
+}
+
+TEST_F(TestThermalModel, without_a_magnet_coefficient_the_flux_linkage_does_not_drift)
+{
+    model.Thermal().SetTemperature(125.0f);
+
+    EXPECT_NEAR(model.Winding().fluxLinkage, foc::M_2310P_LN_04K::parameters.psi_f.Value(), 1e-9f);
+}
+
 TEST_F(TestThermalModel, temperature_rises_when_current_flows)
 {
     constexpr int cycles = 10000;

@@ -32,6 +32,11 @@ namespace foc
         return foc::Henry{ atReference.Value() * (1.0f - config.ironInductanceCoeff * AboveReference()) };
     }
 
+    foc::Weber ThermalModel::FluxLinkage(foc::Weber atReference) const
+    {
+        return foc::Weber{ atReference.Value() * (1.0f - config.magnetFluxTempCoeff * AboveReference()) };
+    }
+
     void ThermalModel::Step(float copperLossWatts, float dt)
     {
         windingTempCelsius += dt * (copperLossWatts - (windingTempCelsius - config.ambientCelsius) / config.thermalResistance) / config.thermalCapacitance;

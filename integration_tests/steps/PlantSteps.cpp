@@ -76,6 +76,8 @@ namespace
             plant.copperTempCoeff = value;
         else if (key == "iron_inductance_coeff")
             plant.ironInductanceCoeff = value;
+        else if (key == "magnet_flux_temp_coeff")
+            plant.magnetFluxTempCoeff = value;
         else if (key == "encoder_noise_sigma_radians")
             plant.encoderSigmaRadians = value;
         else if (key == "torque_step_nm")

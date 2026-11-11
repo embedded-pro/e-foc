@@ -72,7 +72,7 @@ namespace foc
 
     WindingParameters ThreePhaseMotorModel::Winding() const
     {
-        return { thermal.Resistance(parameters.R).Value(), thermal.Inductance(parameters.Ld).Value(), thermal.Inductance(parameters.Lq).Value(), parameters.psi_f.Value() };
+        return { thermal.Resistance(parameters.R).Value(), thermal.Inductance(parameters.Ld).Value(), thermal.Inductance(parameters.Lq).Value(), thermal.FluxLinkage(parameters.psi_f).Value() };
     }
 
     void ThreePhaseMotorModel::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)

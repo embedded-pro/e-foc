@@ -11,6 +11,7 @@ namespace foc
         float thermalCapacitance{ 25.0f };
         float copperTempCoeff{ 0.00393f };
         float ironInductanceCoeff{ 0.0f };
+        float magnetFluxTempCoeff{ 0.0f };
         float referenceCelsius{ 25.0f };
     };
 
@@ -24,6 +25,7 @@ namespace foc
 
         foc::Ohm Resistance(foc::Ohm atReference) const;
         foc::Henry Inductance(foc::Henry atReference) const;
+        foc::Weber FluxLinkage(foc::Weber atReference) const;
 
         void Step(float copperLossWatts, float dt);
 

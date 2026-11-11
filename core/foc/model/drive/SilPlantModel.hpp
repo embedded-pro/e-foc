@@ -73,6 +73,7 @@ namespace sil
             .thermalCapacitance = config.thermalCapacitance,
             .copperTempCoeff = config.copperTempCoeff,
             .ironInductanceCoeff = config.ironInductanceCoeff,
+            .magnetFluxTempCoeff = config.magnetFluxTempCoeff,
         });
         model.Encoder().SetNoise({
             .sigmaRadians = config.encoderSigmaRadians,

@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.16.0
+version: 1.17.0
 component: "software-in-the-loop"
-date: 2026-11-09
+date: 2026-11-11
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.16.0                      |
+| Version   | 1.17.0                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-09                  |
+| Date      | 2026-11-11                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -89,7 +89,7 @@ The description covers everything the plant needs:
 | Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping                                        |
 | Drive             | Supply voltage, control frequency, peak current, load torque                                                         |
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias, encoder index angle and width          |
-| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                                            |
+| Thermal           | Ambient, thermal resistance and capacitance, copper, iron and magnet coefficients                                    |
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                                                 |
 | Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling, an event-loop stall and when it begins |
 | Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit                          |
@@ -99,9 +99,15 @@ The description covers everything the plant needs:
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                                              |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples                                             |
 
-The thermal group's resistance and inductance coefficients act from the temperature the
+The thermal group's resistance, inductance and magnet coefficients act from the temperature the
 nameplate values were measured at (25 °C), not from the ambient, so a plant described with a hot
-ambient starts with a hot winding.
+ambient starts with a hot winding and a weaker magnet.
+
+The magnet coefficient scales the flux linkage with the one winding temperature, $\psi_f (1 - c\,\Delta T)$, so a
+hot winding has both a higher resistance and a weaker magnet: less back-EMF and less torque per ampere
+(`theory/disturbances-and-noise.md`, *Temperature*). It is a field of the plant description, which took the record
+to layout version 14, and every plant preset carries 0.0011 per kelvin, the figure for neodymium; a scenario sets it
+with `magnet_flux_temp_coeff`, and zero keeps the magnet constant.
 
 When no description is present the firmware falls back to the motor it is built with, so the
 target still boots standalone. A trip threshold of zero disables that protection, which is how a
@@ -1152,7 +1158,7 @@ part of its own, so a change to one cannot reach into another:
 |------------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------|
 | Electrical plant | The winding currents in the rotor frame, the power stage between duty and winding, open phases | Winding parameters, power stage (L), wiring faults (F) |
 | Mechanical plant | Rotor angle and speed under load, external torque, viscous and dry friction, cogging           | Rotor parameters, non-idealities (K), disturbances (H) |
-| Thermal model    | The winding temperature and the resistance and inductance it shifts                            | Thermal description (A)                                |
+| Thermal model    | The winding temperature and the resistance, inductance and flux linkage it shifts              | Thermal description (A)                                |
 | Supply           | The bus voltage: source resistance, current-limit fold-back, a weak supply                     | Supply description (K), wiring faults (F)              |
 | Encoder          | The reported angle: bias, noise, counts per revolution, a stuck encoder                        | Encoder description (K), wiring faults (F)             |
 | Current sensor   | The phase currents as the converter reports them: bias, noise, shunt amplifier, conversion     | Converter noise, current-sense chain (M)               |
@@ -1172,7 +1178,7 @@ graph TD
 
 Every control period runs the parts in one fixed order, and the order is part of the model:
 
-1. The supply gives the bus voltage, and the thermal model the resistance and inductances at the
+1. The supply gives the bus voltage, and the thermal model the resistance, inductances and flux linkage at the
    present temperature.
 2. The electrical plant turns the duties into leg voltages and advances the winding currents by one
    period, at the rotor's electrical angle and speed.

@@ -88,6 +88,7 @@ namespace sil
             .thermalCapacitance = 25.0f,
             .copperTempCoeff = 0.00393f,
             .ironInductanceCoeff = 0.0f,
+            .magnetFluxTempCoeff = 0.0011f,
 
             .encoderSigmaRadians = 0.0f,
             .encoderBiasRadians = 0.0f,

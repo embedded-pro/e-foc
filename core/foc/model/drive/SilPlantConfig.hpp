@@ -37,6 +37,7 @@ namespace sil
         float thermalCapacitance;
         float copperTempCoeff;
         float ironInductanceCoeff;
+        float magnetFluxTempCoeff;
 
         float encoderSigmaRadians;
         float encoderBiasRadians;
@@ -100,10 +101,10 @@ namespace sil
         uint8_t dutyDelayPeriods;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 256, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 260, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 13;
+    static constexpr uint8_t plantConfigLayoutVersion = 14;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);
