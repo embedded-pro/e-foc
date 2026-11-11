@@ -34,6 +34,8 @@ namespace sil
         void Start();
         void Stop();
         void CurrentOffsets(const foc::PhaseCurrents& offsets);
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes);
+        void IgnoreSampleDelays();
         hal::Hertz BaseFrequency() const;
         drivers::DeadTimeLoss InverterDeadTimeLoss() const;
         uint32_t DutyUpdateDelayPeriods() const;

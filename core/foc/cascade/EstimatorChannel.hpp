@@ -5,6 +5,8 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "infra/util/TripleBuffer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <optional>
+#include <utility>
 
 namespace foc
 {
@@ -19,6 +21,7 @@ namespace foc
         void SetMechanical(OnlineMechanicalEstimator& estimator);
         void SetElectrical(OnlineElectricalEstimator& estimator);
         bool HasElectrical() const;
+        std::optional<std::pair<Ohm, MilliHenry>> SettledElectricalEstimate() const;
         void UpdateMechanical();
         void UpdateElectrical(float vdcInvScale, Ampere directCurrentReference);
 

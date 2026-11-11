@@ -32,6 +32,8 @@ namespace application
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
+            if (hardware.zeroVectorSlopes != nullptr)
+                focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
             RegisterFaultHandler(faultNotifier);
             Boot(outerLoopArgs.rotorReference);
         }

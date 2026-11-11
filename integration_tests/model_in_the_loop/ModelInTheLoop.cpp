@@ -137,6 +137,12 @@ namespace mil
         return *this;
     }
 
+    Scenario& Scenario::WithoutSamplingSkewCorrection()
+    {
+        samplingSkewCorrected = false;
+        return *this;
+    }
+
     void ModelInTheLoop::DeferredLowPriorityInterrupt::Trigger()
     {
         pending = true;
@@ -216,6 +222,9 @@ namespace mil
         , indexSearch{ inverterCompensation, drive, noEncoderIndex }
         , rotorStandstill{ drive }
     {
+        if (!scenario.samplingSkewCorrected)
+            drive.IgnoreSampleDelays();
+
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
@@ -223,7 +232,7 @@ namespace mil
 
                 controlMode.emplace(
                     tracer,
-                    application::MotorHardware{ inverterCompensation, drive, currentStream, vdc, drive.DutyUpdateDelayPeriods() },
+                    application::MotorHardware{ inverterCompensation, drive, currentStream, vdc, drive.DutyUpdateDelayPeriods(), &drive },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
                     faultNotifier,

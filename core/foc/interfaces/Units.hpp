@@ -21,6 +21,7 @@ namespace foc
     }
 
     using Ampere = infra::Quantity<infra::Ampere, float>;
+    using AmperePerSecond = infra::Quantity<infra::Ampere::Div<infra::Second>, float>;
     using Volts = infra::Quantity<infra::Volt, float>;
     using Radians = infra::Quantity<unit::Radians, float>;
     using RadiansPerSecond = infra::Quantity<unit::Radians::Div<infra::Second>, float>;

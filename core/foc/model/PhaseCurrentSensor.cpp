@@ -13,12 +13,17 @@ namespace foc
         chain = config;
     }
 
+    bool PhaseCurrentSensor::ChainEnabled() const
+    {
+        return CurrentSenseEnabled(chain);
+    }
+
     void PhaseCurrentSensor::Seed(uint32_t seed)
     {
         engine.seed(seed);
     }
 
-    void PhaseCurrentSensor::Measure(const foc::PhasePwmDutyCycles& duties, const foc::PhaseCurrents& actual, const PowerStageConfig& powerStage, float period)
+    void PhaseCurrentSensor::Measure(const foc::PhasePwmDutyCycles& duties, const foc::PhaseCurrents& actual, const foc::PhaseCurrentSlopes& slopes, const PowerStageConfig& powerStage, float period)
     {
         if (!CurrentSenseEnabled(chain))
         {
@@ -32,13 +37,13 @@ namespace foc
             {
                 return SampleNoise();
             } };
-        const auto read = [this, period, &powerStage, &conversionNoise](uint32_t step, hal::DutyCycle duty, foc::Ampere current, float offset)
+        const auto read = [this, period, &powerStage, &conversionNoise](uint32_t step, hal::DutyCycle duty, foc::Ampere current, foc::AmperePerSecond slope, float offset)
         {
-            const ShuntSample sample{ LowSideConduction(powerStage, foc::DutyFraction(duty), current.Value(), period), current.Value(), offset };
+            const ShuntSample sample{ LowSideConduction(powerStage, foc::DutyFraction(duty), current.Value(), period), current.Value(), offset, slope.Value() };
             return foc::Ampere{ ShuntReading(chain, sample, step, conversionNoise) };
         };
 
-        last = { read(0, duties.a, actual.a, noise.biasAmpereA), read(1, duties.b, actual.b, noise.biasAmpereB), read(2, duties.c, actual.c, noise.biasAmpereC) };
+        last = { read(0, duties.a, actual.a, slopes.a, noise.biasAmpereA), read(1, duties.b, actual.b, slopes.b, noise.biasAmpereB), read(2, duties.c, actual.c, slopes.c, noise.biasAmpereC) };
     }
 
     foc::PhaseCurrents PhaseCurrentSensor::Last() const

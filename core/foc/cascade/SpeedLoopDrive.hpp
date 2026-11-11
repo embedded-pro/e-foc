@@ -34,6 +34,8 @@ namespace foc
         void LimitCurrent(Ampere limit) override;
         void TrackBusVoltage(Volts measured) override;
 
+        using CascadeWithSpeedLoop::SetZeroVectorSlopeSink;
+
     protected:
         using CascadeWithSpeedLoop::CascadeWithSpeedLoop;
         ~SpeedLoopDrive() = default;

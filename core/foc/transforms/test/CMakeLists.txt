@@ -12,4 +12,5 @@ target_sources(e_foc.foc.transforms_test PRIVATE
     TestDelayCompensation.cpp
     TestSpaceVectorModulation.cpp
     TestTransformsClarkePark.cpp
+    TestZeroVectorSlope.cpp
 )

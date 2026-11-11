@@ -1029,12 +1029,16 @@ of the sequence holds its sample at
 
 $$t_k = t_{trig} + \frac{k\,(N_{sh} + N_{conv}) + N_{sh}}{f_{adc}}$$
 
-after the trigger: phase A first, then B, then C, each step averaging $n$ conversions. The
+after the trigger: phase A first, then B, then C, each step averaging $n$ conversions. The plant's
+state is the period mean, which a centre-aligned period reaches at the window centre; from there each
+phase current moves along its zero-vector slope $-(e_k + R\,i_k)/L$, computed from the plant's own
+winding, so a phase held at $t_k$ reads the current of that instant. The
 amplifier rises into the window and decays after it with its time constant. Each conversion adds
 its noise and offset, rounds to a code and clips to the range, and the step averages its codes and
 drops the remainder, as the converter's averager does. The firmware's sample-and-hold request maps
 to 4, 16, 32, 64 or 256 clocks, as the TI platform maps it, and the emulated platform applies the
-readable-duty and maximum-duty limits and rebuilds a hidden phase from the other two as the TI platform does.
+readable-duty and maximum-duty limits, corrects each phase for its hold instant
+([sampling skew](platform-sampling-skew.md)) and rebuilds a hidden phase from the other two as the TI platform does.
 
 On E-FOC-HARDWARE the converter is ADC0 of the TM4C1294 at 16 MHz, with 12 conversion clocks and
 two averaged conversions. The TLV9064 amplifiers at gain 10, behind 200 Ω and 150 pF, lag by about

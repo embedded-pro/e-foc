@@ -14,6 +14,7 @@ target_sources(e_foc.foc.transforms INTERFACE
     DelayCompensation.hpp
     SpaceVectorModulation.hpp
     TransformsClarkePark.hpp
+    ZeroVectorSlope.hpp
 )
 
 add_subdirectory(test)

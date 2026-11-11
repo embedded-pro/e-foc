@@ -99,7 +99,8 @@ namespace foc
         for (uint32_t conversion = 0; conversion != count; ++conversion)
         {
             const auto time = ConversionHoldInstant(config, step * count + conversion);
-            const auto analog = ShuntAmplifierOutput(config, sample.window, sample.current, time) + sample.offset + conversionNoise();
+            const auto current = sample.current + sample.slope * time;
+            const auto analog = ShuntAmplifierOutput(config, sample.window, current, time) + sample.offset + conversionNoise();
 
             if (quantised)
                 codes += converter->Code(analog);

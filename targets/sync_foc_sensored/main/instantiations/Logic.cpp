@@ -70,7 +70,7 @@ namespace application
     {
         controlMode.emplace(
             hardware.Tracer(),
-            MotorHardware{ inverterCompensation, hardware, currentStream, vdc, hardware.DutyUpdateDelayPeriods() },
+            MotorHardware{ inverterCompensation, hardware, currentStream, vdc, hardware.DutyUpdateDelayPeriods(), &hardware },
             storage.Nvm(),
             CalibrationServices{ .electricalIdent = *calibration.electricalIdent, .motorAlignment = *calibration.motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = calibration.confirmedCurrentOffsets, .mapCogging = true, .standstill = calibration.rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *calibration.indexSearch },
             *platformFaultNotifier,

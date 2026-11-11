@@ -16,6 +16,8 @@ namespace application
         , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported(), hardware.currentStream)
         , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
     {
+        if (hardware.zeroVectorSlopes != nullptr)
+            focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
         RegisterFaultHandler(faultNotifier);
         Boot(rotorReference);
     }

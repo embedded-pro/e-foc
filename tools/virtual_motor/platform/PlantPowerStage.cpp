@@ -136,6 +136,11 @@ namespace virtual_motor
         drive.CurrentOffsets(offsets);
     }
 
+    void PlantPowerStage::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        drive.ZeroVectorSlopes(slopes);
+    }
+
     foc::Radians PlantPowerStage::Read()
     {
         return drive.Model().Encoder().Read();

@@ -23,6 +23,7 @@ namespace foc
         ConductionWindow window;
         float current;
         float offset;
+        float slope{ 0.0f };
     };
 
     bool CurrentSenseEnabled(const CurrentSenseConfig& config);

@@ -17,6 +17,14 @@ namespace foc
         return electrical != nullptr;
     }
 
+    std::optional<std::pair<Ohm, MilliHenry>> EstimatorChannel::SettledElectricalEstimate() const
+    {
+        if (electrical == nullptr || !electrical->HasSettled())
+            return std::nullopt;
+
+        return std::make_pair(electrical->CurrentResistance(), electrical->CurrentInductance());
+    }
+
     void EstimatorChannel::UpdateMechanical()
     {
         if (mechanical == nullptr)

@@ -3,6 +3,7 @@
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
+#include <numbers>
 
 namespace
 {
@@ -152,7 +153,8 @@ TEST_F(TestCurrentSense, each_conversion_draws_its_own_noise_and_the_step_averag
 
 TEST_F(TestMotorModelCurrentSense, the_model_converts_the_phases_in_order_inside_the_windows_of_their_own_duties)
 {
-    sensed.CurrentSensor().SetChain({ 16e6f, 16, 12, 2, 0.0f, 0.0f, 0.0f, 0 });
+    const foc::CurrentSenseConfig chain{ 16e6f, 16, 12, 2, 0.0f, 0.0f, 0.0f, 0 };
+    sensed.CurrentSensor().SetChain(chain);
     const foc::PhasePwmDutyCycles duties{ hal::DutyCycle::FromPercent(75), hal::DutyCycle::FromPercent(70), hal::DutyCycle::FromPercent(65) };
 
     for (auto cycle = 0; cycle != 20; ++cycle)
@@ -163,9 +165,41 @@ TEST_F(TestMotorModelCurrentSense, the_model_converts_the_phases_in_order_inside
 
     const auto actual = ideal.CurrentSensor().Last();
     const auto measured = sensed.CurrentSensor().Last();
+    const auto slopes = sensed.Electrical().ZeroVectorSlopes(sensed.Mechanics().ElectricalAngle(), sensed.Mechanics().ElectricalSpeed(), sensed.Winding());
+    const auto at = [&chain](uint32_t conversion)
+    {
+        return foc::ConversionHoldInstant(chain, conversion);
+    };
 
     ASSERT_GT(actual.a.Value(), 0.1f);
-    EXPECT_NEAR(measured.a.Value(), actual.a.Value(), 1e-6f);
-    EXPECT_NEAR(measured.b.Value(), actual.b.Value(), 1e-6f);
-    EXPECT_NEAR(measured.c.Value(), 0.5f * actual.c.Value(), 1e-6f);
+    EXPECT_NEAR(measured.a.Value(), actual.a.Value() + slopes.a.Value() * 0.5f * (at(0) + at(1)), 1e-5f);
+    EXPECT_NEAR(measured.b.Value(), actual.b.Value() + slopes.b.Value() * 0.5f * (at(2) + at(3)), 1e-5f);
+    EXPECT_NEAR(measured.c.Value(), 0.5f * (actual.c.Value() + slopes.c.Value() * at(4)), 1e-5f);
+}
+
+TEST_F(TestCurrentSense, a_phase_is_read_where_its_zero_vector_slope_has_taken_it_by_the_hold_instants)
+{
+    auto sample = Sample(0.5f, 2.0f);
+    sample.slope = 1.0e5f;
+
+    EXPECT_NEAR(foc::ShuntReading(sense, sample, 0, quiet), 2.0f + 1.0e5f * 0.75e-6f, 1e-5f);
+    EXPECT_NEAR(foc::ShuntReading(sense, sample, 1, quiet), 2.0f + 1.0e5f * 2.75e-6f, 1e-5f);
+    EXPECT_NEAR(foc::ShuntReading(sense, sample, 2, quiet), 2.0f + 1.0e5f * 4.75e-6f, 1e-5f);
+}
+
+TEST_F(TestMotorModelCurrentSense, at_speed_without_current_the_back_emf_alone_sets_the_slopes)
+{
+    auto model = Model();
+    const auto winding = model.Winding();
+    constexpr float omega{ 400.0f };
+
+    for (const auto theta : { 0.0f, 1.0f, -2.0f })
+    {
+        const auto slopes = model.Electrical().ZeroVectorSlopes(foc::Radians{ theta }, foc::RadiansPerSecond{ omega }, winding);
+        const auto rate = omega * winding.fluxLinkage / winding.inductanceQ;
+
+        EXPECT_NEAR(slopes.a.Value(), rate * std::sin(theta), 1e-3f * rate);
+        EXPECT_NEAR(slopes.b.Value(), rate * std::sin(theta - 2.0f * std::numbers::pi_v<float> / 3.0f), 1e-3f * rate);
+        EXPECT_NEAR(slopes.c.Value(), rate * std::sin(theta + 2.0f * std::numbers::pi_v<float> / 3.0f), 1e-3f * rate);
+    }
 }

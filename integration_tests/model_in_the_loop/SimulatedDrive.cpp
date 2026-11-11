@@ -141,6 +141,16 @@ namespace mil
         drive.CurrentOffsets(offsets);
     }
 
+    void SimulatedDrive::IgnoreSampleDelays()
+    {
+        drive.IgnoreSampleDelays();
+    }
+
+    void SimulatedDrive::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        drive.ZeroVectorSlopes(slopes);
+    }
+
     foc::Radians SimulatedDrive::Read()
     {
         return drive.Model().Encoder().Read();

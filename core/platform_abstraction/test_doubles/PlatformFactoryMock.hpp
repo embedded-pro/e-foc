@@ -51,6 +51,7 @@ namespace application
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
+        MOCK_METHOD(void, ZeroVectorSlopes, (const foc::PhaseCurrentSlopes& slopes), (override));
 
         MOCK_METHOD(foc::Radians, Read, (), (override));
         MOCK_METHOD(void, Set, (foc::Radians), (override));

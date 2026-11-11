@@ -186,3 +186,86 @@ TEST_F(TestLowSideShuntReadout, two_readable_periods_after_one_above_the_limit_p
 
     ExpectCurrents(readout.Read(measured), 0.9f, -0.4f, -0.3f);
 }
+
+namespace
+{
+    class TestLowSideShuntReadoutSkew
+        : public TestLowSideShuntReadout
+    {
+    public:
+        TestLowSideShuntReadoutSkew()
+        {
+            readout.SampleDelays(delays);
+        }
+
+        using Seconds = std::chrono::duration<float>;
+
+        const foc::PhaseSampleDelays delays{ Seconds{ 0.75e-6f }, Seconds{ 2.75e-6f }, Seconds{ 4.75e-6f } };
+        const foc::PhaseCurrentSlopes slopes{ foc::AmperePerSecond{ 40000.0f }, foc::AmperePerSecond{ -20000.0f }, foc::AmperePerSecond{ -20000.0f } };
+    };
+}
+
+TEST_F(TestLowSideShuntReadoutSkew, without_slopes_the_samples_pass_unchanged)
+{
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+
+    ExpectCurrents(readout.Read(measured), 0.9f, -0.4f, -0.3f);
+}
+
+TEST_F(TestLowSideShuntReadoutSkew, each_phase_read_is_brought_back_by_its_slope_times_its_delay)
+{
+    readout.ZeroVectorSlopes(slopes);
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+
+    ExpectCurrents(readout.Read(measured), 0.9f - 0.03f, -0.4f + 0.055f, -0.3f + 0.095f);
+}
+
+TEST_F(TestLowSideShuntReadoutSkew, a_hidden_phase_is_rebuilt_from_the_two_corrected_phases)
+{
+    readout.ZeroVectorSlopes(slopes);
+    readout.Applied({ Duty(0.5f), Duty(0.5f), Duty(0.9f) });
+    readout.Applied({ Duty(0.5f), Duty(0.5f), Duty(0.9f) });
+
+    const auto corrected = readout.Read({ foc::Ampere{ 0.9f }, foc::Ampere{ -0.4f }, foc::Ampere{ 7.0f } });
+
+    ExpectCurrents(corrected, 0.87f, -0.345f, -(0.87f - 0.345f));
+}
+
+TEST_F(TestLowSideShuntReadoutSkew, cleared_slopes_leave_the_samples_unchanged)
+{
+    readout.ZeroVectorSlopes(slopes);
+    readout.ClearSlopes();
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+    readout.Applied({ Duty(0.7f), Duty(0.5f), Duty(0.1f) });
+
+    ExpectCurrents(readout.Read(measured), 0.9f, -0.4f, -0.3f);
+}
+
+TEST(TestSequentialPhaseSampleDelays, each_phase_is_held_at_the_mean_of_its_averaged_conversions)
+{
+    const auto delays = foc::SequentialPhaseSampleDelays({ .converterClockHertz = 16.0e6f, .sampleHoldClocks = 4, .conversionClocks = 12, .averagedConversions = 2, .triggerDelay = std::chrono::duration<float>{ 0.0f } });
+
+    EXPECT_NEAR(delays.a.count(), 0.75e-6f, 1e-10f);
+    EXPECT_NEAR(delays.b.count(), 2.75e-6f, 1e-10f);
+    EXPECT_NEAR(delays.c.count(), 4.75e-6f, 1e-10f);
+}
+
+TEST(TestSequentialPhaseSampleDelays, the_trigger_delay_adds_to_every_phase_and_one_conversion_needs_no_averaging)
+{
+    const auto delays = foc::SequentialPhaseSampleDelays({ .converterClockHertz = 16.0e6f, .sampleHoldClocks = 16, .conversionClocks = 12, .averagedConversions = 1, .triggerDelay = std::chrono::duration<float>{ 1.0e-6f } });
+
+    EXPECT_NEAR(delays.a.count(), 1.0e-6f + 1.0e-6f, 1e-10f);
+    EXPECT_NEAR(delays.b.count(), 1.0e-6f + 2.75e-6f, 1e-10f);
+    EXPECT_NEAR(delays.c.count(), 1.0e-6f + 4.5e-6f, 1e-10f);
+}
+
+TEST(TestSequentialPhaseSampleDelays, no_converter_clock_gives_no_delay)
+{
+    const auto delays = foc::SequentialPhaseSampleDelays({});
+
+    EXPECT_EQ(delays.a.count(), 0.0f);
+    EXPECT_EQ(delays.b.count(), 0.0f);
+    EXPECT_EQ(delays.c.count(), 0.0f);
+}

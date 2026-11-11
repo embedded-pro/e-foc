@@ -3067,3 +3067,25 @@ TEST_F(FocStateMachineSpeedFrictionTest, a_dry_friction_that_cannot_be_stored_le
     EXPECT_EQ(sm.GetController().loads, 1u);
     EXPECT_NEAR(sm.Calibration().Data().frictionCoulomb, 4.0e-3f, 1e-9f);
 }
+
+TEST_F(FocStateMachineSpeedTest, the_zero_vector_slopes_of_each_control_period_reach_the_power_stage_sink)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    SpeedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc, 0, &sink }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } }, faultNotifierMock, application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }, nvmActivity };
+    AlignAfterBoot(sm);
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+        {
+            inverterMock.StorePhaseCurrentsCallback(onDone);
+        });
+    EXPECT_CALL(inverterMock, Start());
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(sink, ZeroVectorSlopes(_));
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ -0.5f } });
+}
