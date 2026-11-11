@@ -34,6 +34,7 @@ target_link_libraries(e_foc.integration_tests.steps PUBLIC
     e_foc.integration_tests.support
     e_foc.integration_tests.interactor.hardware
     cucumber_cpp.runner
+    numerical.motion_profiles
     GTest::gtest
     GTest::gmock
 )

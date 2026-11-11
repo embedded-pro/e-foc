@@ -187,7 +187,7 @@ Feature: Drive Limits
     And the response is captured for 2000 ms after the last setpoint
     Then the rotor shall travel less than 0.26 rad after the last setpoint
 
-  @sil @REQ-PRO-004 @REQ-CTL-002 @REQ-LCY-005 @REQ-PRO-001 @REQ-COM-001
+  @sil @REQ-PRO-004 @REQ-CTL-002 @REQ-CTL-010 @REQ-LCY-005 @REQ-PRO-001 @REQ-COM-001
   Scenario: The limits are stored and read back after a restart
     Given a nominal motor plant
     When the target boots
@@ -196,6 +196,10 @@ Feature: Drive Limits
     And the followingErrorTime is set to 0.25 over CAN
     And the speedAcceleration is set to 300 over CAN
     And the speedDeceleration is set to 600 over CAN
+    And the profileVelocity is set to 20 over CAN
+    And the profileAcceleration is set to 400 over CAN
+    And the profileDeceleration is set to 500 over CAN
+    And the profileJerk is set to 9000 over CAN
     And the commandTimeout is set to 1.5 over CAN
     And the continuousCurrent is set to 2 over CAN
     And the peakCurrent is set to 3 over CAN
@@ -206,6 +210,10 @@ Feature: Drive Limits
     And the followingErrorTime read over CAN shall be 0.25
     And the speedAcceleration read over CAN shall be 300
     And the speedDeceleration read over CAN shall be 600
+    And the profileVelocity read over CAN shall be 20
+    And the profileAcceleration read over CAN shall be 400
+    And the profileDeceleration read over CAN shall be 500
+    And the profileJerk read over CAN shall be 9000
     And the commandTimeout read over CAN shall be 1.5
     And the continuousCurrent read over CAN shall be 2
     And the peakCurrent read over CAN shall be 3
