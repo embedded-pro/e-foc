@@ -244,7 +244,7 @@ them as the NVM design describes (`service-nvm.md`, version check).
 
 ### Part H — firmware identity (contract 2.6)
 
-Contract 2.6 adds read-only parameters to the FOC motor contract (`service-can.md` Part A, "Contract 2.6"):
+Contract 2.6 adds read-only parameters to the FOC motor contract (`wire-contract.md` of e-foc-protocol Part A, "Contract 2.6"):
 the major, minor and patch numbers of the running firmware's release version, the board kind, and the version
 of the staged pack, zero when none is staged. The running version is the one the build stamps into the
 application header (`bootloader.md` Part B), the project's release version; the staged version is the product

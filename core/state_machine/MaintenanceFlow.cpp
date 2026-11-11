@@ -1,6 +1,6 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/MotorParameterLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include <cmath>
 
 namespace application

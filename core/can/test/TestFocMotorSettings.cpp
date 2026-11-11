@@ -1,5 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include <gtest/gtest.h>
 
 TEST(FocMotorSettings, every_loop_setting_is_written_to_and_read_from_its_own_field)

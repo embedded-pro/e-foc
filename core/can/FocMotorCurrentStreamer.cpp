@@ -1,6 +1,6 @@
 #include "core/can/FocMotorCurrentStreamer.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <chrono>

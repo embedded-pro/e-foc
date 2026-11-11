@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include <optional>
 #include <string>

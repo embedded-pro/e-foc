@@ -6,6 +6,7 @@ target_include_directories(e_foc.foc.interfaces INTERFACE
 )
 
 target_link_libraries(e_foc.foc.interfaces INTERFACE
+    e_foc_protocol.foc
     infra.util
     numerical.math
     numerical.controllers.interfaces
@@ -13,14 +14,12 @@ target_link_libraries(e_foc.foc.interfaces INTERFACE
 
 target_sources(e_foc.foc.interfaces PRIVATE
     Algorithms.hpp
-    CommandLimits.hpp
     Execution.hpp
     Foc.hpp
     LoopTunings.hpp
     MotorModel.hpp
     OnlineEstimators.hpp
     Signals.hpp
-    Units.hpp
 )
 
 add_subdirectory(test)

@@ -1,5 +1,5 @@
 #include "can-lite/drivers/hub/VirtualCanHub.hpp"
-#include "core/can/FocMotorCanClient.hpp"
+#include "e-foc-protocol/client/FocMotorCanClient.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/StaticStorage.hpp"
 #include "motor_parameters/PlantPresets.hpp"

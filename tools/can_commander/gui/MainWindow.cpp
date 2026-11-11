@@ -1,5 +1,5 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
 #include "tools/can_commander/support/IssueReport.hpp"
 #include "tools/can_commander/support/UpdateInstallation.hpp"

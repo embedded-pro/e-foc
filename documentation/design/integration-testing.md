@@ -415,7 +415,7 @@ dropped link fails no later scenario.
 One follow-up change, in this order, each step leaving the suite green:
 
 1. **Contract 2.2.** Add `Calibrate`, `ClearCalibration`, `ClearDiagnostics` and the read-only
-   parameters of `service-can.md` Part A: wire contract, wire tests, firmware handlers, and the CAN
+   parameters of `wire-contract.md` of e-foc-protocol Part A: wire contract, wire tests, firmware handlers, and the CAN
    Commander views. Done.
 2. **Emulator transport.** CAN moves to its own emulated serial port, the plant record to its file,
    and the serial output becomes the per-scenario debug log. Done.

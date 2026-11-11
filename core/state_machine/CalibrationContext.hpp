@@ -2,10 +2,10 @@
 
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include <cstdint>
 #include <functional>
 #include <optional>

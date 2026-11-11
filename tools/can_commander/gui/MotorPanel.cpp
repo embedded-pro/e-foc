@@ -1,5 +1,5 @@
 #include "tools/can_commander/gui/MotorPanel.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/gui/SetpointKnob.hpp"
 #include "tools/can_commander/logic/CommandDescriptions.hpp"
 #include "tools/can_commander/logic/SetpointAxis.hpp"

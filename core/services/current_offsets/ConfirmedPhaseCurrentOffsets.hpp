@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/BoundedVector.hpp"
 

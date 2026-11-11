@@ -1,6 +1,6 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 
 namespace tool
 {

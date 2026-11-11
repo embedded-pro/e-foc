@@ -1,5 +1,5 @@
-#include "core/can/FocMotorMessages.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>

@@ -1,5 +1,5 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>

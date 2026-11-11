@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <cstdint>

@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/CommandTracker.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <utility>
 
 namespace tool

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/CurrentSense.hpp"
 #include "core/foc/model/ElectricalPlant.hpp"
 #include "core/foc/model/EncoderModel.hpp"
@@ -13,6 +12,7 @@
 #include "core/foc/model/ThermalModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
 #include <cstdint>

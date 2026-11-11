@@ -27,17 +27,10 @@ target_link_libraries(e_foc.can_test PUBLIC
 target_sources(e_foc.can_test PRIVATE
     TestCanCommandTimeout.cpp
     TestCanLivenessWatchdog.cpp
-    TestFocMotorCategoryServer.cpp
-    TestFocMotorCategoryClient.cpp
     TestFocMotorCanBridge.cpp
-    TestFocMotorCanClient.cpp
     TestFocMotorCurrentStreamer.cpp
-    TestFocMotorWireContract.cpp
     TestFocMotorSettings.cpp
-    TestWireContractDocumentation.cpp
 )
-
-target_compile_definitions(e_foc.can_test PRIVATE E_FOC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 if (EMIL_ENABLE_COVERAGE)
     emil_enable_coverage_for(e_foc.can_test)

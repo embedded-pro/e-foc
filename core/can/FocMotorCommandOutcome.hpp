@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>
 

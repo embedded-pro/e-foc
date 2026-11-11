@@ -1,7 +1,7 @@
 #pragma once
 
 #include "can-lite/categories/firmware_upgrade/FirmwareVersion.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <array>
 #include <cstdint>
 #include <map>

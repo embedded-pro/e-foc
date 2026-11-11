@@ -1,4 +1,4 @@
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "tools/can_commander/logic/CommandDescriptions.hpp"
 #include "gtest/gtest.h"
 

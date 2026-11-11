@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryClient.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/client/FocMotorCategoryClient.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "tools/can_commander/logic/FaultRecordAssembler.hpp"
 #include "tools/can_commander/logic/FirmwareIdentityCollector.hpp"
 #include "tools/can_commander/logic/ReadScheduler.hpp"

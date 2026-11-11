@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>
 #include <optional>

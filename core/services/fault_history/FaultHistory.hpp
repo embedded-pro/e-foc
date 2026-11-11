@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/fault_history/FaultLog.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/BoundedVector.hpp"

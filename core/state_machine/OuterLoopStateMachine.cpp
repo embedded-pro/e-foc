@@ -1,6 +1,6 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
 
