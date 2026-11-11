@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/TravelLimits.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/motion_profiles/TrapezoidalProfileFromState.hpp"
 #include <cstdint>
 
