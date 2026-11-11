@@ -57,7 +57,7 @@ TEST_F(TestFocController, StopDisablesTheInverterThenTheFocAlgorithm)
     controller.Stop();
 }
 
-TEST_F(TestFocController, RegisteredObserverIsInvokedForEveryPhaseCurrentsSample)
+TEST_F(TestFocController, RegisteredObserverIsInvokedForEveryPhaseCurrents)
 {
     foc::FocController<testing::StrictMock<foc::FocTorqueMock>> controller{ inverterMock, encoderMock };
 
@@ -66,13 +66,14 @@ TEST_F(TestFocController, RegisteredObserverIsInvokedForEveryPhaseCurrentsSample
     controller.Start();
 
     bool observed = false;
-    controller.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&)
+    controller.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&, foc::Ampere, foc::Radians)
         {
             observed = true;
         });
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(controller, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
+    EXPECT_CALL(controller, MeasuredQuadratureCurrent()).WillOnce(Return(foc::Ampere{ 0.0f }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
@@ -92,7 +93,7 @@ TEST_F(TestFocController, UnregisteredObserverIsNotInvoked)
     controller.Start();
 
     bool observed = false;
-    controller.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&)
+    controller.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&, foc::Ampere, foc::Radians)
         {
             observed = true;
         });

@@ -1,8 +1,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 
@@ -37,7 +35,6 @@ namespace services
         currentConfig = config;
         currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
-        polePairs = static_cast<float>(numberOfPolePairs);
         outcome = Outcome::pending;
         window.Restart(encoder.Read().Value(), samplingPeriod);
         queue.Clear();
@@ -45,9 +42,9 @@ namespace services
         const auto dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
         fit.Restart(config.forgettingFactor, dwellSamples, static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples)));
 
-        observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
+        observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& phases, auto quadratureCurrent, auto mechanicalAngle)
             {
-                OnSamplingUpdate(currents, torqueConstant);
+                OnSamplingUpdate(phases, quadratureCurrent.Value() * torqueConstant.Value(), mechanicalAngle.Value());
             });
 
         StartExcitation(config);
@@ -155,7 +152,7 @@ namespace services
         inverter.Stop();
     }
 
-    void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
+    void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float torque, float mechanicalAngle)
     {
         if (!fit.IsRunning())
             return;
@@ -166,11 +163,7 @@ namespace services
             return;
         }
 
-        const auto mechanicalPos = encoder.Read().Value();
-        const auto electricalAngle = mechanicalPos * polePairs;
-        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
-
-        if (const auto closed = window.Add(mechanicalPos, rotatingFrame.q * torqueConstant.Value()); closed.has_value())
+        if (const auto closed = window.Add(mechanicalAngle, torque); closed.has_value())
             OnWindowClosed(*closed);
     }
 
@@ -199,20 +192,8 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::Post(const IdentificationObservation& observation)
     {
-        const auto result = queue.Post(observation);
-        if (result == ObservationQueue::PostResult::full)
+        if (!queue.Post(observation))
             outcome = Outcome::observationsDropped;
-        else if (result == ObservationQueue::PostResult::halfFull)
-            ScheduleFit();
-    }
-
-    void MechanicalParametersIdentificationImpl::ScheduleFit()
-    {
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule([](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
-            {
-                self->FitPostedObservations();
-            },
-            WeakFromThis());
     }
 
     void MechanicalParametersIdentificationImpl::FitPostedObservations()

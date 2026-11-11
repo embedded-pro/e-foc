@@ -40,6 +40,11 @@ namespace foc
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
 
+        ALWAYS_INLINE_HOT Ampere MeasuredQuadratureCurrentImpl() const
+        {
+            return Ampere{ estimation.window.LastIq() };
+        }
+
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
 

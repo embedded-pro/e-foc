@@ -293,7 +293,7 @@ TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlot)
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }
 
-TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritten)
+TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsWithTheLoopsMeasurementAfterTheDutiesAreWritten)
 {
     foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
@@ -302,16 +302,25 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
     runner.Enable();
 
     bool dutiesWritten = false;
-    std::optional<foc::PhaseCurrents> observed;
 
-    runner.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents& currents)
+    struct Observed
+    {
+        foc::PhaseCurrents phases;
+        foc::Ampere quadratureCurrent;
+        foc::Radians mechanicalAngle;
+    };
+
+    std::optional<Observed> observed;
+
+    runner.RegisterPhaseCurrentsObserver([&dutiesWritten, &observed](const foc::PhaseCurrents& phases, foc::Ampere quadratureCurrent, foc::Radians mechanicalAngle)
         {
             EXPECT_TRUE(dutiesWritten);
-            observed = currents;
+            observed = Observed{ phases, quadratureCurrent, mechanicalAngle };
         });
 
-    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.25f }));
     EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
+    EXPECT_CALL(focMock, MeasuredQuadratureCurrent()).WillOnce(Return(foc::Ampere{ 0.75f }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).WillOnce([&](const foc::PhasePwmDutyCycles&)
         {
             dutiesWritten = true;
@@ -320,7 +329,42 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 
     ASSERT_TRUE(observed.has_value());
-    EXPECT_NEAR(1.0f, observed->a.Value(), 1e-6f);
+    EXPECT_NEAR(1.0f, observed->phases.a.Value(), 1e-6f);
+    EXPECT_NEAR(0.75f, observed->quadratureCurrent.Value(), 1e-6f);
+    EXPECT_NEAR(0.25f, observed->mechanicalAngle.Value(), 1e-6f);
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, AnObserverRegisteredOverAnotherReplacesIt)
+{
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    int first = 0;
+    int second = 0;
+    runner.RegisterPhaseCurrentsObserver([&first](const foc::PhaseCurrents&, foc::Ampere, foc::Radians)
+        {
+            ++first;
+        });
+    runner.RegisterPhaseCurrentsObserver([&second](const foc::PhaseCurrents&, foc::Ampere, foc::Radians)
+        {
+            ++second;
+        });
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
+    EXPECT_CALL(focMock, MeasuredQuadratureCurrent()).WillOnce(Return(foc::Ampere{ 0.0f }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    EXPECT_EQ(first, 0);
+    EXPECT_EQ(second, 1);
 
     EXPECT_CALL(inverterMock, Stop());
     EXPECT_CALL(focMock, Disable());
@@ -335,7 +379,7 @@ TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
     runner.Enable();
 
     bool observed = false;
-    runner.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&)
+    runner.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&, foc::Ampere, foc::Radians)
         {
             observed = true;
         });

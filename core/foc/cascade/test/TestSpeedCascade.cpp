@@ -723,6 +723,22 @@ TEST_F(TestSpeedCascade, the_stream_receives_the_measured_currents_and_the_mecha
     EXPECT_NEAR(sample->position.Value(), 0.25f, 1e-6f);
 }
 
+TEST_F(TestSpeedCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.25f };
+    const float electricalAngle = 0.25f * static_cast<float>(polePairs);
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focSpeed->MeasuredQuadratureCurrent().Value(), -std::sin(electricalAngle), 1e-2f);
+
+    foc::Radians aligned{ 0.0f };
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, aligned);
+
+    EXPECT_NEAR(focSpeed->MeasuredQuadratureCurrent().Value(), 0.0f, 1e-2f);
+}
+
 TEST_F(TestSpeedCascade, enabling_restarts_the_stream_window)
 {
     focSpeed->Enable();

@@ -34,17 +34,16 @@ TEST_F(TestObservationQueue, observations_are_taken_in_the_order_posted)
     EXPECT_FALSE(queue.Take().has_value());
 }
 
-TEST_F(TestObservationQueue, reaching_half_capacity_asks_for_a_fit_and_a_full_queue_refuses)
+TEST_F(TestObservationQueue, a_full_queue_refuses_and_keeps_what_it_holds)
 {
-    for (uint32_t sample = 1; sample != ObservationQueue::capacity / 2; ++sample)
-        EXPECT_EQ(ObservationQueue::PostResult::posted, queue.Post(ObservationAt(sample)));
+    for (uint32_t sample = 1; sample <= ObservationQueue::capacity; ++sample)
+        EXPECT_TRUE(queue.Post(ObservationAt(sample)));
 
-    EXPECT_EQ(ObservationQueue::PostResult::halfFull, queue.Post(ObservationAt(ObservationQueue::capacity / 2)));
+    EXPECT_FALSE(queue.Post(ObservationAt(999)));
 
-    for (uint32_t sample = ObservationQueue::capacity / 2 + 1; sample <= ObservationQueue::capacity; ++sample)
-        EXPECT_EQ(ObservationQueue::PostResult::posted, queue.Post(ObservationAt(sample)));
-
-    EXPECT_EQ(ObservationQueue::PostResult::full, queue.Post(ObservationAt(99)));
+    for (uint32_t sample = 1; sample <= ObservationQueue::capacity; ++sample)
+        ASSERT_EQ(sample, queue.Take()->sample);
+    EXPECT_FALSE(queue.Take().has_value());
 }
 
 TEST_F(TestObservationQueue, the_queue_wraps_around_its_storage)

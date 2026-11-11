@@ -762,6 +762,17 @@ TEST_F(TestPositionCascade, the_stream_receives_the_measured_currents_and_the_me
     EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
 }
 
+TEST_F(TestPositionCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    focPosition->Enable();
+
+    const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
+    foc::Radians position{ mechanicalAngle };
+    focPosition->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focPosition->MeasuredQuadratureCurrent().Value(), -1.0f, 1e-2f);
+}
+
 namespace
 {
     float QuadratureDrive(const foc::PhasePwmDutyCycles& duty)

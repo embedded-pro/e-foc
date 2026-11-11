@@ -41,7 +41,8 @@ namespace foc
         ~PhaseCurrentsObservable() = default;
 
     public:
-        virtual void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) = 0;
+        // With the phases come the q-axis current the loop measured from them and the mechanical angle it used.
+        virtual void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>& observer) = 0;
         virtual void UnregisterPhaseCurrentsObserver() = 0;
     };
 }

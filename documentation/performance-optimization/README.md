@@ -245,6 +245,12 @@ The 20 kHz path should do only the work that changes from one sample to the next
   concrete type, inert in a state it already has. Behind an interface it trades that one-cycle test for a virtual call,
   and the outer loop's test for an electrical estimator also decides whether the d-axis excitation runs, so those
   tests stay.
+- **Hand an observer what the loop already measured.** A calibration observer gets each sample's phase currents
+  with the q-axis current the cascade measured from them and the rotor angle the runner read, so it reads no
+  encoder and repeats no transform. The cascade keeps that current anyway, and the runner fetches it inside the
+  observer's slot, so a tick without an observer still costs the one test of the slot.
+- **Do not schedule from the control interrupt.** Scheduling an event costs about 600 cycles. The mechanical
+  identification posts its windows to a ring that holds three event-loop ticks of them, and the tick fits them.
 - **Cache reciprocals.** The encoder keeps 2π/resolution from construction and wraps with one compare instead of two
   divides and a `floor`.
 - **Clamp once.** The modulator clamps and quantises each phase in one step; a second clamp in a later conversion is
@@ -379,7 +385,7 @@ binary. Each budget is the same slice of time on every MCU, in cycles of its clo
 |-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
 | ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
 | Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
-| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
+| ADC ISR → inner loop → calibration observer               | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
 
 On a pull request each MCU gets one cycle banner and one memory banner. The cycle banner
 (`.github/scripts/cycle-analysis-banner.py`) shows one row per path (worst-case cycles and budget, both also as a
@@ -396,7 +402,8 @@ the *Analysis Notes* of each report list what is left open.
 - **Calls through a pointer are not followed.** Every `infra::Function` callback and every virtual call on a path
   hands over to a function the configuration names: the HAL's interrupt lambda, each callback of the
   phase-current chain, `PlatformFactoryImpl::Read`, the three `ThreePhasePwmOutput` stages, the PWM driver's
-  `Start`, `ZeroVectorSlopes`, the low-priority trigger, and in the outer loop the online estimators and their
+  `Start`, `ZeroVectorSlopes`, the low-priority trigger, on the identification path the runner's hand-over to the
+  calibration observer, and in the outer loop the online estimators and their
   `RecursiveLeastSquares`. A new callback or virtual call on a path needs its target named, or the note
   "calls through a register are not followed" grows by one.
 - **Alternatives are charged once.** A stage with `"combine": "max"` charges the costliest of the functions it
@@ -417,7 +424,6 @@ the *Analysis Notes* of each report list what is left open.
 | `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                    |
 | Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |   list | One bound per loop, below                               |
 | Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                           |
-| `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                              |
 | `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record         |
 
 The mechanical estimator and its `RecursiveLeastSquares` walk a 3×3 matrix as a 3×3 nest, as a loop over its three
@@ -438,9 +444,8 @@ with `CutPowerStage`, the ST HAL's `assert_failed`, `ADC_Disable` (single-shot D
 circular), `HAL_TIM_GenerateEvent` (the timer start-up branch; `Start()` has run from the event loop before the
 interrupt is registered) and, on the identification path, `FailEnvelope`.
 
-Not charged: the encoder read the mechanical identification observer makes is the second call of a function
-already charged once, about 90 cycles. Not modelled: flash wait states, five on the TM4C at 120 MHz, which make
-taken branches and literal loads dearer on silicon than any table says. Tier 3 is the figure for that.
+Not modelled: flash wait states, five on the TM4C at 120 MHz, which make taken branches and literal loads dearer
+on silicon than any table says. Tier 3 is the figure for that.
 
 With the worst-path model the estimates at this revision are:
 

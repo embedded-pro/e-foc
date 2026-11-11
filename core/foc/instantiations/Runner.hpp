@@ -24,7 +24,7 @@ namespace foc
         void Enable();
         void Disable();
 
-        void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) override;
+        void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>& observer) override;
         void UnregisterPhaseCurrentsObserver() override;
 
     private:
@@ -35,7 +35,9 @@ namespace foc
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         FocImpl& foc;
-        infra::HotSwapFunction<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
+        // The control interrupt tests only the slot; the observer is replaced while the slot is clear.
+        infra::HotSwapFunction<void(const PhaseCurrents& phases, const Radians& mechanicalAngle)> observerSlot;
+        infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)> phaseCurrentsObserver;
         volatile bool stopRequested{ false };
     };
 
@@ -90,15 +92,20 @@ namespace foc
     }
 
     template<typename FocImpl>
-    void Runner<FocImpl>::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)
+    void Runner<FocImpl>::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>& observer)
     {
-        phaseCurrentsObserver.Set(observer);
+        observerSlot.Clear();
+        phaseCurrentsObserver = observer;
+        observerSlot.Set([this](const PhaseCurrents& phases, const Radians& mechanicalAngle)
+            {
+                phaseCurrentsObserver(phases, foc.MeasuredQuadratureCurrent(), mechanicalAngle);
+            });
     }
 
     template<typename FocImpl>
     void Runner<FocImpl>::UnregisterPhaseCurrentsObserver()
     {
-        phaseCurrentsObserver.Clear();
+        observerSlot.Clear();
     }
 
     template<typename FocImpl>
@@ -122,6 +129,6 @@ namespace foc
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
 
-        phaseCurrentsObserver(currentPhases);
+        observerSlot(currentPhases, position);
     }
 }

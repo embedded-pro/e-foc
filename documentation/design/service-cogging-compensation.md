@@ -209,12 +209,12 @@ sequenceDiagram
     OL->>CM: measure (torque constant, inertia, pole pairs)
     CM->>SL: speed +10 rad/s
     loop half a revolution to settle, two measured
-        ISR-->>CM: phase currents and rotor angle
+        ISR-->>CM: phase currents, q-axis current and rotor angle
         note over CM: add current and rotation to the angle's bin
     end
     CM->>SL: speed -10 rad/s
     loop half a revolution to settle, two measured
-        ISR-->>CM: phase currents and rotor angle
+        ISR-->>CM: phase currents, q-axis current and rotor angle
     end
     CM->>SL: stop
     note over CM: per bin, torque less inertia times acceleration, averaged over both directions
@@ -239,12 +239,12 @@ sequenceDiagram
 
 ### Required
 
-| Interface          | Purpose                                   | Contract                                                |
-|--------------------|-------------------------------------------|---------------------------------------------------------|
-| Speed command      | Turn the rotor at the measurement's speed | The speed loop configured from the identified mechanics |
-| Phase currents     | Every control interrupt's sample          | One observer at a time; released when the run ends      |
-| Encoder            | The rotor's mechanical angle              | Zeroed by the alignment of this power cycle             |
-| Calibration record | Store and restore the map                 | Layout version 4                                        |
+| Interface          | Purpose                                                                                                 | Contract                                                |
+|--------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| Speed command      | Turn the rotor at the measurement's speed                                                               | The speed loop configured from the identified mechanics |
+| Phase currents     | Every control interrupt's sample, with the q-axis current the loop measured and the rotor angle it used | One observer at a time; released when the run ends      |
+| Encoder            | The rotor's mechanical angle when the run starts                                                        | Zeroed by the alignment of this power cycle             |
+| Calibration record | Store and restore the map                                                                               | Layout version 4                                        |
 
 ---
 

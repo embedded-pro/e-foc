@@ -494,6 +494,20 @@ TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_st
     EXPECT_NEAR(sample->position.Value(), mechanicalAngle, 1e-6f);
 }
 
+TEST_F(TestTorqueCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
+    foc::Radians position{ mechanicalAngle };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focTorque->MeasuredQuadratureCurrent().Value(), -1.0f, 1e-2f);
+
+    foc::Radians aligned{ 0.0f };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, aligned);
+
+    EXPECT_NEAR(focTorque->MeasuredQuadratureCurrent().Value(), 0.0f, 1e-2f);
+}
+
 TEST_F(TestTorqueCascade, enabling_restarts_the_stream_window)
 {
     stream.Start(2);

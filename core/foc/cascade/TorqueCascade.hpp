@@ -36,6 +36,11 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
+        Ampere MeasuredQuadratureCurrent() const final
+        {
+            return Ampere{ lastIq };
+        }
+
         MotionObservation ObserveMotion() const override;
         void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
 
