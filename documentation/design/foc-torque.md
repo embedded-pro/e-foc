@@ -63,7 +63,7 @@ The sequence executed each cycle is:
 5. Clarke forward: (Ia, Ib) → (Iα, Iβ); Ic is derived from the balanced-phase constraint.
 6. Park forward: (Iα, Iβ, θe) → (Id, Iq).
 7. Current stream: add Id and Iq to the stream window; on the window's last sample, store the two means and θm
-   for the event loop (`service-can.md` Part J). Skipped when no stream is attached or the stream is stopped.
+   for the event loop (`service-can.md` Part J). Skipped while the stream is stopped.
 8. Speed limiter: fold Iq_setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
    add the cogging current at θe (`service-cogging-compensation.md` Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
@@ -220,7 +220,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
 | Calculate         | Executes the full 12-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
 | TrackBusVoltage   | Hands a measured bus voltage (Bus Voltage Tracking).                                                            | Called from the event loop; in force from the next `Calculate()`, also while Enabled.                                                   |
-| SetCurrentStream  | Attaches the current stream whose window the loop fills (`service-can.md` Part J).                              | Called once, before the first `Calculate()`. The stream outlives the controller.                                                        |
+| Current stream    | The stream whose window the loop fills, given at construction (`service-can.md` Part J).                        | Never absent, so `Calculate()` does not test for it. The stream outlives the controller.                                                |
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 | Speed limit       | Sets the overspeed limit, in mechanical rad/s, that the speed limiter folds the q-axis setpoint against.        | Callable in any state, also while Enabled; in force from the next sample. A limit of zero folds nothing.                                |
 | Current limit     | Sets the current limit, in amperes, that the q-axis setpoint is clamped to below the envelope.                  | Callable in any state, also while Enabled; in force from the next sample. Capped at the envelope.                                       |

@@ -38,7 +38,8 @@ namespace
         auto parameters = MotorParameters(polePairs);
         parameters.dutyUpdateDelayPeriods = dutyUpdateDelayPeriods;
 
-        foc::TorqueCascade cascade{ foc::Ampere{ 10.0f } };
+        foc::CurrentStream cascadeStream;
+        foc::TorqueCascade cascade{ foc::Ampere{ 10.0f }, cascadeStream };
         cascade.Configure(parameters);
         cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
         cascade.SetPoint({ foc::Ampere{ 0.5f }, foc::Ampere{ 1.0f } });
@@ -66,13 +67,14 @@ namespace
     public:
         void SetUp() override
         {
-            focTorque.emplace(testMaxCurrent);
+            focTorque.emplace(testMaxCurrent, stream);
             focTorque->Configure(MotorParameters(polePairs));
             focTorque->Enable();
         }
 
         const foc::Ampere testMaxCurrent{ 10.0f };
 
+        foc::CurrentStream stream;
         std::optional<foc::TorqueCascade> focTorque;
         const std::size_t polePairs{ 7 };
     };
@@ -130,12 +132,14 @@ TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 
     for (std::size_t poles : { std::size_t{ 1 }, std::size_t{ 2 }, std::size_t{ 4 }, std::size_t{ 7 } })
     {
-        foc::TorqueCascade scaled{ testMaxCurrent };
+        foc::CurrentStream scaledStream;
+        foc::TorqueCascade scaled{ testMaxCurrent, scaledStream };
         scaled.Configure(MotorParameters(poles));
         scaled.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
         scaled.Enable();
 
-        foc::TorqueCascade reference{ testMaxCurrent };
+        foc::CurrentStream referenceStream;
+        foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
         reference.Configure(MotorParameters(1));
         reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
         reference.Enable();
@@ -406,7 +410,8 @@ TEST_F(TestTorqueCascade, a_current_command_drives_the_q_axis_current_it_asks_fo
     foc::Radians position{ 0.0f };
     const auto commanded = focTorque->Calculate(ZeroCurrents(), position);
 
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     reference.Enable();
     reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 2.0f } });
@@ -459,10 +464,8 @@ TEST_F(TestTorqueCascade, outside_a_current_command_no_q_axis_voltage_is_kept)
     EXPECT_NEAR(focTorque->QuadratureVoltage().Value(), 0.0f, 1e-6f);
 }
 
-TEST_F(TestTorqueCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+TEST_F(TestTorqueCascade, the_stream_receives_the_measured_currents_and_the_mechanical_angle)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(1);
 
     foc::Radians position{ 0.0f };
@@ -477,8 +480,6 @@ TEST_F(TestTorqueCascade, an_attached_stream_receives_the_measured_currents_and_
 
 TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_stationary_ones)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(1);
 
     const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
@@ -494,8 +495,6 @@ TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_st
 
 TEST_F(TestTorqueCascade, enabling_restarts_the_stream_window)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(2);
 
     foc::Radians position{ 0.0f };
@@ -554,7 +553,8 @@ namespace
 
         foc::PhasePwmDutyCycles Unlimited(float quadrature, float mechanicalSpeed) const
         {
-            foc::TorqueCascade reference{ testMaxCurrent };
+            foc::CurrentStream referenceStream;
+            foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
             reference.Configure(MotorParameters(polePairs));
             EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
             reference.Enable();
@@ -602,7 +602,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_current_that_brakes_the_rotor_is_not_folde
 
 TEST_F(TestTorqueCascadeSpeedLimit, beyond_the_limit_no_current_pushes_the_rotor)
 {
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -726,7 +727,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_loaded_cogging_map_adds_the_cogging_curren
 
     foc::CoggingFeedForward feedForward;
     feedForward.Load(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -758,7 +760,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, the_cogging_current_is_held_within_the_curre
     foc::Radians position{ offPeakAngle };
     const auto limited = focTorque->Calculate(ZeroCurrents(), position);
 
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -781,7 +784,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_calibration_current_command_is_not_compens
 
 TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_doubles_the_duty_for_the_same_command)
 {
-    foc::TorqueCascade nominal{ testMaxCurrent };
+    foc::CurrentStream nominalStream;
+    foc::TorqueCascade nominal{ testMaxCurrent, nominalStream };
     nominal.Configure(MotorParameters(polePairs));
     nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
     nominal.Enable();
@@ -804,7 +808,8 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_doubles_the_duty_
 
 TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_same_duties)
 {
-    foc::TorqueCascade nominal{ testMaxCurrent };
+    foc::CurrentStream nominalStream;
+    foc::TorqueCascade nominal{ testMaxCurrent, nominalStream };
     nominal.Configure(MotorParameters(polePairs));
     nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
     nominal.Enable();

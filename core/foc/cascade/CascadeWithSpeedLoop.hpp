@@ -24,7 +24,7 @@ namespace foc
     class CascadeWithSpeedLoop
     {
     protected:
-        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
+        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
         ~CascadeWithSpeedLoop();
 
         bool ConfigureImpl(const MotorModelParameters& parameters);
@@ -62,7 +62,6 @@ namespace foc
         void ClearCoggingMapImpl();
         void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
         void ClearFrictionFeedForwardImpl();
-        void SetCurrentStream(CurrentStream& stream);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
 
@@ -129,6 +128,6 @@ namespace foc
         Estimation estimation;
         DirectAxisExcitation directAxisExcitation;
         FeedForwards feedForward;
-        CurrentStream* currentStream{ nullptr };
+        CurrentStream& currentStream;
     };
 }

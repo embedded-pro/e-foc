@@ -61,7 +61,7 @@ namespace
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
+            focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, stream, lowPriorityFrequency);
             focSpeed->Configure(MotorParameters(polePairs));
             focSpeed->ConfigureMechanics(MechanicalParameters());
             focSpeed->SetCurrentTunings(foc::CurrentLoopTunings{});
@@ -69,6 +69,7 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
+        foc::CurrentStream stream;
         std::optional<foc::SpeedCascade> focSpeed;
         const std::size_t polePairs{ 7 };
     };
@@ -118,7 +119,7 @@ namespace
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
+            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, stream, lowPriorityFrequency);
             cascade->Configure(MotorParameters(polePairs));
             cascade->ConfigureMechanics(MechanicalParameters());
             cascade->SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -126,6 +127,7 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        foc::CurrentStream stream;
         std::optional<foc::SpeedCascade> cascade;
     };
 
@@ -139,7 +141,8 @@ namespace
         EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
         EXPECT_CALL(lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
 
-        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency };
+        foc::CurrentStream cascadeStream;
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, cascadeStream, lowPriorityFrequency };
         cascade.Configure(parameters);
         cascade.ConfigureMechanics(MechanicalParameters());
         cascade.SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -443,7 +446,8 @@ TEST(TestSpeedCascadeLifetime, destruction_unregisters_the_outer_loop_handler_so
     }
 
     {
-        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency };
+        foc::CurrentStream cascadeStream;
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, cascadeStream, lowPriorityFrequency };
         cascade.Configure(MotorParameters(7));
         cascade.ConfigureMechanics(MechanicalParameters());
         cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
@@ -701,10 +705,8 @@ TEST_F(TestSpeedCascade, a_cleared_cogging_map_no_longer_drives_the_winding)
     ExpectCentredDuty(FirstDutyAtStandstill(speedCascade, 0.03f));
 }
 
-TEST_F(TestSpeedCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+TEST_F(TestSpeedCascade, the_stream_receives_the_measured_currents_and_the_mechanical_angle)
 {
-    foc::CurrentStream stream;
-    focSpeed->SetCurrentStream(stream);
     focSpeed->Enable();
     stream.Start(1);
 
@@ -721,8 +723,6 @@ TEST_F(TestSpeedCascade, an_attached_stream_receives_the_measured_currents_and_t
 
 TEST_F(TestSpeedCascade, enabling_restarts_the_stream_window)
 {
-    foc::CurrentStream stream;
-    focSpeed->SetCurrentStream(stream);
     focSpeed->Enable();
     stream.Start(2);
 
@@ -970,7 +970,8 @@ TEST_F(TestSpeedCascadeRamp, a_current_limit_clamps_the_reference_the_speed_law_
     EXPECT_CALL(referenceInterrupt, Register(_)).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
     EXPECT_CALL(referenceInterrupt, Unregister()).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
     EXPECT_CALL(referenceInterrupt, Trigger()).Times(testing::AnyNumber());
-    foc::SpeedCascade reference{ foc::Ampere{ 1.0f }, baseFrequency, referenceInterrupt, lowPriorityFrequency };
+    foc::CurrentStream referenceStream;
+    foc::SpeedCascade reference{ foc::Ampere{ 1.0f }, baseFrequency, referenceInterrupt, referenceStream, lowPriorityFrequency };
     reference.Configure(MotorParameters(polePairs));
     auto mechanics = MechanicalParameters();
     mechanics.maxCurrent = foc::Ampere{ 1.0f };

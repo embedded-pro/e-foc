@@ -28,6 +28,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
@@ -212,7 +213,7 @@ namespace
         {
             return PositionStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
@@ -336,7 +337,7 @@ TEST_F(FocStateMachinePositionTest, no_mech_ident_override_uses_its_own_identifi
 
     PositionStateMachine sm{
         tracer,
-        application::MotorHardware{ inverterMock, encoderMock, vdc },
+        application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
         faultNotifierMock,
@@ -576,6 +577,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
@@ -760,7 +762,7 @@ namespace
         {
             return PositionAutoStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
@@ -1636,7 +1638,7 @@ TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_uses_its_own_iden
 
     PositionAutoStateMachine sm{
         tracer,
-        application::MotorHardware{ inverterMock, encoderMock, vdc },
+        application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
         faultNotifierMock,
@@ -2003,7 +2005,7 @@ namespace
         {
             return RecordingStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,

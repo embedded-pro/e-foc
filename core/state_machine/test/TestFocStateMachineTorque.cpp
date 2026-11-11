@@ -45,6 +45,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -213,7 +214,7 @@ namespace
         {
             return TestedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
@@ -228,7 +229,7 @@ namespace
 
             return TestedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .fluxLinkage = configuredFluxLinkage, .fluxIdentOverride = fluxIdentMock },
                 faultNotifierMock,
@@ -284,7 +285,7 @@ namespace
 
             return TestedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .currentOffsets = offsetsMock, .standstill = standstillMock },
                 faultNotifierMock,
@@ -347,7 +348,7 @@ namespace
         {
             return TestedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .indexSearch = indexSearchMock },
                 faultNotifierMock,
@@ -363,7 +364,7 @@ namespace
 
             return TestedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ .electricalIdent = electricalIdentMock, .motorAlignment = alignmentMock, .currentOffsets = offsetsMock, .standstill = standstillMock, .indexSearch = indexSearchMock },
                 faultNotifierMock,
@@ -1854,6 +1855,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -1995,7 +1997,7 @@ namespace
         {
             return AutoStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
@@ -3924,7 +3926,7 @@ TEST_F(FocStateMachineTorqueTest, a_drive_kept_homed_across_a_mode_switch_boots_
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
-    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::keptHomed };
+    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::keptHomed };
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
     EXPECT_TRUE(sm.Calibration().IsHomed());
@@ -3935,7 +3937,7 @@ TEST_F(FocStateMachineTorqueTest, a_drive_kept_aligned_across_a_mode_switch_boot
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
-    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::kept };
+    TestedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock }, faultNotifierMock, nvmActivity, application::RotorReference::kept };
 
     ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
     EXPECT_FALSE(sm.Calibration().IsHomed());

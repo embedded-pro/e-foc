@@ -239,6 +239,12 @@ The 20 kHz path should do only the work that changes from one sample to the next
 
 - **Gate by wiring, not by a flag.** The runner holds the phase-current slot only while the bridge runs, so no sample
   tests an `enabled` flag (`documentation/design/state-machine.md`).
+- **Hand a collaborator over at construction, do not test for it.** The cascades take their current stream as a
+  constructor reference, so no sample tests a pointer; a stopped stream stands in for "no stream". The test was one
+  compare-and-branch: two cycles of the static worst case on EK-TM4C1294XL. A stand-in pays only where it is the same
+  concrete type, inert in a state it already has. Behind an interface it trades that one-cycle test for a virtual call,
+  and the outer loop's test for an electrical estimator also decides whether the d-axis excitation runs, so those
+  tests stay.
 - **Cache reciprocals.** The encoder keeps 2π/resolution from construction and wraps with one compare instead of two
   divides and a `floor`.
 - **Clamp once.** The modulator clamps and quantises each phase in one step; a second clamp in a later conversion is
@@ -256,8 +262,7 @@ The 20 kHz path should do only the work that changes from one sample to the next
   into a window in the interrupt and hands the event loop one mean per window, so the 20 kHz path does two additions,
   an increment and a compare per sample. The window's reciprocal length is computed once, at the first sample after
   the rate changes, so closing a window multiplies instead of dividing. A stopped stream costs two loads and two
-  compares, and a cascade without a stream one pointer test. Every stream function is inlined into the cascade's `Calculate`, so the
-  cycle analysis measures it there.
+  compares. Every stream function is inlined into the cascade's `Calculate`, so the cycle analysis measures it there.
 
 The 1 kHz outer loop follows the same rules. The software position limits (`documentation/design/foc-position.md`) add
 a compare to the cascade and to each difference the position law takes, and a wrap and a clamp of the reference while
