@@ -313,6 +313,50 @@ TEST_F(TestParameterIdentification, winding_heating_is_tracked_by_the_online_res
     mil::ExpectOnline(mil, Quantity::resistance, 10.0f, 90.0f);
 }
 
+TEST_F(TestParameterIdentification, a_hot_magnet_is_tracked_by_the_online_flux_linkage_estimate)
+{
+    auto scenario = OnlineScenario("hot");
+    scenario.Calibrated().BootsIn(state_machine::ControlMode::speed);
+
+    mil::ModelInTheLoop mil{ scenario };
+    Excite(mil);
+    const auto estimates = mil.OnlineEstimates();
+    ASSERT_TRUE(estimates.has_value());
+    EXPECT_TRUE(estimates->fluxLinkageSettled);
+    mil::ExpectOnline(mil, Quantity::fluxLinkage, 1.0f, 90.0f);
+}
+
+TEST_F(TestParameterIdentification, a_cold_magnet_keeps_the_online_flux_linkage_estimate_on_the_calibrated_value)
+{
+    for (const auto* motor : referenceMotors)
+    {
+        SCOPED_TRACE(motor);
+        auto scenario = OnlineScenario(motor);
+        scenario.Calibrated().BootsIn(state_machine::ControlMode::speed);
+
+        mil::ModelInTheLoop mil{ scenario };
+        Excite(mil);
+        mil::ExpectOnline(mil, Quantity::fluxLinkage, 0.5f);
+    }
+}
+
+TEST_F(TestParameterIdentification, a_hot_magnet_is_tracked_through_the_benchs_power_stage_current_sense_and_late_duty)
+{
+    auto scenario = OnlineScenario("bench");
+    sil::DescribeBenchPowerStage(scenario.plant);
+    sil::DescribeBenchCurrentSense(scenario.plant);
+    sil::DescribeBoardPwmUpdate(scenario.plant);
+    sil::DescribeBenchDeadTimeCompensation(scenario.plant);
+    scenario.plant.ambientCelsius = 90.0f;
+    scenario.plant.thermalCapacitance = 0.5f;
+    scenario.plant.thermalResistance = 20.0f;
+    scenario.Calibrated().BootsIn(state_machine::ControlMode::speed);
+
+    mil::ModelInTheLoop mil{ scenario };
+    Excite(mil);
+    mil::ExpectOnline(mil, Quantity::fluxLinkage, 1.0f, 90.0f);
+}
+
 TEST_F(TestParameterIdentification, the_full_calibration_identifies_the_flux_linkage_from_the_back_emf)
 {
     for (const auto* motor : { "bench", "teknic", "anaheim" })

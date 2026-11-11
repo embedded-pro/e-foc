@@ -62,7 +62,7 @@ namespace mil
             case Quantity::cogging:
                 return plant.coggingTorqueNm;
             case Quantity::fluxLinkage:
-                return plant.fluxLinkageWeber;
+                return plant.fluxLinkageWeber * (1.0f - plant.magnetFluxTempCoeff * (windingCelsius - referenceCelsius));
         }
         return 0.0f;
     }
@@ -101,9 +101,10 @@ namespace mil
                 return estimates.inertia.Value();
             case Quantity::friction:
                 return estimates.viscousFriction.Value();
+            case Quantity::fluxLinkage:
+                return estimates.fluxLinkage.Value();
             case Quantity::dryFriction:
             case Quantity::cogging:
-            case Quantity::fluxLinkage:
                 return 0.0f;
         }
         return 0.0f;
