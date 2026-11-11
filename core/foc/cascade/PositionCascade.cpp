@@ -32,9 +32,9 @@ namespace foc
         travelLimits = TravelLimits{ minimum, maximum };
     }
 
-    void PositionCascade::ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed)
+    void PositionCascade::ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk)
     {
-        profile.Limit(velocity, acceleration, deceleration);
+        profile.Limit(velocity, acceleration, deceleration, jerk);
     }
 
     SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
