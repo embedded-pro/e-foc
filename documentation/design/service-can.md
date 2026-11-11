@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.24.1
+version: 0.25.0
 component: can-service
-date: 2026-11-10
+date: 2026-11-11
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.24.1                   |
+| Version   | 0.25.0                   |
 | Component | can-service              |
-| Date      | 2026-11-10               |
+| Date      | 2026-11-11               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -94,6 +94,19 @@ servers `can-lite` tracks per bus.
 The sections that follow name the version that introduced each message and parameter. They record history:
 since compatibility needs equal versions, no client branches on a minor version, and a remark below that an
 older client does not ask for something describes the contract as it was, not behaviour to implement.
+
+**Contract 3.1 — online flux linkage.** Version 3.1 adds two read-only parameters; nothing in 3.0 changes, so
+under the rule that a client and a server must agree on the version, both move to 3.1 together
+(`service-flux-linkage-ident.md`, Part D; `online-recalibration.md`).
+
+| ID     | Parameter              | Unit | Value                                                                                                  | Automatic |
+|--------|------------------------|------|--------------------------------------------------------------------------------------------------------|-----------|
+| `0x9B` | `estimatedFluxLinkage` | Wb   | Online estimate; the calibration record's until it settles, `0` while the active mode runs no estimator | no        |
+| `0x9C` | `modelFluxLinkage`     | Wb   | Flux linkage the current loop and the torque conversion use; the record's until a recalibration         | no        |
+
+`modelFluxLinkage` is the one model parameter that also answers in torque mode: there it shows the flux linkage
+carried over from the speed or position mode (`online-recalibration.md`, Part D), which a newton-metre torque
+setpoint is converted with. The motor parameter `fluxLinkage` keeps reading the calibration record.
 
 **Contract 3.0 — one form per command.** Version 3.0 removes every message that duplicated another one, so
 each quantity has one way onto the wire. The identifiers of the removed messages are retired and never reused.

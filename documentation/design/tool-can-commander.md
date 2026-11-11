@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.24.0
+version: 0.25.0
 component: "tool-can-commander"
-date: 2026-11-10
+date: 2026-11-11
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.24.0               |
+| Version   | 0.25.0               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-10           |
+| Date      | 2026-11-11           |
 
 ---
 
@@ -308,15 +308,16 @@ read from it: the controller's own interlock refuses the transfer while its moto
 ### Part K — diagnostics
 
 The **Diagnostics** tab shows what the controller measured or derived and cannot be edited: the calibration
-record's current-sensor offsets and cogging peak, the online estimates (zero in torque mode, which runs no
-estimator), the control-loop statistics and the cause of the last reset, named. They are the read-only
+record's current-sensor offsets and cogging peak, the online estimates of resistance, inductance, inertia, viscous
+friction and flux linkage (zero in torque mode, which runs no estimator), the control-loop statistics and the cause of the last reset, named. They are the read-only
 parameters of contract 2.2, read one at a time like the settings when the node is found compatible, after a
 calibration and on Refresh; each shows "—" until it is read, and the values are dropped when the node leaves
 the bus. Clear Statistics sends `ClearDiagnostics`, which restarts the control-loop and CAN error statistics,
 and reads them again once the controller accepts it.
 
-Its **Online Recalibration** group shows the model the loops are designed from — resistance, inductance, inertia and
-viscous friction in use — and the recalibrations applied, rejected and stored since power-up (contracts 2.17 and 2.18),
+Its **Online Recalibration** group shows the model the loops are designed from — resistance, inductance, inertia,
+viscous friction and flux linkage in use (the flux linkage from contract 3.1; in torque mode it shows the one carried
+over from speed or position mode) — and the recalibrations applied, rejected and stored since power-up (contracts 2.17 and 2.18),
 read with the other diagnostics and again after a Recalibrate or Reset Model is accepted. Recalibrate sends
 `Recalibrate`; it is disabled, with the reason shown in the group and on the button, while the mode is *Off*, in torque
 mode (which runs no estimators) and while the motor runs or calibrates, since the firmware refuses it then.

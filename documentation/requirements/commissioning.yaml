@@ -25,8 +25,9 @@
   status: verified
   verification: [sil, mil, unit]
   shall: >
-    In speed and position mode the drive shall estimate the resistance, inductance, inertia and
-    viscous friction online, converging on the motor from a wrong calibration. It shall re-measure
+    In speed and position mode the drive shall estimate the resistance, inductance, inertia,
+    viscous friction and magnet flux linkage online, converging on the motor from a wrong
+    calibration and following a magnet that weakens as it warms. It shall re-measure
     the current offsets on the first Enable after power-up, a mode switch or a fault. When the
     operator enables recalibration it shall adopt a settled estimate only within its plausibility
     band and only while stopped, keep the loop bandwidths, and store the learned model at most

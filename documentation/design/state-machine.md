@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.13.0
+version: 0.14.0
 component: state-machine
-date: 2026-11-08
+date: 2026-11-11
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.13.0                     |
+| Version   | 0.14.0                     |
 | Component | state-machine              |
-| Date      | 2026-11-08                 |
+| Date      | 2026-11-11                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -927,10 +927,11 @@ Over CAN a re-alignment is the `Align` command. Because the same completion path
 
 ### Online Parameter Estimation (Speed/Position Modes)
 
-For speed and position control modes, the state machine creates and manages two online parameter estimators alongside the main control loop:
+For speed and position control modes, the state machine creates and manages three online parameter estimators alongside the main control loop:
 
 - **Online Mechanical Estimator** — continuously refines rotor inertia (J) and viscous friction (B) using a Recursive Least Squares estimator that runs at the outer-loop rate (1 kHz).
 - **Online Electrical Estimator** — continuously refines phase resistance (R) and d-axis inductance (Ld) using a d-axis voltage-model RLS estimator running at the same rate.
+- **Online Flux Linkage Estimator** — continuously refines the magnet flux linkage (ψf) from the q-axis voltage with the resistance and inductance of the electrical estimator taken off (`service-flux-linkage-ident.md`, Part D), at the same rate. The speed and position machines own it; the torque machine has none.
 
 **Lifecycle of online estimators:**
 
@@ -939,20 +940,28 @@ sequenceDiagram
     participant SM as FOC State Machine
     participant ME as Online Mech. Estimator
     participant EE as Online Elec. Estimator
+    participant FE as Online Flux Estimator
 
     SM->>ME: constructed (in SM constructor)
     SM->>EE: constructed (in SM constructor)
-    note over SM: ApplyCalibrationData seeds both estimators\nfrom NVM calibration values (warm start)
+    SM->>FE: constructed (in SM constructor)
+    note over SM: ApplyCalibrationData seeds all estimators\nfrom NVM calibration values (warm start)
     SM->>ME: SetInitialEstimate(J_cal, B_cal)
     SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
+    SM->>FE: SetInitialEstimate(ψf of the record)
 
     SM->>ME: SetTorqueConstant(3/2·p·ψf from the record) [on entering Enabled]
     note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
 ```
 
-**Seeding from calibration data:** When `ApplyCalibrationData` is called (either after calibration completes or on NVM boot load), both estimators are seeded with the values from `CalibrationData`. This warm-starts the RLS theta vector at the known-good calibration values rather than zero, ensuring the estimators produce physically meaningful outputs from the first update.
+**Seeding from calibration data:** When `ApplyCalibrationData` is called (either after calibration completes or on NVM boot load), the estimators are seeded with the values from `CalibrationData`. This warm-starts the RLS theta vector at the known-good calibration values rather than zero, ensuring the estimators produce physically meaningful outputs from the first update.
 
 The electrical estimator is seeded using `lD` (d-axis inductance), as the underlying model assumes a non-salient motor ($L_d \approx L_q$). For interior PMSMs, a 3-parameter model with separate Ld and Lq would be required; this is a known limitation.
+
+The torque constant the mechanical estimator is given on entering `Enabled`, and the one the friction and cogging
+feed-forwards and the torque-to-current conversions use, are derived from the flux linkage in use: the record's
+until a recalibration adopts the estimate (`online-recalibration.md`, Part D). The torque machine applies the flux
+linkage in use on becoming ready after a mode switch.
 
 **Estimates reach the loops only while the drive is stopped:** the gains are never redesigned while `Enabled`,
 where neither the current nor the speed loop design is interrupt-safe. Online recalibration

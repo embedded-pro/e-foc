@@ -2,7 +2,7 @@
 title: "Embedded Performance Optimization"
 type: theory
 status: approved
-version: 1.5.0
+version: 1.6.0
 component: "foc"
 date: 2026-11-11
 ---
@@ -268,6 +268,14 @@ The Coulomb friction feed-forward (`documentation/theory/disturbances-and-noise.
 loop, not in the interrupt: one scaled, clamped multiply of the speed reference per period, inlined into
 `CascadeWithSpeedLoop::RunSpeedLoop`, which the outer-loop gate charges through the low-priority handler. The
 20 kHz path gains one load and one addition of the stored current, before the clamp that was already there.
+
+The online flux linkage estimate (`documentation/design/service-flux-linkage-ident.md`, Part D) adds one thing to the 20 kHz
+path: the sum of the q-axis voltage applied, `vqSum += applied.q`, one load and one addition beside the d-axis voltage
+sum the window already keeps, and one more store when a window closes (the current at its end and the mean voltage).
+The rest runs in the outer loop: `EstimatorChannel::UpdateFluxLinkage` builds the window and
+`RealTimeFluxLinkageEstimator::Update` takes a handful of multiplications, one division and one comparison per
+window. The estimator is reached through a pointer, so the outer-loop gate names its three methods
+in `cycle-analysis-outer.json` as one more stage after the electrical estimator's.
 
 ---
 

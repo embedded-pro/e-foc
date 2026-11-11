@@ -2,9 +2,9 @@
 title: "Disturbances, Non-Idealities and Noise"
 type: theory
 status: draft
-version: 0.4.3
+version: 0.5.0
 component: "disturbances-and-noise"
-date: 2026-11-09
+date: 2026-11-11
 ---
 
 | Field     | Value                                  |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Disturbances, Non-Idealities and Noise |
 | Type      | theory                                 |
 | Status    | draft                                  |
-| Version   | 0.4.3                                  |
+| Version   | 0.5.0                                  |
 | Component | disturbances-and-noise                 |
-| Date      | 2026-11-09                             |
+| Date      | 2026-11-11                             |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -188,11 +188,21 @@ spends phase margin against the loop delay. A deadbeat law, which inverts $L_s$,
 identified at has 31 % more resistance. NdFeB magnet flux falls about 0.1 %/K (ferrite about 0.2 %/K), so
 torque per ampere and back-EMF fall with it. Integral action absorbs both in the current and speed loops; a
 torque command converted to current with a cold $K_t$ delivers less torque on a hot motor, and model-based laws
-lose the accuracy of their model. *e-foc today:* the online estimator follows $R_s$
+lose the accuracy of their model. The magnet follows
+$$
+\psi_f(T) = \psi_{f,cal}\,\bigl(1 - c\,(T - T_{cal})\bigr), \qquad c \approx 0.0011\ \text{K}^{-1}\ (\text{NdFeB}),
+$$
+so a winding 80 K above its calibration has a magnet 9 % weaker, and the back-EMF it induces and the torque each
+ampere makes fall by the same 9 %. *e-foc today:* the online estimator follows $R_s$
 (`documentation/design/service-electrical-ident.md`), and the drive turns it back into a winding temperature,
 $T = T_{cal} + (R_s / R_{cal} - 1)/0.00393$, from the resistance $R_{cal}$ the calibration measured at
-$T_{cal}$ (`documentation/design/fault-supervision.md` Part K); the simulation plant models $R_s$ and $L_s$ against
-winding temperature but not $\psi_f$ (`core/foc/model/ThermalModel.cpp`).
+$T_{cal}$ (`documentation/design/fault-supervision.md` Part K). A second estimator follows $\psi_f$ from the
+quadrature voltage, $\bar v_q - R\,\bar i_q - L\,\Delta i_q/T - \bar\omega_e L\,\bar i_d = \bar\omega_e\psi_f$
+(`documentation/design/service-flux-linkage-ident.md` Part D), and the online recalibration adopts a flux linkage
+more than 5 % off at the next stop, so the torque constant of the speed design, the torque-to-current conversions and the back-EMF
+feed-forward follow the magnet (`documentation/design/online-recalibration.md`). The simulation plant models
+$R_s$, $L_s$ and $\psi_f$ against the one winding temperature
+(`core/foc/model/ThermalModel.cpp`), with the magnet coefficient above in every plant preset.
 
 **Bus voltage.** The modulator works in per-unit of $V_{dc}/\sqrt3$, and the current-loop gains are normalised
 by $V_{dc}$. If the bus sags under load, each per-unit command produces proportionally less voltage: the
@@ -396,7 +406,7 @@ graph TD
 | $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error                                               |
 | $V_{dc}$ variation | Affects gain normalisation; e-foc reads $V_{dc}$ once at boot                                                    |
 | ADC offset         | Bias on $i_d$, $i_q$ that rotates at $f_e$; calibrated at startup                                                |
-| $\psi_f$ error     | Torque per ampere and back-EMF feed-forward; drifts with magnet temperature                                      |
+| $\psi_f$ error     | Torque per ampere and back-EMF feed-forward; drifts with magnet temperature, tracked online beyond 5 %           |
 | $J$ error          | Speed-loop bandwidth scales with $\hat{J}/J$                                                                     |
 
 ### Magnitudes on the Reference Hardware

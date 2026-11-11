@@ -2,9 +2,9 @@
 title: "Online Recalibration"
 type: design
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: online-recalibration
-date: 2026-11-06
+date: 2026-11-11
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Online Recalibration |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.1                |
+| Version   | 0.3.0                |
 | Component | online-recalibration |
-| Date      | 2026-11-06           |
+| Date      | 2026-11-11           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -30,9 +30,10 @@ date: 2026-11-06
 
 In speed and position mode the drive re-estimates its motor while it runs: the resistance and inductance from a
 small d-axis injection (`service-electrical-ident.md`, Excitation), the inertia and viscous friction from the speed
-and torque current (`service-mechanical-ident.md`). The loop gains are designed from the calibration record, so a
-load whose inertia differs from the commissioned one, or a winding whose resistance has risen, runs on a model that
-no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CMS-003),
+and torque current (`service-mechanical-ident.md`), the magnet flux linkage from the quadrature voltage
+(`service-flux-linkage-ident.md`, Part D). The loop gains are designed from the calibration record, so a
+load whose inertia differs from the commissioned one, a winding whose resistance has risen, or a magnet that has
+warmed and weakened, runs on a model that no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CMS-003),
 and keeps the inductance, inertia and friction it learned across power cycles (REQ-CMS-003).
 
 **Is responsible for:**
@@ -43,6 +44,8 @@ and keeps the inductance, inertia and friction it learned across power cycles (R
   loop bandwidths the operator or the calibration chose.
 - The operator's choice of when: never, on command, or on every stop.
 - Counting each recalibration applied and each estimate rejected, and showing the model in use.
+- Carrying the flux linkage in use into torque mode, which estimates nothing, until the model is reverted or the
+  drive is calibrated again (Part D).
 - Storing the recalibrated inductance, inertia and viscous friction, at most once every 15 minutes, restoring them at
   power-up while they belong to the commissioned model, and discarding them on the operator's command.
 
@@ -50,10 +53,11 @@ and keeps the inductance, inertia and friction it learned across power cycles (R
 - Changing a gain while the drive is `Enabled`. The current and speed loop designs are not interrupt-safe; the drive
   waits for its next stop.
 - Changing the calibration record. It keeps the commissioned values; the learned ones are a record of their own.
-- Storing the resistance. It tracks the winding temperature, which is estimated from it against the commissioned
-  resistance (`fault-supervision.md`, Part K), so a hot resistance stored as the baseline would read as a cold winding
-  at the next power-up.
-- Torque mode, which runs no estimators.
+- Storing the resistance or the flux linkage. The resistance tracks the winding temperature, which is estimated from
+  it against the commissioned resistance (`fault-supervision.md`, Part K), so a hot resistance stored as the baseline
+  would read as a cold winding at the next power-up. The flux linkage follows the magnet temperature the same way: a
+  weakened magnet stored as the baseline would be restored at power-up on a cold magnet.
+- Estimating in torque mode, which runs no estimators.
 
 ---
 
@@ -61,8 +65,8 @@ and keeps the inductance, inertia and friction it learned across power cycles (R
 
 ### Part A — The model in use
 
-The model in use holds the four quantities the loops are designed from: resistance, inductance, inertia and viscous
-friction. At power-up, and whenever the calibration record changes — a calibration, a motor parameter written over
+The model in use holds the five quantities the loops are designed from: resistance, inductance, inertia, viscous
+friction and flux linkage. At power-up, and whenever the calibration record changes — a calibration, a motor parameter written over
 CAN, a cleared calibration — it is the commissioned model, the record's values, with the stored inductance, inertia
 and friction in place of the record's while the mode is not off (Part F). A recalibration replaces some of its
 quantities; the record does not change. A control-mode switch keeps the model in use: the new mode's loops are
@@ -75,17 +79,20 @@ The event loop reads the estimates every 100 ms while the drive is `Enabled`. A 
 1. **Its estimator has settled.** The electrical estimator once it has taken the 200 updates it needs before it
    publishes; the mechanical estimator once a direction's fit has settled (`service-mechanical-ident.md`). An
    estimator that has not settled since it was seeded publishes its seed.
-2. **It differs from the model in use by more than 10 %,** and has done so for **5 s of running**. Time spent
-   stopped does not count; a reading within 10 % starts the count again.
+2. **It differs from the model in use by more than its threshold,** and has done so for **5 s of running**. The
+   threshold is 10 % for the resistance, inductance, inertia and friction and 5 % for the flux linkage, whose
+   estimate is the least noisy and whose drift is slow. Time spent stopped does not count; a reading within the
+   threshold starts the count again.
 
 A candidate is applied only inside its plausibility band, a ratio to the commissioned value:
 
-| Quantity         | Band        | Why                                                                   |
-|------------------|-------------|-----------------------------------------------------------------------|
-| Resistance       | 0.7 – 2.0 × | Copper from −50 °C to 280 °C around a 25 °C commissioning             |
-| Inductance       | 0.5 – 1.5 × | Saturation and the d-axis injection's spread; more is a wrong reading |
-| Inertia          | 0.5 – 5.0 × | A load coupled or removed; outside it the speed loop's design fails   |
-| Viscous friction | 0.2 – 5.0 × | Friction varies widely with temperature and lubrication               |
+| Quantity         | Band         | Why                                                                          |
+|------------------|--------------|------------------------------------------------------------------------------|
+| Resistance       | 0.7 – 2.0 ×  | Copper from −50 °C to 280 °C around a 25 °C commissioning                    |
+| Inductance       | 0.5 – 1.5 ×  | Saturation and the d-axis injection's spread; more is a wrong reading        |
+| Inertia          | 0.5 – 5.0 ×  | A load coupled or removed; outside it the speed loop's design fails          |
+| Viscous friction | 0.2 – 5.0 ×  | Friction varies widely with temperature and lubrication                      |
+| Flux linkage     | 0.75 – 1.1 × | A magnet loses 0.1 – 0.2 % per kelvin; −25 % is a hot winding, more is wrong |
 
 A candidate outside its band is rejected: it is counted, traced, and the model in use keeps its value. A quantity
 whose commissioned value is not positive — a record without friction — is never recalibrated.
@@ -96,11 +103,11 @@ correction follows a settled electrical estimate inside them while the drive run
 
 ### Part C — When it is applied
 
-| Mode       | Behaviour                                                                                                       |
-|------------|-----------------------------------------------------------------------------------------------------------------|
-| Off        | Estimates are only read, as before (the default)                                                                |
-| On command | A Recalibrate command while stopped adopts every settled estimate more than 10 % off, inside its band, no dwell |
-| Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                    |
+| Mode       | Behaviour                                                                                                         |
+|------------|-------------------------------------------------------------------------------------------------------------------|
+| Off        | Estimates are only read, as before (the default)                                                                  |
+| On command | A Recalibrate command while stopped adopts every settled estimate beyond its threshold, inside its band, no dwell |
+| Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                      |
 
 The mode is a drive-wide setting of the configuration record (`service-nvm.md`), read and written over CAN
 (`service-can.md`, contract 2.17). The CAN Commander chooses it on its Configuration tab and shows the model in
@@ -120,18 +127,32 @@ stateDiagram-v2
 
 ### Part D — How it is applied
 
-Applying a model redesigns the current loop from the resistance and inductance in use and the speed loop, and in
-position mode the position loop, from the inertia and friction in use, with the record's flux linkage and pole
-pairs. The operator's loop settings are then applied again, so the bandwidths do not change. It happens only while
+Applying a model redesigns the current loop from the resistance, inductance and flux linkage in use and the speed
+loop, and in position mode the position loop, from the inertia and friction in use, with the record's pole pairs. The operator's loop settings are then applied again, so the bandwidths do not change. It happens only while
 the drive is stopped, so neither control interrupt runs a loop half-redesigned; the next `Enable` resets the loops
 as it always does. The estimators are not seeded again: they keep tracking from where they are, and the model in use
 now agrees with them.
 
+The flux linkage in use reaches everything that is built from the magnet's strength: the back-EMF feed-forward
+of the current loop, the torque constant (torque per ampere) of the speed loop's design and of the online mechanical
+estimator, the friction and cogging feed-forwards, which convert a torque to a current, and the conversion of a
+torque setpoint in newton-metres to a current over CAN. Without it, a magnet that has lost 10 % of its flux would
+deliver 10 % less torque for the current the speed loop asks for, and the speed loop would be designed for a
+stronger actuator than it has.
+
+**Torque mode.** Torque mode runs no estimator, so it cannot learn the flux linkage, but it keeps the one in use: on
+a switch to torque mode the new machine applies the flux linkage in use once it is ready, and the conversion of
+a newton-metre setpoint and the current loop's back-EMF feed-forward use it. The resistance, inductance, inertia and
+friction in use are not carried, since torque mode does not use them. The flux linkage in use stays until Reset
+Model, a new calibration or a change of the calibration record; those return to the record's value, and so does
+a power cycle, because the flux linkage is never stored.
+
 ### Part E — Reporting
 
 Each applied quantity and each rejected candidate is traced with its value and its commissioned value. Two counters
-of applied quantities and rejected candidates, and the four quantities of the model in use, are read-only
-parameters over CAN; the motor parameters keep reading the calibration record. The counters restart at power-up.
+of applied quantities and rejected candidates, and the five quantities of the model in use, are read-only
+parameters over CAN (the flux linkage in torque mode too, where it shows the one carried); the motor parameters keep
+reading the calibration record. The counters restart at power-up.
 
 ---
 
@@ -177,7 +198,7 @@ stateDiagram-v2
 |-------------|---------------------------------------|---------------------------------------------------------------------|
 | Mode        | Off, on command or automatic          | Stored in the configuration record; takes effect at the next stop   |
 | Recalibrate | Adopt the settled estimates now       | Refused while running, in torque mode and with the mode off         |
-| Model       | The four quantities the loops use     | Read-only; equals the calibration record until a recalibration      |
+| Model       | The five quantities the loops use     | Read-only; equals the calibration record until a recalibration      |
 | Counters    | Applied quantities, rejected readings | Read-only; restart at power-up                                      |
 | Reset Model | Discard the stored model              | Refused while running; acknowledged once the empty record is stored |
 | Stores      | Learned-model stores since power-up   | Read-only; at most one per 15 minutes of uptime                     |
@@ -196,10 +217,11 @@ stateDiagram-v2
 
 ## Constraints & Limitations
 
-| Constraint     | Description                                                                        |
-|----------------|------------------------------------------------------------------------------------|
-| Stopped only   | A change during a long run waits for the next stop                                 |
-| Resistance     | Never stored; every power-up starts from the commissioned resistance               |
-| Store rate     | At most one learned-model store per 15 minutes of uptime; the reset is not limited |
-| Fixed criteria | The 10 % threshold, the 5 s dwell and the bands are constants, not settings        |
-| Torque mode    | Runs no estimators; the mode has no effect and the command is refused              |
+| Constraint     | Description                                                                              |
+|----------------|------------------------------------------------------------------------------------------|
+| Stopped only   | A change during a long run waits for the next stop                                       |
+| Resistance     | Never stored; every power-up starts from the commissioned resistance                     |
+| Flux linkage   | Never stored; every power-up starts from the commissioned flux linkage                   |
+| Store rate     | At most one learned-model store per 15 minutes of uptime; the reset is not limited       |
+| Fixed criteria | The 10 % and 5 % thresholds, the 5 s dwell and the bands are constants, not settings     |
+| Torque mode    | Runs no estimators; the command is refused, the flux linkage in use is kept (Part D)     |

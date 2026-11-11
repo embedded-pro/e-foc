@@ -2,9 +2,9 @@
 title: "Service: Flux Linkage Identification"
 type: design
 status: draft
-version: 0.1.1
+version: 0.2.0
 component: service-flux-linkage-ident
-date: 2026-10-29
+date: 2026-11-11
 ---
 
 | Field     | Value                                |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Service: Flux Linkage Identification |
 | Type      | design                               |
 | Status    | draft                                |
-| Version   | 0.1.1                                |
+| Version   | 0.2.0                                |
 | Component | service-flux-linkage-ident           |
-| Date      | 2026-10-29                           |
+| Date      | 2026-11-11                           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -33,6 +33,8 @@ date: 2026-10-29
 - Moving the rotor only within a bounded current and speed, and leaving it at rest.
 - Reporting a value only when the measurement is precise and spans enough speed, and reporting a
   runaway as a failure in its own right.
+- Tracking the flux linkage while the drive runs in speed or position mode, so a magnet that warms and weakens
+  is followed (Part D). Applying the result is the online recalibration's business (`online-recalibration.md`).
 
 The flux linkage cannot come from the mechanical identification: that service turns current into
 torque through $K_t = \tfrac{3}{2} p \psi_f$ and fits inertia and friction to the motion, and from speed
@@ -118,6 +120,58 @@ most half its highest, the slope's relative standard error is at most 5 %, the i
 parameter may take. Otherwise the result is not identified, and the calibration keeps the value it
 had. A speed above the limit at any point is reported as an overspeed, which fails the calibration.
 
+### Part D — Online tracking
+
+A magnet loses flux as it warms: neodymium about 0.11 % per kelvin, ferrite about 0.2 %. A winding that has
+run hot for an hour has a magnet 10 % weaker than the one that was calibrated cold, so the same current delivers
+10 % less torque and the back-EMF feed-forward of the current loop cancels 10 % too much of the voltage the
+motion induces. The drive therefore estimates the flux linkage while it runs, in speed and position mode.
+Torque mode runs no estimator.
+
+**Equation.** Each 1 ms window of the outer loop gives the mean q-axis voltage the current loop applied $\bar v_q$,
+the mean q-axis current $\bar i_q$ and d-axis current $\bar i_d$, the q-axis current at the window's end, and the
+mean electrical speed $\bar\omega_e$, from the rotation over the window. With the resistance and inductance of the
+online electrical estimate (`service-electrical-ident.md`), the voltage that only the magnet explains is
+
+$$
+y_k = \bar v_q - R\,\bar i_q - L\,\frac{i_{q,k}^{\text{end}} - i_{q,k-1}^{\text{end}}}{T} - \bar\omega_e L\,\bar i_d
+\;=\; \bar\omega_e\,\psi_f , \qquad x_k = \bar\omega_e
+$$
+
+with $T$ the window length. The voltage applied is paired with the current it produced the way the direct-axis
+voltage is, a period later when the board updates its duty a period late
+(`platform-sampling-skew.md`).
+
+**Filter.** The estimate is the least-squares slope through the origin with exponential forgetting:
+$S_{xy} \leftarrow \lambda S_{xy} + x_k y_k$, $S_{xx} \leftarrow \lambda S_{xx} + x_k^2$, $\hat\psi_f = S_{xy}/S_{xx}$,
+with $\lambda = 0.9995$, a memory of about two seconds, long against the speed loop and short against a magnet's
+thermal time constant of minutes. The sign of the speed cancels, so reverse rotation gives the same estimate.
+
+**Which windows count.** The first window after the loops restart has no earlier current to difference and is
+skipped. A window whose back-EMF $|\bar\omega_e|\psi_{\text{seed}}$ is below 2 % of the largest phase voltage
+the bus gives, $V_{dc}/\sqrt3$, is skipped: there the dead-time and the voltage error of the inverter are as large
+as the signal. The estimator reports it has settled after 200 counted windows since it was seeded; until then,
+and whenever the slope is not finite and positive, it reports its seed. It is seeded with the flux linkage of the
+calibration record whenever a calibration is applied, and not seeded again by a recalibration, so it keeps tracking
+from where it is.
+
+```mermaid
+flowchart LR
+    W["1 ms window: v_q, i_q, i_d, i_q at end, speed"] --> G{"first window, or<br/>speed too low?"}
+    G -- yes --> S["skip"]
+    G -- no --> Y["y = v_q - R i_q - L di_q/T - w L i_d"]
+    E["online R and L"] --> Y
+    Y --> F["S_xy, S_xx with forgetting"]
+    F --> P["psi = S_xy / S_xx, published once<br/>200 windows counted and positive"]
+```
+
+**Accuracy.** The estimate depends on the resistance and inductance of the online estimate: a resistance 5 % off at
+a q-axis current of 5 A and a speed of 400 rad/s shifts the flux linkage by $0.05 R i_q/\omega_e$, a few
+percent of a small motor's flux linkage, which is why the online recalibration adopts the flux linkage only beyond
+5 % and only inside a band. The voltage offset of the inverter's dead time and the resistance drift with the
+winding are the leading errors; the model-in-the-loop test with a hot magnet bounds the combined error
+(`software-in-the-loop.md`).
+
 ---
 
 ## Sequence Diagrams
@@ -147,11 +201,12 @@ sequenceDiagram
 
 ### Provided
 
-| Interface  | Purpose                            | Contract                                                          |
-|------------|------------------------------------|-------------------------------------------------------------------|
-| Identify   | Measure the flux linkage           | Asynchronous; leaves the rotor at rest and the drive stopped      |
-| Abort      | Abandon a measurement              | Stops the drive; the measurement reports nothing                  |
-| Is running | Whether a measurement is in flight | True from Identify until its result is delivered or it is aborted |
+| Interface           | Purpose                                         | Contract                                                                          |
+|---------------------|-------------------------------------------------|-----------------------------------------------------------------------------------|
+| Identify            | Measure the flux linkage                        | Asynchronous; leaves the rotor at rest and the drive stopped                      |
+| Abort               | Abandon a measurement                           | Stops the drive; the measurement reports nothing                                  |
+| Is running          | Whether a measurement is in flight              | True from Identify until its result is delivered or it is aborted                 |
+| Online flux linkage | The tracked flux linkage and whether it settled | Written once per outer-loop period while the drive runs in speed or position mode |
 
 ### Required
 
@@ -180,6 +235,12 @@ both reference motors, in torque and in speed mode. With the bench's 38.5 mA of 
 duty a period late, it is within 1 % under every current law, at the noise-bound automatic bandwidth.
 The mechanical identification that follows reads the inertia within 0.1 % on a 1000-count encoder
 (REQ-CMS-001, `parameter_identification.feature`).
+
+The online estimator is unit tested against synthetic windows: it removes the resistive, inductive and cross-coupling
+terms, ignores slow windows and the first window, follows a drifting magnet, and reports the seed until 200 windows
+have counted. In the model-in-the-loop a plant whose magnet has warmed is followed by the online estimate
+within a tolerance pinned from the test's metric line, and the automatic recalibration restores the torque per
+ampere (REQ-CMS-003, `online-recalibration.md`).
 
 On the bench, three torque-mode calibrations under sliding mode stored 4.54 to 4.63 mWb, and the
 calibrations in the hardware regression 4.55 to 4.67 mWb. The inertia was a factor 1.51 below the one
