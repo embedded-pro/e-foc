@@ -194,6 +194,8 @@ namespace can
         recalibrationsApplied = 0x98,
         recalibrationsRejected = 0x99,
         recalibrationsStored = 0x9A,
+        estimatedFluxLinkage = 0x9B,
+        modelFluxLinkage = 0x9C,
         loopSamples = 0xA0,
         loopBudgetCycles = 0xA1,
         loopMinimumCycles = 0xA2,

@@ -121,6 +121,19 @@ TEST_F(TestDiagnosticsTab, the_model_in_use_and_the_recalibration_counts_are_sho
     EXPECT_EQ("3", Value("Recalibrations applied").text());
 }
 
+TEST_F(TestDiagnosticsTab, the_flux_linkage_estimate_and_the_flux_linkage_in_use_are_shown_in_webers)
+{
+    EXPECT_EQ("—", Value("Estimated flux linkage").text());
+    EXPECT_EQ("—", Value("Flux linkage in use").text());
+
+    tab.ShowValue(can::FocParameter::estimatedFluxLinkage, can::FocParameterValue{ 0.0042f, false });
+    tab.ShowValue(can::FocParameter::modelFluxLinkage, can::FocParameterValue{ 0.0046f, false });
+
+    EXPECT_TRUE(Value("Estimated flux linkage").text().endsWith(" Wb"));
+    EXPECT_TRUE(Value("Estimated flux linkage").text().startsWith("0.0042"));
+    EXPECT_TRUE(Value("Flux linkage in use").text().startsWith("0.0046"));
+}
+
 TEST_F(TestDiagnosticsTab, recalibrate_and_reset_model_ask_the_panel_to_send_them)
 {
     int recalibrations{ 0 };

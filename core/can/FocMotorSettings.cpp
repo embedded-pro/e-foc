@@ -32,7 +32,7 @@ namespace can
         // Each group of readings takes a contiguous block of identifiers.
         constexpr std::array<ReadingRange, 4> readingRanges{ {
             { FocParameter::currentOffsetA, FocParameter::coggingPeak, ParameterGroup::calibrationRecord },
-            { FocParameter::estimatedResistance, FocParameter::recalibrationsStored, ParameterGroup::onlineEstimate },
+            { FocParameter::estimatedResistance, FocParameter::modelFluxLinkage, ParameterGroup::onlineEstimate },
             { FocParameter::loopSamples, FocParameter::loopReentries, ParameterGroup::loopStatistics },
             { FocParameter::resetCause, FocParameter::stagedVersionPatch, ParameterGroup::platform },
         } };

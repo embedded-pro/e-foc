@@ -131,7 +131,7 @@ namespace can
         data.rPhase = pendingElectricalR->Value();
         data.lD = pendingElectricalL->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs);
-        data.fluxLinkage = controlMode.Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode.Drive().ActiveCommon().Calibration().EffectiveFluxLinkage().Value();
         data.currentOffsetA = pendingOffsets.a.Value();
         data.currentOffsetB = pendingOffsets.b.Value();
         data.currentOffsetC = pendingOffsets.c.Value();

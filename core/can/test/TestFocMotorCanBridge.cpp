@@ -914,6 +914,45 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_StoresTheResultReadBackAsPara
     ExpectAnswered(4.0f, false);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_StoresTheRecordsFluxLinkageNotTheOneInUse)
+{
+    ConstructFixtureInReady();
+    const auto record = coordinator->Drive().ActiveCommon().Calibration().EffectiveFluxLinkage();
+    ASSERT_TRUE(coordinator->Drive().ActiveCommon().ApplyFluxLinkage(foc::Weber{ 0.9f * record.Value() }));
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> done)
+            {
+                done(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([record](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+            {
+                EXPECT_NEAR(data.fluxLinkage, record.Value(), 1e-9f);
+                done(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
 {
     ConstructFixture();
@@ -1659,6 +1698,18 @@ TEST_F(FocMotorCanBridgeTest, OnSetSetpoint_TorqueInNewtonMetres_ConvertsWithThe
 
     ResetCaptures();
     DispatchSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.64f);
+    ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetSetpoint_TorqueInNewtonMetres_ConvertsWithTheFluxLinkageInUse)
+{
+    ConstructFixtureInReady();
+    const auto record = coordinator->Drive().ActiveCommon().Calibration().ActiveFluxLinkage();
+    ASSERT_TRUE(coordinator->Drive().ActiveCommon().ApplyFluxLinkage(foc::Weber{ 0.9f * record.Value() }));
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetTorqueSetpointNewtonMeterId, 0.62f);
+
     ExpectAcknowledged(can::focSetTorqueSetpointNewtonMeterId, services::CanAckStatus::invalidPayload);
 }
 
@@ -2761,6 +2812,33 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InSpeedMode_IsTheCalibra
     ExpectAnswered(0.0f, false);
     DispatchQueryParameter(can::FocParameter::recalibrationsStored);
     ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_FluxLinkage_InSpeedMode_ReportsTheEstimatorAndTheModelInUse)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+    const auto estimates = coordinator->Drive().ActiveStateMachine().CurrentOnlineEstimates();
+    ASSERT_TRUE(estimates.has_value());
+
+    DispatchQueryParameter(can::FocParameter::estimatedFluxLinkage);
+    ExpectAnswered(estimates->fluxLinkage.Value(), false);
+    DispatchQueryParameter(can::FocParameter::modelFluxLinkage);
+    ExpectAnswered(coordinator->Drive().ActiveCommon().Calibration().EffectiveFluxLinkage().Value(), false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_FluxLinkage_InTorqueMode_ReportsTheFluxLinkageInUse)
+{
+    ConstructFixtureInReady();
+    const auto record = coordinator->Drive().ActiveCommon().Calibration().ActiveFluxLinkage();
+    ASSERT_TRUE(coordinator->Drive().ActiveCommon().ApplyFluxLinkage(foc::Weber{ 0.9f * record.Value() }));
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::estimatedFluxLinkage);
+    ExpectAnswered(0.0f, false);
+    DispatchQueryParameter(can::FocParameter::modelFluxLinkage);
+    ExpectAnswered(0.9f * record.Value(), false);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_ModelInUse_InTorqueMode_IsZero)

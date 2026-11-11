@@ -34,7 +34,7 @@ namespace can
         bool IsRecalibrationReading(FocParameter parameter)
         {
             const auto id = static_cast<uint8_t>(parameter);
-            return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsStored);
+            return (id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsStored)) || parameter == FocParameter::modelFluxLinkage;
         }
 
         bool IsStoredSetting(FocParameter parameter)
@@ -201,6 +201,8 @@ namespace can
                 return FocParameterValue{ estimates->inductance.Value(), false };
             case FocParameter::estimatedInertia:
                 return FocParameterValue{ estimates->inertia.Value(), false };
+            case FocParameter::estimatedFluxLinkage:
+                return FocParameterValue{ estimates->fluxLinkage.Value(), false };
             default:
                 return FocParameterValue{ estimates->viscousFriction.Value(), false };
         }
@@ -216,6 +218,9 @@ namespace can
             return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsStored()), false };
 
         const auto model = controlMode.Recalibration().ModelInUse();
+        if (parameter == FocParameter::modelFluxLinkage)
+            return FocParameterValue{ model.has_value() ? model->fluxLinkage.Value() : controlMode.Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value(), false };
+
         if (!model.has_value())
             return FocParameterValue{ 0.0f, false };
 

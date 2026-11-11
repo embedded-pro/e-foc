@@ -777,6 +777,17 @@ TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_every_parameter_once_
     EXPECT_TRUE(Queried(can::FocParameter::telemetryRate));
 }
 
+TEST_F(TestCanCommandClient, a_compatible_node_is_read_for_its_flux_linkage_estimate_and_the_flux_linkage_in_use)
+{
+    RecordSends();
+    BringCompatible(1);
+
+    AnswerAllReads();
+
+    EXPECT_TRUE(Queried(can::FocParameter::estimatedFluxLinkage));
+    EXPECT_TRUE(Queried(can::FocParameter::modelFluxLinkage));
+}
+
 TEST_F(TestCanCommandClient, an_incompatible_node_is_read_for_its_firmware_identity_only)
 {
     BringOnline(1);
@@ -1273,6 +1284,7 @@ TEST_F(TestCanCommandClient, an_accepted_recalibration_reads_the_model_in_use_ag
 
     EXPECT_TRUE(Queried(can::FocParameter::modelResistance));
     EXPECT_TRUE(Queried(can::FocParameter::modelViscousFriction));
+    EXPECT_TRUE(Queried(can::FocParameter::modelFluxLinkage));
     EXPECT_TRUE(Queried(can::FocParameter::recalibrationsApplied));
     EXPECT_TRUE(Queried(can::FocParameter::recalibrationsStored));
 }

@@ -95,6 +95,24 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::stagedVersionPatch, Readings().back().parameter);
 }
 
+TEST_F(TestMotorSettings, the_flux_linkage_follows_the_other_online_estimates_and_the_model_in_use)
+{
+    const auto readings = Readings();
+    const auto estimate = std::ranges::find_if(readings, [](const SettingPresentation& reading)
+        {
+            return reading.parameter == FocParameter::estimatedFluxLinkage;
+        });
+    ASSERT_NE(readings.end(), estimate);
+    EXPECT_EQ(FocParameter::estimatedViscousFriction, (estimate - 1)->parameter);
+    EXPECT_EQ(FocParameter::loopSamples, (estimate + 1)->parameter);
+
+    const auto model = RecalibrationReadings();
+    EXPECT_EQ(FocParameter::modelResistance, model.front().parameter);
+    EXPECT_EQ(FocParameter::modelFluxLinkage, model[4].parameter);
+    EXPECT_EQ(FocParameter::recalibrationsStored, model.back().parameter);
+    EXPECT_EQ(8u, model.size());
+}
+
 TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_and_reads_out_the_rest)
 {
     const auto readOnly = [](const SettingPresentation& setting)

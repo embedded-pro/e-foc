@@ -19,7 +19,7 @@
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 3;
-    static constexpr uint8_t focContractVersionMinor = 0;
+    static constexpr uint8_t focContractVersionMinor = 1;
 
     constexpr bool IsCompatibleContract(uint8_t major, uint8_t minor)
     {
@@ -264,7 +264,7 @@ namespace can
 
     inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
 
-    inline constexpr std::array<ParameterDescriptor, 85> focParameters{ {
+    inline constexpr std::array<ParameterDescriptor, 87> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -322,6 +322,7 @@ namespace can
         { FocParameter::estimatedInductance, "estimatedInductance", "mH", 0.0f, focMaxReading, false, false, true },
         { FocParameter::estimatedInertia, "estimatedInertia", "kg.m2", 0.0f, focMaxReading, false, false, true },
         { FocParameter::estimatedViscousFriction, "estimatedViscousFriction", "Nm.s/rad", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::estimatedFluxLinkage, "estimatedFluxLinkage", "Wb", 0.0f, focMaxReading, false, false, true },
         { FocParameter::loopSamples, "loopSamples", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::loopBudgetCycles, "loopBudgetCycles", "cycles", 0.0f, focMaxReading, true, false, true },
         { FocParameter::loopMinimumCycles, "loopMinimumCycles", "cycles", 0.0f, focMaxReading, true, false, true },
@@ -346,6 +347,7 @@ namespace can
         { FocParameter::modelInductance, "modelInductance", "mH", 0.0f, focMaxReading, false, false, true },
         { FocParameter::modelInertia, "modelInertia", "kg.m2", 0.0f, focMaxReading, false, false, true },
         { FocParameter::modelViscousFriction, "modelViscousFriction", "Nm.s/rad", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::modelFluxLinkage, "modelFluxLinkage", "Wb", 0.0f, focMaxReading, false, false, true },
         { FocParameter::recalibrationsApplied, "recalibrationsApplied", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::recalibrationsRejected, "recalibrationsRejected", "-", 0.0f, focMaxReading, true, false, true },
         { FocParameter::recalibrationsStored, "recalibrationsStored", "-", 0.0f, focMaxReading, true, false, true },

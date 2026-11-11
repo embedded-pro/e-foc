@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 85> presentations{ {
+        constexpr std::array<SettingPresentation, 87> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -115,6 +115,7 @@ namespace tool
             { FocParameter::estimatedInductance, "Estimated inductance", "Inductance:", " mH", "Online estimate of the stator inductance; 0 in torque mode, which runs no estimator.", {} },
             { FocParameter::estimatedInertia, "Estimated inertia", "Inertia:", kilogramSquareMetre, "Online estimate of the inertia of the rotor and its load; 0 in torque mode, which runs no estimator.", {} },
             { FocParameter::estimatedViscousFriction, "Estimated viscous friction", "Viscous friction:", frictionUnit, "Online estimate of the viscous friction coefficient; 0 in torque mode, which runs no estimator.", {} },
+            { FocParameter::estimatedFluxLinkage, "Estimated flux linkage", "Flux linkage:", " Wb", "Online estimate of the magnet flux linkage, which falls as the magnet warms; the calibration record's until it settles, 0 in torque mode, which runs no estimator.", {} },
             { FocParameter::loopSamples, "Control loop samples", "Samples:", {}, "Control periods measured since the statistics were last cleared.", {} },
             { FocParameter::loopBudgetCycles, "Control loop budget", "Budget:", cycles, "Cycles one control period allows.", {} },
             { FocParameter::loopMinimumCycles, "Shortest control loop run", "Minimum:", cycles, "Shortest control-interrupt execution.", {} },
@@ -141,6 +142,7 @@ namespace tool
             { FocParameter::modelInductance, "Inductance in use", "Inductance:", " mH", "Inductance the current loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelInertia, "Inertia in use", "Inertia:", kilogramSquareMetre, "Inertia the speed loop is designed from; the calibration record's until a recalibration.", {} },
             { FocParameter::modelViscousFriction, "Viscous friction in use", "Viscous friction:", frictionUnit, "Viscous friction the speed loop is designed from; the calibration record's until a recalibration.", {} },
+            { FocParameter::modelFluxLinkage, "Flux linkage in use", "Flux linkage:", " Wb", "Flux linkage the current loop and the torque conversion use; the calibration record's until a recalibration. In torque mode it shows the one carried over from speed or position mode.", {} },
             { FocParameter::recalibrationsApplied, "Recalibrations applied", "Applied:", {}, "Quantities recalibrated since power-up.", {} },
             { FocParameter::recalibrationsRejected, "Recalibrations rejected", "Rejected:", {}, "Settled readings outside their plausibility band since power-up.", {} },
             { FocParameter::recalibrationsStored, "Recalibrations stored", "Stored:", {}, "Stores of the recalibrated inductance, inertia and friction since power-up, at most one every 15 minutes.", {} },
@@ -355,27 +357,27 @@ namespace tool
 
     std::span<const SettingPresentation> Readings()
     {
-        return Slice(49, 24);
+        return Slice(49, 25);
     }
 
     std::span<const SettingPresentation> StatusReadings()
     {
-        return Slice(73, 3);
+        return Slice(74, 3);
     }
 
     std::span<const SettingPresentation> RecalibrationSettings()
     {
-        return Slice(76, 1);
+        return Slice(77, 1);
     }
 
     std::span<const SettingPresentation> RecalibrationReadings()
     {
-        return Slice(77, 7);
+        return Slice(78, 8);
     }
 
     std::span<const SettingPresentation> HomingSettings()
     {
-        return Slice(84, 1);
+        return Slice(86, 1);
     }
 
     namespace

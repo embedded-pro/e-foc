@@ -41,9 +41,9 @@ namespace tool
 
         const auto readings = Readings();
         layout->addWidget(CreateGroup("Calibration Record", readings.subspan(0, 4)));
-        layout->addWidget(CreateGroup("Online Estimates", readings.subspan(4, 4)));
-        layout->addWidget(CreateGroup("Control Loop", readings.subspan(8, 8)));
-        layout->addWidget(CreateGroup("Platform", readings.subspan(16, 1)));
+        layout->addWidget(CreateGroup("Online Estimates", readings.subspan(4, 5)));
+        layout->addWidget(CreateGroup("Control Loop", readings.subspan(9, 8)));
+        layout->addWidget(CreateGroup("Platform", readings.subspan(17, 1)));
         layout->addWidget(CreateRecalibration());
         layout->addWidget(CreateFaultHistory());
         layout->addWidget(CreateActions());
