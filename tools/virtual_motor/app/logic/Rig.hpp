@@ -15,6 +15,13 @@
 
 namespace virtual_motor::app
 {
+    enum class IssueLevel : uint8_t
+    {
+        info,
+        warning,
+        error,
+    };
+
     class RigObserver
     {
     public:
@@ -23,6 +30,7 @@ namespace virtual_motor::app
         virtual void MotorLogged(uint8_t node, const std::string& line) = 0;
         virtual void MotorRefused(uint8_t node, const port::Refused& refused) = 0;
         virtual void MotorCaptured(uint8_t node) = 0;
+        virtual void Reported(IssueLevel level, const std::string& text) = 0;
 
     protected:
         ~RigObserver() = default;
@@ -95,6 +103,8 @@ namespace virtual_motor::app
     class Rig
     {
     public:
+        static constexpr std::size_t maxMotors{ 8 };
+
         Rig(EngineProcesses& processes, RigStore& store, std::string dataFolder, uint16_t hubPort);
 
         void Observe(RigObserver& observer);
@@ -103,6 +113,7 @@ namespace virtual_motor::app
         void Poll();
 
         std::optional<std::string> Add(const MotorSpec& spec);
+        bool Full() const;
         void Remove(uint8_t node);
         void PowerOn(uint8_t node);
         void PowerOff(uint8_t node);
@@ -122,6 +133,8 @@ namespace virtual_motor::app
         void Introduced(std::unique_ptr<MotorLink> link);
         RigMotor* FindProcess(ProcessId process);
         void Save();
+        void Report(IssueLevel level, const std::string& text) const;
+        void Restore(const std::vector<MotorSpec>& specs);
 
         EngineProcesses& processes;
         RigStore& store;

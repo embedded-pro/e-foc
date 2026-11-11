@@ -1,9 +1,14 @@
 #include "tools/virtual_motor/app/gui/ManagerWindow.hpp"
+#include "tools/can_commander/support/ApplicationInfo.hpp"
+#include "tools/can_commander/support/IssueReport.hpp"
 #include "tools/virtual_motor/app/gui/AddMotorDialog.hpp"
 #include "tools/virtual_motor/app/gui/MotorWindow.hpp"
 #include "tools/virtual_motor/app/logic/MotorText.hpp"
+#include "tools/virtual_motor/port/PlantPortMessages.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include <QCloseEvent>
+#include <QDesktopServices>
+#include <QDir>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -13,6 +18,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QTableWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace virtual_motor::app
@@ -42,11 +48,37 @@ namespace virtual_motor::app
         {
             return "The process ended unexpectedly; the CAN Commander reports this node offline. Open the motor to read its last log lines.";
         }
+
+        const QString displayName{ "e-foc Virtual Motor" };
+
+        QString FullTip()
+        {
+            return QString("A virtual bus carries at most eight motors, the number the CAN Commander follows; remove one first");
+        }
+
+        tool::IssueSeverity SeverityOf(IssueLevel level)
+        {
+            switch (level)
+            {
+                case IssueLevel::error:
+                    return tool::IssueSeverity::error;
+                case IssueLevel::warning:
+                    return tool::IssueSeverity::warning;
+                default:
+                    return tool::IssueSeverity::info;
+            }
+        }
+
+        QString ToQt(std::string_view text)
+        {
+            return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
+        }
     }
 
-    ManagerWindow::ManagerWindow(Rig& rig, const QString& hubStatus, const QString& commanderProgram, QWidget* parent)
+    ManagerWindow::ManagerWindow(Rig& rig, tool::IssueLog& issueLog, const QString& hubStatus, const QString& commanderProgram, QWidget* parent)
         : QMainWindow(parent)
         , rig(rig)
+        , issueLog(issueLog)
         , commanderProgram(commanderProgram)
         , table(new QTableWidget(0, columnCount, this))
     {
@@ -163,13 +195,64 @@ namespace virtual_motor::app
     void ManagerWindow::BuildMenus()
     {
         auto* motors = menuBar()->addMenu("&Motors");
-        motors->addAction("&Add Motor…", QKeySequence::New, this, &ManagerWindow::AddMotor);
+        addAction = motors->addAction("&Add Motor…", QKeySequence::New, this, &ManagerWindow::AddMotor);
         motors->addSeparator();
         motors->addAction("&Quit", QKeySequence::Quit, this, &QWidget::close);
+        BuildHelpMenu();
+    }
+
+    void ManagerWindow::BuildHelpMenu()
+    {
+        auto* help = menuBar()->addMenu("&Help");
+        help->addAction("&Report Issue…", this, &ManagerWindow::ReportIssue);
+        help->addAction("Open &Log Folder", this, &ManagerWindow::OpenLogFolder);
+        help->addSeparator();
+        help->addAction("&About " + displayName, this, &ManagerWindow::ShowAbout);
+    }
+
+    void ManagerWindow::ReportIssue()
+    {
+        issueLog.Write(tool::IssueSeverity::info, "Opening a pre-filled issue report in the browser");
+        const auto environment = tool::CurrentIssueEnvironment(tool::IssueProduct{ displayName, "Virtual Motor" }, ToQt(tool::application::version), issueLog.FilePath());
+        const auto url = tool::BuildIssueUrl(QUrl{ ToQt(tool::application::newIssueUrl) }, environment, issueLog.RecentLines(60));
+        if (!QDesktopServices::openUrl(url))
+            QMessageBox::warning(this, "Report Issue",
+                QString("Could not open a web browser.\n\nPlease report the issue at %1 and attach the log file:\n%2")
+                    .arg(ToQt(tool::application::newIssueUrl), QDir::toNativeSeparators(issueLog.FilePath())));
+    }
+
+    void ManagerWindow::OpenLogFolder()
+    {
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(issueLog.Directory())))
+            QMessageBox::information(this, "Open Log Folder", QString("The log files are in:\n%1").arg(QDir::toNativeSeparators(issueLog.Directory())));
+    }
+
+    void ManagerWindow::ShowAbout()
+    {
+        QMessageBox::about(this, "About " + displayName,
+            QString("<h3>%1 %2</h3>"
+                    "<p>Runs the e-foc application against simulated motors on a virtual CAN bus, up to %3 per bus.</p>"
+                    "<p>Plant port protocol %4 · Qt %5</p>"
+                    "<p><a href=\"%6\">Project page</a> · <a href=\"%7\">Releases</a> · <a href=\"%8\">Report an issue</a></p>")
+                    .arg(displayName, ToQt(tool::application::version))
+                    .arg(Rig::maxMotors)
+                    .arg(port::protocolVersion)
+                    .arg(QString::fromUtf8(qVersion()), ToQt(tool::application::repositoryUrl), ToQt(tool::application::releasesUrl), ToQt(tool::application::newIssueUrl)) +
+                QString("<p>Log files: %1</p><p>Distributed under the e-foc Non-Commercial License.</p>").arg(QDir::toNativeSeparators(issueLog.Directory()).toHtmlEscaped()));
+    }
+
+    void ManagerWindow::Reported(IssueLevel level, const std::string& text)
+    {
+        issueLog.Write(SeverityOf(level), QString::fromStdString(text));
     }
 
     void ManagerWindow::MotorsChanged()
     {
+        const auto full = rig.Full();
+        add->setEnabled(!full);
+        add->setToolTip(full ? FullTip() : QString{});
+        if (addAction != nullptr)
+            addAction->setEnabled(!full);
         const auto selected = SelectedNode();
         table->setRowCount(static_cast<int>(rig.Motors().size()));
         for (int row = 0; row != table->rowCount(); ++row)
@@ -291,8 +374,10 @@ namespace virtual_motor::app
 
     void ManagerWindow::OpenCommander()
     {
-        if (!QProcess::startDetached(commanderProgram, {}))
-            QMessageBox::warning(this, "Open CAN Commander", "The e-foc CAN Commander could not be started from " + commanderProgram + ".");
+        if (QProcess::startDetached(commanderProgram, {}))
+            return;
+        issueLog.Write(tool::IssueSeverity::warning, "The e-foc CAN Commander could not be started from " + commanderProgram);
+        QMessageBox::warning(this, "Open CAN Commander", "The e-foc CAN Commander could not be started from " + commanderProgram + ".");
     }
 
     void ManagerWindow::closeEvent(QCloseEvent* event)

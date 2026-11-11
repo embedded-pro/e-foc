@@ -686,7 +686,7 @@ namespace tool
     void MainWindow::ReportIssue()
     {
         Report(IssueSeverity::info, "Opening a pre-filled issue report in the browser");
-        const auto environment = CurrentIssueEnvironment(ToQt(application::version), issueLog.FilePath());
+        const auto environment = CurrentIssueEnvironment(IssueProduct{ ToQt(application::displayName), ToQt(application::name) }, ToQt(application::version), issueLog.FilePath());
         const auto url = BuildIssueUrl(QUrl{ ToQt(application::newIssueUrl) }, environment, issueLog.RecentLines(60));
 
         if (!QDesktopServices::openUrl(url))

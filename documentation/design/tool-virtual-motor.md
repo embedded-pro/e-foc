@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.8.0                    |
+| Version   | 0.9.0                    |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -105,6 +105,16 @@ without a display:
   Part G), each listed under *Disturbances* while active.
 - Closing the app powers every motor off, after a confirmation that names the motors and says the CAN
   Commander will see them go offline.
+- **Eight motors.** A bus carries at most eight, the number of motors the CAN Commander follows. With
+  eight in the list, Add Motor is disabled and its tooltip says why; a restored list longer than that
+  starts its first eight and reports the rest.
+- **Issue log.** Every motor added, removed, reset or crashed, every refusal, and every start-up
+  failure (virtual motor program missing, plant port unavailable) goes to a persistent issue log: a
+  rotating file in the per-user data folder, in the CAN Commander's format, with timestamps in UTC.
+- **Help.** *Report Issue…* opens a pre-filled issue in the browser, with the app's version, the
+  operating system and the last lines of the issue log, for the user to review before sending; nothing
+  is sent on its own. *Open Log Folder* opens the issue log's folder. *About e-foc Virtual Motor* names
+  the version, the plant port protocol, the Qt version, the log folder and the licence.
 
 ### Part C — the motor window
 
