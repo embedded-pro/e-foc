@@ -89,6 +89,29 @@ Feature: Parameter Identification Against a Known Plant
     And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CMS-003
+  Scenario Outline: The online flux linkage follows a hot magnet
+    Given a bench motor plant
+    And a motor plant with:
+      | ambient_celsius     | 90.0 |
+      | thermal_capacitance | 0.5  |
+      | thermal_resistance  | 20.0 |
+    And the plant reads its currents through the bench's current-sense chain
+    And the plant applies each duty a period late, as the board does
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online fluxLinkage estimate shall be within <limit> % of the plant at <winding> °C
+
+    Examples:
+      | limit | winding |
+      | 1     | 90      |
+
+  @sil @REQ-CMS-003
   Scenario: The online friction estimate is not misled by a dry friction that turns with the rotor
     Given a bench motor plant
     And a motor plant with:

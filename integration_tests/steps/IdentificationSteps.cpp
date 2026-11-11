@@ -72,7 +72,7 @@ namespace
         if (quantity == "cogging")
             return plant.coggingTorqueNm;
         if (quantity == "fluxLinkage")
-            return plant.fluxLinkageWeber;
+            return plant.fluxLinkageWeber * (1.0f - plant.magnetFluxTempCoeff * (windingCelsius - kReferenceCelsius));
         return std::nullopt;
     }
 
@@ -229,9 +229,10 @@ WHEN(R"(the online estimates are read)")
     setup.online.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::estimatedInductance);
     setup.online.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::estimatedInertia);
     setup.online.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::estimatedViscousFriction);
+    setup.online.fluxLinkageWeber = ReadParameterValue(fixture, can::FocParameter::estimatedFluxLinkage);
 
     ASSERT_TRUE(setup.online.resistanceOhm.has_value() && setup.online.inductanceMilliHenry.has_value() &&
-                setup.online.inertiaKgM2.has_value() && setup.online.frictionNmSPerRad.has_value())
+                setup.online.inertiaKgM2.has_value() && setup.online.frictionNmSPerRad.has_value() && setup.online.fluxLinkageWeber.has_value())
         << "The target did not report its online estimates over CAN";
 }
 
@@ -262,9 +263,10 @@ WHEN(R"(the model in use is read)")
     setup.inUse.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::modelInductance);
     setup.inUse.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::modelInertia);
     setup.inUse.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::modelViscousFriction);
+    setup.inUse.fluxLinkageWeber = ReadParameterValue(fixture, can::FocParameter::modelFluxLinkage);
 
     ASSERT_TRUE(setup.inUse.resistanceOhm.has_value() && setup.inUse.inductanceMilliHenry.has_value() &&
-                setup.inUse.inertiaKgM2.has_value() && setup.inUse.frictionNmSPerRad.has_value())
+                setup.inUse.inertiaKgM2.has_value() && setup.inUse.frictionNmSPerRad.has_value() && setup.inUse.fluxLinkageWeber.has_value())
         << "The target did not report the model in use over CAN";
 }
 
@@ -318,4 +320,10 @@ THEN(R"(the online {word} estimate shall be within {float} % of the plant)", (st
 {
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, kReferenceCelsius);
+}
+
+THEN(R"(the online {word} estimate shall be within {float} % of the plant at {float} °C)", (std::string quantity, float limitPercent, float windingCelsius))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, windingCelsius);
 }
