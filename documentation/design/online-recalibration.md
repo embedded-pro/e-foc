@@ -217,11 +217,11 @@ stateDiagram-v2
 
 ## Constraints & Limitations
 
-| Constraint     | Description                                                                              |
-|----------------|------------------------------------------------------------------------------------------|
-| Stopped only   | A change during a long run waits for the next stop                                       |
-| Resistance     | Never stored; every power-up starts from the commissioned resistance                     |
-| Flux linkage   | Never stored; every power-up starts from the commissioned flux linkage                   |
-| Store rate     | At most one learned-model store per 15 minutes of uptime; the reset is not limited       |
-| Fixed criteria | The 10 % and 5 % thresholds, the 5 s dwell and the bands are constants, not settings     |
-| Torque mode    | Runs no estimators; the command is refused, the flux linkage in use is kept (Part D)     |
+| Constraint     | Description                                                                          |
+|----------------|--------------------------------------------------------------------------------------|
+| Stopped only   | A change during a long run waits for the next stop                                   |
+| Resistance     | Never stored; every power-up starts from the commissioned resistance                 |
+| Flux linkage   | Never stored; every power-up starts from the commissioned flux linkage               |
+| Store rate     | At most one learned-model store per 15 minutes of uptime; the reset is not limited   |
+| Fixed criteria | The 10 % and 5 % thresholds, the 5 s dwell and the bands are constants, not settings |
+| Torque mode    | Runs no estimators; the command is refused, the flux linkage in use is kept (Part D) |
