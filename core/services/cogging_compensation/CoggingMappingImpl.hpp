@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/cogging_compensation/CoggingMapBuilder.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
@@ -37,7 +36,7 @@ namespace services
             failed
         };
 
-        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases);
+        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float quadratureCurrent, float position);
         void Advance(float electricalAngle, float quadratureCurrent, float rotation);
         float TargetSpeedIn(Phase current) const;
         void StepSpeedCommand();
@@ -67,7 +66,6 @@ namespace services
         infra::AutoResetFunction<void(const CoggingMeasurement&)> onDone;
 
         CoggingMapBuilder builder;
-        [[no_unique_address]] foc::ClarkePark transform;
 
         struct Travel
         {

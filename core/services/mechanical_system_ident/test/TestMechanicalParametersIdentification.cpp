@@ -49,6 +49,14 @@ namespace
         return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
     }
 
+    foc::Ampere QuadratureCurrentOf(const foc::PhaseCurrents& phases, foc::Radians position)
+    {
+        const auto electricalAngle = position.Value() * polePairs;
+        const foc::ClarkePark transform;
+
+        return foc::Ampere{ transform.Forward(foc::ThreePhase{ phases.a.Value(), phases.b.Value(), phases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle)).q };
+    }
+
     class MechanicalParametersIdentificationTest
         : public ::testing::Test
         , public infra::ClockFixture
@@ -78,10 +86,16 @@ namespace
         float lastAcceleration{ 0.0f };
         std::size_t sampleIndex{ 0 };
 
+        void Publish(const foc::PhaseCurrents& phases)
+        {
+            const auto position = encoderMock.Read();
+            observableMock.Publish(phases, QuadratureCurrentOf(phases, position), position);
+        }
+
         void ExpectRunStarted()
         {
             EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
-                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&)>& observer)
+                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&, foc::Ampere, foc::Radians)>& observer)
                     {
                         observableMock.StoreObserver(observer);
                     }));
@@ -130,7 +144,7 @@ namespace
         {
             AdvanceProfile();
             const auto torque = trueCoulomb + trueInertia * lastAcceleration + trueFriction * lastSpeed;
-            observableMock.Publish(CurrentsProducing(torque, position));
+            Publish(CurrentsProducing(torque, position));
         }
 
         void ExpectPowerStageStoppedImmediately()
@@ -150,7 +164,7 @@ namespace
 
         void PublishCurrents(float a = 1.0f, float b = -0.5f, float c = -0.5f)
         {
-            observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ a }, foc::Ampere{ b }, foc::Ampere{ c } });
+            Publish(foc::PhaseCurrents{ foc::Ampere{ a }, foc::Ampere{ b }, foc::Ampere{ c } });
         }
 
         struct MotorModel
@@ -219,7 +233,7 @@ namespace
             for (std::size_t i = 0; i != samples; ++i)
             {
                 excitation.Advance();
-                observableMock.Publish(excitation.Currents());
+                Publish(excitation.Currents());
             }
         }
 
@@ -251,6 +265,21 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_never_claims_th
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _)).Times(0);
 
     identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, DefaultConfig(), [](auto, auto) {});
+
+    ExpectDriveReleased();
+    identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_sample_brings_its_rotor_angle_so_the_encoder_is_read_only_to_start_the_run)
+{
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, DefaultConfig(), [](auto, auto) {});
+
+    for (int sample = 1; sample != 100; ++sample)
+        observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.1f }, foc::Ampere{ -0.1f } }, foc::Ampere{ 0.1f }, foc::Radians{ 1.0e-3f * static_cast<float>(sample) });
 
     ExpectDriveReleased();
     identification->Abort();
@@ -656,6 +685,35 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_schedules_no
     EXPECT_TRUE(estimated);
 }
 
+TEST_F(MechanicalParametersIdentificationTest, a_continuous_encoder_run_fits_a_window_per_sample_without_scheduling_from_the_control_interrupt)
+{
+    bool fired = false;
+    bool estimated = false;
+    bool scheduledFromTheInterrupt = false;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, DefaultConfig(), [&fired, &estimated](auto b, auto j)
+        {
+            fired = true;
+            estimated = b.has_value() && j.has_value();
+        });
+
+    for (std::size_t i = 0; i != 100000 && !fired; ++i)
+    {
+        PublishConsistentSample();
+        scheduledFromTheInterrupt = scheduledFromTheInterrupt || !IsIdle();
+        ElapseSample();
+    }
+
+    EXPECT_FALSE(scheduledFromTheInterrupt);
+    EXPECT_TRUE(fired);
+    EXPECT_TRUE(estimated);
+}
+
 void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncoder(float countsPerRevolution, float tolerance)
 {
     const float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
@@ -699,7 +757,7 @@ void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncode
         speed += change;
         position += speed * samplingPeriod;
 
-        observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
+        Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
         ElapseSample();
     }
 
@@ -765,7 +823,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy
         speed += change;
         position += speed * samplingPeriod;
 
-        observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
+        Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
         ElapseSample();
     }
 

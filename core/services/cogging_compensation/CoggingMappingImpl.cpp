@@ -3,7 +3,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/AngleUtilities.hpp"
-#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -56,9 +55,9 @@ namespace services
         ++run;
         phase = Phase::forwardSettle;
 
-        observable.RegisterPhaseCurrentsObserver([this](const auto& currents)
+        observable.RegisterPhaseCurrentsObserver([this](const auto& phases, auto quadratureCurrent, auto mechanicalAngle)
             {
-                OnSamplingUpdate(currents);
+                OnSamplingUpdate(phases, quadratureCurrent.Value(), mechanicalAngle.Value());
             });
 
         drive.Start();
@@ -91,7 +90,7 @@ namespace services
         onDone = nullptr;
     }
 
-    void CoggingMappingImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases)
+    void CoggingMappingImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float quadratureCurrent, float position)
     {
         const Phase current = phase;
         if (current == Phase::idle || current == Phase::complete || current == Phase::failed)
@@ -105,15 +104,11 @@ namespace services
             return;
         }
 
-        const auto position = encoder.Read().Value();
         const auto rotation = math::WrapToPi(position - travel.previousPosition);
         travel.previousPosition = position;
         travel.turned += rotation;
 
-        const auto electricalAngle = position * static_cast<float>(mechanics.polePairs);
-        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle));
-
-        Advance(electricalAngle, rotatingFrame.q, rotation);
+        Advance(position * static_cast<float>(mechanics.polePairs), quadratureCurrent, rotation);
     }
 
     void CoggingMappingImpl::Advance(float electricalAngle, float quadratureCurrent, float rotation)

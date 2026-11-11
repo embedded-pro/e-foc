@@ -232,7 +232,7 @@ namespace mil
 
                 controlMode.emplace(
                     tracer,
-                    application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods(), &currentStream, &drive },
+                    application::MotorHardware{ inverterCompensation, drive, currentStream, vdc, drive.DutyUpdateDelayPeriods(), &drive },
                     nvm,
                     application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
                     faultNotifier,

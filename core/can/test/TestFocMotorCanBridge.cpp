@@ -216,7 +216,7 @@ namespace
             }
             coordinator.emplace(
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, foc::Volts{ 24.0f } },
                 nvmMock,
                 calibrationServices,
                 faultNotifierMock,
@@ -379,6 +379,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -1743,7 +1744,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
     services::ConfigData config{};
     coordinator.emplace(
         tracer,
-        application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+        application::MotorHardware{ inverterMock, encoderMock, currentStream, foc::Volts{ 24.0f } },
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
         faultNotifierMock,

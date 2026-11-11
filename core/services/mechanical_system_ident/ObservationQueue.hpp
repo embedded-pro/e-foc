@@ -19,17 +19,10 @@ namespace services
     class ObservationQueue
     {
     public:
-        static constexpr uint32_t capacity{ 16 };
-
-        enum class PostResult : uint8_t
-        {
-            posted,
-            halfFull,
-            full
-        };
+        static constexpr uint32_t capacity{ 64 };
 
         void Clear();
-        PostResult Post(const IdentificationObservation& observation);
+        bool Post(const IdentificationObservation& observation);
         std::optional<IdentificationObservation> Take();
 
     private:
