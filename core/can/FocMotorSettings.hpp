@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 
 namespace can
 {

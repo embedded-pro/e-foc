@@ -2,7 +2,7 @@
 
 #include "core/foc/cascade/EstimatorWindowAccumulator.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/TripleBuffer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <optional>

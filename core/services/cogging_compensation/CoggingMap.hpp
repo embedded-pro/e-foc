@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include <array>
 #include <cstdint>
 #include <optional>

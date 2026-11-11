@@ -996,8 +996,8 @@ reference, re-applying limits) and restores the persisted algorithms, tunings an
 
 `ControlModeStateMachine` receives setpoints from the CAN bridge in physical unit types (`foc::Ampere`,
 `foc::RadiansPerSecond`, `foc::Radians`). The fixed-point wire encoding (scale constants in
-`core/can/FocMotorMessages.hpp`, round-to-nearest with saturation) is specified once, in
-`documentation/design/service-can.md` Part A.
+e-foc-protocol's `FocMotorMessages.hpp`, round-to-nearest with saturation) is specified once, in
+`wire-contract.md` of e-foc-protocol (`infra/e-foc-protocol/documentation/design/wire-contract.md`) Part A.
 
 #### C2 — Re-entrancy Guard for In-Flight Selection
 

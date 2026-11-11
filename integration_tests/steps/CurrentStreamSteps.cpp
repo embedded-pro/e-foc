@@ -1,7 +1,7 @@
 #include "can-lite/core/CanPayload.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"

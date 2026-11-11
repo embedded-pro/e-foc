@@ -1,7 +1,7 @@
 #include "core/state_machine/CalibrationFlow.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <algorithm>
 #include <cstdint>

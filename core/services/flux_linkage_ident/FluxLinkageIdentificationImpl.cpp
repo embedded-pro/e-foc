@@ -1,6 +1,6 @@
 #include "core/services/flux_linkage_ident/FluxLinkageIdentificationImpl.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>

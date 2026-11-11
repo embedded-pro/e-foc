@@ -285,7 +285,7 @@ so a client always learns why it was refused.
 ### Part G — CAN Interface
 
 From contract 2.1 the FOC motor category carries algorithm selection and the tuning settings
-(`service-can.md`, Part A). `SelectAlgorithm` names a loop and an algorithm of that loop and is
+(`wire-contract.md` of e-foc-protocol, Part A). `SelectAlgorithm` names a loop and an algorithm of that loop and is
 refused with `invalidState` unless the active mode is
 stopped (`Idle` or `Ready`), with `busy` while work is outstanding (Part D), with `modeMismatch` when
 the active mode does not run that loop, and with `invalidParameters` when the algorithm cannot be

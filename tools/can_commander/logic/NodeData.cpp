@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/NodeData.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 
 namespace tool
 {

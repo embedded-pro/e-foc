@@ -1,6 +1,6 @@
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include <algorithm>
 #include <hal/synchronous_interfaces/SynchronousPwm.hpp>
 

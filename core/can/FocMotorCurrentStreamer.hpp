@@ -1,9 +1,9 @@
 #pragma once
 
 #include "can-lite/server/CanProtocolServer.hpp"
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/timer/Timer.hpp"

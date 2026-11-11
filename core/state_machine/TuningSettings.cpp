@@ -1,7 +1,7 @@
 #include "core/state_machine/TuningSettings.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace state_machine
 {

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include <array>
 #include <chrono>

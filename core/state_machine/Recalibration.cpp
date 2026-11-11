@@ -1,5 +1,5 @@
 #include "core/state_machine/Recalibration.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>

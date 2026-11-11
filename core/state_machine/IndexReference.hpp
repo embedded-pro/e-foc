@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/index_search/IndexSearch.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <cstdint>

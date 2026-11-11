@@ -1,4 +1,4 @@
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "tools/can_commander/logic/CommandTracker.hpp"
 #include "gmock/gmock.h"

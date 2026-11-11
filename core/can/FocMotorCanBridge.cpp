@@ -1,9 +1,9 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCommandOutcome.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TravelLimits.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>

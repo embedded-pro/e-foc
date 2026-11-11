@@ -2,10 +2,10 @@
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include "core/services/mechanical_system_ident/SteadySpeedFrictionFit.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 #include <array>
 #include <optional>

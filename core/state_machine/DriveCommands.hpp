@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/state_machine/ActiveDrive.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include <optional>
 
 namespace state_machine

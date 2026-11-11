@@ -299,7 +299,7 @@ drops the edits and reads the values in force again.
 Controllers and motor parameters change only while the motor is stopped: their Apply is disabled, with the
 reason, while the last status says the motor runs or calibrates. Start-up settings can be stored at any time.
 
-A node is compatible only when its contract version equals the tool's (`service-can.md` Part A), so every
+A node is compatible only when its contract version equals the tool's (`wire-contract.md` of e-foc-protocol Part A), so every
 setting, reading and command in this part is offered on every compatible node; the tool keeps no path for older
 firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
 firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot

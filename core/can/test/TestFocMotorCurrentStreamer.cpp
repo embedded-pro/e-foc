@@ -2,11 +2,11 @@
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/test/CanMock.hpp"
 #include "can-lite/server/CanProtocolServer.hpp"
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCurrentStreamer.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <gtest/gtest.h>
 #include <vector>

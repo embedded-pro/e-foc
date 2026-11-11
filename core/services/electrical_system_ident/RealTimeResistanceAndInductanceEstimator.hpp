@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/estimators/online/RecursiveInstrumentalVariables.hpp"
 #include <optional>
 

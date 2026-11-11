@@ -2,7 +2,7 @@
 #include "application/bootloader_image/Pack.hpp"
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "generated/Boards.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "tools/can_commander/gui/FirmwareTab.hpp"

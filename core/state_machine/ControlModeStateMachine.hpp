@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ActiveDrive.hpp"
@@ -15,6 +14,7 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/state_machine/SettingTransaction.hpp"
 #include "core/state_machine/TuningSettings.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/Function.hpp"
 
 namespace state_machine

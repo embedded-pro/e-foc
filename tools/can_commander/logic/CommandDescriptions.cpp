@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/CommandDescriptions.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 
 namespace tool
 {

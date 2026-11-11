@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/util/Function.hpp"
 #include <cstddef>
 #include <cstdint>

@@ -221,7 +221,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 
 ### 3. CAN Service
 
-The CAN service layer (`core/can/`) provides the FOC motor CAN category as a server/client pair and the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
+The FOC motor CAN category — its wire contract, the server/client pair and `FocMotorCanClient` — comes from the e-foc-protocol library (`infra/e-foc-protocol/`), which every client of the drive shares. The CAN service layer (`core/can/`) adds the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
 
 **Server half** (runs on the embedded target):
 - `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire encoding (`float32` and the stream's `int16` scaling ↔ physical unit) is contained entirely here.
