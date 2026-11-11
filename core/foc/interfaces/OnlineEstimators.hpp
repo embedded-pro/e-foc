@@ -36,7 +36,6 @@ namespace foc
         Ampere directCurrentReference;
     };
 
-    // One outer-loop window of the quadrature axis; iqAtEnd is the current at its last sample, first marks the window after a restart.
     struct QuadratureWindow
     {
         Volts meanAppliedVq;

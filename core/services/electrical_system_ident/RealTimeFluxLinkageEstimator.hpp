@@ -7,7 +7,6 @@
 
 namespace services
 {
-    // Scalar least squares through the origin on the quadrature voltage equation, with the resistive, inductive and cross-coupling terms taken off the measured voltage.
     class RealTimeFluxLinkageEstimator
         : public foc::OnlineFluxLinkageEstimator
     {

@@ -51,7 +51,6 @@ namespace application
         foc::Volts BusVoltage() const;
         foc::Weber EffectiveFluxLinkage() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
-        // The flux linkage the controller was last configured with: the record's, or the recalibrated one of the model in use.
         foc::Weber ActiveFluxLinkage() const;
 
         float DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const;

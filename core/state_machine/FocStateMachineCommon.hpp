@@ -48,7 +48,6 @@ namespace application
         void RequireHoming(bool required);
         CommissioningCommands& Commissioning();
         const CalibrationContext& Calibration() const;
-        // Retunes the current loops and the mode's torque scaling to a flux linkage other than the record's; refused unless the drive is stopped.
         bool ApplyFluxLinkage(foc::Weber fluxLinkage);
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
