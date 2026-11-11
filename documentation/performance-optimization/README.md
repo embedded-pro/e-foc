@@ -240,11 +240,12 @@ The 20 kHz path should do only the work that changes from one sample to the next
 - **Gate by wiring, not by a flag.** The runner holds the phase-current slot only while the bridge runs, so no sample
   tests an `enabled` flag (`documentation/design/state-machine.md`).
 - **Hand a collaborator over at construction, do not test for it.** The cascades take their current stream as a
-  constructor reference, so no sample tests a pointer; a stopped stream stands in for "no stream". The test was one
-  compare-and-branch: two cycles of the static worst case on EK-TM4C1294XL. A stand-in pays only where it is the same
-  concrete type, inert in a state it already has. Behind an interface it trades that one-cycle test for a virtual call,
-  and the outer loop's test for an electrical estimator also decides whether the d-axis excitation runs, so those
-  tests stay.
+  constructor reference, so no sample tests a pointer; a stopped stream stands in for "no stream". This removes a
+  state, not cycles: the test was one compare-and-branch, and where the compiler then places the stream's blocks
+  moves the estimate by more than that, two cycles down with one GCC and three up with another. A stand-in is free
+  only where it is the same concrete type, inert in a state it already has. Behind an interface it trades that
+  one-cycle test for a virtual call, and the outer loop's test for an electrical estimator also decides whether the
+  d-axis excitation runs, so those tests stay.
 - **Hand an observer what the loop already measured.** A calibration observer gets each sample's phase currents
   with the q-axis current the cascade measured from them and the rotor angle the runner read, so it reads no
   encoder and repeats no transform. The cascade keeps that current anyway, and the runner fetches it inside the
@@ -451,9 +452,9 @@ With the worst-path model the estimates at this revision are:
 
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
-| Inner loop          |          3127 |   4500 |          2951 |   6375 |
+| Inner loop          |          3131 |   4500 |          2955 |   6375 |
 | Outer loop          |          6958 |  20000 |          6958 |  28333 |
-| Identification path |          5111 |   6000 |          4935 |   8500 |
+| Identification path |          4519 |   6000 |          4343 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
 `CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.1.0.
