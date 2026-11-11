@@ -40,17 +40,17 @@ deceleration to rest on the target. It runs in the 1 kHz outer handler, ahead of
 
 ## Prerequisites
 
-| Symbol     | Meaning                                               | Unit       |
-|------------|-------------------------------------------------------|------------|
-| $v_{max}$  | Profile velocity                                      | rad/s      |
-| $a_{max}$  | Profile acceleration                                  | rad/s²     |
-| $d_{max}$  | Profile deceleration (the acceleration when set to 0) | rad/s²     |
+| Symbol          | Meaning                                                  | Unit               |
+|-----------------|----------------------------------------------------------|--------------------|
+| $v_{max}$       | Profile velocity                                         | rad/s              |
+| $a_{max}$       | Profile acceleration                                     | rad/s²             |
+| $d_{max}$       | Profile deceleration (the acceleration when set to 0)    | rad/s²             |
 | $q_0, v_0, a_0$ | Position, velocity and acceleration the plan starts from | rad, rad/s, rad/s² |
-| $q_f$      | Goal of the plan                                      | rad        |
-| $j_{max}$  | Profile jerk limit (0 → trapezoidal plan)             | rad/s³     |
-| $T_o$      | Outer-loop period                                     | s          |
-| $J$        | Rotor inertia                                         | kg·m²      |
-| $K_t$      | Torque constant, $\tfrac{3}{2} p \psi_f$              | N·m/A      |
+| $q_f$           | Goal of the plan                                         | rad                |
+| $j_{max}$       | Profile jerk limit (0 → trapezoidal plan)                | rad/s³             |
+| $T_o$           | Outer-loop period                                        | s                  |
+| $J$             | Rotor inertia                                            | kg·m²              |
+| $K_t$           | Torque constant, $\tfrac{3}{2} p \psi_f$                 | N·m/A              |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant and
 `documentation/theory/closed-loop-control.md` for the loops the reference is fed to.
@@ -210,15 +210,15 @@ flowchart LR
 
 ## Numerical Properties
 
-| Property                | Value                                                                                        |
-|-------------------------|----------------------------------------------------------------------------------------------|
-| Trapezoidal plan        | closed form, no loop, once per setpoint change                                               |
-| S-curve plan            | 32-step bisection, ≈ 5 180 cycles (Cortex-M4F); once per setpoint change only               |
-| Sample                  | closed form, no loop, once per 1 kHz cycle                                                   |
-| Reference duration      | 125 ms for 1.5 rad, 20 rad/s, 400 rad/s² (trapezoid); ≈ 142 ms with 20 000 rad/s³ jerk     |
-| Memory                  | one plan variant (≤ 200 bytes), no heap                                                      |
-| Profile off             | velocity or acceleration 0: the setpoint reaches the law unchanged                           |
-| Jerk off (j = 0)        | trapezoidal plan, bit-identical to the behaviour before jerk was introduced                  |
+| Property           | Value                                                                                  |
+|--------------------|----------------------------------------------------------------------------------------|
+| Trapezoidal plan   | closed form, no loop, once per setpoint change                                         |
+| S-curve plan       | 32-step bisection, ≈ 5 180 cycles (Cortex-M4F); once per setpoint change only          |
+| Sample             | closed form, no loop, once per 1 kHz cycle                                             |
+| Reference duration | 125 ms for 1.5 rad, 20 rad/s, 400 rad/s² (trapezoid); ≈ 142 ms with 20 000 rad/s³ jerk |
+| Memory             | one plan variant (≤ 200 bytes), no heap                                                |
+| Profile off        | velocity or acceleration 0: the setpoint reaches the law unchanged                     |
+| Jerk off (j = 0)   | trapezoidal plan, bit-identical to the behaviour before jerk was introduced            |
 
 ---
 
