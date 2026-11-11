@@ -31,7 +31,7 @@ Feature: Position Travel
   @sil @REQ-CTL-010 @REQ-COM-001
   Scenario: A position move follows the motion profile and reports its target only on arrival
     Given a nominal motor plant
-    And the plant response is recorded at 1000 Hz for up to 600 samples
+    And the plant response is recorded at 1000 Hz for up to 4000 samples
     And the motor is already calibrated
     And the motor boots in position mode
     When the target boots
