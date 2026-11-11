@@ -204,6 +204,11 @@ namespace application
         shuntReadout.Offsets(offsets);
     }
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        shuntReadout.ZeroVectorSlopes(slopes);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
     {
         if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
@@ -446,6 +451,7 @@ namespace application
     void PlatformFactoryImpl::Stop()
     {
         peripherals->pwm->Stop();
+        shuntReadout.ClearSlopes();
         protectionTripped = false;
     }
 

@@ -38,6 +38,7 @@ namespace foc
         foc::RotatingFrame Step(const foc::ThreePhase& phaseVoltages, foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding, float dt);
 
         foc::PhaseCurrents Currents() const;
+        foc::PhaseCurrentSlopes ZeroVectorSlopes(foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding) const;
         foc::RotatingFrame LastDqCurrents() const;
         float InverterPower(const foc::ThreePhase& phaseVoltages) const;
         float CopperLoss(float resistance) const;

@@ -77,4 +77,11 @@ namespace foc
     private:
         infra::Function<void(const PhaseCurrents& currentPhases)> storedObserver;
     };
+
+    class ZeroVectorSlopeSinkMock
+        : public ZeroVectorSlopeSink
+    {
+    public:
+        MOCK_METHOD(void, ZeroVectorSlopes, (const PhaseCurrentSlopes& slopes), (override));
+    };
 }

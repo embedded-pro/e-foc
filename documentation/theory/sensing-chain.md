@@ -187,7 +187,9 @@ the last holds at $(5 \times 16 + 4)/16$ MHz = 5.25 µs. Three consequences:
   moves at $-(e_k + R_s i_k)/L_s$. A phase read $\Delta t$ after the centre is off its period mean by about that
   slope times $\Delta t$. At rated speed and 5 µs that is 71 mA on the Anaheim (9.1 V back-EMF over 0.64 mH) and
   0.40 A on the low-inductance Teknic (16 V over 0.2 mH): a speed-dependent error that grows for exactly the
-  motors with the largest PWM ripple.
+  motors with the largest PWM ripple. The platform subtracts it: the cascade supplies each phase's
+  zero-vector slope from the motor model, and the platform knows each phase's delay
+  ([sampling skew](../design/platform-sampling-skew.md)).
 - **Noise dominates quantisation.** One LSB is 4.03 mA, an RMS quantisation error of $4.03/\sqrt{12} = 1.2$ mA.
   The measured noise is 31–39 mA per averaged sample, about 50 mA per single conversion: eight to ten LSB.
   Hardware averaging over two conversions is worth having (dropping it raised the noise by 15–25 %); a wider
@@ -244,7 +246,7 @@ drift of $R_s$ is tracked by the online estimator; nothing tracks the board's or
 | Common gain error              | up to ~3 %                                         | DC: torque scale | Integral action absorbs it in speed and position modes                                                                 |
 | Noise                          | 31–39 mA RMS                                       | Broadband        | Bandwidth cap; centre sampling                                                                                         |
 | Quantisation                   | 1.2 mA RMS                                         | Broadband        | Negligible                                                                                                             |
-| Sampling skew between phases   | up to 0.4 A on the Teknic at rated speed (derived) | Speed-dependent  | Nothing yet                                                                                                            |
+| Sampling skew between phases   | up to 0.4 A on the Teknic at rated speed (derived) | Speed-dependent  | Zero-vector slope × delay subtracted before the rebuild ([sampling skew](../design/platform-sampling-skew.md))         |
 | Window closing                 | > 70 % duty                                        | Phase lost       | Duty shift and hidden-phase rebuild                                                                                    |
 | Encoder quantisation           | 0.36° electrical; 1.57 rad/s speed                 | Speed noise      | Window-mean positions in the estimators                                                                                |
 

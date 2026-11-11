@@ -69,7 +69,8 @@
       "patterns": [
         "^services::InverterCompensation::ThreePhasePwmOutput\\(",
         "^application::DecimatingThreePhaseInverter::ThreePhasePwmOutput\\(",
-        "application::PlatformFactoryImpl::ThreePhasePwmOutput\\("
+        "application::PlatformFactoryImpl::ThreePhasePwmOutput\\(",
+        "application::PlatformFactoryImpl::ZeroVectorSlopes\\("
       ]
     },
     {

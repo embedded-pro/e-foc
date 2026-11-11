@@ -496,6 +496,7 @@ TEST_F(TestPositionCascade, registered_online_estimators_are_fed_from_the_outer_
 
     focPosition->SetOnlineMechanicalEstimator(mechanicalEstimator);
     focPosition->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
     focPosition->Enable();
     focPosition->SetPoint(foc::Radians{ 0.5f });
 

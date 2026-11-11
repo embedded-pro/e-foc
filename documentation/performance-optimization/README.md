@@ -391,7 +391,7 @@ the *Analysis Notes* of each report list what is left open.
 - **Calls through a pointer are not followed.** Every `infra::Function` callback and every virtual call on a path
   hands over to a function the configuration names: the HAL's interrupt lambda, each callback of the
   phase-current chain, `PlatformFactoryImpl::Read`, the three `ThreePhasePwmOutput` stages, the PWM driver's
-  `Start`, the low-priority trigger, and in the outer loop the online estimators and their
+  `Start`, `ZeroVectorSlopes`, the low-priority trigger, and in the outer loop the online estimators and their
   `RecursiveLeastSquares`. A new callback or virtual call on a path needs its target named, or the note
   "calls through a register are not followed" grows by one.
 - **Alternatives are charged once.** A stage with `"combine": "max"` charges the costliest of the functions it
@@ -441,9 +441,9 @@ With the worst-path model the estimates at this revision are:
 
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
-| Inner loop          |          3030 |   4500 |          2851 |   6375 |
-| Outer loop          |          6750 |  20000 |          6750 |  28333 |
-| Identification path |          5014 |   6000 |          4835 |   8500 |
+| Inner loop          |          3127 |   4500 |          2951 |   6375 |
+| Outer loop          |          6958 |  20000 |          6958 |  28333 |
+| Identification path |          5111 |   6000 |          4935 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
 `CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.1.0.
@@ -494,8 +494,8 @@ GPIO_ClearPin(DEBUG_PIN);
 | 40 kHz       | 3 000         | 2 250                    | High performance, tight budget |
 | 100 kHz      | 1 200         | 900                      | Requires fixed-point or DSP    |
 
-**Estimated inner-loop cost** (`EK-TM4C1294XL`, `RelWithDebInfo`, `fast-math`, LUT sin/cos): **1080–3030 cycles**,
-best to worst path, of which the FOC calculation itself is 538–1206 — at worst 20 % of the 20 kHz period. A
+**Estimated inner-loop cost** (`EK-TM4C1294XL`, `RelWithDebInfo`, `fast-math`, LUT sin/cos): **1111–3127 cycles**,
+best to worst path, of which the FOC calculation itself is 541–1272 — at worst 21 % of the 20 kHz period. A
 non-optimised build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
 
 The torque cascade's speed limiter (`foc-torque.md`) adds a sign test, an absolute value, a multiply-add, a
@@ -516,6 +516,16 @@ against well over 60 for a second interpolated lookup with its wrap. $(n + \tfra
 configuration time. The helper is an `ALWAYS_INLINE_HOT` function defined in a header, so the cycle gate charges it
 inside `TorqueCascade::Calculate` and `CascadeWithSpeedLoop::CalculateInnerLoop`; it adds no symbol. The online estimator's window no longer multiplies the rotation by the quadrature voltage, which takes back
 a multiply-add per sample in the speed and position cascades.
+
+The sampling-skew correction (`documentation/design/platform-sampling-skew.md`) costs each cascade the zero-vector
+rates in rotor coordinates, a second-order turn by $\omega_e T_s$ there (no separate `AdvanceRotation`) and an inverse
+Park and Clarke: about 20 floating-point operations, inlined into `Calculate` (about 32 instructions per cascade on
+the TM4C). The cascade then hands the three rates straight to the platform's shunt readout in one indirect call; a
+first version that sent them through the Runner and down the dead-time compensation and decimating inverter cost
+some 360 cycles in all and took the inner loop past its 4500-cycle budget. The gains are two single-word values, not
+a triple buffer. The platform multiplies each rate by its delay, and the readout subtracts the three products from
+the next sample before the rebuild. `ZeroVectorSlope::Next` is inlined into `Calculate`;
+`PlatformFactoryImpl::ZeroVectorSlopes` is reached through a pointer, so the cycle-gate configurations name it.
 
 ### Key Performance Sensitivities
 

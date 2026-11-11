@@ -4,11 +4,13 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
 #include "infra/util/TripleBuffer.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
@@ -33,8 +35,10 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
+
         MotionObservation ObserveMotion() const override;
         void SetCurrentStream(CurrentStream& stream);
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
 
         void EnableCurrentCommand() override;
         void DisableCurrentCommand() override;
@@ -94,6 +98,8 @@ namespace foc
         DriveLimits limits;
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
+        ZeroVectorSlope zeroVectorSlope;
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
         volatile bool currentCommandActive{ false };
         CurrentStream* currentStream{ nullptr };
     };

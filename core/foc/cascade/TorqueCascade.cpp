@@ -72,6 +72,7 @@ namespace foc
         motor.polePairs = static_cast<float>(parameters.polePairs);
         UpdateSpeedLimit();
         const bool ok = currentLoop.Configure(parameters);
+        zeroVectorSlope.Configure(parameters);
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
         speedMeasurement.scale = motor.polePairs * samplingFrequency;
@@ -161,6 +162,11 @@ namespace foc
         currentStream = &stream;
     }
 
+    void TorqueCascade::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
+    {
+        slopeSink = &sink;
+    }
+
     void TorqueCascade::EnableCurrentCommand()
     {
         requestedSetPoint = IdAndIqPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
@@ -198,6 +204,8 @@ namespace foc
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
+        if (slopeSink != nullptr)
+            slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
         if (currentStream != nullptr)

@@ -411,6 +411,11 @@ namespace application
         drive.CurrentOffsets(offsets);
     }
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        drive.ZeroVectorSlopes(slopes);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
     {
         return drive.InverterDeadTimeLoss();

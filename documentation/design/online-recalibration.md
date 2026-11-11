@@ -90,6 +90,10 @@ A candidate is applied only inside its plausibility band, a ratio to the commiss
 A candidate outside its band is rejected: it is counted, traced, and the model in use keeps its value. A quantity
 whose commissioned value is not positive — a record without friction — is never recalibrated.
 
+The resistance and inductance bands also gate the one use of an estimate that needs no stop: the sampling-skew
+correction follows a settled electrical estimate inside them while the drive runs
+([sampling skew](platform-sampling-skew.md) Part C).
+
 ### Part C — When it is applied
 
 | Mode       | Behaviour                                                                                                       |

@@ -19,4 +19,5 @@ target_sources(e_foc.model_in_the_loop_test PRIVATE
     TestDelayCompensation.cpp
     TestDriveLimits.cpp
     TestFrictionFeedForward.cpp
+    TestSamplingSkew.cpp
 )

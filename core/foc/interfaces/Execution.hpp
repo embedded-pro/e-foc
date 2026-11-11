@@ -16,6 +16,15 @@ namespace foc
         virtual void Unregister() = 0;
     };
 
+    class ZeroVectorSlopeSink
+    {
+    protected:
+        ~ZeroVectorSlopeSink() = default;
+
+    public:
+        virtual void ZeroVectorSlopes(const PhaseCurrentSlopes& slopes) = 0;
+    };
+
     class Controllable
     {
     protected:

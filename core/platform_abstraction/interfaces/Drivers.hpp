@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
@@ -38,6 +39,7 @@ namespace drivers
     };
 
     class ThreePhasePowerStage
+        : public foc::ZeroVectorSlopeSink
     {
     protected:
         ~ThreePhasePowerStage() = default;

@@ -40,6 +40,7 @@ namespace foc
         scaling.vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         busRatio.Configure(parameters.busVoltage);
         scaling.dutyDelay = DutyDelay(parameters.dutyUpdateDelayPeriods, static_cast<float>(parameters.samplingFrequency.Value()));
+        zeroVectorSlope.Configure(parameters);
         return currentLoop.Configure(parameters);
     }
 
@@ -70,6 +71,7 @@ namespace foc
         speedDifferentiator.Restart();
         estimation.window.Restart();
         directAxisExcitation.Restart();
+        zeroVectorSlope.Restart();
         outer.speedLoopOutput = 0.0f;
         outer.frictionCurrent = 0.0f;
         outer.directCurrentReference = 0.0f;
@@ -138,6 +140,8 @@ namespace foc
         const float limit = command.quadratureLimit;
         const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.frictionCurrent + coggingCurrent, -limit, limit);
         const float electricalSpeed = outer.electricalSpeed;
+        if (slopeSink != nullptr)
+            slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ outer.directCurrentReference, quadratureReference }, electricalSpeed, busRatio.Ratio() });
 
         const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, scaling.dutyDelay);
@@ -261,6 +265,9 @@ namespace foc
 
         estimation.channel.UpdateElectrical(scaling.vdcInvScale, Ampere{ outer.directCurrentReference });
         outer.directCurrentReference = directAxisExcitation.Advance();
+
+        if (const auto estimate = estimation.channel.SettledElectricalEstimate())
+            zeroVectorSlope.Track(estimate->first, estimate->second);
     }
 
     void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
@@ -287,5 +294,10 @@ namespace foc
     void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)
     {
         currentStream = &stream;
+    }
+
+    void CascadeWithSpeedLoop::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
+    {
+        slopeSink = &sink;
     }
 }

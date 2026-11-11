@@ -25,6 +25,7 @@ namespace application
         foc::Volts vdc;
         uint32_t dutyUpdateDelayPeriods{ 0 };
         foc::CurrentStream* currentStream{ nullptr };
+        foc::ZeroVectorSlopeSink* zeroVectorSlopes{ nullptr };
     };
 
     // Kept across a mode switch out of an aligned Ready: the encoder zero is shared hardware.

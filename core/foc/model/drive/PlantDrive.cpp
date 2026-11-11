@@ -33,13 +33,13 @@ namespace sil
         ConfigureModel(model, plant);
         bootFaults = BootFaultInjection(plant);
         activeFaults = bootFaults;
-        SampleAndHoldClocks(shortestSampleHoldClocks);
 
         if (plant.maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plant.maxReadableDutyPercent);
         if (plant.maxDutyPercent != 0)
             maxDuty = hal::DutyCycle::FromPercent(plant.maxDutyPercent);
         shuntReadout = foc::LowSideShuntReadout{ maxReadableDuty };
+        SampleAndHoldClocks(shortestSampleHoldClocks);
         dutyDelayed = plant.dutyDelayPeriods != 0;
 
         const uint32_t baseHz = baseFrequency.Value();
@@ -54,8 +54,12 @@ namespace sil
 
     void PlantDrive::SampleAndHoldClocks(uint32_t clocks)
     {
-        if (description)
-            model.CurrentSensor().SetChain(CurrentSense(*description, clocks));
+        if (!description)
+            return;
+
+        const auto chain = CurrentSense(*description, clocks);
+        model.CurrentSensor().SetChain(chain);
+        shuntReadout.SampleDelays(SampleDelays(chain));
     }
 
     void PlantDrive::Tick()
@@ -103,6 +107,7 @@ namespace sil
 
     void PlantDrive::Stop()
     {
+        shuntReadout.ClearSlopes();
         model.Stop();
         model.Mechanics().SetExternalTorque(foc::NewtonMeter{ 0.0f });
         model.Mechanics().Grip(std::nullopt);
@@ -114,6 +119,16 @@ namespace sil
     void PlantDrive::CurrentOffsets(const foc::PhaseCurrents& offsets)
     {
         shuntReadout.Offsets(offsets);
+    }
+
+    void PlantDrive::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        shuntReadout.ZeroVectorSlopes(slopes);
+    }
+
+    void PlantDrive::IgnoreSampleDelays()
+    {
+        shuntReadout.SampleDelays({});
     }
 
     hal::Hertz PlantDrive::BaseFrequency() const

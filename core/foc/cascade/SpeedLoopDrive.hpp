@@ -35,6 +35,7 @@ namespace foc
         void TrackBusVoltage(Volts measured) override;
 
         using CascadeWithSpeedLoop::SetCurrentStream;
+        using CascadeWithSpeedLoop::SetZeroVectorSlopeSink;
 
     protected:
         using CascadeWithSpeedLoop::CascadeWithSpeedLoop;

@@ -17,6 +17,7 @@
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -63,6 +64,7 @@ namespace foc
         void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
         void ClearFrictionFeedForwardImpl();
         void SetCurrentStream(CurrentStream& stream);
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
 
@@ -130,5 +132,7 @@ namespace foc
         DirectAxisExcitation directAxisExcitation;
         FeedForwards feedForward;
         CurrentStream* currentStream{ nullptr };
+        ZeroVectorSlope zeroVectorSlope;
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
     };
 }

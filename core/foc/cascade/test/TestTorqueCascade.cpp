@@ -1,6 +1,7 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
@@ -854,4 +855,46 @@ TEST(TestTorqueCascadeFriction, the_torque_cascade_has_no_friction_feed_forward)
 {
     static_assert(!std::is_base_of_v<foc::FrictionCompensable, foc::TorqueCascade>);
     SUCCEED();
+}
+
+TEST_F(TestTorqueCascade, each_sample_hands_one_set_of_zero_vector_slopes_to_the_sink)
+{
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    focTorque->SetZeroVectorSlopeSink(sink);
+
+    EXPECT_CALL(sink, ZeroVectorSlopes(testing::_)).Times(2);
+    foc::Radians position{ 0.0f };
+    focTorque->Calculate(ZeroCurrents(), position);
+    focTorque->Calculate(ZeroCurrents(), position);
+}
+
+TEST(TestTorqueCascadeZeroVectorSlopes, after_each_sample_the_slopes_follow_the_model_at_the_measured_speed)
+{
+    constexpr float mechanicalStep{ 0.01f };
+    const auto parameters = MotorParameters(2);
+    foc::TorqueCascade cascade{ foc::Ampere{ 10.0f } };
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(testing::_)).WillRepeatedly(testing::SaveArg<0>(&slopes));
+    cascade.SetZeroVectorSlopeSink(sink);
+    cascade.Configure(parameters);
+    cascade.Enable();
+
+    float angle{ 0.0f };
+    for (int sample = 0; sample != 400; ++sample)
+    {
+        angle = static_cast<float>(sample) * mechanicalStep;
+        foc::Radians position{ angle };
+        cascade.Calculate(ZeroCurrents(), position);
+    }
+
+    foc::ZeroVectorSlope reference;
+    reference.Configure(parameters);
+    const auto electricalAngle = math::WrapToPi(2.0f * angle);
+    const auto expected = reference.Next({ 0.0f, 0.0f }, 2.0f * mechanicalStep * 20000.0f, std::cos(electricalAngle), std::sin(electricalAngle));
+
+    EXPECT_NEAR(slopes.a.Value(), expected.a.Value(), 20.0f);
+    EXPECT_NEAR(slopes.b.Value(), expected.b.Value(), 20.0f);
+    EXPECT_NEAR(slopes.c.Value(), expected.c.Value(), 20.0f);
+    EXPECT_GT(std::abs(expected.a.Value()) + std::abs(expected.b.Value()), 1000.0f);
 }

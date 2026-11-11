@@ -329,3 +329,80 @@ TEST(TestPlantDrive, with_a_duty_delay_the_applied_duties_lag_one_period)
     drive.Tick();
     EXPECT_EQ(drive.AppliedDuties().a, driving.a);
 }
+
+namespace
+{
+    sil::SilPlantConfig DescriptionWithSenseChain()
+    {
+        auto plant = Description();
+        plant.adcClockMegahertz = 16.0f;
+        plant.adcConversionClocks = 12u;
+        plant.adcAveragedConversions = 2u;
+        plant.maxReadableDutyPercent = 70u;
+        return plant;
+    }
+
+    const foc::PhaseCurrentSlopes slopes{ foc::AmperePerSecond{ 1.0e5f }, foc::AmperePerSecond{ -5.0e4f }, foc::AmperePerSecond{ -5.0e4f } };
+
+    void ExpectShiftedBy(sil::PlantDrive& drive, float a, float b, float c)
+    {
+        const auto raw = drive.Model().CurrentSensor().Last();
+        const auto shunt = drive.ShuntCurrents();
+
+        EXPECT_NEAR(shunt.a.Value() - raw.a.Value(), a, 1e-5f);
+        EXPECT_NEAR(shunt.b.Value() - raw.b.Value(), b, 1e-5f);
+        EXPECT_NEAR(shunt.c.Value() - raw.c.Value(), c, 1e-5f);
+    }
+}
+
+TEST(TestPlantDrive, the_zero_vector_slopes_move_each_phase_back_by_its_hold_delay_under_a_readable_duty_limit)
+{
+    sil::PlantDrive drive{ DescriptionWithSenseChain(), defaults };
+    drive.Output(neutral);
+    drive.Start();
+    RunTicks(drive, 2);
+
+    drive.ZeroVectorSlopes(slopes);
+
+    ExpectShiftedBy(drive, -1.0e5f * 0.75e-6f, 5.0e4f * 2.75e-6f, 5.0e4f * 4.75e-6f);
+}
+
+TEST(TestPlantDrive, a_longer_sample_and_hold_moves_the_hold_delays)
+{
+    sil::PlantDrive drive{ DescriptionWithSenseChain(), defaults };
+    drive.SampleAndHoldClocks(16);
+
+    drive.ZeroVectorSlopes(slopes);
+
+    ExpectShiftedBy(drive, -1.0e5f * 1.875e-6f, 5.0e4f * 5.375e-6f, 5.0e4f * 8.875e-6f);
+}
+
+TEST(TestPlantDrive, stop_clears_the_zero_vector_slopes)
+{
+    sil::PlantDrive drive{ DescriptionWithSenseChain(), defaults };
+    drive.Start();
+    drive.ZeroVectorSlopes(slopes);
+
+    drive.Stop();
+
+    ExpectShiftedBy(drive, 0.0f, 0.0f, 0.0f);
+}
+
+TEST(TestPlantDrive, ignored_sample_delays_leave_the_samples_unchanged)
+{
+    sil::PlantDrive drive{ DescriptionWithSenseChain(), defaults };
+    drive.IgnoreSampleDelays();
+
+    drive.ZeroVectorSlopes(slopes);
+
+    ExpectShiftedBy(drive, 0.0f, 0.0f, 0.0f);
+}
+
+TEST(TestPlantDrive, without_a_sense_chain_the_zero_vector_slopes_leave_the_samples_unchanged)
+{
+    sil::PlantDrive drive{ Description(), defaults };
+
+    drive.ZeroVectorSlopes(slopes);
+
+    ExpectShiftedBy(drive, 0.0f, 0.0f, 0.0f);
+}
