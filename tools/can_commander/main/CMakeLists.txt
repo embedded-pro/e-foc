@@ -18,6 +18,10 @@ target_sources(e_foc.tool.can_commander PRIVATE
     ../resources/can_commander.qrc
 )
 
+target_compile_definitions(e_foc.tool.can_commander PRIVATE
+    E_FOC_VIRTUAL_MOTOR_APP="$<TARGET_FILE:e_foc.tool.virtual_motor.app>"
+)
+
 set_target_properties(e_foc.tool.can_commander PROPERTIES
     OUTPUT_NAME e-foc-can-commander
     AUTORCC ON

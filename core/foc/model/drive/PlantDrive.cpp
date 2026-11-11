@@ -71,6 +71,7 @@ namespace sil
 
         const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
         model.StepForTest(stepDuty);
+        steppedDutyPhases = stepDuty;
         indexLatched = indexLatched || model.Encoder().IndexAsserted();
         shuntReadout.Applied(stepDuty);
         appliedDutyPhases = lastDutyPhases;
@@ -146,6 +147,11 @@ namespace sil
     uint32_t PlantDrive::DutyUpdateDelayPeriods() const
     {
         return dutyDelayed ? 1 : 0;
+    }
+
+    foc::PhasePwmDutyCycles PlantDrive::AppliedDuties() const
+    {
+        return steppedDutyPhases;
     }
 
     void PlantDrive::ArmIndex()

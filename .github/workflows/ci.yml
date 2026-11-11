@@ -56,6 +56,11 @@ jobs:
           name: e_foc.integration_tests
           path: build/host/integration_tests/main/Debug/e_foc.integration_tests
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e_foc.virtual_motor
+          path: build/host/tools/virtual_motor/engine/Debug/e-foc-virtual-motor
+          if-no-files-found: error
       - name: Upload test logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -104,7 +109,7 @@ jobs:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       # The action installs the analyser with pip, so its own pin does not fix the analyser's version: this does.
-      CYCLE_BUDGET_PACKAGE: "==1.0.0"
+      CYCLE_BUDGET_PACKAGE: "==1.0.1"
     steps:
       - name: Configure Git
         run: |
@@ -154,7 +159,7 @@ jobs:
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis.json
           elf-path: ${{ env.FIRMWARE_ELF }}
@@ -169,7 +174,7 @@ jobs:
           artifact-name: cycle-analysis-${{ matrix.target }}-inner
       - name: Run outer loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis-outer.json
           elf-path: ${{ env.FIRMWARE_ELF }}
@@ -184,7 +189,7 @@ jobs:
           artifact-name: cycle-analysis-${{ matrix.target }}-outer
       - name: Run identification path cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis-identification.json
           elf-path: ${{ env.FIRMWARE_ELF }}
@@ -287,6 +292,52 @@ jobs:
           name: e_foc.bootloader.qemu.elf
           path: build/qemu-foc-sensored/targets/bootloader/main/RelWithDebInfo/e_foc.bootloader.main.elf
           if-no-files-found: error
+  virtual_motor_tests:
+    name: Virtual Motor Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
+    needs: [host_build_test_ubuntu]
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e_foc.integration_tests
+          path: virtual_runner/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e_foc.virtual_motor
+          path: virtual_motor/
+      - name: Run virtual motor tests
+        shell: bash
+        env:
+          E_FOC_VIRTUAL_MOTOR: ${{ github.workspace }}/virtual_motor/e-foc-virtual-motor
+        run: |
+          chmod +x virtual_runner/e_foc.integration_tests "$E_FOC_VIRTUAL_MOTOR"
+          virtual_runner/e_foc.integration_tests \
+            --mode virtual \
+            integration_tests/features/ \
+            -t "@virtual" \
+            --format summary \
+            --format pretty \
+            --format "junit:virtual-motor-test-report.xml"
+      - uses: EnricoMi/publish-unit-test-result-action@da5b7be67623cd59bbbd1a0ce4f022050a55605f # v2.26.0
+        if: always()
+        with:
+          check_name: Virtual Motor Test Results
+          comment_title: Virtual Motor Test Results
+          comment_mode: off
+          files: virtual-motor-test-report.xml
+          report_individual_runs: true
+          report_suite_logs: info
   software_in_the_loop_shard:
     name: Software-in-the-Loop Shard ${{ matrix.shard }}
     runs-on: ubuntu-latest

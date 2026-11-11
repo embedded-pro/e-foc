@@ -203,15 +203,27 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 ### Virtual motors
 
 A virtual motor runs the e-foc application on the development machine against the simulated motor plant,
-as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). Start one that also
-hosts the bus, then connect the CAN Commander to `virtual:default`:
+as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). The e-foc Virtual
+Motor app ([design](documentation/design/tool-virtual-motor.md)) hosts the bus, starts and stops motors,
+changes their load, disturbance torque and sensor noise while they run, and shows their currents,
+voltages, mechanics and supply on scopes, with full-rate triggered captures that save as CSV, along
+with the modulation hexagon, the turning rotor and the encoder's error, and runs disturbance profiles
+written in its Profile editor or loaded from a file:
+
+```bash
+./build/host/tools/virtual_motor/app/main/Debug/e-foc-virtual-motor-app
+```
+
+Add a motor, then connect the CAN Commander to `virtual:default` and command it as a board. A motor can
+also run headless, hosting the bus itself:
 
 ```bash
 ./build/host/tools/virtual_motor/engine/Debug/e-foc-virtual-motor --host-bus --node 1 --plant teknic
 ```
 
 Further motors join the same bus with their own `--node`; `--plant anaheim` selects the other reference
-motor, and `--factory-fresh` starts with erased memory. `--help` lists every option. A virtual motor keeps
+motor, `--factory-fresh` starts with erased memory and `--calibrated` with the calibration a bench run on
+its plant would store. `--help` lists every option. A virtual motor keeps
 its memory in `virtual-motor-<bus>-<node>.nvm` in its working directory, so it stays calibrated between
 runs; `--memory` names another file in that directory.
 
@@ -287,6 +299,10 @@ The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation 
 (`.zip`, `.tar.gz`) remain available. On Linux, bring a SocketCAN interface up first, e.g.
 `sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
 version without opening a window (on Windows, run it from a console).
+
+Both installers also install the e-foc Virtual Motor app (`e-foc-virtual-motor-app`, *e-foc Virtual Motor*
+in the Start or applications menu) and its virtual motor program (`e-foc-virtual-motor`); the CAN Commander
+starts the app from Motor → Launch Virtual Motor….
 
 ### Issue log, bug reports and updates
 

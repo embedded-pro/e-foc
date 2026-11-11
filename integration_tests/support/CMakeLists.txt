@@ -1,11 +1,10 @@
 add_subdirectory(interactor/interfaces)
 add_subdirectory(interactor/qemu)
+add_subdirectory(interactor/virtual_motor)
 add_subdirectory(interactor/hardware)
 add_subdirectory(response)
 
 add_library(e_foc.integration_tests.plant STATIC
-    nvm/NvmImageBuilder.hpp
-    nvm/NvmImageBuilder.cpp
     plant/PlantConfigWriter.hpp
     plant/PlantConfigWriter.cpp
 )
@@ -16,7 +15,7 @@ target_include_directories(e_foc.integration_tests.plant PUBLIC
 
 target_link_libraries(e_foc.integration_tests.plant PUBLIC
     e_foc.foc.model
-    e_foc.services.non_volatile_memory
+    e_foc.foc.model.drive.memory
     infra.util
 )
 

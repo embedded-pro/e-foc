@@ -38,6 +38,8 @@ namespace tool
         MainWindow(services::CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
         ~MainWindow() override;
 
+        void SetVirtualMotorApp(const QString& program);
+
         void StartAutomaticUpdateChecks();
 
         void ReportStartupProblem(const QString& title, const QString& message);
@@ -75,6 +77,7 @@ namespace tool
         void BuildMenus();
         void BuildFileMenu();
         void BuildMotorMenu();
+        void LaunchVirtualMotor();
         void BuildHelpMenu();
         void BuildLayout();
         QWidget* BuildSafetyBar();
@@ -131,6 +134,8 @@ namespace tool
         QLabel* motorsStatus{ nullptr };
         QAction* addMotorAction{ nullptr };
         QAction* emergencyStopAction{ nullptr };
+        QAction* launchVirtualMotorAction{ nullptr };
+        QString virtualMotorApp;
         QAction* showFramesAction{ nullptr };
         QAction* automaticUpdatesAction{ nullptr };
 

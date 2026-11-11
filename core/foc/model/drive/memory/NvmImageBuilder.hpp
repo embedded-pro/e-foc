@@ -2,8 +2,8 @@
 
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include <array>
 #include <cstdint>
-#include <vector>
 
 namespace sil
 {
@@ -13,6 +13,8 @@ namespace sil
     static constexpr uint32_t learnedModelRegionOffset = 352;
     static constexpr uint32_t faultHistoryRegionOffset = 384;
     static constexpr float calibratedCurrentLoopBandwidth = 2000.0f;
+
+    using NvmImage = std::array<uint8_t, nvmImageSize>;
 
     enum class RecordDamage : uint8_t
     {
@@ -34,7 +36,7 @@ namespace sil
 
     services::CalibrationData CompleteCalibration();
 
-    std::vector<uint8_t> BuildNvmImage(const NvmImageSpec& spec);
+    NvmImage BuildNvmImage(const NvmImageSpec& spec);
 
-    std::vector<uint8_t> BlankNvmImage();
+    NvmImage BlankNvmImage();
 }

@@ -7,11 +7,14 @@ target_include_directories(e_foc.tool.virtual_motor.options PUBLIC
 target_link_libraries(e_foc.tool.virtual_motor.options PUBLIC
     can_lite.drivers.codec
     can_lite.drivers.virtual
+    numerical.math
 )
 
 target_sources(e_foc.tool.virtual_motor.options PRIVATE
     StartOptions.cpp
     StartOptions.hpp
+    Supervisor.cpp
+    Supervisor.hpp
 )
 
 add_executable(e_foc.tool.virtual_motor)
@@ -32,5 +35,9 @@ target_link_libraries(e_foc.tool.virtual_motor PRIVATE
 target_sources(e_foc.tool.virtual_motor PRIVATE
     Main.cpp
 )
+
+if(WIN32)
+    target_link_libraries(e_foc.tool.virtual_motor PRIVATE winmm)
+endif()
 
 add_subdirectory(test)

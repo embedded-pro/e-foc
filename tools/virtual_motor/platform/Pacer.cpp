@@ -9,6 +9,14 @@ namespace virtual_motor
         , origin(start)
     {}
 
+    void Pacer::Begin()
+    {
+        start = now();
+        origin = start;
+        stepsSinceOrigin = 0;
+        stepsRun = 0;
+    }
+
     void Pacer::Service()
     {
         const auto elapsed = now() - origin;
@@ -23,6 +31,18 @@ namespace virtual_motor
 
         for (; stepsSinceOrigin < due; ++stepsSinceOrigin, ++stepsRun)
             advance();
+    }
+
+    void Pacer::Suspend()
+    {
+        suspendedAt = now();
+    }
+
+    void Pacer::Resume()
+    {
+        const auto suspended = now() - suspendedAt;
+        start += suspended;
+        origin += suspended;
     }
 
     Pacer::TimePoint Pacer::NextDue() const

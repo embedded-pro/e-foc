@@ -20,4 +20,5 @@ target_link_libraries(e_foc.foc.model.drive PUBLIC
     e_foc.platform_abstraction
 )
 
+add_subdirectory(memory)
 add_subdirectory(test)

@@ -24,12 +24,14 @@ TEST(TestStartOptions, defaults_to_node_zero_on_the_default_bus_with_the_teknic_
     EXPECT_FALSE(parsed.options->factoryFresh);
     EXPECT_FALSE(parsed.options->hostBus);
     EXPECT_FALSE(parsed.options->restarted);
+    EXPECT_FALSE(parsed.options->supervised);
     EXPECT_FALSE(parsed.options->seed.has_value());
+    EXPECT_FALSE(parsed.options->plantPort.has_value());
 }
 
 TEST(TestStartOptions, reads_every_option)
 {
-    const auto parsed = Parse({ "--bus", "bench", "--node", "3", "--plant", "anaheim", "--memory", "m.nvm", "--seed", "42", "--hub-port", "4000", "--factory-fresh", "--host-bus", "--restarted" });
+    const auto parsed = Parse({ "--bus", "bench", "--node", "3", "--plant", "anaheim", "--memory", "m.nvm", "--seed", "42", "--hub-port", "4000", "--plant-port", "41000", "--factory-fresh", "--host-bus", "--restarted" });
 
     ASSERT_TRUE(parsed.options.has_value());
     EXPECT_EQ(parsed.options->bus, "bench");
@@ -38,6 +40,7 @@ TEST(TestStartOptions, reads_every_option)
     EXPECT_EQ(parsed.options->memoryFile, "m.nvm");
     EXPECT_EQ(parsed.options->seed, 42u);
     EXPECT_EQ(parsed.options->hubPort, 4000);
+    EXPECT_EQ(parsed.options->plantPort, 41000);
     EXPECT_TRUE(parsed.options->factoryFresh);
     EXPECT_TRUE(parsed.options->hostBus);
     EXPECT_TRUE(parsed.options->restarted);
@@ -59,6 +62,28 @@ TEST(TestStartOptions, refuses_an_unknown_option)
     EXPECT_EQ(parsed.error, "unknown option --speed");
 }
 
+TEST(TestStartOptions, reads_a_current_offset_for_each_phase)
+{
+    const auto parsed = Parse({ "--current-offset", "0.02,-0.015,0" });
+
+    ASSERT_TRUE(parsed.options.has_value());
+    ASSERT_TRUE(parsed.options->currentOffset.has_value());
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[0], 0.02f);
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[1], -0.015f);
+    EXPECT_FLOAT_EQ((*parsed.options->currentOffset)[2], 0.0f);
+    EXPECT_FALSE(Parse({}).options->currentOffset.has_value());
+}
+
+TEST(TestStartOptions, refuses_a_current_offset_without_three_amperes_in_range)
+{
+    const std::string error{ "--current-offset must be three currents from -10 to 10 A, as a,b,c" };
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,0.2" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,0.2,0.3,0.4" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,x,0.3" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,11,0.3" }).error, error);
+    EXPECT_EQ(Parse({ "--current-offset", "0.1,nan,0.3" }).error, error);
+}
+
 TEST(TestStartOptions, refuses_an_option_without_its_value)
 {
     const auto parsed = Parse({ "--bus" });
@@ -72,6 +97,7 @@ TEST(TestStartOptions, refuses_a_node_or_port_out_of_range)
     EXPECT_EQ(Parse({ "--node", "256" }).error, "--node must be a number from 0 to 255");
     EXPECT_EQ(Parse({ "--node", "x" }).error, "--node must be a number from 0 to 255");
     EXPECT_EQ(Parse({ "--hub-port", "70000" }).error, "--hub-port must be a number from 1 to 65535");
+    EXPECT_EQ(Parse({ "--plant-port", "0" }).error, "--plant-port must be a number from 1 to 65535");
 }
 
 TEST(TestStartOptions, refuses_a_bus_name_a_join_line_cannot_carry)
@@ -104,4 +130,28 @@ TEST(TestStartOptions, help_is_asked_for_not_an_error)
     EXPECT_FALSE(parsed.options.has_value());
     EXPECT_TRUE(parsed.help);
     EXPECT_TRUE(parsed.error.empty());
+}
+
+TEST(TestStartOptions, reads_the_flags_a_restart_and_a_supervisor_add)
+{
+    const auto parsed = Parse({ "--restarted", "--supervised" });
+
+    ASSERT_TRUE(parsed.options.has_value());
+    EXPECT_TRUE(parsed.options->restarted);
+    EXPECT_TRUE(parsed.options->supervised);
+}
+
+TEST(TestStartOptions, starts_calibrated_on_request_but_never_also_factory_fresh)
+{
+    EXPECT_FALSE(Parse({}).options->calibrated);
+    EXPECT_TRUE(Parse({ "--calibrated" }).options->calibrated);
+
+    const auto both = Parse({ "--calibrated", "--factory-fresh" });
+    EXPECT_FALSE(both.options.has_value());
+    EXPECT_EQ(both.error, "--calibrated and --factory-fresh cannot be combined");
+}
+
+TEST(TestStartOptions, the_usage_names_the_calibrated_start)
+{
+    EXPECT_NE(virtual_motor::StartOptionsUsage().find("--calibrated"), std::string::npos);
 }

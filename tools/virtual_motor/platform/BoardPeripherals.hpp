@@ -32,6 +32,11 @@ namespace virtual_motor
     public:
         void SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion) override;
         void ReceiveData(infra::Function<void(infra::ConstByteRange data)> dataReceived) override;
+
+        void Mirror(const infra::Function<void(infra::ConstByteRange data)>& sink);
+
+    private:
+        infra::Function<void(infra::ConstByteRange data)> mirror;
     };
 
     class DeferredLowPriorityInterrupt

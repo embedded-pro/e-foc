@@ -81,9 +81,14 @@ namespace tool
         auto* header = new QWidget();
         auto* layout = new QHBoxLayout(header);
         layout->setContentsMargins(0, 0, 0, 0);
+        virtualBadge = new QLabel("VIRTUAL");
+        virtualBadge->setToolTip("A virtual motor: the e-foc application running against a simulated plant on this machine, not hardware");
+        virtualBadge->setVisible(false);
+        ui::backend::qt::StyleStatusLabel(*virtualBadge, StatusLevel::Warning);
         onlineLabel = new QLabel();
         firmwareLabel = new QLabel();
         activityLabel = new QLabel();
+        layout->addWidget(virtualBadge);
         layout->addWidget(onlineLabel);
         layout->addWidget(firmwareLabel);
         layout->addWidget(activityLabel);
@@ -98,7 +103,7 @@ namespace tool
 
     QString MotorPanel::Title() const
     {
-        return QString("Motor %1").arg(nodeId);
+        return firmware->IsVirtual() ? QString("Motor %1 · Virtual").arg(nodeId) : QString("Motor %1").arg(nodeId);
     }
 
     QString MotorPanel::TabText() const
@@ -119,6 +124,7 @@ namespace tool
     void MotorPanel::OnFirmwareIdentity(const FirmwareIdentity& identity)
     {
         firmware->OnFirmwareIdentity(identity);
+        virtualBadge->setVisible(firmware->IsVirtual());
     }
 
     void MotorPanel::SetLatestRelease(const ReleaseInfo& release)
@@ -568,6 +574,7 @@ namespace tool
 
     void MotorPanel::RefreshHeader()
     {
+        virtualBadge->setVisible(firmware->IsVirtual());
         onlineLabel->setText(QString("Node %1: %2").arg(nodeId).arg(Summary()));
         ui::backend::qt::StyleStatusLabel(*onlineLabel, Level());
 

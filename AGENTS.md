@@ -11,7 +11,8 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/math/` — `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`);
-  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), and the `BoardProtectionSimulator`; host and QEMU only
+  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), the `BoardProtectionSimulator`,
+  and `memory/`, the memory image builder (`BuildNvmImage`) and the calibration a plant would store (`CalibratedFor`) that the harnesses and the virtual motor share; host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
@@ -23,7 +24,9 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
   with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
 - `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,
-  a `virtual:` CAN port, a wall-clock `Pacer`), `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it
+  a `virtual:` CAN port, a wall-clock `Pacer` under a pausable `RunLoop`, `PlantDisturbances` for live torque and noise, the motor side of the plant port),
+  `port/` the plant port's frames and messages, shared with the Virtual Motor app, `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it,
+  `app/` the e-foc Virtual Motor app (`documentation/design/tool-virtual-motor.md`): `logic/` the rig of motor processes and their plant ports, trace history, captures, the trace view and the modulation, rotor and encoder views, `gui/` the manager and motor windows
 - `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
@@ -149,7 +152,7 @@ standalone at the start of flash on every board and replaces the bootloader when
 
 `qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
-**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
+**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.virtual_motor`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
 Its `release_tools_build` job calls `build-tools.yml`, the same workflow the release uses, so every PR
 builds, packages and install-tests the Linux and Windows tools exactly as a release does (MSVC with
 warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubuntu-latest`); signing
@@ -157,6 +160,9 @@ stays release-only. The `software_in_the_loop_shard` jobs (three, run at once) r
 run behavioral tests — never recompile. Do not add cmake build steps to them. Each runs the features `integration_tests/sil-shards.json` assigns it, after `integration_tests/sil-shard.py` checks the plan lists
 every feature with an `@sil` scenario exactly once; a new feature goes into the shard that keeps the three balanced. `software_in_the_loop_tests` gathers the shards' reports into the one
 `Software-in-the-Loop Test Results` check and fails unless every shard passed; a re-run shard replaces its report, so the check follows the latest attempt.
+
+**ccache**: every configure preset inherits `defaults`, which sets `ccache` as the C/C++ compiler launcher both as cache variables and in the environment (so the native `_native_bootloader_image` sub-build is cached too), with `CCACHE_BASEDIR` at the source tree.
+Every CI job that compiles restores a cache with `hendrikmuhs/ccache-action` (saved from `main` only); a job that configures without a preset, like the Windows tools build, passes the launcher itself. A new compiling job does the same.
 
 Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `static-analysis.yml` (SonarCloud), `requirements-validation.yml` and
 `submodule-check.yml` (submodules point to `main`), plus `documentation-validation.yml` and `build-booklet.yml` when `documentation/` changes.
@@ -224,7 +230,9 @@ what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. T
 Clang has no `-Wmaybe-uninitialized`: in a Clang build the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
-**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware,
+and `@virtual` for the virtual motor runner (`--mode virtual`, the host build's `e-foc-virtual-motor`), a small functional set that keeps its `@sil` tag and that `ci.yml`'s `virtual_motor_tests` job runs.
+The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
 model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.

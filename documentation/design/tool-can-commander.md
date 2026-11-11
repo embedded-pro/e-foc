@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.23.0
+version: 0.24.0
 component: "tool-can-commander"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.23.0               |
+| Version   | 0.24.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-10           |
 
@@ -578,9 +578,11 @@ the Virtual Motor app (`tool-virtual-motor.md`).
   chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
   motor.
 - **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else: no release,
-  no pack and no update steps, because a virtual motor runs the firmware it was built with.
+  no pack and no update steps, because a virtual motor runs the firmware it was built with; the Download
+  and Apply actions stay disabled and say so.
 - **Launching.** Motor → Launch Virtual Motor… starts the Virtual Motor app, which is installed with the
-  tool (`tool-virtual-motor.md` Part I).
+  tool (`tool-virtual-motor.md` Part I). Where the app is not installed next to the tool the action is
+  disabled and says so.
 - **Going offline.** A paused, powered-off or crashed virtual motor goes silent and is reported offline
   after the usual liveness timeout; closing the hub closes the bus as an unplugged adapter would.
 

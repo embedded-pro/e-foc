@@ -16,6 +16,7 @@ namespace virtual_motor
         bool Connect(infra::BoundedConstString bus, uint32_t bitrate);
         bool IsConnected() const;
         void Poll();
+        void Mute(bool muted);
 
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
@@ -42,5 +43,8 @@ namespace virtual_motor
         services::SlcanAdapter adapter{ port };
         ErrorObserver errorObserver{ adapter, *this };
         infra::Function<void(services::CanBusError)> onError;
+        infra::Function<void(Id id, const Message& data)> onReceived;
+        infra::Function<void(bool success)> mutedSendDone;
+        bool muted{ false };
     };
 }
