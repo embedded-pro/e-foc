@@ -109,7 +109,7 @@ jobs:
       FIRMWARE_ELF: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
       POST_PR_COMMENT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       # The action installs the analyser with pip, so its own pin does not fix the analyser's version: this does.
-      CYCLE_BUDGET_PACKAGE: "==1.0.0"
+      CYCLE_BUDGET_PACKAGE: "==1.0.1"
     steps:
       - name: Configure Git
         run: |
@@ -159,7 +159,7 @@ jobs:
       # The three paths run even when an earlier one is over budget, so the banner always shows all of them.
       - name: Run inner loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis.json
           elf-path: ${{ env.FIRMWARE_ELF }}
@@ -174,7 +174,7 @@ jobs:
           artifact-name: cycle-analysis-${{ matrix.target }}-inner
       - name: Run outer loop cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis-outer.json
           elf-path: ${{ env.FIRMWARE_ELF }}
@@ -189,7 +189,7 @@ jobs:
           artifact-name: cycle-analysis-${{ matrix.target }}-outer
       - name: Run identification path cycle analysis
         if: ${{ !cancelled() && matrix.budget-analysis && steps.build.outcome == 'success' }}
-        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        uses: embedded-pro/cortex-cycle-budget@e9727d03fb1068b3a888549751a64dabc56a381f # v1.0.1
         with:
           config-path: targets/sync_foc_sensored/main/cycle-analysis-identification.json
           elf-path: ${{ env.FIRMWARE_ELF }}
