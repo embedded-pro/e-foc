@@ -22,9 +22,9 @@ namespace application
     {
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
+        foc::CurrentStream& currentStream;
         foc::Volts vdc;
         uint32_t dutyUpdateDelayPeriods{ 0 };
-        foc::CurrentStream* currentStream{ nullptr };
         foc::ZeroVectorSlopeSink* zeroVectorSlopes{ nullptr };
     };
 

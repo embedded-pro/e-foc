@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/mechanical_system_ident/MechanicalFit.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -38,10 +37,9 @@ namespace services
             observationsDropped
         };
 
-        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant);
+        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float torque, float mechanicalAngle);
         void OnWindowClosed(const ClosedWindow& closed);
         void Post(const IdentificationObservation& observation);
-        void ScheduleFit();
         void FitPostedObservations();
         void StartExcitation(const Config& config);
         void StopExcitation();
@@ -61,10 +59,8 @@ namespace services
         foc::Ampere supportedCurrent;
         Config currentConfig;
         foc::Ampere currentEnvelope{ 0.0f };
-        float polePairs{ 1.0f };
         infra::AutoResetFunction<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> onDone;
 
-        [[no_unique_address]] foc::ClarkePark transform;
         SampleWindow window;
         ObservationQueue queue;
         MechanicalFit fit;

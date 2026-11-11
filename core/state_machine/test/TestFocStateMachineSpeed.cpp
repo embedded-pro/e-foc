@@ -31,6 +31,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
@@ -219,7 +220,7 @@ namespace
         {
             return SpeedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
@@ -998,6 +999,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
@@ -1182,7 +1184,7 @@ namespace
         {
             return SpeedAutoStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
@@ -2348,7 +2350,7 @@ namespace
         {
             return RefusingStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
@@ -2361,7 +2363,7 @@ namespace
         {
             return RecordingStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
@@ -2374,7 +2376,7 @@ namespace
         {
             return RecordingStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage, 2 },
                 faultNotifierMock,
@@ -2750,7 +2752,7 @@ namespace
 
             return SpeedStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 services,
                 faultNotifierMock,
@@ -2886,7 +2888,7 @@ namespace
 
             return FrictionStateMachine{
                 tracer,
-                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc },
                 nvmMock,
                 services,
                 faultNotifierMock,
@@ -3071,7 +3073,7 @@ TEST_F(FocStateMachineSpeedTest, the_zero_vector_slopes_of_each_control_period_r
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
-    SpeedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, vdc, 0, nullptr, &sink }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } }, faultNotifierMock, application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }, nvmActivity };
+    SpeedStateMachine sm{ tracer, application::MotorHardware{ inverterMock, encoderMock, currentStream, vdc, 0, &sink }, nvmMock, application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } }, faultNotifierMock, application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }, nvmActivity };
     AlignAfterBoot(sm);
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
         {

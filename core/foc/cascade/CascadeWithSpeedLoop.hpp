@@ -25,7 +25,7 @@ namespace foc
     class CascadeWithSpeedLoop
     {
     protected:
-        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
+        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
         ~CascadeWithSpeedLoop();
 
         bool ConfigureImpl(const MotorModelParameters& parameters);
@@ -39,6 +39,11 @@ namespace foc
         void EnableSpeedLoop();
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
+
+        ALWAYS_INLINE_HOT Ampere MeasuredQuadratureCurrentImpl() const
+        {
+            return Ampere{ estimation.window.LastIq() };
+        }
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration = 0.0f);
@@ -63,7 +68,6 @@ namespace foc
         void ClearCoggingMapImpl();
         void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
         void ClearFrictionFeedForwardImpl();
-        void SetCurrentStream(CurrentStream& stream);
         void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
@@ -132,7 +136,7 @@ namespace foc
         Estimation estimation;
         DirectAxisExcitation directAxisExcitation;
         FeedForwards feedForward;
-        CurrentStream* currentStream{ nullptr };
+        CurrentStream& currentStream;
         ZeroVectorSlope zeroVectorSlope;
         ZeroVectorSlopeSink* slopeSink{ nullptr };
     };

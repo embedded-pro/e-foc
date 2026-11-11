@@ -52,6 +52,11 @@ namespace foc
             ++ticks;
         }
 
+        ALWAYS_INLINE_HOT float LastIq() const
+        {
+            return previousIq;
+        }
+
         ALWAYS_INLINE_HOT EstimatorSnapshot Close()
         {
             const auto inverseTicks = ticks != 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;

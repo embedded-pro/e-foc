@@ -239,6 +239,19 @@ The 20 kHz path should do only the work that changes from one sample to the next
 
 - **Gate by wiring, not by a flag.** The runner holds the phase-current slot only while the bridge runs, so no sample
   tests an `enabled` flag (`documentation/design/state-machine.md`).
+- **Hand a collaborator over at construction, do not test for it.** The cascades take their current stream as a
+  constructor reference, so no sample tests a pointer; a stopped stream stands in for "no stream". This removes a
+  state, not cycles: the test was one compare-and-branch, and where the compiler then places the stream's blocks
+  moves the estimate by more than that, two cycles down with one GCC and three up with another. A stand-in is free
+  only where it is the same concrete type, inert in a state it already has. Behind an interface it trades that
+  one-cycle test for a virtual call, and the outer loop's test for an electrical estimator also decides whether the
+  d-axis excitation runs, so those tests stay.
+- **Hand an observer what the loop already measured.** A calibration observer gets each sample's phase currents
+  with the q-axis current the cascade measured from them and the rotor angle the runner read, so it reads no
+  encoder and repeats no transform. The cascade keeps that current anyway, and the runner fetches it inside the
+  observer's slot, so a tick without an observer still costs the one test of the slot.
+- **Do not schedule from the control interrupt.** Scheduling an event costs about 600 cycles. The mechanical
+  identification posts its windows to a ring that holds three event-loop ticks of them, and the tick fits them.
 - **Cache reciprocals.** The encoder keeps 2π/resolution from construction and wraps with one compare instead of two
   divides and a `floor`.
 - **Clamp once.** The modulator clamps and quantises each phase in one step; a second clamp in a later conversion is
@@ -256,8 +269,7 @@ The 20 kHz path should do only the work that changes from one sample to the next
   into a window in the interrupt and hands the event loop one mean per window, so the 20 kHz path does two additions,
   an increment and a compare per sample. The window's reciprocal length is computed once, at the first sample after
   the rate changes, so closing a window multiplies instead of dividing. A stopped stream costs two loads and two
-  compares, and a cascade without a stream one pointer test. Every stream function is inlined into the cascade's `Calculate`, so the
-  cycle analysis measures it there.
+  compares. Every stream function is inlined into the cascade's `Calculate`, so the cycle analysis measures it there.
 
 The 1 kHz outer loop follows the same rules. The software position limits (`documentation/design/foc-position.md`) add
 a compare to the cascade and to each difference the position law takes, and a wrap and a clamp of the reference while
@@ -370,11 +382,11 @@ Tier 1 gates three paths on two MCUs, each path with one configuration under `ta
 that both share. A stage lists the TI and the ST symbols side by side and fails only when none of them is in the
 binary. Each budget is the same slice of time on every MCU, in cycles of its clock:
 
-| Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
-|-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
-| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
-| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
-| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
+| Path                                                    | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
+|---------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
+| ADC ISR → inner loop → PWM                              | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
+| Low-priority interrupt → outer loop → online estimators | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
+| ADC ISR → inner loop → calibration observer             | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
 
 On a pull request each MCU gets one cycle banner and one memory banner. The cycle banner
 (`.github/scripts/cycle-analysis-banner.py`) shows one row per path (worst-case cycles and budget, both also as a
@@ -391,7 +403,8 @@ the *Analysis Notes* of each report list what is left open.
 - **Calls through a pointer are not followed.** Every `infra::Function` callback and every virtual call on a path
   hands over to a function the configuration names: the HAL's interrupt lambda, each callback of the
   phase-current chain, `PlatformFactoryImpl::Read`, the three `ThreePhasePwmOutput` stages, the PWM driver's
-  `Start`, `ZeroVectorSlopes`, the low-priority trigger, and in the outer loop the online estimators and their
+  `Start`, `ZeroVectorSlopes`, the low-priority trigger, on the identification path the runner's hand-over to the
+  calibration observer, and in the outer loop the online estimators and their
   `RecursiveLeastSquares`. A new callback or virtual call on a path needs its target named, or the note
   "calls through a register are not followed" grows by one.
 - **Alternatives are charged once.** A stage with `"combine": "max"` charges the costliest of the functions it
@@ -412,7 +425,6 @@ the *Analysis Notes* of each report list what is left open.
 | `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                    |
 | Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |   list | One bound per loop, below                               |
 | Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                           |
-| `MechanicalParametersIdentificationImpl::ScheduleFit`                     |      2 | One compare-and-swap retry                              |
 | `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record         |
 
 The mechanical estimator and its `RecursiveLeastSquares` walk a 3×3 matrix as a 3×3 nest, as a loop over its three
@@ -433,17 +445,16 @@ with `CutPowerStage`, the ST HAL's `assert_failed`, `ADC_Disable` (single-shot D
 circular), `HAL_TIM_GenerateEvent` (the timer start-up branch; `Start()` has run from the event loop before the
 interrupt is registered) and, on the identification path, `FailEnvelope`.
 
-Not charged: the encoder read the mechanical identification observer makes is the second call of a function
-already charged once, about 90 cycles. Not modelled: flash wait states, five on the TM4C at 120 MHz, which make
-taken branches and literal loads dearer on silicon than any table says. Tier 3 is the figure for that.
+Not modelled: flash wait states, five on the TM4C at 120 MHz, which make taken branches and literal loads dearer
+on silicon than any table says. Tier 3 is the figure for that.
 
 With the worst-path model the estimates at this revision are:
 
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
-| Inner loop          |          3127 |   4500 |          2951 |   6375 |
+| Inner loop          |          3131 |   4500 |          2955 |   6375 |
 | Outer loop          |          6958 |  20000 |          6958 |  28333 |
-| Identification path |          5111 |   6000 |          4935 |   8500 |
+| Identification path |          4519 |   6000 |          4343 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
 `CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.1.0.

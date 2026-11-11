@@ -25,7 +25,7 @@ namespace foc
         , public BusVoltageTrackable
     {
     public:
-        explicit TorqueCascade(foc::Ampere maxCurrent);
+        explicit TorqueCascade(foc::Ampere maxCurrent, CurrentStream& currentStream);
 
         bool Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
@@ -36,8 +36,12 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
+        Ampere MeasuredQuadratureCurrent() const final
+        {
+            return Ampere{ lastIq };
+        }
+
         MotionObservation ObserveMotion() const override;
-        void SetCurrentStream(CurrentStream& stream);
         void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
 
         void EnableCurrentCommand() override;
@@ -101,6 +105,6 @@ namespace foc
         ZeroVectorSlope zeroVectorSlope;
         ZeroVectorSlopeSink* slopeSink{ nullptr };
         volatile bool currentCommandActive{ false };
-        CurrentStream* currentStream{ nullptr };
+        CurrentStream& currentStream;
     };
 }

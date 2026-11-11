@@ -5,7 +5,6 @@
     "StaticInvoke<hal::tiva::Adc::Adc\\(": 6,
     "^hal::PwmStmBase::StartImpl\\(": 3,
     "^services::InverterCompensation::ThreePhasePwmOutput\\(": 1,
-    "^services::MechanicalParametersIdentificationImpl::ScheduleFit\\(": 2,
     "^memmove$": 12,
     "^memset$": 32
   },
@@ -82,11 +81,18 @@
       ]
     },
     {
+      "label": "Observer Hand-over",
+      "combine": "max",
+      "patterns": [
+        "StaticInvoke<foc::Runner<foc::(Torque|Speed|Position)Cascade>::RegisterPhaseCurrentsObserver\\("
+      ]
+    },
+    {
       "label": "Calibration Observer (costliest)",
       "combine": "max",
       "patterns": [
-        "InvokerFunctions<void \\(foc::PhaseCurrents const&\\), 8u>::StaticInvoke<services::MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia\\(",
-        "InvokerFunctions<void \\(foc::PhaseCurrents const&\\), 8u>::StaticInvoke<services::CoggingMappingImpl::Measure\\("
+        "InvokerFunctions<void \\(foc::PhaseCurrents const&, .*\\), 8u>::StaticInvoke<services::MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia\\(",
+        "InvokerFunctions<void \\(foc::PhaseCurrents const&, .*\\), 8u>::StaticInvoke<services::CoggingMappingImpl::Measure\\("
       ]
     },
     {

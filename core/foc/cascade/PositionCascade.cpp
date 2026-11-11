@@ -3,8 +3,8 @@
 
 namespace foc
 {
-    PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
-        : SpeedLoopDrive(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
+    PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
+        : SpeedLoopDrive(maxCurrent, baseFrequency, lowPriorityInterrupt, currentStream, lowPriorityFrequency, dutyUpdateDelayPeriods)
         , outerLoopFrequency(lowPriorityFrequency)
         , profile(lowPriorityFrequency)
     {

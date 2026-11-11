@@ -34,7 +34,7 @@ namespace foc
             runner.Disable();
         }
 
-        void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) override
+        void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>& observer) override
         {
             runner.RegisterPhaseCurrentsObserver(observer);
         }

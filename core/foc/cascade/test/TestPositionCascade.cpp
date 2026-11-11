@@ -67,7 +67,7 @@ namespace
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            focPosition.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
+            focPosition.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, stream, lowPriorityFrequency);
             focPosition->Configure(MotorParameters(polePairs));
             focPosition->ConfigureMechanics(MechanicalParameters());
             focPosition->SetCurrentTunings(foc::CurrentLoopTunings{});
@@ -76,6 +76,7 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
+        foc::CurrentStream stream;
         std::optional<foc::PositionCascade> focPosition;
         const std::size_t polePairs{ 7 };
     };
@@ -127,7 +128,7 @@ namespace
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
+            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, stream, lowPriorityFrequency);
             cascade->Configure(MotorParameters(polePairs));
             cascade->ConfigureMechanics(MechanicalParameters());
             cascade->SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -137,6 +138,7 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        foc::CurrentStream stream;
         std::optional<foc::PositionCascade> cascade;
     };
 
@@ -267,7 +269,8 @@ TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
     EXPECT_CALL(speedInterrupt, Register(_)).WillOnce(Invoke(&speedInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
     EXPECT_CALL(speedInterrupt, Unregister()).WillOnce(Invoke(&speedInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
-    foc::SpeedCascade speedCascade{ foc::Ampere{ 10.0f }, baseFrequency, speedInterrupt, lowPriorityFrequency };
+    foc::CurrentStream speedCascadeStream;
+    foc::SpeedCascade speedCascade{ foc::Ampere{ 10.0f }, baseFrequency, speedInterrupt, speedCascadeStream, lowPriorityFrequency };
     speedCascade.Configure(MotorParameters(polePairs));
     speedCascade.ConfigureMechanics(MechanicalParameters());
     speedCascade.SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -746,10 +749,8 @@ TEST_F(TestPositionCascade, a_current_command_bypasses_the_position_and_speed_lo
     EXPECT_NEAR(DutyPercent(duty.c), 50.0f, 1.0f);
 }
 
-TEST_F(TestPositionCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+TEST_F(TestPositionCascade, the_stream_receives_the_measured_currents_and_the_mechanical_angle)
 {
-    foc::CurrentStream stream;
-    focPosition->SetCurrentStream(stream);
     focPosition->Enable();
     stream.Start(1);
 
@@ -761,6 +762,17 @@ TEST_F(TestPositionCascade, an_attached_stream_receives_the_measured_currents_an
     EXPECT_NEAR(sample->meanId.Value(), 1.0f, 1e-2f);
     EXPECT_NEAR(sample->meanIq.Value(), 0.0f, 1e-2f);
     EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestPositionCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    focPosition->Enable();
+
+    const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
+    foc::Radians position{ mechanicalAngle };
+    focPosition->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focPosition->MeasuredQuadratureCurrent().Value(), -1.0f, 1e-2f);
 }
 
 namespace

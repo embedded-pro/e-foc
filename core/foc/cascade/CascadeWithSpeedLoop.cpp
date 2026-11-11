@@ -14,7 +14,7 @@ namespace foc
         constexpr std::chrono::seconds excitationCycle{ 60 };
     }
 
-    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
+    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
         : lowPriorityInterrupt(lowPriorityInterrupt)
         , maxCurrent{ maxCurrent }
         , schedule{ lowPriorityFrequency, baseFrequency.Value() / lowPriorityFrequency.Value(), 0 }
@@ -22,6 +22,7 @@ namespace foc
         , command{ 0.0f, maxCurrent.Value(), false, QuadratureVoltageWindow{} }
         , estimation{ EstimatorChannel{}, EstimatorWindowAccumulator{ baseFrequency, schedule.prescaler, dutyUpdateDelayPeriods }, 0.0f }
         , directAxisExcitation{ Ampere{ maxCurrent.Value() * excitationCurrentFraction }, excitationFrequency, lowPriorityFrequency, excitationBurst, excitationCycle }
+        , currentStream{ currentStream }
     {
         really_assert(maxCurrent.Value() > 0);
         really_assert(lowPriorityFrequency.Value() > 0);
@@ -80,8 +81,7 @@ namespace foc
         outer.mechanicalSpeed = 0.0f;
         estimation.meanIq = 0.0f;
         schedule.triggerCounter = 0;
-        if (currentStream != nullptr)
-            currentStream->Restart();
+        currentStream.Restart();
         enabled = true;
     }
 
@@ -135,8 +135,7 @@ namespace foc
         auto sinTheta = math::FastSine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        if (currentStream != nullptr)
-            currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
+        currentStream.Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto coggingCurrent = feedForward.cogging.CurrentAt(electricalAngle);
         const float limit = command.quadratureLimit;
         const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.feedForwardCurrent + coggingCurrent, -limit, limit);
@@ -290,11 +289,6 @@ namespace foc
     {
         feedForward.friction.Clear();
         outer.feedForwardCurrent = 0.0f;
-    }
-
-    void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)
-    {
-        currentStream = &stream;
     }
 
     void CascadeWithSpeedLoop::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)

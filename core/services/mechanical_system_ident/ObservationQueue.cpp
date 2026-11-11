@@ -8,18 +8,17 @@ namespace services
         taken = 0;
     }
 
-    ObservationQueue::PostResult ObservationQueue::Post(const IdentificationObservation& observation)
+    bool ObservationQueue::Post(const IdentificationObservation& observation)
     {
         const auto count = posted.load();
-        const auto pending = count - taken.load();
 
-        if (pending == capacity)
-            return PostResult::full;
+        if (count - taken.load() == capacity)
+            return false;
 
         observations[count % capacity] = observation;
         posted = count + 1;
 
-        return pending + 1 == capacity / 2 ? PostResult::halfFull : PostResult::posted;
+        return true;
     }
 
     std::optional<IdentificationObservation> ObservationQueue::Take()

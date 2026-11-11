@@ -13,11 +13,9 @@ namespace application
         NvmActivity& nvmActivity,
         RotorReference rotorReference)
         : FocStateMachineCommon(tracer, hardware, nvm, calibServices, nvmActivity)
-        , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
+        , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported(), hardware.currentStream)
         , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
     {
-        if (hardware.currentStream != nullptr)
-            focController.SetCurrentStream(*hardware.currentStream);
         if (hardware.zeroVectorSlopes != nullptr)
             focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
         RegisterFaultHandler(faultNotifier);

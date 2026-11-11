@@ -23,7 +23,7 @@ namespace application
             const OuterLoopArgs& outerLoopArgs,
             NvmActivity& nvmActivity)
             : OuterLoopStateMachine(tracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
-            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
+            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, hardware.currentStream, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
@@ -32,8 +32,6 @@ namespace application
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
-            if (hardware.currentStream != nullptr)
-                focController.SetCurrentStream(*hardware.currentStream);
             if (hardware.zeroVectorSlopes != nullptr)
                 focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
             RegisterFaultHandler(faultNotifier);

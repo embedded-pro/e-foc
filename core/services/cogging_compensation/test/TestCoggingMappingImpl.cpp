@@ -36,6 +36,14 @@ namespace
         return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
     }
 
+    foc::Ampere QuadratureCurrentOf(const foc::PhaseCurrents& phases, foc::Radians position)
+    {
+        const auto electricalAngle = position.Value() * static_cast<float>(polePairs);
+        const foc::ClarkePark transform;
+
+        return foc::Ampere{ transform.Forward(foc::ThreePhase{ phases.a.Value(), phases.b.Value(), phases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle)).q };
+    }
+
     class TestCoggingMappingImpl
         : public ::testing::Test
         , public infra::ClockFixture
@@ -46,10 +54,16 @@ namespace
             ExecuteAllActions();
         }
 
+        void Publish(const foc::PhaseCurrents& phases)
+        {
+            const auto position = encoderMock.Read();
+            observableMock.Publish(phases, QuadratureCurrentOf(phases, position), position);
+        }
+
         void ExpectRunStarted()
         {
             EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
-                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&)>& observer)
+                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&, foc::Ampere, foc::Radians)>& observer)
                     {
                         observableMock.StoreObserver(observer);
                     }));
@@ -94,7 +108,7 @@ namespace
                     const auto speed = rotorSpeedScale * commandedSpeed;
                     position += speed * samplePeriod;
                     const auto friction = speed > 0.0f ? dryFriction : (speed < 0.0f ? -dryFriction : 0.0f);
-                    observableMock.Publish(CurrentsProducing(Cogging(position) + friction, position));
+                    Publish(CurrentsProducing(Cogging(position) + friction, position));
                 }
 
                 ForwardTime(std::chrono::milliseconds{ 1 });
@@ -159,13 +173,33 @@ TEST_F(TestCoggingMappingImpl, turning_each_way_also_measures_the_dry_friction)
     EXPECT_NEAR(frictionCoulomb, dryFriction, 0.05f * dryFriction);
 }
 
+TEST_F(TestCoggingMappingImpl, a_sample_brings_its_rotor_angle_so_the_encoder_is_read_only_to_start_the_run)
+{
+    EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
+        .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&, foc::Ampere, foc::Radians)>& observer)
+            {
+                observableMock.StoreObserver(observer);
+            }));
+    EXPECT_CALL(driveMock, Start());
+    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    Start();
+
+    for (int sample = 1; sample != 100; ++sample)
+        observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.1f }, foc::Ampere{ -0.1f } }, foc::Ampere{ 0.1f }, foc::Radians{ 1.0e-3f * static_cast<float>(sample) });
+
+    ExpectDriveReleased();
+    mapping->Abort();
+}
+
 TEST_F(TestCoggingMappingImpl, a_phase_current_beyond_the_envelope_stops_the_bridge_and_yields_no_map)
 {
     ExpectRunStarted();
     Start();
 
     EXPECT_CALL(inverterMock, Stop());
-    observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
+    Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
 
     ExpectDriveReleased();
     ExecuteAllActions();
@@ -184,7 +218,7 @@ TEST_F(TestCoggingMappingImpl, a_slew_step_after_the_run_failed_ramps_the_speed_
     ASSERT_GT(speedBeforeFailure, 0.0f);
 
     EXPECT_CALL(inverterMock, Stop());
-    observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
+    Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
     systemTimerService.TimeProgressed(std::chrono::milliseconds{ 1 });
 
     EXPECT_LT(commandedSpeed, speedBeforeFailure);

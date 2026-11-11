@@ -24,8 +24,9 @@ namespace foc
         }
     }
 
-    TorqueCascade::TorqueCascade(foc::Ampere maxCurrent)
+    TorqueCascade::TorqueCascade(foc::Ampere maxCurrent, CurrentStream& currentStream)
         : maxCurrent{ maxCurrent }
+        , currentStream{ currentStream }
     {
         really_assert(maxCurrent.Value() > 0);
         limits.current = maxCurrent.Value();
@@ -40,8 +41,7 @@ namespace foc
         speedMeasurement.previousAngleValid = false;
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
-        if (currentStream != nullptr)
-            currentStream->Restart();
+        currentStream.Restart();
         SetPoint(requestedSetPoint);
     }
 
@@ -157,11 +157,6 @@ namespace foc
         limits.inverseElectricalSpeed = electricalLimit > 0.0f ? 1.0f / electricalLimit : 0.0f;
     }
 
-    void TorqueCascade::SetCurrentStream(CurrentStream& stream)
-    {
-        currentStream = &stream;
-    }
-
     void TorqueCascade::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
     {
         slopeSink = &sink;
@@ -208,8 +203,7 @@ namespace foc
             slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
-        if (currentStream != nullptr)
-            currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
+        currentStream.Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& [directSetPoint, quadratureSetPoint] = setPointBuffer.Acquire();
         const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);
         const auto quadrature = LimitedQuadrature(quadratureSetPoint.Value(), electricalSpeed, coggingCurrent);
