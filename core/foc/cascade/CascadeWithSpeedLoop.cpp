@@ -49,6 +49,7 @@ namespace foc
     {
         parameters.maxCurrent = maxCurrent;
         parameters.samplingFrequency = schedule.frequency;
+        accelerationCurrentGain = parameters.torqueConstant.Value() > 0.0f ? parameters.inertia.Value() / parameters.torqueConstant.Value() : 0.0f;
         return speedLoop.Configure(parameters);
     }
 
@@ -74,7 +75,7 @@ namespace foc
         directAxisExcitation.Restart();
         zeroVectorSlope.Restart();
         outer.speedLoopOutput = 0.0f;
-        outer.frictionCurrent = 0.0f;
+        outer.feedForwardCurrent = 0.0f;
         outer.directCurrentReference = 0.0f;
         outer.electricalSpeed = 0.0f;
         outer.mechanicalSpeed = 0.0f;
@@ -137,7 +138,7 @@ namespace foc
         currentStream.Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto coggingCurrent = feedForward.cogging.CurrentAt(electricalAngle);
         const float limit = command.quadratureLimit;
-        const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.frictionCurrent + coggingCurrent, -limit, limit);
+        const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.feedForwardCurrent + coggingCurrent, -limit, limit);
         const float electricalSpeed = outer.electricalSpeed;
         if (slopeSink != nullptr)
             slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
@@ -186,16 +187,16 @@ namespace foc
         return mechanicalSpeed;
     }
 
-    void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
+    void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration)
     {
         outer.speedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ outer.speedReference } }).Value();
-        outer.frictionCurrent = feedForward.friction.CurrentFor(outer.speedReference);
+        outer.feedForwardCurrent = feedForward.friction.CurrentFor(outer.speedReference) + accelerationCurrentGain * referenceAcceleration;
     }
 
-    void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
+    void CascadeWithSpeedLoop::SetDirectCurrentReference(float current, float referenceAcceleration)
     {
         outer.speedLoopOutput = current;
-        outer.frictionCurrent = 0.0f;
+        outer.feedForwardCurrent = accelerationCurrentGain * referenceAcceleration;
     }
 
     void CascadeWithSpeedLoop::EnableCurrentCommandImpl()
@@ -233,7 +234,7 @@ namespace foc
     MotionObservation CascadeWithSpeedLoop::ObserveSpeedLoopMotion() const
     {
         const float limit = command.quadratureLimit;
-        const float demanded = outer.speedLoopOutput;
+        const float demanded = outer.speedLoopOutput + outer.feedForwardCurrent;
         return { RadiansPerSecond{ outer.mechanicalSpeed }, Ampere{ estimation.meanIq }, RadiansPerSecond{ outer.speedReference }, Radians{ 0.0f }, Ampere{ std::clamp(demanded, -limit, limit) } };
     }
 
@@ -287,7 +288,7 @@ namespace foc
     void CascadeWithSpeedLoop::ClearFrictionFeedForwardImpl()
     {
         feedForward.friction.Clear();
-        outer.frictionCurrent = 0.0f;
+        outer.feedForwardCurrent = 0.0f;
     }
 
     void CascadeWithSpeedLoop::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)

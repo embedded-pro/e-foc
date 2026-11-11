@@ -93,3 +93,14 @@
     control period, the drive shall keep the direct-axis current excursion after a change of speed
     demand within the limit set for each current law, whether the power stage applies a new duty at
     once or a period after it is computed.
+
+- id: REQ-CTL-010
+  title: Position moves follow a profile within the operator's limits
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    With a profile velocity and acceleration set, position mode shall move the rotor to a new
+    setpoint along a path whose speed, acceleration and deceleration stay within the operator's
+    limits, starting from the motion already under way when the setpoint changes, and shall
+    follow it within the error its acceptance criteria give. With them unset it shall behave as
+    without a profile.

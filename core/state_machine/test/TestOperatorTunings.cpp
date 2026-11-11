@@ -111,6 +111,10 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.followingErrorTime = 20.0f;
     config.limits.speedAcceleration = -5.0f;
     config.limits.speedDeceleration = 2.0e5f;
+    config.limits.profileVelocity = 6000.0f;
+    config.limits.profileAcceleration = -1.0f;
+    config.limits.profileDeceleration = 2.0e5f;
+    config.limits.profileJerk = 2.0e7f;
     config.limits.commandTimeout = 61.0f;
     config.limits.continuousCurrent = -1.0f;
     config.limits.peakCurrent = 500.0f;
@@ -132,6 +136,10 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     EXPECT_NEAR(config.limits.followingErrorTime, services::LimitSettings{}.followingErrorTime, 1e-6f);
     EXPECT_NEAR(config.limits.speedAcceleration, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.speedDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileVelocity, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileAcceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileJerk, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.commandTimeout, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.continuousCurrent, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.peakCurrent, 0.0f, 1e-9f);

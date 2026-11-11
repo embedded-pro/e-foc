@@ -283,7 +283,16 @@ namespace mil
         clock.ForwardTime(tickPeriod);
 
         if (drive.Tick() % ticksPerMillisecond == 0)
+        {
             DrainRecords();
+            if (millisecondObserver)
+                millisecondObserver();
+        }
+    }
+
+    void ModelInTheLoop::ObserveEachMillisecond(std::function<void()> observer)
+    {
+        millisecondObserver = std::move(observer);
     }
 
     void ModelInTheLoop::DrainRecords()

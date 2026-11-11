@@ -86,6 +86,10 @@ drive *pushes for motion* when two things hold together:
 - the drive demands motion: a position error of at least the configured threshold or, without one, a
   demanded speed of at least the configured threshold.
 
+With a motion profile on (`foc-position.md`, Motion Profile) that position error is the one to the profiled
+reference, not to the final setpoint, so a move planned within the drive's limits does not read as a demand
+the rotor ignores.
+
 The *direction* of the push is the sign of that position error or, without one, of the demanded speed. A
 position law that commands the current demands no speed, so the stale speed reference it leaves in the
 speed loop is not a demand. A drive holding its position against a load carries current but has no error
@@ -307,8 +311,10 @@ stateDiagram-v2
 ### Part H — Following error
 
 A fifth watch, the following-error monitor, reads the position error the active drive observes every 1 ms on
-the event loop while the drive is `Enabled`. It is the mechanical setpoint minus the measured angle, wrapped to
-half a turn, the same error Part A judges; only position mode has one, the other modes report zero and are
+the event loop while the drive is `Enabled`. It is the mechanical reference minus the measured angle, wrapped to
+half a turn, the same error Part A judges; with a motion profile on (`foc-position.md`, Motion Profile) the
+reference is the profiled one, so the error is how far the rotor lags the path the profile plans, and a step
+within the profile's limits no longer needs a window wider than the step; only position mode has one, the other modes report zero and are
 never faulted. An evaluation counts when the magnitude of the error exceeds the following-error window. The span
 starts at the first evaluation that counts; when the evaluations have counted without a break for the
 following-error time, the monitor raises `followingError` once and stays silent until the drive leaves

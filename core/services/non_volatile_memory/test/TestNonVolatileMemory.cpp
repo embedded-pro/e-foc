@@ -487,6 +487,34 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_ok_with_correct_data_after_sav
     ExpectConfigDataEqual(loaded, written);
 }
 
+TEST_F(NonVolatileMemoryTest, the_motion_profile_survives_a_save_and_a_load)
+{
+    auto written = MakeTestConfig();
+    written.limits.profileVelocity = 20.0f;
+    written.limits.profileAcceleration = 400.0f;
+    written.limits.profileDeceleration = 500.0f;
+    written.limits.profileJerk = 9000.0f;
+    bool saveDone = false;
+    nvm.SaveConfig(written, [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData loaded{};
+    bool done = false;
+    nvm.LoadConfig(loaded, [&](auto)
+        {
+            done = true;
+        });
+    RunUntilDone(done);
+
+    EXPECT_NEAR(loaded.limits.profileVelocity, 20.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileAcceleration, 400.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileDeceleration, 500.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileJerk, 9000.0f, 1e-3f);
+}
+
 TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
 {
     auto written = MakeTestConfig();
@@ -509,9 +537,9 @@ TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
     EXPECT_EQ(loaded.homingRequired, uint8_t{ 1 });
 }
 
-TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_14)
+TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_15)
 {
-    EXPECT_EQ(services::ConfigLayoutVersion, 14);
+    EXPECT_EQ(services::ConfigLayoutVersion, 15);
 }
 
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)

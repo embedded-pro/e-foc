@@ -69,6 +69,10 @@ namespace state_machine
         const foc::RadiansPerSecond overspeedLimit{ config.limits.overspeedLimit };
         const foc::RadiansPerSecondSquared acceleration{ config.limits.speedAcceleration };
         const foc::RadiansPerSecondSquared deceleration{ config.limits.speedDeceleration };
+        const foc::RadiansPerSecond profileVelocity{ config.limits.profileVelocity };
+        const foc::RadiansPerSecondSquared profileAcceleration{ config.limits.profileAcceleration };
+        const foc::RadiansPerSecondSquared profileDeceleration{ config.limits.profileDeceleration };
+        const foc::RadiansPerSecondCubed profileJerk{ config.limits.profileJerk };
         const foc::Radians positionMinimum{ config.limits.positionMinimum };
         const foc::Radians positionMaximum{ config.limits.positionMaximum };
         const bool homingRequired = config.homingRequired != 0;
@@ -80,6 +84,7 @@ namespace state_machine
                 else if constexpr (!std::is_same_v<Machine, std::monostate>)
                 {
                     sm.RampSpeed(acceleration, deceleration);
+                    sm.ProfileMotion(profileVelocity, profileAcceleration, profileDeceleration, profileJerk);
                     sm.LimitTravel(positionMinimum, positionMaximum);
                     if constexpr (std::is_same_v<Machine, application::PositionStateMachine>)
                         sm.RequireHoming(homingRequired);

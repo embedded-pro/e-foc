@@ -46,7 +46,7 @@ namespace supervision
             return false;
 
         const auto window = settings().window.Value();
-        return window > 0.0f && math::Abs(drive->ObserveMotion().positionError.Value()) <= window;
+        return window > 0.0f && math::Abs(drive->ObserveMotion().targetError.Value()) <= window;
     }
 
     TargetReachedMonitor::Settings TargetReachedSettingsFrom(const services::ConfigData& config)

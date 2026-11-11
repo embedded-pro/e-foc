@@ -72,6 +72,9 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::overspeedLimit, LimitSettings().front().parameter);
     EXPECT_EQ(FocParameter::peakCurrentTime, LimitSettings().back().parameter);
     EXPECT_EQ(9u, LimitSettings().size());
+    EXPECT_EQ(FocParameter::profileVelocity, MotionProfileSettings().front().parameter);
+    EXPECT_EQ(FocParameter::profileJerk, MotionProfileSettings().back().parameter);
+    EXPECT_EQ(4u, MotionProfileSettings().size());
     EXPECT_EQ(FocParameter::positionWindow, TargetWindowSettings().front().parameter);
     EXPECT_EQ(FocParameter::positionWindowTime, TargetWindowSettings().back().parameter);
     EXPECT_EQ(2u, TargetWindowSettings().size());
@@ -110,6 +113,7 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(StreamSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(SupervisionSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(LimitSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(MotionProfileSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(TargetWindowSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(TravelLimitSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(ThermalSettings(), readOnly));
@@ -120,7 +124,7 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(RecalibrationSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(HomingSettings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(RecalibrationReadings(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + StreamSettings().size() + SupervisionSettings().size() + LimitSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + Readings().size() + StatusReadings().size() + RecalibrationSettings().size() + RecalibrationReadings().size() + HomingSettings().size());
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + StreamSettings().size() + SupervisionSettings().size() + LimitSettings().size() + MotionProfileSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + Readings().size() + StatusReadings().size() + RecalibrationSettings().size() + RecalibrationReadings().size() + HomingSettings().size());
 }
 
 TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)

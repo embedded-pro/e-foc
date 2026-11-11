@@ -161,7 +161,7 @@ mode starts from its own setpoint. The measured speed and position read in rpm a
 decimals; loop bandwidths stay in rad/s, since they are frequencies, not speeds.
 
 The measured speed and position come from the motion telemetry that answers each status request
-(`service-can.md`, contract 3.0). The panel offers no torque in newton-metres; the tool's client can send it,
+(`service-can.md`, contract 3.1). The panel offers no torque in newton-metres; the tool's client can send it,
 and the controller converts it with the calibrated torque constant.
 
 Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
@@ -262,6 +262,11 @@ flowchart LR
   only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
   setpoint. They are stored at once and in force from the next control period, in any
   state; the group says that a drive beyond 110 % of the limit faults and coasts.
+  Its **Motion Profile** group holds the profile velocity, acceleration, deceleration and jerk of contract 3.1
+  (`foc-position.md`, Motion Profile): position mode plans a trapezoidal path to each setpoint within them, the
+  profile is off while the velocity or the acceleration is zero, a deceleration of zero uses the acceleration,
+  and the jerk is reserved for a later S-curve and has no effect yet, as the group says. They are stored at once
+  and in force from the next control period, in any state.
   Its **Target Window** group holds the position window and its time of contract 2.10 (`foc-position.md`,
   Target Reached): position mode reports the target reached once its error has stayed within the window for
   the time, and a window of zero keeps the report off, as the group says. They are stored at once and in force

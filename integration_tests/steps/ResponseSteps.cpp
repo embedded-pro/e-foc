@@ -5,11 +5,13 @@
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
+#include "numerical/motion_profiles/TrapezoidalProfileFromState.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <gtest/gtest.h>
+#include <limits>
 #include <string>
 
 using namespace integration;
@@ -157,6 +159,40 @@ namespace
         if (!first)
             return std::nullopt;
         return std::abs(last - *first);
+    }
+
+    struct ProfileLimits
+    {
+        float velocity;
+        float acceleration;
+    };
+
+    float ProfileFollowingError(const ScenarioSetup& setup, uint32_t stamp, float start, float goal, const ProfileLimits& limits, float offsetMs, float fromMs, float toMs)
+    {
+        const motion_profiles::TrapezoidalProfileFromState<float> profile{ start, 0.0f, goal, { limits.velocity, limits.acceleration, limits.acceleration } };
+        const float ticksPerSecond = static_cast<float>(setup.plant.baseFrequencyHz);
+        float worst{ 0.0f };
+
+        for (const auto& sample : setup.trace.Samples())
+        {
+            if (sample.tick < stamp)
+                continue;
+
+            const float elapsedMs = static_cast<float>(sample.tick - stamp) / ticksPerSecond * kMilliPerSecond - offsetMs;
+            if (elapsedMs >= fromMs && elapsedMs <= toMs)
+                worst = std::max(worst, std::abs(sample.thetaMech - profile.Sample(elapsedMs / kMilliPerSecond).position));
+        }
+
+        return worst;
+    }
+
+    std::optional<float> PositionAtTick(const ScenarioSetup& setup, uint32_t tick)
+    {
+        for (const auto& sample : setup.trace.Samples())
+            if (sample.tick >= tick)
+                return sample.thetaMech;
+
+        return std::nullopt;
     }
 
     void RequireCapturedTrace(const ScenarioSetup& setup)
@@ -512,6 +548,58 @@ THEN(R"(the rotor shall travel less than {float} rad after the last setpoint)", 
     ASSERT_TRUE(travel.has_value()) << "No plant samples after the last setpoint";
     std::fprintf(stderr, "[METRIC] sil travel_rad value=%.3f\n", *travel);
     EXPECT_LT(*travel, maximum) << "The rotor travelled " << *travel << " rad";
+}
+
+THEN(R"(the rotor shall arrive within {float} rad of the last setpoint between {float} and {float} ms after it)", (float band, float earliestMs, float latestMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+    const auto stamp = SetpointStampAfterEnable(setup);
+    ASSERT_TRUE(stamp.has_value()) << "No setpoint was applied after enable";
+
+    std::optional<uint32_t> arrival;
+    for (const auto& sample : setup.trace.Samples())
+    {
+        const bool inside = sample.tick >= *stamp && std::abs(sample.thetaMech - setup.lastSetpoint->value) <= band;
+        if (!inside)
+            arrival.reset();
+        else if (!arrival)
+            arrival = sample.tick;
+    }
+
+    ASSERT_TRUE(arrival.has_value()) << "The rotor did not stay within " << band << " rad of the setpoint";
+    const float arrivalMs = static_cast<float>(*arrival - *stamp) / static_cast<float>(setup.plant.baseFrequencyHz) * kMilliPerSecond;
+    std::fprintf(stderr, "[METRIC] sil position_arrival band_rad=%.4f arrival_ms=%.3f\n", band, arrivalMs);
+    EXPECT_GE(arrivalMs, earliestMs);
+    EXPECT_LE(arrivalMs, latestMs);
+}
+
+THEN(R"(the rotor shall follow a trapezoidal profile of {float} rad\/s and {float} rad\/s2 within {float} rad through the cruise)", (float velocity, float acceleration, float limit))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+    const auto stamp = SetpointStampAfterEnable(setup);
+    ASSERT_TRUE(stamp.has_value()) << "No setpoint was applied after enable";
+    const auto start = PositionAtTick(setup, *stamp);
+    ASSERT_TRUE(start.has_value()) << "No plant samples after the last setpoint";
+
+    constexpr float kLatestStartMs = 3.0f;
+    constexpr float kOffsetStepMs = 0.25f;
+    const float rampMs = velocity / acceleration * kMilliPerSecond;
+    float best{ std::numeric_limits<float>::max() };
+    float bestOffsetMs{ 0.0f };
+    for (float offsetMs = 0.0f; offsetMs <= kLatestStartMs; offsetMs += kOffsetStepMs)
+    {
+        const float error = ProfileFollowingError(setup, *stamp, *start, setup.lastSetpoint->value, { velocity, acceleration }, offsetMs, 1.1f * rampMs, 1.4f * rampMs);
+        if (error < best)
+        {
+            best = error;
+            bestOffsetMs = offsetMs;
+        }
+    }
+
+    std::fprintf(stderr, "[METRIC] sil position_profile cruise_error_rad=%.4f start_offset_ms=%.2f\n", best, bestOffsetMs);
+    EXPECT_LT(best, limit);
 }
 
 THEN(R"(the response shall have no dropped samples)")

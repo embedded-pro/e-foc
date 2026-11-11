@@ -112,6 +112,10 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     can::WriteLimitSetting(config, can::FocParameter::followingErrorTime, 0.25f);
     can::WriteLimitSetting(config, can::FocParameter::speedAcceleration, 300.0f);
     can::WriteLimitSetting(config, can::FocParameter::speedDeceleration, 600.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileVelocity, 20.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileAcceleration, 400.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileDeceleration, 500.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileJerk, 9000.0f);
     can::WriteLimitSetting(config, can::FocParameter::commandTimeout, 0.5f);
     can::WriteLimitSetting(config, can::FocParameter::continuousCurrent, 2.0f);
     can::WriteLimitSetting(config, can::FocParameter::peakCurrent, 3.0f);
@@ -128,6 +132,14 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::speedDeceleration), 600.0f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedAcceleration), can::ParameterGroup::limits);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedDeceleration), can::ParameterGroup::limits);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileVelocity), 20.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileAcceleration), 400.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileDeceleration), 500.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileJerk), 9000.0f, 1e-3f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileVelocity), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileAcceleration), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileDeceleration), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileJerk), can::ParameterGroup::limits);
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::commandTimeout), 0.5f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::commandTimeout), can::ParameterGroup::limits);
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::continuousCurrent), 2.0f, 1e-6f);

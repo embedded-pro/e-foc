@@ -37,7 +37,7 @@ namespace
 TEST_F(NvmRecordTest, the_calibration_record_is_its_header_and_one_hundred_data_bytes)
 {
     EXPECT_EQ(109u, services::CalibrationRecord::size);
-    EXPECT_EQ(177u, services::ConfigRecord::size);
+    EXPECT_EQ(193u, services::ConfigRecord::size);
     EXPECT_EQ(6, services::CalibrationLayoutVersion);
 }
 

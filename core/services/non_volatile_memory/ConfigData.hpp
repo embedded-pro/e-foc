@@ -47,6 +47,10 @@ namespace services
         float followingErrorTime = 0.1f;
         float speedAcceleration = 0.0f;
         float speedDeceleration = 0.0f;
+        float profileVelocity = 0.0f;
+        float profileAcceleration = 0.0f;
+        float profileDeceleration = 0.0f;
+        float profileJerk = 0.0f;
         float commandTimeout = 0.0f;
         float continuousCurrent = 0.0f;
         float peakCurrent = 0.0f;
@@ -70,7 +74,7 @@ namespace services
     };
 
     inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
-    inline constexpr uint8_t ConfigLayoutVersion = 14;
+    inline constexpr uint8_t ConfigLayoutVersion = 15;
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
@@ -94,5 +98,5 @@ namespace services
         uint8_t homingRequired = 0;
     };
 
-    static_assert(sizeof(ConfigData) == 168, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 184, "ConfigData layout must be free of implicit padding");
 }

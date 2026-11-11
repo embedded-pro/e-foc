@@ -538,6 +538,15 @@ a triple buffer. The platform multiplies each rate by its delay, and the readout
 the next sample before the rebuild. `ZeroVectorSlope::Next` is inlined into `Calculate`;
 `PlatformFactoryImpl::ZeroVectorSlopes` is reached through a pointer, so the cycle-gate configurations name it.
 
+The position motion profile (`documentation/theory/position-motion-profile.md`) runs in the 1 kHz outer loop, ahead
+of the position law, so it is charged to the outer-loop budget and not to the 20 kHz one. A sample is a handful of
+multiplications and compares on a closed-form trapezoid with no loop and no division; a replan, which happens once
+per setpoint change, adds the planner's few divisions and one square root for a move too short to reach the
+profile velocity, and one wrapped difference whose `fmodf` the existing loop bound already covers. The plan is a
+plain member, not an `std::optional`, and the acceleration feed-forward is one multiply-add stored beside the
+friction current, so the 20 kHz inner loop is unchanged. The cycle gate follows the calls from
+`PositionCascade::LowPriorityHandler` directly, so `cycle-analysis-outer.json` needs no new entry.
+
 ### Key Performance Sensitivities
 
 | Code Pattern           | Cycle Impact       | Recommendation                      |

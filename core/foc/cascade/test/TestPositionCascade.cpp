@@ -4,9 +4,11 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
+#include "core/foc/position_loop/LqrPositionController.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "numerical/math/Tolerance.hpp"
 #include <array>
+#include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -892,4 +894,104 @@ TEST_F(TestPositionCascade, a_bus_below_the_configured_voltage_raises_the_inner_
 
     ExpectOffCentreDuty(expected);
     EXPECT_GT(deviation(raised), deviation(expected));
+}
+
+namespace
+{
+    constexpr float profileVelocity{ 20.0f };
+    constexpr float profileAcceleration{ 400.0f };
+    constexpr float outerPeriod{ 1.0f / 2000.0f };
+
+    void ProfileMotion(PositionCascadeUnderTest& positionCascade)
+    {
+        positionCascade.cascade->ProfileMotion(foc::RadiansPerSecond{ profileVelocity }, foc::RadiansPerSecondSquared{ profileAcceleration }, foc::RadiansPerSecondSquared{ 0.0f }, foc::RadiansPerSecondCubed{ 0.0f });
+    }
+}
+
+TEST_F(TestPositionCascade, a_speed_commanding_algorithm_adds_the_profile_speed_to_the_error_term)
+{
+    PositionCascadeUnderTest profiled{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
+    EXPECT_CALL(profiled.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    ProfileMotion(profiled);
+    constexpr int cycles{ 40 };
+
+    DutyAfterOuterCycles(profiled, 1.5f, 0.0f, cycles);
+
+    const auto observation = profiled.cascade->ObserveMotion();
+    const float time = static_cast<float>(cycles) * outerPeriod;
+    EXPECT_NEAR(observation.positionError.Value(), 0.5f * profileAcceleration * time * time, 1e-5f);
+    EXPECT_NEAR(observation.demandedSpeed.Value(), foc::PositionLoopTunings{}.bandwidth * observation.positionError.Value() + profileAcceleration * time, 1e-3f);
+}
+
+TEST_F(TestPositionCascade, the_profile_acceleration_adds_its_torque_current_to_the_demand)
+{
+    PositionCascadeUnderTest profiled{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    EXPECT_CALL(profiled.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    ProfileMotion(profiled);
+
+    foc::LqrPositionController law;
+    law.Configure(MechanicalParameters());
+    law.SetTunings(foc::PositionLoopTunings{});
+    const float reference = 0.5f * profileAcceleration * outerPeriod * outerPeriod;
+    const float feedback = law.Compute({ foc::Radians{ 0.0f }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ profileAcceleration * outerPeriod }, true }).value;
+    const float inertiaCurrent = MechanicalParameters().inertia.Value() / MechanicalParameters().torqueConstant.Value() * profileAcceleration;
+    ASSERT_LT(std::abs(feedback + inertiaCurrent), 10.0f);
+
+    DutyAfterOuterCycles(profiled, 1.5f, 0.0f, 1);
+
+    EXPECT_NEAR(profiled.cascade->ObserveMotion().demandedTorqueCurrent.Value(), feedback + inertiaCurrent, 1e-3f);
+}
+
+TEST_F(TestPositionCascade, a_profile_keeps_the_reference_error_apart_from_the_error_to_the_target)
+{
+    PositionCascadeUnderTest profiled{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(profiled.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    ProfileMotion(profiled);
+
+    DutyAfterOuterCycles(profiled, 1.5f, 0.0f, 20);
+
+    const auto observation = profiled.cascade->ObserveMotion();
+    EXPECT_NEAR(observation.targetError.Value(), 1.5f, 1e-5f);
+    EXPECT_LT(observation.positionError.Value(), 0.05f);
+    EXPECT_GT(observation.positionError.Value(), 0.0f);
+}
+
+TEST_F(TestPositionCascade, without_a_profile_the_error_to_the_target_is_the_error_to_the_reference)
+{
+    PositionCascadeUnderTest plain{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(plain.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+
+    DutyAfterOuterCycles(plain, 1.5f, 0.0f, 20);
+
+    const auto observation = plain.cascade->ObserveMotion();
+    EXPECT_NEAR(observation.targetError.Value(), 1.5f, 1e-6f);
+    EXPECT_NEAR(observation.positionError.Value(), 1.5f, 1e-6f);
+}
+
+TEST_F(TestPositionCascade, a_velocity_without_an_acceleration_leaves_the_cascade_unprofiled)
+{
+    PositionCascadeUnderTest plain{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    PositionCascadeUnderTest halfSet{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(plain.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    EXPECT_CALL(halfSet.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    halfSet.cascade->ProfileMotion(foc::RadiansPerSecond{ profileVelocity }, foc::RadiansPerSecondSquared{ 0.0f }, foc::RadiansPerSecondSquared{ 0.0f }, foc::RadiansPerSecondCubed{ 0.0f });
+
+    ExpectSameDuty(DutyAfterOuterCycles(halfSet, 1.5f, 0.0f, 10), DutyAfterOuterCycles(plain, 1.5f, 0.0f, 10));
+}
+
+TEST_F(TestPositionCascade, a_speed_command_drops_the_profile_and_the_next_move_starts_from_the_measured_state)
+{
+    PositionCascadeUnderTest profiled{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+    EXPECT_CALL(profiled.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+    ProfileMotion(profiled);
+    DutyAfterOuterCycles(profiled, 1.5f, 0.0f, 40);
+
+    profiled.cascade->EnableSpeedCommand();
+    foc::Radians jogged{ 1.0f };
+    profiled.cascade->Calculate(ZeroCurrents(), jogged);
+    profiled.lowPriorityInterrupt.TriggerHandler();
+    profiled.cascade->DisableSpeedCommand();
+    DutyAfterOuterCycles(profiled, 1.5f, 1.0f, 1);
+
+    EXPECT_NEAR(profiled.cascade->ObserveMotion().positionError.Value(), 0.5f * profileAcceleration * outerPeriod * outerPeriod, 1e-5f);
 }

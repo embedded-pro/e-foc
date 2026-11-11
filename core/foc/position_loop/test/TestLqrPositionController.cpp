@@ -210,3 +210,14 @@ TEST_F(TestLqrPositionController, a_higher_bandwidth_asks_for_more_current_on_th
 
     EXPECT_GT(Command(error, 0.0f), slow);
 }
+
+TEST_F(TestLqrPositionController, a_speed_equal_to_the_reference_speed_commands_as_at_rest)
+{
+    controller.Configure(ValidParameters());
+    foc::LqrPositionController atRest;
+    atRest.Configure(ValidParameters());
+    const foc::PositionControlContext rest{ foc::Radians{ 0.0f }, foc::Radians{ 0.001f } };
+    const foc::PositionControlContext moving{ foc::Radians{ 0.0f }, foc::Radians{ 0.001f }, foc::RadiansPerSecond{ 20.0f }, false, foc::RadiansPerSecond{ 20.0f } };
+
+    EXPECT_NEAR(controller.Compute(moving).value, atRest.Compute(rest).value, tolerance);
+}

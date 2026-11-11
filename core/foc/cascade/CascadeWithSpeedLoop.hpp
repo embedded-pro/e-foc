@@ -46,9 +46,9 @@ namespace foc
         }
 
         void SetSpeedReference(RadiansPerSecond reference);
-        void RunSpeedLoop(float mechanicalSpeed);
+        void RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration = 0.0f);
 
-        void SetDirectCurrentReference(float current);
+        void SetDirectCurrentReference(float current, float referenceAcceleration = 0.0f);
         float MeasureMechanicalSpeed();
 
         void EnableCurrentCommandImpl();
@@ -83,7 +83,7 @@ namespace foc
         struct OuterLoopOutputs
         {
             volatile float speedLoopOutput;
-            volatile float frictionCurrent;
+            volatile float feedForwardCurrent;
             volatile float directCurrentReference;
             volatile float speedReference;
             volatile float electricalSpeed;
@@ -129,6 +129,7 @@ namespace foc
         SpeedDifferentiator speedDifferentiator;
         OuterLoopOutputs outer{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
         CurrentCommand command;
+        float accelerationCurrentGain{ 0.0f };
         MotorScaling scaling{ 0.0f, 1.0f, 0.0f };
         BusVoltageRatio busRatio;
         volatile bool enabled{ false };

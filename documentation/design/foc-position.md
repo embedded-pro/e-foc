@@ -126,8 +126,8 @@ stateDiagram-v2
 ### Target Reached
 
 A host that sequences moves needs to know when one is done. The drive reports the target reached once the
-position error — the wrapped difference between the setpoint and θm that the loop works on — has stayed
-within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
+target error — the wrapped difference between the final setpoint and θm, which the motion profile (Motion
+Profile) does not shorten — has stayed within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
 1 ms keeps that count in a `SustainedCondition` (`core/supervision/`), and the error is read again when a host asks: a setpoint the drive has accepted is
 never answered with the previous move's flag, because a target outside the window clears it at once, and the
 count starts over when the rotor arrives.
@@ -145,6 +145,46 @@ stateDiagram-v2
     Settling --> Moving : error beyond the window, or leaves Enabled
     Settling --> Reached : within the window for the window time
     Reached --> Moving : error beyond the window, or leaves Enabled
+```
+
+### Motion Profile
+
+A step setpoint asks the loop for the most speed and current it has. Two stored limits shape the move instead:
+the profile velocity and the profile acceleration, with an optional profile deceleration (0 uses the
+acceleration) and a profile jerk. Position mode then plans a trapezoid of speed from the motion already under
+way to the setpoint and hands the position law a moving reference with its velocity and acceleration
+(`documentation/theory/position-motion-profile.md`). The settings are contract 3.1 parameters and drive-wide
+limits (`service-can.md`, `service-nvm.md`); the jerk is reserved for a later S-curve and is stored and read
+back without effect.
+
+- **On and off.** The profile is on only while the velocity and the acceleration are both above zero. Off, the
+  setpoint reaches the position law exactly as without the feature, and so do every output and every
+  observation.
+- **Replan.** A new setpoint is noticed at the next 1 kHz tick and the plan restarts from the reference's own
+  position and velocity, so both stay continuous. A reversal brakes at the deceleration, then turns round; the
+  speed and rates stay within the limits throughout.
+- **Seed.** On Enable, after a speed or current command, and when the profile is switched on, the reference
+  starts from the measured position and speed.
+- **Circle and limits.** Without travel limits the goal is placed by the wrapped difference, the shorter way
+  round the seam. With travel limits it is the setpoint held between them and the move goes the direct way.
+- **Feed-forward.** The reference velocity feeds each position law (speed reference for PID, Cascade P and
+  Two-DOF; the speed state of LQR and LQI), and the acceleration feeds the q-axis current as J·a/Kt beside the
+  friction feed-forward, under the same current limit. The Two-DOF law bypasses its reference pre-filter while the
+  profile is on.
+- **Errors.** The drive reports two position errors: the *position error*, profiled reference minus θm, which
+  the following-error monitor and the encoder plausibility monitor measure (`fault-supervision.md` Parts H and
+  K), and the *target error*, final setpoint minus θm, which the target-reached check measures. The target is
+  therefore not reported reached while the reference is on its way.
+
+```mermaid
+flowchart LR
+    SP["setpoint"] --> Q{"profile on?"}
+    Q -- no --> LAW["position law"]
+    Q -- yes --> TR["trapezoid, replanned on a new setpoint"]
+    TR -->|"reference, velocity"| LAW
+    TR -->|"acceleration"| FF["J·a/Kt"]
+    FF --> IQ["q-axis current reference"]
+    LAW --> IQ
 ```
 
 ### Homing and the Position Reference
@@ -218,9 +258,10 @@ flowchart LR
 
 Within a single LPI callback, the position and speed loops execute in strict order:
 
-1. **Position law fires first**: reads θm, computes the wrapped position error, produces either a speed setpoint or an Iq setpoint.
-2. **Speed PID fires second, if the position law produced a speed setpoint**: reads the freshly updated setpoint, computes speed error using Δθ/Δt, produces and clamps the Iq setpoint. A current-reference law writes the Iq setpoint itself and this step is skipped.
-3. Callback returns. On the next 20 kHz ISR cycle, the inner loop picks up the updated Iq setpoint.
+1. **Motion profile fires first** (Motion Profile): replans on a new setpoint and samples the reference position, velocity and acceleration for this tick; with the profile off it passes the setpoint through.
+2. **Position law fires second**: reads θm, computes the wrapped position error to the reference, produces either a speed setpoint or an Iq setpoint.
+3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint, computes speed error using Δθ/Δt, produces and clamps the Iq setpoint. A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
+4. Callback returns. On the next 20 kHz ISR cycle, the inner loop picks up the updated Iq setpoint.
 
 This ordering guarantees that the Iq setpoint used by the inner loop is always the one derived in the most recent outer-loop tick.
 
@@ -230,19 +271,20 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 ### Provided
 
-| Interface               | Purpose                                                                                                                     | Contract                                                                                                                                                                                    |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Configure               | Supplies the motor model, including the pole-pair count.                                                                    | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
-| Enable                  | Resets the position law and arms the loops beneath it.                                                                      | Safe to call repeatedly. Position setpoint is preserved.                                                                                                                                    |
-| Disable                 | Disarms all PIDs and forces zero duty cycle output.                                                                         | Safe to call from any context.                                                                                                                                                              |
-| SetCurrentTunings       | Sets the current loop closed-loop bandwidth.                                                                                | Gains are derived from the motor model and normalised internally.                                                                                                                           |
-| SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.                                                                                  | Speed loop output clamped to ± maxCurrent.                                                                                                                                                  |
-| SetPositionTunings      | Sets the position loop bandwidth and cost weights.                                                                          | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live. |
-| SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
-| SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
-| Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
-| ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed and position error, for REQ-PRO-005. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.      |
-| Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                 |
+| Interface               | Purpose                                                                                                                     | Contract                                                                                                                                                                                                                                            |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure               | Supplies the motor model, including the pole-pair count.                                                                    | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                                                                                   |
+| Enable                  | Resets the position law and arms the loops beneath it.                                                                      | Safe to call repeatedly. Position setpoint is preserved.                                                                                                                                                                                            |
+| Disable                 | Disarms all PIDs and forces zero duty cycle output.                                                                         | Safe to call from any context.                                                                                                                                                                                                                      |
+| SetCurrentTunings       | Sets the current loop closed-loop bandwidth.                                                                                | Gains are derived from the motor model and normalised internally.                                                                                                                                                                                   |
+| SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.                                                                                  | Speed loop output clamped to ± maxCurrent.                                                                                                                                                                                                          |
+| SetPositionTunings      | Sets the position loop bandwidth and cost weights.                                                                          | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live.                                                         |
+| SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                                                                                      |
+| SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle; with a motion profile on it starts a replan.                                                                                                                                                 |
+| ProfileMotion           | Sets the motion profile: velocity, acceleration, deceleration and jerk.                                                     | Applied with the other limits at the next outer-loop period. Off while the velocity or the acceleration is zero; a deceleration of zero uses the acceleration; the jerk has no effect yet.                                                          |
+| Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                              |
+| ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed, the position error to the reference and the target error to the final setpoint, for REQ-PRO-005. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one. |
+| Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                                                                         |
 
 ### Required
 

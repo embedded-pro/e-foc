@@ -41,7 +41,7 @@ namespace foc
             return { PositionOutputKind::currentReference, 0.0f };
 
         const auto deviation = -PositionDifference(context.reference, context.measured, context.direct);
-        const auto scaledSpeed = context.measuredSpeed.Value() * SamplePeriod();
+        const auto scaledSpeed = (context.measuredSpeed.Value() - context.referenceSpeed.Value()) * SamplePeriod();
 
         accumulatedDeviation += deviation;
 

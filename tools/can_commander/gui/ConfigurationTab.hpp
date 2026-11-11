@@ -21,6 +21,7 @@ namespace tool
         void BuildStreamGroup();
         void BuildSupervisionGroup();
         void BuildLimitsGroup();
+        void BuildMotionProfileGroup();
         void BuildTargetWindowGroup();
         void BuildTravelLimitsGroup();
         void BuildThermalGroup();

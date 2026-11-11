@@ -90,6 +90,8 @@ namespace mil
         bool AlternateSpeed(float low, float high, std::chrono::milliseconds dwell, std::chrono::milliseconds total);
         bool HoldSpeed(float speed, std::chrono::milliseconds duration);
 
+        void ObserveEachMillisecond(std::function<void()> observer);
+
         bool IsRunning() const;
         bool IsReady() const;
         bool HasFault() const;
@@ -198,6 +200,7 @@ namespace mil
         integration::response::PlantTrace trace;
         std::optional<uint32_t> setpointTick;
         std::optional<float> setpoint;
+        std::function<void()> millisecondObserver;
     };
 
     std::optional<integration::response::StepResponseMetrics> MeasureStep(ModelInTheLoop& mil, integration::response::Signal signal, float bandPercent, const char* label);
