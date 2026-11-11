@@ -381,11 +381,11 @@ Tier 1 gates three paths on two MCUs, each path with one configuration under `ta
 that both share. A stage lists the TI and the ST symbols side by side and fails only when none of them is in the
 binary. Each budget is the same slice of time on every MCU, in cycles of its clock:
 
-| Path                                                      | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
-|-----------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
-| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
-| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
-| ADC ISR → inner loop → calibration observer               | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
+| Path                                                    | Configuration                        | Time     | EK-TM4C1294XL (120 MHz) | NUCLEO-G474RE (170 MHz) |
+|---------------------------------------------------------|--------------------------------------|----------|-------------------------|-------------------------|
+| ADC ISR → inner loop → PWM                              | `cycle-analysis.json`                | 37.5 µs  | 4500                    | 6375                    |
+| Low-priority interrupt → outer loop → online estimators | `cycle-analysis-outer.json`          | 166.7 µs | 20000                   | 28333                   |
+| ADC ISR → inner loop → calibration observer             | `cycle-analysis-identification.json` | 50 µs    | 6000                    | 8500                    |
 
 On a pull request each MCU gets one cycle banner and one memory banner. The cycle banner
 (`.github/scripts/cycle-analysis-banner.py`) shows one row per path (worst-case cycles and budget, both also as a

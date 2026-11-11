@@ -157,7 +157,6 @@ namespace foc
         limits.inverseElectricalSpeed = electricalLimit > 0.0f ? 1.0f / electricalLimit : 0.0f;
     }
 
-
     void TorqueCascade::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
     {
         slopeSink = &sink;
