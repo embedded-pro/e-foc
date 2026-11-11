@@ -1,8 +1,8 @@
 #pragma once
 
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstdint>
 #include <optional>
 

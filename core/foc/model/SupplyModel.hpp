@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 
 namespace foc
 {

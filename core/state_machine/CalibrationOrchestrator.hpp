@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
@@ -8,6 +7,7 @@
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"

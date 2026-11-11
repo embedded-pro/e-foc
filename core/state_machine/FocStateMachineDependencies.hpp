@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/cascade/CurrentStream.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
@@ -11,6 +10,7 @@
 #include "core/services/index_search/IndexSearch.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <cstdint>
 #include <functional>

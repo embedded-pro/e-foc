@@ -1,6 +1,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 
 namespace foc
 {

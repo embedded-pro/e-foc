@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/MotorSettings.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "generated/Boards.hpp"
 #include <algorithm>
 #include <array>

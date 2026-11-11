@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/Function.hpp"
 #include <array>
 #include <cstddef>

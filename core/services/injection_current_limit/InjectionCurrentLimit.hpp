@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/SharedPtr.hpp"

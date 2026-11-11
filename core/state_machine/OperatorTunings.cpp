@@ -1,6 +1,6 @@
 #include "core/state_machine/OperatorTunings.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace state_machine
 {

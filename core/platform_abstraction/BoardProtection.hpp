@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>

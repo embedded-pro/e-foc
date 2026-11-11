@@ -72,8 +72,8 @@ cmake --build --preset EK-TM4C1294XL-Debug
 e-foc/
 ├── core/                            # FOC library code (no application entry points)
 │   ├── foc/                         # Field-Oriented Control
-│   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, MotorModel.hpp, LoopTunings.hpp, Execution.hpp, Units.hpp)
-│   │   ├── math/                    # Generic numerics (ParameterValidation.hpp, CoggingFeedForward.hpp)
+│   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, MotorModel.hpp, LoopTunings.hpp, Execution.hpp)
+│   │   ├── math/                    # Generic numerics (CoggingFeedForward.hpp, TravelLimits.hpp)
 │   │   ├── transforms/              # Clarke/Park transforms and Space Vector Modulation
 │   │   ├── selection/               # Heap-free runtime controller selection
 │   │   ├── current_loop/            # PID/decoupled-PID/deadbeat/sliding-mode current regulators
@@ -116,6 +116,7 @@ e-foc/
 │   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
 │   ├── numerical-toolbox/           # PID, filters, fixed-point algorithms
 │   ├── can-lite/                    # CAN protocol library
+│   ├── e-foc-protocol/              # FOC motor CAN wire contract, server and client categories
 │   └── hal/                         # Hardware abstraction layer (ST, TI)
 ├── documentation/                   # Architecture, design, theory, and requirements docs
 └── build/                           # Build artifacts (generated, not committed)
@@ -398,6 +399,7 @@ How requirements, scenarios and design documents divide the work: [Integration T
 | [Agent Instructions](AGENTS.md)                          | Development guidelines, patterns, and constraints         |
 | [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference   |
 | [numerical-toolbox](infra/numerical-toolbox/README.md)   | Reusable numerical algorithms (PID, filters, fixed-point) |
+| [e-foc-protocol](infra/e-foc-protocol/README.md)         | FOC motor CAN wire contract, server and client            |
 
 ## License
 

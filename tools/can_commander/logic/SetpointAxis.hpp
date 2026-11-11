@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstdint>
 #include <string_view>
 

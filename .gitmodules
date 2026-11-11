@@ -17,3 +17,6 @@
 	path = infra/e-foc-hardware
 	url = https://github.com/embedded-pro/e-foc-hardware
 	update = none
+[submodule "infra/e-foc-protocol"]
+	path = infra/e-foc-protocol
+	url = https://github.com/embedded-pro/e-foc-protocol.git

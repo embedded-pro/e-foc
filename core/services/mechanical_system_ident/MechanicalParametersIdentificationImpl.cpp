@@ -1,6 +1,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"

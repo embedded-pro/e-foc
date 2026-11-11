@@ -9,5 +9,4 @@ target_link_libraries(e_foc.foc.interfaces_test PUBLIC
 
 target_sources(e_foc.foc.interfaces_test PRIVATE
     TestMotorModel.cpp
-    TestUnits.cpp
 )

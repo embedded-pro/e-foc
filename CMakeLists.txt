@@ -81,6 +81,7 @@ if (DEFINED TARGET_MCU_VENDOR)
 endif()
 
 add_subdirectory(infra/numerical-toolbox SYSTEM)
+add_subdirectory(infra/e-foc-protocol SYSTEM)
 
 if (NOT E_FOC_EMBEDDED_BUILD)
     set(UI_BUILD_QT_BACKEND On CACHE BOOL "" FORCE)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstdint>
 #include <string_view>
 

@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/SetpointAxis.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>

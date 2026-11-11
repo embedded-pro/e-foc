@@ -1,9 +1,7 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCommissioningBridge.hpp"
 #include "core/can/FocMotorSettingsBridge.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
@@ -11,6 +9,8 @@
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <functional>

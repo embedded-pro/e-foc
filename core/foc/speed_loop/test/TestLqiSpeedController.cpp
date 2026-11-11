@@ -1,6 +1,6 @@
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/speed_loop/LqiSpeedController.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
 #include <algorithm>
 #include <gmock/gmock.h>
 

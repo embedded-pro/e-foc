@@ -6,9 +6,9 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 ## Architecture
 
-- `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
+- `core/foc/interfaces/` — FOC vocabulary/contracts (`Signals.hpp`, `Foc.hpp`). No algorithms. The unit types (`Units.hpp`), the accepted parameter ranges (`CommandLimits.hpp`) and their checks (`ParameterValidation.hpp`) come from `infra/e-foc-protocol/` (`e-foc-protocol/foc/…`)
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
-- `core/foc/math/` — `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
+- `core/foc/math/` — `CoggingFeedForward.hpp`, `TravelLimits.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
 - `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`);
   `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), the `BoardProtectionSimulator`,
@@ -17,10 +17,11 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
 - `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, fault history (`fault_history/`), `injection_current_limit/`, status LEDs (`leds/`)
-- `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`); `FirmwareUpgradeInterlock` holds the drive for can-lite's `services::FirmwareUpgradeSession` (download and staging of an upgrade pack)
+- `core/can/` — the firmware side of the FOC motor CAN category: `FocMotorCanBridge` (the server's observer), settings, current streamer, liveness watchdog, command timeout; `FirmwareUpgradeInterlock` holds the drive for can-lite's `services::FirmwareUpgradeSession` (download and staging of an upgrade pack)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
+- `infra/e-foc-protocol/` — the FOC motor CAN wire contract (`e-foc-protocol/contract/`), the category server and client and `FocMotorCanClient`, shared with every client of the drive. A contract change starts there (its `documentation/design/wire-contract.md`), then bumps the submodule here
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
   with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
 - `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,

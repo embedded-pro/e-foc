@@ -1,7 +1,7 @@
 #include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/can/FocMotorSettings.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include <limits>
 
 namespace can

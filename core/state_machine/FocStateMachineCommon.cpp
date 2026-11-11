@@ -1,6 +1,6 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/FocLifecycleTable.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace application
 {

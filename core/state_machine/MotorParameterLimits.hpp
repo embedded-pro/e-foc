@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <cmath>
 

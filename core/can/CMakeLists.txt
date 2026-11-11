@@ -6,6 +6,8 @@ target_include_directories(e_foc.can PUBLIC
 )
 
 target_link_libraries(e_foc.can PUBLIC
+    e_foc_protocol.client
+    e_foc_protocol.server
     can_lite.core
     can_lite.server
     can_lite.client
@@ -20,14 +22,8 @@ target_link_libraries(e_foc.can PUBLIC
 )
 
 target_sources(e_foc.can PRIVATE
-    FocMotorMessages.hpp
-    FocMotorWireContract.hpp
     FocMotorSettings.hpp
     FocMotorSettings.cpp
-    FocMotorCategoryServer.hpp
-    FocMotorCategoryServer.cpp
-    FocMotorCategoryClient.hpp
-    FocMotorCategoryClient.cpp
     FocMotorCanBridge.hpp
     FocMotorCanBridge.cpp
     FirmwareUpgradeInterlock.hpp
@@ -37,8 +33,6 @@ target_sources(e_foc.can PRIVATE
     FocMotorCommissioningBridge.cpp
     FocMotorSettingsBridge.hpp
     FocMotorSettingsBridge.cpp
-    FocMotorCanClient.hpp
-    FocMotorCanClient.cpp
     FocMotorCurrentStreamer.hpp
     FocMotorCurrentStreamer.cpp
     CanCommandTimeout.hpp

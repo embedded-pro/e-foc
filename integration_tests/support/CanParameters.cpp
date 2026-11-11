@@ -1,6 +1,6 @@
 #include "integration_tests/support/CanParameters.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include <bit>
 #include <chrono>
 

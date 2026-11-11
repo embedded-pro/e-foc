@@ -1,5 +1,5 @@
-#include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>

@@ -1,5 +1,5 @@
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
 #include <gtest/gtest.h>
 #include <limits>
 

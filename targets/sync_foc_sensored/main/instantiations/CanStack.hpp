@@ -5,8 +5,8 @@
 #include "can-lite/tracing/TracingBypassCan.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
 #include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include <cstdint>
 
 namespace application
