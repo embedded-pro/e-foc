@@ -104,10 +104,9 @@ the same stopping-distance logic as the trapezoid but accounting for the initial
 
 The peak velocity is found by a 32-step binary search over the range $[0, v_{max}]$; each evaluation of
 the distance-to-peak function costs about two ramp simulations (each 3 × polynomial integration steps plus
-3 sqrt and 6 div on a Cortex-M4F). The total plan cost is roughly 35 × (sqrt + div) ≈ **70 sqrt + 300 div**,
-or about 70 × 14 + 300 × 14 = **5 180 cycles** at the M4F latencies, against the 20 000-cycle outer-loop
-budget. With the existing 8 133-cycle baseline the worst-case outer-loop cost is estimated at **13 300 cycles**,
-well inside 20 000.
+3 sqrt and 6 div on a Cortex-M4F), about **70 sqrt + 300 div** in all. The static cycle estimate charges the plan
+**3 182 cycles** on a Cortex-M4F, which brings the worst-case outer loop to 11 315 of its 20 000-cycle budget at
+120 MHz.
 
 **Preconditions.** All limits must be positive. The initial acceleration must satisfy
 $|a_0| \le \max(a_{max}, d_{max})$; on reseed (Enable, after jog) the seed acceleration is 0, which
@@ -213,7 +212,7 @@ flowchart LR
 | Property           | Value                                                                                  |
 |--------------------|----------------------------------------------------------------------------------------|
 | Trapezoidal plan   | closed form, no loop, once per setpoint change                                         |
-| S-curve plan       | 32-step bisection, ≈ 5 180 cycles (Cortex-M4F); once per setpoint change only          |
+| S-curve plan       | 32-step bisection, 3 182 cycles (Cortex-M4F); once per setpoint change only            |
 | Sample             | closed form, no loop, once per 1 kHz cycle                                             |
 | Reference duration | 125 ms for 1.5 rad, 20 rad/s, 400 rad/s² (trapezoid); ≈ 142 ms with 20 000 rad/s³ jerk |
 | Memory             | one plan variant (≤ 200 bytes), no heap                                                |

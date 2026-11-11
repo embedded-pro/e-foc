@@ -543,9 +543,9 @@ of the position law, so it is charged to the outer-loop budget and not to the 20
 multiplications and compares on a closed-form plan with no loop and no division. A trapezoidal replan (jerk = 0)
 adds a few divisions and one square root for a move too short to reach the profile velocity. An S-curve replan
 (jerk > 0) runs a 32-step bisection search: each of the 32 iterations evaluates two ramp integrals, each costing
-about one sqrt and three divisions on a Cortex-M4F, so a worst-case S-curve plan costs roughly 70 sqrt + 300 div ≈
-5 180 extra cycles. With the 8 133-cycle baseline the worst-case outer-loop cost is estimated at **13 300 cycles**,
-well inside the 20 000-cycle budget. The bisection loop in `SCurveProfileFromState::Bisect` requires a
+about one sqrt and three divisions on a Cortex-M4F. The static estimate charges the S-curve plan 3 182 cycles: the
+outer-loop handler goes from 4 413 to 7 595 and the outer loop from 8 133 to **11 315 cycles**, against 20 000 on
+EK-TM4C1294XL and 28 333 on NUCLEO-G474RE. The bisection loop in `SCurveProfileFromState::Bisect` requires a
 `loop_bounds` entry of 32 iterations in `cycle-analysis-outer.json`, and `PositionProfile::Replan` must be
 reachable as a direct call from the stage that covers `PositionCascade::LowPriorityHandler`.
 The plan is held in a `std::variant` member, so the 20 kHz inner loop is unchanged.
