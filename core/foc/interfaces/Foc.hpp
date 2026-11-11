@@ -114,6 +114,7 @@ namespace foc
     public:
         virtual void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) = 0;
         virtual void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) = 0;
+        virtual void SetOnlineFluxLinkageEstimator(OnlineFluxLinkageEstimator& estimator) = 0;
     };
 
     class CoggingCompensable

@@ -152,6 +152,54 @@ TEST_F(CalibrationContextTest, effective_flux_linkage_returns_configured_default
     EXPECT_NEAR(context.EffectiveFluxLinkage().Value(), 0.005f, 1e-6f);
 }
 
+TEST_F(CalibrationContextTest, the_active_flux_linkage_is_the_effective_one_until_a_model_is_applied)
+{
+    context.SetData(CompleteData());
+
+    EXPECT_NEAR(context.ActiveFluxLinkage().Value(), 0.007f, 1e-6f);
+}
+
+TEST_F(CalibrationContextTest, an_applied_model_makes_its_flux_linkage_the_active_one_and_leaves_the_record_alone)
+{
+    context.SetData(CompleteData());
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).WillOnce(Return(true));
+    EXPECT_CALL(foc, SetCurrentTunings(_));
+
+    context.ApplyModel(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 7, foc::Weber{ 0.0063f }, foc::Ampere{ 0.0f }, foc, foc);
+
+    EXPECT_NEAR(context.ActiveFluxLinkage().Value(), 0.0063f, 1e-9f);
+    EXPECT_NEAR(context.EffectiveFluxLinkage().Value(), 0.007f, 1e-9f);
+}
+
+TEST_F(CalibrationContextTest, applying_the_record_drops_the_model_flux_linkage_in_use)
+{
+    context.SetData(CompleteData());
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).Times(2).WillRepeatedly(Return(true));
+    EXPECT_CALL(foc, SetCurrentTunings(_)).Times(2);
+    context.ApplyModel(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 7, foc::Weber{ 0.0063f }, foc::Ampere{ 0.0f }, foc, foc);
+
+    context.Apply(foc, foc);
+
+    EXPECT_NEAR(context.ActiveFluxLinkage().Value(), 0.007f, 1e-9f);
+}
+
+TEST_F(CalibrationContextTest, a_new_record_drops_the_model_flux_linkage_in_use)
+{
+    context.SetData(CompleteData());
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).WillOnce(Return(true));
+    EXPECT_CALL(foc, SetCurrentTunings(_));
+    context.ApplyModel(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 7, foc::Weber{ 0.0063f }, foc::Ampere{ 0.0f }, foc, foc);
+    auto replaced = CompleteData();
+    replaced.fluxLinkage = 0.009f;
+
+    context.SetData(replaced);
+
+    EXPECT_NEAR(context.ActiveFluxLinkage().Value(), 0.009f, 1e-9f);
+}
+
 TEST_F(CalibrationContextTest, apply_calls_foc_configure_and_sets_current_tunings)
 {
     context.SetData(CompleteData());

@@ -57,6 +57,12 @@ namespace foc
     }
 
     template<class FocInterface>
+    void SpeedLoopDrive<FocInterface>::SetOnlineFluxLinkageEstimator(OnlineFluxLinkageEstimator& estimator)
+    {
+        SetOnlineFluxLinkageEstimatorImpl(estimator);
+    }
+
+    template<class FocInterface>
     void SpeedLoopDrive<FocInterface>::CommandCurrent(Ampere quadrature)
     {
         CommandCurrentImpl(quadrature);

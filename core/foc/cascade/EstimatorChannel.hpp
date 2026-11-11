@@ -20,14 +20,17 @@ namespace foc
 
         void SetMechanical(OnlineMechanicalEstimator& estimator);
         void SetElectrical(OnlineElectricalEstimator& estimator);
+        void SetFluxLinkage(OnlineFluxLinkageEstimator& estimator);
         bool HasElectrical() const;
         std::optional<std::pair<Ohm, MilliHenry>> SettledElectricalEstimate() const;
         void UpdateMechanical();
         void UpdateElectrical(float vdcInvScale, Ampere directCurrentReference);
+        void UpdateFluxLinkage(float vdcInvScale, float polePairs, float outerFrequency);
 
     private:
         OnlineMechanicalEstimator* mechanical{ nullptr };
         OnlineElectricalEstimator* electrical{ nullptr };
+        OnlineFluxLinkageEstimator* fluxLinkage{ nullptr };
         infra::TripleBuffer<EstimatorSnapshot> buffer;
     };
 }

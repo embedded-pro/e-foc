@@ -103,6 +103,7 @@ namespace foc
 
         UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
+        UpdateOnlineFluxLinkageEstimator();
     }
 
     void SpeedCascade::EnableCurrentCommand()

@@ -97,6 +97,8 @@ namespace state_machine
         foc::NewtonMeterSecondPerRadian viscousFriction;
         bool electricalSettled{ false };
         bool mechanicalSettled{ false };
+        foc::Weber fluxLinkage{ 0.0f };
+        bool fluxLinkageSettled{ false };
     };
 
     class FocStateMachineBase

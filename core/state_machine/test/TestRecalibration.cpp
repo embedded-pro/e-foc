@@ -8,6 +8,7 @@ namespace
     constexpr float inductance{ 0.2f };
     constexpr float inertia{ 1.0e-5f };
     constexpr float friction{ 4.0e-6f };
+    constexpr float fluxLinkage{ 0.01f };
 
     state_machine::MotorModel Commissioned()
     {
@@ -260,4 +261,118 @@ TEST_F(TestRecalibration, it_tells_whether_it_was_commissioned_from_a_record_and
     EXPECT_TRUE(recalibration.IsCommissionedFrom(Commissioned(), {}));
     EXPECT_FALSE(recalibration.IsCommissionedFrom(Commissioned(), stored));
     EXPECT_FALSE(state_machine::Recalibration{}.IsCommissionedFrom(Commissioned(), {}));
+}
+
+namespace
+{
+    state_machine::MotorModel CommissionedWithFlux()
+    {
+        auto model = Commissioned();
+        model.fluxLinkage = foc::Weber{ fluxLinkage };
+        return model;
+    }
+
+    state_machine::OnlineEstimates EstimatesWithFlux(float fluxRatio, bool fluxSettled = true)
+    {
+        auto estimates = Estimates(1.0f, 1.0f, 1.0f, 1.0f);
+        estimates.fluxLinkage = foc::Weber{ fluxLinkage * fluxRatio };
+        estimates.fluxLinkageSettled = fluxSettled;
+        return estimates;
+    }
+
+    class TestRecalibrationFluxLinkage
+        : public testing::Test
+    {
+    public:
+        TestRecalibrationFluxLinkage()
+        {
+            recalibration.Commission(CommissionedWithFlux());
+        }
+
+        void Run(const state_machine::OnlineEstimates& estimates, infra::Duration duration)
+        {
+            for (auto elapsed = infra::Duration{}; elapsed < duration; elapsed += state_machine::Recalibration::observationPeriod)
+                recalibration.Observe(estimates);
+        }
+
+        state_machine::Recalibration recalibration;
+    };
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_flux_linkage_five_percent_off_is_adopted_after_the_dwell)
+{
+    Run(EstimatesWithFlux(0.93f), state_machine::Recalibration::dwell);
+
+    const auto outcome = recalibration.Decide(state_machine::RecalibrationTrigger::automatic);
+
+    EXPECT_NEAR(0.93f * fluxLinkage, recalibration.InUse().fluxLinkage.Value(), 1e-9f);
+    EXPECT_EQ(state_machine::RecalibrationVerdict::applied, outcome.verdicts[4]);
+    EXPECT_NEAR(0.93f * fluxLinkage, outcome.readings[4], 1e-9f);
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_flux_linkage_within_five_percent_is_not_adopted)
+{
+    Run(EstimatesWithFlux(0.97f), 2 * state_machine::Recalibration::dwell);
+
+    const auto outcome = recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    EXPECT_EQ(CommissionedWithFlux(), recalibration.InUse());
+    EXPECT_EQ(state_machine::RecalibrationVerdict::unchanged, outcome.verdicts[4]);
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_flux_linkage_that_has_not_settled_is_never_adopted)
+{
+    Run(EstimatesWithFlux(0.9f, false), 2 * state_machine::Recalibration::dwell);
+
+    recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    EXPECT_EQ(CommissionedWithFlux(), recalibration.InUse());
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_flux_linkage_outside_the_band_is_rejected)
+{
+    Run(EstimatesWithFlux(0.6f), state_machine::Recalibration::dwell);
+
+    const auto outcome = recalibration.Decide(state_machine::RecalibrationTrigger::automatic);
+
+    EXPECT_EQ(state_machine::RecalibrationVerdict::rejected, outcome.verdicts[4]);
+    EXPECT_EQ(CommissionedWithFlux(), recalibration.InUse());
+    EXPECT_EQ(1, recalibration.Rejected());
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_stronger_magnet_up_to_the_upper_band_edge_is_adopted)
+{
+    Run(EstimatesWithFlux(1.08f), 2 * state_machine::Recalibration::dwell);
+
+    recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    EXPECT_NEAR(1.08f * fluxLinkage, recalibration.InUse().fluxLinkage.Value(), 1e-9f);
+}
+
+TEST_F(TestRecalibrationFluxLinkage, the_flux_linkage_is_never_part_of_what_is_learned)
+{
+    Run(EstimatesWithFlux(0.9f), 2 * state_machine::Recalibration::dwell);
+    recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    EXPECT_EQ(state_machine::StoredModel{}, recalibration.Learned());
+}
+
+TEST_F(TestRecalibrationFluxLinkage, reverting_returns_the_commissioned_flux_linkage)
+{
+    Run(EstimatesWithFlux(0.9f), 2 * state_machine::Recalibration::dwell);
+    recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    recalibration.Revert();
+
+    EXPECT_NEAR(fluxLinkage, recalibration.InUse().fluxLinkage.Value(), 1e-9f);
+}
+
+TEST_F(TestRecalibrationFluxLinkage, a_commissioned_model_without_a_flux_linkage_never_adopts_one)
+{
+    recalibration.Commission(Commissioned());
+    Run(EstimatesWithFlux(0.9f), 2 * state_machine::Recalibration::dwell);
+
+    const auto outcome = recalibration.Decide(state_machine::RecalibrationTrigger::command);
+
+    EXPECT_EQ(state_machine::RecalibrationVerdict::unchanged, outcome.verdicts[4]);
 }

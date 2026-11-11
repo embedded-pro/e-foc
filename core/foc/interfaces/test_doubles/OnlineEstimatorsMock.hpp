@@ -26,4 +26,14 @@ namespace foc
         MOCK_METHOD(MilliHenry, CurrentInductance, (), (const, override));
         MOCK_METHOD(bool, HasSettled, (), (const, override));
     };
+
+    class OnlineFluxLinkageEstimatorMock
+        : public OnlineFluxLinkageEstimator
+    {
+    public:
+        MOCK_METHOD(void, SetInitialEstimate, (Weber fluxLinkage), (override));
+        MOCK_METHOD(void, Update, (const QuadratureWindow& window), (override));
+        MOCK_METHOD(Weber, CurrentFluxLinkage, (), (const, override));
+        MOCK_METHOD(bool, HasSettled, (), (const, override));
+    };
 }

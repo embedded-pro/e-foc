@@ -37,6 +37,7 @@ namespace state_machine
         StoredModel StoredFor(const MotorModel& commissioned) const;
         void Conclude(const Recalibration::Outcome& outcome);
         void ApplyModelInUse();
+        void CarryFluxLinkageIntoTorque();
         void Report(const Recalibration::Outcome& outcome);
         MotorModel CommissionedModel() const;
         services::RecalibrationMode RecalibrationModeSetting() const;

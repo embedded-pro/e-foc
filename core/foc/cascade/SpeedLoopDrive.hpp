@@ -25,6 +25,7 @@ namespace foc
         SpeedAlgorithm ActiveSpeedAlgorithm() const override;
         void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
+        void SetOnlineFluxLinkageEstimator(OnlineFluxLinkageEstimator& estimator) override;
         void CommandCurrent(Ampere quadrature) override;
         Volts QuadratureVoltage() const override;
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;

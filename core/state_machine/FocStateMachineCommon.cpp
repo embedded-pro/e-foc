@@ -205,6 +205,20 @@ namespace application
         return tracer;
     }
 
+    bool FocStateMachineCommon::ApplyFluxLinkage(foc::Weber fluxLinkage)
+    {
+        if (!state_machine::IsStopped(CurrentState()) || !calibration.HasValidCalibration())
+            return false;
+
+        auto data = calibrationContext.Data();
+        if (!ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, fluxLinkage, foc::Ampere{ services::CurrentNoiseAmpere(data.currentNoiseMilliAmpere) }))
+            return false;
+
+        data.fluxLinkage = fluxLinkage.Value();
+        ApplyModeSpecificCalibration(data);
+        return true;
+    }
+
     bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise)
     {
         return calibrationContext.ApplyModel(resistance, inductance, polePairs, fluxLinkage, currentNoise, GetFoc(), CurrentTunable());

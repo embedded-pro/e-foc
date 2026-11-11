@@ -105,7 +105,12 @@ namespace state_machine
     void ModelRecalibration::RecalibrateOnReady()
     {
         if (drive.ActiveOuterLoop() == nullptr)
+        {
+            if (drive.HasMachine())
+                CommissionModel();
+            ApplyModelInUse();
             return;
+        }
 
         CommissionModel();
         if (ranSinceStop && RecalibrationModeSetting() == services::RecalibrationMode::automatic)
@@ -143,8 +148,14 @@ namespace state_machine
     void ModelRecalibration::ApplyModelInUse()
     {
         auto* outerLoop = drive.ActiveOuterLoop();
+        if (outerLoop == nullptr)
+        {
+            CarryFluxLinkageIntoTorque();
+            return;
+        }
+
         const bool commissioned = model.InUse() == model.Commissioned();
-        if (outerLoop == nullptr || (commissioned && !loopsRecalibrated))
+        if (commissioned && !loopsRecalibrated)
             return;
 
         if (outerLoop->ApplyModel(model.InUse()))
@@ -154,11 +165,28 @@ namespace state_machine
         }
     }
 
+    void ModelRecalibration::CarryFluxLinkageIntoTorque()
+    {
+        if (!drive.HasMachine())
+            return;
+
+        const auto commissioned = CommissionedModel();
+        const bool carried = model.Commissioned() == commissioned && model.InUse().fluxLinkage != commissioned.fluxLinkage;
+        if (!carried && !loopsRecalibrated)
+            return;
+
+        if (drive.ActiveCommon().ApplyFluxLinkage(carried ? model.InUse().fluxLinkage : commissioned.fluxLinkage))
+        {
+            loopsRecalibrated = carried;
+            tunings.ApplyOperatorTunings();
+        }
+    }
+
     void ModelRecalibration::Report(const Recalibration::Outcome& outcome)
     {
-        constexpr std::array<const char*, Recalibration::quantities> names{ "resistance", "inductance", "inertia", "viscous friction" };
+        constexpr std::array<const char*, Recalibration::quantities> names{ "resistance", "inductance", "inertia", "viscous friction", "flux linkage" };
         const auto& commissioned = model.Commissioned();
-        const std::array<float, Recalibration::quantities> references{ commissioned.resistance.Value(), commissioned.inductance.Value(), commissioned.inertia.Value(), commissioned.viscousFriction.Value() };
+        const std::array<float, Recalibration::quantities> references{ commissioned.resistance.Value(), commissioned.inductance.Value(), commissioned.inertia.Value(), commissioned.viscousFriction.Value(), commissioned.fluxLinkage.Value() };
 
         for (std::size_t quantity = 0; quantity != Recalibration::quantities; ++quantity)
         {
@@ -172,7 +200,8 @@ namespace state_machine
     MotorModel ModelRecalibration::CommissionedModel() const
     {
         const auto& record = drive.CalibrationRecord();
-        return MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } };
+        return MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous },
+            drive.ActiveCommon().Calibration().EffectiveFluxLinkage(record) };
     }
 
     services::RecalibrationMode ModelRecalibration::RecalibrationModeSetting() const

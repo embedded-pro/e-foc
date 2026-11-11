@@ -19,8 +19,10 @@ namespace state_machine
                     return model.inductance.Value();
                 case 2:
                     return model.inertia.Value();
-                default:
+                case 3:
                     return model.viscousFriction.Value();
+                default:
+                    return model.fluxLinkage.Value();
             }
         }
 
@@ -37,15 +39,18 @@ namespace state_machine
                 case 2:
                     model.inertia = foc::NewtonMeterSecondSquared{ value };
                     break;
-                default:
+                case 3:
                     model.viscousFriction = foc::NewtonMeterSecondPerRadian{ value };
+                    break;
+                default:
+                    model.fluxLinkage = foc::Weber{ value };
                     break;
             }
         }
 
         std::array<float, Recalibration::quantities> ReadingsOf(const OnlineEstimates& estimates)
         {
-            return { estimates.resistance.Value(), estimates.inductance.Value(), estimates.inertia.Value(), estimates.viscousFriction.Value() };
+            return { estimates.resistance.Value(), estimates.inductance.Value(), estimates.inertia.Value(), estimates.viscousFriction.Value(), estimates.fluxLinkage.Value() };
         }
 
         uint16_t Counted(uint16_t count, uint8_t added)
@@ -61,13 +66,21 @@ namespace state_machine
 
         std::array<std::optional<float>, Recalibration::quantities> QuantitiesOf(const StoredModel& stored)
         {
-            return { std::nullopt, ValueOf(stored.inductance), ValueOf(stored.inertia), ValueOf(stored.viscousFriction) };
+            return { std::nullopt, ValueOf(stored.inductance), ValueOf(stored.inertia), ValueOf(stored.viscousFriction), std::nullopt };
         }
 
         bool WithinBand(std::size_t quantity, float value, float reference)
         {
             const auto ratio = value / reference;
             return ratio >= Recalibration::bands[quantity].minimum && ratio <= Recalibration::bands[quantity].maximum;
+        }
+
+        bool SettledIn(const OnlineEstimates& estimates, std::size_t quantity)
+        {
+            if (quantity < 2)
+                return estimates.electricalSettled;
+
+            return quantity < 4 ? estimates.mechanicalSettled : estimates.fluxLinkageSettled;
         }
 
         template<class Quantity>
@@ -123,7 +136,7 @@ namespace state_machine
         {
             auto& entry = tracked[quantity];
             entry.reading = readings[quantity];
-            entry.settled = (quantity < 2 ? estimates.electricalSettled : estimates.mechanicalSettled) && foc::IsFinitePositive(entry.reading);
+            entry.settled = SettledIn(estimates, quantity) && foc::IsFinitePositive(entry.reading);
             entry.differing = Differs(quantity) ? entry.differing + observationPeriod : infra::Duration{};
         }
     }
@@ -149,7 +162,7 @@ namespace state_machine
     {
         const auto& entry = tracked[quantity];
         const auto current = QuantityOf(inUse, quantity);
-        return entry.settled && foc::IsFinitePositive(current) && math::Abs(entry.reading - current) > deviationThreshold * current;
+        return entry.settled && foc::IsFinitePositive(current) && math::Abs(entry.reading - current) > deviationThresholds[quantity] * current;
     }
 
     RecalibrationVerdict Recalibration::Judge(std::size_t quantity, RecalibrationTrigger trigger)

@@ -4077,3 +4077,32 @@ TEST_F(FocStateMachineTorqueTest, the_zero_vector_slopes_of_each_control_period_
     EXPECT_CALL(sink, ZeroVectorSlopes(_));
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ -0.5f } });
 }
+
+TEST_F(FocStateMachineTorqueTest, a_flux_linkage_in_use_is_applied_while_the_drive_is_stopped)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    const auto record = sm.Calibration().ActiveFluxLinkage();
+
+    EXPECT_TRUE(sm.ApplyFluxLinkage(foc::Weber{ 0.9f * record.Value() }));
+
+    EXPECT_NEAR(sm.Calibration().ActiveFluxLinkage().Value(), 0.9f * record.Value(), 1e-9f);
+    EXPECT_NEAR(sm.Calibration().EffectiveFluxLinkage().Value(), record.Value(), 1e-9f);
+}
+
+TEST_F(FocStateMachineTorqueTest, a_flux_linkage_in_use_is_refused_while_the_drive_runs)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    const auto record = sm.Calibration().ActiveFluxLinkage();
+
+    EXPECT_FALSE(sm.ApplyFluxLinkage(foc::Weber{ 0.9f * record.Value() }));
+    EXPECT_NEAR(sm.Calibration().ActiveFluxLinkage().Value(), record.Value(), 1e-9f);
+}

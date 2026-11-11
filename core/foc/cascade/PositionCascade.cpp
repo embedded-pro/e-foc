@@ -133,6 +133,7 @@ namespace foc
             RunSpeedLoop(mechanicalSpeed);
             UpdateOnlineMechanicalEstimator();
             UpdateOnlineElectricalEstimator();
+            UpdateOnlineFluxLinkageEstimator();
             return;
         }
 
@@ -150,6 +151,7 @@ namespace foc
 
         UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
+        UpdateOnlineFluxLinkageEstimator();
     }
 
     PhasePwmDutyCycles PositionCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)

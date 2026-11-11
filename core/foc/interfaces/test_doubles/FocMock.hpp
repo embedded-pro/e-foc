@@ -45,6 +45,7 @@ namespace foc
         MOCK_METHOD(SpeedAlgorithm, ActiveSpeedAlgorithm, (), (const, override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
+        MOCK_METHOD(void, SetOnlineFluxLinkageEstimator, (OnlineFluxLinkageEstimator & estimator), (override));
         MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
         MOCK_METHOD(MotionObservation, ObserveMotion, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
@@ -90,6 +91,7 @@ namespace foc
         MOCK_METHOD(PositionAlgorithm, ActivePositionAlgorithm, (), (const, override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
+        MOCK_METHOD(void, SetOnlineFluxLinkageEstimator, (OnlineFluxLinkageEstimator & estimator), (override));
         MOCK_METHOD(MotionObservation, ObserveMotion, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };

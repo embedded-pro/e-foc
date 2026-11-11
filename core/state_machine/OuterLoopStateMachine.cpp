@@ -50,14 +50,15 @@ namespace application
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
-        ApplyCoggingMap(data);
-        ApplyFrictionFeedForward(data);
+        GetOnlineFluxEstimator().SetInitialEstimate(Calibration().EffectiveFluxLinkage(data));
+        ApplyCoggingMap(data, TorqueConstantFor(data));
+        ApplyFrictionFeedForward(data, TorqueConstantFor(data));
     }
 
-    void OuterLoopStateMachine::ApplyFrictionFeedForward(const services::CalibrationData& data)
+    void OuterLoopStateMachine::ApplyFrictionFeedForward(const services::CalibrationData& data, foc::NewtonMeter torqueConstant)
     {
         if (foc::IsFinitePositive(data.frictionCoulomb))
-            LoadFrictionCompensation(foc::NewtonMeter{ data.frictionCoulomb }, TorqueConstantFor(data));
+            LoadFrictionCompensation(foc::NewtonMeter{ data.frictionCoulomb }, torqueConstant);
         else
             ClearFrictionCompensation();
     }
@@ -68,10 +69,8 @@ namespace application
         ClearFrictionCompensation();
     }
 
-    void OuterLoopStateMachine::ApplyCoggingMap(const services::CalibrationData& data)
+    void OuterLoopStateMachine::ApplyCoggingMap(const services::CalibrationData& data, foc::NewtonMeter torqueConstant)
     {
-        const auto torqueConstant = TorqueConstantFor(data);
-
         if (foc::IsFinitePositive(data.coggingTorqueScale) && foc::IsFinitePositive(torqueConstant.Value()))
             LoadCoggingCompensation(infra::MakeRange(data.coggingTorque), data.coggingTorqueScale, torqueConstant);
         else
@@ -85,7 +84,7 @@ namespace application
 
     void OuterLoopStateMachine::PrepareForEnabled()
     {
-        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(Calibration().Data()));
+        GetOnlineMechEstimator().SetTorqueConstant(foc::TorqueConstantFor(Calibration().Data().polePairs, Calibration().ActiveFluxLinkage()));
     }
 
     std::optional<state_machine::OnlineEstimates> OuterLoopStateMachine::CurrentOnlineEstimates()
@@ -96,7 +95,9 @@ namespace application
             GetOnlineMechEstimator().CurrentInertia(),
             GetOnlineMechEstimator().CurrentFriction(),
             GetOnlineElecEstimator().HasSettled(),
-            GetOnlineMechEstimator().HasSettled()
+            GetOnlineMechEstimator().HasSettled(),
+            GetOnlineFluxEstimator().CurrentFluxLinkage(),
+            GetOnlineFluxEstimator().HasSettled()
         };
     }
 
@@ -106,9 +107,13 @@ namespace application
             return false;
 
         const auto& calibration = Calibration().Data();
-        ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, TorqueConstantFor(calibration));
-        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, Calibration().EffectiveFluxLinkage(calibration),
+        const auto fluxLinkage = foc::IsFinitePositive(model.fluxLinkage.Value()) ? model.fluxLinkage : Calibration().EffectiveFluxLinkage(calibration);
+        const auto torqueConstant = foc::TorqueConstantFor(calibration.polePairs, fluxLinkage);
+        ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, torqueConstant);
+        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, fluxLinkage,
             foc::Ampere{ services::CurrentNoiseAmpere(calibration.currentNoiseMilliAmpere) });
+        ApplyCoggingMap(calibration, torqueConstant);
+        ApplyFrictionFeedForward(calibration, torqueConstant);
         return true;
     }
 

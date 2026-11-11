@@ -253,6 +253,11 @@ namespace foc
         estimation.channel.SetElectrical(estimator);
     }
 
+    void CascadeWithSpeedLoop::SetOnlineFluxLinkageEstimatorImpl(OnlineFluxLinkageEstimator& estimator)
+    {
+        estimation.channel.SetFluxLinkage(estimator);
+    }
+
     void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator()
     {
         estimation.channel.UpdateMechanical();
@@ -268,6 +273,11 @@ namespace foc
 
         if (const auto estimate = estimation.channel.SettledElectricalEstimate())
             zeroVectorSlope.Track(estimate->first, estimate->second);
+    }
+
+    void CascadeWithSpeedLoop::UpdateOnlineFluxLinkageEstimator()
+    {
+        estimation.channel.UpdateFluxLinkage(scaling.vdcInvScale, scaling.polePairs, static_cast<float>(schedule.frequency.Value()));
     }
 
     void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)

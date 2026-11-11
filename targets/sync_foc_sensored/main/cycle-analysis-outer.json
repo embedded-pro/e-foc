@@ -50,6 +50,12 @@
       ]
     },
     {
+      "label": "Online Flux Linkage Estimator",
+      "patterns": [
+        "^services::RealTimeFluxLinkageEstimator::(Update|HasSettled|CurrentFluxLinkage)\\("
+      ]
+    },
+    {
       "label": "LPI Exit (exception return)",
       "type": "exception_exit"
     }

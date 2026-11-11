@@ -881,3 +881,72 @@ TEST_F(TestPositionCascade, a_bus_below_the_configured_voltage_raises_the_inner_
     ExpectOffCentreDuty(expected);
     EXPECT_GT(deviation(raised), deviation(expected));
 }
+
+TEST_F(TestPositionCascade, a_registered_flux_linkage_estimator_is_fed_from_the_outer_loop_with_the_electrical_estimate)
+{
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    testing::StrictMock<foc::OnlineFluxLinkageEstimatorMock> fluxEstimator;
+    focPosition->SetOnlineElectricalEstimator(electricalEstimator);
+    focPosition->SetOnlineFluxLinkageEstimator(fluxEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
+    EXPECT_CALL(electricalEstimator, Update(_));
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(testing::Return(foc::Ohm{ 1.5f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(testing::Return(foc::MilliHenry{ 1.25f }));
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.5f });
+
+    EXPECT_CALL(fluxEstimator, Update(testing::AllOf(
+                                   testing::Field(&foc::QuadratureWindow::resistance, foc::Ohm{ 1.5f }),
+                                   testing::Field(&foc::QuadratureWindow::inductance, foc::MilliHenry{ 1.25f }),
+                                   testing::Field(&foc::QuadratureWindow::phaseVoltageRange, foc::Volts{ 24.0f * std::numbers::inv_sqrt3_v<float> }),
+                                   testing::Field(&foc::QuadratureWindow::first, true))));
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+}
+
+TEST_F(TestPositionCascade, the_flux_linkage_window_carries_the_electrical_speed_of_the_rotation_in_the_window)
+{
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    testing::StrictMock<foc::OnlineFluxLinkageEstimatorMock> fluxEstimator;
+    focPosition->SetOnlineElectricalEstimator(electricalEstimator);
+    focPosition->SetOnlineFluxLinkageEstimator(fluxEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
+    EXPECT_CALL(electricalEstimator, Update(_)).Times(2);
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(testing::Return(foc::Ohm{ 1.0f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(testing::Return(foc::MilliHenry{ 1.0f }));
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.5f });
+
+    constexpr float mechanicalStep{ 0.001f };
+    foc::QuadratureWindow second{};
+    EXPECT_CALL(fluxEstimator, Update(_)).Times(2).WillOnce(testing::Return()).WillOnce(testing::SaveArg<0>(&second));
+
+    foc::Radians position{ 0.0f };
+    for (int window = 0; window != 2; ++window)
+    {
+        for (uint32_t tick = 0; tick != baseFrequencyValue / 2000; ++tick)
+        {
+            position = foc::Radians{ position.Value() + mechanicalStep };
+            focPosition->Calculate(ZeroCurrents(), position);
+        }
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    EXPECT_FALSE(second.first);
+    EXPECT_NEAR(second.meanElectricalSpeed.Value(), 10.0f * mechanicalStep * static_cast<float>(polePairs) * 2000.0f, 1e-2f);
+}
+
+TEST_F(TestPositionCascade, a_flux_linkage_estimator_without_an_electrical_estimate_is_not_fed)
+{
+    testing::StrictMock<foc::OnlineFluxLinkageEstimatorMock> fluxEstimator;
+    focPosition->SetOnlineFluxLinkageEstimator(fluxEstimator);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.5f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+}

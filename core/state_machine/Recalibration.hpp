@@ -18,11 +18,12 @@ namespace state_machine
         foc::MilliHenry inductance{ 0.0f };
         foc::NewtonMeterSecondSquared inertia{ 0.0f };
         foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
+        foc::Weber fluxLinkage{ 0.0f };
 
         bool operator==(const MotorModel&) const = default;
     };
 
-    // The resistance is never stored: it follows the winding temperature.
+    // The resistance and the flux linkage are never stored: both follow the winding temperature.
     struct StoredModel
     {
         std::optional<foc::MilliHenry> inductance;
@@ -48,15 +49,16 @@ namespace state_machine
     class Recalibration
     {
     public:
-        static constexpr float deviationThreshold{ 0.1f };
         static constexpr infra::Duration observationPeriod{ std::chrono::milliseconds(100) };
         static constexpr infra::Duration dwell{ std::chrono::seconds(5) };
-        static constexpr std::size_t quantities{ 4 };
+        static constexpr std::size_t quantities{ 5 };
 
         using Band = foc::EstimateBand;
 
-        // Resistance, inductance, inertia and viscous friction, as ratios to the commissioned value.
-        static constexpr std::array<Band, quantities> bands{ { foc::resistanceEstimateBand, foc::inductanceEstimateBand, { 0.5f, 5.0f }, { 0.2f, 5.0f } } };
+        // Resistance, inductance, inertia, viscous friction and flux linkage, as ratios to the commissioned value.
+        static constexpr std::array<Band, quantities> bands{ { foc::resistanceEstimateBand, foc::inductanceEstimateBand, { 0.5f, 5.0f }, { 0.2f, 5.0f }, foc::fluxLinkageEstimateBand } };
+        // Fractions of the value in use; the flux linkage is held tighter because its readings are the least noisy.
+        static constexpr std::array<float, quantities> deviationThresholds{ 0.1f, 0.1f, 0.1f, 0.1f, 0.05f };
 
         struct Outcome
         {

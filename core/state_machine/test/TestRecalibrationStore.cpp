@@ -265,3 +265,11 @@ TEST_F(TestRecalibrationStore, a_reset_during_a_store_is_written_once_the_store_
     EXPECT_EQ(services::LearnedModelData{}, written.back());
     EXPECT_EQ(true, stored);
 }
+
+TEST(TestCommissioningCheck, the_flux_linkage_of_the_commissioned_model_does_not_enter_the_check)
+{
+    auto drifted = Commissioned();
+    drifted.fluxLinkage = foc::Weber{ 0.009f };
+
+    EXPECT_EQ(state_machine::CommissioningCheck(Commissioned()), state_machine::CommissioningCheck(drifted));
+}

@@ -33,11 +33,13 @@ namespace application
     void CalibrationContext::SetData(const services::CalibrationData& data)
     {
         calibrationData = data;
+        fluxLinkageInUse.reset();
     }
 
     void CalibrationContext::Invalidate()
     {
         calibrationData = services::CalibrationData{};
+        fluxLinkageInUse.reset();
         rotorReferenceValid_ = false;
         homed_ = false;
         ApplyCurrentOffsets();
@@ -89,7 +91,7 @@ namespace application
     {
         ApplyCurrentOffsets();
 
-        return ApplyModel(
+        const bool configured = ApplyModel(
             foc::Ohm{ calibrationData.rPhase },
             foc::MilliHenry{ calibrationData.lD },
             calibrationData.polePairs,
@@ -97,6 +99,9 @@ namespace application
             foc::Ampere{ services::CurrentNoiseAmpere(calibrationData.currentNoiseMilliAmpere) },
             controller,
             tunable);
+
+        fluxLinkageInUse.reset();
+        return configured;
     }
 
     void CalibrationContext::ApplyCurrentOffsets()
@@ -126,6 +131,9 @@ namespace application
             polePairs,
             dutyUpdateDelayPeriods });
 
+        if (configured)
+            fluxLinkageInUse = fluxLinkage;
+
         auto tunings = foc::CurrentLoopTunings{};
         tunings.bandwidth = DefaultCurrentLoopBandwidth(inductance, currentNoise);
         tunable.SetCurrentTunings(tunings);
@@ -150,7 +158,7 @@ namespace application
 
     foc::Weber CalibrationContext::ActiveFluxLinkage() const
     {
-        return EffectiveFluxLinkage();
+        return fluxLinkageInUse.value_or(EffectiveFluxLinkage());
     }
 
     float CalibrationContext::AutomaticCurrentLoopBandwidth() const

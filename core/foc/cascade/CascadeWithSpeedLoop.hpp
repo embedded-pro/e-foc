@@ -57,8 +57,10 @@ namespace foc
 
         void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
         void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
+        void SetOnlineFluxLinkageEstimatorImpl(OnlineFluxLinkageEstimator& estimator);
         void UpdateOnlineMechanicalEstimator();
         void UpdateOnlineElectricalEstimator();
+        void UpdateOnlineFluxLinkageEstimator();
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
         void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);

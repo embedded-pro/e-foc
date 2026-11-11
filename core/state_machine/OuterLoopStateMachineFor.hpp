@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/services/electrical_system_ident/RealTimeFluxLinkageEstimator.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
@@ -26,12 +27,14 @@ namespace application
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
+            , onlineFluxEstimator(services::RealTimeFluxLinkageEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
             , resolvedCoggingMapping(ResolveCoggingMapping(calibServices, ownCoggingMapping, focController, focController, focController, hardware.inverter, hardware.encoder))
             , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
+            focController.SetOnlineFluxLinkageEstimator(onlineFluxEstimator);
             if (hardware.currentStream != nullptr)
                 focController.SetCurrentStream(*hardware.currentStream);
             if (hardware.zeroVectorSlopes != nullptr)
@@ -118,6 +121,11 @@ namespace application
             return onlineElecEstimator;
         }
 
+        services::RealTimeFluxLinkageEstimator& GetOnlineFluxEstimator() override
+        {
+            return onlineFluxEstimator;
+        }
+
         services::MechanicalParametersIdentification& MechIdentImpl() override
         {
             return resolvedMechIdent.get();
@@ -166,6 +174,7 @@ namespace application
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
+        services::RealTimeFluxLinkageEstimator onlineFluxEstimator;
         std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>> ownMechIdent;
         std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
         std::optional<infra::WithSharedAccess<services::CoggingMappingImpl>> ownCoggingMapping;

@@ -12,6 +12,11 @@ namespace foc
         electrical = &estimator;
     }
 
+    void EstimatorChannel::SetFluxLinkage(OnlineFluxLinkageEstimator& estimator)
+    {
+        fluxLinkage = &estimator;
+    }
+
     bool EstimatorChannel::HasElectrical() const
     {
         return electrical != nullptr;
@@ -40,5 +45,16 @@ namespace foc
 
         const auto& snapshot = buffer.Acquire();
         electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq, directCurrentReference });
+    }
+
+    void EstimatorChannel::UpdateFluxLinkage(float vdcInvScale, float polePairs, float outerFrequency)
+    {
+        if (fluxLinkage == nullptr || electrical == nullptr)
+            return;
+
+        const auto& snapshot = buffer.Acquire();
+        const RadiansPerSecond electricalSpeed{ snapshot.mechanical.rotation.Value() * polePairs * outerFrequency };
+        fluxLinkage->Update(QuadratureWindow{ Volts{ snapshot.meanNormalizedVq * vdcInvScale }, Ampere{ snapshot.meanIq }, Ampere{ snapshot.iqAtEnd }, Ampere{ snapshot.meanId },
+            electricalSpeed, electrical->CurrentResistance(), electrical->CurrentInductance(), Volts{ vdcInvScale }, snapshot.mechanical.first });
     }
 }

@@ -24,6 +24,12 @@ using namespace testing;
 
 namespace
 {
+    state_machine::MotorModel ModelOf(const application::CalibrationContext& context)
+    {
+        const auto& record = context.Data();
+        return state_machine::MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous }, context.EffectiveFluxLinkage() };
+    }
+
     float NonFinite(uint32_t bits)
     {
         volatile uint32_t opaque = bits;
@@ -1085,9 +1091,8 @@ TEST_F(ControlModeStateMachineLifecycleTest, Recalibrate_While_Stopped_With_Noth
 
     EXPECT_EQ(state_machine::SettingResult::ok, subject->Recalibration().CmdRecalibrate());
 
-    const auto& record = subject->Drive().CalibrationRecord();
     ASSERT_TRUE(subject->Recalibration().ModelInUse().has_value());
-    EXPECT_EQ((state_machine::MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } }), *subject->Recalibration().ModelInUse());
+    EXPECT_EQ(ModelOf(subject->Drive().ActiveCommon().Calibration()), *subject->Recalibration().ModelInUse());
     EXPECT_EQ(0, subject->Recalibration().RecalibrationsApplied());
     EXPECT_EQ(0, subject->Recalibration().RecalibrationsRejected());
 }
@@ -1100,14 +1105,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, Torque_Mode_Has_No_Model_In_Use)
     EXPECT_FALSE(subject->Recalibration().ModelInUse().has_value());
 }
 
-namespace
-{
-    state_machine::MotorModel ModelOf(const services::CalibrationData& record)
-    {
-        return state_machine::MotorModel{ foc::Ohm{ record.rPhase }, foc::MilliHenry{ record.lD }, foc::NewtonMeterSecondSquared{ record.inertia }, foc::NewtonMeterSecondPerRadian{ record.frictionViscous } };
-    }
-}
-
 TEST_F(ControlModeStateMachineLifecycleTest, A_Stored_Inertia_Learned_From_The_Record_Is_In_Use_At_Ready)
 {
     GivenNvmAlwaysInvalid();
@@ -1118,7 +1115,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, A_Stored_Inertia_Learned_From_The_R
     subject->Drive().ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
     CompleteCalibration_WithMechIdent();
     subject->Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::automatic);
-    const auto record = ModelOf(subject->Drive().CalibrationRecord());
+    const auto record = ModelOf(subject->Drive().ActiveCommon().Calibration());
     const services::LearnedModelData stored{ state_machine::CommissioningCheck(record), std::nullopt, 1.5f * record.inertia.Value(), std::nullopt };
     EXPECT_CALL(nvmMock, LoadLearnedModel(_, _)).WillOnce(Invoke([stored](services::LearnedModelData& model, const infra::Function<void(services::NvmStatus)>& onDone)
         {
@@ -1143,7 +1140,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, With_The_Mode_Off_A_Stored_Model_Is
     subject->Modes().Select(state_machine::ControlMode::speed, [](auto) {});
     subject->Drive().ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
     CompleteCalibration_WithMechIdent();
-    const auto record = ModelOf(subject->Drive().CalibrationRecord());
+    const auto record = ModelOf(subject->Drive().ActiveCommon().Calibration());
     const services::LearnedModelData stored{ state_machine::CommissioningCheck(record), std::nullopt, 1.5f * record.inertia.Value(), std::nullopt };
     EXPECT_CALL(nvmMock, LoadLearnedModel(_, _)).WillOnce(Invoke([stored](services::LearnedModelData& model, const infra::Function<void(services::NvmStatus)>& onDone)
         {
@@ -1182,7 +1179,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, ResetModel_While_Stopped_Stores_An_
     subject->Drive().ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
     CompleteCalibration_WithMechIdent();
     subject->Config().recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::onCommand);
-    const auto record = ModelOf(subject->Drive().CalibrationRecord());
+    const auto record = ModelOf(subject->Drive().ActiveCommon().Calibration());
     const services::LearnedModelData stored{ state_machine::CommissioningCheck(record), std::nullopt, 1.5f * record.inertia.Value(), std::nullopt };
     EXPECT_CALL(nvmMock, LoadLearnedModel(_, _)).WillOnce(Invoke([stored](services::LearnedModelData& model, const infra::Function<void(services::NvmStatus)>& onDone)
         {

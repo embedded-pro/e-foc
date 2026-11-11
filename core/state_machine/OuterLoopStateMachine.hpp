@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
+#include "core/services/electrical_system_ident/RealTimeFluxLinkageEstimator.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
@@ -77,6 +78,7 @@ namespace application
         virtual const services::MechanicalParametersIdentification& MechIdentImpl() const = 0;
         virtual services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() = 0;
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
+        virtual services::RealTimeFluxLinkageEstimator& GetOnlineFluxEstimator() = 0;
         virtual services::CoggingMapping* CoggingMappingImpl() = 0;
         virtual const services::CoggingMapping* CoggingMappingImpl() const = 0;
         virtual void LoadCoggingCompensation(infra::MemoryRange<const int8_t> torque, float torqueScale, foc::NewtonMeter torqueConstant) = 0;
@@ -90,8 +92,8 @@ namespace application
         foc::NewtonMeter TorqueConstantFor(const services::CalibrationData& data) const;
         services::MechanicalParametersIdentification::Config ExcitationConfig() const;
         services::CoggingMapping::Config CoggingConfig() const;
-        void ApplyCoggingMap(const services::CalibrationData& data);
-        void ApplyFrictionFeedForward(const services::CalibrationData& data);
+        void ApplyCoggingMap(const services::CalibrationData& data, foc::NewtonMeter torqueConstant);
+        void ApplyFrictionFeedForward(const services::CalibrationData& data, foc::NewtonMeter torqueConstant);
         void ClearFeedForwards();
 
         static constexpr float velocityBandwidthRadPerSec = 100.0f;

@@ -973,6 +973,48 @@ TEST_F(FocStateMachineSpeedTest, a_model_is_applied_while_the_drive_is_stopped)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineSpeedTest, a_model_with_a_flux_linkage_retunes_the_loops_to_it_and_the_record_keeps_its_own)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
+    const auto record = sm.Calibration().EffectiveFluxLinkage();
+    auto model = state_machine::MotorModel{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::NewtonMeterSecondSquared{ 2.0e-5f }, foc::NewtonMeterSecondPerRadian{ 1.0e-5f }, foc::Weber{ 0.9f * record.Value() } };
+
+    ASSERT_TRUE(sm.ApplyModel(model));
+
+    EXPECT_NEAR(sm.Calibration().ActiveFluxLinkage().Value(), 0.9f * record.Value(), 1e-9f);
+    EXPECT_NEAR(sm.Calibration().EffectiveFluxLinkage().Value(), record.Value(), 1e-9f);
+}
+
+TEST_F(FocStateMachineSpeedTest, a_model_without_a_flux_linkage_keeps_the_record_s)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
+    const auto record = sm.Calibration().EffectiveFluxLinkage();
+
+    ASSERT_TRUE(sm.ApplyModel(state_machine::MotorModel{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::NewtonMeterSecondSquared{ 2.0e-5f }, foc::NewtonMeterSecondPerRadian{ 1.0e-5f } }));
+
+    EXPECT_NEAR(sm.Calibration().ActiveFluxLinkage().Value(), record.Value(), 1e-9f);
+}
+
+TEST_F(FocStateMachineSpeedTest, the_online_estimates_start_from_the_record_and_have_not_settled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
+
+    const auto estimates = sm.CurrentOnlineEstimates();
+
+    ASSERT_TRUE(estimates.has_value());
+    EXPECT_NEAR(estimates->fluxLinkage.Value(), sm.Calibration().EffectiveFluxLinkage().Value(), 1e-9f);
+    EXPECT_FALSE(estimates->fluxLinkageSettled);
+}
+
 namespace
 {
     class FocStateMachineSpeedAutoTest

@@ -15,7 +15,9 @@ namespace foc
         float meanIq{ 0.0f };
         float meanId{ 0.0f };
         float idAtEnd{ 0.0f };
+        float iqAtEnd{ 0.0f };
         float meanNormalizedVd{ 0.0f };
+        float meanNormalizedVq{ 0.0f };
         float meanElectricalSpeedTimesIq{ 0.0f };
         MechanicalWindow mechanical{};
     };
@@ -43,6 +45,7 @@ namespace foc
             iqSum += meanIq;
             idSum += 0.5f * (measured.d + previousId);
             vdSum += applied.d;
+            vqSum += applied.q;
             rotationTimesIqSum += electricalRotation * meanIq;
 
             previousIq = measured.q;
@@ -55,11 +58,12 @@ namespace foc
         ALWAYS_INLINE_HOT EstimatorSnapshot Close()
         {
             const auto inverseTicks = ticks != 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;
-            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, vdSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency, mechanical.Close() };
+            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, previousIq, vdSum * inverseTicks, vqSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency, mechanical.Close() };
 
             iqSum = 0.0f;
             idSum = 0.0f;
             vdSum = 0.0f;
+            vqSum = 0.0f;
             rotationTimesIqSum = 0.0f;
             ticks = 0;
 
@@ -70,6 +74,7 @@ namespace foc
         float iqSum{ 0.0f };
         float idSum{ 0.0f };
         float vdSum{ 0.0f };
+        float vqSum{ 0.0f };
         float rotationTimesIqSum{ 0.0f };
         float previousIq{ 0.0f };
         float previousId{ 0.0f };
