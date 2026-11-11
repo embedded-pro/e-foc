@@ -294,9 +294,8 @@ WHEN(R"(the target boots)")
     auto& interactor = TargetInteractor::Instance();
 
     interactor.ConfigurePlant(sil::EncodePlantConfig(setup.plant));
-    interactor.ConfigureNonVolatileMemory(setup.nvm.includeCalibration || setup.nvm.includeConfig
-                                              ? sil::BuildNvmImage(setup.nvm)
-                                              : sil::BlankNvmImage());
+    const auto image = setup.nvm.includeCalibration || setup.nvm.includeConfig ? sil::BuildNvmImage(setup.nvm) : sil::BlankNvmImage();
+    interactor.ConfigureNonVolatileMemory({ image.begin(), image.end() });
     interactor.RestartTarget();
     setup.booted = true;
 

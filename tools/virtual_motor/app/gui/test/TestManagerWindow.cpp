@@ -6,6 +6,7 @@
 #include <QDoubleSpinBox>
 #include <QMenuBar>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QTableWidget>
 #include <filesystem>
 
@@ -148,6 +149,20 @@ TEST_F(TestManagerWindow, help_offers_an_issue_report_the_log_folder_and_about)
     EXPECT_TRUE(actions.contains("&Report Issue…"));
     EXPECT_TRUE(actions.contains("Open &Log Folder"));
     EXPECT_TRUE(actions.contains("&About e-foc Virtual Motor"));
+}
+
+TEST(TestAddMotorDialog, offers_a_start_calibrated_for_the_plant)
+{
+    AddMotorDialog dialog{ {} };
+
+    QRadioButton* calibrated{ nullptr };
+    for (auto* button : dialog.findChildren<QRadioButton*>())
+        if (button->text().startsWith("Calibrated for its plant"))
+            calibrated = button;
+    ASSERT_NE(calibrated, nullptr);
+
+    calibrated->setChecked(true);
+    EXPECT_EQ(dialog.Spec().start, StartMode::calibrated);
 }
 
 TEST(TestAddMotorDialog, a_node_already_in_the_list_cannot_be_added_and_the_dialog_says_why)

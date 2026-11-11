@@ -2,7 +2,7 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.9.0
+version: 0.10.0
 component: "tool-virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.9.0                    |
+| Version   | 0.10.0                   |
 | Component | tool-virtual-motor       |
 | Date      | 2026-11-10               |
 
@@ -81,8 +81,8 @@ without a display:
 ```
 
 - **Add Motor** asks for the node, the plant (Teknic, Anaheim, or a description file, which is where
-  non-idealities and wiring faults are set) and how it starts: keep its memory or factory-fresh. Starting
-  calibrated for the plant is offered once a virtual motor can (`virtual-motor.md` Open Question 4). A
+  non-idealities and wiring faults are set) and how it starts: keep its memory, factory-fresh, or
+  calibrated for its plant, which runs in every control mode once aligned (`virtual-motor.md` Part B). A
   node already in the list is refused with the reason. It also asks for the current-sense offset of each
   phase, the offset a board's conditioning circuit adds to the measured currents, zero by default: it
   holds for the motor's life, is kept with the motor and shown with its parameters, and the firmware's

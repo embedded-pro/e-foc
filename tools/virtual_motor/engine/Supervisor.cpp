@@ -22,6 +22,7 @@ namespace virtual_motor
     {
         auto restarted = With(arguments, "--restarted");
         std::erase(restarted, "--factory-fresh");
+        std::erase(restarted, "--calibrated");
         return restarted;
     }
 

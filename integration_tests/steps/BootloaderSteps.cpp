@@ -1,6 +1,7 @@
 #include "bootloader/ApplicationInstaller.hpp"
 #include "bootloader/ImageFormat.hpp"
 #include "bootloader/StatusJournal.hpp"
+#include "core/foc/model/drive/memory/NvmImageBuilder.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "generated/Boards.hpp"
 #include "integration_tests/steps/UpgradePacks.hpp"
@@ -8,7 +9,6 @@
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/interactor/interfaces/BootloaderTarget.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
-#include "integration_tests/support/nvm/NvmImageBuilder.hpp"
 #include "integration_tests/support/plant/PlantConfigWriter.hpp"
 #include "services/synchronous_flash/SynchronousFlashMemory.hpp"
 #include "upgrade/pack/UpgradePackHeader.hpp"
@@ -100,7 +100,8 @@ WHEN(R"(the emulated target starts)")
     auto& interactor = TargetInteractor::Instance();
 
     interactor.ConfigurePlant(sil::EncodePlantConfig(setup.plant));
-    interactor.ConfigureNonVolatileMemory(sil::BlankNvmImage());
+    const auto image = sil::BlankNvmImage();
+    interactor.ConfigureNonVolatileMemory({ image.begin(), image.end() });
     interactor.RestartTarget();
     setup.booted = true;
 }

@@ -259,7 +259,7 @@ namespace virtual_motor::app
         Save();
         if (observer != nullptr)
             observer->MotorsChanged();
-        Start(motor, spec.start == StartMode::factoryFresh);
+        Start(motor, spec.start);
         return std::nullopt;
     }
 
@@ -285,7 +285,7 @@ namespace virtual_motor::app
     void Rig::PowerOn(uint8_t node)
     {
         if (auto* motor = Find(node); motor != nullptr && !motor->process.has_value())
-            Start(*motor, false);
+            Start(*motor, StartMode::keepMemory);
     }
 
     void Rig::PowerOff(uint8_t node)
@@ -309,7 +309,7 @@ namespace virtual_motor::app
             motor->stopping = true;
             processes.Stop(*motor->process);
         }
-        Start(*motor, false);
+        Start(*motor, StartMode::keepMemory);
     }
 
     void Rig::PowerOffAll()
@@ -353,7 +353,7 @@ namespace virtual_motor::app
         motor->stopping = false;
     }
 
-    void Rig::Start(RigMotor& motor, bool factoryFresh)
+    void Rig::Start(RigMotor& motor, StartMode start)
     {
         const auto folder = std::filesystem::path{ dataFolder } / MotorFolderName(motor.spec);
         std::error_code error;
@@ -362,7 +362,7 @@ namespace virtual_motor::app
         motor.stopping = false;
         motor.status.reset();
         motor.changes.reset();
-        motor.process = processes.Start(EngineArguments(motor.spec, { listener.Port().value_or(0), hubPort }, factoryFresh), folder.string());
+        motor.process = processes.Start(EngineArguments(motor.spec, { listener.Port().value_or(0), hubPort }, start), folder.string());
         if (motor.process.has_value())
             motor.SetState(MotorState::starting);
         else
@@ -420,7 +420,7 @@ namespace virtual_motor::app
                 continue;
             }
             motors.push_back(std::make_unique<RigMotor>(spec, *this));
-            Start(*motors.back(), false);
+            Start(*motors.back(), StartMode::keepMemory);
         }
 
         if (!skipped.empty())

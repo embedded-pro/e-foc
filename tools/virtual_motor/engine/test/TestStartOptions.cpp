@@ -140,3 +140,18 @@ TEST(TestStartOptions, reads_the_flags_a_restart_and_a_supervisor_add)
     EXPECT_TRUE(parsed.options->restarted);
     EXPECT_TRUE(parsed.options->supervised);
 }
+
+TEST(TestStartOptions, starts_calibrated_on_request_but_never_also_factory_fresh)
+{
+    EXPECT_FALSE(Parse({}).options->calibrated);
+    EXPECT_TRUE(Parse({ "--calibrated" }).options->calibrated);
+
+    const auto both = Parse({ "--calibrated", "--factory-fresh" });
+    EXPECT_FALSE(both.options.has_value());
+    EXPECT_EQ(both.error, "--calibrated and --factory-fresh cannot be combined");
+}
+
+TEST(TestStartOptions, the_usage_names_the_calibrated_start)
+{
+    EXPECT_NE(virtual_motor::StartOptionsUsage().find("--calibrated"), std::string::npos);
+}

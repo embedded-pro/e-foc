@@ -504,3 +504,14 @@ TEST_F(TestRig, a_motor_speaking_another_protocol_is_an_error)
     EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "Node 4"));
     EXPECT_TRUE(observer.HasIssue(IssueLevel::error, "plant port protocol"));
 }
+
+TEST_F(TestRig, a_motor_added_calibrated_starts_calibrated_once_and_keeps_its_memory_after)
+{
+    rig.Add(MotorSpec{ "default", 5, "anaheim", StartMode::calibrated });
+    rig.PowerCycle(5);
+
+    ASSERT_EQ(processes.started.size(), 2u);
+    EXPECT_THAT(processes.started[0], testing::Contains("--calibrated"));
+    EXPECT_THAT(processes.started[1], testing::Not(testing::Contains("--calibrated")));
+    EXPECT_EQ(store.stored[0].start, StartMode::keepMemory);
+}

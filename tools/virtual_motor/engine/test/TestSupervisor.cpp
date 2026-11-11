@@ -64,3 +64,9 @@ TEST(TestSupervisor, starts_a_motor_that_asks_to_restart_again_as_restarted)
                         { "e-foc-virtual-motor", "--supervised", "--restarted" },
                     }));
 }
+
+TEST(TestSupervisor, restart_keeps_the_memory_a_calibrated_start_wrote)
+{
+    EXPECT_EQ(virtual_motor::RestartArguments({ "e-foc-virtual-motor", "--calibrated" }),
+        (Arguments{ "e-foc-virtual-motor", "--restarted" }));
+}

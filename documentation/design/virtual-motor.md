@@ -2,7 +2,7 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.9.0
+version: 0.10.0
 component: "virtual-motor"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.9.0                |
+| Version   | 0.10.0               |
 | Component | virtual-motor        |
 | Date      | 2026-11-10           |
 
@@ -114,7 +114,7 @@ A virtual motor is started with:
 | Node           | The board ID the CAN node address is built from (`service-can.md` Part I)                                                       | 0                         |
 | Plant          | A reference motor preset (`teknic`, `anaheim`) or a plant description file                                                      | `teknic`                  |
 | Memory         | The file holding its non-volatile memory, a name in the working directory                                                       | one file per bus and node |
-| Start from     | Keep the memory file, or start factory-fresh                                                                                    | keep                      |
+| Start from     | Keep the memory file, start factory-fresh, or start calibrated for the plant                                                    | keep                      |
 | Seed           | Seed of every noise source, so a run replays exactly                                                                            | fixed                     |
 | Current offset | The offset the current-sense chain adds to the measured phase currents a, b and c, in A, as a board's conditioning circuit does | the plant description's   |
 | Host the bus   | Open the hub for the named bus if no hub is listening yet                                                                       | off                       |
@@ -150,6 +150,12 @@ another. The memory file is always in the working directory: its name is letters
 not starting with `.`, and an engine given a path elsewhere refuses to start, so a start option never
 reads, overwrites or deletes a file outside the motor's own folder. A missing or short file is a factory-fresh board. *Start factory-fresh* replaces the file with
 an erased memory, so the motor needs calibrating from the CAN Commander, as a new board does.
+*Start calibrated* replaces it with the memory a board calibrated on this plant would hold: the
+complete calibration record (pole pairs, resistance, inductance, flux linkage, inertia, viscous and
+Coulomb friction, the current-sense offsets the board adds, and the encoder index angle when the
+encoder has one) and the configuration with the calibrated current-loop bandwidth. The motor reaches
+*Ready* in every control mode once aligned, with no identification run. Like *factory-fresh*, it
+applies to the first start only: a reset keeps the memory the application has written since.
 
 ### Part C — Time
 
@@ -506,4 +512,4 @@ Signals of the continuous stream and of a capture, per control period, in the or
 | 1 | Where does the `virtual:` adapter live?      | In can-lite's host adapter composition; or in the CAN Commander only                                        | resolved: can-lite (Part G)                                                 |
 | 2 | Does a virtual motor take a firmware update? | Refuse a download; or offer none                                                                            | resolved: none offered (Part B)                                             |
 | 3 | What may change while the motor runs?        | Torque and noise only; or intrinsic parameters too                                                          | resolved: torque and noise (Part E)                                         |
-| 4 | When can a virtual motor start calibrated?   | Once the calibration image builder leaves the test harness for a library the engine can link on Windows too | open: until then a factory-fresh motor is calibrated from the CAN Commander |
+| 4 | When can a virtual motor start calibrated?   | Once the calibration image builder leaves the test harness for a library the engine can link on Windows too | resolved: the builder is a library of the plant drive (Part B)              |

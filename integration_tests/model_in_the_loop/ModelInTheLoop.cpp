@@ -10,6 +10,14 @@ namespace mil
 {
     namespace
     {
+        std::vector<uint8_t> MemoryOf(const Scenario& scenario)
+        {
+            if (scenario.nvmImage.has_value())
+                return *scenario.nvmImage;
+            const auto image = scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage();
+            return { image.begin(), image.end() };
+        }
+
         constexpr float kMilliPerUnit = 1000.0f;
         constexpr float kMilliPerSecond = 1000.0f;
         constexpr std::size_t kTracerTailCharacters = 4000;
@@ -193,7 +201,7 @@ namespace mil
         : scenario{ scenario }
         , drive{ scenario.plant }
         , inverter{ drive }
-        , eeprom{ scenario.nvmImage.has_value() ? *scenario.nvmImage : (scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage()) }
+        , eeprom{ MemoryOf(scenario) }
         , vdc{ drive.PowerSupplyVoltage() }
         , tickPeriod{ std::chrono::nanoseconds{ 1000000000u / drive.BaseFrequency().Value() } }
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }

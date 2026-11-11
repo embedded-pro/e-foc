@@ -129,7 +129,7 @@ namespace virtual_motor::app
     private:
         friend class RigMotor;
 
-        void Start(RigMotor& motor, bool factoryFresh);
+        void Start(RigMotor& motor, StartMode start);
         void Introduced(std::unique_ptr<MotorLink> link);
         RigMotor* FindProcess(ProcessId process);
         void Save();

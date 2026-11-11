@@ -20,6 +20,7 @@ namespace virtual_motor
         uint16_t hubPort{ services::loopback::virtualCanHubPort };
         std::optional<uint16_t> plantPort;
         bool factoryFresh{ false };
+        bool calibrated{ false };
         bool hostBus{ false };
         bool restarted{ false };
         bool supervised{ false };

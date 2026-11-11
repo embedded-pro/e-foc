@@ -12,6 +12,7 @@ target_link_libraries(e_foc.tool.virtual_motor.platform_test PUBLIC
 
 target_sources(e_foc.tool.virtual_motor.platform_test PRIVATE
     InstrumentReportsMock.hpp
+    TestCalibratedMemory.cpp
     TestCaptureRecorder.cpp
     TestFileEeprom.cpp
     TestPacer.cpp

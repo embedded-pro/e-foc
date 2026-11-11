@@ -222,7 +222,8 @@ also run headless, hosting the bus itself:
 ```
 
 Further motors join the same bus with their own `--node`; `--plant anaheim` selects the other reference
-motor, and `--factory-fresh` starts with erased memory. `--help` lists every option. A virtual motor keeps
+motor, `--factory-fresh` starts with erased memory and `--calibrated` with the calibration a bench run on
+its plant would store. `--help` lists every option. A virtual motor keeps
 its memory in `virtual-motor-<bus>-<node>.nvm` in its working directory, so it stays calibrated between
 runs; `--memory` names another file in that directory.
 

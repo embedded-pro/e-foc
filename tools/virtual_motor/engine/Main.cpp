@@ -3,6 +3,7 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include "tools/virtual_motor/engine/StartOptions.hpp"
 #include "tools/virtual_motor/engine/Supervisor.hpp"
+#include "tools/virtual_motor/platform/CalibratedMemory.hpp"
 #include "tools/virtual_motor/platform/PlantDescription.hpp"
 #include "tools/virtual_motor/platform/PlantPortClient.hpp"
 #include "tools/virtual_motor/platform/PlatformPortTarget.hpp"
@@ -153,6 +154,11 @@ namespace
 
         if (options.factoryFresh)
             std::filesystem::remove(options.memoryFile);
+        if (options.calibrated && !virtual_motor::WriteCalibratedMemory(options.memoryFile, *plant))
+        {
+            std::cerr << "e-foc-virtual-motor: could not write the calibrated memory to " << options.memoryFile << "\n";
+            return EXIT_FAILURE;
+        }
 
         static infra::StaticStorage<virtual_motor::VirtualPlatform> platform;
         static infra::StaticStorage<services::VirtualCanHub> hub;
