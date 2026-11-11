@@ -99,8 +99,8 @@ older client does not ask for something describes the contract as it was, not be
 under the rule that a client and a server must agree on the version, both move to 3.1 together
 (`service-flux-linkage-ident.md`, Part D; `online-recalibration.md`).
 
-| ID     | Parameter              | Unit | Value                                                                                                  | Automatic |
-|--------|------------------------|------|--------------------------------------------------------------------------------------------------------|-----------|
+| ID     | Parameter              | Unit | Value                                                                                                   | Automatic |
+|--------|------------------------|------|---------------------------------------------------------------------------------------------------------|-----------|
 | `0x9B` | `estimatedFluxLinkage` | Wb   | Online estimate; the calibration record's until it settles, `0` while the active mode runs no estimator | no        |
 | `0x9C` | `modelFluxLinkage`     | Wb   | Flux linkage the current loop and the torque conversion use; the record's until a recalibration         | no        |
 
