@@ -135,6 +135,27 @@ Feature: Position Travel
     And the motor is enabled
     Then the state machine shall report a position-limit fault
 
+  @sil @REQ-CTL-010 @REQ-CTL-011 @REQ-COM-001
+  Scenario: A position move with a jerk limit follows an S-curve profile and arrives in time
+    Given a nominal motor plant
+    And the plant response is recorded at 1000 Hz for up to 4000 samples
+    And the motor is already calibrated
+    And the motor boots in position mode
+    When the target boots
+    And the profileVelocity is set to 20 over CAN
+    And the profileAcceleration is set to 400 over CAN
+    And the profileJerk is set to 20000 over CAN
+    And the rotor is aligned
+    And a position setpoint of 0.0 rad is applied
+    And the motor is enabled
+    Then the targetReached read over CAN shall become 1 within 500 ms
+    When a position setpoint of 1.5 rad is applied
+    Then the targetReached read over CAN shall be 0
+    When the response is captured for 500 ms after the last setpoint
+    Then the rotor shall follow a jerk-limited S-curve of 20 rad/s and 400 rad/s2 and 20000 rad/s3 within 0.03 rad
+    And the rotor shall arrive within 0.005 rad of the last setpoint between 125 and 165 ms after it
+    And the targetReached read over CAN shall become 1 within 500 ms
+
   @sil @REQ-COM-001
   Scenario: The position window, its time and the travel limits are stored and read back after a restart
     Given a nominal motor plant

@@ -5,6 +5,7 @@
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
+#include "numerical/motion_profiles/SCurveProfileFromState.hpp"
 #include "numerical/motion_profiles/TrapezoidalProfileFromState.hpp"
 #include <algorithm>
 #include <chrono>
@@ -600,6 +601,46 @@ THEN(R"(the rotor shall follow a trapezoidal profile of {float} rad\/s and {floa
 
     std::fprintf(stderr, "[METRIC] sil position_profile cruise_error_rad=%.4f start_offset_ms=%.2f\n", best, bestOffsetMs);
     EXPECT_LT(best, limit);
+}
+
+THEN(R"(the rotor shall follow a jerk-limited S-curve of {float} rad\/s and {float} rad\/s2 and {float} rad\/s3 within {float} rad)", (float velocity, float acceleration, float jerk, float limit))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedRecord(setup, std::chrono::milliseconds{ 0 });
+    const auto stamp = SetpointStampAfterEnable(setup);
+    ASSERT_TRUE(stamp.has_value()) << "No setpoint was applied after enable";
+    const auto start = PositionAtTick(setup, *stamp);
+    ASSERT_TRUE(start.has_value()) << "No plant samples after the last setpoint";
+
+    const motion_profiles::SCurveProfileFromState<float> profile{
+        *start, 0.0f, 0.0f, setup.lastSetpoint->value,
+        { velocity, acceleration, acceleration, jerk }
+    };
+    const float ticksPerSecond = static_cast<float>(setup.plant.baseFrequencyHz);
+    constexpr float kLatestStartMs = 3.0f;
+    float worst{ std::numeric_limits<float>::max() };
+    float bestOffsetMs{ 0.0f };
+    for (float offsetMs = 0.0f; offsetMs <= kLatestStartMs; offsetMs += 0.25f)
+    {
+        float candidate{ 0.0f };
+        for (const auto& sample : setup.trace.Samples())
+        {
+            if (sample.tick < *stamp)
+                continue;
+            const float elapsed = static_cast<float>(sample.tick - *stamp) / ticksPerSecond - offsetMs / kMilliPerSecond;
+            if (elapsed < 0.0f)
+                continue;
+            candidate = std::max(candidate, std::abs(sample.thetaMech - profile.Sample(elapsed).position));
+        }
+        if (candidate < worst)
+        {
+            worst = candidate;
+            bestOffsetMs = offsetMs;
+        }
+    }
+
+    std::fprintf(stderr, "[METRIC] sil scurve_profile following_error_rad=%.4f start_offset_ms=%.2f\n", worst, bestOffsetMs);
+    EXPECT_LT(worst, limit);
 }
 
 THEN(R"(the response shall have no dropped samples)")

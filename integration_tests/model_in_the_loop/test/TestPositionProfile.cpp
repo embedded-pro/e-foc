@@ -35,11 +35,15 @@ namespace
         { foc::PositionAlgorithm::twoDof, "twodof" },
     } };
 
-    mil::Scenario Profiled(const std::string& plant, foc::PositionAlgorithm algorithm, float velocity = profileVelocity, float acceleration = profileAcceleration)
+    constexpr float profileJerk{ 20000.0f };
+    constexpr float scurveFollowingErrorLimit{ 0.04f };
+
+    mil::Scenario Profiled(const std::string& plant, foc::PositionAlgorithm algorithm, float velocity = profileVelocity, float acceleration = profileAcceleration, float jerk = 0.0f)
     {
         auto scenario = mil::Scenario{}.Plant(plant).PositionLoop(algorithm).Recorded(1000, 2000).Calibrated().BootsIn(state_machine::ControlMode::position);
         scenario.nvm.config.limits.profileVelocity = velocity;
         scenario.nvm.config.limits.profileAcceleration = acceleration;
+        scenario.nvm.config.limits.profileJerk = jerk;
         return scenario;
     }
 
@@ -216,5 +220,80 @@ TEST(TestPositionProfile, without_a_profile_the_error_to_the_reference_is_the_er
 
         EXPECT_LT(largestDifference, 1e-6f);
         EXPECT_GT(std::abs(session.observed[from + 5].positionError), 0.5f);
+    }
+}
+
+TEST(TestPositionProfile, every_position_law_moves_1_5_rad_in_145_ms_with_jerk_limit_and_stays_within_cruise_error)
+{
+    for (const std::string plant : { "nominal", "anaheim" })
+    {
+        for (const auto& law : laws)
+        {
+            SCOPED_TRACE(plant + " " + law.name);
+            Session session{ Profiled(plant, law.algorithm, profileVelocity, profileAcceleration, profileJerk) };
+            ASSERT_TRUE(session.Settle(0.0f));
+            const auto from = session.Mark();
+            ASSERT_TRUE(session.mil.SetPosition(move));
+            session.Run(500);
+
+            const auto remaining = RemainingReference(session.observed, from);
+            const auto duration = Duration(remaining);
+
+            float cruiseError{ 0.0f };
+            float peakError{ 0.0f };
+            for (std::size_t i = 0; i != remaining.size(); ++i)
+            {
+                const float error = std::abs(session.observed[from + i].positionError);
+                peakError = std::max(peakError, error);
+                if (i >= 80 && i <= 110)
+                    cruiseError = std::max(cruiseError, error);
+            }
+            const float finalTargetError = std::abs(session.observed.back().targetError);
+            std::fprintf(stderr, "[METRIC] mil scurve_profile plant=%s law=%s duration_ms=%zu cruise_error=%.4f peak_error=%.4f final_target_error=%.5f\n",
+                plant.c_str(), law.name, duration, cruiseError, peakError, finalTargetError);
+
+            EXPECT_NEAR(static_cast<float>(duration), 142.0f, 2.0f);
+            EXPECT_LT(cruiseError, scurveFollowingErrorLimit);
+            EXPECT_LT(finalTargetError, 0.002f);
+            EXPECT_TRUE(session.mil.IsRunning());
+            mil::ExpectNoDroppedSamples(session.mil);
+        }
+    }
+}
+
+TEST(TestPositionProfile, with_jerk_limit_a_mid_move_reversal_keeps_acceleration_rate_within_limit)
+{
+    for (const auto& law : laws)
+    {
+        SCOPED_TRACE(law.name);
+        Session session{ Profiled("nominal", law.algorithm, profileVelocity, profileAcceleration, profileJerk) };
+        ASSERT_TRUE(session.Settle(0.0f));
+        const auto from = session.Mark();
+        ASSERT_TRUE(session.mil.SetPosition(move));
+        session.Run(40);
+        const auto reversal = session.Mark();
+        ASSERT_TRUE(session.mil.SetPosition(-1.0f));
+        session.Run(500);
+
+        std::vector<float> reference;
+        for (std::size_t i = from; i != session.observed.size(); ++i)
+        {
+            const float target = i < reversal ? move : -1.0f;
+            reference.push_back(target - (session.observed[i].targetError - session.observed[i].positionError));
+        }
+
+        float peakJerkEstimate{ 0.0f };
+        for (std::size_t i = 3; i < reference.size(); ++i)
+        {
+            const float vel2 = (reference[i] - reference[i - 1]) / periodSeconds;
+            const float vel1 = (reference[i - 1] - reference[i - 2]) / periodSeconds;
+            const float vel0 = (reference[i - 2] - reference[i - 3]) / periodSeconds;
+            const float jerk = std::abs((vel2 - 2.0f * vel1 + vel0) / periodSeconds / periodSeconds);
+            peakJerkEstimate = std::max(peakJerkEstimate, jerk);
+        }
+        std::fprintf(stderr, "[METRIC] mil scurve_reversal law=%s peak_jerk_estimate=%.1f\n", law.name, peakJerkEstimate);
+
+        EXPECT_LE(peakJerkEstimate, profileJerk * 1.1f);
+        EXPECT_NEAR(reference.back(), -1.0f, 1e-3f);
     }
 }
