@@ -329,3 +329,28 @@ TEST_F(TestPidPositionController, a_higher_bandwidth_widens_the_speed_envelope)
 
     EXPECT_NEAR(Command(0.1f, 0.0f), ReferenceStepGain(tunings) * 0.1f * SpeedEnvelope(tunings), 1e-3f);
 }
+
+TEST_F(TestPidPositionController, the_reference_speed_is_added_after_the_clamped_state)
+{
+    controller.Configure(ValidParameters());
+    foc::PidPositionController reference;
+    reference.Configure(ValidParameters());
+    const foc::PositionControlContext step{ foc::Radians{ 0.0f }, foc::Radians{ 1.0f } };
+    const foc::PositionControlContext profiled{ foc::Radians{ 0.0f }, foc::Radians{ 1.0f }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ 20.0f } };
+
+    EXPECT_NEAR(controller.Compute(profiled).value, reference.Compute(step).value + 20.0f, tolerance);
+}
+
+TEST_F(TestPidPositionController, the_reference_speed_does_not_feed_the_integral_state)
+{
+    controller.Configure(ValidParameters());
+    foc::PidPositionController reference;
+    reference.Configure(ValidParameters());
+    const foc::PositionControlContext profiled{ foc::Radians{ 0.0f }, foc::Radians{ 0.0f }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ 20.0f } };
+    const foc::PositionControlContext rest{ foc::Radians{ 0.0f }, foc::Radians{ 0.0f } };
+
+    for (int sample = 0; sample != 100; ++sample)
+        controller.Compute(profiled);
+
+    EXPECT_NEAR(controller.Compute(profiled).value, reference.Compute(rest).value + 20.0f, tolerance);
+}

@@ -80,6 +80,11 @@ is transparent and the raw setpoint passes through. Inside software position lim
 dropped and the prefilter runs on the line: the setpoint and the filter state stay between the
 limits, which never contain the seam (`position-loop-pid.md`, Angle-Error Wrapping).
 
+**Motion profile**: a motion profile (`position-motion-profile.md`) already shapes the reference, so while
+it is active the pre-filter is bypassed and the feedback controller works on the profiled reference with its
+velocity feed-forward; the pre-filter state is dropped and reseeded from the measured angle when the profile
+ends. Without a profile the pre-filter is unchanged.
+
 **Relation to P2**: When $F(z) = 1$ and the feedback controller is a proportional P, the structure
 collapses to Cascade P→PI. Two-DOF position control is the generalisation — $F(z)$ independently
 shapes tracking and the feedback controller independently shapes stiffness.

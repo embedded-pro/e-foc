@@ -190,6 +190,14 @@ holds the rotor, and the rotor creeps onto the setpoint as it does under Cascade
 rest: every speed law rejects a constant torque with no speed error, so no disturbance needs the
 position integral to hold a stationary rotor.
 
+### Profile velocity feed-forward
+
+While a motion profile is active (`position-motion-profile.md`) the reference is $r$ with velocity $\dot r$.
+The velocity-form PI keeps its state on the normalised error and its clamp as before; $\dot r$ is added to the
+speed reference after the clamped state, so the feed-forward cannot wind the integral up, and the acceleration
+feed-forward $J\ddot r / K_t$ joins the q-axis current. Without a profile $\dot r = 0$ and the output is
+unchanged.
+
 ### Output Limiting
 
 The speed reference is clamped to $\pm\omega_{m,max}$ to prevent demanding speeds beyond the

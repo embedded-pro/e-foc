@@ -35,7 +35,8 @@ namespace
             EXPECT_CALL(drive, ObserveMotion()).WillRepeatedly(Invoke([this]()
                 {
                     foc::MotionObservation observation{};
-                    observation.positionError = foc::Radians{ error };
+                    observation.targetError = foc::Radians{ error };
+                    observation.positionError = foc::Radians{ referenceError };
                     return observation;
                 }));
 
@@ -58,6 +59,7 @@ namespace
         state_machine::State state{ state_machine::Enabled{} };
         bool inPositionMode{ true };
         float error{ 0.001f };
+        float referenceError{ 0.0f };
         supervision::TargetReachedMonitor::Settings settings{ foc::Radians{ 0.01f }, std::chrono::milliseconds(20) };
         supervision::TargetReachedMonitor monitor;
     };
@@ -84,6 +86,16 @@ TEST_F(TargetReachedMonitorTest, an_error_short_of_the_setpoint_counts_as_well)
 TEST_F(TargetReachedMonitorTest, an_error_beyond_the_window_does_not_reach_the_target)
 {
     error = 0.011f;
+
+    Run(std::chrono::milliseconds(500));
+
+    EXPECT_FALSE(monitor.IsReached());
+}
+
+TEST_F(TargetReachedMonitorTest, a_reference_that_still_runs_ahead_of_the_rotor_does_not_count_as_reached)
+{
+    error = 0.5f;
+    referenceError = 0.001f;
 
     Run(std::chrono::milliseconds(500));
 

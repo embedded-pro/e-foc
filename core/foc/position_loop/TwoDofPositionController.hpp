@@ -18,6 +18,12 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context)
         {
+            if (context.profiled)
+            {
+                seeded = false;
+                return feedback.Compute(context);
+            }
+
             auto shaped = context;
             shaped.reference = ShapedReference(context);
 

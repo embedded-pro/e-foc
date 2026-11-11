@@ -12,6 +12,7 @@ target_link_libraries(e_foc.foc.cascade PUBLIC
     e_foc.foc.speed_loop
     e_foc.foc.position_loop
     e_foc.foc.transforms
+    numerical.motion_profiles
 )
 
 target_sources(e_foc.foc.cascade PRIVATE
@@ -29,6 +30,8 @@ target_sources(e_foc.foc.cascade PRIVATE
     MechanicalWindowAccumulator.hpp
     PositionCascade.cpp
     PositionCascade.hpp
+    PositionProfile.cpp
+    PositionProfile.hpp
     QuadratureVoltageWindow.cpp
     QuadratureVoltageWindow.hpp
     SpeedCascade.cpp

@@ -133,3 +133,15 @@ TEST_F(TestTwoDofPositionController, a_longer_time_constant_slows_the_reference_
 
     EXPECT_LT(controller.Compute(step).value, responsive.Compute(step).value);
 }
+
+TEST_F(TestTwoDofPositionController, a_profiled_reference_bypasses_the_pre_filter)
+{
+    controller.Configure(ValidParameters());
+
+    foc::PidPositionController withoutPreFilter;
+    withoutPreFilter.Configure(ValidParameters());
+
+    const foc::PositionControlContext step{ foc::Radians{ 0.0f }, foc::Radians{ 1.0f }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ 0.0f }, true };
+
+    EXPECT_NEAR(controller.Compute(step).value, withoutPreFilter.Compute(step).value, tolerance);
+}

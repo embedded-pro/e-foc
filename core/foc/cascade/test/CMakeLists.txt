@@ -18,6 +18,7 @@ target_sources(e_foc.foc.cascade_test PRIVATE
     TestEstimatorWindowAccumulator.cpp
     TestMechanicalWindowAccumulator.cpp
     TestPositionCascade.cpp
+    TestPositionProfile.cpp
     TestSpeedCascade.cpp
     TestSpeedDifferentiator.cpp
     TestTorqueCascade.cpp

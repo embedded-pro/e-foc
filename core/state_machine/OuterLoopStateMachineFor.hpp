@@ -71,6 +71,12 @@ namespace application
                 focController.RampSpeed(acceleration, deceleration);
         }
 
+        void ProfileMotion(foc::RadiansPerSecond velocity, foc::RadiansPerSecondSquared acceleration, foc::RadiansPerSecondSquared deceleration, foc::RadiansPerSecondCubed jerk)
+        {
+            if constexpr (std::is_base_of_v<foc::PositionProfilable, Cascade>)
+                focController.ProfileMotion(velocity, acceleration, deceleration, jerk);
+        }
+
         void LimitTravel(foc::Radians minimum, foc::Radians maximum)
         {
             if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)

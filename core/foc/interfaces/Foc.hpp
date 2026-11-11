@@ -20,6 +20,7 @@ namespace foc
         RadiansPerSecond demandedSpeed{ 0.0f };
         Radians positionError{ 0.0f };
         Ampere demandedTorqueCurrent{ 0.0f };
+        Radians targetError{ 0.0f };
     };
 
     class FocBase
@@ -180,6 +181,16 @@ namespace foc
 
     public:
         virtual void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) = 0;
+    };
+
+    class PositionProfilable
+    {
+    protected:
+        ~PositionProfilable() = default;
+
+    public:
+        // Off while velocity or acceleration is zero; zero deceleration uses the acceleration; jerk is stored for a later S-curve.
+        virtual void ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk) = 0;
     };
 
     class SpeedCommandable

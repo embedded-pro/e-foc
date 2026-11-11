@@ -44,7 +44,7 @@ namespace foc
         output = std::clamp(candidate, -1.0f, 1.0f);
         heldBackReference = HeldBack(candidate - output, referencePart);
 
-        return { PositionOutputKind::speedReference, output * SpeedEnvelope() };
+        return { PositionOutputKind::speedReference, output * SpeedEnvelope() + context.referenceSpeed.Value() };
     }
 
     float PidPositionController::HeldBack(float clamped, float referencePart)

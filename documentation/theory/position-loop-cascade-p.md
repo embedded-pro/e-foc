@@ -101,6 +101,11 @@ $$
 With $K_{ff} = 1$, steady-state velocity tracking error is theoretically zero. Use $K_{ff} \in (0,1)$
 when the velocity reference signal carries noise.
 
+**Motion profile**: while a profile is active (`position-motion-profile.md`) the firmware sets
+$K_{ff} = 1$ and takes the profile velocity $\dot r$ as the velocity reference, so the output is
+$\omega_m^* = K_v\,(r - \theta_m) + \dot r$, and the acceleration feed-forward $J\ddot r / K_t$ is added to the
+q-axis current. Without a profile the term is zero.
+
 **Tuning**:
 - $K_v$ (rad/s / rad): start at $\omega_{speed}/5$.
 - $K_{ff} \in [0,\,1]$: start at 0; increase after speed loop is tuned and stable.
