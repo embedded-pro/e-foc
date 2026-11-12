@@ -1,3 +1,12 @@
+add_library(e_foc.integration_tests.gdb_script STATIC
+    GdbScript.hpp
+    GdbScript.cpp
+)
+
+target_include_directories(e_foc.integration_tests.gdb_script PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../../..>"
+)
+
 add_library(e_foc.integration_tests.interactor.hardware OBJECT
     BridgeConfig.hpp
     BridgeConfig.cpp
@@ -20,6 +29,7 @@ target_include_directories(e_foc.integration_tests.interactor.hardware PUBLIC
 
 target_link_libraries(e_foc.integration_tests.interactor.hardware PUBLIC
     e_foc.integration_tests.interactor.interfaces
+    e_foc.integration_tests.gdb_script
     e_foc.tool.hardware_bridge.client
     services.network_instantiations
     hal.interfaces
@@ -27,3 +37,5 @@ target_link_libraries(e_foc.integration_tests.interactor.hardware PUBLIC
     GTest::gtest
     GTest::gmock
 )
+
+add_subdirectory(test)
