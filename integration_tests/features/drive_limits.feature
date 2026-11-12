@@ -218,3 +218,48 @@ Feature: Drive Limits
     And the continuousCurrent read over CAN shall be 2
     And the peakCurrent read over CAN shall be 3
     And the peakCurrentTime read over CAN shall be 2.5
+
+  @hil_motor @REQ-PRO-004 @REQ-CTL-002 @REQ-CTL-010 @REQ-LCY-005 @REQ-PRO-001 @REQ-COM-001
+  Scenario: The board stores the limits and reads them back after a restart
+    On the board the overspeed limit stored is 50 rad/s, within the bench's 60 rad/s, and the command
+    timeout is checked on a speed-mode rotor at 30 rad/s: a torque setpoint held that long would spin
+    the free rotor far past the bench limit.
+
+    When the overspeedLimit is set to 50 over CAN
+    And the followingErrorWindow is set to 0.4 over CAN
+    And the followingErrorTime is set to 0.25 over CAN
+    And the speedAcceleration is set to 300 over CAN
+    And the speedDeceleration is set to 600 over CAN
+    And the profileVelocity is set to 20 over CAN
+    And the profileAcceleration is set to 400 over CAN
+    And the profileDeceleration is set to 500 over CAN
+    And the profileJerk is set to 9000 over CAN
+    And the commandTimeout is set to 1.5 over CAN
+    And the continuousCurrent is set to 2 over CAN
+    And the peakCurrent is set to 3 over CAN
+    And the peakCurrentTime is set to 2.5 over CAN
+    And the target restarts
+    Then the overspeedLimit read over CAN shall be 50
+    And the followingErrorWindow read over CAN shall be 0.4
+    And the followingErrorTime read over CAN shall be 0.25
+    And the speedAcceleration read over CAN shall be 300
+    And the speedDeceleration read over CAN shall be 600
+    And the profileVelocity read over CAN shall be 20
+    And the profileAcceleration read over CAN shall be 400
+    And the profileDeceleration read over CAN shall be 500
+    And the profileJerk read over CAN shall be 9000
+    And the commandTimeout read over CAN shall be 1.5
+    And the continuousCurrent read over CAN shall be 2
+    And the peakCurrent read over CAN shall be 3
+    And the peakCurrentTime read over CAN shall be 2.5
+
+  @hil_motor @REQ-LCY-005
+  Scenario: A client that stops sending setpoints faults the board's running drive
+    Given the speed motor system is initialised with no valid calibration data
+    When the speed control mode is selected
+    And the full calibration is run
+    And the commandTimeout is set to 2 over CAN
+    And a speed setpoint of 30 rad/s is applied
+    And the motor is enabled
+    Then the measured speed shall settle at 30 rad/s within 4 rad/s in 1500 ms
+    And the state machine shall report a command-timeout fault

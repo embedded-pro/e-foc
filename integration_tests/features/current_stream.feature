@@ -38,3 +38,34 @@ Feature: Streamed Currents and Rotor Position
     And the motor is enabled
     And a torque setpoint of 0.5 A is applied
     Then no streamed current sample shall arrive within 500 ms
+
+  @hil_motor @REQ-COM-002
+  Scenario: The board streams contiguous one-millisecond windows of the measured currents at 0 A
+    On the board the rotor runs free, so the stream is checked at 0 A, where the window means sit on the
+    current sensors' noise and the rotor stays put. One run in eleven on the bench lost 4 of 1000
+    windows and the others none; where they were lost, bridge host or board, is not known, so the
+    limit is twice that.
+
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the telemetry rate is set to 1000 Hz
+    And the motor is enabled
+    And a torque setpoint of 0 A is applied
+    And 1000 streamed current samples are collected
+    Then the streamed sequence shall have at most 8 gaps
+    And the mean streamed q-axis current shall be within 0.005 A of 0.0 A
+    And the mean streamed d-axis current shall be within 0.005 A of 0.0 A
+    And every streamed position shall lie within half a turn of the alignment zero
+    When the motor is disabled
+
+  @hil_motor @REQ-COM-002
+  Scenario: A zero telemetry rate stops the board's stream
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the telemetry rate is set to 0 Hz
+    And the motor is enabled
+    And a torque setpoint of 0 A is applied
+    Then no streamed current sample shall arrive within 500 ms
+    When the motor is disabled

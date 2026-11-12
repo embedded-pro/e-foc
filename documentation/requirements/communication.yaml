@@ -1,7 +1,7 @@
 - id: REQ-COM-001
   title: Every function of the drive is reachable through one published CAN contract
   status: verified
-  verification: [sil, unit]
+  verification: [sil, hil, unit]
   shall: >
     Every command, setting, diagnostic and fault code of the drive, commissioning included, shall
     be reachable over CAN through one published, versioned motor contract, so that no function
@@ -16,7 +16,7 @@
 - id: REQ-COM-002
   title: Telemetry reports the drive's state, faults and motion
   status: verified
-  verification: sil
+  verification: [sil, hil]
   shall: >
     The drive shall broadcast its state, fault code and measured mechanical speed, send a fault
     the moment it is raised without waiting for a request, and stream the measured d- and q-axis

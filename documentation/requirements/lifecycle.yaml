@@ -43,7 +43,7 @@
 - id: REQ-LCY-005
   title: A drive whose commanding client goes silent stops
   status: verified
-  verification: [sil, unit]
+  verification: [sil, hil, unit]
   shall: >
     An Enabled drive shall stop when its CAN client goes offline. With a command timeout set, it
     shall also enter Fault with commandTimeout within 10 ms of the timeout running out without an
@@ -53,7 +53,7 @@
 - id: REQ-LCY-006
   title: A quick stop brings the rotor to rest under control
   status: verified
-  verification: [sil, mil, unit]
+  verification: [sil, mil, hil, unit]
   shall: >
     On a quick stop while Enabled the drive shall keep driving the motor and decelerate the rotor
     to rest at the operator's quick-stop deceleration, report that it is stopping, and then stop

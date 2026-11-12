@@ -32,7 +32,8 @@ Feature: Motor controller application on the connected motor
     And a torque setpoint of <torque> A is applied
     Then the measured speed shall exceed <speed> rad/s within 1000 ms
     When a torque setpoint of 0 A is applied
-    And the motor is disabled
+    Then the measured speed shall stay below 55 rad/s in magnitude for 500 ms
+    When the motor is disabled
     Then the state machine shall be in the Ready state
 
     Examples:

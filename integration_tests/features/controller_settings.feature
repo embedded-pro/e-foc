@@ -43,3 +43,24 @@ Feature: Controllers and Settings Over CAN
     And the inertia is set to 0.00002 over CAN
     And the target restarts
     Then the inertia read over CAN shall be 0.00002
+
+  @hil_motor @REQ-CTL-006 @REQ-COM-001
+  Scenario: A bandwidth set over CAN holds across a restart of the board until it is set back to automatic
+    On the board the speed bandwidth is derived once a calibration exists, so that scenario calibrates
+    first.
+
+    Given the speed motor system is initialised with no valid calibration data
+    When the speed control mode is selected
+    And the full calibration is run
+    Then the speedBandwidth read over CAN shall be automatic
+    When the speedBandwidth is set to 120 over CAN
+    And the target restarts
+    Then the speedBandwidth read over CAN shall be 120
+    When the speedBandwidth is set to automatic over CAN
+    Then the speedBandwidth read over CAN shall be automatic
+
+  @hil_motor @REQ-CMS-004 @REQ-COM-001
+  Scenario: The board stores a motor parameter set over CAN and reads it back after a restart
+    When the inertia is set to 0.00002 over CAN
+    And the target restarts
+    Then the inertia read over CAN shall be 0.00002

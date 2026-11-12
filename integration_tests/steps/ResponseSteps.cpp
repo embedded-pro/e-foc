@@ -572,6 +572,7 @@ WHEN(R"(a quick stop is issued over CAN)")
     const auto commandsBefore = setup.trace.Commands().size();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focQuickStopId)) << "Quick stop refused";
     setup.quickStop = Setpoint{ can::focQuickStopId, 0.0f, fixture.ServerNodeId(), commandsBefore };
+    setup.quickStopAcknowledgedAt = std::chrono::steady_clock::now();
 }
 
 THEN(R"(the rotor speed shall fall below {float} rad\/s between {float} and {float} ms after the quick stop)", (float speed, float fromMs, float toMs))

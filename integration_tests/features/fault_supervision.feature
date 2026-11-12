@@ -57,3 +57,11 @@ Feature: Fault Supervision
     And the target restarts
     Then the supervisionWindow read over CAN shall be 2.5
     And the stallDetection read over CAN shall be 0
+
+  @hil_motor @REQ-PRO-005 @REQ-COM-001
+  Scenario: The board stores the supervision settings and reads them back after a restart
+    When the supervisionWindow is set to 2.5 over CAN
+    And the stallDetection is set to 0 over CAN
+    And the target restarts
+    Then the supervisionWindow read over CAN shall be 2.5
+    And the stallDetection read over CAN shall be 0

@@ -35,7 +35,7 @@
 - id: REQ-CMS-004
   title: A calibration survives a power cycle and can be entered by hand
   status: verified
-  verification: sil
+  verification: [sil, hil]
   shall: >
     The drive shall store a successful calibration, restore it at power-up and, unless its encoder
     has an index, stay in Idle until the rotor has been aligned again. While stopped, the operator shall be able to enter the

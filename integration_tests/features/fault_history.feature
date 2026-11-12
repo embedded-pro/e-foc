@@ -50,3 +50,48 @@ Feature: Fault History
     When the fault history is cleared over CAN
     And the target restarts
     Then the fault history shall hold no record 0
+
+  @hil_motor @REQ-PRO-006 @REQ-COM-001
+  Scenario: The board reads back the faults of two power-ups newest first after a restart
+    The bench supply is about 24 V, so on the board a 20 V maximum faults a starting drive with
+    overvoltage and a 30 V minimum with undervoltage; the start is at 0 A. The board counts its
+    power-ups from its first boot, so the records are compared with each other, not with a number.
+
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the fault history is cleared over CAN
+    And the busVoltageMaximum is set to 20 over CAN
+    And a torque setpoint of 0 A is applied
+    And the motor start command is issued
+    Then the state machine shall report an overvoltage fault
+    When the drive is left for 2000 ms
+    And the target restarts
+    And the busVoltageMaximum is set to 0 over CAN
+    And the torque control mode is selected
+    And electrical identification is run
+    And the busVoltageMinimum is set to 30 over CAN
+    And a torque setpoint of 0 A is applied
+    And the motor start command is issued
+    Then the state machine shall report an undervoltage fault
+    When the drive is left for 2000 ms
+    And the target restarts
+    Then fault record 0 shall be an undervoltage fault in torque mode
+    And fault record 0 shall carry a bus voltage within 1.0 V of 24.3 V
+    And fault record 1 shall be an overvoltage fault in torque mode
+    And fault record 1 shall come from the power-up before that of record 0
+    And the fault history shall hold no record 2
+
+  @hil_motor @REQ-PRO-006 @REQ-COM-001
+  Scenario: The board reports a fault at once, and its cleared history stays empty after a restart
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the busVoltageMaximum is set to 20 over CAN
+    And a torque setpoint of 0 A is applied
+    And the motor start command is issued
+    Then the state machine shall report an overvoltage fault
+    And fault record 0 shall be an overvoltage fault in torque mode
+    When the fault history is cleared over CAN
+    And the target restarts
+    Then the fault history shall hold no record 0

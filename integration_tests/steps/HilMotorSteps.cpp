@@ -3,10 +3,13 @@
 #include "integration_tests/support/ControllerSelection.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <numbers>
+#include <optional>
 #include <thread>
 
 using namespace integration;
@@ -166,4 +169,44 @@ THEN(R"(the motor shall not report a fault)")
     const auto state = fixture.ReadMotorState();
     ASSERT_TRUE(state.has_value()) << "No state telemetry";
     EXPECT_NE(*state, can::FocMotorState::fault);
+}
+
+THEN(R"(the measured speed shall stay below {float} rad\/s in magnitude for {int} ms)", (float limit, int durationMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ durationMs };
+    float peak = 0.0f;
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto speed = fixture.ReadMeasuredSpeed();
+        ASSERT_TRUE(speed.has_value()) << "No speed telemetry";
+        peak = std::max(peak, std::fabs(*speed));
+    }
+
+    std::printf("[METRIC] hil peak_speed_rad_s value=%.1f limit=%.1f\n", static_cast<double>(peak), static_cast<double>(limit));
+    EXPECT_LT(peak, limit) << "The rotor reached " << peak << " rad/s";
+}
+
+THEN(R"(the measured speed shall fall below {float} rad\/s between {int} and {int} ms after the quick stop)", (float speed, int fromMs, int toMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(setup.quickStopAcknowledgedAt.has_value()) << "No quick stop was issued";
+    const auto issued = *setup.quickStopAcknowledgedAt;
+    const auto deadline = issued + std::chrono::milliseconds{ 2 * toMs };
+    std::optional<double> fellAfterMs;
+
+    while (!fellAfterMs && std::chrono::steady_clock::now() < deadline)
+    {
+        const auto measured = fixture.ReadMeasuredSpeed();
+        ASSERT_TRUE(measured.has_value()) << "No speed telemetry";
+        if (std::fabs(*measured) < speed)
+            fellAfterMs = std::chrono::duration<double, std::milli>{ std::chrono::steady_clock::now() - issued }.count();
+    }
+
+    ASSERT_TRUE(fellAfterMs.has_value()) << "The speed stayed above " << speed << " rad/s for " << 2 * toMs << " ms after the quick stop";
+    std::printf("[METRIC] hil quick_stop_below_speed_ms value=%.1f\n", *fellAfterMs);
+    EXPECT_GE(*fellAfterMs, fromMs);
+    EXPECT_LE(*fellAfterMs, toMs);
 }
