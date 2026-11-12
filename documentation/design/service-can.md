@@ -63,6 +63,7 @@ restates none of it.
 
 The server category is part of e-foc-protocol (`wire-contract.md` Part B). The firmware attaches
 `FocMotorCanBridge` (Part D) as its only observer.
+
 ### Part C — FocMotorCategoryClient
 
 The client category is part of e-foc-protocol (`wire-contract.md` Part C).

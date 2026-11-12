@@ -319,6 +319,7 @@ setting, reading and command in this part is offered on every compatible node; t
 firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
 firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot
 read from it: the controller's own interlock refuses the transfer while its motor runs.
+
 ### Part K — diagnostics
 
 The **Diagnostics** tab shows what the controller measured or derived and cannot be edited: the calibration

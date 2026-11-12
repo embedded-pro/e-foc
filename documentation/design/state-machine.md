@@ -58,6 +58,7 @@ The state machine has six named states:
 | `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Stopping` (CmdQuickStop), → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                       |
 | `Stopping`    | FOC controller active; the drive decelerates the rotor to a standstill under control (Quick Stop below)                               | → `Ready` (the rotor below 2 rad/s, the stop deadline, CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                        |
 | `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                               |
+
 ### State Diagram
 
 ```mermaid
