@@ -28,11 +28,14 @@ project(e_foc LANGUAGES C CXX ASM VERSION 2.0.1) # x-release-please-version
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-# Use -Og for Debug builds on GCC/Clang to enable optimizations while maintaining debuggability
-# This significantly improves FOC real-time performance in Debug builds
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_C_FLAGS_DEBUG "-Og -g" CACHE STRING "C Debug flags" FORCE)
-    set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "C++ Debug flags" FORCE)
+    if(E_FOC_EMBEDDED_BUILD)
+        set(e_foc_debug_level "-O1")
+    else()
+        set(e_foc_debug_level "-Og")
+    endif()
+    set(CMAKE_C_FLAGS_DEBUG "${e_foc_debug_level} -g" CACHE STRING "C Debug flags" FORCE)
+    set(CMAKE_CXX_FLAGS_DEBUG "${e_foc_debug_level} -g" CACHE STRING "C++ Debug flags" FORCE)
 endif()
 
 set_directory_properties(PROPERTY USE_FOLDERS ON)
