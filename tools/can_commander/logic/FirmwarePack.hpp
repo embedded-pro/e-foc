@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/services/firmware_upgrade/FirmwareVersion.hpp"
+#include "can-lite/categories/firmware_upgrade/FirmwareVersion.hpp"
 #include <cstdint>
 #include <optional>
 #include <string>

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/services/firmware_upgrade/FirmwareUpgradeDrive.hpp"
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeHold.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 
 namespace can
 {
     class FirmwareUpgradeInterlock
-        : public services::FirmwareUpgradeDrive
+        : public services::FirmwareUpgradeHold
     {
     public:
         explicit FirmwareUpgradeInterlock(state_machine::ControlModeStateMachine& controlMode);

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
@@ -33,7 +33,7 @@ namespace application
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -52,7 +52,6 @@ namespace application
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
 
-        // Also satisfies ThreePhaseInverter::Start; no-op on host
         void Start() override;
 
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
@@ -71,6 +70,7 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
@@ -177,8 +177,6 @@ namespace application
         };
 
     private:
-        // Constructed before onInitialized() runs, so anything it schedules or times during
-        // Logic's construction finds a live TimerService / EventDispatcherWithWeakPtr::Instance().
         hal::TimerServiceGeneric timerService;
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::Function<void()> onInitialized;
@@ -189,10 +187,10 @@ namespace application
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;
         std::optional<ThreeChannelsPwmStub> pwm;
         std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
-        std::optional<CanBusAdapterImpl<CanStub>> canBus;
+        std::optional<services::MonitoredCanImpl<CanStub>> canBus;
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };

@@ -6,7 +6,7 @@ target_link_libraries(e_foc.tool.can_commander.logic_test PUBLIC
     gmock_main
     infra.timer_test_helper
     e_foc.tool.can_commander.logic
-    e_foc.services.firmware_upgrade.test_pack
+    upgrade.staging
 )
 
 target_sources(e_foc.tool.can_commander.logic_test PRIVATE
@@ -14,10 +14,17 @@ target_sources(e_foc.tool.can_commander.logic_test PRIVATE
     CanCommandClientObserverMock.hpp
     TestCanCommandClient.cpp
     TestCommandDescriptions.cpp
+    TestCommandTracker.cpp
+    TestFaultRecordAssembler.cpp
+    TestFirmwareIdentityCollector.cpp
+    TestFaultHistoryText.cpp
     TestFirmwarePack.cpp
     TestFirmwareRefusal.cpp
     TestFirmwareTransfer.cpp
     TestMotorSettings.cpp
+    TestReadScheduler.cpp
     TestRecoveryAdvice.cpp
     TestSetpointAxis.cpp
+    TestPack.cpp
+    TestPack.hpp
 )

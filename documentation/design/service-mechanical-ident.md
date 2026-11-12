@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.4.1
+version: 0.5.1
 component: service-mechanical-ident
-date: 2026-10-23
+date: 2026-11-08
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.4.1                                         |
+| Version   | 0.5.1                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-10-23                                    |
+| Date      | 2026-11-08                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -131,8 +131,9 @@ each step, so that ratio was a few percent. The bench plant read its inertia abo
 read within 0.15 %. When the rotor crosses tens of counts in a window, the quantisation error of the window's mean
 changes little from one window to the next, so with window means the bias falls to about 0.1 % at both encoder sizes.
 
-The encoder is read at every sample, because the electrical angle that turns the phase currents into the q-axis
-current needs it, and the q-axis current is accumulated over the window the way the position is. The second difference
+Every sample arrives with the rotor angle the control loop read and the q-axis current it measured from the phase
+currents at that angle, so the procedure reads no encoder and repeats no transform while it runs. The q-axis current
+is accumulated over the window the way the position is. The second difference
 of three window means is the true acceleration weighted by a quadratic kernel over the three windows. With $u$ the
 position of a sample within its window, the kernel rises as $u^2/2$ over the first window, is $1/2 + u(1-u)$ over the
 second, and falls as $(1-u)^2/2$ over the third. The torque it is regressed on must be weighted by the same kernel,
@@ -264,10 +265,10 @@ name only.
 
 ### Recursive Least Squares Estimator
 
-The RLS estimator maintains a 3×1 parameter vector θ = [J, B, τ_friction]ᵀ and a 3×3 covariance matrix P. At each observation k, a 1×3 regressor row vector is formed:
+The RLS estimator maintains a 3×1 parameter vector θ = [τ_friction, J, B]ᵀ and a 3×3 covariance matrix P. At each observation k, a 1×3 regressor row vector is formed:
 
 ```text
-φ_k = [ dω/dt_k,  ω_k,  1 ]
+φ_k = [ 1,  dω/dt_k,  ω_k ]
 ```
 
 and the scalar observation is:
@@ -310,7 +311,7 @@ flowchart TD
     CB --> VEL["Accumulate ω, dω/dt\nfrom encoder"]
     TAU --> POST["Close the window,\npost it to the ring"]
     VEL --> POST
-    POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[dω/dt, ω, 1], y=τ)"]
+    POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[1, dω/dt, ω], y=τ)"]
     RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
     TIMEOUT -->|No| CB
     TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
@@ -323,7 +324,7 @@ flowchart TD
 The control interrupt observes every sample, but it neither fits nor schedules. It accumulates the
 window, checks the current and speed envelopes, decides whether the window is observable, and posts the
 closed window (acceleration, speed, torque, the sample it closed on and the window's length) to a ring of
-16 entries. When the run reaches its outcome, converged on a dwell boundary, outside the envelope or with
+64 entries. When the run reaches its outcome, converged on a dwell boundary, outside the envelope or with
 a full ring, the interrupt only records it.
 
 The run's 1 ms tick in the event loop, the one that also slews the speed command, takes the windows from
@@ -341,18 +342,35 @@ which can come a little after it because the fit runs on the next tick. The fit 
 or past the boundary, so the run fits exactly the windows it fitted when the fit ran in the interrupt.
 On the timeout, and when the run finishes, the windows still in the ring are fitted first.
 
-Windows shorter than the tick arrive faster than it fits them, so once half the ring is waiting the
-interrupt schedules a fit at once. At the rig's window of about 4 ms the tick leaves at most one window
-waiting, so this never happens there. A run whose windows still fill the ring before they are fitted ends
-without an estimate rather than skipping a window.
+A window can be as short as one sample, so at 20 kHz up to twenty arrive between two ticks. The ring holds
+three ticks of them, and the tick is the only thing that fits: the interrupt never schedules a fit. With a
+16-entry ring it had to, once half the ring was waiting, which was every eighth sample of a run with
+single-sample windows and cost the 600 cycles above each time. A run whose windows still fill the ring
+before they are fitted ends without an estimate rather than skipping a window.
+
+### Structure
+
+`MechanicalParametersIdentificationImpl` owns the run: the drive, the envelopes, the tick and timeout timers, the outcome
+and the result. The work above is split into parts that each run in one context:
+
+| Part                   | Context                | Holds                                                                                                              |
+|------------------------|------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `EncoderResolution`    | control interrupt      | Smallest step and step-change energy; the window length they call for                                              |
+| `SampleWindow`         | control interrupt      | Position and torque accumulation, the kernel-centred speed and torque, the window resize; owns `EncoderResolution` |
+| `ObservationQueue`     | interrupt → event loop | The 16-entry ring; reports when half of it waits and when it is full                                               |
+| `MechanicalFit`        | event loop             | The RLS estimator, persistence of excitation, the convergence decision and the dwell boundary to finish on         |
+| `InertiaSettling`      | event loop             | The inertia reference compared once per estimator memory                                                           |
+| `TwoLevelSpeedProfile` | event loop             | The dwell and target levels, the slewed speed command and the timer that alternates them                           |
+
+The interrupt reads two things the event loop writes: whether a run is active and the dwell boundary to finish on.
 
 ### Timeout and Result Delivery
 
 A `TimerSingleShot` starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:
 
-- **J** (inertia) is the first element of θ; reported as `NewtonMeterSecondSquared`.
-- **B** (viscous friction) is the second element of θ; reported as `NewtonMeterSecondPerRadian`.
-- **τ_friction** (Coulomb friction) is the third element of θ; it is observed internally but is not part of the output interface for this version.
+- **τ_friction** (the constant term) is the first element of θ. It is τ_c plus any constant shaft load, because the one-shot run turns one way only and cannot separate dry friction from a load, so it is not reported. The Coulomb friction comes from the cogging-map step, which turns both ways (`service-cogging-compensation.md`).
+- **J** (inertia) is the second element of θ; reported as `NewtonMeterSecondSquared`.
+- **B** (viscous friction) is the third element of θ; reported as `NewtonMeterSecondPerRadian`.
 
 ### Acceptance Policy
 
@@ -410,11 +428,12 @@ or pole-pair count is not positive.
 
 ### Required
 
-| Interface            | Purpose                                                                                 | Contract                                                                                                                                                                       |
-|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocSpeed`           | Commands the two speed setpoints that excite the mechanical dynamics                    | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
-| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                                                                                                                            |
-| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                                                                                                                      |
+| Interface                 | Purpose                                                                                                                   | Contract                                                                                                                                                                       |
+|---------------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocSpeed`                | Commands the two speed setpoints that excite the mechanical dynamics                                                      | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
+| `ThreePhaseInverter`      | Gives the control rate and the supported current, and stops the power stage when a sample leaves the envelope             | Stopped from the control interrupt; everything else of the teardown is deferred                                                                                                |
+| `PhaseCurrentsObservable` | Every control interrupt's phase currents, with the q-axis current the loop measured from them and the rotor angle it used | One observer at a time; released when the run ends                                                                                                                             |
+| `Encoder`                 | Supplies the mechanical angle the run starts from                                                                         | Read once, when the run starts; every later angle comes with its sample                                                                                                        |
 
 ---
 
@@ -586,4 +605,4 @@ The online forgetting factor $\lambda = 0.9995$ applies an exponential weight de
 
 ### Estimate Consumption
 
-Estimates are not applied automatically. The operator or application explicitly triggers a speed-PID retune via `ApplyOnlineEstimates()` on the state machine. See the State Machine design document for details.
+The estimate reaches the speed loop only through online recalibration (`online-recalibration.md`): once a direction's fit has settled, the estimator reports itself settled, and a settled estimate may replace the inertia and friction the loop is designed from while the drive is stopped.

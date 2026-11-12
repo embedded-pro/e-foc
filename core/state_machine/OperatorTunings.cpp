@@ -1,6 +1,6 @@
 #include "core/state_machine/OperatorTunings.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace state_machine
 {
@@ -120,6 +120,10 @@ namespace state_machine
 
         if (config.stallDetection > 1)
             config.stallDetection = services::ConfigData{}.stallDetection;
+        if (config.recalibrationMode > static_cast<uint8_t>(services::RecalibrationMode::automatic))
+            config.recalibrationMode = services::ConfigData{}.recalibrationMode;
+        if (config.homingRequired > 1)
+            config.homingRequired = services::ConfigData{}.homingRequired;
     }
 
     void SanitizeLimits(services::ConfigData& config)
@@ -132,6 +136,10 @@ namespace state_machine
         stored.followingErrorTime = WithinOrDefault(stored.followingErrorTime, CommandLimits::minFollowingErrorTime, CommandLimits::maxFollowingErrorTime, defaults.followingErrorTime);
         stored.speedAcceleration = WithinOrDefault(stored.speedAcceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedAcceleration);
         stored.speedDeceleration = WithinOrDefault(stored.speedDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.speedDeceleration);
+        stored.profileVelocity = WithinOrDefault(stored.profileVelocity, 0.0f, CommandLimits::maxOverspeedLimit, defaults.profileVelocity);
+        stored.profileAcceleration = WithinOrDefault(stored.profileAcceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.profileAcceleration);
+        stored.profileDeceleration = WithinOrDefault(stored.profileDeceleration, 0.0f, CommandLimits::maxSpeedRate, defaults.profileDeceleration);
+        stored.profileJerk = WithinOrDefault(stored.profileJerk, 0.0f, CommandLimits::maxProfileJerk, defaults.profileJerk);
         stored.commandTimeout = WithinOrDefault(stored.commandTimeout, 0.0f, CommandLimits::maxCommandTimeout, defaults.commandTimeout);
         stored.continuousCurrent = WithinOrDefault(stored.continuousCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.continuousCurrent);
         stored.peakCurrent = WithinOrDefault(stored.peakCurrent, 0.0f, CommandLimits::maxRatedCurrent, defaults.peakCurrent);

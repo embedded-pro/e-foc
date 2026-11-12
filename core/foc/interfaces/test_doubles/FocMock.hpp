@@ -18,6 +18,7 @@ namespace foc
         MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
         MOCK_METHOD(MotionObservation, ObserveMotion, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
+        MOCK_METHOD(Ampere, MeasuredQuadratureCurrent, (), (const, override));
     };
 
     class SpeedLoopTunableMock
@@ -48,6 +49,7 @@ namespace foc
         MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
         MOCK_METHOD(MotionObservation, ObserveMotion, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
+        MOCK_METHOD(Ampere, MeasuredQuadratureCurrent, (), (const, override));
     };
 
     class SpeedCommandableMock
@@ -92,5 +94,6 @@ namespace foc
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(MotionObservation, ObserveMotion, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
+        MOCK_METHOD(Ampere, MeasuredQuadratureCurrent, (), (const, override));
     };
 }

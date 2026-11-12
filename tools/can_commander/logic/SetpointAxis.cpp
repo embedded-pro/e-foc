@@ -1,5 +1,5 @@
 #include "tools/can_commander/logic/SetpointAxis.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -14,9 +14,13 @@ namespace tool
 
         constexpr float halfTurn{ std::numbers::pi_v<float> };
 
-        constexpr SetpointAxis torqueAxis{ " A", 1.0, can::focCurrentScale, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
-        constexpr SetpointAxis speedAxis{ " rpm", rpmPerRadPerSecond, can::focSpeedScale, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
-        constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, can::focPositionScale, halfTurn, "One turn from the alignment zero" };
+        constexpr int32_t torqueCountsPerAmpere{ 1000 };
+        constexpr int32_t speedCountsPerRadPerSecond{ 100 };
+        constexpr int32_t positionCountsPerRadian{ 1000 };
+
+        constexpr SetpointAxis torqueAxis{ " A", 1.0, torqueCountsPerAmpere, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
+        constexpr SetpointAxis speedAxis{ " rpm", rpmPerRadPerSecond, speedCountsPerRadPerSecond, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
+        constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, positionCountsPerRadian, halfTurn, "One turn from the alignment zero" };
     }
 
     std::string_view SetpointAxis::Suffix() const
@@ -42,7 +46,7 @@ namespace tool
 
     double SetpointAxis::DisplayStep() const
     {
-        return displayPerSi / wireScale;
+        return displayPerSi / countsPerSi;
     }
 
     int32_t SetpointAxis::CountsOf(double displayValue) const
@@ -63,7 +67,7 @@ namespace tool
 
     float SetpointAxis::SiOf(int32_t counts) const
     {
-        return static_cast<float>(static_cast<double>(counts) / wireScale);
+        return static_cast<float>(static_cast<double>(counts) / countsPerSi);
     }
 
     const SetpointAxis& TorqueAxis()

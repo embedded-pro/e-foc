@@ -2,8 +2,8 @@
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "generated/Boards.hpp"
 #include "generated/Version.h"
 #include "integration_tests/steps/UpgradePacks.hpp"
@@ -32,6 +32,7 @@ namespace
     constexpr std::size_t staleImageSize = 4096;
     constexpr auto installTimeout = std::chrono::seconds{ 60 };
     constexpr auto activateToDeployedBound = std::chrono::duration<double>{ 5.0 };
+    constexpr auto beginAnswerBound = std::chrono::duration<double>{ 1.0 };
     constexpr auto silenceTimeout = std::chrono::seconds{ 10 };
     constexpr auto silence = std::chrono::milliseconds{ 1500 };
     constexpr auto journalPollInterval = std::chrono::milliseconds{ 100 };
@@ -93,8 +94,12 @@ namespace
 
     void Begin(Fixture& fixture, FirmwareDownload& download)
     {
+        const auto sent = std::chrono::steady_clock::now();
         const auto answer = FirmwareUpgradeClient{ fixture }.Begin(static_cast<uint32_t>(download.pack.size()));
+        const auto answered = std::chrono::duration<double>{ std::chrono::steady_clock::now() - sent }.count();
         ASSERT_TRUE(answer.has_value()) << "Begin Upgrade was not answered";
+        std::printf("[METRIC] firmware upgrade begin_to_answer_s=%.2f\n", answered);
+        EXPECT_LE(answered, beginAnswerBound.count()) << "Begin Upgrade kept the controller silent for too long";
         download.beginAnswer = static_cast<uint8_t>(answer->error);
         download.pageSize = answer->pageSize;
     }
@@ -301,15 +306,13 @@ THEN(R"(the drive reports the version of its build and its board kind)")
 THEN(R"(setting the telemetry rate to {int} Hz is refused as busy)", (int rateHz))
 {
     auto& fixture = context.Get<Fixture>();
-    services::CanPayloadWriter payload;
-    payload.WriteUInt32(static_cast<uint32_t>(rateHz));
 
     const auto mark = fixture.MarkCapture();
-    EXPECT_FALSE(fixture.SendCanCommand(can::focMotorCategoryId, can::focConfigureTelemetryRateId, payload.Message())) << "The telemetry rate was accepted";
+    EXPECT_FALSE(WriteParameter(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz))) << "The telemetry rate was accepted";
 
     const auto error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
     ASSERT_TRUE(error.has_value() && error->size() == 2) << "The drive sent no category error";
-    EXPECT_EQ((*error)[0], can::focConfigureTelemetryRateId);
+    EXPECT_EQ((*error)[0], can::focSetParameterId);
     EXPECT_EQ((*error)[1], static_cast<uint8_t>(can::FocMotorCategoryError::busy));
 }
 

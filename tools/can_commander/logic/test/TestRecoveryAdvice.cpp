@@ -128,6 +128,14 @@ TEST_F(TestRecoveryAdvice, setpoint_for_another_mode_names_both_modes)
     EXPECT_THAT(advice->text, HasSubstr("runs position mode"));
 }
 
+TEST_F(TestRecoveryAdvice, a_torque_setpoint_in_newton_metres_is_a_torque_setpoint)
+{
+    const auto advice = Refuse(can::focSetTorqueSetpointNewtonMeterId, FocMotorState::idle, Refusal::modeMismatch, FocMotorMode::speed);
+
+    ASSERT_TRUE(advice.has_value());
+    EXPECT_THAT(advice->text, HasSubstr("torque setpoint applies in torque mode only"));
+}
+
 TEST_F(TestRecoveryAdvice, align_refused_while_stopped_asks_for_a_calibration)
 {
     const auto advice = Refuse(can::focAlignId, FocMotorState::idle, Refusal::modeMismatch, FocMotorMode::speed);
@@ -163,4 +171,13 @@ TEST_F(TestRecoveryAdvice, names_every_action_like_its_button)
     EXPECT_EQ("Stop Motor", RecoveryActionName(RecoveryAction::stopMotor));
     EXPECT_EQ("Open Motor Parameters", RecoveryActionName(RecoveryAction::showMotorParameters));
     EXPECT_TRUE(RecoveryActionName(RecoveryAction::none).empty());
+}
+
+TEST(TestRecoveryAdviceEquality, advice_is_equal_only_with_the_same_text_and_action)
+{
+    const tool::RecoveryAdvice align{ "Align the rotor first.", tool::RecoveryAction::alignRotor };
+
+    EXPECT_TRUE(align == (tool::RecoveryAdvice{ "Align the rotor first.", tool::RecoveryAction::alignRotor }));
+    EXPECT_FALSE(align == (tool::RecoveryAdvice{ "Align the rotor first.", tool::RecoveryAction::clearFault }));
+    EXPECT_FALSE(align == (tool::RecoveryAdvice{ "Clear the fault first.", tool::RecoveryAction::alignRotor }));
 }

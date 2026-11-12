@@ -4,13 +4,12 @@
 #include <optional>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
-#include "core/services/cli/SerialCommunicationMirror.hpp"
 #include "drivers/eeprom/Eeprom24xx.hpp"
 #include "hal/cortex_m/DataWatchpointAndTrace.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
@@ -31,6 +30,7 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
+#include "services/util/SerialCommunicationMirror.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include "targets/platform_implementations/st/implementation/AdcTriggeredByPwmStm.hpp"
@@ -48,6 +48,7 @@ namespace application
 
     class PlatformFactoryImpl
         : public PlatformFactory
+        , public drivers::EncoderIndex
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -57,7 +58,7 @@ namespace application
         uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -77,6 +78,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
+        std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -85,10 +87,15 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
+
+        bool HasIndex() const override;
+        void ArmIndex() override;
+        bool IndexSeen() override;
 
     private:
         static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
@@ -143,7 +150,7 @@ namespace application
         void MonitorBoard(hal::AdcMultiChannel::Samples samples);
         void TripProtection(BoardProtectionReason reason);
 
-        static CanBusAdapter::CanError ToAdapterError(hal::FdCanStm::Error error);
+        static services::CanBusError ToAdapterError(hal::FdCanStm::Error error);
 
         void OnWatchdogExpired();
 
@@ -181,7 +188,7 @@ namespace application
             std::optional<AdcPhaseCurrentMeasurementImpl<PhaseCurrentAdc>> phaseCurrentAdc;
             std::optional<hal::PwmStm> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::SynchronousQuadratureEncoderStm>> encoder;
-            std::optional<CanBusAdapterImpl<hal::FdCanStm::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
+            std::optional<services::MonitoredCanImpl<hal::FdCanStm::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
         };
 
     private:
@@ -196,13 +203,14 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         uint8_t boardId{ 0 };
         hal::cortex::DataWatchpointAndTrace cycleCounter;
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool protectionTripped{ false };
         foc::LowSideShuntReadout shuntReadout{ Peripheral::maxReadableDuty };
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         EncoderZero encoderZero;
+        bool indexLatched{ false };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;

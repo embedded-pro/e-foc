@@ -13,9 +13,11 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
+#include "core/foc/math/FrictionFeedForward.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -23,7 +25,7 @@ namespace foc
     class CascadeWithSpeedLoop
     {
     protected:
-        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
+        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
         ~CascadeWithSpeedLoop();
 
         bool ConfigureImpl(const MotorModelParameters& parameters);
@@ -38,13 +40,18 @@ namespace foc
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
 
+        ALWAYS_INLINE_HOT Ampere MeasuredQuadratureCurrentImpl() const
+        {
+            return Ampere{ estimation.window.LastIq() };
+        }
+
         void SetSpeedReference(RadiansPerSecond reference);
-        void RunSpeedLoop(float mechanicalSpeed);
+        void RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration = 0.0f);
         void BeginQuickStop(RadiansPerSecondSquared deceleration);
         bool IsQuickStopping() const;
         bool RunQuickStop(float mechanicalSpeed);
 
-        void SetDirectCurrentReference(float current);
+        void SetDirectCurrentReference(float current, float referenceAcceleration = 0.0f);
         float MeasureMechanicalSpeed();
 
         void EnableCurrentCommandImpl();
@@ -62,11 +69,58 @@ namespace foc
         void UpdateOnlineElectricalEstimator();
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
-        void SetCurrentStream(CurrentStream& stream);
+        void LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant);
+        void ClearFrictionFeedForwardImpl();
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
         void LimitCurrentImpl(Ampere limit);
         void TrackBusVoltageImpl(Volts measured);
 
     private:
+        struct OuterLoopSchedule
+        {
+            hal::Hertz frequency;
+            uint32_t prescaler;
+            uint32_t triggerCounter;
+        };
+
+        struct OuterLoopOutputs
+        {
+            volatile float speedLoopOutput;
+            volatile float feedForwardCurrent;
+            volatile float directCurrentReference;
+            volatile float speedReference;
+            volatile float electricalSpeed;
+            volatile float mechanicalSpeed;
+        };
+
+        struct CurrentCommand
+        {
+            volatile float current;
+            volatile float quadratureLimit;
+            volatile bool active;
+            QuadratureVoltageWindow voltageWindow;
+        };
+
+        struct MotorScaling
+        {
+            float polePairs;
+            float vdcInvScale;
+            float dutyDelay;
+        };
+
+        struct Estimation
+        {
+            EstimatorChannel channel;
+            EstimatorWindowAccumulator window;
+            volatile float meanIq;
+        };
+
+        struct FeedForwards
+        {
+            CoggingFeedForward cogging;
+            FrictionFeedForward friction;
+        };
+
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         CurrentControllerSelector currentLoop;
@@ -74,34 +128,22 @@ namespace foc
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         LowPriorityInterrupt& lowPriorityInterrupt;
         Ampere maxCurrent;
-        hal::Hertz outerLoopFrequency;
+        OuterLoopSchedule schedule;
         SpeedDifferentiator speedDifferentiator;
-        volatile float lastSpeedLoopOutput{ 0.0f };
-        volatile float directCurrentReference{ 0.0f };
-        volatile float lastElectricalSpeed{ 0.0f };
-        volatile float lastMechanicalSpeed{ 0.0f };
-        volatile float lastMeanIq{ 0.0f };
-        volatile float speedReference{ 0.0f };
-        volatile float commandedCurrent{ 0.0f };
-        // Written by the event loop, read by the control interrupt; never above maxCurrent.
-        volatile float quadratureLimit;
-        volatile bool currentCommandActive{ false };
-        // Written by the event loop before quickStopping is set, then owned by the outer loop; mechanical rad/s per outer-loop period.
+        OuterLoopOutputs outer{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+        CurrentCommand command;
+        float accelerationCurrentGain{ 0.0f };
+        MotorScaling scaling{ 0.0f, 1.0f, 0.0f };
+        // Written by the event loop before quickStopping is set; mechanical rad/s per outer-loop period.
         volatile float quickStopStep{ 0.0f };
-        volatile float quickStopReference{ 0.0f };
         volatile bool quickStopping{ false };
-        uint32_t prescaler;
-        uint32_t triggerCounter{ 0 };
-        float polePairs{ 0.0f };
-        float vdcInvScale{ 1.0f };
         BusVoltageRatio busRatio;
         volatile bool enabled{ false };
-
-        EstimatorChannel estimators;
-        EstimatorWindowAccumulator estimatorWindow;
+        Estimation estimation;
         DirectAxisExcitation directAxisExcitation;
-        CoggingFeedForward coggingFeedForward;
-        QuadratureVoltageWindow voltageWindow;
-        CurrentStream* currentStream{ nullptr };
+        FeedForwards feedForward;
+        CurrentStream& currentStream;
+        ZeroVectorSlope zeroVectorSlope;
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
     };
 }

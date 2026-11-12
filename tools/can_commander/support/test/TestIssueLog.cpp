@@ -10,6 +10,17 @@ namespace
     using tool::IssueLog;
     using tool::IssueSeverity;
 
+    int& ForwardedMessages()
+    {
+        static int forwarded{ 0 };
+        return forwarded;
+    }
+
+    void CountingHandler(QtMsgType, const QMessageLogContext&, const QString&)
+    {
+        ++ForwardedMessages();
+    }
+
     class TestIssueLog
         : public testing::Test
     {
@@ -164,4 +175,52 @@ TEST_F(TestIssueLog, keeps_running_when_the_log_folder_disappears_while_capturin
     log.Write(IssueSeverity::error, "written after the folder vanished");
 
     EXPECT_TRUE(log.RecentLines(10).back().endsWith("written after the folder vanished"));
+}
+
+TEST_F(TestIssueLog, captures_qt_critical_messages_as_errors_and_skips_debug_and_info)
+{
+    IssueLog log{ Config() };
+    log.CaptureQtMessages();
+    qDebug("debug chatter");
+    qInfo("info chatter");
+    qCritical("socket lost");
+
+    const auto lines = log.RecentLines(10);
+    ASSERT_EQ(1, lines.size());
+    EXPECT_TRUE(lines.front().endsWith("[ERROR] Qt: socket lost"));
+}
+
+TEST_F(TestIssueLog, a_second_log_does_not_take_the_capture_from_the_first)
+{
+    IssueLog first{ Config() };
+    first.CaptureQtMessages();
+    first.CaptureQtMessages();
+
+    auto secondConfig = Config();
+    secondConfig.directory = QDir{ temporary.path() }.filePath("second");
+    IssueLog second{ secondConfig };
+    second.CaptureQtMessages();
+
+    qWarning("only the first log hears this");
+
+    EXPECT_EQ(1, first.RecentLines(10).size());
+    EXPECT_TRUE(second.RecentLines(10).isEmpty());
+}
+
+TEST_F(TestIssueLog, forwards_qt_messages_to_the_handler_installed_before_it)
+{
+    const auto original = qInstallMessageHandler(CountingHandler);
+    ForwardedMessages() = 0;
+    {
+        IssueLog log{ Config() };
+        log.CaptureQtMessages();
+        qWarning("seen by both");
+
+        EXPECT_EQ(1, ForwardedMessages());
+        EXPECT_EQ(1, log.RecentLines(10).size());
+    }
+
+    qWarning("seen by the restored handler only");
+    EXPECT_EQ(2, ForwardedMessages());
+    qInstallMessageHandler(original);
 }

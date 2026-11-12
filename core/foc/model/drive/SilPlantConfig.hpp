@@ -1,0 +1,117 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+namespace sil
+{
+    namespace PlantFaultFlag
+    {
+        static constexpr uint8_t openPhaseA = 1u << 0;
+        static constexpr uint8_t openPhaseB = 1u << 1;
+        static constexpr uint8_t openPhaseC = 1u << 2;
+        static constexpr uint8_t encoderStuck = 1u << 3;
+    }
+
+    struct SilPlantConfig
+    {
+        float statorResistanceOhm;
+        float dAxisInductanceHenry;
+        float qAxisInductanceHenry;
+        float fluxLinkageWeber;
+        float rotorInertiaKgM2;
+        float viscousDampingNmSPerRad;
+        float maxSupportedCurrentAmpere;
+        float loadTorqueNm;
+
+        float powerSupplyVoltageVolts;
+        uint32_t baseFrequencyHz;
+
+        float noiseSigmaAmpere;
+        float noiseBiasAmpereA;
+        float noiseBiasAmpereB;
+        float noiseBiasAmpereC;
+
+        float ambientCelsius;
+        float thermalResistance;
+        float thermalCapacitance;
+        float copperTempCoeff;
+        float ironInductanceCoeff;
+
+        float encoderSigmaRadians;
+        float encoderBiasRadians;
+
+        float overCurrentTripAmpere;
+        float overVoltageTripVolts;
+        float underVoltageTripVolts;
+        float overTemperatureTripCelsius;
+
+        float supplyVoltageScale;
+        uint32_t randomSeed;
+
+        float torqueStepNm;
+        uint32_t torqueStepDelayMs;
+        uint32_t responseSampleRateHz;
+        uint32_t responseMaxSamples;
+
+        float coulombFrictionNm;
+        float coggingTorqueNm;
+        uint32_t coggingCyclesPerRevolution;
+        float supplySourceResistanceOhm;
+        float supplyCurrentLimitAmpere;
+        uint32_t encoderCountsPerRevolution;
+
+        float deadTimeNanoseconds;
+        float switchNodeCapacitancePicofarad;
+        float switchOnResistanceOhm;
+        float diodeForwardVolts;
+        float minimumPulseNanoseconds;
+
+        float adcClockMegahertz;
+        uint32_t adcSampleHoldClocks;
+        uint32_t adcConversionClocks;
+        uint32_t adcAveragedConversions;
+        float adcTriggerDelayNanoseconds;
+        float currentAmplifierTimeConstantNanoseconds;
+        float currentFullScaleAmpere;
+        uint32_t adcResolutionBits;
+        uint32_t maxReadableDutyPercent;
+        uint32_t maxDutyPercent;
+
+        float deadTimeCompensationNanoseconds;
+        float deadTimeCompensationKneeAmpere;
+
+        uint32_t eventLoopStallDelayMs;
+        float shaftTurnRadians;
+        uint32_t shaftGripDelayMs;
+        uint32_t shaftTurnMs;
+        uint32_t cableDisconnectDelayMs;
+        // Zero means the supply never steps; otherwise the open-circuit voltage it steps to, as a fraction.
+        float supplyStepScale;
+        uint32_t supplyStepDelayMs;
+        float encoderIndexRadians;
+        // Zero means no index channel
+        uint32_t encoderIndexWidthCounts;
+
+        uint8_t polePairs;
+        uint8_t faultFlags;
+        // Centiseconds in a spare byte; zero means the encoder never freezes while running.
+        uint8_t encoderFreezeDelayCentiseconds;
+        uint8_t dutyDelayPeriods;
+    };
+
+    static_assert(sizeof(SilPlantConfig) == 256, "SilPlantConfig layout must be free of implicit padding");
+
+    static constexpr uint32_t plantConfigMagic = 0x504C4E54;
+    static constexpr uint8_t plantConfigLayoutVersion = 13;
+
+    static constexpr std::size_t plantConfigRecordSize =
+        sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);
+
+    static constexpr std::size_t plantConfigMagicOffset = 0;
+    static constexpr std::size_t plantConfigVersionOffset = sizeof(uint32_t);
+    static constexpr std::size_t plantConfigCrcOffset = plantConfigVersionOffset + sizeof(uint8_t);
+    static constexpr std::size_t plantConfigDataOffset = plantConfigCrcOffset + sizeof(uint32_t);
+
+    static constexpr const char* plantConfigFileName = "plant.bin";
+}

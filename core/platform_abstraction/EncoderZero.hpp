@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
 
@@ -31,7 +31,7 @@ namespace application
 
         void Set(foc::Radians reading, foc::Radians angle)
         {
-            zero = foc::detail::PositionWithWrapAround(reading.Value() - angle.Value());
+            zero = math::WrapToPi(reading.Value() - angle.Value());
         }
 
     private:

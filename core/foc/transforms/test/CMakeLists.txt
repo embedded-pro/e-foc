@@ -9,6 +9,8 @@ target_link_libraries(e_foc.foc.transforms_test PUBLIC
 )
 
 target_sources(e_foc.foc.transforms_test PRIVATE
+    TestDelayCompensation.cpp
     TestSpaceVectorModulation.cpp
     TestTransformsClarkePark.cpp
+    TestZeroVectorSlope.cpp
 )

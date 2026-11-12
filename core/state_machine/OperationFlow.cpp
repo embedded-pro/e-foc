@@ -1,6 +1,6 @@
 #include "core/state_machine/OperationFlow.hpp"
 #include "infra/util/ReallyAssert.hpp"
-#include <cmath>
+#include "numerical/math/Math.hpp"
 
 namespace application
 {
@@ -8,6 +8,7 @@ namespace application
         : env(environment)
         , calibration(calibration)
         , offsetRefresh(services.currentOffsets, services.standstill, environment.tracer)
+        , index(services.indexSearch, environment.tracer)
     {}
 
     void OperationFlow::RegisterFaultHandler(state_machine::FaultNotifier& notifier)
@@ -40,6 +41,11 @@ namespace application
         return faultController.IsPending();
     }
 
+    void OperationFlow::RequireHoming(bool required)
+    {
+        homingRequired = required;
+    }
+
     bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready)
     {
         faultController.SampleCondition();
@@ -53,25 +59,52 @@ namespace application
             return false;
         }
 
-        if (!ready.rotorReferenceValid)
+        const bool referenced = ready.rotorReferenceValid || env.context.IsRotorReferenceValid() || IsIndexSearchDue();
+
+        if (!referenced)
+        {
             env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
+            return false;
+        }
 
-        return ready.rotorReferenceValid;
+        if (homingRequired && !env.context.IsHomed() && !IsIndexSearchDue())
+        {
+            env.tracer.Trace() << "[SM] Enable rejected: position mode requires homing; calibrate or restore the reference from the encoder index";
+            return false;
+        }
+
+        return true;
     }
 
-    bool OperationFlow::IsOffsetRefreshDue() const
+    bool OperationFlow::IsEnablePreparationDue() const
     {
-        return offsetRefresh.IsDue();
+        return offsetRefresh.IsDue() || IsIndexSearchDue();
     }
 
-    bool OperationFlow::IsRefreshingOffsets() const
+    bool OperationFlow::IsIndexSearchDue() const
     {
-        return offsetRefresh.IsRunning();
+        return !env.context.IsRotorReferenceValid() && index.CanRestore(env.context.Data());
     }
 
-    void OperationFlow::BeginOffsetRefresh(const state_machine::Ready& ready, const state_machine::Enable& command)
+    bool OperationFlow::IsPreparingEnable() const
+    {
+        return offsetRefresh.IsRunning() || index.IsRunning();
+    }
+
+    const IndexReference& OperationFlow::Index() const
+    {
+        return index;
+    }
+
+    void OperationFlow::BeginEnablePreparation(const state_machine::Ready& ready, const state_machine::Enable& command)
     {
         env.pending.Accept(command.onDone);
+
+        if (!offsetRefresh.IsDue())
+        {
+            SearchIndex();
+            return;
+        }
 
         const auto& record = ready.loadedData;
         offsetRefresh.Start(foc::PhaseCurrents{ foc::Ampere{ record.currentOffsetA }, foc::Ampere{ record.currentOffsetB }, foc::Ampere{ record.currentOffsetC } },
@@ -81,30 +114,50 @@ namespace application
             });
     }
 
+    void OperationFlow::SearchIndex()
+    {
+        index.Start(env.context.Data(), env.context.BusVoltage(), [this](bool found)
+            {
+                if (found)
+                {
+                    env.context.SetRotorReferenceValid(true);
+                    env.context.SetHomed(true);
+                }
+
+                env.machine.Dispatch(state_machine::IndexSearched{ found });
+            });
+    }
+
     void OperationFlow::RefuseAfterOffsetRefresh(state_machine::OffsetRefreshOutcome outcome)
     {
         env.pending.Complete(outcome == state_machine::OffsetRefreshOutcome::refreshed ? state_machine::CommandResult::rejected : state_machine::CommandResult::calibrationFailed);
     }
 
-    void OperationFlow::AbandonOffsetRefresh()
+    void OperationFlow::RefuseAfterIndexSearch()
     {
-        env.tracer.Trace() << "[SM] Enable abandoned: disabled while measuring the current offsets";
-        offsetRefresh.Abort();
+        env.pending.Complete(state_machine::CommandResult::calibrationFailed);
+    }
+
+    void OperationFlow::AbandonEnablePreparation()
+    {
+        env.tracer.Trace() << "[SM] Enable abandoned: disabled while preparing to enable";
+        AbortEnablePreparation();
         env.pending.Complete(state_machine::CommandResult::rejected);
     }
 
-    void OperationFlow::AbortOffsetRefresh()
+    void OperationFlow::AbortEnablePreparation()
     {
         offsetRefresh.Abort();
+        index.Abort();
     }
 
     state_machine::Enabled OperationFlow::BuildEnabled(const state_machine::Enable& command)
     {
         env.pending.Accept(command.onDone);
-        return BuildEnabledAfterOffsetRefresh();
+        return BuildEnabledAfterPreparation();
     }
 
-    state_machine::Enabled OperationFlow::BuildEnabledAfterOffsetRefresh()
+    state_machine::Enabled OperationFlow::BuildEnabledAfterPreparation()
     {
         env.mode.PrepareForEnabled();
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
@@ -119,10 +172,21 @@ namespace application
         return calibration.ReadyState();
     }
 
+    bool OperationFlow::CanBeginQuickStop() const
+    {
+        return env.mode.CanBeginQuickStop();
+    }
+
     state_machine::Stopping OperationFlow::BeginQuickStop()
     {
         env.tracer.Trace() << "[SM] Quick stop";
         quickStopStarted = infra::Now();
+
+        const auto initialSpeed = math::Abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
+        const auto deceleration = env.mode.QuickStopDeceleration().Value();
+        dynamicStopTimeout = deceleration > 0.0f
+            ? std::min(std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(initialSpeed / deceleration * 1.25f + 0.1f)), quickStopTimeout)
+            : quickStopTimeout;
 
         if (env.mode.BeginQuickStop())
             quickStopTimer.Start(quickStopCheckPeriod, [this]()
@@ -141,8 +205,8 @@ namespace application
 
     void OperationFlow::CheckQuickStop()
     {
-        const auto speed = std::abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
-        if (speed >= quickStopSpeed && infra::Now() - quickStopStarted < quickStopTimeout)
+        const auto speed = math::Abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
+        if (speed >= quickStopSpeed && infra::Now() - quickStopStarted < dynamicStopTimeout)
             return;
 
         quickStopTimer.Cancel();
@@ -159,7 +223,8 @@ namespace application
     {
         env.tracer.Trace() << "[SM] Fault: " << state_machine::FaultCodeName(code);
 
-        if (!faultController.IsRecorded())
+        const bool newEpisode = !faultController.IsRecorded();
+        if (newEpisode)
             lastFaultCode = code;
         else
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
@@ -168,7 +233,7 @@ namespace application
         quickStopTimer.Cancel();
         faultController.EnterFault();
         faultController.SampleCondition();
-        offsetRefresh.Abort();
+        AbortEnablePreparation();
         offsetRefresh.MarkStale();
 
         if (wasActive)
@@ -176,6 +241,10 @@ namespace application
 
         calibration.Abort();
         env.pending.CompleteAfterTransition(pendingResult);
+
+        if (newEpisode && faultEnteredHandler != nullptr)
+            faultEnteredHandler(code);
+
         return state_machine::Fault{ lastFaultCode };
     }
 
@@ -188,11 +257,6 @@ namespace application
     {
         faultController.SampleCondition();
         return faultController.EvaluateClear();
-    }
-
-    bool OperationFlow::CanClearFault()
-    {
-        return EvaluateClearFault() == ClearRefusal::none;
     }
 
     void OperationFlow::TraceFaultClearRefused(ClearRefusal refusal) const
@@ -231,7 +295,7 @@ namespace application
         quickStopTimer.Cancel();
         env.mode.GetFocControl().Stop();
         calibration.Abort();
-        offsetRefresh.Abort();
+        AbortEnablePreparation();
     }
 
     void OperationFlow::StopWithoutTransition()
@@ -257,6 +321,11 @@ namespace application
     void OperationFlow::RegisterReadyHandler(const infra::Function<void()>& onReady)
     {
         readyHandler = onReady;
+    }
+
+    void OperationFlow::RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered)
+    {
+        faultEnteredHandler = onFaultEntered;
     }
 
     bool OperationFlow::StartUnlessFaulted()

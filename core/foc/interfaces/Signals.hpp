@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include <chrono>
 
 namespace foc
 {
@@ -10,6 +11,20 @@ namespace foc
         Ampere a;
         Ampere b;
         Ampere c;
+    };
+
+    struct PhaseCurrentSlopes
+    {
+        AmperePerSecond a;
+        AmperePerSecond b;
+        AmperePerSecond c;
+    };
+
+    struct PhaseSampleDelays
+    {
+        std::chrono::duration<float> a;
+        std::chrono::duration<float> b;
+        std::chrono::duration<float> c;
     };
 
     struct PhasePwmDutyCycles

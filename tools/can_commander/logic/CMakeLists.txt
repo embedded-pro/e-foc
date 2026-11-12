@@ -8,7 +8,7 @@ target_include_directories(e_foc.tool.can_commander.logic PUBLIC
 target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
     e_foc.boards
     e_foc.can
-    e_foc.services.firmware_upgrade.pack_header
+    upgrade.staging
     can_lite.categories.firmware_upgrade
     can_lite.drivers.interface
 )
@@ -18,14 +18,28 @@ target_sources(e_foc.tool.can_commander.logic PRIVATE
     CanCommandClient.cpp
     CommandDescriptions.hpp
     CommandDescriptions.cpp
+    CommandTracker.hpp
+    CommandTracker.cpp
+    FaultRecordAssembler.hpp
+    FaultRecordAssembler.cpp
+    FaultHistoryText.hpp
+    FaultHistoryText.cpp
+    FirmwareIdentityCollector.hpp
+    FirmwareIdentityCollector.cpp
     FirmwarePack.hpp
     FirmwarePack.cpp
     FirmwareRefusal.hpp
     FirmwareRefusal.cpp
     FirmwareTransfer.hpp
     FirmwareTransfer.cpp
+    MotorCommands.hpp
+    MotorCommands.cpp
     MotorSettings.hpp
     MotorSettings.cpp
+    NodeData.hpp
+    NodeData.cpp
+    ReadScheduler.hpp
+    ReadScheduler.cpp
     RecoveryAdvice.hpp
     RecoveryAdvice.cpp
     SetpointAxis.hpp

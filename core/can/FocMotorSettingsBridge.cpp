@@ -1,28 +1,27 @@
 #include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/can/FocMotorSettings.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include <limits>
 
 namespace can
 {
     namespace
     {
-        uint32_t LoopStatistic(const application::ControlLoopMetrics::Snapshot& statistics, FocParameter parameter)
+        uint32_t LoopStatistic(const infra::ExecutionTimeStatistics::Snapshot& statistics, FocParameter parameter)
         {
             switch (parameter)
             {
                 case FocParameter::loopSamples:
                     return statistics.samples;
                 case FocParameter::loopBudgetCycles:
-                    return statistics.budgetCycles;
+                    return statistics.budget;
                 case FocParameter::loopMinimumCycles:
-                    return statistics.minimumCycles;
+                    return statistics.minimum;
                 case FocParameter::loopAverageCycles:
-                    return statistics.averageCycles;
+                    return statistics.average;
                 case FocParameter::loopMaximumCycles:
-                    return statistics.maximumCycles;
+                    return statistics.maximum;
                 case FocParameter::loopOverruns:
                     return statistics.overruns;
                 case FocParameter::loopDeadlineMisses:
@@ -30,6 +29,12 @@ namespace can
                 default:
                     return statistics.reentries;
             }
+        }
+
+        bool IsRecalibrationReading(FocParameter parameter)
+        {
+            const auto id = static_cast<uint8_t>(parameter);
+            return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsStored);
         }
 
         bool IsStoredSetting(FocParameter parameter)
@@ -69,84 +74,6 @@ namespace can
         , firmwareUpgrade(firmwareUpgrade)
     {}
 
-    void FocMotorSettingsBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(messageId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (!(bandwidth >= foc::CommandLimits::minBandwidth))
-        {
-            server.SendCommandAck(messageId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        pendingLegacyCommand = messageId;
-        pendingNvmDoneCallback = onDone;
-        SetLoopSetting(parameter, bandwidth, [this](state_machine::SettingResult result)
-            {
-                CompleteStoredCommand(pendingLegacyCommand, result);
-            });
-    }
-
-    void FocMotorSettingsBridge::SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (resolution == 0)
-        {
-            server.SendCommandAck(can::focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().encoderResolution = resolution;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::persistenceFailed);
-            });
-    }
-
-    void FocMotorSettingsBridge::ConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (rateHz > focMaxTelemetryRateHz)
-        {
-            server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().telemetryRateHz = rateHz;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::persistenceFailed);
-            });
-    }
-
     void FocMotorSettingsBridge::SelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)
     {
         if (SettingOutstanding())
@@ -162,11 +89,11 @@ namespace can
         };
 
         if (loop == FocControlLoop::current)
-            controlMode.SelectCurrentAlgorithm(ToCurrentAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectCurrentAlgorithm(ToCurrentAlgorithm(algorithm), completed);
         else if (loop == FocControlLoop::speed)
-            controlMode.SelectSpeedAlgorithm(ToSpeedAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectSpeedAlgorithm(ToSpeedAlgorithm(algorithm), completed);
         else
-            controlMode.SelectPositionAlgorithm(ToPositionAlgorithm(algorithm), completed);
+            controlMode.Algorithms().SelectPositionAlgorithm(ToPositionAlgorithm(algorithm), completed);
     }
 
     void FocMotorSettingsBridge::SetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone)
@@ -186,7 +113,7 @@ namespace can
         };
 
         if (GroupOf(parameter) == ParameterGroup::motor)
-            controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
+            controlMode.Tunings().SetMotorParameter(ToMotorParameter(parameter), value, completed);
         else if (IsStoredSetting(parameter))
             SetStoredSetting(parameter, value);
         else
@@ -196,10 +123,10 @@ namespace can
     FocAlgorithms FocMotorSettingsBridge::ActiveAlgorithms() const
     {
         return FocAlgorithms{
-            state_machine::ToCanMode(controlMode.Active()),
-            ToCanAlgorithm(controlMode.ActiveCurrentAlgorithm()),
-            ToCanAlgorithm(controlMode.ActiveSpeedAlgorithm()),
-            ToCanAlgorithm(controlMode.ActivePositionAlgorithm())
+            state_machine::ToCanMode(controlMode.Drive().Active()),
+            ToCanAlgorithm(controlMode.Algorithms().ActiveCurrentAlgorithm()),
+            ToCanAlgorithm(controlMode.Algorithms().ActiveSpeedAlgorithm()),
+            ToCanAlgorithm(controlMode.Algorithms().ActivePositionAlgorithm())
         };
     }
 
@@ -222,7 +149,7 @@ namespace can
             case ParameterGroup::platform:
                 return HeldPlatformReading(parameter);
             case ParameterGroup::motion:
-                return FocParameterValue{ targetReached != nullptr && targetReached() ? 1.0f : 0.0f, false };
+                return HeldMotionReading(parameter);
             case ParameterGroup::thermal:
                 return HeldWindingTemperature();
             default:
@@ -242,7 +169,7 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldCalibrationReading(FocParameter parameter) const
     {
-        const auto& record = controlMode.CalibrationRecord();
+        const auto& record = controlMode.Drive().CalibrationRecord();
 
         switch (parameter)
         {
@@ -259,7 +186,10 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldOnlineEstimate(FocParameter parameter) const
     {
-        const auto estimates = controlMode.ActiveStateMachine().CurrentOnlineEstimates();
+        if (IsRecalibrationReading(parameter))
+            return HeldRecalibrationReading(parameter);
+
+        const auto estimates = controlMode.Drive().ActiveStateMachine().CurrentOnlineEstimates();
         if (!estimates.has_value())
             return FocParameterValue{ 0.0f, false };
 
@@ -276,9 +206,57 @@ namespace can
         }
     }
 
+    FocParameterValue FocMotorSettingsBridge::HeldRecalibrationReading(FocParameter parameter) const
+    {
+        if (parameter == FocParameter::recalibrationsApplied)
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsApplied()), false };
+        if (parameter == FocParameter::recalibrationsRejected)
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsRejected()), false };
+        if (parameter == FocParameter::recalibrationsStored)
+            return FocParameterValue{ static_cast<float>(controlMode.Recalibration().RecalibrationsStored()), false };
+
+        const auto model = controlMode.Recalibration().ModelInUse();
+        if (!model.has_value())
+            return FocParameterValue{ 0.0f, false };
+
+        switch (parameter)
+        {
+            case FocParameter::modelResistance:
+                return FocParameterValue{ model->resistance.Value(), false };
+            case FocParameter::modelInductance:
+                return FocParameterValue{ model->inductance.Value(), false };
+            case FocParameter::modelInertia:
+                return FocParameterValue{ model->inertia.Value(), false };
+            default:
+                return FocParameterValue{ model->viscousFriction.Value(), false };
+        }
+    }
+
+    void FocMotorSettingsBridge::Recalibrate(const infra::Function<void()>& onAccepted)
+    {
+        const auto result = controlMode.Recalibration().CmdRecalibrate();
+        if (result == state_machine::SettingResult::ok)
+            onAccepted();
+        else
+            ReportSettingFailure(focRecalibrateId, result);
+    }
+
+    void FocMotorSettingsBridge::ResetModel(const infra::Function<void(bool stored)>& onDone)
+    {
+        const auto result = controlMode.Recalibration().CmdResetModel(onDone);
+        if (result != state_machine::SettingResult::ok)
+            ReportSettingFailure(focResetModelId, result);
+    }
+
+    FocParameterValue FocMotorSettingsBridge::HeldMotionReading(FocParameter parameter) const
+    {
+        const bool value = parameter == FocParameter::homed ? controlMode.Drive().IsHomed() : targetReached != nullptr && targetReached();
+        return FocParameterValue{ value ? 1.0f : 0.0f, false };
+    }
+
     FocParameterValue FocMotorSettingsBridge::HeldWindingTemperature() const
     {
-        const auto temperature = controlMode.WindingTemperature();
+        const auto temperature = controlMode.Drive().WindingTemperature();
         return FocParameterValue{ temperature.has_value() ? temperature->Value() : std::numeric_limits<float>::quiet_NaN(), false };
     }
 
@@ -315,17 +293,17 @@ namespace can
     bool FocMotorSettingsBridge::SettingOutstanding() const
     {
         const bool downloading = firmwareUpgrade && firmwareUpgrade->get().IsRunning();
-        return downloading || pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
+        return downloading || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
     }
 
     void FocMotorSettingsBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
     {
         if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            controlMode.SetCurrentTunings(WithSetting(controlMode.StoredCurrentTunings(), parameter, value), completed);
+            controlMode.Tunings().SetCurrentTunings(WithSetting(controlMode.Tunings().StoredCurrentTunings(), parameter, value), completed);
         else if (GroupOf(parameter) == ParameterGroup::speedLoop)
-            controlMode.SetSpeedTunings(WithSetting(controlMode.StoredSpeedTunings(), parameter, value), completed);
+            controlMode.Tunings().SetSpeedTunings(WithSetting(controlMode.Tunings().StoredSpeedTunings(), parameter, value), completed);
         else
-            controlMode.SetPositionTunings(WithSetting(controlMode.StoredPositionTunings(), parameter, value), completed);
+            controlMode.Tunings().SetPositionTunings(WithSetting(controlMode.Tunings().StoredPositionTunings(), parameter, value), completed);
     }
 
     void FocMotorSettingsBridge::SetStoredSetting(FocParameter parameter, float value)
@@ -364,17 +342,6 @@ namespace can
             ReportSettingFailure(can::focSetParameterId, result);
     }
 
-    void FocMotorSettingsBridge::CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result)
-    {
-        auto onDone = pendingNvmDoneCallback;
-        pendingNvmDoneCallback = nullptr;
-
-        if (result == state_machine::SettingResult::ok)
-            onDone();
-        else
-            ReportSettingFailure(commandId, result);
-    }
-
     void FocMotorSettingsBridge::ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result)
     {
         switch (result)
@@ -406,22 +373,22 @@ namespace can
     FocParameterValue FocMotorSettingsBridge::HeldLoopSetting(FocParameter parameter) const
     {
         if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            return FocParameterValue{ SettingOf(controlMode.EffectiveCurrentTunings(), parameter),
-                IsBandwidth(parameter) && controlMode.StoredCurrentTunings().bandwidth == 0.0f };
+            return FocParameterValue{ SettingOf(controlMode.Tunings().EffectiveCurrentTunings(), parameter),
+                IsBandwidth(parameter) && controlMode.Tunings().StoredCurrentTunings().bandwidth == 0.0f };
 
         if (GroupOf(parameter) == ParameterGroup::speedLoop)
         {
-            const auto stored = controlMode.StoredSpeedTunings();
-            return FocParameterValue{ SettingOf(controlMode.EffectiveSpeedTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
+            const auto stored = controlMode.Tunings().StoredSpeedTunings();
+            return FocParameterValue{ SettingOf(controlMode.Tunings().EffectiveSpeedTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
         }
 
-        const auto stored = controlMode.StoredPositionTunings();
-        return FocParameterValue{ SettingOf(controlMode.EffectivePositionTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
+        const auto stored = controlMode.Tunings().StoredPositionTunings();
+        return FocParameterValue{ SettingOf(controlMode.Tunings().EffectivePositionTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldMotorParameter(FocParameter parameter) const
     {
-        const auto& record = controlMode.CalibrationRecord();
+        const auto& record = controlMode.Drive().CalibrationRecord();
 
         if (parameter == FocParameter::fluxLinkage && !foc::IsFinitePositive(record.fluxLinkage))
             return FocParameterValue{ controlMode.DefaultFluxLinkage().Value(), true };

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/estimators/online/RecursiveInstrumentalVariables.hpp"
 #include <optional>
 
@@ -14,6 +14,8 @@ namespace services
     public:
         static constexpr float defaultForgettingFactor = 0.9995f;
         static constexpr float minimumDirectCurrent = 0.05f;
+        // An open phase or a saturated loop leaves the current behind its reference, and such a window carries no information.
+        static constexpr float minimumFollowedFraction = 0.5f;
         static constexpr uint16_t minimumUpdates = 200;
 
         explicit RealTimeResistanceAndInductanceEstimator(float forgettingFactor, hal::Hertz samplingFrequency);
@@ -26,6 +28,7 @@ namespace services
 
         foc::Ohm CurrentResistance() const override;
         foc::MilliHenry CurrentInductance() const override;
+        bool HasSettled() const override;
 
     private:
         using Estimator = estimators::RecursiveInstrumentalVariables<float, 2>;
@@ -39,6 +42,8 @@ namespace services
         float previousIdAtEnd{ 0.0f };
         float previousReference{ 0.0f };
         bool primed{ false };
+        bool following{ true };
+        bool settled{ false };
         uint16_t updates{ 0 };
 
         foc::Ohm currentResistance{ 0.0f };

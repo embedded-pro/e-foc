@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/current_loop/AntiWindupPi.hpp"
 #include "core/foc/current_loop/CurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "numerical/controllers/implementations/PiIncremental.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -39,8 +39,8 @@ namespace foc
     private:
         bool ApplyGains();
 
-        AntiWindupPi dPi;
-        AntiWindupPi qPi;
+        controllers::PiIncremental<float> dPi;
+        controllers::PiIncremental<float> qPi;
         MotorModelParameters parameters{};
         float bandwidth{ CurrentLoopTunings{}.bandwidth };
     };

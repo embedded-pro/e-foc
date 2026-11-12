@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/supervision/SustainedCondition.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
-#include <optional>
 
 namespace supervision
 {
@@ -21,7 +21,6 @@ namespace supervision
             infra::Duration time;
         };
 
-        // Returns the active drive while position mode is the active mode, nullptr otherwise.
         using PositionDrive = infra::Function<const state_machine::FocStateMachineBase*()>;
 
         void Enable(const infra::Function<Settings()>& settings);
@@ -35,7 +34,7 @@ namespace supervision
         PositionDrive positionDrive;
         infra::Function<Settings()> settings;
         infra::TimerRepeating evaluationTimer;
-        std::optional<infra::TimePoint> withinSince;
+        SustainedCondition within;
         bool reached{ false };
     };
 

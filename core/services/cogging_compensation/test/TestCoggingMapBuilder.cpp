@@ -15,6 +15,7 @@ namespace
         float torqueConstant{ 0.042f };
         float viscousFriction{ 5.0e-6f };
         float dryFriction{ 3.7e-3f };
+        float loadTorque{ 0.0f };
         float coggingTorque{ 4.0e-3f };
         float coggingCycles{ 24.0f };
         float countsPerRevolution{ 4000.0f };
@@ -66,7 +67,7 @@ namespace
             const auto current = proportional * error + integrator;
 
             const auto friction = speed > 0.0f ? rotor.dryFriction : (speed < 0.0f ? -rotor.dryFriction : 0.0f);
-            const auto acceleration = (rotor.torqueConstant * current - Cogging(angle) - friction - rotor.viscousFriction * speed) / rotor.inertia;
+            const auto acceleration = (rotor.torqueConstant * current - Cogging(angle) - rotor.loadTorque - friction - rotor.viscousFriction * speed) / rotor.inertia;
             speed += acceleration * samplePeriod;
             angle += speed * samplePeriod;
 
@@ -97,6 +98,14 @@ namespace
             run.Turn(builder, Direction::forward, 10.0f, 0.5f, 3.0f);
             run.Turn(builder, Direction::backward, -10.0f, 0.5f, 3.0f);
             return builder.Build(foc::NewtonMeter{ rotor.torqueConstant }, foc::NewtonMeterSecondSquared{ inertiaForBuild }, polePairs, samplePeriod);
+        }
+
+        std::optional<foc::NewtonMeter> TurnBothWaysAndMeasureFriction(float viscousForBuild)
+        {
+            SpeedLoopRun run{ rotor };
+            run.Turn(builder, Direction::forward, 10.0f, 0.5f, 3.0f);
+            run.Turn(builder, Direction::backward, -10.0f, 0.5f, 3.0f);
+            return builder.FrictionCoulomb(foc::NewtonMeter{ rotor.torqueConstant }, foc::NewtonMeterSecondSquared{ rotor.inertia }, foc::NewtonMeterSecondPerRadian{ viscousForBuild }, polePairs, samplePeriod);
         }
 
         float WorstBinError(const services::CoggingMap& map) const
@@ -222,4 +231,70 @@ TEST_F(TestCoggingMapAgreement, a_profile_only_one_direction_shows_yields_no_map
     Run(Direction::backward, 0.0f, 1.0f);
 
     EXPECT_FALSE(Build().has_value());
+}
+
+TEST_F(TestCoggingMapBuilder, a_rotor_carried_both_ways_yields_its_dry_friction)
+{
+    const auto friction = TurnBothWaysAndMeasureFriction(rotor.viscousFriction);
+
+    ASSERT_TRUE(friction.has_value());
+    EXPECT_NEAR(friction->Value(), rotor.dryFriction, 0.05f * rotor.dryFriction);
+}
+
+TEST_F(TestCoggingMapBuilder, a_constant_shaft_load_does_not_change_the_dry_friction)
+{
+    rotor.loadTorque = 8.0e-3f;
+
+    const auto friction = TurnBothWaysAndMeasureFriction(rotor.viscousFriction);
+
+    ASSERT_TRUE(friction.has_value());
+    EXPECT_NEAR(friction->Value(), rotor.dryFriction, 0.05f * rotor.dryFriction);
+}
+
+TEST_F(TestCoggingMapBuilder, the_viscous_friction_is_taken_out_of_the_dry_friction)
+{
+    rotor.viscousFriction = 2.0e-4f;
+
+    const auto friction = TurnBothWaysAndMeasureFriction(rotor.viscousFriction);
+    const auto ignoringViscous = TurnBothWaysAndMeasureFriction(0.0f);
+
+    ASSERT_TRUE(friction.has_value());
+    ASSERT_TRUE(ignoringViscous.has_value());
+    EXPECT_NEAR(friction->Value(), rotor.dryFriction, 0.05f * rotor.dryFriction);
+    EXPECT_NEAR(ignoringViscous->Value() - friction->Value(), rotor.viscousFriction * 10.0f, 0.1f * rotor.viscousFriction * 10.0f);
+}
+
+TEST_F(TestCoggingMapBuilder, a_rotor_without_cogging_still_yields_its_dry_friction)
+{
+    rotor.coggingTorque = 0.0f;
+
+    const auto friction = TurnBothWaysAndMeasureFriction(rotor.viscousFriction);
+
+    ASSERT_TRUE(friction.has_value());
+    EXPECT_NEAR(friction->Value(), rotor.dryFriction, 0.05f * rotor.dryFriction);
+}
+
+TEST_F(TestCoggingMapBuilder, a_rotor_that_left_a_bin_empty_yields_no_dry_friction)
+{
+    SpeedLoopRun run{ rotor };
+    run.Turn(builder, Direction::forward, 10.0f, 0.5f, 0.1f);
+    run.Turn(builder, Direction::backward, -10.0f, 0.5f, 3.0f);
+
+    EXPECT_FALSE(builder.FrictionCoulomb(foc::NewtonMeter{ rotor.torqueConstant }, foc::NewtonMeterSecondSquared{ rotor.inertia }, foc::NewtonMeterSecondPerRadian{ rotor.viscousFriction }, polePairs, samplePeriod).has_value());
+}
+
+TEST_F(TestCoggingMapBuilder, a_rotor_that_resists_less_forward_than_backward_yields_no_dry_friction)
+{
+    rotor.dryFriction = -1.0e-3f;
+
+    EXPECT_FALSE(TurnBothWaysAndMeasureFriction(rotor.viscousFriction).has_value());
+}
+
+TEST_F(TestCoggingMapBuilder, an_unusable_torque_constant_yields_no_dry_friction)
+{
+    SpeedLoopRun run{ rotor };
+    run.Turn(builder, Direction::forward, 10.0f, 0.5f, 3.0f);
+    run.Turn(builder, Direction::backward, -10.0f, 0.5f, 3.0f);
+
+    EXPECT_FALSE(builder.FrictionCoulomb(foc::NewtonMeter{ 0.0f }, foc::NewtonMeterSecondSquared{ rotor.inertia }, foc::NewtonMeterSecondPerRadian{ rotor.viscousFriction }, polePairs, samplePeriod).has_value());
 }

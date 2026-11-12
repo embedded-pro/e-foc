@@ -2,9 +2,11 @@
 """Trace requirements to the feature scenarios that verify them.
 
 Lists every requirement ID with the @REQ tags found in integration_tests/features
-and fails on a duplicate ID, a tag naming an unknown or retired ID, a requirement
-with `status: verified` and no verifying tag, and a scenario kind (@sil, @hil) the
-requirement's `verification` field does not declare. Standard library only.
+and fails on a duplicate ID, a requirement without a status or a verification, a
+`shall` longer than MAX_SHALL_WORDS words or naming another requirement, a tag naming
+an unknown or retired ID, a requirement with `status: verified` and no verifying tag,
+and a scenario kind (@sil, @hil) the requirement's `verification` field does not
+declare. Standard library only.
 """
 
 import argparse
@@ -17,6 +19,8 @@ STATUSES = {"draft", "implemented", "verified", "retired"}
 KINDS = {"sil", "hil", "mil", "unit", "inspection"}
 TAG_KINDS = {"sil": "sil", "hil": "hil", "hil_motor": "hil"}
 REQ_TAG = re.compile(r"@(REQ-[A-Z]+-[0-9]{3})\b")
+REQ_REFERENCE = re.compile(r"\bREQ-[A-Z]+-[0-9]{3}\b")
+MAX_SHALL_WORDS = 90
 SCENARIO_KEYWORDS = ("Scenario:", "Scenario Outline:", "Scenario Template:", "Example:")
 
 
@@ -94,13 +98,22 @@ def check(entries, retired, scenarios):
             errors.append(f"{where}: duplicate ID {requirement_id}")
         by_id[requirement_id] = entry
         status = entry.get("status")
-        if status is not None and status not in STATUSES:
+        if status is None:
+            errors.append(f"{where}: {requirement_id} has no status")
+        elif status not in STATUSES:
             errors.append(f"{where}: {requirement_id} has unknown status {status!r}")
         declared = entry.get("verification", [])
         declared = [declared] if isinstance(declared, str) else declared
-        if any(kind not in KINDS for kind in declared):
+        if not declared:
+            errors.append(f"{where}: {requirement_id} has no verification")
+        elif any(kind not in KINDS for kind in declared):
             errors.append(f"{where}: {requirement_id} has unknown verification {declared!r}")
         entry["_declared"] = set(declared)
+        shall = entry.get("shall", "")
+        if len(shall.split()) > MAX_SHALL_WORDS:
+            errors.append(f"{where}: {requirement_id} has a shall of {len(shall.split())} words, over {MAX_SHALL_WORDS}")
+        if REQ_REFERENCE.search(shall):
+            errors.append(f"{where}: {requirement_id} names another requirement in its shall")
     for requirement_id in retired:
         if requirement_id in by_id:
             errors.append(f"{requirement_id} is listed as retired and still defined")
@@ -137,7 +150,7 @@ def print_listing(by_id, tags):
         entry = by_id[requirement_id]
         files = sorted({f"{scenario['file']}:{scenario['line']}" for scenario, _ in tags.get(requirement_id, [])})
         status = entry.get("status", "-")
-        print(f"  {requirement_id:<13} {status:<12} {', '.join(files) if files else '-'}")
+        print(f"  {requirement_id:<13} {status:<12} {len(files):>3}  {', '.join(files) if files else '-'}")
 
 
 def print_summary(by_id, tags):

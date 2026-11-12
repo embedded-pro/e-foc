@@ -8,6 +8,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "core/state_machine/Recalibration.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include <optional>
 
@@ -19,6 +20,7 @@ namespace application
         hal::Hertz baseFrequency;
         foc::LowPriorityInterrupt& lowPriorityInterrupt;
         hal::Hertz outerLoopFrequency{ 1000 };
+        RotorReference rotorReference{ RotorReference::lost };
     };
 
     class OuterLoopStateMachine
@@ -28,13 +30,13 @@ namespace application
         ~OuterLoopStateMachine() = default;
 
     public:
-        state_machine::AppliedEstimates ApplyOnlineEstimates() override;
+        // Redesigns the current and speed loops from the model; refused unless the drive is stopped.
+        bool ApplyModel(const state_machine::MotorModel& model);
         std::optional<state_machine::OnlineEstimates> CurrentOnlineEstimates() override;
-        void TraceOnlineEstimates();
         float AutomaticSpeedLoopBandwidth() const;
 
     protected:
-        OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,
+        OuterLoopStateMachine(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
@@ -45,7 +47,6 @@ namespace application
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
-        void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
@@ -80,6 +81,8 @@ namespace application
         virtual const services::CoggingMapping* CoggingMappingImpl() const = 0;
         virtual void LoadCoggingCompensation(infra::MemoryRange<const int8_t> torque, float torqueScale, foc::NewtonMeter torqueConstant) = 0;
         virtual void ClearCoggingCompensation() = 0;
+        virtual void LoadFrictionCompensation(foc::NewtonMeter coulomb, foc::NewtonMeter torqueConstant) = 0;
+        virtual void ClearFrictionCompensation() = 0;
 
     private:
         bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant);
@@ -88,6 +91,8 @@ namespace application
         services::MechanicalParametersIdentification::Config ExcitationConfig() const;
         services::CoggingMapping::Config CoggingConfig() const;
         void ApplyCoggingMap(const services::CalibrationData& data);
+        void ApplyFrictionFeedForward(const services::CalibrationData& data);
+        void ClearFeedForwards();
 
         static constexpr float velocityBandwidthRadPerSec = 100.0f;
 

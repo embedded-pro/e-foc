@@ -2,9 +2,9 @@
 title: "Service: Command-Line Interface (CLI)"
 type: design
 status: draft
-version: 0.1.0
+version: 1.0.0
 component: service-cli
-date: 2026-04-07
+date: 2026-11-06
 ---
 
 | Field     | Value                                 |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Command-Line Interface (CLI) |
 | Type      | design                                |
 | Status    | draft                                 |
-| Version   | 0.1.0                                 |
+| Version   | 1.0.0                                 |
 | Component | service-cli                           |
-| Date      | 2026-04-07                            |
+| Date      | 2026-11-06                            |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,215 +29,100 @@ date: 2026-04-07
 ## Responsibilities
 
 **Is responsible for:**
-- Providing a human-readable serial command-line interface for commissioning, diagnostics, and runtime control of the motor
-- Parsing user-typed command strings into typed arguments (numeric values, enums) using `TerminalHelper`, and returning structured `StatusWithMessage` responses on success or failure
-- Routing commands to the appropriate control mode interface (`FocTorque`, `FocSpeed`, `FocPosition`) based on which control mode is active
-- Delegating motor lifecycle and calibration to the `FocStateMachine` when lifecycle commands such as `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` are issued
-- Printing a welcome banner with version information and available commands when the terminal first connects
+- The serial command line of the bring-up application, `hardware_test`: parsing typed commands into
+  bounded arguments, answering each with a status and a message, and the hardware commands of that
+  application (EEPROM, ADC, CAN, watchdog, reset cause) that the `@hil` scenarios drive
+- The startup banner of both applications: firmware name, version and revision, build, compiler,
+  target, system clock, supply voltage, reset cause, and the fault record a crash left behind
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
 
 **Is NOT responsible for:**
-- Physical serial framing, character echo, or byte-level UART management — those are handled by the `TerminalWithStorage` infrastructure component
-- Choosing which control mode is active — the control-mode coordinator owns that choice
-- Executing identification or alignment procedures itself — commands are forwarded to the relevant service; results are printed asynchronously when the service callback fires
+- Commanding the motor application. `sync_foc_sensored` has no command line: CAN is its only command
+  interface (`service-can.md`), and its serial port carries only the trace output, starting with the
+  startup banner (Part B)
+- Physical serial framing, character echo, or byte-level UART management — those are handled by the
+  `TerminalWithStorage` infrastructure component
 
 ---
 
 ## Component Details
 
-### Command Registration
+### Part A — Where the command line lives
 
-Every command is registered by the control-mode coordinator, which owns the only lifetime-safe
-reference to the active control mode. There is no per-mode interactor object in production: the
-active mode lives inside a `std::variant` that is replaced on a mode switch, so an object holding a
-reference to it could outlive its target. The coordinator instead dispatches each command to
-whichever mode is active and rejects the command when it does not apply.
+| Application         | Command line | Serial output                                        | Commands                     |
+|---------------------|--------------|------------------------------------------------------|------------------------------|
+| `hardware_test`     | Yes          | Startup banner, command prompt, command answers      | Bring-up and `@hil` hardware |
+| `sync_foc_sensored` | No           | Startup banner and the trace output, nothing to type | None; CAN (`service-can.md`) |
 
-```mermaid
-classDiagram
-    class ControlModeStateMachine {
-        +RegisterCliCommands()
-        -TrySetTorque(iq)
-        -TrySetSpeed(omega)
-        -TrySetPosition(theta)
-        -ActiveStateMachine()
-    }
-    class TerminalWithStorage {
-        +AddCommand(descriptor, handler)
-    }
-    ControlModeStateMachine --> TerminalWithStorage : registers
-```
+The motor application once registered terminal commands of its own. Each has a CAN equivalent, and
+the scenarios and tools use CAN only (`integration-testing.md`):
 
-#### Lifecycle Commands
+| Former terminal command                                                           | Over CAN                                                                |
+|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `select_current_algorithm`, `select_speed_algorithm`, `select_position_algorithm` | `SelectAlgorithm`                                                       |
+| `active_algorithms`                                                               | `QueryAlgorithms`                                                       |
+| `active_mode`                                                                     | `SelectControlMode`'s response and the telemetry status                 |
+| `set_torque`, `set_speed`, `set_position`                                         | `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`          |
+| `set_current_bandwidth`, `set_speed_bandwidth`, `set_position_bandwidth`          | The bandwidth parameters, with the same ranges and stopped-state policy |
+| `set_flux_linkage`                                                                | The motor parameter `fluxLinkage`                                       |
+| `apply_estimates`                                                                 | `Recalibrate` (`online-recalibration.md`)                               |
+| `estimate_status`                                                                 | The online estimates, `0x90`–`0x93`                                     |
+| `loop_stats`, `clear_stats`                                                       | The loop statistics, `0xA0`–`0xA7`, and `ClearDiagnostics`              |
+| `can_stats`                                                                       | None: the CAN error counters are not read in the motor application      |
 
-| Command           | Alias | Arguments | Action                                         |
-|-------------------|-------|-----------|------------------------------------------------|
-| `calibrate`       | `cal` | —         | Runs the calibration sequence                  |
-| `enable`          | `en`  | —         | Enables the motor; rejected outside `Ready`    |
-| `disable`         | `dis` | —         | Disables the motor                             |
-| `clear_fault`     | `cf`  | —         | Clears a latched fault                         |
-| `clear_cal`       | `cc`  | —         | Invalidates stored calibration                 |
-| `active_mode`     | `am`  | —         | Prints the active control mode                 |
-| `apply_estimates` | `ae`  | —         | Applies the online estimates to the loop gains |
-| `estimate_status` | `es`  | —         | Prints the current online estimates            |
+The lifecycle commands (`calibrate`, `align`, `enable`, `disable`, `clear_fault`, `clear_cal`) were
+never registered by the motor application, which drives its state machines from CAN; they are gone
+with the command line.
 
-#### Algorithm Selection
+### Part B — The startup banner
 
-| Command                     | Alias | Arguments                               | Action                                                                                                     |
-|-----------------------------|-------|-----------------------------------------|------------------------------------------------------------------------------------------------------------|
-| `select_current_algorithm`  | `sca` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop law; rejected while enabled or before the motor model is identified               |
-| `select_speed_algorithm`    | `ssa` | pid \| lqi \| adrc \| twodof            | Selects the speed-loop law; speed and position modes only                                                  |
-| `select_position_algorithm` | `spa` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop law; position mode only. LQR and LQI are refused when their Riccati design fails |
-| `active_algorithms`         | `aa`  | —                                       | Prints the active current, speed and position laws                                                         |
+Both applications trace the same banner as they start, before anything else:
 
-#### Setpoints
+- A clear-screen sequence and a delimiter line
+- The application name, and the firmware version and source revision injected from the build
+  information (`generated/Version.h`, which EmIL's `add_version_header_target` regenerates on every
+  build from the CMake project version and the abbreviated source revision, empty when the revision
+  cannot be read); the library holds no version literal
+- The build date, the compiler and the target board
+- The system clock and the supply voltage
+- The reset cause, and the fault record a crash left behind between visible delimiters
+  (`error-handling.md`, Boot-time reporting)
 
-Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
-message in the others, and rejected when the lifecycle state does not accept setpoints.
+`hardware_test` follows it with the line inviting commands; the motor application does not.
 
-| Command        | Alias | Arguments     | Accepted range | Mode     |
-|----------------|-------|---------------|----------------|----------|
-| `set_torque`   | `st`  | Iq (A)        | ±100           | Torque   |
-| `set_speed`    | `ss`  | omega (rad/s) | ±1000          | Speed    |
-| `set_position` | `sp`  | theta (rad)   | ±2π            | Position |
+### Part C — The bring-up command line
 
-Ranges come from `foc::CommandLimits`. The CAN path checks speed and position against the same
-limits, but checks torque against the inverter's `MaxCurrentSupported()`. Either way the torque
-cascade scales every setpoint onto the `MaxCurrentSupported()` envelope, so neither path can command
-more current than the inverter supports. A value outside the range checked at entry is rejected and
-never reaches the control law.
+`TerminalWithBanner` is the `hardware_test` terminal: a `TerminalWithStorage` that traces the
+startup banner when it is built. Command handlers convert a bounded-string token into a number with
+EmIL's `services::ParseDecimal` (`services/util/DecimalToken.hpp`). A whole or decimal number within a caller-supplied
+minimum and maximum is accepted; a malformed or out-of-range token yields no value, and the command
+handler answers with a non-ok status describing the expected input. No dynamic string allocation
+occurs.
 
-The torque command takes the q-axis current only. The d-axis reference is held at zero by the
-control law, so exposing it would let an operator command a flux reference the cascade immediately
-overwrites.
-
-#### Bandwidths
-
-| Command                  | Alias  | Arguments         | Accepted range | Availability             |
-|--------------------------|--------|-------------------|----------------|--------------------------|
-| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s) | 1 … 20000      | All modes                |
-| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | 1 … 2000       | Speed and position modes |
-| `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | 1 … 500        | Position mode            |
-
-Retuning is refused unless the motor is stopped (`Idle` or `Ready`), and refused when the active law
-cannot be redesigned for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or negative bandwidth
-produces zero or sign-inverted gains, which inverts the sense of the loop's feedback on a motor that
-may be spinning.
-
-Both bounds and the stopped-state policy are enforced inside `ControlModeStateMachine::TrySet*Bandwidth`
-rather than in the command handlers. The CAN bridge sets the same bandwidths through the settings path,
-which applies the same ranges and policy and answers once the value is stored. The ranges come
-from `foc::CommandLimits`; the predicates that apply them live in `core/foc/math/ParameterValidation.hpp`.
-A rejected value is reported before any controller is touched, so a refused retune leaves the previously
-accepted bandwidth live.
-
-The same per-loop predicates gate bandwidths arriving from persisted calibration: `CurrentTuningsFor` and
-`OuterLoopStateMachine::ApplyMechanics` fall back to the compiled default unless the stored value is within
-the loop's range, so a record written by an older firmware cannot install an out-of-range or non-finite gain.
-
-### Diagnostics Commands
-
-Three commands expose what the control loop and the CAN bus have been doing. Each of these numbers
-was previously either computed and discarded or never gathered at all.
-
-| Command       | Alias | Reports                                                                                                               |
-|---------------|-------|-----------------------------------------------------------------------------------------------------------------------|
-| `loop_stats`  | `ls`  | Control-interrupt execution: sample count, budget, last/min/average/max cycles, overruns, deadline misses, re-entries |
-| `can_stats`   | `cs`  | CAN error counters, total and per class, printing only the classes that have occurred                                 |
-| `clear_stats` | `xs`  | Resets both sets of counters                                                                                          |
-
-**Overrun versus deadline miss.** The two are distinct and both are reported. An overrun means the
-interrupt exceeded the share of the period it is budgeted — the margin is gone, but the deadline was
-still met. A deadline miss means it exceeded the period itself: the next conversion was already due
-when it finished.
-
-**Re-entry** is the same failure caught as it happens rather than measured afterwards. A conversion
-arriving while the previous interrupt has not returned is recorded directly, which no measured
-duration can reveal.
-
-Counters saturate rather than wrap, so a long run cannot present itself as a healthy one.
-
-### `TerminalWithBanner` — Decorator
-
-`TerminalWithBanner` wraps any `TerminalWithStorage` instance and intercepts the first connection event. On first connect, it prints a formatted welcome message containing:
-
-- Firmware version and source revision, injected by the application from the build information (`generated/Version.h`, which EmIL's `add_version_header_target` regenerates on every build from the CMake project version and the abbreviated source revision, empty when the revision cannot be read); the library holds no version literal
-- Board/hardware identifier
-- A list of available commands (the commands registered on the terminal)
-
-After the banner is printed, all subsequent inputs and outputs pass through to the underlying `TerminalWithStorage` unchanged. The banner is printed at most once per connection — reconnecting the serial terminal causes the banner to be printed again.
-
-### `TerminalHelper` — Argument Parsing
-
-`TerminalHelper` is a stateless utility that command handlers use to convert a bounded-string token extracted from the command line into a number. A whole or decimal number within a caller-supplied minimum and maximum is accepted; a malformed or out-of-range token yields no value, and the command handler answers with a non-ok `StatusWithMessage` describing the expected input.
-
-`TerminalHelper` operates entirely on `infra::BoundedString` tokens — no dynamic string allocation occurs.
-
-### Lifecycle Commands via `FocStateMachine`
-
-The `FocStateMachine` registers additional commands on the same `TerminalWithStorage` instance that enforce the motor lifecycle state machine. These commands are always available regardless of which control mode is active:
-
-| Command       | Alias | Action                                                                                               |
-|---------------|-------|------------------------------------------------------------------------------------------------------|
-| `calibrate`   | `cal` | Runs the full calibration sequence (pole pairs → R/L → alignment → mechanical ident for speed modes) |
-| `enable`      | `en`  | Enables the FOC controller (only allowed from `Ready` state)                                         |
-| `disable`     | `dis` | Disables the FOC controller and returns to `Ready`                                                   |
-| `clear_fault` | `cf`  | Clears the active fault and returns to `Ready` (if calibration data is held) or `Idle`               |
-| `clear_cal`   | `cc`  | Invalidates NVM calibration data and returns to `Idle`                                               |
-
-### Response Model — `StatusWithMessage`
-
-Every command handler returns a `StatusWithMessage`, which is a pair:
-
-- **Status** — an enumeration value (`ok`, `badArgument`, `notAllowed`, `hardwareError`, …)
-- **Message** — an `infra::BoundedString` containing a human-readable description of the outcome
-
-The terminal writes the message to the serial output verbatim. For asynchronous commands (alignment, identification, NVM), the immediate return to the terminal is `{ok, "Operation started"}` and the final result is written by the service's completion callback.
+Every command handler answers with a status (`ok`, `badArgument`, `notAllowed`, `hardwareError`, …)
+and a bounded message, which the terminal writes verbatim. A command that starts an asynchronous
+operation returns its prompt only when the operation completes.
 
 ```mermaid
 sequenceDiagram
     participant User as Serial terminal
     participant TWS as TerminalWithStorage
-    participant CMSM as ControlModeStateMachine
-    participant Helper as TerminalHelper
-    participant FocSpeed
+    participant Handler as Command handler
+    participant Hal as Hardware interface
 
-    User->>TWS: types "set_speed 100.0"
-    TWS->>CMSM: dispatch("set_speed", ["100.0"])
-    CMSM->>Helper: ParseInput("100.0", min, max)
-    Helper-->>CMSM: 100.0
-    CMSM->>FocSpeed: SetPoint(100.0 rad/s)
-    CMSM-->>TWS: StatusWithMessage{success}
+    User->>TWS: types "eeprom_read 0 4"
+    TWS->>Handler: dispatch("eeprom_read", ["0", "4"])
+    Handler->>Hal: ReadBuffer(address 0, 4 bytes, onDone)
+    Hal-->>Handler: onDone
+    Handler->>TWS: trace the bytes, ProcessResult
     TWS-->>User: prompt
-```
-
-### Asynchronous Command Flow
-
-For commands that trigger asynchronous services, the command handler initiates the service and returns `{ok, "Operation started"}` immediately. The service's `onDone` callback captures a reference to the `TerminalWithStorage` and writes the final result:
-
-```mermaid
-sequenceDiagram
-    participant User as Serial terminal
-    participant TWS as TerminalWithStorage
-    participant MSM as FocStateMachine
-    participant Alignment as MotorAlignmentImpl
-
-    User->>TWS: types "align"
-    TWS->>MSM: dispatch("align", [])
-    MSM->>Alignment: ForceAlignment(polePairs, config, onDone)
-    MSM-->>TWS: StatusWithMessage{ok, "Aligning..."}
-    TWS-->>User: "Aligning...\r\n"
-    note over Alignment: rotor settling...
-    Alignment-->>MSM: onDone(offset=0.314 rad)
-    MSM->>TWS: write("Alignment complete: offset = 0.314 rad\r\n")
-    TWS-->>User: "Alignment complete: offset = 0.314 rad\r\n"
 ```
 
 ### Memory Constraints
 
-All string handling within the CLI layer uses `infra::BoundedString` with compile-time fixed capacities. Command names, argument tokens, and response messages are all bounded. The maximum response message length is enforced statically.
-
-Registered command handlers are stored in a fixed-size look-up structure in the `TerminalWithStorage` infrastructure — no dynamic registration table is used.
+All string handling within the command line uses `infra::BoundedString` with compile-time fixed
+capacities. Command names, argument tokens and answers are all bounded, and registered commands are
+held in a fixed-size table in `TerminalWithStorage` — no dynamic registration table is used.
 
 ---
 
@@ -245,16 +130,17 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface            | Purpose                                                                       | Contract                                                                 |
-|----------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection | Transparent to the underlying terminal after the banner has been printed |
-| `TerminalHelper`     | Parses a command token into a number within caller-supplied bounds            | Yields no value for a malformed or out-of-range token                    |
+| Interface            | Purpose                                                     | Contract                                                                 |
+|----------------------|-------------------------------------------------------------|--------------------------------------------------------------------------|
+| Startup banner       | Traces the banner of Part B                                 | Traced once, as the application starts                                   |
+| `TerminalWithBanner` | The `hardware_test` terminal, tracing the banner when built | Transparent to the underlying terminal after the banner has been printed |
 
 ### Required
 
 | Interface             | Purpose                                                                                     | Contract                                                                         |
 |-----------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
-| `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | Must be connected to the physical serial driver before any command is registered |
+| `Tracer`              | The serial trace output the banner is written to                                            | Available before the application's other components are built                    |
+| `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | `hardware_test` only; connected to the serial driver before any command is added |
 
 ---
 

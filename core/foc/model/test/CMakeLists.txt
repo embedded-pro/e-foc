@@ -11,6 +11,7 @@ target_link_libraries(e_foc.foc.model_test PUBLIC
 target_sources(e_foc.foc.model_test PRIVATE
     TestAdcNoise.cpp
     TestCurrentSense.cpp
+    TestEncoderIndex.cpp
     TestEncoderNoise.cpp
     TestFaultInjection.cpp
     TestMotorModel.cpp
@@ -18,5 +19,6 @@ target_sources(e_foc.foc.model_test PRIVATE
     TestPlantNonidealities.cpp
     TestPlantResponseRecorder.cpp
     TestPowerStage.cpp
+    TestSimulatedEncoder.cpp
     TestThermalModel.cpp
 )

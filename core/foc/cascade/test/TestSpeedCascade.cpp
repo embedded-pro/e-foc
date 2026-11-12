@@ -61,7 +61,7 @@ namespace
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
+            focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, stream, lowPriorityFrequency);
             focSpeed->Configure(MotorParameters(polePairs));
             focSpeed->ConfigureMechanics(MechanicalParameters());
             focSpeed->SetCurrentTunings(foc::CurrentLoopTunings{});
@@ -69,6 +69,7 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
+        foc::CurrentStream stream;
         std::optional<foc::SpeedCascade> focSpeed;
         const std::size_t polePairs{ 7 };
     };
@@ -118,7 +119,7 @@ namespace
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
             EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
-            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
+            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, stream, lowPriorityFrequency);
             cascade->Configure(MotorParameters(polePairs));
             cascade->ConfigureMechanics(MechanicalParameters());
             cascade->SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -126,8 +127,39 @@ namespace
         }
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        foc::CurrentStream stream;
         std::optional<foc::SpeedCascade> cascade;
     };
+
+    foc::PhasePwmDutyCycles DutyAfterConstantSpeed(uint32_t dutyUpdateDelayPeriods, std::size_t polePairs, float mechanicalStep, float angleOffset)
+    {
+        auto parameters = MotorParameters(polePairs);
+        parameters.dutyUpdateDelayPeriods = dutyUpdateDelayPeriods;
+
+        testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+        EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
+        EXPECT_CALL(lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+
+        foc::CurrentStream cascadeStream;
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, cascadeStream, lowPriorityFrequency };
+        cascade.Configure(parameters);
+        cascade.ConfigureMechanics(MechanicalParameters());
+        cascade.SetCurrentTunings(UnsaturatedCurrentTunings());
+        cascade.SetSpeedTunings(foc::SpeedLoopTunings{});
+        cascade.Enable();
+        cascade.SetPoint(foc::RadiansPerSecond{ 20.0f });
+
+        foc::PhasePwmDutyCycles duty{};
+        for (int sample = 0; sample != 400; ++sample)
+        {
+            foc::Radians position{ angleOffset + static_cast<float>(sample) * mechanicalStep };
+            duty = cascade.Calculate(ZeroCurrents(), position);
+            if (sample % static_cast<int>(baseFrequencyValue / lowPriorityFrequency.Value()) == 0)
+                lowPriorityInterrupt.TriggerHandler();
+        }
+        return duty;
+    }
 
     foc::PhasePwmDutyCycles FirstDutyAtStandstill(SpeedCascadeUnderTest& speedCascade, float stationaryAngle)
     {
@@ -253,6 +285,34 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
                         (DutyPercent(result1.c) != DutyPercent(result2.c));
 
     EXPECT_TRUE(anyDifferent);
+}
+
+// A duty one period later than another acts one electrical step further on, so the voltage must be
+// rotated one more step: (n = 1, sampled at θ) lands where (n = 0, sampled one step later) does.
+TEST_F(TestSpeedCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
+{
+    constexpr float step = 0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestSpeedCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_negative_speed)
+{
+    constexpr float step = -0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestSpeedCascade, the_advance_moves_the_voltage_once_the_rotor_turns)
+{
+    constexpr float step = 0.005f;
+
+    EXPECT_GT(std::abs(DutyPercent(DutyAfterConstantSpeed(1, polePairs, step, 0.0f).a) - DutyPercent(DutyAfterConstantSpeed(0, polePairs, step, 0.0f).a)), 0.1f);
+}
+
+TEST_F(TestSpeedCascade, a_duty_that_acts_later_leaves_the_voltage_at_standstill_unchanged)
+{
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, 0.0f, 0.3f), DutyAfterConstantSpeed(0, polePairs, 0.0f, 0.3f));
 }
 
 TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
@@ -386,7 +446,8 @@ TEST(TestSpeedCascadeLifetime, destruction_unregisters_the_outer_loop_handler_so
     }
 
     {
-        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency };
+        foc::CurrentStream cascadeStream;
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, cascadeStream, lowPriorityFrequency };
         cascade.Configure(MotorParameters(7));
         cascade.ConfigureMechanics(MechanicalParameters());
         cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
@@ -422,6 +483,7 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
 
     focSpeed->SetOnlineMechanicalEstimator(mechanicalEstimator);
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
@@ -446,6 +508,7 @@ TEST_F(TestSpeedCascade, the_electrical_window_carries_the_direct_axis_reference
     };
 
     focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(testing::Return(false));
     focSpeed->Enable();
 
     testing::InSequence sequence;
@@ -644,10 +707,8 @@ TEST_F(TestSpeedCascade, a_cleared_cogging_map_no_longer_drives_the_winding)
     ExpectCentredDuty(FirstDutyAtStandstill(speedCascade, 0.03f));
 }
 
-TEST_F(TestSpeedCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+TEST_F(TestSpeedCascade, the_stream_receives_the_measured_currents_and_the_mechanical_angle)
 {
-    foc::CurrentStream stream;
-    focSpeed->SetCurrentStream(stream);
     focSpeed->Enable();
     stream.Start(1);
 
@@ -662,10 +723,24 @@ TEST_F(TestSpeedCascade, an_attached_stream_receives_the_measured_currents_and_t
     EXPECT_NEAR(sample->position.Value(), 0.25f, 1e-6f);
 }
 
+TEST_F(TestSpeedCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.25f };
+    const float electricalAngle = 0.25f * static_cast<float>(polePairs);
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focSpeed->MeasuredQuadratureCurrent().Value(), -std::sin(electricalAngle), 1e-2f);
+
+    foc::Radians aligned{ 0.0f };
+    focSpeed->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, aligned);
+
+    EXPECT_NEAR(focSpeed->MeasuredQuadratureCurrent().Value(), 0.0f, 1e-2f);
+}
+
 TEST_F(TestSpeedCascade, enabling_restarts_the_stream_window)
 {
-    foc::CurrentStream stream;
-    focSpeed->SetCurrentStream(stream);
     focSpeed->Enable();
     stream.Start(2);
 
@@ -913,7 +988,8 @@ TEST_F(TestSpeedCascadeRamp, a_current_limit_clamps_the_reference_the_speed_law_
     EXPECT_CALL(referenceInterrupt, Register(_)).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
     EXPECT_CALL(referenceInterrupt, Unregister()).WillOnce(Invoke(&referenceInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
     EXPECT_CALL(referenceInterrupt, Trigger()).Times(testing::AnyNumber());
-    foc::SpeedCascade reference{ foc::Ampere{ 1.0f }, baseFrequency, referenceInterrupt, lowPriorityFrequency };
+    foc::CurrentStream referenceStream;
+    foc::SpeedCascade reference{ foc::Ampere{ 1.0f }, baseFrequency, referenceInterrupt, referenceStream, lowPriorityFrequency };
     reference.Configure(MotorParameters(polePairs));
     auto mechanics = MechanicalParameters();
     mechanics.maxCurrent = foc::Ampere{ 1.0f };
@@ -984,7 +1060,34 @@ namespace
 
         float angle{ 0.0f };
     };
+
+    constexpr float frictionTorque{ 0.5f };
+    constexpr float justBeyondTheRamp{ 1.25f * foc::FrictionFeedForward::rampWidth };
+
+    float QuadratureDrive(const foc::PhasePwmDutyCycles& duty)
+    {
+        return DutyPercent(duty.b) - DutyPercent(duty.c);
+    }
+
+    foc::SpeedLoopTunings SlowSpeedLoop()
+    {
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = 1.0f;
+        return tunings;
+    }
+
+    float DriveAddedByFriction(std::size_t polePairs, float setPoint, float ceiling = 10.0f)
+    {
+        SpeedCascadeUnderTest withFriction{ polePairs, SlowSpeedLoop() };
+        SpeedCascadeUnderTest withoutFriction{ polePairs, SlowSpeedLoop() };
+        withFriction.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+        withFriction.cascade->LimitCurrent(foc::Ampere{ ceiling });
+        withoutFriction.cascade->LimitCurrent(foc::Ampere{ ceiling });
+
+        return QuadratureDrive(FirstDutyAfterSpeedStep(withFriction, setPoint)) - QuadratureDrive(FirstDutyAfterSpeedStep(withoutFriction, setPoint));
+    }
 }
+
 
 TEST_F(TestSpeedCascadeQuickStop, a_quick_stop_ramps_the_reference_from_the_measured_speed_to_zero)
 {
@@ -1064,4 +1167,144 @@ TEST_F(TestSpeedCascadeQuickStop, enable_ends_a_quick_stop)
     Turn(10.0f, 1);
 
     EXPECT_NEAR(Reference(), 10.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, a_forward_speed_reference_adds_the_friction_current_to_the_quadrature_reference)
+{
+    EXPECT_GT(DriveAddedByFriction(polePairs, justBeyondTheRamp), 1.0f);
+}
+
+TEST_F(TestSpeedCascade, a_reverse_speed_reference_subtracts_the_friction_current)
+{
+    EXPECT_LT(DriveAddedByFriction(polePairs, -justBeyondTheRamp), -1.0f);
+}
+
+TEST_F(TestSpeedCascade, the_friction_current_is_the_same_either_way_round)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, justBeyondTheRamp), -DriveAddedByFriction(polePairs, -justBeyondTheRamp), 1e-3f);
+}
+
+TEST_F(TestSpeedCascade, a_zero_speed_reference_adds_no_friction_current)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 0.0f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestSpeedCascade, a_reference_inside_the_ramp_adds_a_proportional_share_of_the_friction_current)
+{
+    const auto full = DriveAddedByFriction(polePairs, justBeyondTheRamp);
+
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 0.5f * foc::FrictionFeedForward::rampWidth), 0.5f * full, 0.02f * full);
+}
+
+TEST_F(TestSpeedCascade, the_sum_of_speed_loop_and_friction_current_is_held_within_the_current_limit)
+{
+    EXPECT_NEAR(DriveAddedByFriction(polePairs, 500.0f, 1.0f), 0.0f, 1e-4f);
+}
+
+TEST_F(TestSpeedCascade, a_cleared_friction_adds_no_current)
+{
+    SpeedCascadeUnderTest cleared{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    cleared.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+    cleared.cascade->ClearFrictionFeedForward();
+
+    ExpectSameDuty(FirstDutyAfterSpeedStep(cleared, 50.0f), FirstDutyAfterSpeedStep(reference, 50.0f));
+}
+
+TEST_F(TestSpeedCascade, friction_is_not_added_to_the_current_a_current_command_asks_for)
+{
+    SpeedCascadeUnderTest commanded{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    commanded.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ frictionTorque }, foc::NewtonMeter{ 0.1f });
+    auto firstDuty = [](SpeedCascadeUnderTest& under)
+    {
+        under.cascade->EnableCurrentCommand();
+        under.cascade->CommandCurrent(foc::Ampere{ 1.0f });
+        foc::Radians position{ 0.0f };
+        under.cascade->Calculate(ZeroCurrents(), position);
+        under.lowPriorityInterrupt.TriggerHandler();
+        return under.cascade->Calculate(ZeroCurrents(), position);
+    };
+
+    ExpectSameDuty(firstDuty(commanded), firstDuty(reference));
+}
+
+TEST_F(TestSpeedCascade, a_friction_beyond_the_current_envelope_adds_no_current)
+{
+    SpeedCascadeUnderTest implausible{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest reference{ polePairs, foc::SpeedLoopTunings{} };
+    implausible.cascade->LoadFrictionFeedForward(foc::NewtonMeter{ 1.5f }, foc::NewtonMeter{ 0.1f });
+
+    ExpectSameDuty(FirstDutyAfterSpeedStep(implausible, 50.0f), FirstDutyAfterSpeedStep(reference, 50.0f));
+}
+
+TEST_F(TestSpeedCascade, the_current_algorithm_is_selectable_while_disabled)
+{
+    EXPECT_EQ(focSpeed->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    EXPECT_EQ(focSpeed->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::decoupledPid);
+}
+
+TEST_F(TestSpeedCascade, at_standstill_the_zero_vector_slopes_are_each_current_decaying_through_the_resistance)
+{
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    EXPECT_NEAR(slopes.a.Value(), 0.0f, 1.0f);
+    EXPECT_NEAR(slopes.b.Value(), -1000.0f * 1.5f, 1.0f);
+    EXPECT_NEAR(slopes.c.Value(), 1000.0f * 1.5f, 1.0f);
+}
+
+TEST_F(TestSpeedCascade, a_settled_online_inductance_inside_the_band_sets_the_zero_vector_slopes)
+{
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(Return(true));
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(Return(foc::Ohm{ 1.0f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(Return(foc::MilliHenry{ 1.25f }));
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    EXPECT_NEAR(slopes.b.Value(), -800.0f * 1.5f, 1.0f);
+    EXPECT_NEAR(slopes.c.Value(), 800.0f * 1.5f, 1.0f);
+}
+
+TEST_F(TestSpeedCascade, an_enable_returns_the_zero_vector_slopes_to_the_configured_model)
+{
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(_)).WillRepeatedly(SaveArg<0>(&slopes));
+    focSpeed->SetZeroVectorSlopeSink(sink);
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    EXPECT_CALL(electricalEstimator, Update(_)).Times(AnyNumber());
+    EXPECT_CALL(electricalEstimator, HasSettled()).WillRepeatedly(Return(true));
+    EXPECT_CALL(electricalEstimator, CurrentResistance()).WillRepeatedly(Return(foc::Ohm{ 1.0f }));
+    EXPECT_CALL(electricalEstimator, CurrentInductance()).WillRepeatedly(Return(foc::MilliHenry{ 1.25f }));
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(AnyNumber());
+    focSpeed->Enable();
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    focSpeed->Disable();
+    focSpeed->Enable();
+    focSpeed->Calculate(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.5f }, foc::Ampere{ -1.5f } }, position);
+
+    EXPECT_NEAR(slopes.b.Value(), -1000.0f * 1.5f, 1.0f);
 }

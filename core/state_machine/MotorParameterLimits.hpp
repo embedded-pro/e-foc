@@ -1,8 +1,9 @@
 #pragma once
 
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace state_machine
@@ -18,13 +19,15 @@ namespace state_machine
             case services::MotorParameter::inductance:
                 return foc::IsWithinInclusive(value, CommandLimits::minInductanceMilliHenry, CommandLimits::maxInductanceMilliHenry);
             case services::MotorParameter::polePairs:
-                return foc::IsWithinInclusive(value, 1.0f, CommandLimits::maxPolePairs) && std::round(value) == value;
+                return foc::IsWithinInclusive(value, 1.0f, CommandLimits::maxPolePairs) && math::Round(value) == value;
             case services::MotorParameter::fluxLinkage:
                 return value == 0.0f || foc::IsWithinInclusive(value, CommandLimits::minFluxLinkage, CommandLimits::maxFluxLinkage);
             case services::MotorParameter::inertia:
                 return foc::IsWithinInclusive(value, CommandLimits::minInertia, CommandLimits::maxInertia);
-            default:
+            case services::MotorParameter::viscousFriction:
                 return foc::IsWithinInclusive(value, 0.0f, CommandLimits::maxViscousFriction);
+            default:
+                return foc::IsWithinInclusive(value, 0.0f, CommandLimits::maxFrictionCoulomb);
         }
     }
 }

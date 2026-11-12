@@ -2,9 +2,9 @@
 title: "FOC Plant Models — Discretization and State-Space Foundations"
 type: theory
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: "foc-plant-models"
-date: 2026-10-29
+date: 2026-11-09
 ---
 
 | Field     | Value                                                         |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | FOC Plant Models — Discretization and State-Space Foundations |
 | Type      | theory                                                        |
 | Status    | draft                                                         |
-| Version   | 0.2.1                                                         |
+| Version   | 0.2.2                                                         |
 | Component | foc-plant-models                                              |
-| Date      | 2026-10-29                                                    |
+| Date      | 2026-11-09                                                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -235,7 +235,7 @@ graph LR
 
 ## Reference Motors
 
-The plant model is exercised, in the unit tests, the simulator and the software-in-the-loop suite,
+The plant model is exercised, in the unit tests, the model-in-the-loop tests and the software-in-the-loop suite,
 with two motors whose parameters are published by their vendors and by the evaluation kits built
 around them. The values below are per phase for a wye winding, which is what the model and the
 identification services use. The headers under `motor_parameters/` carry exactly these numbers.

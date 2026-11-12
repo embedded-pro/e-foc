@@ -1,5 +1,4 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <array>
 #include <cmath>
@@ -12,13 +11,10 @@ namespace
         : public ::testing::Test
     {
     protected:
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
-            hal::Hertz{ 100000 },
-            std::optional<std::size_t>{}
+            hal::Hertz{ 100000 }
         };
     };
 
@@ -34,9 +30,6 @@ namespace
         {}
 
         void StatorVoltages(foc::ThreePhase, foc::TwoPhase) override
-        {}
-
-        void Finished() override
         {}
 
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians, foc::RadiansPerSecond) override
@@ -61,7 +54,7 @@ namespace
 
 TEST_F(TestAdcNoise, zero_sigma_produces_finite_currents)
 {
-    model.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{});
+    model.CurrentSensor().SetNoise(foc::ThreePhaseMotorModel::NoiseConfig{});
 
     CurrentCollector collector{ model };
     DriveModelCycles(model, 200);
@@ -92,11 +85,10 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
     foc::ThreePhaseMotorModel model2{
         foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
-        hal::Hertz{ 100000 },
-        std::optional<std::size_t>{}
+        hal::Hertz{ 100000 }
     };
     constexpr float sigma = 1.0f;
-    model2.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
+    model2.CurrentSensor().SetNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
 
     CurrentCollector noisyCollector{ model2 };
     const foc::PhasePwmDutyCycles duty{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(40) };

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace application
@@ -16,7 +17,7 @@ namespace application
     ALWAYS_INLINE_HOT bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c, foc::Ampere limit)
     {
         const auto bound = limit.Value();
-        return std::abs(a.Value()) > bound || std::abs(b.Value()) > bound || std::abs(c.Value()) > bound;
+        return math::Abs(a.Value()) > bound || math::Abs(b.Value()) > bound || math::Abs(c.Value()) > bound;
     }
 
     // Event-loop context only: readBusVoltage may block, and it is skipped while a latch already decides the answer.

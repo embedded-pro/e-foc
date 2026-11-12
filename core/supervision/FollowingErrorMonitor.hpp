@@ -1,13 +1,13 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/supervision/SustainedCondition.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
-#include <optional>
 
 namespace supervision
 {
@@ -34,8 +34,7 @@ namespace supervision
         infra::Function<const state_machine::FocStateMachineBase&()> activeDrive;
         infra::Function<Settings()> settings;
         infra::TimerRepeating evaluationTimer;
-        std::optional<infra::TimePoint> beyondSince;
-        bool reported{ false };
+        SustainedCondition beyond;
     };
 
     FollowingErrorMonitor::Settings FollowingErrorSettingsFrom(const services::ConfigData& config);

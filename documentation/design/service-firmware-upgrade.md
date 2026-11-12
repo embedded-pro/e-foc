@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.10
+version: 0.3.11
 component: "service-firmware-upgrade"
 date: 2026-11-05
 ---
@@ -39,6 +39,14 @@ two steps, and the user starts each of them, separately, while the motor is stop
 
 The CAN Commander offers both steps (`tool-can-commander.md` Part M). The service never starts either on its
 own.
+
+The service is `services::FirmwareUpgradeSession` of `can-lite`
+(`infra/can-lite/can-lite/categories/firmware_upgrade/`); this application supplies what it needs. The platform
+returns a `services::FirmwareStaging` (staging flash, journal flash, product name, capacity, page size). The
+CAN bridge's `FirmwareUpgradeInterlock` implements `services::FirmwareUpgradeHold` (`IsStoppedAndIdle`, `Hold`,
+`Release`) on the control-mode state machine. The emergency stop ends a download through
+`services::FirmwareUpgradeControl::CancelDownload()`. The pack header names its destination `app`
+(`FirmwareUpgradeSession::applicationTargetName`), as `bootloader.md` requires.
 
 **Is responsible for:**
 - Answering the `can-lite` firmware-upgrade category (`0x1`) on the drive's CAN node: Begin Upgrade, Data
@@ -224,15 +232,19 @@ them as the NVM design describes (`service-nvm.md`, version check).
   25 ms after a warning its handler has not cleared. A 16 KB erase takes about 17 ms on the bench and up to
   40 ms with wear, so an erase in the half the application executes from cannot be made safe by splitting
   it. The staging slot and the journal therefore lie entirely in the other half (`bootloader.md` Part A),
-  where their erases run while the core keeps executing. The service still erases one sector per event-loop
-  turn and programs one page at a time, so the node keeps sending its heartbeat while Begin waits for the
-  erase.
+  where their erases run while the core keeps executing. The service erases one sector per event-loop turn
+  and programs one page at a time, so the watchdog's own 100 ms expiry is never approached. Those turns
+  follow each other with nothing else scheduled between them, so from an accepted Begin to its answer the
+  node sends nothing, its heartbeat included: 0.68 s on the EK-TM4C1294XL for the 21 sectors with their
+  read-back. The design bounds that silence at 1 s, one heartbeat interval and a third of the 3 s after
+  which a client reports the node offline, and the hardware apply scenario's `[METRIC]` line, Begin to
+  answer, measures it.
 - **Real time.** The drive is stopped while a pack is received, so no PWM depends on the control interrupt
   during a stall. No code is added to the control interrupt or the outer loop.
 
 ### Part H — firmware identity (contract 2.6)
 
-Contract 2.6 adds read-only parameters to the FOC motor contract (`service-can.md` Part A, "Contract 2.6"):
+Contract 2.6 adds read-only parameters to the FOC motor contract (`wire-contract.md` of e-foc-protocol Part A, "Contract 2.6"):
 the major, minor and patch numbers of the running firmware's release version, the board kind, and the version
 of the staged pack, zero when none is staged. The running version is the one the build stamps into the
 application header (`bootloader.md` Part B), the project's release version; the staged version is the product
@@ -287,14 +299,14 @@ continuous integration on every pull request, so the step a release takes is the
 
 ### Part K — verification
 
-| Level                | What it shows                                                                                                                                                                                                                                                                                                                                          | Requirements                      |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
-| Unit tests           | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                                                                                  | REQ-UPD-001 to 008, 011 to 014    |
-| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                      | supports REQ-BOOT-001 to 005, 007 |
-| Software in the loop | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader                                                             | REQ-UPD-001 to 007, 011, 013, 014 |
-| Software in the loop | The emulated bootloader's own scenarios: install, interrupted install repeated, a downloaded pack left alone, refusals for a bad signature, another product, another board and another destination, a damaged or empty slot halting it (`software-in-the-loop.md` Part P)                                                                              | REQ-BOOT-001 to 004, 006, 007     |
-| Hardware in the loop | Download, run, stop, apply and restart on the EK-TM4C1294XL, the version read back (`@hil_motor`)                                                                                                                                                                                                                                                      | REQ-UPD-005, REQ-UPD-007          |
-| CAN Commander tests  | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus; the tab's download and apply enabled only for a stopped motor with its identity read, no command pending and no other transfer on the bus, and sent only after the user's confirmation, against the tab's own buttons | REQ-UPD-009, 010, 012             |
+| Level                | What it shows                                                                                                                                                                                                                                                                                                                                          | Requirements                                       |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| Unit tests           | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                                                                                  | REQ-FWU-002, REQ-FWU-003, REQ-FWU-004, REQ-FWU-005 |
+| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                      | supports REQ-FWU-001, REQ-FWU-002                  |
+| Software in the loop | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader                                                             | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005              |
+| Software in the loop | The emulated bootloader's own scenarios: install, interrupted install repeated, a downloaded pack left alone, refusals for a bad signature, another product, another board and another destination, a damaged or empty slot halting it (`software-in-the-loop.md` Part P)                                                                              | REQ-FWU-001, REQ-FWU-002                           |
+| Hardware in the loop | Download, run, stop, apply and restart on the EK-TM4C1294XL, the version read back (`@hil_motor`)                                                                                                                                                                                                                                                      | REQ-FWU-002, REQ-FWU-003                           |
+| CAN Commander tests  | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus; the tab's download and apply enabled only for a stopped motor with its identity read, no command pending and no other transfer on the bus, and sent only after the user's confirmation, against the tab's own buttons | REQ-FWU-004                                        |
 
 The hardware scenario downloads the application it runs, as a pack signed with the development key set,
 so the board needs the bootloader with that key set, as every build programmed by a debugger has
@@ -420,20 +432,20 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint          | Value / Description                                                                                                              |
-|---------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                            |
-| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                            |
-| Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                               |
-| Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                     |
-| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                            |
-| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                         |
-| Flash stall         | one sector erase or one page program at a time, each far below the 100 ms watchdog expiry                                        |
-| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download |
-| NVM writes          | refused with `busy` while a pack is received                                                                                     |
-| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                 |
-| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                              |
-| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                 |
+| Constraint          | Value / Description                                                                                                                                |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                                              |
+| When                | Begin and Activate only in `Idle` or `Ready` with nothing outstanding                                                                              |
+| Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                                                 |
+| Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                                       |
+| Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                                              |
+| Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                                           |
+| Flash stall         | one sector erase or one page program per event-loop turn; from Begin to its answer the node is silent, 0.68 s on the EK-TM4C1294XL and at most 1 s |
+| Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download                   |
+| NVM writes          | refused with `busy` while a pack is received                                                                                                       |
+| One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                                   |
+| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                                                |
+| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                                   |
 
 ---
 

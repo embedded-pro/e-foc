@@ -42,7 +42,7 @@ namespace application
         MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
         MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
-        MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
+        MOCK_METHOD(services::MonitoredCan&, CanBus, (), (override));
 
         MOCK_METHOD(void, PhaseCurrentsReady, (const infra::Function<void(foc::PhaseCurrents)>&), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
@@ -51,6 +51,7 @@ namespace application
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(void, CurrentOffsets, (const foc::PhaseCurrents& offsets), (override));
+        MOCK_METHOD(void, ZeroVectorSlopes, (const foc::PhaseCurrentSlopes& slopes), (override));
 
         MOCK_METHOD(foc::Radians, Read, (), (override));
         MOCK_METHOD(void, Set, (foc::Radians), (override));

@@ -3,8 +3,8 @@
 #include "core/foc/cascade/MechanicalWindowAccumulator.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <cstdint>
 
@@ -29,7 +29,7 @@ namespace foc
 
         ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs, float coggingCurrent)
         {
-            const auto mechanicalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) : 0.0f;
+            const auto mechanicalRotation = rotationPrimed ? math::WrapToPi(mechanicalAngle - previousMechanicalAngle) : 0.0f;
             const auto electricalRotation = mechanicalRotation * polePairs;
             previousMechanicalAngle = mechanicalAngle;
             rotationPrimed = true;
@@ -42,7 +42,7 @@ namespace foc
 
             iqSum += meanIq;
             idSum += 0.5f * (measured.d + previousId);
-            vdSum += applied.d + 0.5f * electricalRotation * applied.q;
+            vdSum += applied.d;
             rotationTimesIqSum += electricalRotation * meanIq;
 
             previousIq = measured.q;
@@ -50,6 +50,11 @@ namespace foc
             earlierNormalizedVoltage = previousNormalizedVoltage;
             previousNormalizedVoltage = normalizedVoltage;
             ++ticks;
+        }
+
+        ALWAYS_INLINE_HOT float LastIq() const
+        {
+            return previousIq;
         }
 
         ALWAYS_INLINE_HOT EstimatorSnapshot Close()

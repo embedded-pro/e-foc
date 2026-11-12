@@ -1,0 +1,83 @@
+- id: REQ-CMS-001
+  title: One calibration command commissions an unknown motor
+  status: verified
+  verification: [sil, hil]
+  shall: >
+    A single calibration command shall, on a motor at rest, measure the current sensors' offsets,
+    identify the pole-pair count exactly, the phase resistance within 5 %, the phase inductance
+    within 20 % and the flux linkage, align the encoder and, in speed and position mode, identify
+    the inertia within 5 % and the viscous friction within 10 % and map the cogging torque. It
+    shall store the result and enter Ready, or enter Fault with calibrationFailed when a step
+    fails, including an encoder that does not follow the field.
+
+- id: REQ-CMS-002
+  title: Calibration stays inside its current, speed and time envelope
+  status: implemented
+  verification: unit
+  shall: >
+    Every calibration step shall stop driving the motor and fail on the first sample beyond the
+    inverter's maximum current or beyond its own current or speed envelope, and shall end within a
+    bounded time. An aborted or failed calibration shall leave the motor model the drive held
+    before it, and shall never store or report a provisional model as a calibration result.
+
+- id: REQ-CMS-003
+  title: The motor model follows the motor while it runs
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    In speed and position mode the drive shall estimate the resistance, inductance, inertia and
+    viscous friction online, converging on the motor from a wrong calibration. It shall re-measure
+    the current offsets on the first Enable after power-up, a mode switch or a fault. When the
+    operator enables recalibration it shall adopt a settled estimate only within its plausibility
+    band and only while stopped, keep the loop bandwidths, and store the learned model at most
+    once every 15 minutes.
+
+- id: REQ-CMS-004
+  title: A calibration survives a power cycle and can be entered by hand
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall store a successful calibration, restore it at power-up and, unless its encoder
+    has an index, stay in Idle until the rotor has been aligned again. While stopped, the operator shall be able to enter the
+    motor's parameters by hand; the drive shall store them before it applies them.
+
+- id: REQ-CMS-005
+  title: A drive with an encoder index starts after a power cycle without aligning
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    On a motor whose encoder has an index, the calibration shall record the index's position
+    relative to the rotor's electrical angle. After a power cycle the drive shall be Ready, and its
+    first Start shall turn the rotor at a bounded current, at most a revolution and a quarter, until
+    the index passes, then run without aligning; a Start that finds no index shall be refused.
+
+- id: REQ-CMS-006
+  title: The drive reports whether its position zero is the commissioned one
+  status: implemented
+  verification: unit
+  shall: >
+    The drive shall report to the operator whether its position zero is the one it was commissioned
+    with: yes after a successful calibration or after the rotor reference has been restored from
+    the encoder index in this power-up, no at every power-up, after the calibration is cleared and
+    after an alignment that is not part of a calibration, and it shall keep the report across a
+    change of control mode.
+
+- id: REQ-CMS-007
+  title: Position mode can be held back until the position zero is the commissioned one
+  status: implemented
+  verification: unit
+  shall: >
+    When the operator requires homing, the drive shall refuse to start in position mode unless its
+    position zero is the commissioned one or the start restores it from the encoder index, and
+    shall start in speed and torque mode whatever the setting. Without the requirement, which is
+    the default, the drive shall start in position mode as before.
+
+- id: REQ-CMS-008
+  title: The calibration measures the rotor's dry friction whatever constant load the shaft carries
+  status: implemented
+  verification: [mil, unit]
+  shall: >
+    In speed and position mode the calibration shall measure the rotor's dry friction, a torque
+    that opposes the motion whichever way the rotor turns, so that a constant torque on the shaft
+    does not enter it, and shall store it with the other mechanical parameters. A measurement that
+    is negative, not a number or cannot be made shall be stored as no dry friction.

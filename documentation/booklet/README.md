@@ -51,6 +51,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Position Loop — LQR/LQI (P1)](../theory/position-loop-lqr-lqi.md)                    | DARE-optimal simultaneous θ, ω regulation                   |
 | [Position Loop — Cascade P (P2)](../theory/position-loop-cascade-p.md)                | Industry-standard Kv architecture; velocity feedforward     |
 | [Position Loop — Two-DOF (P3)](../theory/position-loop-two-dof.md)                    | Decoupled tracking and stiffness; angle-wrapping pre-filter |
+| [Position Motion Profile](../theory/position-motion-profile.md)                       | Trapezoidal reference, replan, and feed-forward             |
 | [Resistance and Inductance Estimation](../theory/resistance-inductance-estimation.md) | RLS-based online electrical parameter identification        |
 | [Friction and Inertia Estimation](../theory/friction-inertia-estimation.md)           | RLS-based online mechanical parameter identification        |
 | [Motor Alignment](../theory/alignment.md)                                             | Rotor flux alignment procedure and angle offset calibration |
@@ -72,18 +73,21 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Runtime Controller Selection](../design/controller-selection.md)                      | Heap-free variant storage, std::visit dispatch, state gating                           |
 | [Service: FOC State Machine](../design/state-machine.md)                               | States, transitions, guards, and the enable/disable lifecycle                          |
 | [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                              |
+| [Service: Encoder Index Search](../design/service-index-search.md)                     | Index angle at commissioning, rotor reference from the index at power-up               |
 | [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                              |
 | [Service: Rotor Standstill](../design/service-standstill.md)                           | Waits for the rotor to come to rest before the offsets are measured                    |
 | [Service: Bus Voltage](../design/service-bus-voltage.md)                               | Measures the bus every 10 ms so that the duties follow it                              |
 | [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample            |
 | [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures          |
 | [Platform: Phase-Current Sample Rate](../design/platform-phase-current-rate.md)        | Per-period platform samples, decimated in one place to the rate a consumer asks for    |
+| [Platform: Phase-Current Sampling Skew](../design/platform-sampling-skew.md)           | Each phase brought back to the window centre along its zero-vector slope               |
 | [Service: Cogging Compensation](../design/service-cogging-compensation.md)             | Cogging torque map at calibration, current feed-forward in the cascades                |
 | [Service: Flux Linkage Identification](../design/service-flux-linkage-ident.md)        | Flux linkage from the back-EMF while the rotor coasts, before the mechanical step      |
 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                                  |
 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                          |
-| [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                          |
+| [Service: Command-Line Interface](../design/service-cli.md)                            | Bring-up command line of `hardware_test` and the startup banner                        |
 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow                        |
+| [Service: Status LEDs](../design/service-leds.md)                                      | Green, amber and red LED patterns, blink codes of the latched faults                   |
 | [Service: Firmware Upgrade](../design/service-firmware-upgrade.md)                     | Receiving a firmware pack over CAN, checking it and restarting into the bootloader     |
 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                            |
 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry          |
@@ -91,11 +95,14 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings              |
 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                              |
 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers              |
+| [Virtual Motor](../design/virtual-motor.md)                                            | Shipping application on the host against the plant, on a virtual CAN bus               |
+| [Tool: Virtual Motor](../design/tool-virtual-motor.md)                                 | Starting virtual motors, their plant views, disturbances and faults                    |
 
 ## Building the booklet
 
-Install the dependencies used by CI (mermaid-cli, Pandoc, and a XeLaTeX toolchain), then build
-both outputs:
+CI builds the booklet in the [`embedded-devcontainer-documentation`](https://hub.docker.com/r/gabrielfrasantos/embedded-devcontainer-documentation) container image, which contains all
+dependencies (mermaid-cli, Pandoc, and a XeLaTeX toolchain). Use that image, or install the same
+tools, then build both outputs:
 
 ```
 python documentation/tools/build-foc-booklet.py --format all

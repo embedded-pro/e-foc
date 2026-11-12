@@ -96,21 +96,21 @@ TEST_F(TestParameterIdentification, a_current_offset_window_one_phase_reads_wron
     mil::ModelInTheLoop mil{ scenario };
     const auto readPhaseBWithBias = [&mil, &scenario](float biasAmpereB)
     {
-        mil.Drive().Model().SetAdcNoise({ .sigmaAmpere = scenario.plant.noiseSigmaAmpere,
+        mil.Drive().Model().CurrentSensor().SetNoise({ .sigmaAmpere = scenario.plant.noiseSigmaAmpere,
             .biasAmpereA = scenario.plant.noiseBiasAmpereA,
             .biasAmpereB = biasAmpereB,
             .biasAmpereC = scenario.plant.noiseBiasAmpereC });
     };
 
     std::optional<state_machine::CommandResult> result;
-    mil.ControlMode().ActiveStateMachine().CmdCalibrate([&result](state_machine::CommandResult outcome)
+    mil.ControlMode().Drive().ActiveStateMachine().CmdCalibrate([&result](state_machine::CommandResult outcome)
         {
             result = outcome;
         });
 
     ASSERT_TRUE(mil.RunUntil([&mil]()
         {
-            const auto* calibrating = std::get_if<state_machine::Calibrating>(&mil.ControlMode().ActiveStateMachine().CurrentState());
+            const auto* calibrating = std::get_if<state_machine::Calibrating>(&mil.ControlMode().Drive().ActiveStateMachine().CurrentState());
             return calibrating != nullptr && calibrating->step == state_machine::CalibrationStep::currentOffsets;
         },
         15s));
@@ -144,7 +144,7 @@ TEST_F(TestParameterIdentification, the_full_calibration_measures_the_sensor_noi
         EXPECT_NEAR(stored, noise, 0.1f * noise);
 
         const auto expected = 0.08f / (mil.CalibrationRecord().lD * 1e-3f * stored);
-        EXPECT_NEAR(mil.ControlMode().EffectiveCurrentTunings().bandwidth, expected, 0.01f * expected);
+        EXPECT_NEAR(mil.ControlMode().Tunings().EffectiveCurrentTunings().bandwidth, expected, 0.01f * expected);
     }
 }
 
@@ -157,7 +157,7 @@ TEST_F(TestParameterIdentification, a_calibration_on_a_quiet_sensor_keeps_the_pw
     ASSERT_TRUE(mil.Calibrate());
 
     const auto pwmBound = static_cast<float>(scenario.plant.baseFrequencyHz) / 15.0f * 2.0f * std::numbers::pi_v<float>;
-    EXPECT_NEAR(mil.ControlMode().EffectiveCurrentTunings().bandwidth, pwmBound, 1.0f);
+    EXPECT_NEAR(mil.ControlMode().Tunings().EffectiveCurrentTunings().bandwidth, pwmBound, 1.0f);
 }
 
 TEST_F(TestParameterIdentification, the_full_calibration_identifies_the_mechanical_parameters)
@@ -267,6 +267,22 @@ TEST_F(TestParameterIdentification, the_full_calibration_stores_no_cogging_map_f
     ASSERT_TRUE(mil.Calibrate());
     EXPECT_EQ(mil::Identified(mil.CalibrationRecord(), Quantity::cogging), 0.0f);
     mil::ExpectIdentified(mil, Quantity::inertia, 5.0f);
+}
+
+TEST_F(TestParameterIdentification, the_full_calibration_reads_the_benchs_dry_friction_with_and_without_cogging)
+{
+    for (const float cogging : { 0.0f, 0.004f })
+    {
+        SCOPED_TRACE(cogging);
+        mil::Scenario scenario;
+        scenario.Plant("bench").BootsIn(state_machine::ControlMode::speed);
+        sil::DescribeBenchFrictionAndCogging(scenario.plant);
+        scenario.plant.coggingTorqueNm = cogging;
+
+        mil::ModelInTheLoop mil{ scenario };
+        ASSERT_TRUE(mil.Calibrate());
+        mil::ExpectIdentified(mil, Quantity::dryFriction, 5.0f);
+    }
 }
 
 TEST_F(TestParameterIdentification, a_constant_shaft_torque_does_not_bias_the_online_mechanical_estimates)

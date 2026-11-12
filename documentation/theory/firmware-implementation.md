@@ -2,9 +2,9 @@
 title: "From Equations to Firmware — Practical Implementation"
 type: theory
 status: draft
-version: 0.1.1
+version: 0.1.3
 component: "firmware-implementation"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                                                 |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | From Equations to Firmware — Practical Implementation |
 | Type      | theory                                                |
 | Status    | draft                                                 |
-| Version   | 0.1.1                                                 |
+| Version   | 0.1.3                                                 |
 | Component | firmware-implementation                               |
-| Date      | 2026-11-05                                            |
+| Date      | 2026-11-08                                            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -67,7 +67,7 @@ Three execution contexts share the CPU, by priority:
 | PWM fault interrupt (highest)   | On a comparator trip | ADC digital comparators through the PWM fault input       | Fault latch                                                |
 | Outer loop, PendSV (lowest)     | 1 kHz                | Every 20th control interrupt                              | Speed estimate, speed or position loop, online estimators  |
 | Watchdog early warning (lowest) | 25 ms                | Watchdog timer                                            | Power-stage cut before the reset                           |
-| Event loop (`main`)             | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, CLI, NVM         |
+| Event loop (`main`)             | As events arrive     | Timers, CAN, UART, deferred interrupt work                | State machine, calibration services, CAN, NVM              |
 
 Sources: `targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp` (priorities),
 `documentation/architecture/system.md`. CAN and UART interrupts sit in between, at normal and low priority.
@@ -113,7 +113,7 @@ $$
 
 The inner loop may use 4500 of them (75 %); the outer loop 20 000 per millisecond. The rest is for the outer
 loop, the communication interrupts and the event loop, which run only in the time the control interrupt leaves
-(`documentation/requirements/performance/real-time-requirements.yaml`).
+(REQ-PLT-004, `documentation/requirements/platform.yaml`).
 
 The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
 counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a
@@ -145,8 +145,10 @@ The platform states the delay (`DutyUpdateDelayPeriods() = 1` on TI) so that cod
 account for it: the deadbeat current law predicts the current at the instant its duty lands, and the estimators
 pair each current change with the voltage that caused it (`documentation/theory/current-loop-deadbeat.md`,
 `documentation/design/service-electrical-ident.md`). Together with the hold it gives the 1.5-period loop delay of
-[closed-loop control](closed-loop-control.md) §7. The inverse Park still uses the sampled angle
-([disturbances and noise](disturbances-and-noise.md) §5).
+[closed-loop control](closed-loop-control.md) §7. The inverse Park does not use the sampled angle: the rotor turns
+during those $n + \tfrac12$ periods, so the angle is advanced by $(n + \tfrac12)\,\omega_e T_s$, with $n$ the
+platform's delay, by rotating the sampled $(\cos\theta_e, \sin\theta_e)$ through that small angle
+([disturbances and noise](disturbances-and-noise.md) §5, [FOC transforms](../design/foc-transforms.md)).
 
 ### 4. Numerics on a Cortex-M4F
 
@@ -162,7 +164,7 @@ The EK-TM4C1294XL's Cortex-M4F has a single-precision floating-point unit. That 
 
 Source: `documentation/performance-optimization/README.md`. Further choices:
 
-- **Compiler flags.** Embedded builds use `-ffast-math -fno-finite-math-only` (`cmake/CompilerOptimizations.cmake`):
+- **Compiler flags.** Embedded builds use `-ffast-math -fno-finite-math-only` (`numerical_toolbox_enable_embedded_optimizations()`):
   reassociation and contraction into fused multiply-adds are allowed, but infinities and NaNs keep their meaning,
   so a check for them still works where one is made. Hot functions defined in headers are forced inline; nothing
   uses per-function optimisation pragmas, which would block inlining.
@@ -197,7 +199,7 @@ Each context writes what another reads, without locks (a lock in an interrupt ca
 
 - **Control interrupt ↔ outer loop**: single-writer, single-reader **triple buffers**. The writer always has a free
   slot that the reader does not hold, so neither side waits and the reader always gets a complete, consistent
-  value (`core/foc/cascade/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
+  value (EmIL's `infra/util/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
   loop this way, and the torque-mode set point from the event loop to the control interrupt. A single 32-bit value
   needs no buffer: the speed loop's current reference is one `volatile float`, which the Cortex-M writes and reads in
   one access (`core/foc/cascade/CascadeWithSpeedLoop.hpp`).
@@ -240,7 +242,7 @@ the map was added) makes every stored calibration invalid and forces a new one (
 | Watchdog             | A stalled event loop or interrupt                                                 | 25 ms early warning, 100 ms expiry                                                                                             | Event-loop stall: power stage cut, then reset; a hung interrupt starves the lowest-priority early warning: reset only      |
 | Fault clearing       | Repeated faults                                                                   | At most 3 clears, budget restored after 10 s (a 250 ms dwell where the platform reports protection status; TI reports unknown) | Stays in `Fault`                                                                                                           |
 
-Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `core/platform_abstraction/ControlLoopMetrics.hpp`,
+Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `infra/util/ExecutionTimeStatistics.hpp`,
 `documentation/design/fault-supervision.md`, `documentation/design/watchdog.md`, `documentation/design/error-handling.md`. The hardware protection paths are in
 [power stage](power-stage.md) §7.
 

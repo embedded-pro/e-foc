@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/Function.hpp"
 #include <array>
 #include <cstddef>
@@ -56,6 +56,7 @@ namespace state_machine
 
         services::CalibrationData loadedData{};
         bool rotorReferenceValid{ false };
+        bool homed{ false };
     };
 
     struct Enabled
@@ -93,18 +94,14 @@ namespace state_machine
         return std::holds_alternative<Idle>(state) || std::holds_alternative<Ready>(state);
     }
 
-    struct AppliedEstimates
-    {
-        bool mechanics{ false };
-        bool electrical{ false };
-    };
-
     struct OnlineEstimates
     {
         foc::Ohm resistance;
         foc::MilliHenry inductance;
         foc::NewtonMeterSecondSquared inertia;
         foc::NewtonMeterSecondPerRadian viscousFriction;
+        bool electricalSettled{ false };
+        bool mechanicalSettled{ false };
     };
 
     class FocStateMachineBase
@@ -132,11 +129,6 @@ namespace state_machine
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEmergencyStop() = 0;
         virtual CommandResult CmdQuickStop() = 0;
-
-        virtual AppliedEstimates ApplyOnlineEstimates()
-        {
-            return {};
-        }
 
         virtual std::optional<OnlineEstimates> CurrentOnlineEstimates()
         {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -18,6 +18,12 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context)
         {
+            if (context.profiled)
+            {
+                seeded = false;
+                return feedback.Compute(context);
+            }
+
             auto shaped = context;
             shaped.reference = ShapedReference(context);
 
@@ -35,7 +41,7 @@ namespace foc
                 seeded = true;
             }
 
-            shapedReference = detail::PositionWithWrapAround(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
+            shapedReference = math::WrapToPi(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
 
             return Radians{ shapedReference };
         }

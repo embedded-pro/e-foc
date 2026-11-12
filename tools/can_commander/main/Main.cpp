@@ -10,15 +10,18 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QIcon>
 #include <QNetworkProxyFactory>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QSysInfo>
+#include <algorithm>
 #include <cstring>
 #include <initializer_list>
 #include <iostream>
 #include <optional>
+#include <span>
 
 #if defined(__linux__) || defined(_WIN32)
 #include "can-lite/drivers/implementation/PlatformCanAdapter.hpp"
@@ -31,13 +34,27 @@
 
 namespace
 {
+    QString VirtualMotorApp()
+    {
+#if defined(_WIN32)
+        const QString name{ "e-foc-virtual-motor-app.exe" };
+#else
+        const QString name{ "e-foc-virtual-motor-app" };
+#endif
+        if (const auto beside = QDir{ QCoreApplication::applicationDirPath() }.filePath(name); QFileInfo::exists(beside))
+            return beside;
+        if (QFileInfo::exists(E_FOC_VIRTUAL_MOTOR_APP))
+            return E_FOC_VIRTUAL_MOTOR_APP;
+        return {};
+    }
+
     using ui::backend::qt::ToQt;
 
-    bool HasArgument(int argc, char* argv[], std::initializer_list<const char*> names)
+    bool HasArgument(std::span<char* const> arguments, std::initializer_list<const char*> names)
     {
-        for (int index = 1; index < argc; ++index)
+        for (const auto* argument : arguments.subspan(std::min<std::size_t>(1, arguments.size())))
             for (const auto* name : names)
-                if (std::strcmp(argv[index], name) == 0)
+                if (std::strcmp(argument, name) == 0)
                     return true;
 
         return false;
@@ -66,16 +83,18 @@ namespace
 
     bool AnswersWithoutGui(int argc, char* argv[], const QCommandLineOption& noUpdateCheck)
     {
-        if (HasArgument(argc, argv, { "-v", "--version", "-h", "--help", "--help-all", "-?" }))
+        const std::span<char* const> arguments{ argv, static_cast<std::size_t>(argc) };
+
+        if (HasArgument(arguments, { "-v", "--version", "-h", "--help", "--help-all", "-?" }))
             AttachToParentConsole();
 
-        if (HasArgument(argc, argv, { "-v", "--version" }))
+        if (HasArgument(arguments, { "-v", "--version" }))
         {
             std::cout << tool::application::displayName << " " << tool::application::version << "\n";
             return true;
         }
 
-        if (!HasArgument(argc, argv, { "-h", "--help", "--help-all", "-?" }))
+        if (!HasArgument(arguments, { "-h", "--help", "--help-all", "-?" }))
             return false;
 
         QCoreApplication core{ argc, argv };
@@ -158,6 +177,7 @@ int main(int argc, char* argv[])
 
 #if defined(__linux__) || defined(_WIN32)
     tool::MainWindow window(adapter, issueLog);
+    window.SetVirtualMotorApp(VirtualMotorApp());
     window.show();
 
     if (!parser.isSet(noUpdateCheck))

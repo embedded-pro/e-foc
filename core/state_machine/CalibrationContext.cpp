@@ -1,6 +1,7 @@
 #include "core/state_machine/CalibrationContext.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <numbers>
 
@@ -38,15 +39,15 @@ namespace application
     {
         calibrationData = services::CalibrationData{};
         rotorReferenceValid_ = false;
+        homed_ = false;
         ApplyCurrentOffsets();
     }
 
     bool CalibrationContext::HasFiniteElectricalParameters(const services::CalibrationData& data)
     {
         return foc::IsFinitePositive(data.rPhase) &&
-               foc::IsFiniteValue(data.lD) &&
-               foc::IsFiniteValue(data.fluxLinkage) &&
-               foc::IsFiniteValue(data.currentLoopBandwidth);
+               math::IsFinite(data.lD) &&
+               math::IsFinite(data.fluxLinkage);
     }
 
     bool CalibrationContext::IsComplete(bool modeSpecificValid) const
@@ -71,6 +72,17 @@ namespace application
     void CalibrationContext::SetRotorReferenceValid(bool valid)
     {
         rotorReferenceValid_ = valid;
+        homed_ = homed_ && valid;
+    }
+
+    bool CalibrationContext::IsHomed() const
+    {
+        return homed_ && rotorReferenceValid_;
+    }
+
+    void CalibrationContext::SetHomed(bool homed)
+    {
+        homed_ = homed;
     }
 
     bool CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
@@ -81,7 +93,6 @@ namespace application
             foc::Ohm{ calibrationData.rPhase },
             foc::MilliHenry{ calibrationData.lD },
             calibrationData.polePairs,
-            calibrationData.currentLoopBandwidth,
             EffectiveFluxLinkage(),
             foc::Ampere{ services::CurrentNoiseAmpere(calibrationData.currentNoiseMilliAmpere) },
             controller,
@@ -101,7 +112,6 @@ namespace application
         foc::Ohm resistance,
         foc::MilliHenry inductance,
         std::size_t polePairs,
-        float bandwidth,
         foc::Weber fluxLinkage,
         foc::Ampere currentNoise,
         foc::FocBase& controller,
@@ -116,7 +126,9 @@ namespace application
             polePairs,
             dutyUpdateDelayPeriods });
 
-        tunable.SetCurrentTunings(CurrentTuningsFor(bandwidth, inductance, currentNoise));
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = DefaultCurrentLoopBandwidth(inductance, currentNoise);
+        tunable.SetCurrentTunings(tunings);
 
         return configured;
     }
@@ -141,6 +153,11 @@ namespace application
         return EffectiveFluxLinkage();
     }
 
+    float CalibrationContext::AutomaticCurrentLoopBandwidth() const
+    {
+        return DefaultCurrentLoopBandwidth(foc::MilliHenry{ Data().lD }, foc::Ampere{ services::CurrentNoiseAmpere(Data().currentNoiseMilliAmpere) });
+    }
+
     float CalibrationContext::DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const
     {
         const auto switchingBound = (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
@@ -151,12 +168,5 @@ namespace application
 
         const auto noiseBound = std::max(inaudibleVoltageNoise / (henry * currentNoise.Value()), minimumAutomaticBandwidth);
         return std::min(switchingBound, noiseBound);
-    }
-
-    foc::CurrentLoopTunings CalibrationContext::CurrentTuningsFor(float bandwidth, foc::MilliHenry inductance, foc::Ampere currentNoise) const
-    {
-        auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth(inductance, currentNoise);
-        return tunings;
     }
 }

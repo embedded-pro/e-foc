@@ -18,14 +18,16 @@ jobs:
   validate-requirements:
     name: Validate Requirements Schema
     runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-documentation:v7.4.0@sha256:0537b16931e116f98fd62e0bad454af5bcd102ec6501ccdef2b270aa83fd281e
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Validate requirements and generate PDF
-        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
+        uses: embedded-pro/project-documentation@e1b8b6866333964f2e02b29bba322cbee211819b # v0.3.0
         with:
+          python-version: ''
           run-validate-requirements: 'true'
           run-generate-requirements-pdf: 'true'
           upload-requirements-pdf: 'true'

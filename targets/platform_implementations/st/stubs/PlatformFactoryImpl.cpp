@@ -40,7 +40,6 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
-        // The driver starts the early warning at highest priority; lowest, so a hung handler starves it.
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
 
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
@@ -54,7 +53,6 @@ namespace application
 
     hal::WatchDogStm::Config PlatformFactoryImpl::WatchdogConfig()
     {
-        // The shortest early-warning period keeps the expiry close to the timeout, which is rounded up to whole periods
         hal::WatchDogStm::Config config;
         config.prescaler = WWDG_PRESCALER_1;
         return config;
@@ -123,6 +121,9 @@ namespace application
     void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents&)
     {}
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes&)
+    {}
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
@@ -132,7 +133,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds, SampleAndHold)
     {
         phaseCurrentAdc.reset();
         phaseCurrentAdc.emplace(0.0f, 0.0f);
@@ -147,14 +148,14 @@ namespace application
         encoder.emplace(resolution);
     }
 
-    void PlatformFactoryImpl::ConfigureCanBus(uint32_t /*bitRate*/, bool /*testMode*/)
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t, bool)
     {
         canBus.reset();
         canBus.emplace();
         diagnostics.AttachCanBus(*canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *canBus;
     }

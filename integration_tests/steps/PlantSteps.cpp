@@ -1,8 +1,9 @@
-#include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/plant/PlantConfigWriter.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <string>
@@ -18,10 +19,7 @@ namespace
         if (quantity == "resistance")
             calibration.rPhase *= factor;
         else if (quantity == "inductance")
-        {
             calibration.lD *= factor;
-            calibration.lQ *= factor;
-        }
         else if (quantity == "inertia")
             calibration.inertia *= factor;
         else if (quantity == "friction")
@@ -146,6 +144,10 @@ namespace
             plant.supplyCurrentLimitAmpere = value;
         else if (key == "duty_delay_periods")
             plant.dutyDelayPeriods = static_cast<uint8_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "encoder_index_radians")
+            plant.encoderIndexRadians = value;
+        else if (key == "encoder_index_width_counts")
+            plant.encoderIndexWidthCounts = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "encoder_counts_per_revolution")
             plant.encoderCountsPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "random_seed")
@@ -238,17 +240,19 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.includeCalibration = true;
     setup.nvm.includeConfig = true;
     setup.nvm.calibration = sil::CompleteCalibration();
+    setup.nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
     setup.nvm.calibration.polePairs = setup.plant.polePairs;
     setup.nvm.calibration.rPhase = setup.plant.statorResistanceOhm;
-    // The calibration record carries inductance in millihenry; the plant record in henry.
     setup.nvm.calibration.lD = setup.plant.dAxisInductanceHenry * kMilliPerUnit;
-    setup.nvm.calibration.lQ = setup.plant.qAxisInductanceHenry * kMilliPerUnit;
     setup.nvm.calibration.fluxLinkage = setup.plant.fluxLinkageWeber;
     setup.nvm.calibration.inertia = setup.plant.rotorInertiaKgM2;
     setup.nvm.calibration.frictionViscous = setup.plant.viscousDampingNmSPerRad;
     setup.nvm.calibration.currentOffsetA = setup.plant.noiseBiasAmpereA;
     setup.nvm.calibration.currentOffsetB = setup.plant.noiseBiasAmpereB;
     setup.nvm.calibration.currentOffsetC = setup.plant.noiseBiasAmpereC;
+
+    if (setup.plant.encoderIndexWidthCounts != 0)
+        setup.nvm.calibration.encoderIndexAngle = math::WrapToPi(setup.plant.encoderIndexRadians);
 }
 
 GIVEN(R"(the stored calibration is off by:)")
@@ -290,9 +294,8 @@ WHEN(R"(the target boots)")
     auto& interactor = TargetInteractor::Instance();
 
     interactor.ConfigurePlant(sil::EncodePlantConfig(setup.plant));
-    interactor.ConfigureNonVolatileMemory(setup.nvm.includeCalibration || setup.nvm.includeConfig
-                                              ? sil::BuildNvmImage(setup.nvm)
-                                              : sil::BlankNvmImage());
+    const auto image = setup.nvm.includeCalibration || setup.nvm.includeConfig ? sil::BuildNvmImage(setup.nvm) : sil::BlankNvmImage();
+    interactor.ConfigureNonVolatileMemory({ image.begin(), image.end() });
     interactor.RestartTarget();
     setup.booted = true;
 

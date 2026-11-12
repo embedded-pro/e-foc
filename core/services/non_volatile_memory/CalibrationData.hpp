@@ -1,9 +1,13 @@
 #pragma once
-
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <numbers>
+#include <optional>
 
 namespace services
 {
@@ -15,12 +19,13 @@ namespace services
 
     inline constexpr std::size_t coggingMapBins = 48;
 
-    // Padding-free schema: four-byte fields first, the current noise completes the word; see service-nvm.md.
+    inline constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
+    inline constexpr uint8_t CalibrationLayoutVersion = 6;
+
     struct CalibrationData
     {
         float rPhase = 0.0f;
         float lD = 0.0f;
-        float lQ = 0.0f;
         float fluxLinkage = 0.0f;
         float currentOffsetA = 0.0f;
         float currentOffsetB = 0.0f;
@@ -28,25 +33,39 @@ namespace services
         float inertia = 0.0f;
         float frictionCoulomb = 0.0f;
         float frictionViscous = 0.0f;
-        int32_t encoderZeroOffset = 0;
-        float currentLoopBandwidth = 0.0f;
         float speedLoopBandwidth = 0.0f;
         float coggingTorqueScale = 0.0f;
-        uint8_t encoderDirection = 0;
+        // Mechanical angle of the encoder index in the aligned frame; NaN when none was found
+        float encoderIndexAngle = std::numeric_limits<float>::quiet_NaN();
+        uint16_t currentNoiseMilliAmpere = 0;
         uint8_t polePairs = 0;
         CalibrationStage stage = CalibrationStage::none;
-        uint8_t currentNoiseMilliAmpere = 0;
         std::array<int8_t, coggingMapBins> coggingTorque{};
     };
 
-    static_assert(sizeof(CalibrationData) == 108, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 100, "CalibrationData layout must be free of implicit padding");
 
-    inline uint8_t CurrentNoiseMilliAmpere(float noiseAmpere)
+    inline std::optional<float> EncoderIndexAngle(const CalibrationData& data)
     {
-        return static_cast<uint8_t>(std::clamp(noiseAmpere * 1000.0f + 0.5f, 0.0f, 255.0f));
+        constexpr float pi = std::numbers::pi_v<float>;
+
+        if (!math::IsFinite(data.encoderIndexAngle) || data.encoderIndexAngle < -pi || data.encoderIndexAngle > pi)
+            return std::nullopt;
+
+        return data.encoderIndexAngle;
     }
 
-    inline float CurrentNoiseAmpere(uint8_t noiseMilliAmpere)
+    inline void ForgetEncoderIndexAngle(CalibrationData& data)
+    {
+        data.encoderIndexAngle = std::numeric_limits<float>::quiet_NaN();
+    }
+
+    inline uint16_t CurrentNoiseMilliAmpere(float noiseAmpere)
+    {
+        return static_cast<uint16_t>(std::clamp(noiseAmpere * 1000.0f + 0.5f, 0.0f, 65535.0f));
+    }
+
+    inline float CurrentNoiseAmpere(uint16_t noiseMilliAmpere)
     {
         return static_cast<float>(noiseMilliAmpere) * 0.001f;
     }
@@ -58,7 +77,8 @@ namespace services
         polePairs,
         fluxLinkage,
         inertia,
-        viscousFriction
+        viscousFriction,
+        frictionCoulomb
     };
 
     inline float ReadMotorParameter(const CalibrationData& data, MotorParameter parameter)
@@ -75,8 +95,10 @@ namespace services
                 return data.fluxLinkage;
             case MotorParameter::inertia:
                 return data.inertia;
-            default:
+            case MotorParameter::viscousFriction:
                 return data.frictionViscous;
+            default:
+                return data.frictionCoulomb;
         }
     }
 
@@ -89,7 +111,6 @@ namespace services
                 break;
             case MotorParameter::inductance:
                 data.lD = value;
-                data.lQ = value;
                 break;
             case MotorParameter::polePairs:
                 data.polePairs = static_cast<uint8_t>(value);
@@ -100,8 +121,11 @@ namespace services
             case MotorParameter::inertia:
                 data.inertia = value;
                 break;
-            default:
+            case MotorParameter::viscousFriction:
                 data.frictionViscous = value;
+                break;
+            default:
+                data.frictionCoulomb = value;
                 break;
         }
     }

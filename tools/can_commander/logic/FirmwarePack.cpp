@@ -1,10 +1,11 @@
 #include "tools/can_commander/logic/FirmwarePack.hpp"
-#include "core/services/firmware_upgrade/PackHeaderCheck.hpp"
 #include "generated/Boards.hpp"
 #include "infra/util/Crc.hpp"
+#include "upgrade/staging/UpgradePackCheck.hpp"
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <format>
 #include <sstream>
 
 namespace tool
@@ -52,7 +53,7 @@ namespace tool
 
         std::optional<PackProblem> SizeProblem(const std::vector<uint8_t>& bytes)
         {
-            if (bytes.size() < services::minimumPackSize)
+            if (bytes.size() < application::minimumUpgradePackSize)
                 return PackProblem::tooSmall;
             if (bytes.size() > stagingCapacity)
                 return PackProblem::tooLarge;
@@ -88,8 +89,8 @@ namespace tool
         if (const auto problem = SizeProblem(bytes); problem.has_value())
             return PackInspection{ std::nullopt, *problem, {}, {} };
 
-        services::PackHeader header{};
-        if (!ReadAt(bytes, 0, header.prologue) || header.prologue.magic != application::upgradePackMagic || !ReadAt(bytes, services::EpilogueOffset(header.prologue), header.epilogue))
+        application::StagedPackHeader header{};
+        if (!ReadAt(bytes, 0, header.prologue) || header.prologue.magic != application::upgradePackMagic || !ReadAt(bytes, application::UpgradePackEpilogueOffset(header.prologue), header.epilogue))
             return PackInspection{ std::nullopt, PackProblem::notAPack, {}, {} };
         if (header.epilogue.headerVersion != knownHeaderVersion)
             return PackInspection{ std::nullopt, PackProblem::unknownHeaderVersion, {}, {} };
@@ -102,7 +103,7 @@ namespace tool
             return inspection;
         }
 
-        const auto version = ReadAt(bytes, header.epilogue.headerLength, header.image) ? services::CheckPackHeader(header, { infra::BoundedConstString{ board.productName.data(), board.productName.size() }, applicationCapacity, static_cast<uint32_t>(bytes.size()) }) : std::nullopt;
+        const auto version = ReadAt(bytes, header.epilogue.headerLength, header.image) ? application::CheckStagedPackHeader(header, { infra::BoundedConstString{ board.productName.data(), board.productName.size() }, "app", applicationCapacity, static_cast<uint32_t>(bytes.size()) }) : std::nullopt;
         if (!version.has_value())
         {
             inspection.problem = PackProblem::notAnApplication;
@@ -138,6 +139,6 @@ namespace tool
 
     std::string VersionText(const services::FirmwareVersion& version)
     {
-        return std::to_string(version.major) + "." + std::to_string(version.minor) + "." + std::to_string(version.patch);
+        return std::format("{}.{}.{}", static_cast<uint32_t>(version.major), static_cast<uint32_t>(version.minor), static_cast<uint32_t>(version.patch));
     }
 }

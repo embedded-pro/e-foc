@@ -16,6 +16,7 @@ target_link_libraries(e_foc.state_machine PUBLIC
     e_foc.services.current_offsets
     e_foc.services.electrical_system_ident
     e_foc.services.flux_linkage_ident
+    e_foc.services.index_search
     e_foc.services.mechanical_system_ident
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
@@ -26,61 +27,83 @@ target_link_libraries(e_foc.state_machine PUBLIC
 )
 
 target_sources(e_foc.state_machine PRIVATE
-    AlgorithmPersistence.hpp
+    ActiveDrive.cpp
+    ActiveDrive.hpp
     AlgorithmPersistence.cpp
-    ConfigWriter.hpp
-    ConfigWriter.cpp
-    OperatorTunings.hpp
-    OperatorTunings.cpp
-    CalibrationContext.hpp
-    CalibrationContext.cpp
-    CalibrationOrchestrator.hpp
-    CalibrationOrchestrator.cpp
-    ControlMode.hpp
-    ControlModeCliCommands.hpp
-    ControlModeCliCommands.cpp
-    ControlModeStateMachine.hpp
-    ControlModeStateMachine.cpp
-    FaultController.hpp
-    FaultController.cpp
-    FaultNotifier.hpp
-    FocStateMachine.hpp
-    FocStateMachineEvents.hpp
-    BootSequence.hpp
+    AlgorithmPersistence.hpp
+    AlgorithmSettings.cpp
+    AlgorithmSettings.hpp
     BootSequence.cpp
-    CalibrationFlow.hpp
+    BootSequence.hpp
+    CalibrationContext.cpp
+    CalibrationContext.hpp
     CalibrationFlow.cpp
+    CalibrationFlow.hpp
+    CalibrationOrchestrator.cpp
+    CalibrationOrchestrator.hpp
+    CommandRejections.cpp
     CommandRejections.hpp
+    CommissioningCommands.cpp
+    CommissioningCommands.hpp
+    ConfigWriter.cpp
+    ConfigWriter.hpp
+    ControlMode.hpp
+    ControlModeStateMachine.cpp
+    ControlModeStateMachine.hpp
     CurrentOffsetRefresh.cpp
     CurrentOffsetRefresh.hpp
-    CommandRejections.cpp
-    FocLifecycleTable.hpp
+    DefaultModeHooks.cpp
+    DefaultModeHooks.hpp
+    DriveCommands.cpp
+    DriveCommands.hpp
+    FaultController.cpp
+    FaultController.hpp
+    FaultNotifier.hpp
+    FluxLinkageIdentResolution.cpp
+    FluxLinkageIdentResolution.hpp
     FocLifecycleTable.cpp
-    FocStateMachineCommon.hpp
+    FocLifecycleTable.hpp
+    FocStateMachine.hpp
     FocStateMachineCommon.cpp
+    FocStateMachineCommon.hpp
     FocStateMachineDependencies.hpp
-    LifecycleCliCommands.hpp
+    FocStateMachineEvents.hpp
+    IndexReference.cpp
+    IndexReference.hpp
     LifecycleContext.hpp
-    MaintenanceFlow.hpp
-    MotorParameterLimits.hpp
     MaintenanceFlow.cpp
+    MaintenanceFlow.hpp
     ModeHooks.hpp
-    NvmActivity.hpp
+    ModelRecalibration.cpp
+    ModelRecalibration.hpp
+    ModeSelection.cpp
+    ModeSelection.hpp
+    MotorParameterLimits.hpp
     NvmActivity.cpp
-    OperationFlow.hpp
+    NvmActivity.hpp
     OperationFlow.cpp
-    PendingCommand.hpp
-    PendingCommand.cpp
-    OuterLoopStateMachine.hpp
+    OperationFlow.hpp
+    OperatorTunings.cpp
+    OperatorTunings.hpp
     OuterLoopStateMachine.cpp
+    OuterLoopStateMachine.hpp
     OuterLoopStateMachineFor.hpp
-    PlatformFaultNotifier.hpp
+    PendingCommand.cpp
+    PendingCommand.hpp
     PlatformFaultNotifier.cpp
+    PlatformFaultNotifier.hpp
     PositionStateMachine.hpp
+    Recalibration.cpp
+    Recalibration.hpp
+    RecalibrationStore.cpp
+    RecalibrationStore.hpp
+    SettingTransaction.cpp
+    SettingTransaction.hpp
     SpeedStateMachine.hpp
-    TorqueStateMachine.hpp
     TorqueStateMachine.cpp
-    TransitionPolicies.hpp
+    TorqueStateMachine.hpp
+    TuningSettings.cpp
+    TuningSettings.hpp
 )
 
 add_subdirectory(test)

@@ -1,4 +1,5 @@
 #include "core/supervision/OverspeedMonitor.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -31,29 +32,19 @@ namespace supervision
 
         if (!std::holds_alternative<state_machine::Enabled>(drive.CurrentState()))
         {
-            evaluationsBeyond = 0;
-            reported = false;
+            beyond.Reset();
             return;
         }
 
-        if (reported)
+        if (beyond.Reported())
             return;
 
-        if (!BeyondLimit(drive))
-        {
-            evaluationsBeyond = 0;
-            return;
-        }
-
-        if (++evaluationsBeyond < evaluationsToFault)
-            return;
-
-        reported = true;
-        onFault(state_machine::FaultCode::overspeed);
+        if (beyond.ReportOnce(beyond.HeldCount(BeyondLimit(drive), evaluationsToFault)))
+            onFault(state_machine::FaultCode::overspeed);
     }
 
     bool OverspeedMonitor::BeyondLimit(const state_machine::FocStateMachineBase& drive) const
     {
-        return std::abs(drive.ObserveMotion().measuredSpeed.Value()) > faultMargin * speedLimit().Value();
+        return math::Abs(drive.ObserveMotion().measuredSpeed.Value()) > faultMargin * speedLimit().Value();
     }
 }

@@ -1,69 +1,54 @@
 {
   "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
   "loop_rates_khz": [1],
+  "loop_bounds": {
+    "^motion_profiles::SCurveProfileFromState<float>::Bisect\\(": 32,
+    "^foc::SpeedDifferentiator::Measure\\(": 2,
+    "^__ieee754_fmodf$": 3,
+    "^services::RealTimeFrictionAndInertiaEstimator::SteadyFriction\\(": 2,
+    "^services::RealTimeFrictionAndInertiaEstimator::Update\\(": [
+      2, 3, 3, 3, 9, 9, 9
+    ],
+    "^estimators::RecursiveLeastSquares<float, 3u>::Update\\(": [
+      3, 3, 3, 9, 9, 9
+    ],
+    "^services::RealTimeResistanceAndInductanceEstimator::ComputeEstimate\\(": 4,
+    "^estimators::RecursiveLeastSquares<float, 2u>::Update\\(": 4
+  },
   "path_stages": [
     {
       "label": "LPI Entry (exception overhead)",
       "type": "exception_entry"
     },
     {
-      "label": "FOC Outer Loop (LowPriorityHandler)",
+      "label": "Interrupt Vector",
       "patterns": [
-        "PositionCascade::LowPriorityHandler",
-        "SpeedCascade::LowPriorityHandler",
-        "CascadeWithSpeedLoop::RunSpeedLoop",
-        "CascadeWithSpeedLoop::RunQuickStop",
-        "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
-        "CascadeWithSpeedLoop::SetSpeedReference",
-        "CascadeWithSpeedLoop::SetDirectCurrentReference",
-        "CascadeWithSpeedLoop::CurrentMechanicalAngle",
-        "SpeedDifferentiator::Measure",
-        "PidSpeedController::Compute",
-        "LqiSpeedController::Compute",
-        "AdrcSpeedController::Compute",
-        "TwoDofSpeedController::Compute",
-        "PidPositionController::Compute",
-        "CascadePPositionController::Compute",
-        "LqrPositionController::Compute",
-        "LqiPositionController::Compute",
-        "TwoDofPositionController::Compute",
-        "PidIncrementalSynchronous.*::Process",
-        "PidIncrementalSynchronous.*::SetPoint",
-        "OuterSamplePeriod",
-        "WrappedPositionError",
-        "PositionWithWrapAround",
-        "LimitToCurrentEnvelope"
+        "^Default_Handler_Forwarded$",
+        "^hal::cortex::LowPriorityInterrupt::Invoke\\(",
+        "StaticInvoke<hal::cortex::LowPriorityInterrupt::onInvoke"
+      ]
+    },
+    {
+      "label": "FOC Outer Loop (LowPriorityHandler)",
+      "combine": "max",
+      "patterns": [
+        "StaticInvoke<foc::(Speed|Position)Cascade::(Speed|Position)Cascade\\(",
+        "^foc::(Speed|Position)Cascade::LowPriorityHandler\\(",
+        "^foc::CascadeWithSpeedLoop::RunQuickStop\\("
       ]
     },
     {
       "label": "Online Mechanical Estimator (RLS)",
-      "required": false,
       "patterns": [
-        "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
-        "EstimatorChannel::UpdateMechanical",
-        "RealTimeFrictionAndInertiaEstimator::Update",
-        "ClarkePark::Forward",
-        "RecursiveLeastSquares<float, 3u>::Update",
-        "RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative",
-        "RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled",
-        "RealTimeFrictionAndInertiaEstimator::PublishOnlineEstimate",
-        "MechanicalExcitation::Count",
-        "IsMechanicallyObservable",
-        "IsPlausibleMechanics",
-        "IsFiniteValue"
+        "^services::RealTimeFrictionAndInertiaEstimator::Update\\(",
+        "^estimators::RecursiveLeastSquares<float, 3u>::(Update|Coefficients)\\("
       ]
     },
     {
       "label": "Online Electrical Estimator (RLS)",
-      "required": false,
       "patterns": [
-        "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
-        "EstimatorChannel::UpdateElectrical",
-        "RealTimeResistanceAndInductanceEstimator::Update",
-        "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
-        "RealTimeResistanceAndInductanceEstimator::Publish",
-        "RecursiveLeastSquares<float, 2u>::Update",
-        "DirectAxisExcitation::Advance"
+        "^services::RealTimeResistanceAndInductanceEstimator::(Update|HasSettled|CurrentResistance|CurrentInductance)\\(",
+        "^estimators::RecursiveLeastSquares<float, 2u>::(Update|Coefficients)\\("
       ]
     },
     {

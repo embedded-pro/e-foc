@@ -1,7 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
@@ -25,7 +26,20 @@ namespace drivers
         virtual void SetZero() = 0;
     };
 
+    class EncoderIndex
+    {
+    protected:
+        ~EncoderIndex() = default;
+
+    public:
+        virtual bool HasIndex() const = 0;
+        virtual void ArmIndex() = 0;
+        // Polled from the phase-current interrupt; true once a pulse has passed since ArmIndex
+        virtual bool IndexSeen() = 0;
+    };
+
     class ThreePhasePowerStage
+        : public foc::ZeroVectorSlopeSink
     {
     protected:
         ~ThreePhasePowerStage() = default;

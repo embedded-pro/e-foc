@@ -1,27 +1,24 @@
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace application
 {
     TorqueStateMachine::TorqueStateMachine(
-        const TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
-        state_machine::TransitionPolicy transitionPolicy,
         NvmActivity& nvmActivity,
         RotorReference rotorReference)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
-        , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
+        : FocStateMachineCommon(tracer, hardware, nvm, calibServices, nvmActivity)
+        , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported(), hardware.currentStream)
         , resolvedFluxIdent(ResolveFluxLinkageIdent(calibServices, ownFluxIdent, focController, focController, focController, hardware.inverter))
     {
-        if (hardware.currentStream != nullptr)
-            focController.SetCurrentStream(*hardware.currentStream);
+        if (hardware.zeroVectorSlopes != nullptr)
+            focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
         RegisterFaultHandler(faultNotifier);
-        RegisterCliIfNeeded(transitionPolicy);
         Boot(rotorReference);
     }
 
@@ -60,15 +57,22 @@ namespace application
         return focController.ObserveMotion();
     }
 
+    bool TorqueStateMachine::CanBeginQuickStop() const
+    {
+        const auto& data = GetCalibration();
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        return foc::IsFinitePositive(data.inertia) && foc::IsFinitePositive(torqueConstant.Value());
+    }
+
     bool TorqueStateMachine::BeginQuickStop()
     {
         const auto& data = GetCalibration();
-        const auto torqueConstant = 1.5f * static_cast<float>(data.polePairs) * EffectiveFluxLinkage(data).Value();
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
 
-        if (!foc::IsFiniteValue(data.inertia) || data.inertia <= 0.0f || !foc::IsFiniteValue(torqueConstant) || torqueConstant <= 0.0f)
+        if (!CanBeginQuickStop())
             return false;
 
-        focController.Brake(QuickStopDeceleration(), data.inertia / torqueConstant);
+        focController.Brake(QuickStopDeceleration(), data.inertia / torqueConstant.Value());
         return true;
     }
 
@@ -94,7 +98,7 @@ namespace application
 
     void TorqueStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
-        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, Calibration().EffectiveFluxLinkage(data));
 
         if (foc::IsFinitePositive(data.coggingTorqueScale) && foc::IsFinitePositive(torqueConstant.Value()))
             focController.LoadCoggingMap(infra::MakeRange(data.coggingTorque), data.coggingTorqueScale, torqueConstant);

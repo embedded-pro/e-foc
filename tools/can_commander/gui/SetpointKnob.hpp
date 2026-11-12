@@ -19,6 +19,7 @@ namespace tool
     public:
         explicit SetpointKnob(const SetpointAxis& axis, QWidget* parent = nullptr);
 
+        void SetAxis(const SetpointAxis& newAxis);
         void SetAccepted(std::optional<int32_t> counts);
         QString Format(int32_t counts) const;
 
@@ -31,7 +32,7 @@ namespace tool
     private:
         double AngleOf(int32_t counts) const;
 
-        const SetpointAxis& axis;
+        const SetpointAxis* axis;
         std::optional<int32_t> accepted;
     };
 }

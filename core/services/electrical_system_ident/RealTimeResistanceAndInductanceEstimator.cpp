@@ -1,5 +1,5 @@
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -34,7 +34,13 @@ namespace services
             return;
         }
 
-        if (std::abs(reference) < minimumDirectCurrent)
+        if (math::Abs(reference) < minimumDirectCurrent)
+            return;
+
+        if (math::Abs(referenceChange) < minimumDirectCurrent)
+            following = math::Abs(window.meanId.Value()) >= minimumFollowedFraction * math::Abs(reference);
+
+        if (!following)
             return;
 
         Estimator::InputMatrix regressor;
@@ -63,11 +69,17 @@ namespace services
         const auto resistance = estimator->Coefficients().at(0, 0);
         const auto inductance = estimator->Coefficients().at(1, 0);
 
-        if (!foc::IsFiniteValue(resistance) || !foc::IsFiniteValue(inductance) || resistance <= 0.0f || inductance <= 0.0f)
+        if (!math::IsFinite(resistance) || !math::IsFinite(inductance) || resistance <= 0.0f || inductance <= 0.0f)
             return;
 
         currentResistance = foc::Ohm{ resistance };
         currentInductance = foc::MilliHenry{ inductance };
+        settled = true;
+    }
+
+    bool RealTimeResistanceAndInductanceEstimator::HasSettled() const
+    {
+        return settled;
     }
 
     void RealTimeResistanceAndInductanceEstimator::Seed(foc::Ohm resistance, foc::MilliHenry inductance)
@@ -80,6 +92,8 @@ namespace services
         estimator->SetCoefficients(initial);
 
         primed = false;
+        following = true;
+        settled = false;
         updates = 0;
     }
 

@@ -1,10 +1,9 @@
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -35,32 +34,30 @@ namespace services
         , supportedCurrent(inverter.MaxCurrentSupported())
     {}
 
-    void CoggingMappingImpl::Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, const Config& config, const infra::Function<void(std::optional<CoggingMap>)>& onDone)
+    void CoggingMappingImpl::Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone)
     {
-        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !foc::IsFiniteValue(inertia.Value()) || inertia.Value() < 0.0f || polePairs == 0)
+        if (IsRunning() || !IsUsableConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || !math::IsFinite(inertia.Value()) || inertia.Value() < 0.0f || !math::IsFinite(viscousFriction.Value()) || viscousFriction.Value() < 0.0f || polePairs == 0)
         {
-            onDone(std::nullopt);
+            onDone(CoggingMeasurement{});
             return;
         }
 
         this->config = config;
-        this->torqueConstant = torqueConstant;
-        this->inertia = inertia;
-        this->polePairs = polePairs;
+        mechanics = Mechanics{ torqueConstant, inertia, viscousFriction, polePairs };
         this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
 
         builder.Restart();
-        previousPosition = encoder.Read().Value();
-        turned = 0.0f;
-        mark = 0.0f;
+        travel.previousPosition = encoder.Read().Value();
+        travel.turned = 0.0f;
+        travel.mark = 0.0f;
         commandedSpeed = 0.0f;
         ++run;
         phase = Phase::forwardSettle;
 
-        observable.RegisterPhaseCurrentsObserver([this](const auto& currents)
+        observable.RegisterPhaseCurrentsObserver([this](const auto& phases, auto quadratureCurrent, auto mechanicalAngle)
             {
-                OnSamplingUpdate(currents);
+                OnSamplingUpdate(phases, quadratureCurrent.Value(), mechanicalAngle.Value());
             });
 
         drive.Start();
@@ -93,7 +90,7 @@ namespace services
         onDone = nullptr;
     }
 
-    void CoggingMappingImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases)
+    void CoggingMappingImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float quadratureCurrent, float position)
     {
         const Phase current = phase;
         if (current == Phase::idle || current == Phase::complete || current == Phase::failed)
@@ -107,15 +104,11 @@ namespace services
             return;
         }
 
-        const auto position = encoder.Read().Value();
-        const auto rotation = foc::detail::PositionWithWrapAround(position - previousPosition);
-        previousPosition = position;
-        turned += rotation;
+        const auto rotation = math::WrapToPi(position - travel.previousPosition);
+        travel.previousPosition = position;
+        travel.turned += rotation;
 
-        const auto electricalAngle = position * static_cast<float>(polePairs);
-        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-
-        Advance(electricalAngle, rotatingFrame.q, rotation);
+        Advance(position * static_cast<float>(mechanics.polePairs), quadratureCurrent, rotation);
     }
 
     void CoggingMappingImpl::Advance(float electricalAngle, float quadratureCurrent, float rotation)
@@ -123,31 +116,31 @@ namespace services
         switch (phase)
         {
             case Phase::forwardSettle:
-                if (turned >= config.settleTurns * turn)
+                if (travel.turned >= config.settleTurns * turn)
                 {
-                    mark = turned;
+                    travel.mark = travel.turned;
                     phase = Phase::forwardMeasure;
                 }
                 break;
             case Phase::forwardMeasure:
                 builder.Add(CoggingMapBuilder::Direction::forward, electricalAngle, quadratureCurrent, rotation);
-                if (turned - mark >= config.measuredTurns * turn)
+                if (travel.turned - travel.mark >= config.measuredTurns * turn)
                     phase = Phase::reversing;
                 break;
             case Phase::backwardStart:
-                mark = turned;
+                travel.mark = travel.turned;
                 phase = Phase::backwardSettle;
                 break;
             case Phase::backwardSettle:
-                if (mark - turned >= config.settleTurns * turn)
+                if (travel.mark - travel.turned >= config.settleTurns * turn)
                 {
-                    mark = turned;
+                    travel.mark = travel.turned;
                     phase = Phase::backwardMeasure;
                 }
                 break;
             case Phase::backwardMeasure:
                 builder.Add(CoggingMapBuilder::Direction::backward, electricalAngle, quadratureCurrent, rotation);
-                if (mark - turned >= config.measuredTurns * turn)
+                if (travel.mark - travel.turned >= config.measuredTurns * turn)
                 {
                     phase = Phase::complete;
                     ScheduleFinish();
@@ -158,16 +151,23 @@ namespace services
         }
     }
 
+    float CoggingMappingImpl::TargetSpeedIn(Phase current) const
+    {
+        if (current == Phase::forwardSettle || current == Phase::forwardMeasure)
+            return config.speed.Value();
+        if (current == Phase::reversing || current == Phase::backwardStart || current == Phase::backwardSettle || current == Phase::backwardMeasure)
+            return -config.speed.Value();
+        return 0.0f;
+    }
+
     void CoggingMappingImpl::StepSpeedCommand()
     {
         const Phase current = phase;
-        const bool forward = current == Phase::forwardSettle || current == Phase::forwardMeasure;
-        const bool backward = current == Phase::reversing || current == Phase::backwardStart || current == Phase::backwardSettle || current == Phase::backwardMeasure;
-        const auto target = forward ? config.speed.Value() : (backward ? -config.speed.Value() : 0.0f);
+        const auto target = TargetSpeedIn(current);
 
         const auto step = config.speedSlewRate * slewPeriodSeconds;
         const auto remaining = target - commandedSpeed;
-        commandedSpeed = std::abs(remaining) <= step ? target : commandedSpeed + std::copysign(step, remaining);
+        commandedSpeed = math::Abs(remaining) <= step ? target : commandedSpeed + math::Copysign(step, remaining);
         controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
 
         if (current == Phase::reversing && commandedSpeed == target)
@@ -205,9 +205,14 @@ namespace services
         StopMotion();
         phase = Phase::idle;
 
-        const auto map = complete ? builder.Build(torqueConstant, inertia, polePairs, samplePeriod) : std::nullopt;
+        CoggingMeasurement measurement{};
+        if (complete)
+        {
+            measurement.map = builder.Build(mechanics.torqueConstant, mechanics.inertia, mechanics.polePairs, samplePeriod);
+            measurement.frictionCoulomb = builder.FrictionCoulomb(mechanics.torqueConstant, mechanics.inertia, mechanics.viscousFriction, mechanics.polePairs, samplePeriod).value_or(foc::NewtonMeter{ 0.0f });
+        }
 
         if (onDone)
-            onDone(map);
+            onDone(measurement);
     }
 }

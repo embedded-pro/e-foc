@@ -2,9 +2,9 @@
 title: "Fault Supervision Design"
 type: design
 status: draft
-version: 0.8.0
+version: 0.9.0
 component: "supervision"
-date: 2026-11-05
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Fault Supervision Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.8.0                    |
+| Version   | 0.9.0                    |
 | Component | supervision              |
-| Date      | 2026-11-05               |
+| Date      | 2026-11-06               |
 
 ---
 
@@ -22,35 +22,35 @@ date: 2026-11-05
 
 **Is responsible for:**
 - Watching an enabled drive from the event loop for effort without motion: torque current that asks the
-  rotor to move while the encoder reading stays put (REQ-SM-028).
+  rotor to move while the encoder reading stays put (REQ-PRO-005).
 - Telling the two causes it can tell apart: a rotor an outside force pushed against the drive and then
   held (`stall`), and everything else — an encoder that stopped reporting, or a rotor locked before it
   ever moved (`encoderLoss`).
 - Raising the fault through the platform fault notifier, as a board protection trip is raised.
 - Using the drive-wide supervision settings of the configuration record from its next evaluation, and
-  leaving stall reporting off when the operator turned it off (REQ-SM-033).
+  leaving stall reporting off when the operator turned it off (REQ-PRO-005).
 - Watching an enabled drive for a current it demands but cannot make flow, and raising `phaseMissing` when the
-  motor is disconnected while it runs (REQ-EH-015, Part E).
+  motor is disconnected while it runs (REQ-PRO-005, Part E).
 - Watching an enabled drive, in every control mode, for an encoder reading that stops dead faster than the rotor
-  could physically stop, and raising `encoderLoss` (REQ-SM-028, Part F). This is the watch that covers torque
+  could physically stop, and raising `encoderLoss` (REQ-PRO-005, Part F). This is the watch that covers torque
   mode, where the drive demands no motion for Parts A to C to judge.
 - Watching an enabled drive, in every control mode, for a rotor that turns faster than the overspeed limit allows,
-  and raising `overspeed` (REQ-PRT-003, Part G).
+  and raising `overspeed` (REQ-PRO-004, Part G).
 - Watching an enabled position drive for a position error that stays beyond the operator's following-error
-  window for the following-error time, and raising `followingError` (REQ-PRT-004, Part H).
+  window for the following-error time, and raising `followingError` (REQ-PRO-004, Part H).
 - Keeping a thermal model of the motor's winding from its current and folding the drive's current limit back
-  from the peak to the continuous rating when the motor is overloaded (REQ-PRT-001, Part I).
+  from the peak to the continuous rating when the motor is overloaded (REQ-PRO-001, Part I).
 - Watching an enabled position drive for a rotor carried more than four encoder counts past the software
-  position limits, and raising `positionLimit` (REQ-POS-016, Part J).
+  position limits, and raising `positionLimit` (REQ-CTL-007, Part J).
 - Inferring the winding's temperature from the online resistance estimate in speed and position mode
-  (REQ-PRT-002), derating the current limit as it nears the temperature limit and raising `overtemperature`
-  at the limit (REQ-PRT-008, Part K).
+  (REQ-PRO-002), derating the current limit as it nears the temperature limit and raising `overtemperature`
+  at the limit (REQ-PRO-002, Part K).
 - Watching an enabled drive's filtered bus voltage against the operator's bus-voltage limits, and raising
-  `overvoltage` or `undervoltage` when it leaves them (REQ-PRT-009, Part L).
+  `overvoltage` or `undervoltage` when it leaves them (REQ-PRO-003, Part L).
 
 **Is NOT responsible for:**
 - Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
-  (REQ-PERF-003); sensor and power-stage failures that need a faster answer belong to board protection.
+  (REQ-PLT-004); sensor and power-stage failures that need a faster answer belong to board protection.
 - Telling a frozen encoder from a rotor locked before it moved. Both look the same from the drive — current
   flows, the error does not close, the reading does not change — so both are reported as `encoderLoss`.
 - Storing or range-checking settings on the wire. The CAN settings bridge validates a write against the
@@ -85,6 +85,10 @@ drive *pushes for motion* when two things hold together:
 - the torque current is at least the configured fraction of the drive's current limit, and
 - the drive demands motion: a position error of at least the configured threshold or, without one, a
   demanded speed of at least the configured threshold.
+
+With a motion profile on (`foc-position.md`, Motion Profile) that position error is the one to the profiled
+reference, not to the final setpoint, so a move planned within the drive's limits does not read as a demand
+the rotor ignores.
 
 The *direction* of the push is the sign of that position error or, without one, of the demanded speed. A
 position law that commands the current demands no speed, so the stale speed reference it leaves in the
@@ -189,7 +193,7 @@ The 10 rad/s bound leaves the back-EMF under 0.3 V on both reference motors.
 
 A cable pulled while the rotor turns faster than that is reported once friction has slowed the rotor below
 it. A single open phase is not reported: two phases still carry current and turn the rotor, so the shortfall
-never appears. Both limits are recorded in REQ-EH-015.
+never appears. Both limits are recorded in REQ-PRO-005.
 
 The demanded current is what the active drive commands its current loop: the torque setpoint after the
 current envelope in torque mode, the speed loop's output (or the current a position law commands directly)
@@ -272,7 +276,9 @@ stateDiagram-v2
 A fourth watch, the overspeed monitor, reads the speed the active drive measures every 1 ms on the event loop
 while the drive is `Enabled`, in every mode. An evaluation counts when the magnitude of that speed exceeds
 110 % of the overspeed limit; five evaluations that count in a row raise `overspeed` once, and the monitor stays
-silent until the drive leaves `Enabled`. An evaluation that does not count starts the count again.
+silent until the drive leaves `Enabled`. An evaluation that does not count starts the count again. The count and the
+report-once latch are the counting form of `SustainedCondition`, the class the following-error, over-temperature and
+target-reached monitors share for their time spans.
 
 The overspeed limit is one drive-wide setting of the configuration record (`service-nvm.md`), read at every
 evaluation, so a value written over CAN (`service-can.md`, contract 2.9) is in force from the next one:
@@ -289,7 +295,7 @@ through a tuning or sensor fault, and a load that runs away in position mode.
 
 The speed is the one the drive reports in its motion observation: the filtered per-sample speed in torque mode,
 the outer loop's window speed in speed and position modes. Five 1 ms evaluations bound the reaction to
-5–6 ms after the speed passes 110 %, inside the 10 ms of REQ-PRT-003, and keep a single noisy speed sample from
+5–6 ms after the speed passes 110 %, inside the 10 ms of REQ-PRO-004, and keep a single noisy speed sample from
 faulting the drive. The fault is raised through the same notifier as the other watches, so the drive cuts its
 power stage and coasts, as for every other fault.
 
@@ -305,12 +311,15 @@ stateDiagram-v2
 ### Part H — Following error
 
 A fifth watch, the following-error monitor, reads the position error the active drive observes every 1 ms on
-the event loop while the drive is `Enabled`. It is the mechanical setpoint minus the measured angle, wrapped to
-half a turn, the same error Part A judges; only position mode has one, the other modes report zero and are
+the event loop while the drive is `Enabled`. It is the mechanical reference minus the measured angle, wrapped to
+half a turn, the same error Part A judges; with a motion profile on (`foc-position.md`, Motion Profile) the
+reference is the profiled one, so the error is how far the rotor lags the path the profile plans, and a step
+within the profile's limits no longer needs a window wider than the step; only position mode has one, the other modes report zero and are
 never faulted. An evaluation counts when the magnitude of the error exceeds the following-error window. The span
 starts at the first evaluation that counts; when the evaluations have counted without a break for the
 following-error time, the monitor raises `followingError` once and stays silent until the drive leaves
-`Enabled`. An evaluation that does not count ends the span.
+`Enabled`. An evaluation that does not count ends the span. The span and the report-once latch are a
+`SustainedCondition` (`core/supervision/SustainedCondition.hpp`), reset whenever the drive is not `Enabled`.
 
 | Setting                | Default | Range        | Meaning                                           |
 |------------------------|---------|--------------|---------------------------------------------------|
@@ -353,7 +362,8 @@ measures:
 time. While θ stays below i_cont² the drive may carry the peak current; once θ reaches i_cont² the current limit
 folds back to the continuous rating, and it is released to the peak again only once θ has fallen below half of
 i_cont², so the limit does not chatter at the threshold. A motor that keeps carrying its continuous rating holds
-θ at i_cont² and stays folded back, as it should.
+θ at i_cont² and stays folded back, as it should. The update of θ is the class `I2tThermalModel`; `MotorOverload` keeps
+the fold-back and release policy and reads θ from it.
 
 | Setting            | Default         | Range      | Meaning                                                   |
 |--------------------|-----------------|------------|-----------------------------------------------------------|
@@ -390,7 +400,7 @@ The software position limits keep the reference and the way to it between the po
 past them. A sixth watch, the position-limit monitor, reads the encoder's mechanical angle every 1 ms on the event
 loop while position mode is the active mode, the drive is `Enabled` and the limits are on. When the angle lies
 more than four encoder counts outside the limits — 2π · 4 / resolution, 6.28 mrad with the default 4000-count
-encoder — the monitor raises `positionLimit` (REQ-POS-016) once and stays silent until the drive leaves
+encoder — the monitor raises `positionLimit` (REQ-CTL-007) once and stays silent until the drive leaves
 `Enabled`. The four counts keep a rotor settled on a limit, whose reading dithers by a count, from faulting.
 
 The angle is the one the loop works on, wrapped to [−π, π), so a rotor pushed past a limit and across the encoder
@@ -409,7 +419,7 @@ stateDiagram-v2
 ### Part K — Winding temperature
 
 The board has no temperature input, so the drive infers the winding's temperature from its resistance
-(REQ-PRT-002). In speed and position mode the online electrical estimator follows the phase resistance R through
+(REQ-PRO-002). In speed and position mode the online electrical estimator follows the phase resistance R through
 its d-axis excitation bursts, 4 s at the start of every 60 s (`service-electrical-ident.md`). Copper's resistance
 rises 0.393 % per kelvin, so with the resistance R_cal the calibration record holds, measured at the calibration
 temperature T_cal, the winding is at
@@ -428,8 +438,9 @@ the drive's only thermal protection. Without a calibrated resistance the tempera
 estimate is the read-only parameter `windingTemperature` of contract 2.13 (`service-can.md`), not a number while
 it is unknown.
 
-**Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRT-008) and
-acts on it through a first-order filter with a 1 s time constant, started from the first known value. A winding cannot
+**Derating and trip.** An over-temperature monitor reads the estimate every 100 ms on the event loop (REQ-PRO-002) and
+acts on it through a first-order filter with a 1 s time constant (the toolbox's `filters::passive::ExponentialMovingAverage`),
+started from the first known value. A winding cannot
 move noticeably within a second; an estimate that does is not heat. A cable pulled from a running drive is one: the open
 phase reads as a resistance 1.6 times the calibrated one at once, about 170 °C, and the phase-loss monitor (Part E)
 answers it within its 50 ms span, before the filter has carried the derating anywhere near it. While the filtered
@@ -440,7 +451,8 @@ the overload model. At or above T_max, while the drive is `Enabled`, the monitor
 stays silent until the drive leaves `Enabled`; the drive cuts its power stage and coasts, as for the board's own
 over-temperature trip.
 
-The trip waits 5 s after each entry to `Enabled`, one excitation burst and a margin: the estimate a stop left behind
+The trip waits 5 s after each entry to `Enabled`, one excitation burst and a margin (a `SustainedCondition` timed from
+the entry to `Enabled`, not from the temperature crossing the limit): the estimate a stop left behind
 is the winding's temperature at the stop, and a motor that cooled since would otherwise be faulted again before the
 first burst had measured it. The derating applies from the first evaluation, on the estimate as it stands, which is
 the cautious side. Where the temperature is unknown — torque mode, or no calibrated resistance — the monitor neither
@@ -466,7 +478,7 @@ stateDiagram-v2
 ### Part L — Bus-voltage limits
 
 The board's comparators trip at the bus voltages the power stage survives, which a motor or a supply rated lower
-does not. A bus-voltage limit monitor holds the drive to two operator limits inside them (REQ-PRT-009). It takes each
+does not. A bus-voltage limit monitor holds the drive to two operator limits inside them (REQ-PRO-003). It takes each
 value the bus-voltage service hands on (`service-bus-voltage.md`): a reading every 10 ms, filtered with a 50 ms time
 constant. While the drive is `Enabled`, a value below the minimum raises `undervoltage` and a value above the maximum
 raises `overvoltage`, once, and the monitor stays silent until the drive leaves `Enabled`; the drive cuts its power
@@ -497,6 +509,14 @@ stateDiagram-v2
     Reported --> Watching : drive leaves Enabled
 ```
 
+### Part M — Peak current for the fault history
+
+A fault record carries the peak torque current of the last 10 ms (`service-fault-history.md`). A peak-current tracker
+reads the active drive's measured torque current every millisecond on the event loop and keeps the last ten readings;
+the peak is the reading of largest magnitude, with its sign. It raises nothing and has no settings: it only answers the
+fault history when the drive enters `Fault`. Because it samples the one-millisecond reading, the peak is not the largest
+phase-current sample of the control interrupt, which does no per-sample bookkeeping.
+
 ---
 
 ## Interfaces
@@ -516,5 +536,5 @@ stateDiagram-v2
 | Encoder          | Mechanical angle                                                                           | Read every evaluation while the drive is enabled                             |
 | Settings         | The configuration record's supervision fields and limits                                   | Read every evaluation                                                        |
 | Bus voltage      | Filtered bus voltage (Part L)                                                              | Handed on every 10 ms from the event loop                                    |
-| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I)                                            | Runs on the event loop                                                       |
+| Repeating timer  | 10 ms evaluation period (1 ms for Parts F to I and M)                                      | Runs on the event loop                                                       |
 | Kinematic limits | Current limit, encoder resolution, and the calibrated inertia, flux linkage and pole pairs | Read when a still reading follows travel; missing values select the fallback |

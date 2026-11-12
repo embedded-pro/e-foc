@@ -1,6 +1,7 @@
 #include "core/services/current_offsets/PhaseCurrentOffsetMeasurement.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -162,7 +163,7 @@ namespace services
         const foc::PhaseCurrents measured{ foc::Ampere{ sums.a / count }, foc::Ampere{ sums.b / count }, foc::Ampere{ sums.c / count } };
         const auto limit = config.maxOffset.Value();
 
-        if (std::fabs(measured.a.Value()) > limit || std::fabs(measured.b.Value()) > limit || std::fabs(measured.c.Value()) > limit)
+        if (math::Abs(measured.a.Value()) > limit || math::Abs(measured.b.Value()) > limit || math::Abs(measured.c.Value()) > limit)
             return std::nullopt;
 
         const auto variance = [count](float sum, float square)
@@ -170,7 +171,7 @@ namespace services
             const auto mean = sum / count;
             return std::max(square / count - mean * mean, 0.0f);
         };
-        noise = foc::Ampere{ std::sqrt((variance(sums.a, squares.a) + variance(sums.b, squares.b) + variance(sums.c, squares.c)) / 3.0f) };
+        noise = foc::Ampere{ math::Sqrt((variance(sums.a, squares.a) + variance(sums.b, squares.b) + variance(sums.c, squares.c)) / 3.0f) };
 
         return measured;
     }

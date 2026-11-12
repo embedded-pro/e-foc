@@ -1,23 +1,21 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
-#include <algorithm>
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstdint>
-#include <limits>
 #include <string_view>
 
 namespace tool
 {
-    // The wire carries a setpoint in SI units as a 16-bit count; the operator reads speed in rpm and
-    // position in degrees. A count is the smallest step offered, so no value is lost in the frame.
+    // The wire carries a setpoint in SI units as a float; the operator reads speed in rpm and position in
+    // degrees. A count is the smallest step offered, finer than the encoder resolves.
     class SetpointAxis
     {
     public:
-        constexpr SetpointAxis(std::string_view suffix, double displayPerSi, int32_t wireScale, float limit, std::string_view rangeLabel)
+        constexpr SetpointAxis(std::string_view suffix, double displayPerSi, int32_t countsPerSi, float limit, std::string_view rangeLabel)
             : suffix(suffix)
             , displayPerSi(displayPerSi)
-            , wireScale(wireScale)
-            , maxCounts(static_cast<int32_t>(std::min(static_cast<double>(limit) * wireScale, static_cast<double>(std::numeric_limits<int16_t>::max()))))
+            , countsPerSi(countsPerSi)
+            , maxCounts(static_cast<int32_t>(static_cast<double>(limit) * countsPerSi))
             , rangeLabel(rangeLabel)
         {}
 
@@ -35,7 +33,7 @@ namespace tool
     private:
         std::string_view suffix;
         double displayPerSi;
-        int32_t wireScale;
+        int32_t countsPerSi;
         int32_t maxCounts;
         std::string_view rangeLabel;
     };

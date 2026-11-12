@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryServer.hpp"
+#include "can-lite/categories/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
-#include "core/services/firmware_upgrade/FirmwareUpgradeControl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/util/Function.hpp"
 #include <cstdint>
 #include <functional>
@@ -20,14 +20,13 @@ namespace can
             application::PlatformDiagnostics& diagnostics, FocResetCause resetCause, FocFirmwareIdentity firmware,
             FirmwareUpgrade firmwareUpgrade = std::nullopt);
 
-        void SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone);
-        void SetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone);
-        void ConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone);
         void SelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone);
         void SetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone);
         FocAlgorithms ActiveAlgorithms() const;
         FocParameterValue HeldValue(FocParameter parameter) const;
         void ClearDiagnostics();
+        void Recalibrate(const infra::Function<void()>& onAccepted);
+        void ResetModel(const infra::Function<void(bool stored)>& onDone);
         void ReportTargetReached(const infra::Function<bool()>& isReached);
 
     private:
@@ -36,7 +35,6 @@ namespace can
         void SetStoredSetting(FocParameter parameter, float value);
         void CompleteAlgorithmSelection(state_machine::SettingResult result);
         void CompleteParameter(state_machine::SettingResult result);
-        void CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result);
         void ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result);
         FocParameterValue HeldLoopSetting(FocParameter parameter) const;
         FocParameterValue HeldMotorParameter(FocParameter parameter) const;
@@ -44,7 +42,9 @@ namespace can
         FocParameterValue HeldOnlineEstimate(FocParameter parameter) const;
         FocParameterValue HeldLoopStatistic(FocParameter parameter) const;
         FocParameterValue HeldPlatformReading(FocParameter parameter) const;
+        FocParameterValue HeldMotionReading(FocParameter parameter) const;
         FocParameterValue HeldWindingTemperature() const;
+        FocParameterValue HeldRecalibrationReading(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
@@ -54,11 +54,9 @@ namespace can
         FirmwareUpgrade firmwareUpgrade;
         infra::Function<bool()> targetReached;
 
-        infra::Function<void()> pendingNvmDoneCallback;
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;
         infra::Function<void(FocParameterValue)> pendingParameterCallback;
         FocParameter pendingParameter{ FocParameter::currentBandwidth };
         float previousStoredSetting{ 0.0f };
-        uint8_t pendingLegacyCommand{ 0 };
     };
 }

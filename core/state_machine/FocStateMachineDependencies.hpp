@@ -1,43 +1,39 @@
 #pragma once
 
 #include "core/foc/cascade/CurrentStream.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
+#include "core/services/index_search/IndexSearch.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/standstill/RotorStandstill.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 #include <cstdint>
 #include <functional>
 #include <optional>
 
 namespace application
 {
-    struct TerminalAndTracer
-    {
-        services::TerminalWithStorage& terminal;
-        services::Tracer& tracer;
-    };
-
     struct MotorHardware
     {
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
+        foc::CurrentStream& currentStream;
         foc::Volts vdc;
         uint32_t dutyUpdateDelayPeriods{ 0 };
-        foc::CurrentStream* currentStream{ nullptr };
+        foc::ZeroVectorSlopeSink* zeroVectorSlopes{ nullptr };
     };
 
     // Kept across a mode switch out of an aligned Ready: the encoder zero is shared hardware.
     enum class RotorReference : uint8_t
     {
         lost,
-        kept
+        kept,
+        keptHomed
     };
 
     struct CalibrationServices
@@ -53,5 +49,6 @@ namespace application
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill{ std::nullopt };
         bool identifyFluxLinkage{ false };
         std::optional<std::reference_wrapper<services::FluxLinkageIdentification>> fluxIdentOverride{ std::nullopt };
+        std::optional<std::reference_wrapper<services::IndexSearch>> indexSearch{ std::nullopt };
     };
 }

@@ -1,7 +1,8 @@
 #include "core/supervision/EncoderFreezeMonitor.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
-#include <cmath>
 #include <numbers>
 #include <variant>
 
@@ -60,7 +61,7 @@ namespace supervision
         if (now - anchorTime < evaluationPeriod)
             return;
 
-        const auto travel = std::abs(foc::detail::PositionWithWrapAround(reading - *anchor));
+        const auto travel = math::Abs(math::WrapToPi(reading - *anchor));
 
         if (travel >= 0.5f * armedLimits.encoderStep.Value())
             NoteTravel(reading, travel, now);
@@ -116,7 +117,7 @@ namespace supervision
     bool EncoderFreezeMonitor::CouldNotHaveStopped() const
     {
         const auto alpha = armedLimits.maximumDeceleration.Value();
-        const auto stopping = std::sqrt(alpha * armedLimits.encoderStep.Value());
+        const auto stopping = math::Sqrt(alpha * armedLimits.encoderStep.Value());
         const auto last = Seconds(lastSpan);
 
         return Exceeds(lastSpeed, stopping + alpha * last * 0.5f) ||
@@ -133,8 +134,8 @@ namespace supervision
         constexpr float margin = 2.0f;
         constexpr float fallbackPerAmpere = 2.0e4f;
 
-        const auto torqueConstant = 1.5f * static_cast<float>(calibration.polePairs) * calibration.fluxLinkage;
-        const auto perAmpere = torqueConstant > 0.0f && calibration.inertia > 0.0f ? torqueConstant / calibration.inertia : fallbackPerAmpere;
+        const auto torqueConstant = foc::TorqueConstantFor(calibration.polePairs, foc::Weber{ calibration.fluxLinkage });
+        const auto perAmpere = torqueConstant.Value() > 0.0f && calibration.inertia > 0.0f ? torqueConstant.Value() / calibration.inertia : fallbackPerAmpere;
 
         return EncoderFreezeMonitor::Limits{
             .maximumDeceleration = foc::RadiansPerSecondSquared{ margin * perAmpere * maxCurrent.Value() },

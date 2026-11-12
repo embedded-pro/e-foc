@@ -2,9 +2,9 @@
 title: "FOC Mathematical Transforms"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: foc-transforms
-date: 2026-04-07
+date: 2026-11-08
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | FOC Mathematical Transforms |
 | Type      | design                      |
 | Status    | draft                       |
-| Version   | 0.1.0                       |
+| Version   | 0.2.0                       |
 | Component | foc-transforms              |
-| Date      | 2026-04-07                  |
+| Date      | 2026-11-08                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -97,6 +97,10 @@ Vβ = Vd·sin(θe) + Vq·cos(θe)
 
 The inverse Park transform is applied after the PID controllers produce voltage demands Vd and Vq, converting them back to the stationary frame for SVM processing.
 
+**Delay compensation (angle advance):**
+
+The duty computed from a sample takes effect n periods after the next counter zero and is held for a period, so the rotor turns through (n + ½)·ωe·Ts before the average of the applied vector. The advance rotates the already evaluated (cos θe, sin θe) pair through δ = (n + ½)·ωe·Ts, with cos δ ≈ 1 − δ²/2 and sin δ ≈ δ − δ³/6, instead of looking the trigonometry up a second time: nine multiplications and a few additions, against a wrap, two table reads and two interpolations. The product (n + ½)·Ts is computed when the controller is configured. δ is limited to ±0.35 rad: the largest error inside that band is 6.3·10⁻⁴ on the cosine (δ⁴/24) and 4.4·10⁻⁵ on the sine (δ⁵/120), a 3·10⁻⁴ error in the length of the voltage vector, and the angle error is below 10⁻⁴ rad. The band covers the Teknic at 6000 rpm (δ = 0.19 rad with n = 1) and any 4-pole-pair motor up to the 1000 rad/s speed setpoint limit with n = 1 (0.30 rad); beyond it the compensation saturates instead of leaving the approximation. At zero speed the pair is returned unchanged.
+
 **Electrical angle:**
 
 The electrical angle θe is obtained by multiplying the mechanical rotor angle θm by the motor's pole-pair count P:
@@ -108,7 +112,7 @@ The electrical angle θe is obtained by multiplying the mechanical rotor angle �
 The caller is responsible for supplying the correct θe.
 
 **Invariants:**
-- The same θe (and therefore the same cos/sin pair) must be used for both the forward Park in the current-sensing path and the inverse Park in the voltage-output path within a single control cycle.
+- The forward Park in the current-sensing path uses the sampled θe. The inverse Park of the closed-loop current paths uses that angle advanced by the delay between the sample and the instant the voltage is applied, θe + (n + ½)·ωe·Ts, where n is the number of periods the bridge takes to load a new duty and ωe is the electrical speed the cascade already holds. The open-loop drives (alignment, pole-pair sweep, inductance injection, resistance hold) and the cogging feed-forward keep the sampled angle.
 - The transform is stateless — no memory of previous cycles.
 
 ### Composite ClarkePark — Chained Transform with Single Trigonometric Evaluation
@@ -196,24 +200,22 @@ form.
 
 ### Provided
 
-| Interface                                | Purpose                                           | Contract                                                                                                                                       |
-|------------------------------------------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                         | Converts (Ia, Ib, Ic) to (Iα, Iβ)                 | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
-| Clarke — Inverse                         | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
-| Park — Forward                           | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
-| Park — Inverse                           | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
-| ClarkePark — Forward                     | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
-| ClarkePark — Inverse                     | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
-| SpaceVectorModulation — Generate         | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
-| FastTrigonometry — Sine                  | Returns an approximation of sin(θ)                | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
-| FastTrigonometry — Cosine                | Returns an approximation of cos(θ)                | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
-| FastTrigonometry — AccurateSineAndCosine | Returns sin(θ) and cos(θ) within 1.3 × 10⁻⁶       | Same ROM; table entry plus a short series. For configuration-time use, not the control loop.                                                   |
+| Interface                        | Purpose                                           | Contract                                                                                                                                       |
+|----------------------------------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward                 | Converts (Ia, Ib, Ic) to (Iα, Iβ)                 | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
+| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
+| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
+| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
+| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
+| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
 
 ### Required
 
-| Interface | Purpose                                                                        | Contract |
-|-----------|--------------------------------------------------------------------------------|----------|
-| None      | All transforms are pure mathematical algorithms with no external dependencies. | —        |
+| Interface                                      | Purpose                                     | Contract                                                                                  |
+|------------------------------------------------|---------------------------------------------|-------------------------------------------------------------------------------------------|
+| `math::FastSine`, `math::FastCosine` (toolbox) | sin(θe) and cos(θe) for the Park transforms | 512-entry ROM table with linear interpolation; any angle, no wrap needed; within 2 × 10⁻⁵ |
+| `math::AccurateSineAndCosine` (toolbox)        | sin(θ) and cos(θ) for configuration code    | Same table plus a short series; within 1.3 × 10⁻⁶. Not for the control loop               |
 
 ---
 
@@ -239,7 +241,7 @@ graph LR
     Ia["Ia, Ib (Ampere)"] --> Clarke["Clarke\nForward"]
     Clarke --> Ialpha["Iα, Iβ"]
     Ialpha --> Park["Park\nForward"]
-    Theta["θe (Radians)"] --> Trig["FastTrigonometry\nLUT"]
+    Theta["θe (Radians)"] --> Trig["math::FastSine/FastCosine\nLUT"]
     Trig --> Park
     Trig --> InvPark["Park\nInverse"]
     Park --> dq["Id, Iq"]
@@ -257,10 +259,10 @@ graph LR
 | Constraint                      | Value / Description                                                                                                       |
 |---------------------------------|---------------------------------------------------------------------------------------------------------------------------|
 | Three-sensor current topology   | All three phase currents are measured directly. The amplitude-invariant Clarke form is valid regardless of phase balance. |
-| LUT ROM footprint               | 2 048 bytes (2 KB) of read-only memory.                                                              |
-| LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.              |
-| SVM input normalisation         | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values. |
-| SVM output saturation           | Duty cycles are clamped to [0.0, 1.0]. Over-modulation is silently saturated, not flagged.           |
-| Electrical angle responsibility | The caller is responsible for computing θe = θm × pole_pairs before invoking any Park operation.     |
-| Stateless transforms            | No transform retains state between calls. Every call is independent.                                 |
-| Hot-path constraint             | All transforms must execute within the cycle budget of the 20 kHz FOC interrupt.                     |
+| LUT ROM footprint               | 2 048 bytes (2 KB) of read-only memory.                                                                                   |
+| LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.                                   |
+| SVM input normalisation         | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values.                      |
+| SVM output saturation           | Duty cycles are clamped to [0.0, 1.0]. Over-modulation is silently saturated, not flagged.                                |
+| Electrical angle responsibility | The caller is responsible for computing θe = θm × pole_pairs before invoking any Park operation.                          |
+| Stateless transforms            | No transform retains state between calls. Every call is independent.                                                      |
+| Hot-path constraint             | All transforms must execute within the cycle budget of the 20 kHz FOC interrupt.                                          |

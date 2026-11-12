@@ -168,6 +168,11 @@ namespace application
         shuntReadout.Offsets(offsets);
     }
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        shuntReadout.ZeroVectorSlopes(slopes);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
     {
         if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
@@ -218,6 +223,12 @@ namespace application
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
+        shuntReadout.SampleDelays(foc::SequentialPhaseSampleDelays({
+            .converterClockHertz = AdcForPhaseCurrentMeasurementImpl::converterClockHertz,
+            .sampleHoldClocks = impl.sampleHoldClocks.at(static_cast<std::size_t>(sampleAndHold)),
+            .conversionClocks = AdcForPhaseCurrentMeasurementImpl::conversionClocks,
+            .averagedConversions = AdcForPhaseCurrentMeasurementImpl::averagedConversions,
+        }));
         if constexpr (Peripheral::hasFaultComparators)
             adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
 
@@ -293,7 +304,7 @@ namespace application
         diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *peripherals->canBus;
     }
@@ -355,6 +366,7 @@ namespace application
             {
                 pwm.Stop();
             });
+        shuntReadout.ClearSlopes();
         overCurrentTripped = false;
         pwmFaultAsserted = false;
     }
@@ -379,7 +391,6 @@ namespace application
         return pwmBaseFrequency;
     }
 
-    // The encoder exists only once the NVM load has supplied its resolution
     foc::Radians PlatformFactoryImpl::Read()
     {
         if (!peripherals->encoder)
@@ -397,6 +408,27 @@ namespace application
     {
         if (peripherals->encoder)
             encoderZero.SetZero(peripherals->encoder->Read());
+    }
+
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return peripherals->encoder.has_value();
+    }
+
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        static_assert(Peripheral::QeiIndex == 0, "The index latch is read from QEI0");
+        QEI0->ISC = qeiIndexPulse;
+    }
+
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        return (QEI0->RIS & qeiIndexPulse) != 0;
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
@@ -440,16 +472,15 @@ namespace application
         return diagnostics;
     }
 
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    std::optional<services::FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         if (StagingRegion().empty())
             return std::nullopt;
 
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return services::FirmwareStaging{ peripherals->stagingFlash, peripherals->journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
-    // Both regions lie in the upper flash half: an erase stalls every read of its own half, the watchdog handler included (flash_layout.ld)
     infra::ConstByteRange PlatformFactoryImpl::StagingRegion()
     {
         return infra::ConstByteRange{ __staging_slot_start, __staging_slot_end };

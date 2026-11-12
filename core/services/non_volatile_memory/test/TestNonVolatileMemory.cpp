@@ -1,9 +1,7 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
-#include "infra/util/Crc.hpp"
 #include <algorithm>
-#include <cstring>
 #include <gmock/gmock.h>
 #include <optional>
 #include <vector>
@@ -38,32 +36,18 @@ namespace
             infra::EventDispatcher::Instance().Schedule(onDone);
         }
 
-        std::size_t Size() const override
-        {
-            return storage.size();
-        }
-
         std::vector<uint8_t> storage;
     };
 
-    // Record layout: [magic:4][version:1][crc32:4][data:sizeof(CalibrationData)]
     static constexpr std::size_t recordMagicOffset = 0;
-    static constexpr std::size_t recordVersionOffset = 4;
-    static constexpr std::size_t recordCrc32Offset = 5;
-    static constexpr std::size_t recordDataOffset = 9;
+    static constexpr std::size_t recordVersionOffset = services::CalibrationRecord::versionOffset;
+    static constexpr std::size_t recordCrc32Offset = services::CalibrationRecord::crcOffset;
+    static constexpr std::size_t recordDataOffset = services::CalibrationRecord::dataOffset;
 
-    void WriteCalibrationRecord(NvmRegionStub& region, uint32_t magic, uint8_t version,
-        const services::CalibrationData& data)
+    void WriteCalibrationRecordOfVersion(NvmRegionStub& region, uint8_t version, const services::CalibrationData& data)
     {
-        std::memcpy(region.storage.data() + recordMagicOffset, &magic, sizeof(magic));
-        std::memcpy(region.storage.data() + recordVersionOffset, &version, sizeof(version));
-        std::memcpy(region.storage.data() + recordDataOffset, &data, sizeof(data));
-        infra::Crc32 crc;
-        crc.Update(infra::ConstByteRange(
-            region.storage.data() + recordDataOffset,
-            region.storage.data() + recordDataOffset + sizeof(data)));
-        uint32_t crcValue = crc.Result();
-        std::memcpy(region.storage.data() + recordCrc32Offset, &crcValue, sizeof(crcValue));
+        services::CalibrationRecord::Serialize(data, infra::ByteRange{ region.storage.data(), region.storage.data() + services::CalibrationRecord::size });
+        region.storage[recordVersionOffset] = version;
     }
 
     void ExpectCalibrationDataEqual(const services::CalibrationData& actual,
@@ -71,7 +55,6 @@ namespace
     {
         EXPECT_EQ(actual.rPhase, expected.rPhase);
         EXPECT_EQ(actual.lD, expected.lD);
-        EXPECT_EQ(actual.lQ, expected.lQ);
         EXPECT_EQ(actual.fluxLinkage, expected.fluxLinkage);
         EXPECT_EQ(actual.currentOffsetA, expected.currentOffsetA);
         EXPECT_EQ(actual.currentOffsetB, expected.currentOffsetB);
@@ -79,12 +62,12 @@ namespace
         EXPECT_EQ(actual.inertia, expected.inertia);
         EXPECT_EQ(actual.frictionCoulomb, expected.frictionCoulomb);
         EXPECT_EQ(actual.frictionViscous, expected.frictionViscous);
-        EXPECT_EQ(actual.encoderZeroOffset, expected.encoderZeroOffset);
-        EXPECT_EQ(actual.currentLoopBandwidth, expected.currentLoopBandwidth);
         EXPECT_EQ(actual.speedLoopBandwidth, expected.speedLoopBandwidth);
         EXPECT_EQ(actual.coggingTorqueScale, expected.coggingTorqueScale);
-        EXPECT_EQ(actual.encoderDirection, expected.encoderDirection);
+        EXPECT_EQ(services::EncoderIndexAngle(actual), services::EncoderIndexAngle(expected));
+        EXPECT_EQ(actual.currentNoiseMilliAmpere, expected.currentNoiseMilliAmpere);
         EXPECT_EQ(actual.polePairs, expected.polePairs);
+        EXPECT_EQ(actual.stage, expected.stage);
         EXPECT_EQ(actual.coggingTorque, expected.coggingTorque);
     }
 
@@ -103,16 +86,17 @@ namespace
         , public infra::EventDispatcherFixture
     {
     protected:
-        NvmRegionStub calibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
-        NvmRegionStub configRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+        NvmRegionStub calibrationRegion{ services::CalibrationRecord::size };
+        NvmRegionStub configRegion{ services::ConfigRecord::size };
+        NvmRegionStub faultHistoryRegion{ services::faultHistoryImageSize };
+        NvmRegionStub learnedModelRegion{ services::learnedModelImageSize };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
 
         services::CalibrationData MakeTestCalibration()
         {
             services::CalibrationData d{};
             d.rPhase = 1.5f;
             d.lD = 0.001f;
-            d.lQ = 0.0012f;
             d.fluxLinkage = 0.007f;
             d.currentOffsetA = 0.01f;
             d.currentOffsetB = -0.01f;
@@ -120,12 +104,12 @@ namespace
             d.inertia = 0.0002f;
             d.frictionCoulomb = 0.05f;
             d.frictionViscous = 0.001f;
-            d.encoderZeroOffset = 1234;
-            d.encoderDirection = 1;
             d.polePairs = 7;
-            d.currentLoopBandwidth = 8377.6f;
+            d.stage = services::CalibrationStage::complete;
+            d.currentNoiseMilliAmpere = 300;
             d.speedLoopBandwidth = 50.0f;
             d.coggingTorqueScale = 3.0e-5f;
+            d.encoderIndexAngle = -2.25f;
             for (std::size_t bin = 0; bin != d.coggingTorque.size(); ++bin)
                 d.coggingTorque[bin] = static_cast<int8_t>(static_cast<int>(bin * 5) % 255 - 127);
             return d;
@@ -162,7 +146,6 @@ namespace
         MOCK_METHOD(void, Write, (infra::ConstByteRange data, infra::Function<void()> onDone), (override));
         MOCK_METHOD(void, Read, (infra::ByteRange data, infra::Function<void()> onDone), (override));
         MOCK_METHOD(void, Erase, (infra::Function<void()> onDone), (override));
-        MOCK_METHOD(std::size_t, Size, (), (const, override));
     };
 
     class NonVolatileMemorySingleWriterTest
@@ -171,7 +154,7 @@ namespace
     protected:
         void StartConfigWrite()
         {
-            EXPECT_CALL(configRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+            EXPECT_CALL(configRegion, Write(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
             nvm.SaveConfig(services::ConfigData{}, [this](services::NvmStatus status)
                 {
                     configStatus = status;
@@ -180,7 +163,7 @@ namespace
 
         void StartCalibrationWrite()
         {
-            EXPECT_CALL(calibrationRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+            EXPECT_CALL(calibrationRegion, Write(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
             nvm.SaveCalibration(services::CalibrationData{}, [this](services::NvmStatus status)
                 {
                     calibrationStatus = status;
@@ -197,8 +180,6 @@ namespace
 
         void FinishWrite(testing::StrictMock<NvmRegionMock>& region)
         {
-            EXPECT_CALL(region, Write(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
-            InvokePendingRegionCallback();
             EXPECT_CALL(region, Read(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
             InvokePendingRegionCallback();
             InvokePendingRegionCallback();
@@ -206,12 +187,13 @@ namespace
 
         testing::StrictMock<NvmRegionMock> calibrationRegion;
         testing::StrictMock<NvmRegionMock> configRegion;
-        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+        testing::StrictMock<NvmRegionMock> faultHistoryRegion;
+        testing::StrictMock<NvmRegionMock> learnedModelRegion;
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
 
         infra::Function<void()> pendingRegionCallback;
         std::optional<services::NvmStatus> configStatus;
         std::optional<services::NvmStatus> calibrationStatus;
-        std::optional<bool> calibrationValid;
     };
 }
 
@@ -270,10 +252,9 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_blank_fla
     EXPECT_EQ(result, services::NvmStatus::InvalidData);
 }
 
-TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_wrong_version)
+TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_another_version)
 {
-    WriteCalibrationRecord(calibrationRegion, services::CalibrationMagic,
-        services::CalibrationLayoutVersion + 1, MakeTestCalibration());
+    WriteCalibrationRecordOfVersion(calibrationRegion, services::CalibrationLayoutVersion + 1, MakeTestCalibration());
 
     services::CalibrationData out{};
     bool done = false;
@@ -286,13 +267,12 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_wrong
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::VersionMismatch);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
 }
 
-TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_previous_layout)
+TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_the_previous_layout)
 {
-    WriteCalibrationRecord(calibrationRegion, services::CalibrationMagic,
-        services::CalibrationLayoutVersion - 1, MakeTestCalibration());
+    WriteCalibrationRecordOfVersion(calibrationRegion, services::CalibrationLayoutVersion - 1, MakeTestCalibration());
 
     services::CalibrationData out{};
     bool done = false;
@@ -305,7 +285,7 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_previ
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::VersionMismatch);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
     EXPECT_EQ(out.rPhase, 0.0f);
 }
 
@@ -318,7 +298,6 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_crc_corru
         });
     RunUntilDone(saveDone);
 
-    // Corrupt one byte of the CRC field (record layout: [magic:4][version:1][crc32:4]...)
     calibrationRegion.storage[recordCrc32Offset] ^= 0xFF;
 
     services::CalibrationData out{};
@@ -382,42 +361,7 @@ TEST_F(NonVolatileMemoryTest, load_calibration_on_crc_mismatch_zero_initialises_
     ExpectCalibrationDataEqual(out, services::CalibrationData{});
 }
 
-TEST_F(NonVolatileMemoryTest, is_calibration_valid_returns_true_after_save)
-{
-    bool saveDone = false;
-    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
-        {
-            saveDone = true;
-        });
-    RunUntilDone(saveDone);
-
-    bool done = false;
-    bool valid = false;
-    nvm.IsCalibrationValid([&](bool v)
-        {
-            valid = v;
-            done = true;
-        });
-    RunUntilDone(done);
-
-    EXPECT_TRUE(valid);
-}
-
-TEST_F(NonVolatileMemoryTest, is_calibration_valid_returns_false_on_blank_flash)
-{
-    bool done = false;
-    bool valid = true;
-    nvm.IsCalibrationValid([&](bool v)
-        {
-            valid = v;
-            done = true;
-        });
-    RunUntilDone(done);
-
-    EXPECT_FALSE(valid);
-}
-
-TEST_F(NonVolatileMemoryTest, invalidate_calibration_makes_is_calibration_valid_return_false)
+TEST_F(NonVolatileMemoryTest, invalidate_calibration_makes_the_next_load_invalid)
 {
     bool saveDone = false;
     nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
@@ -433,16 +377,74 @@ TEST_F(NonVolatileMemoryTest, invalidate_calibration_makes_is_calibration_valid_
         });
     RunUntilDone(invalidateDone);
 
+    services::CalibrationData out{};
     bool done = false;
-    bool valid = true;
-    nvm.IsCalibrationValid([&](bool v)
+    services::NvmStatus result{};
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
         {
-            valid = v;
+            result = s;
             done = true;
         });
     RunUntilDone(done);
 
-    EXPECT_FALSE(valid);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
+}
+
+TEST_F(NonVolatileMemoryTest, an_invalidation_whose_erase_leaves_the_record_intact_reports_write_failed)
+{
+    struct EraseIgnoringRegion
+        : NvmRegionStub
+    {
+        using NvmRegionStub::NvmRegionStub;
+
+        void Erase(infra::Function<void()> onDone) override
+        {
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+    };
+
+    EraseIgnoringRegion stuckCalibrationRegion{ services::CalibrationRecord::size };
+    services::NonVolatileMemoryImpl nvmWithStuckRegion{ stuckCalibrationRegion, configRegion, faultHistoryRegion, learnedModelRegion };
+    nvmWithStuckRegion.SaveCalibration(MakeTestCalibration(), [](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    std::optional<services::NvmStatus> status;
+    nvmWithStuckRegion.InvalidateCalibration([&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::WriteFailed, status);
+}
+
+TEST_F(NonVolatileMemoryTest, a_save_writes_the_record_without_erasing_the_region_first)
+{
+    struct EraseCountingRegion
+        : NvmRegionStub
+    {
+        using NvmRegionStub::NvmRegionStub;
+
+        void Erase(infra::Function<void()> onDone) override
+        {
+            ++erases;
+            NvmRegionStub::Erase(onDone);
+        }
+
+        int erases{ 0 };
+    };
+
+    EraseCountingRegion countingCalibrationRegion{ services::CalibrationRecord::size };
+    EraseCountingRegion countingConfigRegion{ services::ConfigRecord::size };
+    services::NonVolatileMemoryImpl nvmCounting{ countingCalibrationRegion, countingConfigRegion, faultHistoryRegion, learnedModelRegion };
+
+    nvmCounting.SaveCalibration(MakeTestCalibration(), [](services::NvmStatus) {});
+    ExecuteAllActions();
+    nvmCounting.SaveConfig(MakeTestConfig(), [](services::NvmStatus) {});
+    ExecuteAllActions();
+
+    EXPECT_EQ(0, countingCalibrationRegion.erases);
+    EXPECT_EQ(0, countingConfigRegion.erases);
 }
 
 TEST_F(NonVolatileMemoryTest, save_config_completes_with_ok)
@@ -485,9 +487,64 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_ok_with_correct_data_after_sav
     ExpectConfigDataEqual(loaded, written);
 }
 
+TEST_F(NonVolatileMemoryTest, the_motion_profile_survives_a_save_and_a_load)
+{
+    auto written = MakeTestConfig();
+    written.limits.profileVelocity = 20.0f;
+    written.limits.profileAcceleration = 400.0f;
+    written.limits.profileDeceleration = 500.0f;
+    written.limits.profileJerk = 9000.0f;
+    bool saveDone = false;
+    nvm.SaveConfig(written, [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData loaded{};
+    bool done = false;
+    nvm.LoadConfig(loaded, [&](auto)
+        {
+            done = true;
+        });
+    RunUntilDone(done);
+
+    EXPECT_NEAR(loaded.limits.profileVelocity, 20.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileAcceleration, 400.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileDeceleration, 500.0f, 1e-6f);
+    EXPECT_NEAR(loaded.limits.profileJerk, 9000.0f, 1e-3f);
+}
+
+TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
+{
+    auto written = MakeTestConfig();
+    written.homingRequired = 1;
+    bool saveDone = false;
+    nvm.SaveConfig(written, [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData loaded{};
+    bool done = false;
+    nvm.LoadConfig(loaded, [&](auto)
+        {
+            done = true;
+        });
+    RunUntilDone(done);
+
+    EXPECT_EQ(loaded.homingRequired, uint8_t{ 1 });
+}
+
+TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_16)
+{
+    EXPECT_EQ(services::ConfigLayoutVersion, 16);
+}
+
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)
 {
-    const services::ConfigData defaults = services::MakeDefaultConfigData();
+    const services::ConfigData defaults = services::ConfigData{};
     services::ConfigData loaded{};
     bool done = false;
     services::NvmStatus result{};
@@ -503,64 +560,6 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)
     ExpectConfigDataEqual(loaded, defaults);
 }
 
-TEST_F(NonVolatileMemoryTest, reset_config_to_defaults_stores_default_values)
-{
-    bool saveDone = false;
-    nvm.SaveConfig(MakeTestConfig(), [&](auto)
-        {
-            saveDone = true;
-        });
-    RunUntilDone(saveDone);
-
-    bool resetDone = false;
-    nvm.ResetConfigToDefaults([&](auto)
-        {
-            resetDone = true;
-        });
-    RunUntilDone(resetDone);
-
-    const services::ConfigData defaults = services::MakeDefaultConfigData();
-    services::ConfigData loaded{};
-    bool done = false;
-
-    nvm.LoadConfig(loaded, [&](auto)
-        {
-            done = true;
-        });
-    RunUntilDone(done);
-
-    ExpectConfigDataEqual(loaded, defaults);
-}
-
-TEST_F(NonVolatileMemoryTest, format_erases_all_regions)
-{
-    bool s1 = false;
-    bool s2 = false;
-    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
-        {
-            s1 = true;
-        });
-    RunUntilDone(s1);
-    nvm.SaveConfig(MakeTestConfig(), [&](auto)
-        {
-            s2 = true;
-        });
-    RunUntilDone(s2);
-
-    bool done = false;
-    nvm.Format([&](services::NvmStatus s)
-        {
-            EXPECT_EQ(s, services::NvmStatus::Ok);
-            done = true;
-        });
-    RunUntilDone(done);
-
-    for (auto byte : calibrationRegion.storage)
-        EXPECT_EQ(byte, 0xFF);
-    for (auto byte : configRegion.storage)
-        EXPECT_EQ(byte, 0xFF);
-}
-
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
 {
     bool saveDone = false;
@@ -570,10 +569,9 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
         });
     RunUntilDone(saveDone);
 
-    // Corrupt one byte of the CRC field (same offset as calibration record)
     configRegion.storage[recordCrc32Offset] ^= 0xFF;
 
-    const services::ConfigData defaults = services::MakeDefaultConfigData();
+    const services::ConfigData defaults = services::ConfigData{};
     services::ConfigData loaded{};
     bool done = false;
     services::NvmStatus result{};
@@ -612,7 +610,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_magic_mismatch)
 
     RunUntilDone(done);
     EXPECT_EQ(result, services::NvmStatus::Ok);
-    ExpectConfigDataEqual(loaded, services::MakeDefaultConfigData());
+    ExpectConfigDataEqual(loaded, services::ConfigData{});
 }
 
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_stale_version)
@@ -638,7 +636,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_stale_version)
 
     RunUntilDone(done);
     EXPECT_EQ(result, services::NvmStatus::Ok);
-    ExpectConfigDataEqual(loaded, services::MakeDefaultConfigData());
+    ExpectConfigDataEqual(loaded, services::ConfigData{});
 }
 
 TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hardware_fault)
@@ -673,16 +671,12 @@ TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hard
             std::fill(storage.begin(), storage.end(), 0xFF);
             infra::EventDispatcher::Instance().Schedule(onDone);
         }
-
-        std::size_t Size() const override
-        {
-            return storage.size();
-        }
     };
 
-    CorruptingRegion corruptCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
-    NvmRegionStub corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion };
+    CorruptingRegion corruptCalibrationRegion{ services::CalibrationRecord::size };
+    NvmRegionStub corruptConfigRegion{ services::ConfigRecord::size };
+    NvmRegionStub faultHistoryRegionStub{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion, faultHistoryRegionStub, learnedModelRegion };
 
     corruptCalibrationRegion.corruptOnRead = true;
 
@@ -729,16 +723,12 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_hardware_
             std::fill(storage.begin(), storage.end(), 0xFF);
             infra::EventDispatcher::Instance().Schedule(onDone);
         }
-
-        std::size_t Size() const override
-        {
-            return storage.size();
-        }
     };
 
-    NvmRegionStub normalCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
-    CorruptingRegion corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
-    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion };
+    NvmRegionStub normalCalibrationRegion{ services::CalibrationRecord::size };
+    CorruptingRegion corruptConfigRegion{ services::ConfigRecord::size };
+    NvmRegionStub normalFaultHistoryRegion{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion, normalFaultHistoryRegion, learnedModelRegion };
 
     bool done = false;
     services::NvmStatus result{};
@@ -835,19 +825,6 @@ TEST_F(NonVolatileMemorySingleWriterTest, invalidate_calibration_during_config_w
     EXPECT_EQ(*calibrationStatus, services::NvmStatus::Busy);
 }
 
-TEST_F(NonVolatileMemorySingleWriterTest, is_calibration_valid_during_config_write_reports_false_without_touching_the_region)
-{
-    StartConfigWrite();
-
-    nvm.IsCalibrationValid([this](bool valid)
-        {
-            calibrationValid = valid;
-        });
-
-    ASSERT_TRUE(calibrationValid.has_value());
-    EXPECT_FALSE(*calibrationValid);
-}
-
 TEST_F(NonVolatileMemorySingleWriterTest, save_config_during_calibration_write_reports_busy_without_touching_the_region)
 {
     StartCalibrationWrite();
@@ -859,20 +836,6 @@ TEST_F(NonVolatileMemorySingleWriterTest, save_config_during_calibration_write_r
 
     ASSERT_TRUE(configStatus.has_value());
     EXPECT_EQ(*configStatus, services::NvmStatus::Busy);
-}
-
-TEST_F(NonVolatileMemorySingleWriterTest, format_during_config_write_reports_busy_without_touching_the_region)
-{
-    StartConfigWrite();
-
-    std::optional<services::NvmStatus> formatStatus;
-    nvm.Format([&formatStatus](services::NvmStatus status)
-        {
-            formatStatus = status;
-        });
-
-    ASSERT_TRUE(formatStatus.has_value());
-    EXPECT_EQ(*formatStatus, services::NvmStatus::Busy);
 }
 
 TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_the_config_write_completes)
@@ -904,4 +867,142 @@ TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_
 
     ASSERT_TRUE(calibrationStatus.has_value());
     EXPECT_EQ(*calibrationStatus, services::NvmStatus::Ok);
+}
+
+TEST_F(NonVolatileMemoryTest, a_saved_fault_history_loads_back)
+{
+    services::FaultHistoryData history;
+    history.powerUps = 4;
+    history.records[2] = services::FaultRecord{ 2, 1, 4, 1500, 4000, 120 };
+    std::optional<services::NvmStatus> saved;
+    nvm.SaveFaultHistory(history, [&saved](services::NvmStatus status)
+        {
+            saved = status;
+        });
+    ExecuteAllActions();
+    ASSERT_EQ(services::NvmStatus::Ok, saved);
+
+    services::FaultHistoryData loaded;
+    std::optional<services::NvmStatus> status;
+    nvm.LoadFaultHistory(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::Ok, status);
+    EXPECT_EQ(4, loaded.powerUps);
+    EXPECT_EQ(history.records, loaded.records);
+}
+
+TEST_F(NonVolatileMemoryTest, a_blank_fault_history_region_loads_as_invalid_and_empty)
+{
+    services::FaultHistoryData loaded;
+    loaded.powerUps = 9;
+    loaded.records[0] = services::FaultRecord{ 2, 1, 1, 1, 1, 1 };
+    std::optional<services::NvmStatus> status;
+
+    nvm.LoadFaultHistory(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::InvalidData, status);
+    EXPECT_EQ(0, loaded.powerUps);
+    EXPECT_FALSE(loaded.records[0].has_value());
+}
+
+TEST_F(NonVolatileMemoryTest, a_fault_history_save_is_refused_while_a_config_save_runs)
+{
+    nvm.SaveConfig(services::ConfigData{}, [](services::NvmStatus) {});
+    std::optional<services::NvmStatus> status;
+
+    nvm.SaveFaultHistory(services::FaultHistoryData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+
+    EXPECT_EQ(services::NvmStatus::Busy, status);
+    ExecuteAllActions();
+}
+
+TEST_F(NonVolatileMemoryTest, a_fault_history_save_whose_read_back_differs_reports_a_hardware_fault)
+{
+    struct ReadBackCorruptingRegion
+        : NvmRegionStub
+    {
+        using NvmRegionStub::NvmRegionStub;
+
+        void Read(infra::ByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(storage.begin(), storage.begin() + data.size(), data.begin());
+            data[0] ^= 0xFF;
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+    };
+
+    ReadBackCorruptingRegion corruptFaultHistoryRegion{ services::faultHistoryImageSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ calibrationRegion, configRegion, corruptFaultHistoryRegion, learnedModelRegion };
+    std::optional<services::NvmStatus> status;
+
+    nvmWithCorruption.SaveFaultHistory(services::FaultHistoryData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::HardwareFault, status);
+}
+
+TEST_F(NonVolatileMemoryTest, a_saved_learned_model_loads_back)
+{
+    const services::LearnedModelData model{ 0xCAFE0001u, 1.1f, std::nullopt, 2.0e-6f };
+    std::optional<services::NvmStatus> saved;
+    nvm.SaveLearnedModel(model, [&saved](services::NvmStatus status)
+        {
+            saved = status;
+        });
+    ExecuteAllActions();
+    ASSERT_EQ(services::NvmStatus::Ok, saved);
+
+    services::LearnedModelData loaded;
+    std::optional<services::NvmStatus> status;
+    nvm.LoadLearnedModel(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::Ok, status);
+    EXPECT_EQ(model, loaded);
+}
+
+TEST_F(NonVolatileMemoryTest, a_blank_learned_model_region_loads_as_invalid_and_empty)
+{
+    services::LearnedModelData loaded{ 7u, 1.0f, 1.0f, 1.0f };
+    std::optional<services::NvmStatus> status;
+
+    nvm.LoadLearnedModel(loaded, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+    ExecuteAllActions();
+
+    EXPECT_EQ(services::NvmStatus::InvalidData, status);
+    EXPECT_EQ(services::LearnedModelData{}, loaded);
+}
+
+TEST_F(NonVolatileMemoryTest, a_learned_model_save_is_refused_while_a_config_save_runs)
+{
+    nvm.SaveConfig(services::ConfigData{}, [](services::NvmStatus) {});
+    std::optional<services::NvmStatus> status;
+
+    nvm.SaveLearnedModel(services::LearnedModelData{}, [&status](services::NvmStatus result)
+        {
+            status = result;
+        });
+
+    EXPECT_EQ(services::NvmStatus::Busy, status);
+    ExecuteAllActions();
 }

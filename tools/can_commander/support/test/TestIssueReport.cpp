@@ -17,7 +17,8 @@ namespace
         }
 
         const QUrl newIssue{ "https://github.com/embedded-pro/e-foc/issues/new" };
-        const IssueEnvironment environment{ "1.2.3", "Ubuntu 24.04 LTS", "x86_64", "6.4.2", "~/.local/share/e-foc/CAN Commander/logs/can_commander.log" };
+        const IssueProduct commander{ "e-foc CAN Commander", "CAN Commander" };
+        const IssueEnvironment environment{ commander, "1.2.3", "Ubuntu 24.04 LTS", "x86_64", "6.4.2", "~/.local/share/e-foc/CAN Commander/logs/can_commander.log" };
     };
 }
 
@@ -29,6 +30,16 @@ TEST_F(TestIssueReport, opens_new_issue_page_with_prefixed_title)
     EXPECT_EQ("github.com", url.host());
     EXPECT_EQ("/embedded-pro/e-foc/issues/new", url.path());
     EXPECT_EQ("[CAN Commander] ", Item(url, "title"));
+}
+
+TEST_F(TestIssueReport, title_and_environment_name_the_product_that_reports)
+{
+    auto virtualMotor = environment;
+    virtualMotor.product = IssueProduct{ "e-foc Virtual Motor", "Virtual Motor" };
+    const auto url = BuildIssueUrl(newIssue, virtualMotor, {});
+
+    EXPECT_EQ("[Virtual Motor] ", Item(url, "title"));
+    EXPECT_TRUE(Item(url, "body").contains("| e-foc Virtual Motor | 1.2.3 |"));
 }
 
 TEST_F(TestIssueReport, body_lists_environment_and_log_file)
@@ -67,9 +78,10 @@ TEST_F(TestIssueReport, drops_oldest_lines_to_fit_url_limit)
 
 TEST_F(TestIssueReport, environment_hides_home_directory)
 {
-    const auto current = CurrentIssueEnvironment("1.2.3", QDir::homePath() + "/logs/can_commander.log");
+    const auto current = CurrentIssueEnvironment(commander, "1.2.3", QDir::homePath() + "/logs/can_commander.log");
 
     EXPECT_EQ("1.2.3", current.applicationVersion);
+    EXPECT_EQ("CAN Commander", current.product.tag);
     EXPECT_TRUE(current.logFilePath.startsWith("~"));
     EXPECT_FALSE(current.logFilePath.contains(QDir::toNativeSeparators(QDir::homePath())));
     EXPECT_FALSE(current.qtVersion.isEmpty());

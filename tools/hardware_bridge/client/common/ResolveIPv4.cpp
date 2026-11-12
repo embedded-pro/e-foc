@@ -1,6 +1,7 @@
 #include "tools/hardware_bridge/client/common/ResolveIPv4.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#include <bit>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -13,13 +14,8 @@ namespace tool
 {
     services::IPv4Address ResolveIPv4(const std::string& host)
     {
-        try
-        {
-            return ParseIPv4(host);
-        }
-        catch (const BridgeArgumentException&)
-        {
-        }
+        if (const auto address = TryParseIPv4(host); address.has_value())
+            return *address;
 
         addrinfo hints{};
         hints.ai_family = AF_INET;
@@ -34,8 +30,8 @@ namespace tool
             throw BridgeArgumentException("cannot resolve host '" + host + "'");
         }
 
-        const auto* in = reinterpret_cast<const sockaddr_in*>(result->ai_addr);
-        const uint32_t addr = ntohl(in->sin_addr.s_addr);
+        const auto in = std::bit_cast<sockaddr_in>(*result->ai_addr);
+        const uint32_t addr = ntohl(in.sin_addr.s_addr);
         ::freeaddrinfo(result);
 
         return services::IPv4Address{

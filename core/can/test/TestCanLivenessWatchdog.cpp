@@ -9,11 +9,9 @@
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
-#include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "services/tracer/Tracer.hpp"
-#include "services/util/Terminal.hpp"
 #include <gtest/gtest.h>
 #include <optional>
 
@@ -29,7 +27,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        StrictMock<hal::SerialCommunicationMock> communication;
 
         infra::Execute setupStreamExpectations{ [this]()
             {
@@ -40,14 +37,11 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -76,12 +70,6 @@ namespace
                 EXPECT_CALL(canMock, SendData(_, _, _)).Times(AnyNumber());
                 EXPECT_CALL(canMock, ReceiveData(_)).Times(AnyNumber());
                 EXPECT_CALL(faultNotifierMock, Register(_, _)).Times(AnyNumber());
-                EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                    .Times(AnyNumber())
-                    .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-                        {
-                            done(true);
-                        }));
                 EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -90,7 +78,6 @@ namespace
                             data.polePairs = 4;
                             data.rPhase = 0.5f;
                             data.lD = 1.0f;
-                            data.lQ = 1.0f;
                             data.stage = services::CalibrationStage::complete;
                             done(services::NvmStatus::Ok);
                         }));
@@ -114,8 +101,8 @@ namespace
 
             server.emplace(canMock, services::CanProtocolServer::Config{ .nodeId = 1 });
             controlMode.emplace(
-                application::TerminalAndTracer{ terminal, tracer },
-                application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+                tracer,
+                application::MotorHardware{ inverterMock, encoderMock, currentStream, foc::Volts{ 24.0f } },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
@@ -136,12 +123,12 @@ namespace
                     {
                         cb(foc::Radians{ 0.0f });
                     }));
-            controlMode->CmdReAlign([](state_machine::CommandResult) {});
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
 
         bool IsEnabled() const
         {
-            return std::holds_alternative<state_machine::Enabled>(controlMode->ActiveStateMachine().CurrentState());
+            return std::holds_alternative<state_machine::Enabled>(controlMode->Drive().ActiveStateMachine().CurrentState());
         }
     };
 }
@@ -150,11 +137,11 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileStoppedLeavesTheStateMachine
 {
     Construct();
 
-    const auto before = controlMode->ActiveStateMachine().CurrentState().index();
+    const auto before = controlMode->Drive().ActiveStateMachine().CurrentState().index();
 
     watchdog->Offline();
 
-    EXPECT_EQ(controlMode->ActiveStateMachine().CurrentState().index(), before);
+    EXPECT_EQ(controlMode->Drive().ActiveStateMachine().CurrentState().index(), before);
 }
 
 TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
@@ -162,7 +149,7 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
     ASSERT_TRUE(IsEnabled());
 
     watchdog->Offline();
@@ -175,7 +162,7 @@ TEST_F(CanLivenessWatchdogTest, RegainingTheClientDoesNotDisturbTheStateMachine)
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
 
     watchdog->Online();
 
@@ -187,9 +174,9 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientDuringItsIdentificationStopsTheDr
     Construct();
     AlignAfterConstruct();
 
-    ASSERT_EQ(controlMode->CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    ASSERT_EQ(controlMode->Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
 
     watchdog->Offline();
 
-    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(controlMode->ActiveStateMachine().CurrentState()));
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(controlMode->Drive().ActiveStateMachine().CurrentState()));
 }

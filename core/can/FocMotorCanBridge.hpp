@@ -1,15 +1,16 @@
 #pragma once
 
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCommissioningBridge.hpp"
 #include "core/can/FocMotorSettingsBridge.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "core/services/fault_history/FaultLog.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <functional>
@@ -36,6 +37,7 @@ namespace can
             std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
             std::optional<std::reference_wrapper<services::RotorStandstill>> standstill;
             FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
+            std::optional<std::reference_wrapper<services::FaultLog>> faultHistory{};
         };
 
         FocMotorCanBridge(
@@ -48,6 +50,8 @@ namespace can
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
         static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };
 
+        static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
+
         void BroadcastFault(state_machine::FaultCode code);
         void ObserveCommands(const infra::Function<void()>& onAccepted);
         void ReportTargetReached(const infra::Function<bool()>& isReached);
@@ -58,18 +62,11 @@ namespace can
         void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnQuickStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnSelectControlMode(FocMotorMode mode, const infra::Function<void(FocMotorMode)>& onActivated) override;
-        void OnSetTorqueSetpoint(foc::Ampere value, const infra::Function<void()>& onDone) override;
-        void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) override;
-        void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) override;
+        void OnSetSetpoint(const FocSetpoint& setpoint, const infra::Function<void()>& onDone) override;
 
-        void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) override;
-        void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) override;
-        void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnIdentifyElectrical(const infra::Function<void()>& onDone) override;
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
-        void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) override;
-        void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) override;
         void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) override;
         void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) override;
         void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) override;
@@ -77,14 +74,18 @@ namespace can
         void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearDiagnostics(const infra::Function<void()>& onDone) override;
+        void OnQueryFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone) override;
+        void OnClearFaultHistory(const infra::Function<void(bool stored)>& onDone) override;
+        void OnRecalibrate(const infra::Function<void()>& onAccepted) override;
+        void OnResetModel(const infra::Function<void(bool stored)>& onDone) override;
 
     private:
-        static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
-        static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);
-
-        void ReportSelectFailure(state_machine::SelectResult result);
+        void AnswerFaultHistory(uint8_t age, const infra::Function<void(const FocFaultRecord&)>& onDone);
+        void ApplyTorqueSetpoint(uint8_t commandId, foc::Ampere value, const infra::Function<void()>& onDone);
+        void ApplyTorqueInNewtonMeter(uint8_t commandId, foc::NewtonMeter torque, const infra::Function<void()>& onDone);
+        void ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone);
+        void ApplyPositionSetpoint(uint8_t commandId, foc::Radians value, const infra::Function<void()>& onDone);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
-        bool SetpointAllowedInCurrentState() const;
         void NotifyCommandAccepted();
 
         FocMotorCategoryServer& server;
@@ -94,6 +95,7 @@ namespace can
         FocMotorCommissioningBridge commissioning;
         FocMotorSettingsBridge settings;
         FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;
+        std::optional<std::reference_wrapper<services::FaultLog>> faultHistory;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
         infra::Function<void(services::CanAckStatus)> pendingStartCallback;

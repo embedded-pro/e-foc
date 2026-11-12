@@ -3,7 +3,7 @@ Feature: Firmware Identity
   before it offers an update. The controller answers with the release version the
   build was configured with and the kind of its board.
 
-  @sil @REQ-UPD-007
+  @sil @REQ-FWU-003
   Scenario: The emulated target reports its firmware version and board kind
     Given a nominal motor plant
     When the target boots

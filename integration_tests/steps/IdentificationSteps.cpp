@@ -1,7 +1,8 @@
 #include "can-lite/core/CanPayload.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
@@ -19,28 +20,15 @@ using namespace integration;
 namespace
 {
     constexpr auto kIdentificationTimeout = std::chrono::seconds{ 180 };
-    constexpr auto kResponseTimeout = std::chrono::seconds{ 15 };
     constexpr auto kRecordPollSlice = std::chrono::milliseconds{ 50 };
     constexpr auto kExcitationWallClockTimeout = std::chrono::seconds{ 300 };
     constexpr float kMilliPerUnit = 1000.0f;
     constexpr float kReferenceCelsius = 25.0f;
-    constexpr std::size_t kElectricalResponseBytes = 5;
 
-    hal::Can::Id ResponseId(Fixture& fixture, uint8_t messageType)
-    {
-        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
-    }
-
-    float Fixed16(const hal::Can::Message& payload, std::size_t offset, int32_t scale)
-    {
-        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[offset]) << 8) | payload[offset + 1]);
-        return static_cast<float>(raw) / static_cast<float>(scale);
-    }
-
-    hal::Can::Message EncodeFixed16BE(float value, int32_t scale)
+    hal::Can::Message EncodeFloat32(float value)
     {
         services::CanPayloadWriter payload;
-        payload.WriteFixed16(value, scale);
+        payload.WriteFloat32(value);
         return payload.Message();
     }
 
@@ -105,6 +93,19 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<float> StoredValue(const services::CalibrationData& record, const std::string& quantity)
+    {
+        if (quantity == "resistance")
+            return record.rPhase;
+        if (quantity == "inductance")
+            return record.lD;
+        if (quantity == "inertia")
+            return record.inertia;
+        if (quantity == "friction")
+            return record.frictionViscous;
+        return std::nullopt;
+    }
+
     void CompareWithPlant(const ScenarioSetup& setup, const IdentifiedParameters& parameters, const char* source, const std::string& quantity, float limitPercent, float windingCelsius)
     {
         const auto truth = PlantTruth(setup, quantity, windingCelsius);
@@ -127,8 +128,6 @@ namespace
             setup.trace.Consume(line);
     }
 
-    // Guest time, not wall-clock: the plant's own samples say how far its clock has advanced, which is
-    // what makes the excitation the same length on every host.
     bool WaitForGuestTicks(ScenarioSetup& setup, uint32_t ticks)
     {
         FeedTrace(setup);
@@ -152,17 +151,14 @@ WHEN(R"(electrical identification is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.MarkCapture();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    const auto payload = fixture.WaitForCapturedCanFrame(ResponseId(fixture, can::focElectricalParamsResponseId), mark, kResponseTimeout);
-    ASSERT_TRUE(payload.has_value()) << "The target sent no electrical parameters response";
-    ASSERT_GE(payload->size(), kElectricalResponseBytes) << "Electrical parameters response is too short";
-
-    setup.identified.resistanceOhm = Fixed16(*payload, 0, can::focResistanceScale);
-    setup.identified.inductanceMilliHenry = Fixed16(*payload, 2, can::focInductanceScale);
-    setup.identified.polePairs = (*payload)[4];
+    ReadCalibrationRecord(fixture, setup.identified);
+    const auto polePairs = ReadParameterValue(fixture, can::FocParameter::polePairs);
+    ASSERT_TRUE(setup.identified.resistanceOhm.has_value() && setup.identified.inductanceMilliHenry.has_value() && polePairs.has_value())
+        << "The target did not report the identified parameters over CAN";
+    setup.identified.polePairs = static_cast<unsigned>(*polePairs);
 }
 
 WHEN(R"(the calibration record is read)")
@@ -210,7 +206,7 @@ namespace
 
             atHigh = !atHigh;
             const float target = atHigh ? high : low;
-            ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFixed16BE(target, can::focSpeedScale)))
+            ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFloat32(target)))
                 << "Speed setpoint command rejected";
             setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target, fixture.ServerNodeId() };
 
@@ -237,6 +233,60 @@ WHEN(R"(the online estimates are read)")
     ASSERT_TRUE(setup.online.resistanceOhm.has_value() && setup.online.inductanceMilliHenry.has_value() &&
                 setup.online.inertiaKgM2.has_value() && setup.online.frictionNmSPerRad.has_value())
         << "The target did not report its online estimates over CAN";
+}
+
+WHEN(R"(the drive is recalibrated over CAN)")
+{
+    ASSERT_TRUE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focRecalibrateId))
+        << "The target refused the Recalibrate command";
+}
+
+WHEN(R"(the model is reset over CAN)")
+{
+    ASSERT_TRUE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focResetModelId))
+        << "The target refused the Reset Model command";
+}
+
+THEN(R"(a recalibration over CAN shall be refused)")
+{
+    EXPECT_FALSE(context.Get<Fixture>().SendCanCommand(can::focMotorCategoryId, can::focRecalibrateId))
+        << "The target accepted the Recalibrate command";
+}
+
+WHEN(R"(the model in use is read)")
+{
+    auto& fixture = context.Get<Fixture>();
+    auto& setup = context.Get<ScenarioSetup>();
+
+    setup.inUse.resistanceOhm = ReadParameterValue(fixture, can::FocParameter::modelResistance);
+    setup.inUse.inductanceMilliHenry = ReadParameterValue(fixture, can::FocParameter::modelInductance);
+    setup.inUse.inertiaKgM2 = ReadParameterValue(fixture, can::FocParameter::modelInertia);
+    setup.inUse.frictionNmSPerRad = ReadParameterValue(fixture, can::FocParameter::modelViscousFriction);
+
+    ASSERT_TRUE(setup.inUse.resistanceOhm.has_value() && setup.inUse.inductanceMilliHenry.has_value() &&
+                setup.inUse.inertiaKgM2.has_value() && setup.inUse.frictionNmSPerRad.has_value())
+        << "The target did not report the model in use over CAN";
+}
+
+THEN(R"(the {word} in use shall be within {float} % of the plant)", (std::string quantity, float limitPercent))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    CompareWithPlant(setup, setup.inUse, "in use", quantity, limitPercent, kReferenceCelsius);
+}
+
+THEN(R"(the {word} in use shall be within {float} % of the stored calibration)", (std::string quantity, float limitPercent))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    const auto stored = StoredValue(setup.nvm.calibration, quantity);
+    ASSERT_TRUE(stored.has_value() && *stored != 0.0f) << "No stored calibration value for " << quantity;
+
+    const auto value = Estimate(setup.inUse, quantity);
+    ASSERT_TRUE(value.has_value()) << "No " << quantity << " in use was captured";
+
+    const float errorPercent = std::fabs(*value - *stored) / std::fabs(*stored) * 100.0f;
+    std::fprintf(stderr, "[METRIC] ident in use %s against the stored calibration %s stored=%.6g value=%.6g error_pct=%.2f\n",
+        quantity.c_str(), setup.plantName.c_str(), *stored, *value, errorPercent);
+    EXPECT_LE(errorPercent, limitPercent) << quantity << " in use is " << *value << " against a stored " << *stored;
 }
 
 THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::string quantity, float limitPercent))

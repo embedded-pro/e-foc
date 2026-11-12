@@ -1,4 +1,5 @@
 #include "core/state_machine/CurrentOffsetRefresh.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace application
@@ -98,8 +99,8 @@ namespace application
 
     bool CurrentOffsetRefresh::IsNearStored(const foc::PhaseCurrents& measured) const
     {
-        return std::abs(measured.a.Value() - stored.a.Value()) <= driftLimit.Value() &&
-               std::abs(measured.b.Value() - stored.b.Value()) <= driftLimit.Value() &&
-               std::abs(measured.c.Value() - stored.c.Value()) <= driftLimit.Value();
+        return math::Abs(measured.a.Value() - stored.a.Value()) <= driftLimit.Value() &&
+               math::Abs(measured.b.Value() - stored.b.Value()) <= driftLimit.Value() &&
+               math::Abs(measured.c.Value() - stored.c.Value()) <= driftLimit.Value();
     }
 }

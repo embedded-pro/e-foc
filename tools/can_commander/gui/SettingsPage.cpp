@@ -98,14 +98,6 @@ namespace tool
         Refresh();
     }
 
-    void SettingsPage::SetLegacy(bool legacyContract)
-    {
-        legacy = legacyContract;
-        for (auto* editor : editors)
-            editor->SetLegacy(legacy);
-        Refresh();
-    }
-
     void SettingsPage::SetUnavailable(const QString& reason)
     {
         unavailableReason = reason;
@@ -188,10 +180,5 @@ namespace tool
     const std::vector<SettingEditor*>& SettingsPage::Editors() const
     {
         return editors;
-    }
-
-    bool SettingsPage::IsLegacy() const
-    {
-        return legacy;
     }
 }

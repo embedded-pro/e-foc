@@ -15,17 +15,15 @@ namespace application
         : public OuterLoopStateMachine
     {
     public:
-        OuterLoopStateMachineFor(const TerminalAndTracer& terminalAndTracer,
+        OuterLoopStateMachineFor(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
-            state_machine::TransitionPolicy transitionPolicy,
             const OuterLoopArgs& outerLoopArgs,
-            NvmActivity& nvmActivity,
-            RotorReference rotorReference = RotorReference::lost)
-            : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
-            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
+            NvmActivity& nvmActivity)
+            : OuterLoopStateMachine(tracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent, nvmActivity)
+            , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, hardware.currentStream, outerLoopArgs.outerLoopFrequency, hardware.dutyUpdateDelayPeriods)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
@@ -34,11 +32,10 @@ namespace application
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
-            if (hardware.currentStream != nullptr)
-                focController.SetCurrentStream(*hardware.currentStream);
+            if (hardware.zeroVectorSlopes != nullptr)
+                focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
             RegisterFaultHandler(faultNotifier);
-            RegisterCliIfNeeded(transitionPolicy);
-            Boot(rotorReference);
+            Boot(outerLoopArgs.rotorReference);
         }
 
         ~OuterLoopStateMachineFor()
@@ -72,6 +69,12 @@ namespace application
                 focController.RampSpeed(acceleration, deceleration);
         }
 
+        void ProfileMotion(foc::RadiansPerSecond velocity, foc::RadiansPerSecondSquared acceleration, foc::RadiansPerSecondSquared deceleration, foc::RadiansPerSecondCubed jerk)
+        {
+            if constexpr (std::is_base_of_v<foc::PositionProfilable, Cascade>)
+                focController.ProfileMotion(velocity, acceleration, deceleration, jerk);
+        }
+
         void LimitTravel(foc::Radians minimum, foc::Radians maximum)
         {
             if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)
@@ -84,6 +87,11 @@ namespace application
         }
 
     protected:
+        bool CanBeginQuickStop() const override
+        {
+            return std::is_base_of_v<foc::QuickStoppable, Cascade>;
+        }
+
         bool BeginQuickStop() override
         {
             if constexpr (std::is_base_of_v<foc::QuickStoppable, Cascade>)
@@ -160,6 +168,18 @@ namespace application
         {
             if constexpr (std::is_base_of_v<foc::CoggingCompensable, Cascade>)
                 focController.ClearCoggingMap();
+        }
+
+        void LoadFrictionCompensation(foc::NewtonMeter coulomb, foc::NewtonMeter torqueConstant) override
+        {
+            if constexpr (std::is_base_of_v<foc::FrictionCompensable, Cascade>)
+                focController.LoadFrictionFeedForward(coulomb, torqueConstant);
+        }
+
+        void ClearFrictionCompensation() override
+        {
+            if constexpr (std::is_base_of_v<foc::FrictionCompensable, Cascade>)
+                focController.ClearFrictionFeedForward();
         }
 
     private:

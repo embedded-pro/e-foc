@@ -1,5 +1,5 @@
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "tools/can_commander/gui/DisplayFormat.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "tools/can_commander/logic/SetpointAxis.hpp"
@@ -71,6 +71,9 @@ namespace tool
         statusLayout->addRow("State:", motorStateLabel);
         statusLayout->addRow("Fault:", faultLabel);
         statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::targetReached).label), targetReachedLabel);
+        homedLabel = new QLabel();
+        homedLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::homed).description));
+        statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::homed).label), homedLabel);
         windingTemperatureLabel = new QLabel();
         windingTemperatureLabel->setToolTip(ToQt(PresentationOf(can::FocParameter::windingTemperature).description));
         statusLayout->addRow(ToQt(PresentationOf(can::FocParameter::windingTemperature).label), windingTemperatureLabel);
@@ -133,6 +136,8 @@ namespace tool
         targetReachedLabel->setText(placeholder);
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, ui::theme::StatusLevel::Neutral);
         windingTemperatureLabel->setText(placeholder);
+        homedLabel->setText(placeholder);
+        ui::backend::qt::StyleStatusLabel(*homedLabel, ui::theme::StatusLevel::Neutral);
         ShowPlaceholders(measurements);
         ShowPlaceholders(parameters);
     }
@@ -177,17 +182,26 @@ namespace tool
         ShowFault(fault);
     }
 
-    void TelemetryPanel::OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairsValue)
+    void TelemetryPanel::OnMotorParameter(can::FocParameter parameter, float value)
     {
-        Show(parameters, resistance, static_cast<double>(resistanceOhm));
-        Show(parameters, inductance, static_cast<double>(inductanceMilliHenry));
-        Show(parameters, polePairs, static_cast<double>(polePairsValue));
+        if (parameter == can::FocParameter::resistance)
+            Show(parameters, resistance, static_cast<double>(value));
+        else if (parameter == can::FocParameter::inductance)
+            Show(parameters, inductance, static_cast<double>(value));
+        else if (parameter == can::FocParameter::polePairs)
+            Show(parameters, polePairs, static_cast<double>(value));
     }
 
     void TelemetryPanel::OnTargetReached(bool reached)
     {
         targetReachedLabel->setText(reached ? "Yes" : "No");
         ui::backend::qt::StyleStatusLabel(*targetReachedLabel, reached ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
+    }
+
+    void TelemetryPanel::OnHomed(bool homed)
+    {
+        homedLabel->setText(homed ? "Yes" : "No");
+        ui::backend::qt::StyleStatusLabel(*homedLabel, homed ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
     }
 
     void TelemetryPanel::OnWindingTemperature(float celsius)

@@ -3,13 +3,15 @@
 #include "core/foc/cascade/BusVoltageRatio.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/QuadratureVoltageWindow.hpp"
-#include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/foc/transforms/ZeroVectorSlope.hpp"
+#include "infra/util/TripleBuffer.hpp"
 #include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
 namespace foc
@@ -23,7 +25,7 @@ namespace foc
         , public BusVoltageTrackable
     {
     public:
-        explicit TorqueCascade(foc::Ampere maxCurrent);
+        explicit TorqueCascade(foc::Ampere maxCurrent, CurrentStream& currentStream);
 
         bool Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
@@ -33,8 +35,14 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
+
+        Ampere MeasuredQuadratureCurrent() const final
+        {
+            return Ampere{ lastIq };
+        }
+
         MotionObservation ObserveMotion() const override;
-        void SetCurrentStream(CurrentStream& stream);
+        void SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink);
 
         void EnableCurrentCommand() override;
         void DisableCurrentCommand() override;
@@ -62,10 +70,17 @@ namespace foc
         CurrentControllerSelector currentLoop;
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         Ampere maxCurrent;
-        float polePairs{ 0.0f };
+
+        struct MotorConstants
+        {
+            float polePairs{ 0.0f };
+            float dutyDelay{ 0.0f };
+        };
+
+        MotorConstants motor;
         volatile bool enabled{ false };
         IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
-        TripleBuffer<IdAndIqPoint> setPointBuffer;
+        infra::TripleBuffer<IdAndIqPoint> setPointBuffer;
 
         struct SpeedMeasurement
         {
@@ -78,9 +93,7 @@ namespace foc
         struct DriveLimits
         {
             RadiansPerSecond speed{ 0.0f };
-            // Written by the event loop, read by the control interrupt; electrical, zero when no limit is set.
             volatile float inverseElectricalSpeed{ 0.0f };
-            // Written by the event loop, read by the control interrupt; never above the envelope.
             volatile float current{ 0.0f };
         };
 
@@ -102,7 +115,9 @@ namespace foc
         DriveLimits limits;
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;
+        ZeroVectorSlope zeroVectorSlope;
+        ZeroVectorSlopeSink* slopeSink{ nullptr };
         volatile bool currentCommandActive{ false };
-        CurrentStream* currentStream{ nullptr };
+        CurrentStream& currentStream;
     };
 }

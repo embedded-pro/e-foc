@@ -8,13 +8,13 @@ Feature: Bootloader
   Background:
     Given a nominal motor plant
 
-  @REQ-BOOT-001 @REQ-BOOT-006 @sil
+  @REQ-FWU-001 @sil
   Scenario: The application starts through the bootloader
     Given the application slot holds "the application"
     When the emulated target starts
     Then the application sends its heartbeat
 
-  @REQ-BOOT-002 @REQ-BOOT-003 @sil
+  @REQ-FWU-001 @sil
   Scenario: A staged pack is installed
     Given the application slot holds "nothing"
     And a development-signed pack of the application is staged and the journal reads "ready to deploy"
@@ -22,7 +22,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "deployed"
 
-  @REQ-BOOT-004 @sil
+  @REQ-FWU-002 @sil
   Scenario: An interrupted installation is repeated
     Given the application slot holds "nothing"
     And a development-signed pack of the application is staged and the journal reads "deploy started"
@@ -30,7 +30,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "deployed"
 
-  @REQ-BOOT-002 @sil
+  @REQ-FWU-001 @sil
   Scenario: A downloaded pack waits for the apply
     Given the application slot holds "the application"
     And a development-signed pack of the application is staged and the journal reads "downloaded"
@@ -38,7 +38,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "downloaded"
 
-  @REQ-BOOT-002 @sil
+  @REQ-FWU-001 @sil
   Scenario: A pack with a bad signature is refused
     Given the application slot holds "the application"
     And a development-signed pack "with a bad signature" is staged and the journal reads "ready to deploy"
@@ -46,7 +46,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "invalid" with the error "invalid signature"
 
-  @REQ-BOOT-002 @sil
+  @REQ-FWU-001 @sil
   Scenario: A pack for another product is refused
     Given the application slot holds "the application"
     And a development-signed pack "for another product" is staged and the journal reads "ready to deploy"
@@ -54,7 +54,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "invalid" with the error "unknown product"
 
-  @REQ-BOOT-007 @sil
+  @REQ-FWU-001 @sil
   Scenario: A pack for another board is refused before the slot is erased
     Given the application slot holds "the application"
     And a development-signed pack "for another board" is staged and the journal reads "ready to deploy"
@@ -62,7 +62,7 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "invalid" with the error "wrong target"
 
-  @REQ-BOOT-003 @sil
+  @REQ-FWU-001 @sil
   Scenario: A pack for another destination is refused
     Given the application slot holds "the application"
     And a development-signed pack "for another destination" is staged and the journal reads "ready to deploy"
@@ -70,14 +70,14 @@ Feature: Bootloader
     Then the application sends its heartbeat
     And the journal reads "invalid" with the error "wrong destination"
 
-  @REQ-BOOT-001 @sil
+  @REQ-FWU-001 @sil
   Scenario: A damaged application is not started
     Given the application slot holds "a damaged application"
     When the emulated target starts
     Then no heartbeat arrives within 3 s
     And the debug log says "bootloader: halted"
 
-  @REQ-BOOT-001 @sil
+  @REQ-FWU-001 @sil
   Scenario: An empty slot is not started
     Given the application slot holds "nothing"
     When the emulated target starts

@@ -1,41 +1,29 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
-
-namespace
-{
-    // Mechanical quantities are traced in micro-units: the tracer prints only three decimals.
-    constexpr float microPerUnit = 1.0e6f;
-
-    float Micro(float value)
-    {
-        return value * microPerUnit;
-    }
-}
 
 namespace application
 {
     OuterLoopStateMachine::OuterLoopStateMachine(
-        const TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         foc::Ampere driveCurrentLimit,
         NvmActivity& nvmActivity)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
+        : FocStateMachineCommon(tracer, hardware, nvm, calibServices, nvmActivity)
         , driveCurrentLimit(driveCurrentLimit)
     {}
 
     foc::NewtonMeter OuterLoopStateMachine::TorqueConstantFor(const services::CalibrationData& data) const
     {
-        return foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        return foc::TorqueConstantFor(data.polePairs, Calibration().EffectiveFluxLinkage(data));
     }
 
     bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant)
     {
-        // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
         const bool configured = SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
             inertia,
             friction,
@@ -52,7 +40,7 @@ namespace application
 
     float OuterLoopStateMachine::AutomaticSpeedLoopBandwidth() const
     {
-        const auto bandwidth = GetCalibration().speedLoopBandwidth;
+        const auto bandwidth = Calibration().Data().speedLoopBandwidth;
         return foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
     }
 
@@ -63,6 +51,21 @@ namespace application
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
         ApplyCoggingMap(data);
+        ApplyFrictionFeedForward(data);
+    }
+
+    void OuterLoopStateMachine::ApplyFrictionFeedForward(const services::CalibrationData& data)
+    {
+        if (foc::IsFinitePositive(data.frictionCoulomb))
+            LoadFrictionCompensation(foc::NewtonMeter{ data.frictionCoulomb }, TorqueConstantFor(data));
+        else
+            ClearFrictionCompensation();
+    }
+
+    void OuterLoopStateMachine::ClearFeedForwards()
+    {
+        ClearCoggingCompensation();
+        ClearFrictionCompensation();
     }
 
     void OuterLoopStateMachine::ApplyCoggingMap(const services::CalibrationData& data)
@@ -77,27 +80,12 @@ namespace application
 
     bool OuterLoopStateMachine::HasValidModeSpecificCalibration(const services::CalibrationData& data) const
     {
-        return foc::IsFiniteValue(data.inertia) && data.inertia > 0.0f && foc::IsFiniteValue(data.frictionViscous) && data.frictionViscous >= 0.0f;
+        return math::IsFinite(data.inertia) && data.inertia > 0.0f && math::IsFinite(data.frictionViscous) && data.frictionViscous >= 0.0f;
     }
 
     void OuterLoopStateMachine::PrepareForEnabled()
     {
-        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(GetCalibration()));
-    }
-
-    void OuterLoopStateMachine::RegisterModeSpecificCli(services::TerminalWithStorage& terminal)
-    {
-        terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
-            [this](const infra::BoundedConstString&)
-            {
-                TraceOnlineEstimates();
-            } });
-    }
-
-    void OuterLoopStateMachine::TraceOnlineEstimates()
-    {
-        GetTracer().Trace() << "[EST] Mech: J_uNms2=" << Micro(GetOnlineMechEstimator().CurrentInertia().Value()) << " B_uNms=" << Micro(GetOnlineMechEstimator().CurrentFriction().Value());
-        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
+        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(Calibration().Data()));
     }
 
     std::optional<state_machine::OnlineEstimates> OuterLoopStateMachine::CurrentOnlineEstimates()
@@ -106,42 +94,22 @@ namespace application
             GetOnlineElecEstimator().CurrentResistance(),
             GetOnlineElecEstimator().CurrentInductance(),
             GetOnlineMechEstimator().CurrentInertia(),
-            GetOnlineMechEstimator().CurrentFriction()
+            GetOnlineMechEstimator().CurrentFriction(),
+            GetOnlineElecEstimator().HasSettled(),
+            GetOnlineMechEstimator().HasSettled()
         };
     }
 
-    state_machine::AppliedEstimates OuterLoopStateMachine::ApplyOnlineEstimates()
+    bool OuterLoopStateMachine::ApplyModel(const state_machine::MotorModel& model)
     {
-        state_machine::AppliedEstimates applied;
-        if (!std::holds_alternative<state_machine::Enabled>(CurrentState()))
-            return applied;
+        if (!state_machine::IsStopped(CurrentState()))
+            return false;
 
-        const auto inertia = GetOnlineMechEstimator().CurrentInertia();
-        const auto friction = GetOnlineMechEstimator().CurrentFriction();
-
-        if (!std::isfinite(inertia.Value()) || inertia.Value() <= 0.0f ||
-            !std::isfinite(friction.Value()) || friction.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping mechanical estimates: non-physical values (J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value()) << ")";
-        else
-        {
-            GetTracer().Trace() << "[SM] Applying mechanical estimates: J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value());
-            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec, TorqueConstantFor(GetCalibration()));
-            applied.mechanics = true;
-        }
-
-        const auto resistance = GetOnlineElecEstimator().CurrentResistance();
-        const auto inductance = GetOnlineElecEstimator().CurrentInductance();
-        if (!std::isfinite(resistance.Value()) || resistance.Value() <= 0.0f ||
-            !std::isfinite(inductance.Value()) || inductance.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping electrical estimates: non-physical values (R=" << resistance.Value() << " L_mH=" << inductance.Value() << ")";
-        else
-        {
-            GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L_mH=" << inductance.Value();
-            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()), foc::Ampere{ services::CurrentNoiseAmpere(GetCalibration().currentNoiseMilliAmpere) });
-            applied.electrical = true;
-        }
-
-        return applied;
+        const auto& calibration = Calibration().Data();
+        ApplyMechanics(model.inertia, model.viscousFriction, calibration.speedLoopBandwidth, TorqueConstantFor(calibration));
+        ApplyElectricalModel(model.resistance, model.inductance, calibration.polePairs, Calibration().EffectiveFluxLinkage(calibration),
+            foc::Ampere{ services::CurrentNoiseAmpere(calibration.currentNoiseMilliAmpere) });
+        return true;
     }
 
     void OuterLoopStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)
@@ -151,7 +119,7 @@ namespace application
 
     bool OuterLoopStateMachine::ApplyProvisionalCurrentControl(const services::CalibrationData& pending)
     {
-        ClearCoggingCompensation();
+        ClearFeedForwards();
         return FocStateMachineCommon::ApplyProvisionalCurrentControl(pending);
     }
 
@@ -173,9 +141,9 @@ namespace application
         calibrating.step = state_machine::CalibrationStep::coggingMap;
         GetTracer().Trace() << "[SM] Mapping cogging torque";
 
-        mapping->Measure(torqueConstant, foc::NewtonMeterSecondSquared{ pending.inertia }, static_cast<std::size_t>(pending.polePairs), CoggingConfig(), [this](std::optional<services::CoggingMap> map)
+        mapping->Measure(torqueConstant, foc::NewtonMeterSecondSquared{ pending.inertia }, foc::NewtonMeterSecondPerRadian{ pending.frictionViscous }, static_cast<std::size_t>(pending.polePairs), CoggingConfig(), [this](const services::CoggingMeasurement& measurement)
             {
-                Dispatch(state_machine::CoggingMapped{ map });
+                Dispatch(state_machine::CoggingMapped{ measurement });
             });
 
         return true;
@@ -230,18 +198,16 @@ namespace application
         return &**ownCoggingMapping;
     }
 
-    // Inert current gains or a zero speed envelope never move the rotor, so both are applied first.
     bool OuterLoopStateMachine::ApplyIdentificationControl(const services::CalibrationData& pending)
     {
         const auto torqueConstant = TorqueConstantFor(pending);
 
-        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
+        if (!foc::IsFinitePositive(pending.rPhase) || !math::IsFinite(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
             return false;
 
-        // Marked first: the electrical model sets the current tunings even when the plant is refused.
         MarkProvisionalControlApplied();
 
-        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
+        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, Calibration().EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) }))
             return false;
 
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);
@@ -265,8 +231,8 @@ namespace application
     void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
-        const auto pending = calibrating.pendingData;
-        ClearCoggingCompensation();
+        const auto& pending = calibrating.pendingData;
+        ClearFeedForwards();
 
         if (!ApplyIdentificationControl(pending))
         {

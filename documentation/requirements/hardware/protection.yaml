@@ -103,11 +103,8 @@
   status: verified
   verification: [sil, unit]
   shall: >
-    On a quick stop while Enabled the drive shall keep the power stage on and decelerate the
-    rotor at the stored quick-stop deceleration, settable from 0 to 100000 rad/s2 with a default
-    of 0 braking at the current limit: speed and position mode ramping the speed reference from
-    the measured speed to zero, torque mode braking with a current against the measured speed
-    capped at the inertia times the deceleration over the torque constant. It shall cut the power
-    stage and enter Ready once the speed is below 2 rad/s or 1 s after the quick stop. From
-    100 rad/s at 500 rad/s2 in speed mode the speed shall fall below 2 rad/s within
-    196 ms +/- 10 %.
+    While Enabled, the drive shall honour a quick stop command by decelerating the rotor at the
+    stored quick-stop deceleration, entering Ready once the measured speed falls below 2 rad/s
+    or at most 1 s after the quick stop. Torque mode shall refuse quick stop if no inertia is
+    calibrated. With a quick-stop deceleration of 500 rad/s2 and an initial speed of 100 rad/s
+    in speed mode, the speed shall fall below 2 rad/s within 196 ms +/- 10 %.

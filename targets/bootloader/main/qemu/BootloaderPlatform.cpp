@@ -21,8 +21,8 @@ namespace bootloader
     }
 
     BootloaderPlatform::BootloaderPlatform(infra::ConstByteRange packRegion, infra::ConstByteRange journalRegion, infra::ConstByteRange slotRegion)
-        : packFlash("staging.bin", infra::MakeRange(packStorage), eraseUnit)
-        , journalFlash("journal.bin", infra::MakeRange(journalStorage), eraseUnit)
+        : packFlash(fileSystem, "staging.bin", infra::MakeRange(packStorage), eraseUnit)
+        , journalFlash(fileSystem, "journal.bin", infra::MakeRange(journalStorage), eraseUnit)
         , slotFlash(Writable(slotRegion), eraseUnit)
     {
         really_assert(packRegion.size() == packStorage.size() && journalRegion.size() == journalStorage.size());

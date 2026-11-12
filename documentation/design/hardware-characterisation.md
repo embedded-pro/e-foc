@@ -175,7 +175,7 @@ The current loop lost a phase above the readable limit, which is why `foc::KeepL
 
 ### Provided
 
-- The `bench` plant preset (`integration_tests/support/plant/PlantPresets.hpp`), whose values Part A traces to the rig
+- The `bench` plant preset (`motor_parameters/PlantPresets.hpp`), whose values Part A traces to the rig
 - The noise figures of Parts B and C, as the sigma and bias inputs of the plant's ADC and encoder noise settings
 - The scenarios of `identification_robustness.feature`, which hold each target of Part D once its fix lands
 

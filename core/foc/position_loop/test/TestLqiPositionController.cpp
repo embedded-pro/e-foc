@@ -257,3 +257,14 @@ TEST_F(TestLqiPositionController, a_design_installed_after_an_inert_run_starts_f
 
     EXPECT_NEAR(Command(0.0f, 0.0f), 0.0f, tolerance);
 }
+
+TEST_F(TestLqiPositionController, a_speed_equal_to_the_reference_speed_commands_as_at_rest)
+{
+    controller.Configure(ValidParameters());
+    foc::LqiPositionController atRest;
+    atRest.Configure(ValidParameters());
+    const foc::PositionControlContext rest{ foc::Radians{ 0.0f }, foc::Radians{ 0.001f } };
+    const foc::PositionControlContext moving{ foc::Radians{ 0.0f }, foc::Radians{ 0.001f }, foc::RadiansPerSecond{ 20.0f }, false, foc::RadiansPerSecond{ 20.0f } };
+
+    EXPECT_NEAR(controller.Compute(moving).value, atRest.Compute(rest).value, tolerance);
+}

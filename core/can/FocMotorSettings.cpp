@@ -1,4 +1,7 @@
 #include "core/can/FocMotorSettings.hpp"
+#include "numerical/math/Math.hpp"
+#include <array>
+#include <cmath>
 #include <optional>
 
 namespace can
@@ -19,45 +22,33 @@ namespace can
 
     namespace
     {
+        struct ReadingRange
+        {
+            FocParameter first;
+            FocParameter last;
+            ParameterGroup group;
+        };
+
+        // Each group of readings takes a contiguous block of identifiers.
+        constexpr std::array<ReadingRange, 4> readingRanges{ {
+            { FocParameter::currentOffsetA, FocParameter::coggingPeak, ParameterGroup::calibrationRecord },
+            { FocParameter::estimatedResistance, FocParameter::recalibrationsStored, ParameterGroup::onlineEstimate },
+            { FocParameter::loopSamples, FocParameter::loopReentries, ParameterGroup::loopStatistics },
+            { FocParameter::resetCause, FocParameter::stagedVersionPatch, ParameterGroup::platform },
+        } };
+
         std::optional<ParameterGroup> ReadingGroupOf(FocParameter parameter)
         {
-            switch (parameter)
-            {
-                case FocParameter::currentOffsetA:
-                case FocParameter::currentOffsetB:
-                case FocParameter::currentOffsetC:
-                case FocParameter::coggingPeak:
-                    return ParameterGroup::calibrationRecord;
-                case FocParameter::estimatedResistance:
-                case FocParameter::estimatedInductance:
-                case FocParameter::estimatedInertia:
-                case FocParameter::estimatedViscousFriction:
-                    return ParameterGroup::onlineEstimate;
-                case FocParameter::loopSamples:
-                case FocParameter::loopBudgetCycles:
-                case FocParameter::loopMinimumCycles:
-                case FocParameter::loopAverageCycles:
-                case FocParameter::loopMaximumCycles:
-                case FocParameter::loopOverruns:
-                case FocParameter::loopDeadlineMisses:
-                case FocParameter::loopReentries:
-                    return ParameterGroup::loopStatistics;
-                case FocParameter::resetCause:
-                case FocParameter::firmwareVersionMajor:
-                case FocParameter::firmwareVersionMinor:
-                case FocParameter::firmwareVersionPatch:
-                case FocParameter::boardKind:
-                case FocParameter::stagedVersionMajor:
-                case FocParameter::stagedVersionMinor:
-                case FocParameter::stagedVersionPatch:
-                    return ParameterGroup::platform;
-                case FocParameter::targetReached:
-                    return ParameterGroup::motion;
-                case FocParameter::windingTemperature:
-                    return ParameterGroup::thermal;
-                default:
-                    return std::nullopt;
-            }
+            const auto id = static_cast<uint8_t>(parameter);
+            for (const auto& range : readingRanges)
+                if (id >= static_cast<uint8_t>(range.first) && id <= static_cast<uint8_t>(range.last))
+                    return range.group;
+
+            if (parameter == FocParameter::targetReached || parameter == FocParameter::homed)
+                return ParameterGroup::motion;
+            if (parameter == FocParameter::windingTemperature)
+                return ParameterGroup::thermal;
+            return std::nullopt;
         }
 
         std::optional<ParameterGroup> LoopGroupOf(FocParameter parameter)
@@ -85,6 +76,28 @@ namespace can
                     return std::nullopt;
             }
         }
+
+        std::optional<ParameterGroup> ConfigurationGroupOf(FocParameter parameter)
+        {
+            switch (parameter)
+            {
+                case FocParameter::encoderResolution:
+                case FocParameter::canNodeId:
+                case FocParameter::canBitrate:
+                case FocParameter::telemetryRate:
+                    return ParameterGroup::startup;
+                case FocParameter::supervisionWindow:
+                case FocParameter::supervisionCurrentFraction:
+                case FocParameter::supervisionDemandedSpeed:
+                case FocParameter::supervisionPositionError:
+                case FocParameter::supervisionStillExcursion:
+                case FocParameter::stallDetection:
+                case FocParameter::recalibrationMode:
+                    return ParameterGroup::supervision;
+                default:
+                    return std::nullopt;
+            }
+        }
     }
 
     ParameterGroup GroupOf(FocParameter parameter)
@@ -93,25 +106,20 @@ namespace can
             return *reading;
         if (const auto loop = LoopGroupOf(parameter))
             return *loop;
+        if (const auto configuration = ConfigurationGroupOf(parameter))
+            return *configuration;
 
         switch (parameter)
         {
-            case FocParameter::encoderResolution:
-            case FocParameter::canNodeId:
-            case FocParameter::canBitrate:
-                return ParameterGroup::startup;
-            case FocParameter::supervisionWindow:
-            case FocParameter::supervisionCurrentFraction:
-            case FocParameter::supervisionDemandedSpeed:
-            case FocParameter::supervisionPositionError:
-            case FocParameter::supervisionStillExcursion:
-            case FocParameter::stallDetection:
-                return ParameterGroup::supervision;
             case FocParameter::overspeedLimit:
             case FocParameter::followingErrorWindow:
             case FocParameter::followingErrorTime:
             case FocParameter::speedAcceleration:
             case FocParameter::speedDeceleration:
+            case FocParameter::profileVelocity:
+            case FocParameter::profileAcceleration:
+            case FocParameter::profileDeceleration:
+            case FocParameter::profileJerk:
             case FocParameter::commandTimeout:
             case FocParameter::continuousCurrent:
             case FocParameter::peakCurrent:
@@ -120,6 +128,7 @@ namespace can
             case FocParameter::positionWindowTime:
             case FocParameter::positionMinimum:
             case FocParameter::positionMaximum:
+            case FocParameter::homingRequired:
             case FocParameter::calibrationTemperature:
             case FocParameter::temperatureLimit:
             case FocParameter::temperatureMargin:
@@ -234,6 +243,8 @@ namespace can
                 return services::MotorParameter::inertia;
             case FocParameter::viscousFriction:
                 return services::MotorParameter::viscousFriction;
+            case FocParameter::frictionCoulomb:
+                return services::MotorParameter::frictionCoulomb;
             default:
                 return services::MotorParameter::resistance;
         }
@@ -245,6 +256,8 @@ namespace can
             return config.canNodeId;
         if (parameter == FocParameter::canBitrate)
             return config.canBaudrate;
+        if (parameter == FocParameter::telemetryRate)
+            return config.telemetryRateHz;
         return config.encoderResolution;
     }
 
@@ -254,6 +267,8 @@ namespace can
             config.canNodeId = value;
         else if (parameter == FocParameter::canBitrate)
             config.canBaudrate = value;
+        else if (parameter == FocParameter::telemetryRate)
+            config.telemetryRateHz = value;
         else
             config.encoderResolution = value;
     }
@@ -272,6 +287,8 @@ namespace can
                 return config.supervision.stillExcursion;
             case FocParameter::stallDetection:
                 return config.stallDetection != 0 ? 1.0f : 0.0f;
+            case FocParameter::recalibrationMode:
+                return static_cast<float>(config.recalibrationMode);
             default:
                 return config.supervision.window;
         }
@@ -296,6 +313,9 @@ namespace can
             case FocParameter::stallDetection:
                 config.stallDetection = value != 0.0f ? 1 : 0;
                 break;
+            case FocParameter::recalibrationMode:
+                config.recalibrationMode = static_cast<uint8_t>(math::Round(value));
+                break;
             default:
                 config.supervision.window = value;
                 break;
@@ -314,6 +334,14 @@ namespace can
                 return config.limits.speedAcceleration;
             case FocParameter::speedDeceleration:
                 return config.limits.speedDeceleration;
+            case FocParameter::profileVelocity:
+                return config.limits.profileVelocity;
+            case FocParameter::profileAcceleration:
+                return config.limits.profileAcceleration;
+            case FocParameter::profileDeceleration:
+                return config.limits.profileDeceleration;
+            case FocParameter::profileJerk:
+                return config.limits.profileJerk;
             case FocParameter::commandTimeout:
                 return config.limits.commandTimeout;
             case FocParameter::continuousCurrent:
@@ -342,6 +370,8 @@ namespace can
                 return config.limits.busVoltageMaximum;
             case FocParameter::quickStopDeceleration:
                 return config.limits.quickStopDeceleration;
+            case FocParameter::homingRequired:
+                return config.homingRequired != 0 ? 1.0f : 0.0f;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -362,6 +392,18 @@ namespace can
                 break;
             case FocParameter::speedDeceleration:
                 config.limits.speedDeceleration = value;
+                break;
+            case FocParameter::profileVelocity:
+                config.limits.profileVelocity = value;
+                break;
+            case FocParameter::profileAcceleration:
+                config.limits.profileAcceleration = value;
+                break;
+            case FocParameter::profileDeceleration:
+                config.limits.profileDeceleration = value;
+                break;
+            case FocParameter::profileJerk:
+                config.limits.profileJerk = value;
                 break;
             case FocParameter::commandTimeout:
                 config.limits.commandTimeout = value;
@@ -404,6 +446,9 @@ namespace can
                 break;
             case FocParameter::quickStopDeceleration:
                 config.limits.quickStopDeceleration = value;
+                break;
+            case FocParameter::homingRequired:
+                config.homingRequired = value != 0.0f ? 1 : 0;
                 break;
             default:
                 config.limits.overspeedLimit = value;

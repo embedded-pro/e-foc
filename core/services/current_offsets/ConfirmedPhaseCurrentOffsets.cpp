@@ -1,4 +1,5 @@
 #include "core/services/current_offsets/ConfirmedPhaseCurrentOffsets.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -90,7 +91,7 @@ namespace services
     {
         const auto close = [this](foc::Ampere a, foc::Ampere b)
         {
-            return std::fabs(a.Value() - b.Value()) <= config.tolerance.Value();
+            return math::Abs(a.Value() - b.Value()) <= config.tolerance.Value();
         };
 
         return close(first.offsets.a, second.offsets.a) && close(first.offsets.b, second.offsets.b) && close(first.offsets.c, second.offsets.c);

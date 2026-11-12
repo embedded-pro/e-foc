@@ -23,6 +23,8 @@ target_sources(e_foc.foc.model PRIVATE
     SupplyModel.hpp
     ThermalModel.cpp
     ThermalModel.hpp
+    SimulatedEncoder.cpp
+    SimulatedEncoder.hpp
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp
 )
@@ -38,4 +40,5 @@ target_link_libraries(e_foc.foc.model PUBLIC
     numerical.math
 )
 
+add_subdirectory(drive)
 add_subdirectory(test)

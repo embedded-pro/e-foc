@@ -55,22 +55,25 @@ namespace services
         std::size_t consecutiveSettledSamples = 0;
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
-        float settledSumA{ 0.0f };
-        float settledSumB{ 0.0f };
-        float settledSumC{ 0.0f };
 
-        struct PhaseMeans
+        struct PhaseValues
         {
             float a{ 0.0f };
             float b{ 0.0f };
             float c{ 0.0f };
         };
 
-        PhaseMeans startingCurrents;
+        struct Hold
+        {
+            bool first{ false };
+            std::size_t samples = 0;
+            foc::Radians firstPosition{ 0.0f };
+        };
+
+        PhaseValues settledSums;
+        PhaseValues startingCurrents;
         Failure failure{ Failure::none };
-        bool firstHold{ false };
-        std::size_t samplesInHold = 0;
-        foc::Radians firstHoldPosition{ 0.0f };
+        Hold hold;
         std::optional<foc::Radians> outcome;
         infra::AutoResetFunction<void(std::optional<foc::Radians>)> onAlignmentDone;
         infra::TimerSingleShot timeoutTimer;

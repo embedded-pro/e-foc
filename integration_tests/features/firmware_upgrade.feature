@@ -11,7 +11,7 @@ Feature: Firmware upgrade
     And the motor is already calibrated
     And the motor boots in torque mode
 
-  @REQ-UPD-001 @REQ-UPD-004 @REQ-UPD-007 @REQ-UPD-013 @sil
+  @REQ-FWU-005 @REQ-FWU-003 @REQ-FWU-002 @sil
   Scenario: A pack is downloaded and staged over a stale one
     Given the staging slot holds a stale pack and the journal reads "deployed"
     When the target boots
@@ -24,7 +24,7 @@ Feature: Firmware upgrade
     And the drive reports the staged version "2.3.4"
     And the drive reports the version of its build and its board kind
 
-  @REQ-UPD-011 @sil
+  @REQ-FWU-002 @sil
   Scenario: A staged pack waits across runs and restarts
     When the target boots
     And a pack of version "2.3.4" is downloaded
@@ -35,7 +35,7 @@ Feature: Firmware upgrade
     Then the drive reports the staged version "2.3.4"
     And the journal reads "downloaded"
 
-  @REQ-UPD-002 @sil
+  @REQ-FWU-002 @sil
   Scenario: A download is refused while the motor runs
     Given the staging slot holds a stale pack and the journal reads "downloaded"
     When the target boots
@@ -46,14 +46,14 @@ Feature: Firmware upgrade
     And the journal reads "downloaded"
     And the staging slot still holds the stale pack
 
-  @REQ-UPD-005 @sil
+  @REQ-FWU-002 @sil
   Scenario: Activate without a staged pack is refused
     When the target boots
     And Activate is sent
     Then Activate is answered "not ready"
     And the journal reads "empty"
 
-  @REQ-UPD-005 @sil
+  @REQ-FWU-002 @sil
   Scenario: The apply is refused while the motor runs
     When the target boots
     And a pack of version "2.3.4" is downloaded
@@ -63,7 +63,7 @@ Feature: Firmware upgrade
     Then Activate is answered "busy"
     And the journal reads "downloaded"
 
-  @REQ-UPD-003 @REQ-UPD-006 @sil
+  @REQ-FWU-002 @sil
   Scenario: The drive stays stopped while a pack is received
     When the target boots
     And the rotor is aligned
@@ -76,7 +76,7 @@ Feature: Firmware upgrade
     When the telemetry rate is set to 200 Hz
     And the motor is enabled
 
-  @REQ-UPD-004 @REQ-UPD-006 @sil
+  @REQ-FWU-005 @REQ-FWU-002 @sil
   Scenario: A pack for another board is refused
     When the target boots
     And a pack of version "2.3.4" for another board is downloaded
@@ -84,14 +84,14 @@ Feature: Firmware upgrade
     And the journal reads "empty"
     And the drive reports the staged version "0.0.0"
 
-  @REQ-UPD-004 @REQ-UPD-006 @sil
+  @REQ-FWU-005 @REQ-FWU-002 @sil
   Scenario: A pack with a wrong CRC is refused
     When the target boots
     And a pack of version "2.3.4" is downloaded with a CRC that does not match
     Then the download is answered "CRC mismatch"
     And the journal reads "empty"
 
-  @REQ-UPD-014 @sil
+  @REQ-FWU-002 @sil
   Scenario: The emergency stop ends a download
     When the target boots
     And Begin Upgrade is sent for a pack of version "2.3.4"
@@ -100,7 +100,7 @@ Feature: Firmware upgrade
     Then the next block is answered "invalid state"
     And the journal reads "empty"
 
-  @REQ-UPD-005 @REQ-UPD-007 @REQ-UPD-011 @sil
+  @REQ-FWU-002 @REQ-FWU-003 @sil
   Scenario: The apply installs the staged pack
     Given the application is staged as a downloaded pack of the version it runs
     When the target boots

@@ -1,4 +1,5 @@
 #include "core/supervision/PhaseLossMonitor.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <variant>
@@ -71,10 +72,10 @@ namespace supervision
 
     bool PhaseLossMonitor::CurrentMissing(const foc::MotionObservation& observation) const
     {
-        const auto demanded = std::abs(observation.demandedTorqueCurrent.Value());
+        const auto demanded = math::Abs(observation.demandedTorqueCurrent.Value());
 
         return demanded >= minimumDemandFraction * maxCurrent.Value() &&
-               std::abs(observation.measuredTorqueCurrent.Value()) < missingCurrentFraction * demanded &&
-               std::abs(observation.measuredSpeed.Value()) < slowSpeedRadiansPerSecond;
+               math::Abs(observation.measuredTorqueCurrent.Value()) < missingCurrentFraction * demanded &&
+               math::Abs(observation.measuredSpeed.Value()) < slowSpeedRadiansPerSecond;
     }
 }

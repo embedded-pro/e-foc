@@ -1,5 +1,5 @@
-#include "core/can/FocMotorMessages.hpp"
 #include "core/state_machine/ControlMode.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <gtest/gtest.h>
 
 namespace

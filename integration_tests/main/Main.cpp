@@ -13,6 +13,7 @@
 
 #ifdef __unix__
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
+#include "integration_tests/support/interactor/virtual_motor/VirtualMotorInteractor.hpp"
 #endif
 
 namespace
@@ -24,6 +25,7 @@ namespace
     std::string g_qemuElf;
     std::string g_qemuBootloaderElf;
     std::string g_developmentKeys;
+    std::string g_virtualMotor;
 
     hil::BridgeConfig g_bridgeConfig;
 
@@ -43,7 +45,7 @@ int main(int argc, char** argv)
     cucumber_cpp::Application application{};
     auto& cli = application.CliParser();
 
-    cli.add_option("--mode", g_mode, "Target mode: sil or hil")->required();
+    cli.add_option("--mode", g_mode, "Target mode: sil, virtual or hil")->required();
 
     cli.add_option("--log-dir", g_logDir, "Root directory for serial transcripts");
     cli.add_flag("--log-disabled", g_logDisabled, "Disable serial transcript logging");
@@ -51,6 +53,8 @@ int main(int argc, char** argv)
     cli.add_option("--qemu-elf", g_qemuElf, "Path to the QEMU SIL firmware ELF (mode=sil)");
     cli.add_option("--qemu-bootloader-elf", g_qemuBootloaderElf, "Path to the QEMU SIL bootloader ELF (mode=sil)");
     cli.add_option("--development-keys", g_developmentKeys, "Key set the emulated bootloader and the staged packs use (mode=sil)");
+
+    cli.add_option("--virtual-motor", g_virtualMotor, "Path to the e-foc-virtual-motor program (mode=virtual)");
 
     cli.add_option("--bridge-host", g_bridgeConfig.host, "hardware_bridge TCP host (mode=hil)");
     cli.add_option("--serial-port", g_bridgeConfig.serialPort, "hardware_bridge serial TCP port (mode=hil)");
@@ -75,6 +79,15 @@ int main(int argc, char** argv)
                 g_interactor = std::move(qemu);
 #else
                 throw std::runtime_error{ "SIL mode requires a UNIX host" };
+#endif
+            }
+            else if (g_mode == "virtual")
+            {
+#ifdef __unix__
+                g_virtualMotor = OptionOrEnvironment(g_virtualMotor, "E_FOC_VIRTUAL_MOTOR", E_FOC_VIRTUAL_MOTOR_DEFAULT_PATH);
+                g_interactor = std::make_unique<virtual_motor::VirtualMotorInteractor>(g_virtualMotor);
+#else
+                throw std::runtime_error{ "Virtual mode requires a UNIX host" };
 #endif
             }
             else if (g_mode == "hil")

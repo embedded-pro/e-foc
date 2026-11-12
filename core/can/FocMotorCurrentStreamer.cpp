@@ -1,5 +1,7 @@
 #include "core/can/FocMotorCurrentStreamer.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <algorithm>
 #include <chrono>
 
@@ -8,6 +10,12 @@ namespace can
     namespace
     {
         constexpr auto tickInterval{ std::chrono::milliseconds(1) };
+    }
+
+    bool FocMotorCurrentStreamer::IsStreamFrame(hal::Can::Id id)
+    {
+        return id.Is29BitId() && services::ExtractCanCategory(id.Get29BitId()) == focMotorCategoryId &&
+               services::ExtractCanMessageType(id.Get29BitId()) == focTelemetryCurrentsId;
     }
 
     FocMotorCurrentStreamer::FocMotorCurrentStreamer(services::CanProtocolServer& protocolServer, FocMotorCategoryServer& server,
@@ -66,9 +74,8 @@ namespace can
             if (!sample)
                 return;
 
-            // A synchronous bus completes the frame inside the send, so the count goes up before it.
             ++framesWaiting;
-            const auto position = foc::Radians{ foc::detail::PositionWithWrapAround(sample->position.Value()) };
+            const auto position = foc::Radians{ math::WrapToPi(sample->position.Value()) };
             if (!server.BroadcastTelemetryCurrents(sample->sequence, sample->meanId, sample->meanIq, position, [this](bool)
                     {
                         OnFrameDone();

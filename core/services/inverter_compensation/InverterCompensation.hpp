@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>

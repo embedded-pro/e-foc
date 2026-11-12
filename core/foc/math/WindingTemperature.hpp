@@ -1,6 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <optional>
 
@@ -11,7 +12,7 @@ namespace foc
 
     inline std::optional<Celsius> WindingTemperatureFromResistance(Ohm online, Ohm calibrated, Celsius calibration)
     {
-        if (!(calibrated.Value() > 0.0f) || !(online.Value() > 0.0f) || !std::isfinite(online.Value()))
+        if (!(calibrated.Value() > 0.0f) || !(online.Value() > 0.0f) || !math::IsFinite(online.Value()))
             return std::nullopt;
 
         return Celsius{ calibration.Value() + (online.Value() / calibrated.Value() - 1.0f) / copperTemperatureCoefficient };

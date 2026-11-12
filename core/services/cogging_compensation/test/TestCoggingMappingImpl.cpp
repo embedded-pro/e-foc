@@ -1,11 +1,11 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -26,14 +26,22 @@ namespace
     foc::PhaseCurrents CurrentsProducing(float torque, float position)
     {
         const auto electricalAngle = position * static_cast<float>(polePairs);
-        const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle);
-        const auto sine = foc::FastTrigonometry::Sine(electricalAngle);
+        const auto cosine = math::FastCosine(electricalAngle);
+        const auto sine = math::FastSine(electricalAngle);
         const foc::ClarkePark transform;
 
         const auto unitGain = transform.Forward(transform.Inverse(foc::RotatingFrame{ 0.0f, 1.0f }, cosine, sine), cosine, sine).q;
         const auto phases = transform.Inverse(foc::RotatingFrame{ 0.0f, torque / torqueConstant / unitGain }, cosine, sine);
 
         return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
+    }
+
+    foc::Ampere QuadratureCurrentOf(const foc::PhaseCurrents& phases, foc::Radians position)
+    {
+        const auto electricalAngle = position.Value() * static_cast<float>(polePairs);
+        const foc::ClarkePark transform;
+
+        return foc::Ampere{ transform.Forward(foc::ThreePhase{ phases.a.Value(), phases.b.Value(), phases.c.Value() }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle)).q };
     }
 
     class TestCoggingMappingImpl
@@ -46,10 +54,16 @@ namespace
             ExecuteAllActions();
         }
 
+        void Publish(const foc::PhaseCurrents& phases)
+        {
+            const auto position = encoderMock.Read();
+            observableMock.Publish(phases, QuadratureCurrentOf(phases, position), position);
+        }
+
         void ExpectRunStarted()
         {
             EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
-                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&)>& observer)
+                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&, foc::Ampere, foc::Radians)>& observer)
                     {
                         observableMock.StoreObserver(observer);
                     }));
@@ -77,9 +91,10 @@ namespace
 
         void Start(services::CoggingMapping::Config config = {})
         {
-            mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, polePairs, config, [this](std::optional<services::CoggingMap> map)
+            mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, foc::NewtonMeterSecondPerRadian{ 0.0f }, polePairs, config, [this](const services::CoggingMeasurement& measurement)
                 {
-                    result = map;
+                    result = measurement.map;
+                    frictionCoulomb = measurement.frictionCoulomb.Value();
                     reported = true;
                 });
         }
@@ -93,7 +108,7 @@ namespace
                     const auto speed = rotorSpeedScale * commandedSpeed;
                     position += speed * samplePeriod;
                     const auto friction = speed > 0.0f ? dryFriction : (speed < 0.0f ? -dryFriction : 0.0f);
-                    observableMock.Publish(CurrentsProducing(Cogging(position) + friction, position));
+                    Publish(CurrentsProducing(Cogging(position) + friction, position));
                 }
 
                 ForwardTime(std::chrono::milliseconds{ 1 });
@@ -119,6 +134,7 @@ namespace
         float position{ 0.0f };
         float commandedSpeed{ 0.0f };
         std::optional<services::CoggingMap> result;
+        float frictionCoulomb{ -1.0f };
         bool reported{ false };
     };
 }
@@ -145,19 +161,72 @@ TEST_F(TestCoggingMappingImpl, turning_each_way_maps_the_cogging_the_winding_hel
     }
 }
 
+TEST_F(TestCoggingMappingImpl, turning_each_way_also_measures_the_dry_friction)
+{
+    ExpectRunStarted();
+    Start();
+
+    ExpectDriveReleased();
+    Run();
+
+    ASSERT_TRUE(reported);
+    EXPECT_NEAR(frictionCoulomb, dryFriction, 0.05f * dryFriction);
+}
+
+TEST_F(TestCoggingMappingImpl, a_sample_brings_its_rotor_angle_so_the_encoder_is_read_only_to_start_the_run)
+{
+    EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
+        .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&, foc::Ampere, foc::Radians)>& observer)
+            {
+                observableMock.StoreObserver(observer);
+            }));
+    EXPECT_CALL(driveMock, Start());
+    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    Start();
+
+    for (int sample = 1; sample != 100; ++sample)
+        observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.1f }, foc::Ampere{ -0.1f } }, foc::Ampere{ 0.1f }, foc::Radians{ 1.0e-3f * static_cast<float>(sample) });
+
+    ExpectDriveReleased();
+    mapping->Abort();
+}
+
 TEST_F(TestCoggingMappingImpl, a_phase_current_beyond_the_envelope_stops_the_bridge_and_yields_no_map)
 {
     ExpectRunStarted();
     Start();
 
     EXPECT_CALL(inverterMock, Stop());
-    observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
+    Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
 
     ExpectDriveReleased();
     ExecuteAllActions();
 
     EXPECT_TRUE(reported);
     EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(frictionCoulomb, 0.0f);
+}
+
+TEST_F(TestCoggingMappingImpl, a_slew_step_after_the_run_failed_ramps_the_speed_towards_standstill)
+{
+    ExpectRunStarted();
+    Start();
+    Run(1.0f, 100);
+    const auto speedBeforeFailure = commandedSpeed;
+    ASSERT_GT(speedBeforeFailure, 0.0f);
+
+    EXPECT_CALL(inverterMock, Stop());
+    Publish(foc::PhaseCurrents{ foc::Ampere{ 50.0f }, foc::Ampere{ -25.0f }, foc::Ampere{ -25.0f } });
+    systemTimerService.TimeProgressed(std::chrono::milliseconds{ 1 });
+
+    EXPECT_LT(commandedSpeed, speedBeforeFailure);
+    EXPECT_GE(commandedSpeed, 0.0f);
+
+    ExpectDriveReleased();
+    ExecuteAllActions();
+    EXPECT_TRUE(reported);
 }
 
 TEST_F(TestCoggingMappingImpl, a_rotor_that_does_not_turn_runs_into_the_timeout_without_a_map)
@@ -172,6 +241,7 @@ TEST_F(TestCoggingMappingImpl, a_rotor_that_does_not_turn_runs_into_the_timeout_
 
     EXPECT_TRUE(reported);
     EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(frictionCoulomb, 0.0f);
 }
 
 TEST_F(TestCoggingMappingImpl, an_aborted_run_releases_the_drive_and_never_reports)
@@ -190,9 +260,10 @@ TEST_F(TestCoggingMappingImpl, an_aborted_run_releases_the_drive_and_never_repor
 
 TEST_F(TestCoggingMappingImpl, a_request_without_pole_pairs_is_refused_at_once)
 {
-    mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, 0, {}, [this](std::optional<services::CoggingMap> map)
+    mapping->Measure(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, foc::NewtonMeterSecondPerRadian{ 0.0f }, 0, {}, [this](const services::CoggingMeasurement& measurement)
         {
-            result = map;
+            result = measurement.map;
+            frictionCoulomb = measurement.frictionCoulomb.Value();
             reported = true;
         });
 

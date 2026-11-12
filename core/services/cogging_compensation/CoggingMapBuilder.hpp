@@ -1,8 +1,9 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include "numerical/math/Math.hpp"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -36,6 +37,7 @@ namespace services
         }
 
         std::optional<CoggingMap> Build(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, float samplePeriod) const;
+        std::optional<foc::NewtonMeter> FrictionCoulomb(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, float samplePeriod) const;
 
     private:
         struct Bin
@@ -47,16 +49,23 @@ namespace services
 
         using Profile = std::array<float, bins>;
 
+        struct DirectionResult
+        {
+            Profile torque{};
+            float meanSpeed{ 0.0f };
+        };
+
         ALWAYS_INLINE_HOT static std::size_t BinOf(float electricalAngle)
         {
             constexpr float perPeriod{ 0.5f * std::numbers::inv_pi_v<float> };
             const auto turns = electricalAngle * perPeriod;
-            const auto fraction = turns - std::floor(turns);
+            const auto fraction = turns - math::Floor(turns);
             const auto bin = static_cast<std::size_t>(fraction * static_cast<float>(bins));
             return bin < bins ? bin : bins - 1;
         }
 
-        std::optional<Profile> DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const;
+        std::optional<DirectionResult> DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const;
+        static float Mean(const Profile& profile);
         static float Agreement(const Profile& forward, const Profile& backward);
 
         std::array<std::array<Bin, bins>, 2> accumulated{};

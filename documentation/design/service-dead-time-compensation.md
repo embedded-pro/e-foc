@@ -174,10 +174,10 @@ the commanded voltage to within 1 mV.
 
 Through the bench's power stage, uncompensated, the online resistance reads 18.1 to 18.3 % above
 the winding, and compensated with the board's figure it reads 3.2 to 3.3 % above
-(REQ-TRQ-008, `identification_robustness.feature`).
+(REQ-CTL-001, `identification_robustness.feature`).
 
 Through the same stage the calibration resistance reads 4.4 % above the winding uncompensated and
-2.4 % above compensated (REQ-CAL-012). Held at 1 % legs and written once, it read 4.2 % and 4.5 %:
+2.4 % above compensated (REQ-CMS-001). Held at 1 % legs and written once, it read 4.2 % and 4.5 %:
 the correction did not reach it. What stays is the switches' on-resistance, 1.1 % of the bench
 winding, which the current also crosses in closed loop, and the difference between the plant's
 100 ns and the board's 70 ns.

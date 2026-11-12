@@ -1,4 +1,5 @@
 #include "core/foc/model/CurrentSense.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -21,7 +22,7 @@ namespace foc
             if (timeConstant <= 0.0f || elapsed >= settledTimeConstants * timeConstant)
                 return 1.0f;
 
-            return 1.0f - std::exp(-elapsed / timeConstant);
+            return 1.0f - math::Exp(-elapsed / timeConstant);
         }
 
         float Decayed(float elapsed, float timeConstant)
@@ -29,7 +30,7 @@ namespace foc
             if (timeConstant <= 0.0f || elapsed >= decayedTimeConstants * timeConstant)
                 return 0.0f;
 
-            return std::exp(-elapsed / timeConstant);
+            return math::Exp(-elapsed / timeConstant);
         }
 
         bool Quantised(const CurrentSenseConfig& config)
@@ -48,7 +49,7 @@ namespace foc
 
             int32_t Code(float ampere) const
             {
-                return std::clamp(static_cast<int32_t>(std::lround((ampere + fullScale) / codeWidth)), int32_t{ 0 }, highest);
+                return std::clamp(static_cast<int32_t>(math::Round((ampere + fullScale) / codeWidth)), int32_t{ 0 }, highest);
             }
 
             float fullScale;
@@ -98,7 +99,8 @@ namespace foc
         for (uint32_t conversion = 0; conversion != count; ++conversion)
         {
             const auto time = ConversionHoldInstant(config, step * count + conversion);
-            const auto analog = ShuntAmplifierOutput(config, sample.window, sample.current, time) + sample.offset + conversionNoise();
+            const auto current = sample.current + sample.slope * time;
+            const auto analog = ShuntAmplifierOutput(config, sample.window, current, time) + sample.offset + conversionNoise();
 
             if (quantised)
                 codes += converter->Code(analog);

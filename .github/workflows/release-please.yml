@@ -82,6 +82,11 @@ jobs:
         with:
           release: ${{ matrix.gcc }}
       - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc ccache
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: release-${{ matrix.configuration }}-${{ matrix.target }}
+          max-size: 2G
+          save: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: host-install-package
@@ -201,6 +206,7 @@ jobs:
     needs: release_please
     if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-documentation:v7.4.0@sha256:0537b16931e116f98fd62e0bad454af5bcd102ec6501ccdef2b270aa83fd281e
     steps:
       - name: Configure Git
         run: |
@@ -210,13 +216,10 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install TikZ support
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-pictures texlive-latex-extra
       - name: Generate documentation PDFs and traceability matrix
-        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
+        uses: embedded-pro/project-documentation@e1b8b6866333964f2e02b29bba322cbee211819b # v0.3.0
         with:
+          python-version: ''
           run-build-documentation-pdfs: 'true'
           run-traceability-matrix: 'true'
           version: ${{ needs.release_please.outputs.version }}
@@ -266,10 +269,8 @@ jobs:
           v="${{ needs.release_please.outputs.version }}"
           ls -l release-assets
           for asset in \
-            "e_foc-simulator-${v}-linux-x86_64.tar.gz" \
             "e_foc-can_commander-${v}-linux-x86_64.tar.gz" \
             "e_foc-can_commander-${v}-linux-x86_64.deb" \
-            "e_foc-simulator-${v}-windows-x86_64.zip" \
             "e_foc-can_commander-${v}-windows-x86_64.zip" \
             "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \

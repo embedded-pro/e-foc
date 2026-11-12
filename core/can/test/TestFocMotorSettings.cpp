@@ -1,5 +1,5 @@
 #include "core/can/FocMotorSettings.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include <gtest/gtest.h>
 
 TEST(FocMotorSettings, every_loop_setting_is_written_to_and_read_from_its_own_field)
@@ -64,6 +64,10 @@ TEST(FocMotorSettings, every_motor_parameter_reaches_the_calibration_record_fiel
     services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::inertia), 7.06e-6f);
     EXPECT_NEAR(record.rPhase, 0.36f, 1e-6f);
     EXPECT_NEAR(record.inertia, 7.06e-6f, 1e-11f);
+
+    services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::frictionCoulomb), 4.0e-3f);
+    EXPECT_NEAR(record.frictionCoulomb, 4.0e-3f, 1e-9f);
+    EXPECT_EQ(record.frictionViscous, 0.0f);
 }
 
 TEST(FocMotorSettings, every_startup_setting_reaches_its_configuration_field)
@@ -108,6 +112,10 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     can::WriteLimitSetting(config, can::FocParameter::followingErrorTime, 0.25f);
     can::WriteLimitSetting(config, can::FocParameter::speedAcceleration, 300.0f);
     can::WriteLimitSetting(config, can::FocParameter::speedDeceleration, 600.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileVelocity, 20.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileAcceleration, 400.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileDeceleration, 500.0f);
+    can::WriteLimitSetting(config, can::FocParameter::profileJerk, 9000.0f);
     can::WriteLimitSetting(config, can::FocParameter::commandTimeout, 0.5f);
     can::WriteLimitSetting(config, can::FocParameter::continuousCurrent, 2.0f);
     can::WriteLimitSetting(config, can::FocParameter::peakCurrent, 3.0f);
@@ -124,6 +132,14 @@ TEST(FocMotorSettings, every_limit_reaches_its_configuration_field)
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::speedDeceleration), 600.0f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedAcceleration), can::ParameterGroup::limits);
     EXPECT_EQ(can::GroupOf(can::FocParameter::speedDeceleration), can::ParameterGroup::limits);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileVelocity), 20.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileAcceleration), 400.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileDeceleration), 500.0f, 1e-6f);
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::profileJerk), 9000.0f, 1e-3f);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileVelocity), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileAcceleration), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileDeceleration), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::profileJerk), can::ParameterGroup::limits);
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::commandTimeout), 0.5f, 1e-6f);
     EXPECT_EQ(can::GroupOf(can::FocParameter::commandTimeout), can::ParameterGroup::limits);
     EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::continuousCurrent), 2.0f, 1e-6f);
@@ -245,7 +261,7 @@ TEST(FocMotorSettings, every_supervision_setting_reads_back_what_was_written)
     }
 }
 
-TEST(FocMotorSettings, the_six_supervision_settings_form_their_own_group)
+TEST(FocMotorSettings, the_seven_drive_wide_supervision_settings_form_their_own_group)
 {
     std::size_t supervision{ 0 };
     for (const auto& descriptor : can::focParameters)
@@ -256,7 +272,7 @@ TEST(FocMotorSettings, the_six_supervision_settings_form_their_own_group)
             EXPECT_FALSE(descriptor.readOnly) << descriptor.name;
         }
 
-    EXPECT_EQ(supervision, 6u);
+    EXPECT_EQ(supervision, 7u);
 }
 
 TEST(FocMotorSettings, only_the_three_bandwidths_are_bandwidths)
@@ -270,4 +286,28 @@ TEST(FocMotorSettings, only_the_three_bandwidths_are_bandwidths)
         }
 
     EXPECT_EQ(bandwidths, 3u);
+}
+
+TEST(FocMotorSettings, homing_required_is_a_stored_toggle_limit_and_homed_a_read_only_motion_reading)
+{
+    services::ConfigData config{};
+
+    can::WriteLimitSetting(config, can::FocParameter::homingRequired, 1.0f);
+
+    EXPECT_EQ(config.homingRequired, uint8_t{ 1 });
+    EXPECT_NEAR(can::LimitSettingOf(config, can::FocParameter::homingRequired), 1.0f, 1e-6f);
+    can::WriteLimitSetting(config, can::FocParameter::homingRequired, 0.0f);
+    EXPECT_EQ(config.homingRequired, uint8_t{ 0 });
+    EXPECT_EQ(can::GroupOf(can::FocParameter::homingRequired), can::ParameterGroup::limits);
+    EXPECT_EQ(can::GroupOf(can::FocParameter::homed), can::ParameterGroup::motion);
+
+    const auto required = can::FindParameter(can::FocParameter::homingRequired);
+    ASSERT_TRUE(required.has_value());
+    EXPECT_FALSE(required->readOnly);
+    EXPECT_TRUE(required->integer);
+    const auto homed = can::FindParameter(can::FocParameter::homed);
+    ASSERT_TRUE(homed.has_value());
+    EXPECT_TRUE(homed->readOnly);
+    EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::homed), uint8_t{ 0xC2 });
+    EXPECT_EQ(static_cast<uint8_t>(can::FocParameter::homingRequired), uint8_t{ 0x63 });
 }

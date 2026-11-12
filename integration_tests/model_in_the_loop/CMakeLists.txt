@@ -10,16 +10,21 @@ target_include_directories(e_foc.model_in_the_loop PUBLIC
 )
 
 target_link_libraries(e_foc.model_in_the_loop PUBLIC
+    e_foc.can
     e_foc.foc.cascade
     e_foc.foc.model
+    e_foc.foc.model.drive
     e_foc.state_machine
     e_foc.services.alignment
+    e_foc.services.index_search
     e_foc.services.current_offsets
     e_foc.services.inverter_compensation
     e_foc.services.electrical_system_ident
+    e_foc.services.fault_history
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
     e_foc.services.bus_voltage
+    e_foc.supervision
     e_foc.integration_tests.plant
     e_foc.integration_tests.response
     numerical.controllers.implementations

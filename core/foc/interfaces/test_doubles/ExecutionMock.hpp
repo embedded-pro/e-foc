@@ -50,10 +50,10 @@ namespace foc
         : public PhaseCurrentsObservable
     {
     public:
-        MOCK_METHOD(void, RegisterPhaseCurrentsObserver, (const infra::Function<void(const PhaseCurrents& currentPhases)>& observer), (override));
+        MOCK_METHOD(void, RegisterPhaseCurrentsObserver, ((const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>&)), (override));
         MOCK_METHOD(void, UnregisterPhaseCurrentsObserver, (), (override));
 
-        void StoreObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)
+        void StoreObserver(const infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)>& observer)
         {
             storedObserver = observer;
         }
@@ -63,10 +63,10 @@ namespace foc
             storedObserver = nullptr;
         }
 
-        void Publish(const PhaseCurrents& currentPhases)
+        void Publish(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)
         {
             if (storedObserver != nullptr)
-                storedObserver(currentPhases);
+                storedObserver(phases, quadratureCurrent, mechanicalAngle);
         }
 
         bool HasObserver() const
@@ -75,6 +75,13 @@ namespace foc
         }
 
     private:
-        infra::Function<void(const PhaseCurrents& currentPhases)> storedObserver;
+        infra::Function<void(const PhaseCurrents& phases, Ampere quadratureCurrent, Radians mechanicalAngle)> storedObserver;
+    };
+
+    class ZeroVectorSlopeSinkMock
+        : public ZeroVectorSlopeSink
+    {
+    public:
+        MOCK_METHOD(void, ZeroVectorSlopes, (const PhaseCurrentSlopes& slopes), (override));
     };
 }

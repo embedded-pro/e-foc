@@ -20,6 +20,7 @@ namespace foc
         RadiansPerSecond demandedSpeed{ 0.0f };
         Radians positionError{ 0.0f };
         Ampere demandedTorqueCurrent{ 0.0f };
+        Radians targetError{ 0.0f };
     };
 
     class FocBase
@@ -34,6 +35,8 @@ namespace foc
         virtual void Enable() = 0;
         virtual void Disable() = 0;
         virtual PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) = 0;
+        // Of the last Calculate(); read from the control interrupt only.
+        virtual Ampere MeasuredQuadratureCurrent() const = 0;
     };
 
     class CurrentLoopTunable
@@ -126,6 +129,16 @@ namespace foc
         virtual void ClearCoggingMap() = 0;
     };
 
+    class FrictionCompensable
+    {
+    protected:
+        ~FrictionCompensable() = default;
+
+    public:
+        virtual void LoadFrictionFeedForward(NewtonMeter coulomb, NewtonMeter torqueConstant) = 0;
+        virtual void ClearFrictionFeedForward() = 0;
+    };
+
     class SpeedLimitable
     {
     protected:
@@ -178,8 +191,16 @@ namespace foc
         ~QuickStoppable() = default;
 
     public:
-        // Decelerates the rotor to a standstill until the next Enable or Disable; zero steps the speed reference to zero.
         virtual void QuickStop(RadiansPerSecondSquared deceleration) = 0;
+    };
+
+    class PositionProfilable
+    {
+    protected:
+        ~PositionProfilable() = default;
+
+    public:
+        virtual void ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk) = 0;
     };
 
     class SpeedCommandable

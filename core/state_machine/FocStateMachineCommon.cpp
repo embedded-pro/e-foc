@@ -1,18 +1,16 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/FocLifecycleTable.hpp"
-#include "core/state_machine/LifecycleCliCommands.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 
 namespace application
 {
     FocStateMachineCommon::FocStateMachineCommon(
-        const TerminalAndTracer& terminalAndTracer,
+        services::Tracer& tracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         NvmActivity& nvmActivity)
-        : terminal(terminalAndTracer.terminal)
-        , tracer(terminalAndTracer.tracer)
+        : tracer(tracer)
         , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage, calibServices.currentOffsets, hardware.dutyUpdateDelayPeriods)
         , nvmActivity(nvmActivity)
         , environment{ stateMachine, calibrationContext, nvm, nvmActivity, pendingCommand, *this, tracer }
@@ -24,6 +22,7 @@ namespace application
         , stateMachine(context, FocLifecycleTable::Table())
         , stateMachineTracer(stateMachine, tracer)
         , commandRejections(stateMachine)
+        , commissioning(stateMachine)
     {
         FocLifecycleTable::RegisterEnteredHooks(stateMachine);
     }
@@ -36,25 +35,14 @@ namespace application
     void FocStateMachineCommon::ReleaseExternalResources()
     {
         calibration.Abort();
-        operation.AbortOffsetRefresh();
+        operation.AbortEnablePreparation();
         operation.UnregisterFaultHandler();
-    }
-
-    void FocStateMachineCommon::RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy)
-    {
-        if (transitionPolicy != state_machine::TransitionPolicy::Cli)
-            return;
-
-        RegisterLifecycleCliCommands(terminal, [this]() -> FocStateMachineCommon&
-            {
-                return *this;
-            });
-        RegisterModeSpecificCli(terminal);
     }
 
     void FocStateMachineCommon::Boot(RotorReference rotorReference)
     {
-        calibrationContext.SetRotorReferenceValid(rotorReference == RotorReference::kept);
+        calibrationContext.SetRotorReferenceValid(rotorReference != RotorReference::lost);
+        calibrationContext.SetHomed(rotorReference == RotorReference::keptHomed);
         stateMachine.Start<state_machine::Idle>();
         boot.Begin();
     }
@@ -71,12 +59,27 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || operation.IsRefreshingOffsets() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
+        return pendingCommand.Pending() || nvmActivity.InFlight() || operation.HasPendingFault() || operation.IsPreparingEnable() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
     {
         return stateMachine.Is<state_machine::Idle>() && calibrationContext.HasPartial();
+    }
+
+    void FocStateMachineCommon::RequireHoming(bool required)
+    {
+        operation.RequireHoming(required);
+    }
+
+    CommissioningCommands& FocStateMachineCommon::Commissioning()
+    {
+        return commissioning;
+    }
+
+    const CalibrationContext& FocStateMachineCommon::Calibration() const
+    {
+        return calibrationContext;
     }
 
     const FocStateMachineCommon::StateMachine& FocStateMachineCommon::TransitionTable() const
@@ -141,6 +144,8 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdQuickStop()
     {
+        if (std::holds_alternative<state_machine::Enabled>(CurrentState()) && !operation.CanBeginQuickStop())
+            return state_machine::CommandResult::rejected;
         return ToCommandResult(Dispatch(state_machine::QuickStop{}));
     }
 
@@ -154,50 +159,15 @@ namespace application
         return quickStopDeceleration;
     }
 
-    void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        Dispatch(state_machine::ReAlign{ state_machine::CommandCallback{ onDone } });
-    }
-
-    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
-    {
-        return ToCommandResult(Dispatch(state_machine::ReserveExternalCalibration{}));
-    }
-
-    state_machine::CommandResult FocStateMachineCommon::CmdReleaseExternalCalibration()
-    {
-        return ToCommandResult(Dispatch(state_machine::ReleaseExternalCalibration{}));
-    }
-
-    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        Dispatch(state_machine::CompleteExternalCalibration{ data, state_machine::CommandCallback{ onDone } });
-    }
-
-    void FocStateMachineCommon::CmdSetMotorParameter(services::MotorParameter parameter, float value, const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        Dispatch(state_machine::SetMotorParameter{ parameter, value, state_machine::CommandCallback{ onDone } });
-    }
-
-    foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
-    {
-        return calibrationContext.ActiveFluxLinkage();
-    }
-
-    const services::CalibrationData& FocStateMachineCommon::CalibrationRecord() const
-    {
-        return calibrationContext.Data();
-    }
-
-    float FocStateMachineCommon::AutomaticCurrentLoopBandwidth() const
-    {
-        const auto& data = calibrationContext.Data();
-        return calibrationContext.CurrentTuningsFor(data.currentLoopBandwidth, foc::MilliHenry{ data.lD }, foc::Ampere{ services::CurrentNoiseAmpere(data.currentNoiseMilliAmpere) }).bandwidth;
-    }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
     {
         operation.RegisterReadyHandler(onReady);
+    }
+
+    void FocStateMachineCommon::RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered)
+    {
+        operation.RegisterFaultEnteredHandler(onFaultEntered);
     }
 
     void FocStateMachineCommon::MarkProvisionalControlApplied()
@@ -211,25 +181,7 @@ namespace application
             return false;
 
         MarkProvisionalControlApplied();
-        return ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) });
-    }
-
-    services::FluxLinkageIdentification* FocStateMachineCommon::ResolveFluxLinkageIdent(
-        const CalibrationServices& calibServices,
-        std::optional<services::FluxLinkageIdentificationImpl>& ownFluxIdent,
-        foc::CurrentCommandable& currentCommandable,
-        foc::Controllable& drive,
-        const foc::FocBase& motion,
-        drivers::ThreePhaseInverter& inverter)
-    {
-        if (calibServices.fluxIdentOverride.has_value())
-            return &calibServices.fluxIdentOverride->get();
-
-        if (!calibServices.identifyFluxLinkage)
-            return nullptr;
-
-        ownFluxIdent.emplace(currentCommandable, drive, motion, inverter);
-        return &*ownFluxIdent;
+        return ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, calibrationContext.EffectiveFluxLinkage(pending), foc::Ampere{ services::CurrentNoiseAmpere(pending.currentNoiseMilliAmpere) });
     }
 
     // A committed calibration replaces the provisional plant; nothing is left to restore.
@@ -256,33 +208,6 @@ namespace application
             tracer.Trace() << "[SM] Provisional identification model discarded, no calibration held";
     }
 
-    bool FocStateMachineCommon::RunPostMechanicalStep(state_machine::Calibrating& /*calibrating*/)
-    {
-        return false;
-    }
-
-    void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)
-    {}
-
-    bool FocStateMachineCommon::HasValidModeSpecificCalibration(const services::CalibrationData& /*data*/) const
-    {
-        return true;
-    }
-
-    void FocStateMachineCommon::PrepareForEnabled()
-    {}
-
-    void FocStateMachineCommon::AbortModeSpecificServices()
-    {}
-
-    bool FocStateMachineCommon::HasModeSpecificWorkPending() const
-    {
-        return false;
-    }
-
-    void FocStateMachineCommon::RegisterModeSpecificCli(services::TerminalWithStorage& /*terminal*/)
-    {}
-
     void FocStateMachineCommon::SaveCalibration(state_machine::Calibrating& calibrating)
     {
         calibration.Save(calibrating);
@@ -308,19 +233,8 @@ namespace application
         return calibrationContext.EffectiveFluxLinkage(data);
     }
 
-    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage, foc::Ampere currentNoise)
+    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise)
     {
-        return calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, currentNoise, GetFoc(), CurrentTunable());
-    }
-
-    state_machine::CommandResult FocStateMachineCommon::ToCommandResult(services::DispatchResult result)
-    {
-        if (result == services::DispatchResult::rejected || result == services::DispatchResult::forbidden)
-            return state_machine::CommandResult::rejected;
-
-        if (result == services::DispatchResult::queued)
-            return state_machine::CommandResult::queued;
-
-        return state_machine::CommandResult::ok;
+        return calibrationContext.ApplyModel(resistance, inductance, polePairs, fluxLinkage, currentNoise, GetFoc(), CurrentTunable());
     }
 }

@@ -14,7 +14,6 @@ namespace
         d.rPhase = 0.5f;
         d.lD = 1.0f;
         d.fluxLinkage = 0.007f;
-        d.currentLoopBandwidth = 1000.0f;
         return d;
     }
 
@@ -98,6 +97,34 @@ TEST_F(CalibrationContextTest, rotor_reference_valid_set_get)
     EXPECT_TRUE(context.IsRotorReferenceValid());
     context.SetRotorReferenceValid(false);
     EXPECT_FALSE(context.IsRotorReferenceValid());
+}
+
+TEST_F(CalibrationContextTest, homed_false_by_default)
+{
+    EXPECT_FALSE(context.IsHomed());
+}
+
+TEST_F(CalibrationContextTest, homed_needs_a_valid_rotor_reference)
+{
+    context.SetRotorReferenceValid(true);
+    context.SetHomed(true);
+    EXPECT_TRUE(context.IsHomed());
+
+    context.SetRotorReferenceValid(false);
+    EXPECT_FALSE(context.IsHomed());
+
+    context.SetRotorReferenceValid(true);
+    EXPECT_FALSE(context.IsHomed());
+}
+
+TEST_F(CalibrationContextTest, invalidate_drops_homed)
+{
+    context.SetRotorReferenceValid(true);
+    context.SetHomed(true);
+
+    context.Invalidate();
+
+    EXPECT_FALSE(context.IsHomed());
 }
 
 TEST_F(CalibrationContextTest, invalidate_resets_data_and_rotor_reference)
@@ -206,7 +233,6 @@ TEST_F(CalibrationContextTest, apply_bounds_the_automatic_current_bandwidth_with
 {
     auto data = CompleteData();
     data.lD = 1.094f;
-    data.currentLoopBandwidth = 0.0f;
     data.currentNoiseMilliAmpere = 30;
     context.SetData(data);
     StrictMock<foc::FocTorqueMock> foc;

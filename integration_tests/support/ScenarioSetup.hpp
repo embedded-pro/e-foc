@@ -1,8 +1,8 @@
 #pragma once
 
-#include "integration_tests/support/nvm/NvmImageBuilder.hpp"
-#include "integration_tests/support/plant/PlantPresets.hpp"
+#include "core/foc/model/drive/memory/NvmImageBuilder.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
+#include "motor_parameters/PlantPresets.hpp"
 #include <chrono>
 #include <cstddef>
 #include <optional>
@@ -65,6 +65,7 @@ namespace integration
         response::PlantTrace trace;
         IdentifiedParameters identified;
         IdentifiedParameters online;
+        IdentifiedParameters inUse;
         std::vector<StreamedCurrent> streamedCurrents;
         FirmwareDownload download;
     };

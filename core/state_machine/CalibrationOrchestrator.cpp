@@ -10,13 +10,15 @@ namespace application
         services::Tracer& tracer,
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
         std::optional<std::reference_wrapper<services::RotorStandstill>> standstill,
-        foc::Volts busVoltage)
+        foc::Volts busVoltage,
+        std::optional<std::reference_wrapper<services::IndexSearch>> indexSearch)
         : electricalIdent(electricalIdent)
         , motorAlignment(motorAlignment)
         , tracer(tracer)
         , currentOffsets(currentOffsets)
         , standstill(standstill)
         , busVoltage(busVoltage)
+        , indexSearch(indexSearch)
     {}
 
     void CalibrationOrchestrator::Start(
@@ -67,11 +69,14 @@ namespace application
 
         if (standstill)
             standstill->get().Abort();
+
+        if (indexSearch)
+            indexSearch->get().Abort();
     }
 
     bool CalibrationOrchestrator::IsRunning() const
     {
-        return running || electricalIdent.IsRunning() || (currentOffsets && currentOffsets->get().IsRunning());
+        return running || electricalIdent.IsRunning() || (currentOffsets && currentOffsets->get().IsRunning()) || (indexSearch && indexSearch->get().IsRunning());
     }
 
     bool CalibrationOrchestrator::HasRunInFlight() const
@@ -178,7 +183,6 @@ namespace application
                 {
                     pendingData->rPhase = result.resistance->Value();
                     pendingData->lD = result.inductance->Value();
-                    pendingData->lQ = result.inductance->Value();
                     RunAlignmentStep();
                 }
             });
@@ -202,13 +206,54 @@ namespace application
                 if (aborted || token != runToken)
                     return;
 
-                running = false;
-
                 if (!angle)
                     Fail(FaultFor(motorAlignment.LastFailure()));
                 else
-                    onAlignmentDone(*angle);
+                    RunIndexStep(*angle);
             });
+    }
+
+    // The index angle belongs to the alignment just made: a search that finds nothing drops the one stored before
+    void CalibrationOrchestrator::RunIndexStep(foc::Radians alignedAngle)
+    {
+        services::ForgetEncoderIndexAngle(*pendingData);
+
+        if (!indexSearch || !indexSearch->get().Available())
+        {
+            FinishAlignment(alignedAngle);
+            return;
+        }
+
+        tracer.Trace() << "[SM] Searching for the encoder index";
+
+        services::IndexSearch::Config config;
+        config.polePairs = pendingData->polePairs;
+        config.phaseResistance = foc::Ohm{ pendingData->rPhase };
+        config.busVoltage = busVoltage;
+
+        alignedAt = alignedAngle;
+        const auto token = runToken;
+        indexSearch->get().Search(config, [this, token](std::optional<foc::Radians> reading)
+            {
+                if (aborted || token != runToken)
+                    return;
+
+                if (reading)
+                {
+                    pendingData->encoderIndexAngle = reading->Value();
+                    tracer.Trace() << "[SM] Encoder index at " << reading->Value() << " rad";
+                }
+                else
+                    tracer.Trace() << "[SM] No encoder index found; the rotor must be aligned after every power-up";
+
+                FinishAlignment(alignedAt);
+            });
+    }
+
+    void CalibrationOrchestrator::FinishAlignment(foc::Radians alignedAngle)
+    {
+        running = false;
+        onAlignmentDone(alignedAngle);
     }
 
     state_machine::FaultCode CalibrationOrchestrator::FaultFor(services::MotorAlignment::Failure failure)

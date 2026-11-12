@@ -11,6 +11,7 @@ target_link_libraries(e_foc.services.flux_linkage_ident PUBLIC
     e_foc.platform_abstraction
     e_foc.foc.interfaces
     e_foc.foc.math
+    numerical.estimators.online
 )
 
 target_sources(e_foc.services.flux_linkage_ident PRIVATE

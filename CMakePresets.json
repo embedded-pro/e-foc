@@ -2,7 +2,7 @@
   "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 24,
+    "minor": 25,
     "patch": 0
   },
   "configurePresets": [
@@ -11,6 +11,11 @@
       "hidden": true,
       "binaryDir": "${sourceDir}/build/${presetName}",
       "installDir": "${sourceDir}/install",
+      "environment": {
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CCACHE_BASEDIR": "${sourceDir}"
+      },
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "On",
@@ -27,7 +32,6 @@
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
         "E_FOC_TARGET_PLATFORM": "host",
         "E_FOC_BUILD_TESTS": true,
-        "E_FOC_BUILD_SIMULATOR": true,
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
       },
       "generator": "Ninja Multi-Config"
@@ -151,7 +155,6 @@
         "TARGET_CORTEX": "m4",
         "E_FOC_TARGET_PLATFORM": "qemu",
         "E_FOC_BUILD_TESTS": "Off",
-        "E_FOC_BUILD_SIMULATOR": "Off",
         "E_FOC_EMBEDDED_BUILD": "On",
         "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
         "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an386;-nographic;-semihosting-config;enable=on,target=native;-kernel",

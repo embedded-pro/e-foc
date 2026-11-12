@@ -4,15 +4,16 @@
 #include "can-lite/client/CanProtocolClient.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/drivers/interface/CanBusAdapter.hpp"
-#include "core/can/FocMotorCanClient.hpp"
-#include "core/can/FocMotorCategoryClient.hpp"
-#include "core/can/FocMotorMessages.hpp"
-#include "core/services/firmware_upgrade/FirmwareVersion.hpp"
+#include "e-foc-protocol/client/FocMotorCanClient.hpp"
+#include "e-foc-protocol/client/FocMotorCategoryClient.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Observer.hpp"
-#include <array>
+#include "tools/can_commander/logic/CommandTracker.hpp"
+#include "tools/can_commander/logic/FirmwareIdentityCollector.hpp"
+#include "tools/can_commander/logic/MotorCommands.hpp"
+#include "tools/can_commander/logic/NodeData.hpp"
 #include <cstdint>
-#include <deque>
 #include <map>
 #include <optional>
 #include <set>
@@ -23,16 +24,6 @@ namespace tool
     using FocFaultCode = can::FocFaultCode;
 
     class CanCommandClient;
-
-    struct FirmwareIdentity
-    {
-        services::FirmwareVersion running;
-        uint8_t boardKind{ 0 };
-        services::FirmwareVersion staged;
-        bool hasUpgradeService{ true };
-
-        bool operator==(const FirmwareIdentity& other) const = default;
-    };
 
     class CanCommandClientObserver
         : public infra::SingleObserver<CanCommandClientObserver, CanCommandClient>
@@ -56,10 +47,10 @@ namespace tool
         virtual void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) = 0;
         virtual void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) = 0;
         virtual void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) = 0;
-        virtual void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
         virtual void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) = 0;
         virtual void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) = 0;
         virtual void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) = 0;
+        virtual void OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record) = 0;
     };
 
     class CanCommandClient
@@ -69,11 +60,6 @@ namespace tool
         , private services::CanBusAdapterObserver
     {
     public:
-        static constexpr infra::Duration commandTimeout{ std::chrono::seconds(2) };
-        // The first Start after power-up waits up to 10 s for the rotor to rest before measuring the current offsets.
-        static constexpr infra::Duration startCommandTimeout{ std::chrono::seconds(12) };
-        static constexpr infra::Duration motionCommandTimeout{ std::chrono::minutes(2) };
-        static constexpr infra::Duration readTimeout{ std::chrono::seconds(1) };
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
         static constexpr uint8_t settingsContractMinor{ 1 };
         static constexpr uint8_t diagnosticsContractMinor{ 2 };
@@ -135,90 +121,46 @@ namespace tool
         void RequestReadings(uint16_t nodeId);
         void RequestStatus(uint16_t nodeId);
         void RequestFirmwareIdentity(uint16_t nodeId);
+        void RequestFaultHistory(uint16_t nodeId);
 
+        MotorCommands& Commands();
+        NodeData& Data();
         services::FirmwareUpgradeCategoryClient& FirmwareUpgrade();
-        const can::CanFrameOrigin& FrameOrigin() const;
+        const services::CanFrameOrigin& FrameOrigin() const;
 
     private:
-        struct NodeCommand
-        {
-            bool busy{ false };
-            uint8_t pendingCommand{ 0 };
-            infra::TimerSingleShot timeout;
-        };
-
-        struct Read
-        {
-            uint8_t commandType{ 0 };
-            can::FocParameter parameter{ can::FocParameter::currentBandwidth };
-        };
-
-        struct NodeReads
-        {
-            std::deque<Read> queued;
-            std::optional<uint8_t> inFlight;
-            can::FocParameter inFlightParameter{ can::FocParameter::currentBandwidth };
-            infra::TimerSingleShot timeout;
-        };
-
-        struct PartialIdentity
-        {
-            std::array<std::optional<float>, 7> values;
-            bool stagingRefused{ false };
-        };
-
-        void MarkBusy(uint16_t nodeId, uint8_t commandType);
-        void ClearBusy(uint16_t nodeId);
-        void CompleteCommand(uint16_t nodeId, uint8_t commandType);
+        bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
         void MarkOnline(uint16_t nodeId);
         void MarkOffline(uint16_t nodeId);
-        void QueueRead(uint16_t nodeId, Read read);
-        void SendNextRead(uint16_t nodeId);
-        void CompleteRead(uint16_t nodeId, uint8_t commandType);
-        bool SendRead(uint16_t nodeId, const Read& read);
-        void ForgetReads(uint16_t nodeId);
-        void OnAccepted(uint16_t nodeId, uint8_t commandType);
-        bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
-        bool SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const;
         void RefreshStatus();
-        static bool IsRead(uint8_t commandType);
-        void CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value);
-        void OnReadRefused(uint16_t nodeId, uint8_t commandType);
-        void ReportIdentityWhenComplete(uint16_t nodeId);
-        bool IsIdentityQueued(uint16_t nodeId) const;
+        bool HandleCommandAck(uint32_t id, const services::CanFrame& data);
+        void ReportIdentity(uint16_t nodeId, const std::optional<FirmwareIdentity>& identity);
 
-        template<class Send>
-        bool Tracked(uint16_t nodeId, uint8_t commandType, Send send);
-
-        // CanProtocolClientObserver
         void OnServerOnline(uint16_t nodeId) override;
         void OnServerOffline(uint16_t nodeId) override;
         void OnCommandAckTimeout(uint16_t nodeId, uint8_t category, uint8_t messageType) override;
 
-        // FocMotorCategoryClientObserver
         void OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode) override;
         void OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
-        void OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) override;
+        void OnTelemetryStatus(uint16_t nodeId, can::FocMotorState state, can::FocFaultCode fault) override;
+        void OnTelemetryMotion(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position) override;
         void OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position) override;
         void OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor) override;
-        void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterResponse(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
+        void OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs) override;
+        void OnFaultConditionsResponse(uint16_t nodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent) override;
 
-        // services::CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) override;
         void OnError(infra::BoundedConstString message) override;
         void OnConnectionChanged(bool connected) override;
 
-        bool HandleCommandAck(uint32_t id, const services::CanFrame& data);
-        void DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const;
-
         can::FocMotorCanClient focClient;
         services::FirmwareUpgradeCategoryClient firmwareUpgrade;
-        std::map<uint16_t, NodeCommand> commands;
-        std::map<uint16_t, NodeReads> reads;
+        CommandTracker tracker;
+        MotorCommands commands{ focClient.CategoryClient(), tracker };
+        NodeData nodeData{ focClient.CategoryClient() };
         std::map<uint16_t, uint8_t> contractMinors;
-        std::map<uint16_t, PartialIdentity> identities;
         std::set<uint16_t> onlineNodes;
         infra::TimerRepeating statusRefresh;
     };

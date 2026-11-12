@@ -1,6 +1,7 @@
 #include "tools/can_commander/gui/SettingEditor.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include <cmath>
+#include <cstddef>
 
 namespace tool
 {
@@ -11,6 +12,18 @@ namespace tool
         QString BitrateText(uint32_t bitrate)
         {
             return bitrate >= 1000000 ? QString("%1 Mbit/s").arg(bitrate / 1000000) : QString("%1 kbit/s").arg(bitrate / 1000);
+        }
+
+        bool IsChoice(can::FocParameter parameter)
+        {
+            return parameter == can::FocParameter::canBitrate || parameter == can::FocParameter::recalibrationMode;
+        }
+
+        QString ChoiceText(can::FocParameter parameter, float value)
+        {
+            if (parameter == can::FocParameter::recalibrationMode)
+                return ToQt(RecalibrationModeName(value));
+            return BitrateText(static_cast<uint32_t>(value));
         }
     }
 
@@ -27,7 +40,7 @@ namespace tool
         auto* layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
 
-        if (presentation.parameter == can::FocParameter::canBitrate)
+        if (IsChoice(presentation.parameter))
             BuildChoice(*layout);
         else if (IsToggle(presentation.parameter))
             BuildToggle(*layout);
@@ -93,8 +106,12 @@ namespace tool
         choice->setPlaceholderText("—");
         choice->setAccessibleName(ToQt(presentation.name));
         choice->setToolTip(ToQt(presentation.description));
-        for (const auto bitrate : can::focCanBitrates)
-            choice->addItem(BitrateText(bitrate), static_cast<qlonglong>(bitrate));
+        if (presentation.parameter == can::FocParameter::recalibrationMode)
+            for (std::size_t mode = 0; mode != RecalibrationModes().size(); ++mode)
+                choice->addItem(ToQt(RecalibrationModes()[mode]), static_cast<qlonglong>(mode));
+        else
+            for (const auto bitrate : can::focCanBitrates)
+                choice->addItem(BitrateText(bitrate), static_cast<qlonglong>(bitrate));
         layout.addWidget(choice, 1);
         label->setBuddy(choice);
 
@@ -132,16 +149,6 @@ namespace tool
             MarkEdited();
     }
 
-    void SettingEditor::SetLegacy(bool legacyContract)
-    {
-        legacy = legacyContract;
-        if (automatic != nullptr)
-            automatic->setVisible(!legacy);
-
-        UpdateEnabled();
-        MarkEdited();
-    }
-
     void SettingEditor::SetUnavailable(const QString& reason)
     {
         unavailableReason = reason;
@@ -173,7 +180,7 @@ namespace tool
         if (choice != nullptr)
             return choice->currentIndex() >= 0 && (!held.has_value() || choice->currentData().toLongLong() != std::llround(held->value));
 
-        if (automatic != nullptr && !legacy && automatic->isChecked() != (held.has_value() && held->automatic))
+        if (automatic != nullptr && automatic->isChecked() != (held.has_value() && held->automatic))
             return true;
 
         if (IsAutomaticChosen() || number->text() == heldText)
@@ -189,7 +196,7 @@ namespace tool
             return true;
 
         const auto entry = Parse();
-        return entry.has_value() && IsAcceptableEntry(presentation.parameter, *entry, legacy);
+        return entry.has_value() && IsAcceptableEntry(presentation.parameter, *entry);
     }
 
     float SettingEditor::EditedValue() const
@@ -211,10 +218,9 @@ namespace tool
         if (IsValid())
             return {};
 
-        const bool whole = descriptor.integer || (legacy && IsBandwidth(presentation.parameter));
         return QString("%1: enter %2 from %3 to %4%5")
             .arg(ToQt(presentation.name))
-            .arg(whole ? "a whole number" : "a value")
+            .arg(descriptor.integer ? "a whole number" : "a value")
             .arg(Format(descriptor.minimum))
             .arg(Format(descriptor.maximum))
             .arg(ToQt(presentation.suffix));
@@ -228,7 +234,7 @@ namespace tool
         if (toggle != nullptr)
             return QString("%1 %2").arg(name, value >= 0.5f ? "on" : "off");
         if (choice != nullptr)
-            return QString("%1 %2").arg(name, BitrateText(static_cast<uint32_t>(value)));
+            return QString("%1 %2").arg(name, ChoiceText(presentation.parameter, value));
         return QString("%1 %2%3").arg(name, Format(value), ToQt(presentation.suffix));
     }
 
@@ -237,7 +243,7 @@ namespace tool
         if (number != nullptr)
             number->setText(heldText);
         if (automatic != nullptr)
-            automatic->setChecked(held.has_value() && held->automatic && !legacy);
+            automatic->setChecked(held.has_value() && held->automatic);
         if (toggle != nullptr)
             toggle->setChecked(held.has_value() && held->value >= 0.5f);
         if (choice != nullptr)
@@ -294,6 +300,6 @@ namespace tool
 
     bool SettingEditor::IsAutomaticChosen() const
     {
-        return automatic != nullptr && !legacy && automatic->isChecked();
+        return automatic != nullptr && automatic->isChecked();
     }
 }

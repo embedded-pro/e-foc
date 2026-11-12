@@ -1,48 +1,28 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
-#include "can-lite/core/CanPayload.hpp"
-#include "core/can/FocMotorSettings.hpp"
-#include "core/can/FocMotorWireContract.hpp"
-#include <algorithm>
-#include <cmath>
-#include <span>
-#include <utility>
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 
 namespace tool
 {
     using namespace services;
 
-    namespace
-    {
-        constexpr std::array<can::FocParameter, 7> identityParameters{
-            can::FocParameter::firmwareVersionMajor,
-            can::FocParameter::firmwareVersionMinor,
-            can::FocParameter::firmwareVersionPatch,
-            can::FocParameter::boardKind,
-            can::FocParameter::stagedVersionMajor,
-            can::FocParameter::stagedVersionMinor,
-            can::FocParameter::stagedVersionPatch,
-        };
-
-        constexpr std::size_t stagedVersionFirst{ 4 };
-
-        std::optional<std::size_t> IdentitySlot(can::FocParameter parameter)
-        {
-            const auto slot = std::ranges::find(identityParameters, parameter);
-            if (slot == identityParameters.end())
-                return std::nullopt;
-            return static_cast<std::size_t>(slot - identityParameters.begin());
-        }
-
-        uint8_t VersionNumber(const std::optional<float>& value)
-        {
-            return static_cast<uint8_t>(std::lround(value.value_or(0.0f)));
-        }
-    }
-
     CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter }
         , firmwareUpgrade{ focClient.ProtocolClient().Transport(), focClient.ProtocolClient() }
+        , tracker{ [this](uint16_t nodeId, bool busy)
+            {
+                NotifyObservers([nodeId, busy](auto& observer)
+                    {
+                        observer.OnBusyChanged(nodeId, busy);
+                    });
+            },
+            [this](uint16_t nodeId, uint8_t commandType)
+            {
+                NotifyObservers([nodeId, commandType](auto& observer)
+                    {
+                        observer.OnCommandTimeout(nodeId, commandType);
+                    });
+            } }
         , statusRefresh{ statusRefreshInterval, [this]()
             {
                 RefreshStatus();
@@ -63,8 +43,7 @@ namespace tool
 
     bool CanCommandClient::IsBusy(uint16_t nodeId) const
     {
-        const auto node = commands.find(nodeId);
-        return node != commands.end() && node->second.busy;
+        return tracker.IsBusy(nodeId);
     }
 
     bool CanCommandClient::IsOnline(uint16_t nodeId) const
@@ -137,490 +116,179 @@ namespace tool
         return SupportsMinor(nodeId, quickStopContractMinor);
     }
 
-    services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
-    {
-        return firmwareUpgrade;
-    }
-
-    const can::CanFrameOrigin& CanCommandClient::FrameOrigin() const
-    {
-        return focClient.Origin();
-    }
-
     bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
     {
-        const auto minor = contractMinors.find(nodeId);
-        return Compatibility(nodeId) == can::ContractCompatibility::compatible && minor != contractMinors.end() && minor->second >= minimumMinor;
-    }
-
-    bool CanCommandClient::SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const
-    {
-        if (parameter == can::FocParameter::positionWindow || parameter == can::FocParameter::positionWindowTime)
-            return SupportsTargetWindow(nodeId);
-        if (parameter == can::FocParameter::positionMinimum || parameter == can::FocParameter::positionMaximum)
-            return SupportsTravelLimits(nodeId);
-        if (parameter == can::FocParameter::calibrationTemperature)
-            return SupportsThermal(nodeId);
-        if (parameter == can::FocParameter::temperatureLimit || parameter == can::FocParameter::temperatureMargin)
-            return SupportsOverTemperature(nodeId);
-        if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
-            return SupportsBusVoltageLimits(nodeId);
-        if (parameter == can::FocParameter::quickStopDeceleration)
-            return SupportsQuickStop(nodeId);
-
-        switch (can::GroupOf(parameter))
-        {
-            case can::ParameterGroup::supervision:
-                return SupportsSupervision(nodeId);
-            case can::ParameterGroup::limits:
-                return SupportsLimits(nodeId);
-            default:
-                return true;
-        }
+        const auto it = contractMinors.find(nodeId);
+        return Compatibility(nodeId) == can::ContractCompatibility::compatible && it != contractMinors.end() && it->second >= minimumMinor;
     }
 
     infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
     {
-        switch (commandType)
-        {
-            case can::focAlignId:
-            case can::focIdentifyElectricalId:
-            case can::focCalibrateId:
-                return motionCommandTimeout;
-            case can::focStartId:
-                return startCommandTimeout;
-            default:
-                return commandTimeout;
-        }
+        return CommandTracker::TimeoutFor(commandType);
     }
 
-    void CanCommandClient::MarkBusy(uint16_t nodeId, uint8_t commandType)
+    MotorCommands& CanCommandClient::Commands()
     {
-        auto& node = commands[nodeId];
-        node.pendingCommand = commandType;
-        node.timeout.Start(TimeoutFor(commandType), [this, nodeId, commandType]()
-            {
-                ClearBusy(nodeId);
-                NotifyObservers([nodeId, commandType](auto& observer)
-                    {
-                        observer.OnCommandTimeout(nodeId, commandType);
-                    });
-            });
-
-        if (!std::exchange(node.busy, true))
-            NotifyObservers([nodeId](auto& observer)
-                {
-                    observer.OnBusyChanged(nodeId, true);
-                });
+        return commands;
     }
 
-    void CanCommandClient::ClearBusy(uint16_t nodeId)
+    NodeData& CanCommandClient::Data()
     {
-        const auto node = commands.find(nodeId);
-        if (node == commands.end() || !node->second.busy)
-            return;
-
-        node->second.busy = false;
-        node->second.timeout.Cancel();
-        NotifyObservers([nodeId](auto& observer)
-            {
-                observer.OnBusyChanged(nodeId, false);
-            });
-    }
-
-    void CanCommandClient::CompleteCommand(uint16_t nodeId, uint8_t commandType)
-    {
-        const auto node = commands.find(nodeId);
-        if (node != commands.end() && node->second.pendingCommand == commandType)
-            ClearBusy(nodeId);
-    }
-
-    template<class Send>
-    bool CanCommandClient::Tracked(uint16_t nodeId, uint8_t commandType, Send send)
-    {
-        if (!send())
-            return false;
-
-        MarkBusy(nodeId, commandType);
-        return true;
+        return nodeData;
     }
 
     bool CanCommandClient::SendStartMotor(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focStartId, [&]()
-            {
-                return focClient.CategoryClient().SendStart(nodeId);
-            });
+        return commands.SendStartMotor(nodeId);
     }
 
     bool CanCommandClient::SendStopMotor(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focStopId, [&]()
-            {
-                return focClient.CategoryClient().SendStop(nodeId);
-            });
+        return commands.SendStopMotor(nodeId);
     }
 
     bool CanCommandClient::SendEmergencyStop(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focEmergencyStopId, [&]()
-            {
-                return focClient.CategoryClient().SendEmergencyStop(nodeId);
-            });
+        return commands.SendEmergencyStop(nodeId);
     }
 
     bool CanCommandClient::SendQuickStop(uint16_t nodeId)
     {
         if (!SupportsQuickStop(nodeId))
             return false;
-
-        return Tracked(nodeId, can::focQuickStopId, [&]()
-            {
-                return focClient.CategoryClient().SendQuickStop(nodeId);
-            });
+        return commands.SendQuickStop(nodeId);
     }
 
     bool CanCommandClient::SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode)
     {
-        return Tracked(nodeId, can::focSelectControlModeId, [&]()
-            {
-                return focClient.CategoryClient().SendSelectControlMode(nodeId, mode);
-            });
+        return commands.SendSetControlMode(nodeId, mode);
     }
 
     bool CanCommandClient::SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent)
     {
-        return Tracked(nodeId, can::focSetTorqueSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetTorqueSetpoint(nodeId, foc::Ampere{ iqCurrent });
-            });
+        return commands.SendSetTorqueSetpoint(nodeId, iqCurrent);
     }
 
     bool CanCommandClient::SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec)
     {
-        return Tracked(nodeId, can::focSetSpeedSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetSpeedSetpoint(nodeId, foc::RadiansPerSecond{ speedRadPerSec });
-            });
+        return commands.SendSetSpeedSetpoint(nodeId, speedRadPerSec);
     }
 
     bool CanCommandClient::SendSetPositionSetpoint(uint16_t nodeId, float positionRad)
     {
-        return Tracked(nodeId, can::focSetPositionSetpointId, [&]()
-            {
-                return focClient.CategoryClient().SendSetPositionSetpoint(nodeId, foc::Radians{ positionRad });
-            });
+        return commands.SendSetPositionSetpoint(nodeId, positionRad);
     }
 
     bool CanCommandClient::SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked(nodeId, can::focSetPidCurrentId, [&]()
-            {
-                return focClient.CategoryClient().SendSetCurrentBandwidth(nodeId, bandwidth);
-            });
+        return commands.SendSetParameter(nodeId, can::FocParameter::currentBandwidth, bandwidth);
     }
 
     bool CanCommandClient::SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked(nodeId, can::focSetPidSpeedId, [&]()
-            {
-                return focClient.CategoryClient().SendSetSpeedBandwidth(nodeId, bandwidth);
-            });
+        return commands.SendSetParameter(nodeId, can::FocParameter::speedBandwidth, bandwidth);
     }
 
     bool CanCommandClient::SendSetPositionBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked(nodeId, can::focSetPidPositionId, [&]()
-            {
-                return focClient.CategoryClient().SendSetPositionBandwidth(nodeId, bandwidth);
-            });
+        return commands.SendSetParameter(nodeId, can::FocParameter::positionBandwidth, bandwidth);
     }
 
     bool CanCommandClient::SendClearFault(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focClearFaultId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendClearFault(nodeId);
-            });
+        return commands.SendClearFault(nodeId);
     }
 
     bool CanCommandClient::SendAlign(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focAlignId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendAlign(nodeId);
-            });
+        return commands.SendAlign(nodeId);
     }
 
     bool CanCommandClient::SendIdentifyElectrical(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focIdentifyElectricalId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendIdentifyElectrical(nodeId);
-            });
+        return commands.SendIdentifyElectrical(nodeId);
     }
 
     bool CanCommandClient::SendCalibrate(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focCalibrateId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::calibrate);
-            });
+        return commands.SendCalibrate(nodeId);
     }
 
     bool CanCommandClient::SendClearCalibration(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focClearCalibrationId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::clearCalibration);
-            });
+        return commands.SendClearCalibration(nodeId);
     }
 
     bool CanCommandClient::SendClearDiagnostics(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focClearDiagnosticsId, [this, nodeId]()
-            {
-                return focClient.CategoryClient().SendMaintenanceCommand(nodeId, can::FocMaintenanceCommand::clearDiagnostics);
-            });
+        return commands.SendClearDiagnostics(nodeId);
     }
 
     bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
     {
-        return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
-            {
-                return focClient.CategoryClient().SendSetEncoderResolution(nodeId, countsPerRevolution);
-            });
+        return commands.SendSetParameter(nodeId, can::FocParameter::encoderResolution, static_cast<float>(countsPerRevolution));
     }
 
     bool CanCommandClient::SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm)
     {
-        return Tracked(nodeId, can::focSelectAlgorithmId, [this, nodeId, loop, algorithm]()
-            {
-                return focClient.CategoryClient().SendSelectAlgorithm(nodeId, loop, algorithm);
-            });
+        return commands.SendSelectAlgorithm(nodeId, loop, algorithm);
     }
 
     bool CanCommandClient::SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value)
     {
-        return Tracked(nodeId, can::focSetParameterId, [this, nodeId, parameter, value]()
-            {
-                return focClient.CategoryClient().SendSetParameter(nodeId, parameter, value);
-            });
+        return commands.SendSetParameter(nodeId, parameter, value);
     }
 
     bool CanCommandClient::RequestData(uint16_t nodeId)
     {
-        return focClient.CategoryClient().SendQueryContractVersion(nodeId);
+        return nodeData.RequestData(nodeId);
     }
 
     void CanCommandClient::RequestSettings(uint16_t nodeId)
     {
-        if (!SupportsSettings(nodeId))
-            return;
-
-        QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
-        for (const auto& descriptor : can::focParameters)
-            if (!descriptor.readOnly && SupportsSetting(nodeId, descriptor.id))
-                QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+        nodeData.RequestSettings(nodeId);
     }
 
     void CanCommandClient::RequestReadings(uint16_t nodeId)
     {
-        if (!SupportsDiagnostics(nodeId))
-            return;
-
-        for (const auto& descriptor : can::focParameters)
-            if (descriptor.readOnly && descriptor.id != can::FocParameter::targetReached && descriptor.id != can::FocParameter::windingTemperature)
-                QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+        nodeData.RequestReadings(nodeId);
     }
 
     void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
     {
-        if (!SupportsFirmwareIdentity(nodeId) || IsIdentityQueued(nodeId))
-            return;
-
-        identities.erase(nodeId);
-        for (const auto parameter : identityParameters)
-            QueueRead(nodeId, Read{ can::focQueryParameterId, parameter });
+        nodeData.RequestFirmwareIdentity(nodeId);
     }
 
-    bool CanCommandClient::IsIdentityQueued(uint16_t nodeId) const
+    void CanCommandClient::RequestFaultHistory(uint16_t nodeId)
     {
-        const auto node = reads.find(nodeId);
-        return node != reads.end() && std::ranges::any_of(node->second.queued, [](const Read& read)
-                                          {
-                                              return read.commandType == can::focQueryParameterId && IdentitySlot(read.parameter).has_value();
-                                          });
+        nodeData.RequestFaultHistory(nodeId);
     }
 
-    void CanCommandClient::CollectIdentity(uint16_t nodeId, can::FocParameter parameter, float value)
+    services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
     {
-        const auto slot = IdentitySlot(parameter);
-        if (!slot.has_value())
-            return;
-
-        identities[nodeId].values[*slot] = value;
-        ReportIdentityWhenComplete(nodeId);
+        return firmwareUpgrade;
     }
 
-    void CanCommandClient::OnReadRefused(uint16_t nodeId, uint8_t commandType)
+    const services::CanFrameOrigin& CanCommandClient::FrameOrigin() const
     {
-        const auto node = reads.find(nodeId);
-        if (commandType != can::focQueryParameterId || node == reads.end() || node->second.inFlight != commandType)
-            return;
-
-        const auto slot = IdentitySlot(node->second.inFlightParameter);
-        if (!slot.has_value() || *slot < stagedVersionFirst)
-            return;
-
-        identities[nodeId].stagingRefused = true;
-        ReportIdentityWhenComplete(nodeId);
+        return focClient.Origin();
     }
 
-    void CanCommandClient::ReportIdentityWhenComplete(uint16_t nodeId)
+    void CanCommandClient::ReportIdentity(uint16_t nodeId, const std::optional<FirmwareIdentity>& identity)
     {
-        const auto& partial = identities[nodeId];
-        const auto arrived = [&partial](std::size_t first, std::size_t count)
-        {
-            return std::ranges::all_of(std::span{ partial.values }.subspan(first, count), [](const std::optional<float>& value)
-                {
-                    return value.has_value();
-                });
-        };
-
-        const bool staged = arrived(stagedVersionFirst, identityParameters.size() - stagedVersionFirst);
-        if (!arrived(0, stagedVersionFirst) || (!staged && !partial.stagingRefused))
+        if (!identity.has_value())
             return;
 
-        const auto& values = partial.values;
-        const FirmwareIdentity identity{ { VersionNumber(values[0]), VersionNumber(values[1]), VersionNumber(values[2]) }, VersionNumber(values[3]),
-            staged ? services::FirmwareVersion{ VersionNumber(values[4]), VersionNumber(values[5]), VersionNumber(values[6]) } : services::FirmwareVersion{}, staged };
-        identities.erase(nodeId);
         NotifyObservers([nodeId, &identity](auto& observer)
             {
-                observer.OnFirmwareIdentityReceived(nodeId, identity);
+                observer.OnFirmwareIdentityReceived(nodeId, *identity);
             });
-    }
-
-    void CanCommandClient::RequestStatus(uint16_t nodeId)
-    {
-        if (Compatibility(nodeId) != can::ContractCompatibility::compatible)
-            return;
-
-        QueueRead(nodeId, Read{ can::focRequestTelemetryId });
-        if (SupportsTargetWindow(nodeId))
-            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::targetReached });
-        if (SupportsThermal(nodeId))
-            QueueRead(nodeId, Read{ can::focQueryParameterId, can::FocParameter::windingTemperature });
-    }
-
-    void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
-    {
-        auto& node = reads[nodeId];
-        const auto queued = std::ranges::any_of(node.queued, [&read](const Read& other)
-            {
-                return other.commandType == read.commandType && other.parameter == read.parameter;
-            });
-
-        if (!queued)
-            node.queued.push_back(read);
-
-        if (!node.inFlight.has_value())
-            SendNextRead(nodeId);
-    }
-
-    void CanCommandClient::SendNextRead(uint16_t nodeId)
-    {
-        auto& node = reads[nodeId];
-        while (!node.queued.empty())
-        {
-            const auto read = node.queued.front();
-            node.queued.pop_front();
-
-            if (SendRead(nodeId, read))
-            {
-                node.inFlight = read.commandType;
-                node.inFlightParameter = read.parameter;
-                node.timeout.Start(readTimeout, [this, nodeId, commandType = read.commandType]()
-                    {
-                        CompleteRead(nodeId, commandType);
-                    });
-                return;
-            }
-        }
-    }
-
-    bool CanCommandClient::SendRead(uint16_t nodeId, const Read& read)
-    {
-        auto& category = focClient.CategoryClient();
-        switch (read.commandType)
-        {
-            case can::focQueryAlgorithmsId:
-                return category.SendQueryAlgorithms(nodeId);
-            case can::focQueryParameterId:
-                return category.SendQueryParameter(nodeId, read.parameter);
-            default:
-                return category.SendRequestTelemetry(nodeId);
-        }
-    }
-
-    void CanCommandClient::CompleteRead(uint16_t nodeId, uint8_t commandType)
-    {
-        const auto node = reads.find(nodeId);
-        if (node == reads.end() || node->second.inFlight != commandType)
-            return;
-
-        node->second.inFlight.reset();
-        node->second.timeout.Cancel();
-        SendNextRead(nodeId);
-    }
-
-    void CanCommandClient::ForgetReads(uint16_t nodeId)
-    {
-        const auto node = reads.find(nodeId);
-        identities.erase(nodeId);
-        if (node == reads.end())
-            return;
-
-        node->second.queued.clear();
-        node->second.inFlight.reset();
-        node->second.timeout.Cancel();
-    }
-
-    bool CanCommandClient::IsRead(uint8_t commandType)
-    {
-        return commandType == can::focQueryAlgorithmsId || commandType == can::focQueryParameterId || commandType == can::focRequestTelemetryId;
-    }
-
-    void CanCommandClient::OnAccepted(uint16_t nodeId, uint8_t commandType)
-    {
-        switch (commandType)
-        {
-            case can::focSelectControlModeId:
-            case can::focSelectAlgorithmId:
-            case can::focAlignId:
-            case can::focIdentifyElectricalId:
-                RequestSettings(nodeId);
-                break;
-            case can::focCalibrateId:
-            case can::focClearCalibrationId:
-                RequestSettings(nodeId);
-                RequestReadings(nodeId);
-                break;
-            case can::focClearDiagnosticsId:
-                RequestReadings(nodeId);
-                break;
-            default:
-                break;
-        }
-
-        RequestStatus(nodeId);
     }
 
     void CanCommandClient::RefreshStatus()
     {
         for (const auto nodeId : onlineNodes)
-            RequestStatus(nodeId);
+            nodeData.RequestStatus(nodeId);
     }
 
     void CanCommandClient::MarkOnline(uint16_t nodeId)
@@ -632,7 +300,7 @@ namespace tool
             {
                 observer.OnNodeOnlineChanged(nodeId, true);
             });
-        RequestData(nodeId);
+        nodeData.RequestData(nodeId);
     }
 
     void CanCommandClient::MarkOffline(uint16_t nodeId)
@@ -640,8 +308,9 @@ namespace tool
         if (onlineNodes.erase(nodeId) == 0)
             return;
 
-        ClearBusy(nodeId);
-        ForgetReads(nodeId);
+        tracker.Clear(nodeId);
+        contractMinors.erase(nodeId);
+        nodeData.Forget(nodeId);
         NotifyObservers([nodeId](auto& observer)
             {
                 observer.OnNodeOnlineChanged(nodeId, false);
@@ -658,12 +327,12 @@ namespace tool
         MarkOffline(nodeId);
     }
 
-    void CanCommandClient::OnCommandAckTimeout(uint16_t /*nodeId*/, uint8_t /*category*/, uint8_t /*messageType*/)
+    void CanCommandClient::OnCommandAckTimeout(uint16_t, uint8_t, uint8_t)
     {}
 
     void CanCommandClient::OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode)
     {
-        CompleteCommand(nodeId, can::focSelectControlModeId);
+        tracker.Complete(nodeId, can::focSelectControlModeId);
         NotifyObservers([nodeId, activeMode](auto& observer)
             {
                 observer.OnControlModeAcknowledged(nodeId, activeMode);
@@ -672,22 +341,39 @@ namespace tool
 
     void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode)
     {
-        if (IsRead(originCommandId))
+        if (ReadScheduler::IsRead(originCommandId))
         {
-            CompleteRead(nodeId, originCommandId);
+            nodeData.ReadAnswered(nodeId, originCommandId);
             return;
         }
 
-        CompleteCommand(nodeId, originCommandId);
+        tracker.Complete(nodeId, originCommandId);
         NotifyObservers([nodeId, originCommandId, errorCode](auto& observer)
             {
                 observer.OnCommandRejected(nodeId, originCommandId, errorCode);
             });
     }
 
-    void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg)
+    void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, can::FocMotorState state, can::FocFaultCode fault)
     {
-        DecodeTelemetryStatus(nodeId, msg);
+        NotifyObservers([nodeId, state, fault](auto& observer)
+            {
+                observer.OnMotorStatusReceived(nodeId, state, fault);
+            });
+
+        if (fault != FocFaultCode::none)
+            NotifyObservers([nodeId, fault](auto& observer)
+                {
+                    observer.OnFaultEventReceived(nodeId, fault);
+                });
+    }
+
+    void CanCommandClient::OnTelemetryMotion(uint16_t nodeId, foc::RadiansPerSecond speed, foc::Radians position)
+    {
+        NotifyObservers([nodeId, speed, position](auto& observer)
+            {
+                observer.OnSpeedPositionReceived(nodeId, speed.Value(), position.Value());
+            });
     }
 
     void CanCommandClient::OnTelemetryCurrents(uint16_t nodeId, uint8_t sequence, foc::Ampere id, foc::Ampere iq, foc::Radians position)
@@ -700,26 +386,18 @@ namespace tool
 
     void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
     {
-        const bool compatible = major == can::focContractVersionMajor;
         contractMinors[nodeId] = minor;
+        const bool compatible = can::IsCompatibleContract(major, minor);
+
+        if (compatible)
+            nodeData.SetMinor(nodeId, minor);
 
         NotifyObservers([nodeId, major, minor, compatible](auto& observer)
             {
                 observer.OnContractVersion(nodeId, major, minor, compatible);
             });
 
-        RequestSettings(nodeId);
-        RequestReadings(nodeId);
-        RequestFirmwareIdentity(nodeId);
-        RequestStatus(nodeId);
-    }
-
-    void CanCommandClient::OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
-    {
-        NotifyObservers([nodeId, resistance, inductance, polePairs](auto& observer)
-            {
-                observer.OnElectricalParametersReceived(nodeId, resistance.Value(), inductance.Value(), polePairs);
-            });
+        nodeData.RequestAfterContract(nodeId);
     }
 
     void CanCommandClient::OnAlgorithmsResponse(uint16_t nodeId, const can::FocAlgorithms& algorithms)
@@ -736,35 +414,24 @@ namespace tool
             {
                 observer.OnParameterReceived(nodeId, parameter, value);
             });
-        CollectIdentity(nodeId, parameter, value.value);
+        ReportIdentity(nodeId, nodeData.ParameterReceived(nodeId, parameter, value.value));
     }
 
-    void CanCommandClient::DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const
+    void CanCommandClient::OnFaultRecordResponse(uint16_t nodeId, uint8_t age, can::FocFaultCode code, can::FocMotorMode mode, uint32_t uptimeMs)
     {
-        if (!can::PayloadExact(msg, can::focTelemetryStatusResponseId))
+        nodeData.FaultRecordReceived(nodeId, age, code, mode, uptimeMs);
+    }
+
+    void CanCommandClient::OnFaultConditionsResponse(uint16_t nodeId, uint8_t age, int16_t powerUp, foc::Volts busVoltage, foc::Ampere peakCurrent)
+    {
+        const auto record = nodeData.FaultConditionsReceived(nodeId, age, powerUp, busVoltage, peakCurrent);
+        if (!record.has_value())
             return;
 
-        services::CanPayloadReader reader{ msg };
-        const auto state = static_cast<FocMotorState>(reader.ReadUInt8());
-        const auto fault = static_cast<FocFaultCode>(reader.ReadUInt8());
-        const auto speed = reader.ReadFixed16(can::focSpeedScale);
-        const auto position = reader.ReadFixed16(can::focPositionScale);
-
-        NotifyObservers([nodeId, state, fault](auto& observer)
+        NotifyObservers([nodeId, &record](auto& observer)
             {
-                observer.OnMotorStatusReceived(nodeId, state, fault);
+                observer.OnFaultRecordReceived(nodeId, *record);
             });
-        NotifyObservers([nodeId, speed, position](auto& observer)
-            {
-                observer.OnSpeedPositionReceived(nodeId, speed, position);
-            });
-        if (fault != FocFaultCode::none)
-        {
-            NotifyObservers([nodeId, fault](auto& observer)
-                {
-                    observer.OnFaultEventReceived(nodeId, fault);
-                });
-        }
     }
 
     bool CanCommandClient::HandleCommandAck(uint32_t id, const services::CanFrame& data)
@@ -772,21 +439,21 @@ namespace tool
         if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
             return false;
 
-        const auto nodeId = static_cast<uint16_t>(ExtractCanNodeId(id));
+        const auto nodeId = ExtractCanNodeId(id);
         const uint8_t ackCategory = data[0];
         const uint8_t ackMsgType = data[1];
         const auto ackStatus = static_cast<CanAckStatus>(data[2]);
 
-        if (ackCategory == can::focMotorCategoryId && IsRead(ackMsgType))
+        if (ackCategory == can::focMotorCategoryId && ReadScheduler::IsRead(ackMsgType))
         {
             if (ackStatus != CanAckStatus::success)
-                OnReadRefused(nodeId, ackMsgType);
-            CompleteRead(nodeId, ackMsgType);
+                ReportIdentity(nodeId, nodeData.ReadRefused(nodeId, ackMsgType));
+            nodeData.ReadAnswered(nodeId, ackMsgType);
             return true;
         }
 
         if (ackCategory == can::focMotorCategoryId)
-            CompleteCommand(nodeId, ackMsgType);
+            tracker.Complete(nodeId, ackMsgType);
 
         NotifyObservers([nodeId, ackCategory, ackMsgType, ackStatus](auto& observer)
             {
@@ -794,7 +461,7 @@ namespace tool
             });
 
         if (ackCategory == can::focMotorCategoryId && ackStatus == CanAckStatus::success)
-            OnAccepted(nodeId, ackMsgType);
+            nodeData.RequestAfterAccepted(nodeId, ackMsgType);
         return true;
     }
 
@@ -803,10 +470,10 @@ namespace tool
         bool consumed{ false };
         if (!transmitted)
         {
-            MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
+            MarkOnline(ExtractCanNodeId(id));
 
             const uint8_t msgType = ExtractCanMessageType(id);
-            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
+            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryMotionId || msgType == can::focTelemetryCurrentsId || HandleCommandAck(id, data);
         }
 
         if (!consumed)
@@ -833,8 +500,7 @@ namespace tool
             while (!onlineNodes.empty())
                 MarkOffline(*onlineNodes.begin());
 
-            for (auto& [nodeId, command] : commands)
-                ClearBusy(nodeId);
+            tracker.ClearAll();
         }
 
         NotifyObservers([connected](auto& observer)

@@ -13,7 +13,13 @@ target_link_libraries(e_foc.services.mechanical_system_ident_test PUBLIC
 )
 
 target_sources(e_foc.services.mechanical_system_ident_test PRIVATE
+    TestEncoderResolution.cpp
+    TestInertiaSettling.cpp
+    TestMechanicalFit.cpp
     TestMechanicalWindowKinematics.cpp
+    TestObservationQueue.cpp
+    TestSampleWindow.cpp
+    TestTwoLevelSpeedProfile.cpp
     TestRealTimeFrictionAndInertiaEstimator.cpp
     TestMechanicalParametersIdentification.cpp
 )

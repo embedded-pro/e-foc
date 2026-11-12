@@ -1,9 +1,9 @@
 #include "core/state_machine/CalibrationFlow.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <algorithm>
-#include <bit>
 #include <cstdint>
 
 namespace
@@ -19,7 +19,7 @@ namespace application
     CalibrationFlow::CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services)
         : env(environment)
         , agreeingRuns(services.agreeingMechanicalRuns)
-        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets, services.standstill, environment.context.BusVoltage())
+        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets, services.standstill, environment.context.BusVoltage(), services.indexSearch)
     {}
 
     state_machine::Calibrating CalibrationFlow::Begin(const state_machine::Calibrate& command)
@@ -78,7 +78,6 @@ namespace application
         calibrating.pendingData.inertia = held.inertia;
         calibrating.pendingData.frictionViscous = held.frictionViscous;
         calibrating.pendingData.frictionCoulomb = held.frictionCoulomb;
-        calibrating.pendingData.currentLoopBandwidth = held.currentLoopBandwidth;
         calibrating.pendingData.speedLoopBandwidth = held.speedLoopBandwidth;
         RunAlignmentOnly(calibrating);
     }
@@ -91,9 +90,9 @@ namespace application
             {
                 env.machine.Dispatch(state_machine::CalibrationStepChanged{ step });
             },
-            [this](foc::Radians angle)
+            [this](foc::Radians)
             {
-                env.machine.Dispatch(state_machine::AlignmentSucceeded{ angle });
+                env.machine.Dispatch(state_machine::AlignmentSucceeded{});
             },
             [this]
             {
@@ -109,9 +108,9 @@ namespace application
             {
                 env.machine.Dispatch(state_machine::CalibrationStepChanged{ step });
             },
-            [this](foc::Radians angle)
+            [this](foc::Radians)
             {
-                env.machine.Dispatch(state_machine::AlignmentSucceeded{ angle });
+                env.machine.Dispatch(state_machine::AlignmentSucceeded{});
             },
             [this]
             {
@@ -119,10 +118,10 @@ namespace application
             });
     }
 
-    void CalibrationFlow::OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle)
+    void CalibrationFlow::OnAlignmentSucceeded(state_machine::Calibrating& calibrating)
     {
-        calibrating.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
         env.context.SetRotorReferenceValid(true);
+        env.context.SetHomed(false);
 
         if (calibrating.alignmentOnly)
             Save(calibrating);
@@ -243,16 +242,33 @@ namespace application
 
     void CalibrationFlow::OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event)
     {
-        if (event.map)
+        const auto& map = event.measurement.map;
+        if (map)
         {
-            calibrating.pendingData.coggingTorque = event.map->torque;
-            calibrating.pendingData.coggingTorqueScale = event.map->torqueScale;
-            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << event.map->peak.Value() * milliPerUnit << " agreement=" << event.map->agreement;
+            calibrating.pendingData.coggingTorque = map->torque;
+            calibrating.pendingData.coggingTorqueScale = map->torqueScale;
+            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << map->peak.Value() * milliPerUnit << " agreement=" << map->agreement;
         }
         else
             env.tracer.Trace() << "[SM] Cogging map: none";
 
+        StoreFrictionCoulomb(calibrating, event.measurement.frictionCoulomb);
+
         Save(calibrating);
+    }
+
+    void CalibrationFlow::StoreFrictionCoulomb(state_machine::Calibrating& calibrating, foc::NewtonMeter measured)
+    {
+        if (foc::IsFinitePositive(measured.Value()))
+        {
+            calibrating.pendingData.frictionCoulomb = measured.Value();
+            env.tracer.Trace() << "[SM] Coulomb friction: mNm=" << measured.Value() * milliPerUnit;
+        }
+        else
+        {
+            calibrating.pendingData.frictionCoulomb = 0.0f;
+            env.tracer.Trace() << "[SM] Coulomb friction: none";
+        }
     }
 
     void CalibrationFlow::Save(state_machine::Calibrating& calibrating)
@@ -289,7 +305,8 @@ namespace application
                            << " Ib_mA=" << data.currentOffsetB * milliPerUnit
                            << " Ic_mA=" << data.currentOffsetC * milliPerUnit
                            << " In_mA=" << static_cast<uint32_t>(data.currentNoiseMilliAmpere)
-                           << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit;
+                           << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit
+                           << " fc_mNm=" << data.frictionCoulomb * milliPerUnit;
     }
 
     // Busy is contention with another writer of the shared NVM, not a failure of this record
@@ -330,6 +347,7 @@ namespace application
 
         env.mode.ProvisionalControlSuperseded();
         env.context.SetData(data);
+        env.context.SetHomed(!calibrating.alignmentOnly);
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
         env.mode.ApplyModeSpecificCalibration(data);
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
@@ -347,7 +365,7 @@ namespace application
 
     state_machine::Ready CalibrationFlow::ReadyState() const
     {
-        return state_machine::Ready{ env.context.Data(), env.context.IsRotorReferenceValid() };
+        return state_machine::Ready{ env.context.Data(), env.context.IsRotorReferenceValid(), env.context.IsHomed() };
     }
 
     bool CalibrationFlow::HasValidCalibration() const

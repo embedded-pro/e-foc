@@ -1,14 +1,13 @@
 #pragma once
 
-#include "core/foc/math/FiniteGuard.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 
 namespace services
 {
-    // Shared by the one-shot procedure and the online estimator so both refuse and settle alike.
     namespace mechanical_estimate
     {
         inline constexpr float minimumInertia{ 1e-9f };
@@ -38,19 +37,19 @@ namespace services
 
     inline bool IsPlausibleMechanics(float inertia, float friction)
     {
-        return foc::IsFiniteValue(inertia) && foc::IsFiniteValue(friction) &&
+        return math::IsFinite(inertia) && math::IsFinite(friction) &&
                inertia > mechanical_estimate::minimumInertia && inertia < mechanical_estimate::maximumInertia &&
                friction >= 0.0f && friction < mechanical_estimate::maximumFriction;
     }
 
     inline bool EstimatesAgree(float first, float second)
     {
-        return std::abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(std::abs(first), std::abs(second));
+        return math::Abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(math::Abs(first), math::Abs(second));
     }
 
     inline bool IsMechanicallyObservable(float speed)
     {
-        return std::abs(speed) >= mechanical_estimate::minimumSpeed;
+        return math::Abs(speed) >= mechanical_estimate::minimumSpeed;
     }
 
     class MechanicalExcitation
@@ -69,13 +68,13 @@ namespace services
 
         void CountAcceleration(float acceleration)
         {
-            if (std::abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
+            if (math::Abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
                 ++accelerating;
         }
 
         void CountSpeed(float speed)
         {
-            const auto magnitude = std::abs(speed);
+            const auto magnitude = math::Abs(speed);
             slowest = seen ? std::min(slowest, magnitude) : magnitude;
             fastest = seen ? std::max(fastest, magnitude) : magnitude;
             seen = true;
@@ -98,13 +97,11 @@ namespace services
         bool seen{ false };
     };
 
-    // An RLS that forgets cannot push its covariance below a floor proportional to (1 - lambda).
     inline float UncertaintyThresholdFor(float forgettingFactor)
     {
         return std::max(mechanical_estimate::uncertaintyBudgetFactor * (1.0f - forgettingFactor), mechanical_estimate::minimumUncertaintyThreshold);
     }
 
-    // windowScale is how many 16-sample windows one observation spans; it carries their excitation in one update.
     inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor, float windowScale = 1.0f)
     {
         return static_cast<float>(excitation.AcceleratingObservations()) * windowScale >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&

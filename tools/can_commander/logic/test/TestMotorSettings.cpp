@@ -1,5 +1,5 @@
-#include "core/can/FocMotorMessages.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
@@ -61,14 +61,20 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::speedBandwidth, LoopSettings(FocControlLoop::speed).front().parameter);
     EXPECT_EQ(FocParameter::positionReferenceTimeConstant, LoopSettings(FocControlLoop::position).back().parameter);
     EXPECT_EQ(FocParameter::resistance, MotorParameterSettings().front().parameter);
-    EXPECT_EQ(FocParameter::viscousFriction, MotorParameterSettings().back().parameter);
+    EXPECT_EQ(7u, MotorParameterSettings().size());
+    EXPECT_EQ(FocParameter::frictionCoulomb, MotorParameterSettings().back().parameter);
     EXPECT_EQ(FocParameter::encoderResolution, StartupSettings().front().parameter);
     EXPECT_EQ(FocParameter::canBitrate, StartupSettings().back().parameter);
+    EXPECT_EQ(FocParameter::telemetryRate, StreamSettings().front().parameter);
+    EXPECT_EQ(1u, StreamSettings().size());
     EXPECT_EQ(FocParameter::supervisionWindow, SupervisionSettings().front().parameter);
     EXPECT_EQ(FocParameter::stallDetection, SupervisionSettings().back().parameter);
     EXPECT_EQ(FocParameter::overspeedLimit, LimitSettings().front().parameter);
     EXPECT_EQ(FocParameter::peakCurrentTime, LimitSettings().back().parameter);
     EXPECT_EQ(9u, LimitSettings().size());
+    EXPECT_EQ(FocParameter::profileVelocity, MotionProfileSettings().front().parameter);
+    EXPECT_EQ(FocParameter::profileJerk, MotionProfileSettings().back().parameter);
+    EXPECT_EQ(4u, MotionProfileSettings().size());
     EXPECT_EQ(FocParameter::positionWindow, TargetWindowSettings().front().parameter);
     EXPECT_EQ(FocParameter::positionWindowTime, TargetWindowSettings().back().parameter);
     EXPECT_EQ(2u, TargetWindowSettings().size());
@@ -86,8 +92,10 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::quickStopDeceleration, QuickStopSettings().front().parameter);
     EXPECT_EQ(1u, QuickStopSettings().size());
     EXPECT_EQ(FocParameter::targetReached, StatusReadings().front().parameter);
-    EXPECT_EQ(FocParameter::windingTemperature, StatusReadings().back().parameter);
-    EXPECT_EQ(2u, StatusReadings().size());
+    EXPECT_EQ(FocParameter::homed, StatusReadings().back().parameter);
+    EXPECT_EQ(3u, StatusReadings().size());
+    EXPECT_EQ(FocParameter::homingRequired, HomingSettings().front().parameter);
+    EXPECT_EQ(1u, HomingSettings().size());
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::stagedVersionPatch, Readings().back().parameter);
 }
@@ -104,8 +112,10 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
         EXPECT_TRUE(std::ranges::none_of(LoopSettings(loop), readOnly));
     EXPECT_TRUE(std::ranges::none_of(MotorParameterSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(StartupSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(StreamSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(SupervisionSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(LimitSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(MotionProfileSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(TargetWindowSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(TravelLimitSettings(), readOnly));
     EXPECT_TRUE(std::ranges::none_of(ThermalSettings(), readOnly));
@@ -114,13 +124,17 @@ TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_an
     EXPECT_TRUE(std::ranges::none_of(QuickStopSettings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(StatusReadings(), readOnly));
     EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
-    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + SupervisionSettings().size() + LimitSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + QuickStopSettings().size() + Readings().size() + StatusReadings().size());
+    EXPECT_TRUE(std::ranges::none_of(RecalibrationSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(HomingSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::all_of(RecalibrationReadings(), readOnly));
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + StreamSettings().size() + SupervisionSettings().size() + LimitSettings().size() + MotionProfileSettings().size() + TargetWindowSettings().size() + TravelLimitSettings().size() + ThermalSettings().size() + OverTemperatureSettings().size() + BusVoltageSettings().size() + QuickStopSettings().size() + Readings().size() + StatusReadings().size() + RecalibrationSettings().size() + RecalibrationReadings().size() + HomingSettings().size());
 }
 
 TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)
 {
     EXPECT_TRUE(IsToggle(FocParameter::currentTwoStepDeadbeat));
     EXPECT_TRUE(IsToggle(FocParameter::stallDetection));
+    EXPECT_TRUE(IsToggle(FocParameter::homingRequired));
     EXPECT_FALSE(IsToggle(FocParameter::supervisionWindow));
     EXPECT_FALSE(IsToggle(FocParameter::polePairs));
     EXPECT_FALSE(IsToggle(FocParameter::resetCause));
@@ -204,39 +218,46 @@ TEST_F(TestMotorSettings, only_designed_laws_refuse_settings)
 
 TEST_F(TestMotorSettings, accepts_entries_within_the_firmware_range)
 {
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::currentBandwidth, 3141.5f, false));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::currentBandwidth, 20001.0f, false));
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::inertia, 1.0e-9f, false));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::resistance, 0.0f, false));
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::viscousFriction, 0.0f, false));
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::polePairs, 7.0f, false));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::polePairs, 7.5f, false));
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::canBitrate, 500000.0f, false));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::canBitrate, 400000.0f, false));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::currentBandwidth, 3141.5f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::currentBandwidth, 20001.0f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::inertia, 1.0e-9f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::resistance, 0.0f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::viscousFriction, 0.0f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::frictionCoulomb, 0.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::frictionCoulomb, -0.001f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::frictionCoulomb, 101.0f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::polePairs, 7.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::polePairs, 7.5f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::canBitrate, 500000.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::canBitrate, 400000.0f));
 }
 
 TEST_F(TestMotorSettings, a_typed_zero_is_not_read_as_automatic)
 {
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::speedBandwidth, 0.0f, false));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::fluxLinkage, 0.0f, false));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::speedBandwidth, 0.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::fluxLinkage, 0.0f));
 }
 
-TEST_F(TestMotorSettings, the_legacy_bandwidth_commands_carry_whole_radians_per_second)
+TEST_F(TestMotorSettings, a_bandwidth_takes_a_fraction_of_a_radian_per_second)
 {
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::speedBandwidth, 188.0f, true));
-    EXPECT_FALSE(IsAcceptableEntry(FocParameter::speedBandwidth, 188.5f, true));
-    EXPECT_TRUE(IsAcceptableEntry(FocParameter::speedBandwidth, 188.5f, false));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::speedBandwidth, 188.5f));
 }
 
-TEST_F(TestMotorSettings, maps_settings_to_the_commands_that_carry_them)
+TEST_F(TestMotorSettings, the_current_stream_rate_is_a_whole_number_of_hertz_up_to_one_kilohertz)
 {
-    EXPECT_EQ(can::focSetPidSpeedId, LegacyCommandOf(FocParameter::speedBandwidth));
-    EXPECT_EQ(can::focSetEncoderResolutionId, LegacyCommandOf(FocParameter::encoderResolution));
-    EXPECT_FALSE(LegacyCommandOf(FocParameter::inertia).has_value());
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::telemetryRate, 0.0f));
+    EXPECT_TRUE(IsAcceptableEntry(FocParameter::telemetryRate, 1000.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::telemetryRate, 1001.0f));
+    EXPECT_FALSE(IsAcceptableEntry(FocParameter::telemetryRate, 250.5f));
+    EXPECT_EQ(" Hz", PresentationOf(FocParameter::telemetryRate).suffix);
+}
 
-    EXPECT_EQ(can::focSetParameterId, CommandTypeOf(SettingChange::Parameter(FocParameter::speedBandwidth, 100.0f), false));
-    EXPECT_EQ(can::focSetPidSpeedId, CommandTypeOf(SettingChange::Parameter(FocParameter::speedBandwidth, 100.0f), true));
-    EXPECT_EQ(can::focSelectAlgorithmId, CommandTypeOf(SettingChange::Algorithm(FocControlLoop::speed, 1), false));
+TEST_F(TestMotorSettings, every_setting_travels_as_a_parameter)
+{
+    EXPECT_EQ(can::focSetParameterId, CommandTypeOf(SettingChange::Parameter(FocParameter::speedBandwidth, 100.0f)));
+    EXPECT_EQ(can::focSetParameterId, CommandTypeOf(SettingChange::Parameter(FocParameter::encoderResolution, 4000.0f)));
+    EXPECT_EQ(can::focSetParameterId, CommandTypeOf(SettingChange::Parameter(FocParameter::telemetryRate, 500.0f)));
+    EXPECT_EQ(can::focSelectAlgorithmId, CommandTypeOf(SettingChange::Algorithm(FocControlLoop::speed, 1)));
 }
 
 TEST_F(TestMotorSettings, settings_go_before_a_law_that_is_designed_from_them)
@@ -383,6 +404,15 @@ TEST_F(TestMotorSettings, names_the_reset_cause_the_controller_reports)
     EXPECT_EQ("Unknown", ResetCauseName(2.5f));
 }
 
+TEST_F(TestMotorSettings, names_the_online_recalibration_modes)
+{
+    ASSERT_EQ(3, RecalibrationModes().size());
+    EXPECT_EQ("Off", RecalibrationModeName(0.0f));
+    EXPECT_EQ("On command", RecalibrationModeName(1.0f));
+    EXPECT_EQ("Automatic", RecalibrationModeName(2.0f));
+    EXPECT_EQ("Unknown", RecalibrationModeName(3.0f));
+}
+
 TEST_F(TestMotorSettings, names_the_board_kind_the_controller_reports)
 {
     EXPECT_EQ("Unknown", BoardKindName(0.0f));
@@ -391,7 +421,8 @@ TEST_F(TestMotorSettings, names_the_board_kind_the_controller_reports)
     EXPECT_EQ("NUCLEO-H563ZI", BoardKindName(3.0f));
     EXPECT_EQ("Unknown", BoardKindName(4.0f));
     EXPECT_EQ("emulated", BoardKindName(5.0f));
-    EXPECT_EQ("Unknown", BoardKindName(6.0f));
+    EXPECT_EQ("virtual", BoardKindName(6.0f));
+    EXPECT_EQ("Unknown", BoardKindName(7.0f));
     EXPECT_EQ("Unknown", BoardKindName(-1.0f));
     EXPECT_EQ("Unknown", BoardKindName(1.5f));
 }

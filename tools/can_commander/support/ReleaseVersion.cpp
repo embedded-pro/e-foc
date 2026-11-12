@@ -1,6 +1,6 @@
 #include "tools/can_commander/support/ReleaseVersion.hpp"
 #include <charconv>
-#include <tuple>
+#include <format>
 
 namespace tool
 {
@@ -38,15 +38,15 @@ namespace tool
             text.remove_prefix(1);
 
         const auto major = ParseComponent(text, false);
-        if (!major)
+        if (!major.has_value())
             return std::nullopt;
 
         const auto minor = ParseComponent(text, false);
-        if (!minor)
+        if (!minor.has_value())
             return std::nullopt;
 
         const auto patch = ParseComponent(text, true);
-        if (!patch)
+        if (!patch.has_value())
             return std::nullopt;
 
         return ReleaseVersion{ *major, *minor, *patch };
@@ -54,21 +54,6 @@ namespace tool
 
     std::string ReleaseVersion::ToString() const
     {
-        return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch);
-    }
-
-    bool operator==(const ReleaseVersion& lhs, const ReleaseVersion& rhs)
-    {
-        return std::tie(lhs.major, lhs.minor, lhs.patch) == std::tie(rhs.major, rhs.minor, rhs.patch);
-    }
-
-    bool operator<(const ReleaseVersion& lhs, const ReleaseVersion& rhs)
-    {
-        return std::tie(lhs.major, lhs.minor, lhs.patch) < std::tie(rhs.major, rhs.minor, rhs.patch);
-    }
-
-    bool operator>(const ReleaseVersion& lhs, const ReleaseVersion& rhs)
-    {
-        return rhs < lhs;
+        return std::format("{}.{}.{}", major, minor, patch);
     }
 }

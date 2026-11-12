@@ -65,14 +65,6 @@ namespace tool
         return group;
     }
 
-    void MotorParametersTab::SetLegacy(bool legacyContract)
-    {
-        for (auto* editor : Editors())
-            editor->SetUnavailable(legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{});
-
-        SettingsPage::SetLegacy(legacyContract);
-    }
-
     void MotorParametersTab::SetActionsAvailable(const QString& reason)
     {
         actionsUnavailable = reason;

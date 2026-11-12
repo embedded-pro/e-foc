@@ -1,5 +1,5 @@
 #include "tools/can_commander/gui/MotorPanel.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/gui/SetpointKnob.hpp"
 #include "tools/can_commander/logic/CommandDescriptions.hpp"
 #include "tools/can_commander/logic/SetpointAxis.hpp"
@@ -11,7 +11,6 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <chrono>
-#include <cmath>
 #include <utility>
 
 namespace tool
@@ -60,7 +59,7 @@ namespace tool
             },
             [this]()
             {
-                return CommandsUnavailableReason();
+                return FirmwareUnavailableReason();
             },
             this);
         connect(firmware, &MotorFirmware::StatusChanged, this, &MotorPanel::StatusChanged);
@@ -82,9 +81,14 @@ namespace tool
         auto* header = new QWidget();
         auto* layout = new QHBoxLayout(header);
         layout->setContentsMargins(0, 0, 0, 0);
+        virtualBadge = new QLabel("VIRTUAL");
+        virtualBadge->setToolTip("A virtual motor: the e-foc application running against a simulated plant on this machine, not hardware");
+        virtualBadge->setVisible(false);
+        ui::backend::qt::StyleStatusLabel(*virtualBadge, StatusLevel::Warning);
         onlineLabel = new QLabel();
         firmwareLabel = new QLabel();
         activityLabel = new QLabel();
+        layout->addWidget(virtualBadge);
         layout->addWidget(onlineLabel);
         layout->addWidget(firmwareLabel);
         layout->addWidget(activityLabel);
@@ -99,7 +103,7 @@ namespace tool
 
     QString MotorPanel::Title() const
     {
-        return QString("Motor %1").arg(nodeId);
+        return firmware->IsVirtual() ? QString("Motor %1 · Virtual").arg(nodeId) : QString("Motor %1").arg(nodeId);
     }
 
     QString MotorPanel::TabText() const
@@ -120,6 +124,7 @@ namespace tool
     void MotorPanel::OnFirmwareIdentity(const FirmwareIdentity& identity)
     {
         firmware->OnFirmwareIdentity(identity);
+        virtualBadge->setVisible(firmware->IsVirtual());
     }
 
     void MotorPanel::SetLatestRelease(const ReleaseInfo& release)
@@ -167,7 +172,7 @@ namespace tool
         StopApplying("emergency stop");
         pendingCommand = "Emergency Stop";
         pendingCommandType = can::focEmergencyStopId;
-        if (!client.SendEmergencyStop(nodeId))
+        if (!client.Commands().SendEmergencyStop(nodeId))
             return false;
 
         transfer.EmergencyStopSent(nodeId);
@@ -180,7 +185,7 @@ namespace tool
             {
                 Send("Start Motor", can::focStartId, [this]()
                     {
-                        return client.SendStartMotor(nodeId);
+                        return client.Commands().SendStartMotor(nodeId);
                     });
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, this, &MotorPanel::SendStopMotor);
@@ -188,14 +193,14 @@ namespace tool
         connect(commandPanel, &CommandPanel::ClearFaultRequested, this, &MotorPanel::SendClearFault);
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
             {
-                client.RequestData(nodeId);
+                client.Data().RequestData(nodeId);
             });
         connect(commandPanel, &CommandPanel::SetControlModeRequested, this, [this](can::FocMotorMode mode)
             {
                 commandPanel->ShowRequestedControlMode(mode);
                 Send("Control Mode " + CommandPanel::ControlModeName(mode), can::focSelectControlModeId, [this, mode]()
                     {
-                        return client.SendSetControlMode(nodeId, mode);
+                        return client.Commands().SendSetControlMode(nodeId, mode);
                     });
             });
     }
@@ -204,7 +209,7 @@ namespace tool
     {
         Send("Stop Motor", can::focStopId, [this]()
             {
-                return client.SendStopMotor(nodeId);
+                return client.Commands().SendStopMotor(nodeId);
             });
     }
 
@@ -220,7 +225,7 @@ namespace tool
     {
         Send("Clear Fault", can::focClearFaultId, [this]()
             {
-                return client.SendClearFault(nodeId);
+                return client.Commands().SendClearFault(nodeId);
             });
     }
 
@@ -228,7 +233,7 @@ namespace tool
     {
         Send("Align Rotor", can::focAlignId, [this]()
             {
-                return client.SendAlign(nodeId);
+                return client.Commands().SendAlign(nodeId);
             });
     }
 
@@ -239,9 +244,10 @@ namespace tool
 
     void MotorPanel::SendSetpoint(can::FocMotorMode mode, int32_t counts)
     {
-        const auto value = AxisFor(mode).SiOf(counts);
+        const auto& axis = AxisFor(mode);
+        const auto value = axis.SiOf(counts);
         pendingSetpoint = PendingSetpoint{ mode, counts };
-        if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(AxisFor(mode), counts)), SetpointCommandOf(mode), [this, mode, value]()
+        if (!Send(QString("%1 Setpoint %2").arg(CommandPanel::ControlModeName(mode), FormatSetpoint(axis, counts)), SetpointCommandOf(mode), [this, mode, value]()
                 {
                     return SendSetpointValue(mode, value);
                 }))
@@ -253,11 +259,11 @@ namespace tool
         switch (mode)
         {
             case can::FocMotorMode::speed:
-                return client.SendSetSpeedSetpoint(nodeId, value);
+                return client.Commands().SendSetSpeedSetpoint(nodeId, value);
             case can::FocMotorMode::position:
-                return client.SendSetPositionSetpoint(nodeId, value);
+                return client.Commands().SendSetPositionSetpoint(nodeId, value);
             default:
-                return client.SendSetTorqueSetpoint(nodeId, value);
+                return client.Commands().SendSetTorqueSetpoint(nodeId, value);
         }
     }
 
@@ -269,14 +275,14 @@ namespace tool
             {
                 Send("Identify Electrical", can::focIdentifyElectricalId, [this]()
                     {
-                        return client.SendIdentifyElectrical(nodeId);
+                        return client.Commands().SendIdentifyElectrical(nodeId);
                     });
             });
         connect(&tab, &MotorParametersTab::CalibrateRequested, this, [this]()
             {
                 Send("Calibrate", can::focCalibrateId, [this]()
                     {
-                        return client.SendCalibrate(nodeId);
+                        return client.Commands().SendCalibrate(nodeId);
                     });
             });
         connect(&tab, &MotorParametersTab::ClearCalibrationRequested, this, &MotorPanel::ConfirmClearCalibration);
@@ -295,22 +301,66 @@ namespace tool
 
         Send("Clear Calibration", can::focClearCalibrationId, [this]()
             {
-                return client.SendClearCalibration(nodeId);
+                return client.Commands().SendClearCalibration(nodeId);
+            });
+    }
+
+    void MotorPanel::ConfirmClearFaultHistory()
+    {
+        QMessageBox box(QMessageBox::Warning, "Clear Fault History",
+            QString("Delete every fault recorded in %1? The records cannot be read back afterwards.").arg(Title()),
+            QMessageBox::Cancel, this);
+        const auto* clear = box.addButton("Clear Fault History", QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != clear)
+            return;
+
+        Send("Clear Fault History", can::focClearFaultHistoryId, [this]()
+            {
+                return client.Commands().SendClearFaultHistory(nodeId);
+            });
+    }
+
+    void MotorPanel::ConfirmResetModel()
+    {
+        QMessageBox box(QMessageBox::Warning, "Reset Model",
+            QString("Forget the inductance, inertia and friction %1 has learned? Its loops are designed from the calibration record again.").arg(Title()),
+            QMessageBox::Cancel, this);
+        const auto* reset = box.addButton("Reset Model", QMessageBox::DestructiveRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != reset)
+            return;
+
+        Send("Reset Model", can::focResetModelId, [this]()
+            {
+                return client.Commands().SendResetModel(nodeId);
             });
     }
 
     void MotorPanel::ConnectDiagnostics()
     {
         auto& tab = commandPanel->Diagnostics();
+        connect(&tab, &DiagnosticsTab::RecalibrateRequested, this, [this]()
+            {
+                Send("Recalibrate", can::focRecalibrateId, [this]()
+                    {
+                        return client.Commands().SendRecalibrate(nodeId);
+                    });
+            });
+        connect(&tab, &DiagnosticsTab::ResetModelRequested, this, &MotorPanel::ConfirmResetModel);
         connect(&tab, &DiagnosticsTab::RefreshRequested, this, [this]()
             {
-                client.RequestReadings(nodeId);
+                client.Data().RequestReadings(nodeId);
+                client.Data().RequestFaultHistory(nodeId);
             });
+        connect(&tab, &DiagnosticsTab::ClearFaultHistoryRequested, this, &MotorPanel::ConfirmClearFaultHistory);
         connect(&tab, &DiagnosticsTab::ClearStatisticsRequested, this, [this]()
             {
                 Send("Clear Diagnostics", can::focClearDiagnosticsId, [this]()
                     {
-                        return client.SendClearDiagnostics(nodeId);
+                        return client.Commands().SendClearDiagnostics(nodeId);
                     });
             });
     }
@@ -325,7 +375,7 @@ namespace tool
                 });
             connect(page, &SettingsPage::RevertRequested, this, [this]()
                 {
-                    client.RequestSettings(nodeId);
+                    client.Data().RequestSettings(nodeId);
                 });
         }
     }
@@ -363,7 +413,7 @@ namespace tool
     void MotorPanel::SendCurrentChange()
     {
         const auto change = changes.Current();
-        if (!Send(Describe(change), CommandTypeOf(change, IsLegacy()), [this, change]()
+        if (!Send(Describe(change), CommandTypeOf(change), [this, change]()
                 {
                     return SendChange(change);
                 }))
@@ -373,24 +423,9 @@ namespace tool
     bool MotorPanel::SendChange(const SettingChange& change)
     {
         if (change.kind == SettingChange::Kind::algorithm)
-            return client.SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
+            return client.Commands().SendSelectAlgorithm(nodeId, change.loop, change.algorithm);
 
-        if (!IsLegacy())
-            return client.SendSetParameter(nodeId, change.parameter, change.value);
-
-        switch (change.parameter)
-        {
-            case can::FocParameter::currentBandwidth:
-                return client.SendSetCurrentBandwidth(nodeId, change.value);
-            case can::FocParameter::speedBandwidth:
-                return client.SendSetSpeedBandwidth(nodeId, change.value);
-            case can::FocParameter::positionBandwidth:
-                return client.SendSetPositionBandwidth(nodeId, change.value);
-            case can::FocParameter::encoderResolution:
-                return client.SendSetEncoderResolution(nodeId, static_cast<uint32_t>(std::lround(change.value)));
-            default:
-                return false;
-        }
+        return client.Commands().SendSetParameter(nodeId, change.parameter, change.value);
     }
 
     QString MotorPanel::Describe(const SettingChange& change) const
@@ -405,15 +440,11 @@ namespace tool
 
     bool MotorPanel::IsChangeAnswer(uint8_t commandType) const
     {
-        return changes.Active() && commandType == CommandTypeOf(changes.Current(), IsLegacy());
+        return changes.Active() && commandType == CommandTypeOf(changes.Current());
     }
 
     void MotorPanel::OnChangeAccepted()
     {
-        const auto& change = changes.Current();
-        if (IsLegacy() && change.kind == SettingChange::Kind::parameter)
-            applyingPage->ShowValue(change.parameter, can::FocParameterValue{ change.value, false });
-
         if (changes.Advance())
         {
             SendCurrentChange();
@@ -421,7 +452,7 @@ namespace tool
         }
 
         if (applyingPage == &commandPanel->MotorParameters())
-            client.RequestSettings(nodeId);
+            client.Data().RequestSettings(nodeId);
 
         applyingPage->SetApplying(false);
         applyingPage = nullptr;
@@ -446,12 +477,7 @@ namespace tool
     void MotorPanel::ForgetControlMode()
     {
         commandPanel->ClearActiveControlMode();
-        client.RequestSettings(nodeId);
-    }
-
-    bool MotorPanel::IsLegacy() const
-    {
-        return !client.SupportsSettings(nodeId);
+        client.Data().RequestSettings(nodeId);
     }
 
     void MotorPanel::Report(IssueSeverity severity, const QString& message) const
@@ -475,6 +501,13 @@ namespace tool
         firmware->ForgetNodeState();
     }
 
+    QString MotorPanel::FirmwareUnavailableReason() const
+    {
+        if (busConnected && nodeOnline == true && client.Compatibility(nodeId) == can::ContractCompatibility::incompatible)
+            return {};
+        return CommandsUnavailableReason();
+    }
+
     QString MotorPanel::CommandsUnavailableReason() const
     {
         if (!busConnected)
@@ -485,9 +518,10 @@ namespace tool
         switch (client.Compatibility(nodeId))
         {
             case can::ContractCompatibility::incompatible:
-                return QString("Firmware contract %1 is incompatible with this tool (%2.x): commands are disabled. Update the firmware or the tool.")
+                return QString("Firmware contract %1 is incompatible with this tool (%2.%3): commands are disabled. Update the firmware or the tool.")
                     .arg(contractVersion.isEmpty() ? QString("?") : contractVersion)
-                    .arg(can::focContractVersionMajor);
+                    .arg(can::focContractVersionMajor)
+                    .arg(can::focContractVersionMinor);
             case can::ContractCompatibility::unknown:
                 return QString("Waiting for node %1 to report its firmware version…").arg(nodeId);
             default:
@@ -498,17 +532,6 @@ namespace tool
             return "Firmware transfer in progress: the other commands wait until it ends. The emergency stop stays available.";
         if (client.IsBusy(nodeId))
             return QString("Waiting for the response to %1…").arg(pendingCommand);
-        return {};
-    }
-
-    QString MotorPanel::SettingsUnavailableReason() const
-    {
-        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
-            return reason;
-        if (lastState == FocMotorState::running)
-            return "Stop the motor to change its controllers or motor parameters.";
-        if (lastState == FocMotorState::calibrating)
-            return "Wait for the calibration to finish.";
         return {};
     }
 
@@ -568,6 +591,39 @@ namespace tool
         return {};
     }
 
+    QString MotorPanel::SettingsUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (lastState == FocMotorState::running || lastState == FocMotorState::stopping)
+            return "Stop the motor to change its controllers or motor parameters.";
+        if (lastState == FocMotorState::calibrating)
+            return "Wait for the calibration to finish.";
+        return {};
+    }
+
+    QString MotorPanel::RecalibrateUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (commandPanel->ActiveControlMode() == can::FocMotorMode::torque)
+            return "Torque mode runs no online estimators: select speed or position mode to recalibrate.";
+        if (const auto mode = commandPanel->Configuration().EditorFor(can::FocParameter::recalibrationMode)->Held(); mode.has_value() && *mode < 0.5f)
+            return "Online recalibration is off: choose On command or Automatic on the Configuration tab.";
+        if (lastState == FocMotorState::running || lastState == FocMotorState::calibrating)
+            return "Stop the motor first: the loops are redesigned only while it is stopped.";
+        return {};
+    }
+
+    QString MotorPanel::ResetModelUnavailableReason() const
+    {
+        if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
+            return reason;
+        if (lastState == FocMotorState::running || lastState == FocMotorState::calibrating)
+            return "Stop the motor first: the loops are redesigned only while it is stopped.";
+        return {};
+    }
+
     QString MotorPanel::QuickStopUnavailableReason() const
     {
         if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsQuickStop(nodeId))
@@ -584,6 +640,8 @@ namespace tool
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
         commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
+        commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason);
+        commandPanel->Diagnostics().SetRecalibrationUnavailable(RecalibrateUnavailableReason(), ResetModelUnavailableReason());
         commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
         commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
         commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
@@ -599,6 +657,7 @@ namespace tool
 
     void MotorPanel::RefreshHeader()
     {
+        virtualBadge->setVisible(firmware->IsVirtual());
         onlineLabel->setText(QString("Node %1: %2").arg(nodeId).arg(Summary()));
         ui::backend::qt::StyleStatusLabel(*onlineLabel, Level());
 
@@ -651,7 +710,7 @@ namespace tool
 
     void MotorPanel::OnCommandTimeout(uint8_t commandType)
     {
-        const auto timeout = std::chrono::duration_cast<std::chrono::seconds>(CanCommandClient::TimeoutFor(commandType));
+        const auto timeout = std::chrono::duration_cast<std::chrono::seconds>(CommandTracker::TimeoutFor(commandType));
         Report(IssueSeverity::warning, QString("no response to %1 within %2 s: check that the controller is powered")
                                            .arg(pendingCommand.isEmpty() ? QString("the last command") : pendingCommand)
                                            .arg(timeout.count()));
@@ -721,19 +780,16 @@ namespace tool
             StopApplying(QString("%1 was refused").arg(name));
 
         if (commandType == can::focSetParameterId || commandType == can::focSelectAlgorithmId)
-            client.RequestSettings(nodeId);
+            client.Data().RequestSettings(nodeId);
     }
 
     void MotorPanel::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
     {
         contractVersion = QString("%1.%2").arg(major).arg(minor);
+        pendingSetpoint.reset();
 
         if (compatible)
-        {
             Report(IssueSeverity::info, QString("firmware contract %1 is compatible").arg(contractVersion));
-            for (auto* page : commandPanel->SettingsPages())
-                page->SetLegacy(IsLegacy());
-        }
         else
             Report(IssueSeverity::error, CommandsUnavailableReason());
 
@@ -761,7 +817,10 @@ namespace tool
         if (lastFault != fault)
         {
             if (fault != FocFaultCode::none)
+            {
                 Report(IssueSeverity::error, QString("fault: %1").arg(TelemetryPanel::FaultCodeName(fault)));
+                client.Data().RequestFaultHistory(nodeId);
+            }
             else if (lastFault.has_value())
                 Report(IssueSeverity::info, "fault cleared");
         }
@@ -785,16 +844,11 @@ namespace tool
         telemetryPanel->OnSpeedPosition(speed, position);
     }
 
-    void MotorPanel::OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
-    {
-        telemetryPanel->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
-        Report(IssueSeverity::info, QString("electrical parameters R = %1 Ω, L = %2 mH, %3 pole pairs").arg(resistanceOhm).arg(inductanceMilliHenry).arg(polePairs));
-    }
-
     void MotorPanel::OnAlgorithms(const can::FocAlgorithms& algorithms)
     {
         commandPanel->Controllers().SetAlgorithms(algorithms);
         commandPanel->SetActiveControlMode(algorithms.mode);
+        Refresh();
     }
 
     void MotorPanel::OnParameter(can::FocParameter parameter, can::FocParameterValue value)
@@ -802,10 +856,20 @@ namespace tool
         for (auto* page : commandPanel->SettingsPages())
             page->ShowValue(parameter, value);
         commandPanel->Diagnostics().ShowValue(parameter, value);
+        telemetryPanel->OnMotorParameter(parameter, value.value);
         if (parameter == can::FocParameter::targetReached)
             telemetryPanel->OnTargetReached(value.value >= 0.5f);
         if (parameter == can::FocParameter::windingTemperature)
             telemetryPanel->OnWindingTemperature(value.value);
+        if (parameter == can::FocParameter::homed)
+            telemetryPanel->OnHomed(value.value >= 0.5f);
+        if (parameter == can::FocParameter::recalibrationMode)
+            Refresh();
+    }
+
+    void MotorPanel::OnFaultRecord(const can::FocFaultRecord& record)
+    {
+        commandPanel->Diagnostics().ShowFaultRecord(record);
     }
 
     void MotorPanel::OfferRecovery(uint8_t commandType, Refusal refusal)

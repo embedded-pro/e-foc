@@ -1,11 +1,10 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
 #include "bootloader/ImageFormat.hpp"
-#include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "generated/Boards.hpp"
+#include "hal/cortex_m/Semihosting.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "numerical/math/Math.hpp"
 #include "services/tracer/GlobalTracer.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
-#include "targets/platform_implementations/qemu/implementation/SilPlantModel.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -34,29 +33,28 @@ namespace
     std::array<uint8_t, 320 * 1024> stagingStorage;
     std::array<uint8_t, 16 * 1024> journalStorage;
 
-    // No reset-cause register and reset reloads RAM, so the watchdog leaves its record in a host file.
     constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
     constexpr uint8_t watchdogResetMarker = 0x01;
 
     void WriteWatchdogResetMarker(uint8_t value)
     {
-        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::writeBinary);
+        const auto handle = hal::cortex::SemihostingOpenFile(watchdogResetMarkerPath, hal::cortex::SemihostingOpenMode::writeBinary);
         if (handle < 0)
             return;
 
-        application::semihosting::FileWrite(handle, &value, 1);
-        application::semihosting::FileClose(handle);
+        hal::cortex::SemihostingWriteFile(handle, infra::MakeConstByteRange(value));
+        hal::cortex::SemihostingCloseFile(handle);
     }
 
     application::ResetCause TakeWatchdogResetMarker()
     {
-        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::readBinary);
+        const auto handle = hal::cortex::SemihostingOpenFile(watchdogResetMarkerPath, hal::cortex::SemihostingOpenMode::readBinary);
         if (handle < 0)
             return application::ResetCause::powerUp;
 
         uint8_t value{ 0 };
-        const bool read = application::semihosting::FileRead(handle, &value, 1) == 0;
-        application::semihosting::FileClose(handle);
+        const bool read = hal::cortex::SemihostingReadFile(handle, infra::MakeByteRange(value)) == 0;
+        hal::cortex::SemihostingCloseFile(handle);
 
         if (!read || value != watchdogResetMarker)
             return application::ResetCause::powerUp;
@@ -67,12 +65,12 @@ namespace
 
     long Milli(float value)
     {
-        return std::lround(value * 1000.0f);
+        return static_cast<long>(math::Round(value * 1000.0f));
     }
 
     long Micro(float value)
     {
-        return std::lround(value * 1000000.0f);
+        return static_cast<long>(math::Round(value * 1000000.0f));
     }
 
     template<std::size_t Size>
@@ -84,21 +82,6 @@ namespace
 
 namespace application
 {
-    foc::ThreePhaseMotorModel::Parameters PlatformFactoryImpl::MotorParametersFrom(
-        const std::optional<sil::SilPlantConfig>& config,
-        const foc::ThreePhaseMotorModel::Parameters& fallback)
-    {
-        if (!config.has_value())
-            return fallback;
-
-        return sil::MotorParameters(*config);
-    }
-
-    foc::Volts PlatformFactoryImpl::SupplyVoltageFrom(const std::optional<sil::SilPlantConfig>& config)
-    {
-        return config.has_value() ? foc::Volts{ config->powerSupplyVoltageVolts } : foc::Volts{ kDefaultSupplyVoltageVolts };
-    }
-
     hal::Hertz PlatformFactoryImpl::BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config)
     {
         if (!config.has_value() || config->baseFrequencyHz == 0)
@@ -112,17 +95,6 @@ namespace application
         if (!plantConfig.has_value())
             return;
 
-        sil::ConfigureModel(model, *plantConfig);
-        bootFaultInjection = sil::BootFaultInjection(*plantConfig);
-        activeFaultInjection = bootFaultInjection;
-        ApplyCurrentSense(SampleAndHold::shortest);
-        if (plantConfig->maxReadableDutyPercent != 0)
-            maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
-        if (plantConfig->maxDutyPercent != 0)
-            maxDuty = hal::DutyCycle::FromPercent(plantConfig->maxDutyPercent);
-        shuntReadout = foc::LowSideShuntReadout{ maxReadableDuty };
-        dutyDelayed = plantConfig->dutyDelayPeriods != 0;
-
         boardProtection.Configure({
             .overCurrentAmpere = plantConfig->overCurrentTripAmpere,
             .overVoltageVolts = plantConfig->overVoltageTripVolts,
@@ -130,46 +102,8 @@ namespace application
             .overTemperatureCelsius = plantConfig->overTemperatureTripCelsius,
         });
 
-        const uint32_t baseHz = BaseFrequencyFrom(plantConfig).Value();
-
-        if (plantConfig->responseSampleRateHz != 0)
-        {
-            really_assert(baseHz % plantConfig->responseSampleRateHz == 0);
-            responseRecorder.Configure(baseHz / plantConfig->responseSampleRateHz, plantConfig->responseMaxSamples);
-        }
-
-        torqueStepTorque = foc::NewtonMeter{ plantConfig->torqueStepNm };
-        const auto torqueStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u);
-        torqueStep.Configure(plantConfig->torqueStepNm != 0.0f ? std::make_optional(torqueStepDelay) : std::nullopt);
-
-        // The delay is carried in centiseconds because it reuses a byte the record already had.
-        const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u);
-        encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
-
-        const auto cableDisconnectDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->cableDisconnectDelayMs) * baseHz / 1000u);
-        cableDisconnect.Configure(plantConfig->cableDisconnectDelayMs != 0 ? std::make_optional(cableDisconnectDelay) : std::nullopt);
-
-        const auto supplyStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->supplyStepDelayMs) * baseHz / 1000u);
-        supplyStep.Configure(plantConfig->supplyStepScale > 0.0f ? std::make_optional(supplyStepDelay) : std::nullopt);
-
-        ConfigureShaftGrip(baseHz);
-
         if (plantConfig->eventLoopStallDelayMs != 0 && resetCause != ResetCause::watchdog)
             watchdogStall.Schedule(std::chrono::milliseconds(plantConfig->eventLoopStallDelayMs));
-    }
-
-    void PlatformFactoryImpl::ConfigureShaftGrip(uint32_t baseHz)
-    {
-        const auto ticks = [baseHz](uint32_t milliseconds)
-        {
-            return static_cast<uint32_t>(static_cast<uint64_t>(milliseconds) * baseHz / 1000u);
-        };
-
-        const bool gripped = plantConfig->shaftTurnRadians != 0.0f;
-        const auto turnMs = std::max(plantConfig->shaftTurnMs, uint32_t{ 1 });
-        shaftTurnSpeed = foc::RadiansPerSecond{ plantConfig->shaftTurnRadians * 1000.0f / static_cast<float>(turnMs) };
-        shaftGrip.Configure(gripped ? std::make_optional(ticks(plantConfig->shaftGripDelayMs)) : std::nullopt);
-        shaftHold.Configure(gripped ? std::make_optional(ticks(plantConfig->shaftGripDelayMs + turnMs)) : std::nullopt);
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -181,10 +115,9 @@ namespace application
               {
                   FocTimerIsr();
               })
-        , stagingFlash("staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
-        , journalFlash("journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
-        , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig), std::nullopt, false)
-        , baseFrequency(BaseFrequencyFrom(plantConfig))
+        , stagingFlash(fileSystem, "staging.bin", infra::MakeRange(stagingStorage), stagingEraseUnit)
+        , journalFlash(fileSystem, "journal.bin", infra::MakeRange(journalStorage), stagingEraseUnit)
+        , drive(plantConfig, sil::PlantDriveDefaults{ motorParams, foc::Volts{ kDefaultSupplyVoltageVolts }, hal::Hertz{ kDefaultBaseFrequencyHz } })
     {
         really_assert(stagingStorage.size() == static_cast<std::size_t>(__staging_slot_end - __staging_slot_start) && journalStorage.size() == static_cast<std::size_t>(__status_journal_end - __status_journal_start));
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
@@ -256,7 +189,7 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        return model.EffectiveSupplyVoltage();
+        return drive.Model().Supply().Voltage();
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -290,10 +223,10 @@ namespace application
         }
     }
 
-    std::optional<FirmwareStaging> PlatformFactoryImpl::Staging()
+    std::optional<services::FirmwareStaging> PlatformFactoryImpl::Staging()
     {
         const auto slotSize = static_cast<uint32_t>(__application_slot_end - __application_slot_start);
-        return FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
+        return services::FirmwareStaging{ stagingFlash, journalFlash, e_foc::board.identification, slotSize - bootloader::imageDescriptorSize, stagingPageSize };
     }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const
@@ -303,7 +236,6 @@ namespace application
 
     void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
     {
-        // The simulated bridge has no gate to cut; the machine reset that follows restarts the plant as well
         WriteWatchdogResetMarker(watchdogResetMarker);
     }
 
@@ -317,22 +249,12 @@ namespace application
         return diagnostics;
     }
 
-    // Sample-and-hold follows the firmware's request, as on TI, unless a scenario pins it in the plant.
-    void PlatformFactoryImpl::ApplyCurrentSense(SampleAndHold requested)
-    {
-        if (!plantConfig.has_value())
-            return;
-
-        static constexpr std::array<uint32_t, 5> sampleHoldClocks{ 4, 16, 32, 64, 256 };
-
-        model.SetCurrentSense(sil::CurrentSense(*plantConfig, sampleHoldClocks.at(static_cast<std::size_t>(requested))));
-    }
-
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold sampleAndHold)
     {
-        ApplyCurrentSense(sampleAndHold);
+        static constexpr std::array<uint32_t, 5> sampleHoldClocks{ 4, 16, 32, 64, 256 };
+        drive.SampleAndHoldClocks(sampleHoldClocks.at(static_cast<std::size_t>(sampleAndHold)));
 
-        const auto freq = baseFrequency;
+        const auto freq = drive.BaseFrequency();
 
         const auto periodCycles = freq.Value() == 0
                                       ? 0u
@@ -352,7 +274,7 @@ namespace application
         }
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *canBusAdapter;
     }
@@ -364,59 +286,19 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty);
+        drive.Output(dutyPhases);
     }
 
     void PlatformFactoryImpl::FocTimerIsr()
     {
-        const uint32_t tick = controlTick.load(std::memory_order_relaxed) + 1;
-        controlTick.store(tick, std::memory_order_relaxed);
-
-        if (torqueStep.Fire(tick))
-        {
-            model.SetExternalTorque(torqueStepTorque);
-            responseRecorder.Note(foc::PlantResponseKind::torqueStep, PlantSampleAt(tick));
-        }
-
-        if (encoderFreeze.Fire(tick))
-        {
-            activeFaultInjection.encoderStuck = true;
-            model.SetFaultInjection(activeFaultInjection);
-            responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
-        }
-
-        if (cableDisconnect.Fire(tick))
-        {
-            activeFaultInjection.openPhaseA = activeFaultInjection.openPhaseB = activeFaultInjection.openPhaseC = true;
-            model.SetFaultInjection(activeFaultInjection);
-        }
-
-        if (supplyStep.Fire(tick))
-        {
-            activeFaultInjection.supplyVoltageScale = plantConfig->supplyStepScale;
-            model.SetFaultInjection(activeFaultInjection);
-        }
-
-        if (shaftGrip.Fire(tick))
-            model.GripShaft(shaftTurnSpeed);
-
-        if (shaftHold.Fire(tick))
-            model.GripShaft(foc::RadiansPerSecond{ 0.0f });
-
-        const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
-        model.StepForTest(stepDuty);
-        shuntReadout.Applied(stepDuty);
-        appliedDutyPhases = lastDutyPhases;
-        responseRecorder.Capture(PlantSampleAt(tick));
-
-        lastCurrents = model.LastMeasuredCurrents();
+        drive.Tick();
 
         if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
             const auto entryCycles = QemuCycleCounter::Now();
 
-            onPhaseCurrentsReady(shuntReadout.Read(lastCurrents));
+            onPhaseCurrentsReady(drive.ShuntCurrents());
 
             controlLoopMetrics.Record(QemuCycleCounter::Now() - entryCycles);
             controlLoopEntered = false;
@@ -424,37 +306,20 @@ namespace application
         else if (onPhaseCurrentsReady.IsSet() && controlLoopEntered)
             controlLoopMetrics.RecordReentry();
 
-        boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
+        auto& model = drive.Model();
+        boardProtection.Evaluate(model.CurrentSensor().Last(), model.Supply().Voltage().Value(), model.Thermal().Temperature());
     }
 
     void PlatformFactoryImpl::Start()
     {
-        model.Start();
-        responseRecorder.Begin();
-        torqueStep.Begin();
-        encoderFreeze.Begin();
-        cableDisconnect.Begin();
-        supplyStep.Begin();
-        shaftGrip.Begin();
-        shaftHold.Begin();
+        drive.Start();
         boardProtection.SetArmed(true);
     }
 
     void PlatformFactoryImpl::Stop()
     {
         boardProtection.SetArmed(false);
-        model.Stop();
-        model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
-        model.GripShaft(std::nullopt);
-        activeFaultInjection = bootFaultInjection;
-        model.SetFaultInjection(activeFaultInjection);
-        responseRecorder.End();
-    }
-
-    foc::PlantResponseSample PlatformFactoryImpl::PlantSampleAt(uint32_t tick) const
-    {
-        const auto dq = model.LastDqCurrents();
-        return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
+        drive.Stop();
     }
 
     void PlatformFactoryImpl::PollPorts()
@@ -465,8 +330,7 @@ namespace application
         if (!canBusAdapter)
             return;
 
-        // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
-        const uint32_t tick = controlTick.load(std::memory_order_relaxed);
+        const uint32_t tick = drive.TickCount();
         if (const auto frame = canBusAdapter->PollIncoming())
             StampReceivedFrame(tick, *frame);
     }
@@ -475,7 +339,7 @@ namespace application
     {
         for (int i = 0; i != kResponseLinesPerDrain; ++i)
         {
-            const auto record = responseRecorder.Pop();
+            const auto record = drive.PopRecord();
             if (!record)
                 break;
 
@@ -534,44 +398,66 @@ namespace application
 
     hal::Hertz PlatformFactoryImpl::BaseFrequency() const
     {
-        return baseFrequency;
+        return drive.BaseFrequency();
     }
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
-        return model.MaxCurrentSupported();
+        return plantModel.MaxCurrentSupported();
     }
 
     void PlatformFactoryImpl::CurrentOffsets(const foc::PhaseCurrents& offsets)
     {
-        shuntReadout.Offsets(offsets);
+        drive.CurrentOffsets(offsets);
+    }
+
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        drive.ZeroVectorSlopes(slopes);
     }
 
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
     {
-        if (!plantConfig)
-            return {};
-
-        return { std::chrono::nanoseconds{ static_cast<int64_t>(plantConfig->deadTimeCompensationNanoseconds + 0.5f) }, foc::Ampere{ plantConfig->deadTimeCompensationKneeAmpere } };
+        return drive.InverterDeadTimeLoss();
     }
 
     uint32_t PlatformFactoryImpl::DutyUpdateDelayPeriods() const
     {
-        return dutyDelayed ? 1 : 0;
+        return drive.DutyUpdateDelayPeriods();
     }
 
     foc::Radians PlatformFactoryImpl::Read()
     {
-        return model.Read();
+        return drive.Model().Encoder().Read();
     }
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
-        model.Set(value);
+        drive.Model().Encoder().Set(value);
     }
 
     void PlatformFactoryImpl::SetZero()
     {
-        model.SetZero();
+        drive.Model().Encoder().SetZero();
+    }
+
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return plantEncoder.HasIndex();
+    }
+
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        drive.ArmIndex();
+    }
+
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        return drive.IndexSeen();
     }
 }

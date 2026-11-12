@@ -1,6 +1,7 @@
 #include "core/foc/model/MechanicalPlant.hpp"
-#include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace foc
@@ -44,15 +45,14 @@ namespace foc
 
     void MechanicalPlant::Step(float electricalTorque, float dt)
     {
-        // A gripping hand is stronger than any drive: the shaft goes where the hand takes it
         omegaMech = grip.has_value() ? *grip : foc::RadiansPerSecond{ FreeSpeed(electricalTorque, dt) };
         omega = foc::RadiansPerSecond{ polePairs * omegaMech.Value() };
 
         thetaMech += foc::Radians{ omegaMech.Value() * dt };
         theta += foc::Radians{ omega.Value() * dt };
 
-        thetaMech = foc::Radians{ detail::PositionWithWrapAround(thetaMech.Value()) };
-        theta = foc::Radians{ detail::PositionWithWrapAround(theta.Value()) };
+        thetaMech = foc::Radians{ math::WrapToPi(thetaMech.Value()) };
+        theta = foc::Radians{ math::WrapToPi(theta.Value()) };
     }
 
     foc::Radians MechanicalPlant::Angle() const
@@ -106,7 +106,7 @@ namespace foc
         if (coulombFrictionNm > 0.0f)
         {
             const float frictionStep = coulombFrictionNm * dt / inertia;
-            speed = std::fabs(speed) <= frictionStep ? 0.0f : speed - std::copysign(frictionStep, speed);
+            speed = math::Abs(speed) <= frictionStep ? 0.0f : speed - math::Copysign(frictionStep, speed);
         }
 
         return speed;
@@ -117,6 +117,6 @@ namespace foc
         if (coggingTorqueNm == 0.0f)
             return 0.0f;
 
-        return coggingTorqueNm * foc::FastTrigonometry::Sine(static_cast<float>(coggingCyclesPerRevolution) * thetaMech.Value());
+        return coggingTorqueNm * math::FastSine(static_cast<float>(coggingCyclesPerRevolution) * thetaMech.Value());
     }
 }

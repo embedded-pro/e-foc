@@ -2,10 +2,10 @@
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include "core/services/mechanical_system_ident/SteadySpeedFrictionFit.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 #include <array>
 #include <optional>
@@ -27,6 +27,7 @@ namespace services
 
         foc::NewtonMeterSecondSquared CurrentInertia() const override;
         foc::NewtonMeterSecondPerRadian CurrentFriction() const override;
+        bool HasSettled() const;
 
     private:
         using MotorRLS = MechanicalRls;
@@ -57,6 +58,7 @@ namespace services
 
         foc::NewtonMeter torqueConstant{ 1.0f };
         foc::NewtonMeterSecondSquared currentInertia{ 0.0f };
+        bool settled{ false };
         foc::NewtonMeterSecondPerRadian currentFriction{ 0.0f };
     };
 }

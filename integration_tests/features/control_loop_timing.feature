@@ -27,7 +27,7 @@ Feature: Control Loop Timing
   by the same rule. See documentation/design/software-in-the-loop.md,
   Part B3.
 
-  @sil @REQ-PERF-004 @REQ-PERF-008
+  @sil @REQ-PLT-004
   Scenario Outline: The <current> current loop stays within its budget in <mode> mode
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -53,7 +53,7 @@ Feature: Control Loop Timing
       | speed    | decoupled | a speed setpoint of 20 rad/s is applied   | 240        |
       | position | decoupled | a position setpoint of 1.5 rad is applied | 240        |
 
-  @sil @REQ-PERF-004 @REQ-PERF-008
+  @sil @REQ-PLT-004
   Scenario: The control interrupt stays within its budget through a full calibration
     Given a nominal motor plant
     And the motor is already calibrated

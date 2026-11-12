@@ -8,7 +8,7 @@ Feature: FOC Controller Algorithm Coverage
   scenarios, and each law's closed-loop envelope by the host model-in-the-loop
   tests.
 
-  @sil @REQ-CTRL-001
+  @sil @REQ-CTL-005
   Scenario Outline: <label> combines a <current> current loop with the outer loops
     Given a nominal motor plant
     And the motor is already calibrated

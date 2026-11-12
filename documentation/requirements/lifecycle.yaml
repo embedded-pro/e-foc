@@ -1,0 +1,51 @@
+- id: REQ-LCY-001
+  title: The power stage is energised only while the drive calibrates or is enabled
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall start in Idle after a reset, enter Calibrating only on a calibration command,
+    enter Enabled only on a Start command from Ready, and return to Ready on a Stop command. It
+    shall drive current through the motor only while Calibrating or Enabled, and a Start command
+    received in Idle shall leave the drive in Idle.
+
+- id: REQ-LCY-002
+  title: The emergency stop is obeyed in every state
+  status: implemented
+  verification: unit
+  shall: >
+    The drive shall accept an emergency stop in every state, stop driving the motor before it
+    evaluates any other condition, and abandon any command still outstanding. From Enabled or
+    Calibrating it shall return to Ready when it holds a valid calibration and to Idle otherwise;
+    in every other state it shall stay where it is and shall not enter Fault.
+
+- id: REQ-LCY-003
+  title: A fault stops the drive at once and is cleared only once its cause is gone
+  status: verified
+  verification: sil
+  shall: >
+    On a fault the drive shall stop driving the motor within the context that detected it, abort
+    any calibration in progress and enter Fault, also when the fault arrives while the drive is
+    being enabled. A clear-fault command shall be refused while the board's protection condition
+    is asserted or has not stayed clear for its settling interval, and after three consecutive
+    clears without a clean run; an accepted clear shall return to Ready with a valid calibration
+    and to Idle without one.
+
+- id: REQ-LCY-004
+  title: The control mode changes only while the drive is stopped
+  status: verified
+  verification: sil
+  shall: >
+    The operator shall select torque, speed or position mode over CAN. The drive shall refuse the
+    selection while it is Enabled or has work outstanding, persist an accepted mode across power
+    cycles, keep an established rotor reference when the new mode's calibration is complete, and
+    refuse a setpoint whose type does not match the active mode.
+
+- id: REQ-LCY-005
+  title: A drive whose commanding client goes silent stops
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    An Enabled drive shall stop when its CAN client goes offline. With a command timeout set, it
+    shall also enter Fault with commandTimeout within 10 ms of the timeout running out without an
+    accepted Start or setpoint command, whatever other traffic, the heartbeat included, the client
+    keeps sending.

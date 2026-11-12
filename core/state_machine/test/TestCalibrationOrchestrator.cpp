@@ -1,6 +1,7 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
+#include "infra/util/BoundedVector.hpp"
 #include <numbers>
 
 namespace
@@ -505,4 +506,122 @@ TEST_F(CalibrationOrchestratorWithStandstillTest, a_re_alignment_does_not_wait_f
         [](state_machine::CalibrationStep) {},
         [](foc::Radians) {},
         [] {});
+}
+
+namespace
+{
+    class CalibrationOrchestratorWithIndexTest
+        : public CalibrationOrchestratorTest
+    {
+    public:
+        void AlignWithIndex()
+        {
+            pendingData.polePairs = 4;
+            pendingData.rPhase = 0.5f;
+            EXPECT_CALL(motorAlignment, ForceAlignment(4, _, _)).WillOnce(Invoke([this](auto, auto, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                {
+                    storedAlignCb = cb;
+                }));
+
+            withIndex.StartAlignmentOnly(
+                pendingData,
+                [](state_machine::CalibrationStep) {},
+                [this](foc::Radians angle)
+                {
+                    alignedCalled = true;
+                    receivedAngle = angle;
+                },
+                [this]
+                {
+                    failedCalled = true;
+                });
+        }
+
+        void ExpectSearch()
+        {
+            EXPECT_CALL(indexSearch, Available()).WillOnce(Return(true));
+            EXPECT_CALL(indexSearch, Search(_, _)).WillOnce(Invoke([this](const services::IndexSearch::Config& config, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                {
+                    searchConfig = config;
+                    storedSearchCb = cb;
+                }));
+        }
+
+        StrictMock<services::IndexSearchMock> indexSearch;
+        application::CalibrationOrchestrator withIndex{ electricalIdent, motorAlignment, tracer, std::nullopt, std::nullopt, foc::Volts{ 24.0f }, std::ref(indexSearch) };
+        infra::Function<void(std::optional<foc::Radians>)> storedSearchCb;
+        services::IndexSearch::Config searchConfig;
+    };
+}
+
+TEST_F(CalibrationOrchestratorWithIndexTest, the_index_is_searched_in_the_aligned_frame_and_its_angle_stored)
+{
+    AlignWithIndex();
+
+    ExpectSearch();
+    storedAlignCb(foc::Radians{ 0.3f });
+    EXPECT_FALSE(alignedCalled);
+    EXPECT_TRUE(withIndex.IsRunning());
+
+    EXPECT_EQ(searchConfig.polePairs, 4u);
+    EXPECT_FLOAT_EQ(searchConfig.phaseResistance.Value(), 0.5f);
+    EXPECT_FLOAT_EQ(searchConfig.busVoltage.Value(), 24.0f);
+    EXPECT_FALSE(searchConfig.target.has_value());
+
+    storedSearchCb(foc::Radians{ 2.5f });
+
+    EXPECT_TRUE(alignedCalled);
+    EXPECT_FLOAT_EQ(receivedAngle.Value(), 0.3f);
+    ASSERT_TRUE(services::EncoderIndexAngle(pendingData).has_value());
+    EXPECT_FLOAT_EQ(*services::EncoderIndexAngle(pendingData), 2.5f);
+    EXPECT_FALSE(withIndex.HasRunInFlight());
+}
+
+TEST_F(CalibrationOrchestratorWithIndexTest, a_search_that_finds_no_index_completes_without_an_index_angle)
+{
+    pendingData.encoderIndexAngle = 1.0f;
+    AlignWithIndex();
+
+    ExpectSearch();
+    storedAlignCb(foc::Radians{ 0.3f });
+    storedSearchCb(std::nullopt);
+
+    EXPECT_TRUE(alignedCalled);
+    EXPECT_FALSE(failedCalled);
+    EXPECT_FALSE(services::EncoderIndexAngle(pendingData).has_value());
+}
+
+TEST_F(CalibrationOrchestratorWithIndexTest, an_encoder_without_an_index_is_not_searched)
+{
+    pendingData.encoderIndexAngle = 1.0f;
+    AlignWithIndex();
+
+    EXPECT_CALL(indexSearch, Available()).WillOnce(Return(false));
+    storedAlignCb(foc::Radians{ 0.3f });
+
+    EXPECT_TRUE(alignedCalled);
+    EXPECT_FALSE(services::EncoderIndexAngle(pendingData).has_value());
+}
+
+TEST_F(CalibrationOrchestratorWithIndexTest, abort_during_the_search_stops_it_and_drops_its_result)
+{
+    AlignWithIndex();
+    ExpectSearch();
+    storedAlignCb(foc::Radians{ 0.3f });
+
+    EXPECT_CALL(electricalIdent, Abort());
+    EXPECT_CALL(motorAlignment, Abort());
+    EXPECT_CALL(indexSearch, Abort());
+    withIndex.Abort();
+    storedSearchCb(foc::Radians{ 2.5f });
+
+    EXPECT_FALSE(alignedCalled);
+}
+
+TEST(CalibrationDataIndexAngleTest, an_absent_or_out_of_range_index_angle_reads_as_none)
+{
+    services::CalibrationData data{};
+    EXPECT_FALSE(services::EncoderIndexAngle(data).has_value());
+    data.encoderIndexAngle = 4.0f;
+    EXPECT_FALSE(services::EncoderIndexAngle(data).has_value());
 }

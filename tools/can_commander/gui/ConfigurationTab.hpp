@@ -2,7 +2,6 @@
 
 #include "tools/can_commander/gui/SettingsPage.hpp"
 #include <QLabel>
-#include <QString>
 
 namespace tool
 {
@@ -14,7 +13,7 @@ namespace tool
     public:
         explicit ConfigurationTab(QWidget* parent = nullptr);
 
-        void SetLegacy(bool legacyContract) override;
+        void SetLegacy(bool legacyContract);
         void SetSupervisionUnavailable(const QString& reason);
         void SetLimitsUnavailable(const QString& reason);
         void SetTargetWindowUnavailable(const QString& reason);
@@ -24,18 +23,22 @@ namespace tool
         void SetBusVoltageLimitsUnavailable(const QString& reason);
         void SetQuickStopUnavailable(const QString& reason);
 
+
     protected:
         void Refresh() override;
 
     private:
         void BuildStartupGroup();
+        void BuildStreamGroup();
         void BuildSupervisionGroup();
         void BuildLimitsGroup();
+        void BuildMotionProfileGroup();
         void BuildTargetWindowGroup();
         void BuildTravelLimitsGroup();
         void BuildThermalGroup();
         void BuildSupplyLimitsGroup();
         void BuildQuickStopGroup();
+        void BuildRecalibrationGroup();
         void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };

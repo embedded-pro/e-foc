@@ -4,11 +4,20 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <utility>
 
 namespace mil
 {
     namespace
     {
+        std::vector<uint8_t> MemoryOf(const Scenario& scenario)
+        {
+            if (scenario.nvmImage.has_value())
+                return *scenario.nvmImage;
+            const auto image = scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage();
+            return { image.begin(), image.end() };
+        }
+
         constexpr float kMilliPerUnit = 1000.0f;
         constexpr float kMilliPerSecond = 1000.0f;
         constexpr std::size_t kTracerTailCharacters = 4000;
@@ -24,14 +33,13 @@ namespace mil
             if (quantity == "resistance")
                 calibration.rPhase *= factor;
             else if (quantity == "inductance")
-            {
                 calibration.lD *= factor;
-                calibration.lQ *= factor;
-            }
             else if (quantity == "inertia")
                 calibration.inertia *= factor;
             else if (quantity == "friction")
                 calibration.frictionViscous *= factor;
+            else if (quantity == "dryFriction")
+                calibration.frictionCoulomb *= factor;
             else if (quantity == "fluxLinkage")
                 calibration.fluxLinkage *= factor;
             else
@@ -59,13 +67,14 @@ namespace mil
         nvm.includeCalibration = true;
         nvm.includeConfig = true;
         nvm.calibration = sil::CompleteCalibration();
+        nvm.config.currentLoop.bandwidth = sil::calibratedCurrentLoopBandwidth;
         nvm.calibration.polePairs = plant.polePairs;
         nvm.calibration.rPhase = plant.statorResistanceOhm;
         nvm.calibration.lD = plant.dAxisInductanceHenry * kMilliPerUnit;
-        nvm.calibration.lQ = plant.qAxisInductanceHenry * kMilliPerUnit;
         nvm.calibration.fluxLinkage = plant.fluxLinkageWeber;
         nvm.calibration.inertia = plant.rotorInertiaKgM2;
         nvm.calibration.frictionViscous = plant.viscousDampingNmSPerRad;
+        nvm.calibration.frictionCoulomb = plant.coulombFrictionNm;
         nvm.calibration.currentOffsetA = plant.noiseBiasAmpereA;
         nvm.calibration.currentOffsetB = plant.noiseBiasAmpereB;
         nvm.calibration.currentOffsetC = plant.noiseBiasAmpereC;
@@ -83,6 +92,12 @@ namespace mil
     {
         nvm.includeConfig = true;
         nvm.config.defaultControlMode = static_cast<uint8_t>(mode);
+        return *this;
+    }
+
+    Scenario& Scenario::BootsFrom(std::vector<uint8_t> image)
+    {
+        nvmImage = std::move(image);
         return *this;
     }
 
@@ -122,6 +137,12 @@ namespace mil
         return *this;
     }
 
+    Scenario& Scenario::WithoutSamplingSkewCorrection()
+    {
+        samplingSkewCorrected = false;
+        return *this;
+    }
+
     void ModelInTheLoop::DeferredLowPriorityInterrupt::Trigger()
     {
         pending = true;
@@ -147,14 +168,6 @@ namespace mil
         if (handler != nullptr)
             handler();
     }
-
-    void ModelInTheLoop::SilentSerial::SendData(infra::ConstByteRange, infra::Function<void()> actionOnCompletion)
-    {
-        infra::EventDispatcher::Instance().Schedule(actionOnCompletion);
-    }
-
-    void ModelInTheLoop::SilentSerial::ReceiveData(infra::Function<void(infra::ConstByteRange data)>)
-    {}
 
     ModelInTheLoop::MemoryEeprom::MemoryEeprom(std::vector<uint8_t> contents)
         : contents{ std::move(contents) }
@@ -185,11 +198,16 @@ namespace mil
         infra::EventDispatcher::Instance().Schedule(onDone);
     }
 
+    const std::vector<uint8_t>& ModelInTheLoop::MemoryEeprom::Contents() const
+    {
+        return contents;
+    }
+
     ModelInTheLoop::ModelInTheLoop(const Scenario& scenario)
         : scenario{ scenario }
         , drive{ scenario.plant }
         , inverter{ drive }
-        , eeprom{ scenario.nvm.includeCalibration || scenario.nvm.includeConfig ? sil::BuildNvmImage(scenario.nvm) : sil::BlankNvmImage() }
+        , eeprom{ MemoryOf(scenario) }
         , vdc{ drive.PowerSupplyVoltage() }
         , tickPeriod{ std::chrono::nanoseconds{ 1000000000u / drive.BaseFrequency().Value() } }
         , ticksPerMillisecond{ drive.BaseFrequency().Value() / 1000u }
@@ -201,24 +219,47 @@ namespace mil
                 return drive.PowerSupplyVoltage();
             } }
         , motorAlignment{ inverterCompensation, drive }
+        , indexSearch{ inverterCompensation, drive, noEncoderIndex }
         , rotorStandstill{ drive }
     {
+        if (!scenario.samplingSkewCorrected)
+            drive.IgnoreSampleDelays();
+
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
-                    configData = services::MakeDefaultConfigData();
+                    configData = services::ConfigData{};
 
                 controlMode.emplace(
-                    application::TerminalAndTracer{ terminal, tracer },
-                    application::MotorHardware{ inverterCompensation, drive, vdc, drive.DutyUpdateDelayPeriods(), &currentStream },
+                    tracer,
+                    application::MotorHardware{ inverterCompensation, drive, currentStream, vdc, drive.DutyUpdateDelayPeriods(), &drive },
                     nvm,
-                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true },
+                    application::CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = confirmedCurrentOffsets, .mapCogging = true, .standstill = rotorStandstill, .identifyFluxLinkage = true, .indexSearch = *indexSearch },
                     faultNotifier,
                     configData,
                     state_machine::ControlModeStateMachine::OuterLoopArgs{
                         .maxCurrent = drive.MaxCurrentSupported(),
                         .baseFrequency = drive.BaseFrequency(),
                         .lowPriorityInterrupt = lowPriorityInterrupt });
+                controlMode->Recalibration().RestoreStoredModel();
+                faultHistory.emplace(nvm, [this]()
+                    {
+                        controlMode->HoldAsyncWork();
+                    },
+                    [this]()
+                    {
+                        controlMode->ReleaseAsyncWork();
+                    });
+                peakCurrent.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->Drive().ActiveStateMachine();
+                    });
+                controlMode->OnFaultEntered([this](state_machine::FaultCode code)
+                    {
+                        faultHistory->Record(static_cast<uint8_t>(can::FocMotorCanBridge::ToCanFaultCode(code)),
+                            services::FaultHistory::Conditions{ static_cast<uint8_t>(state_machine::ToCanMode(controlMode->Drive().Active())), filteredBusVoltage, peakCurrent.Peak() });
+                    });
+                faultHistory->Start();
                 busVoltage.Start();
             });
 
@@ -229,6 +270,8 @@ namespace mil
     ModelInTheLoop::~ModelInTheLoop()
     {
         busVoltage.Stop();
+        clock.ExecuteAllActions();
+        faultHistory.reset();
         controlMode.reset();
         clock.ExecuteAllActions();
     }
@@ -240,7 +283,16 @@ namespace mil
         clock.ForwardTime(tickPeriod);
 
         if (drive.Tick() % ticksPerMillisecond == 0)
+        {
             DrainRecords();
+            if (millisecondObserver)
+                millisecondObserver();
+        }
+    }
+
+    void ModelInTheLoop::ObserveEachMillisecond(std::function<void()> observer)
+    {
+        millisecondObserver = std::move(observer);
     }
 
     void ModelInTheLoop::DrainRecords()
@@ -288,7 +340,7 @@ namespace mil
     {
         return RunUntil([this, &predicate]()
             {
-                return predicate(controlMode->ActiveStateMachine().CurrentState());
+                return predicate(controlMode->Drive().ActiveStateMachine().CurrentState());
             },
             limit);
     }
@@ -297,7 +349,7 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->CmdReAlign(onDone);
+                controlMode->Drive().ActiveCommon().Commissioning().CmdReAlign(onDone);
             },
             kCommandTimeout);
     }
@@ -306,7 +358,7 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->ActiveStateMachine().CmdCalibrate(onDone);
+                controlMode->Drive().ActiveStateMachine().CmdCalibrate(onDone);
             },
             kCalibrationTimeout);
     }
@@ -315,14 +367,14 @@ namespace mil
     {
         return Command([this](const auto& onDone)
             {
-                controlMode->ActiveStateMachine().CmdClearCalibration(onDone);
+                controlMode->Drive().ActiveStateMachine().CmdClearCalibration(onDone);
             },
             kCommandTimeout);
     }
 
     std::optional<ElectricalIdentification> ModelInTheLoop::IdentifyElectrical()
     {
-        if (controlMode->CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveCommon().Commissioning().CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
             return std::nullopt;
 
         using Result = services::ElectricalParametersIdentification::ResistanceInductanceResult;
@@ -342,7 +394,7 @@ namespace mil
         const auto& measured = **resistanceAndInductance;
         if (!measured.resistance.has_value() || !measured.inductance.has_value() || measured.fitQuality < 0.5f)
         {
-            controlMode->CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
@@ -359,20 +411,19 @@ namespace mil
                 kCalibrationTimeout) ||
             !polePairs->value().has_value())
         {
-            controlMode->CmdReleaseExternalCalibration();
+            controlMode->Drive().ActiveCommon().Commissioning().CmdReleaseExternalCalibration();
             return std::nullopt;
         }
 
         services::CalibrationData data{};
         data.rPhase = measured.resistance->Value();
         data.lD = measured.inductance->Value();
-        data.lQ = measured.inductance->Value();
         data.polePairs = static_cast<uint8_t>(*polePairs->value());
-        data.fluxLinkage = controlMode->ActiveFluxLinkage().Value();
+        data.fluxLinkage = controlMode->Drive().ActiveCommon().Calibration().ActiveFluxLinkage().Value();
 
         if (!Command([this, &data](const auto& onDone)
                 {
-                    controlMode->CmdCompleteExternalCalibration(data, onDone);
+                    controlMode->Drive().ActiveCommon().Commissioning().CmdCompleteExternalCalibration(data, onDone);
                 },
                 kCommandTimeout))
             return std::nullopt;
@@ -382,7 +433,7 @@ namespace mil
 
     bool ModelInTheLoop::Enable()
     {
-        if (controlMode->ActiveStateMachine().CmdEnable() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveStateMachine().CmdEnable() != state_machine::CommandResult::ok)
             return false;
 
         if (!RunUntilState(Holds<state_machine::Enabled>, kStateTimeout))
@@ -394,7 +445,7 @@ namespace mil
 
     bool ModelInTheLoop::Disable()
     {
-        if (controlMode->ActiveStateMachine().CmdDisable() != state_machine::CommandResult::ok)
+        if (controlMode->Drive().ActiveStateMachine().CmdDisable() != state_machine::CommandResult::ok)
             return false;
 
         const bool ready = RunUntilState(Holds<state_machine::Ready>, kStateTimeout);
@@ -405,7 +456,7 @@ namespace mil
     bool ModelInTheLoop::Select(state_machine::ControlMode mode)
     {
         auto result = std::make_shared<std::optional<state_machine::SelectResult>>();
-        controlMode->Select(mode, [result](state_machine::SelectResult outcome)
+        controlMode->Modes().Select(mode, [result](state_machine::SelectResult outcome)
             {
                 *result = outcome;
             });
@@ -422,7 +473,7 @@ namespace mil
     bool ModelInTheLoop::SetTorque(float ampere)
     {
         StampSetpoint(ampere);
-        const bool accepted = controlMode->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ ampere } });
+        const bool accepted = controlMode->Commands().TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ ampere } });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -430,7 +481,7 @@ namespace mil
     bool ModelInTheLoop::SetSpeed(float radiansPerSecond)
     {
         StampSetpoint(radiansPerSecond);
-        const bool accepted = controlMode->TrySetSpeed(foc::RadiansPerSecond{ radiansPerSecond });
+        const bool accepted = controlMode->Commands().TrySetSpeed(foc::RadiansPerSecond{ radiansPerSecond });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -438,7 +489,7 @@ namespace mil
     bool ModelInTheLoop::SetPosition(float radians)
     {
         StampSetpoint(radians);
-        const bool accepted = controlMode->TrySetPosition(foc::Radians{ radians });
+        const bool accepted = controlMode->Commands().TrySetPosition(foc::Radians{ radians });
         Run(kCommandSpacing);
         return accepted;
     }
@@ -496,17 +547,17 @@ namespace mil
 
     bool ModelInTheLoop::IsRunning() const
     {
-        return Holds<state_machine::Enabled>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Enabled>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     bool ModelInTheLoop::HasFault() const
     {
-        return Holds<state_machine::Fault>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Fault>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     bool ModelInTheLoop::IsReady() const
     {
-        return Holds<state_machine::Ready>(controlMode->ActiveStateMachine().CurrentState());
+        return Holds<state_machine::Ready>(controlMode->Drive().ActiveStateMachine().CurrentState());
     }
 
     state_machine::ControlModeStateMachine& ModelInTheLoop::ControlMode()
@@ -521,17 +572,22 @@ namespace mil
 
     std::optional<state_machine::OnlineEstimates> ModelInTheLoop::OnlineEstimates()
     {
-        return controlMode->ActiveStateMachine().CurrentOnlineEstimates();
+        return controlMode->Drive().ActiveStateMachine().CurrentOnlineEstimates();
     }
 
     const services::CalibrationData& ModelInTheLoop::CalibrationRecord() const
     {
-        return controlMode->CalibrationRecord();
+        return controlMode->Drive().CalibrationRecord();
     }
 
     const Scenario& ModelInTheLoop::Setup() const
     {
         return scenario;
+    }
+
+    std::vector<uint8_t> ModelInTheLoop::NvmImage() const
+    {
+        return eeprom.Contents();
     }
 
     SimulatedDrive& ModelInTheLoop::Drive()

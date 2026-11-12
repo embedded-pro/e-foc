@@ -2,9 +2,9 @@
 title: "Service: Motor Alignment"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: service-alignment
-date: 2026-10-30
+date: 2026-11-06
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Service: Motor Alignment |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.3.1                    |
+| Version   | 0.4.0                    |
 | Component | service-alignment        |
-| Date      | 2026-10-30               |
+| Date      | 2026-11-06               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -33,13 +33,14 @@ date: 2026-10-30
 - Applying an open-loop DC voltage vector at electrical angle 0° via the three-phase inverter to force the rotor to a known magnetic position
 - Detecting rotor settlement by monitoring encoder position change over consecutive samples
 - Reporting the calibrated encoder offset (in radians) via a single completion callback on success, or reporting failure if the rotor does not settle within the allowed time
-- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-EH-015): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
-- Refusing to align when the encoder does not follow the field (REQ-SM-034): the vector is held a quarter electrical turn ahead first, and the encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
+- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-PRO-005): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
+- Refusing to align when the encoder does not follow the field (REQ-CMS-001): the vector is held a quarter electrical turn ahead first, and the encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
 **Is NOT responsible for:**
 - Persisting the returned encoder offset to NVM — that is the caller's decision
+- Finding the encoder's index — the index search does that once the alignment has set the frame (`service-index-search.md`)
 - Running during normal FOC operation — the FOC loop must be stopped by the caller before alignment begins
 - Measuring or interpreting motor electrical parameters (R, L, pole pairs)
 - Providing any feedback during the alignment beyond the single completion callback
@@ -135,14 +136,17 @@ The service applies the offset itself, by calling `Encoder::SetZero()` once the 
 the rotor is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
 rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
 read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
-loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
-calibration must be re-run to orient the field.
+loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot. What
+survives a reset is the angle of the encoder's index in the frame the alignment sets, which the calibration
+measures right after the alignment with an index search (`service-index-search.md`); a drive whose record
+holds one restores the frame from the index at its first Enable instead of aligning again. Without an index,
+the alignment must be re-run after every power-up to orient the field.
 
 ### Phase Continuity Check
 
 A rotor held at electrical zero by a vector the windings do not carry looks exactly like an aligned rotor:
 its reading stops changing at once. So when the rotor is declared settled, before the encoder is zeroed, the
-service compares the phase currents of the settled run with the ones the vector must drive (REQ-EH-015).
+service compares the phase currents of the settled run with the ones the vector must drive (REQ-PRO-005).
 
 The vector puts `d·Vdc/2` across phase a and `−d·Vdc/4` across phases b and c, with `d` the test voltage as a
 fraction of the bus. With the rotor at rest there is no back-EMF, so the currents settle at
@@ -193,7 +197,7 @@ so the caller can enter `phaseMissing` instead of a generic calibration failure.
 
 An encoder that has stopped reporting — stuck from boot, unplugged, or with a broken channel — reads as a rotor
 that settled at once, so the alignment would zero it and the drive would enable against a reading that means
-nothing (REQ-SM-034). With a non-zero follow step the service therefore aligns in two holds:
+nothing (REQ-CMS-001). With a non-zero follow step the service therefore aligns in two holds:
 
 1. **First hold.** The vector is applied at the follow step, a quarter electrical turn ahead of the alignment
    angle, and settlement is detected as above. The settled reading is recorded; nothing is zeroed.

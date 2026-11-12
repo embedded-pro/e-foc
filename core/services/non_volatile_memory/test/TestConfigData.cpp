@@ -11,47 +11,51 @@ namespace
 
 TEST_F(TestConfigData, make_default_config_data_returns_expected_can_node_id)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.canNodeId, 1u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_expected_can_baudrate)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.canBaudrate, 1000000u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_expected_telemetry_rate)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.telemetryRateHz, 100u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_expected_encoder_resolution)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.encoderResolution, 4000u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mode)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_172)
+TEST_F(TestConfigData, config_data_sizeof_is_188)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 172 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 188 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_NEAR(cfg.limits.overspeedLimit, 1000.0f, 1e-6f);
     EXPECT_NEAR(cfg.limits.followingErrorWindow, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.followingErrorTime, 0.1f, 1e-6f);
     EXPECT_NEAR(cfg.limits.speedAcceleration, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.speedDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.profileVelocity, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.profileAcceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.profileDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.limits.profileJerk, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.commandTimeout, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.continuousCurrent, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.limits.peakCurrent, 0.0f, 1e-9f);
@@ -70,7 +74,7 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_settings)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_NEAR(cfg.supervision.window, 0.1f, 1e-6f);
     EXPECT_NEAR(cfg.supervision.currentFraction, 0.05f, 1e-6f);
     EXPECT_NEAR(cfg.supervision.demandedSpeed, 2.0f, 1e-6f);
@@ -79,9 +83,14 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_se
     EXPECT_EQ(cfg.stallDetection, uint8_t{ 1 });
 }
 
+TEST_F(TestConfigData, make_default_config_data_does_not_require_homing)
+{
+    EXPECT_EQ(services::ConfigData{}.homingRequired, uint8_t{ 0 });
+}
+
 TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_NEAR(cfg.currentLoop.bandwidth, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.speedLoop.bandwidth, 0.0f, 1e-9f);
     EXPECT_NEAR(cfg.positionLoop.bandwidth, 0.0f, 1e-9f);
@@ -89,7 +98,7 @@ TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_law_settings)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_NEAR(cfg.currentLoop.switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
     EXPECT_NEAR(cfg.currentLoop.boundaryLayer, foc::CurrentLoopTunings{}.boundaryLayer, 1e-6f);
     EXPECT_EQ(cfg.currentTwoStepDeadbeat, uint8_t{ 0 });
@@ -105,7 +114,7 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_law_settings)
 
 TEST_F(TestConfigData, make_default_config_data_selects_pid_for_both_loops)
 {
-    const auto cfg = services::MakeDefaultConfigData();
+    const auto cfg = services::ConfigData{};
     EXPECT_EQ(cfg.currentAlgorithm, uint8_t{ 0 });
     EXPECT_EQ(cfg.speedAlgorithm, uint8_t{ 0 });
 }

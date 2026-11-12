@@ -2,9 +2,9 @@
 title: "Error Handling Design"
 type: design
 status: stable
-version: 1.0.1
+version: 1.3.0
 component: "error-handling"
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                 |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Error Handling Design |
 | Type      | design                |
 | Status    | stable                |
-| Version   | 1.0.1                 |
+| Version   | 1.3.0                 |
 | Component | error-handling        |
-| Date      | 2026-11-05            |
+| Date      | 2026-11-08            |
 
 ---
 
@@ -25,7 +25,7 @@ date: 2026-11-05
 - Cutting the power stage and resetting when an assertion fails.
 - Persisting that diagnostic snapshot in a memory region that is not cleared on reset, so it survives the subsequent boot.
 - Reporting the cause of the most recent reset (power-up, brown-out, software, hardware, or watchdog) to the application layer via `PlatformFactory`.
-- Exposing the formatted fault snapshot and reset cause to the CLI at boot time.
+- Reporting the formatted fault snapshot and the reset cause in the startup banner at boot.
 - Providing a platform-initiated software reset via `PlatformFactory::Reset()`.
 
 **Is NOT responsible for:**
@@ -76,7 +76,7 @@ definition is empty, and says so: that target does not drive a bridge yet, so th
 
 `PlatformFactory::BoardProtectionStatus()` answers `asserted`, `clear` or `unknown` for the board-protection
 condition, and is what lets the state machine refuse to re-arm a drive whose hardware is still faulted
-(REQ-SM-025, REQ-SM-026). It is a dispatcher-context query — an implementation may read a peripheral status
+(REQ-LCY-003). It is a dispatcher-context query — an implementation may read a peripheral status
 register, but nothing calls it from an interrupt, so it need not be interrupt-safe.
 
 `unknown` is a first-class answer, not a failure. A platform reports it whenever it cannot observe the
@@ -107,7 +107,7 @@ outside the board's overvoltage and undervoltage thresholds (a reading that is n
   on E-FOC-HARDWARE: its shunt returns the low-side current of all three legs, and the sequence converts at the
   counter's zero, where the low sides conduct and that current sums to zero. The phase currents are converted
   at that same instant, where each winding's current crosses its own shunt, so the conversion interrupt checks
-  each of them against the same 6.6 A before handing them on (REQ-EH-014). A sample beyond it cuts the outputs
+  each of them against the same 6.6 A before handing them on. A sample beyond it cuts the outputs
   at once, the way the watchdog's early warning does, and from then on the platform withholds the samples and
   refuses every duty command and start until the bridge is stopped, as the hardware fault latch would. It
   reports the over-current from the event loop, because the state machine's response stops the control loop,
@@ -140,7 +140,7 @@ response to a board-protection fault through the QEMU board protection. The trip
 by review only, and no automated test is planned for them (#487): the TI comparators driving the PWM fault inputs,
 the TI per-sample over-current cut and the NUCLEO-G474RE software checks. Exercising them takes a dedicated rig that
 is out of scope here: a programmable supply driven above 58 V and below 18 V, a way to force a phase current above
-6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (REQ-INT-016) has.
+6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (`integration-testing.md`, *Commands and Verdicts over CAN Only*) has.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
@@ -169,26 +169,35 @@ The fault handler's file therefore defines `abort()` on TI and ST, replacing the
 
 The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
 
-The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-EH-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
+The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-PLT-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
+
+### Fault history
+
+The persistent fault region keeps one HardFault snapshot, in RAM, until the next cold start. Faults the drive
+handles — a board protection trip, a supervision fault, a failed calibration — are kept apart in the non-volatile
+fault history: the last eight entries into `Fault`, with their power-up, uptime, control mode, bus voltage and
+peak current, readable over CAN (`service-fault-history.md`).
 
 ### Reset cause detection
 
 Each platform's `PlatformFactoryImpl` reads the hardware-specific reset status register during construction, before anything else modifies it. It converts the raw vendor bits to the platform-agnostic `ResetCause` enumeration and clears the register so that subsequent resets are not misreported. The `ResetCause` value is then accessible for the lifetime of the application via `PlatformFactory::GetResetCause()`.
 
-### Boot-time CLI reporting
+### Boot-time reporting
 
-The CLI banner reads both the reset cause and any pending fault snapshot from `PlatformFactory` during
-construction. If a valid snapshot exists, it is formatted into a human-readable string and the validity
-sentinel is cleared immediately after formatting, so the snapshot is consumed at most once. The formatted
-string is retained for the lifetime of the application for later `fault_status` CLI queries. The banner prints
-the reset cause unconditionally and surrounds fault data with visible delimiters.
+The startup banner (`service-cli.md`, Part B), which both applications trace as they start, reads the
+reset cause and any pending fault snapshot from `PlatformFactory`. If a valid snapshot exists, the
+platform formats it into a human-readable string during construction and clears the validity sentinel
+immediately after formatting, so the snapshot is consumed at most once. The banner prints the reset
+cause unconditionally and surrounds fault data with visible delimiters. The motor application also
+reports the reset cause over CAN (`resetCause`, `0xB0`).
 
 ---
 
 ### Control-loop and bus statistics
 
-Alongside the post-mortem fault record, the platform keeps two live sets of counters, both readable
-from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
+Alongside the post-mortem fault record, the platform keeps two live sets of counters. The loop
+statistics are read over CAN (`0xA0`–`0xA7`), and `ClearDiagnostics` resets both sets
+(`service-can.md`); no interface of the motor application reads the CAN error counters.
 
 **Control-interrupt execution.** The Cortex-M cycle counter (EmIL's
 `hal::cortex::DataWatchpointAndTrace`, started once when the platform is built) is left free-running and read on entry
@@ -196,7 +205,7 @@ to and exit from the application callback that executes inside the control inter
 is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
 own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
 control law and PWM write — the work the cycle budget applies to. Hardware ISR entry/exit overhead
-is excluded; REQ-PERF-001 reserves 25% of the control period for that overhead. The measurement is
+is excluded; REQ-PLT-004 reserves 25% of the control period for that overhead. The measurement is
 taken in the platform layer so it is consistent across targets. The emulated target has no cycle
 counter and reads a free-running timer of its instruction-counted clock instead
 ([software-in-the-loop.md](software-in-the-loop.md), Part B3).
@@ -215,12 +224,19 @@ number from `SCB->ICSR`, its bit in `NVIC->ISPR`). Both drivers clear their inte
 pending bit before calling back, so the bit is set only by a conversion or transfer that completed
 during the callback.
 
-**CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
-that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
-omit it. This is what separates a bus with marginal termination from one that is unplugged.
+**CAN errors.** Every error class the controller reports is counted, not only the bus-off condition
+that raises a fault. Each platform's bus is a can-lite `MonitoredCanImpl` around its driver, and
+counting happens in its `MonitoredCan` base, so no platform's reporting path can omit it. This is what separates a bus with marginal termination from one that is unplugged.
 
 Both sets saturate rather than wrap. The cost on the control path is a pair of register reads and
 about two dozen inlined instructions, under one percent of the 20 kHz period.
+
+### Fault indication on the LEDs
+
+A drive in Fault shows its fault on the red board LED as a repeating group of flashes, two for over-current up to
+eight for a command timeout, or steadily for a fault without a code of its own. The green LED goes out. The
+indication is driven from the event loop by the status LEDs service and reads the same state and fault code the CAN
+telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 
 ---
 

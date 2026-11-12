@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <cstdint>
 
@@ -32,7 +33,7 @@ namespace foc
             iqTimesUSum += iqTimesU;
             iqTimesUSquaredSum += iqTimesU * u;
 
-            const auto size = std::abs(mechanicalStep);
+            const auto size = math::Abs(mechanicalStep);
             if (size > 0.0f && (smallestStep == 0.0f || size < smallestStep))
                 smallestStep = size;
 

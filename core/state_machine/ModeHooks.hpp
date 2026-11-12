@@ -5,7 +5,7 @@
 #include "core/services/flux_linkage_ident/FluxLinkageIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
-#include "services/util/TerminalWithStorage.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 
 namespace application
 {
@@ -30,10 +30,12 @@ namespace application
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data) = 0;
         virtual bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const = 0;
         virtual void PrepareForEnabled() = 0;
+        virtual foc::RadiansPerSecondSquared QuickStopDeceleration() const = 0;
+        // True when the mode can brake to a stop; false for torque mode without a calibrated inertia.
+        virtual bool CanBeginQuickStop() const = 0;
         // Starts decelerating the rotor with the power stage on; false when the mode cannot brake.
         virtual bool BeginQuickStop() = 0;
         virtual void AbortModeSpecificServices() = 0;
         virtual bool HasModeSpecificWorkPending() const = 0;
-        virtual void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) = 0;
     };
 }

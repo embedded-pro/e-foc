@@ -2,9 +2,9 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: service-cogging-compensation
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Cogging Compensation |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.3.0                         |
+| Version   | 0.4.0                         |
 | Component | service-cogging-compensation  |
-| Date      | 2026-11-05                    |
+| Date      | 2026-11-08                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -42,6 +42,8 @@ between the neighbouring detents instead (`documentation/theory/position-loop-pi
 - Adding the measured torque, as current, to what the torque, speed and position cascades ask of
   the winding at every control interrupt
 - Keeping that addition out of the torque the online mechanical estimator regresses
+- Measuring the dry friction from the same two-direction run, and storing it with the calibration record
+  for the speed and position cascades' friction feed-forward (Part F)
 
 **Is NOT responsible for:**
 - Measuring a map in torque mode, which runs no mechanical identification; it compensates with the map a
@@ -85,7 +87,8 @@ therefore the winding's less the rotor's:
 
 Without the inertia term the map missed most of the cogging. The two directions are then averaged:
 the cogging follows the angle and stays, the friction follows the motion and cancels, and so does
-the viscous term at equal speeds. The mean is taken out. A direction that left a bin with fewer
+the viscous term at equal speeds. The mean is taken out. The same two profiles carry the dry friction
+(Part F). A direction that left a bin with fewer
 than 16 samples, or turned the wrong way, yields no map.
 
 A motor without cogging still gave a map: noise alone, 0.13 to 0.26 mN·m on the bench plant, which
@@ -146,7 +149,7 @@ after the speed limiter (`foc-torque.md`), so the limiter folds the operator's t
 and holds the sum within the current limit. The compensation is added, not part of the command: the demand the
 cascade reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step,
 such as the flux-linkage identification's, is not compensated, and a new calibration clears the map before it
-identifies the motor, as in the other modes (REQ-TRQ-012).
+identifies the motor, as in the other modes (REQ-CTL-001).
 
 The online mechanical estimator regresses the current without the compensation's share. The
 compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
@@ -162,6 +165,31 @@ the inertia, the friction, and only what the map missed (`service-mechanical-ide
 - **Torque mode without a stored map.** It runs no mechanical identification and measures no map of its
   own; until a speed or position calibration has stored one, its setpoint is passed through uncompensated.
 - **Differences between pole pairs.** One electrical period holds the average of the four.
+
+### Part F — The dry friction and its feed-forward
+
+(REQ-CMS-008 and REQ-CTL-008)
+
+The two directions' mean torques differ by the friction that turns with the rotor. Forward, the winding carries
+the cogging, any constant shaft load, the dry friction $\tau_c$ and the viscous term $B\omega$; backward, the
+same cogging and load, less $\tau_c$ and $B|\omega|$. So $\tau_c$ is half the difference of the two directions'
+mean torques, less $B$ times the mean speed, and a constant load cancels. The one-way mechanical
+identification cannot say this: its constant term is $\tau_c$ plus the load. The identified viscous friction and
+inertia are inputs.
+
+The estimate is kept apart from the map. A motor without cogging stores no map but still has dry friction, so
+a run that covered every bin in both directions yields the friction even when the map is refused. A run that
+left a bin empty, or whose estimate is negative or not finite, yields none and the record keeps 0, which the
+cascades read as no feed-forward; the calibration traces the value, or that there is none.
+
+The speed and position cascades, when a calibration with a friction is applied, divide it by the torque
+constant once, and at every outer-loop period add that current, signed by the speed reference and ramped
+linearly through zero over $\pm$2 rad/s, to the speed loop's demand (`documentation/theory/disturbances-and-noise.md`,
+*Friction*). The current is held below the drive's current limit at load time; a friction that would need the
+whole limit is refused. The addition sits before the current limit, so the sum is held within it, and outside the
+torque the online mechanical estimator regresses. Torque mode has no speed reference and applies none. Like the
+map, the feed-forward is cleared before the mechanical identification runs, and while the cogging map is measured,
+so neither measurement sees the compensation of an earlier calibration.
 
 ---
 
@@ -181,12 +209,12 @@ sequenceDiagram
     OL->>CM: measure (torque constant, inertia, pole pairs)
     CM->>SL: speed +10 rad/s
     loop half a revolution to settle, two measured
-        ISR-->>CM: phase currents and rotor angle
+        ISR-->>CM: phase currents, q-axis current and rotor angle
         note over CM: add current and rotation to the angle's bin
     end
     CM->>SL: speed -10 rad/s
     loop half a revolution to settle, two measured
-        ISR-->>CM: phase currents and rotor angle
+        ISR-->>CM: phase currents, q-axis current and rotor angle
     end
     CM->>SL: stop
     note over CM: per bin, torque less inertia times acceleration, averaged over both directions
@@ -203,19 +231,20 @@ sequenceDiagram
 
 ### Provided
 
-| Interface            | Purpose                                                          | Contract                                                                  |
-|----------------------|------------------------------------------------------------------|---------------------------------------------------------------------------|
-| Cogging mapping      | Measure the map during the calibration                           | One run at a time; reports a map or none exactly once, unless aborted     |
-| Cogging compensation | Load or clear the map in the torque, speed and position cascades | Takes effect at the next control interrupt; a cleared map adds no current |
+| Interface             | Purpose                                                           | Contract                                                                       |
+|-----------------------|-------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Cogging mapping       | Measure the map during the calibration                            | One run at a time; reports a map or none exactly once, unless aborted          |
+| Cogging compensation  | Load or clear the map in the torque, speed and position cascades  | Takes effect at the next control interrupt; a cleared map adds no current      |
+| Friction compensation | Load or clear the dry friction in the speed and position cascades | Takes effect at the next outer-loop period; a cleared friction adds no current |
 
 ### Required
 
-| Interface          | Purpose                                   | Contract                                                |
-|--------------------|-------------------------------------------|---------------------------------------------------------|
-| Speed command      | Turn the rotor at the measurement's speed | The speed loop configured from the identified mechanics |
-| Phase currents     | Every control interrupt's sample          | One observer at a time; released when the run ends      |
-| Encoder            | The rotor's mechanical angle              | Zeroed by the alignment of this power cycle             |
-| Calibration record | Store and restore the map                 | Layout version 4                                        |
+| Interface          | Purpose                                                                                                 | Contract                                                |
+|--------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| Speed command      | Turn the rotor at the measurement's speed                                                               | The speed loop configured from the identified mechanics |
+| Phase currents     | Every control interrupt's sample, with the q-axis current the loop measured and the rotor angle it used | One observer at a time; released when the run ends      |
+| Encoder            | The rotor's mechanical angle when the run starts                                                        | Zeroed by the alignment of this power cycle             |
+| Calibration record | Store and restore the map                                                                               | Layout version 4                                        |
 
 ---
 
@@ -230,6 +259,10 @@ sequenceDiagram
     a cogging smaller than the noise when both directions share it.
   - The mapping service turns both ways and reports the map, stops the bridge past the current
     envelope, times out with no map when the rotor does not turn, and stays silent once aborted.
+  - The builder recovers the bench's 3.7 mN·m of dry friction from a simulated rotor with and without a constant
+    shaft load, refuses an incomplete run and a negative estimate.
+  - The friction feed-forward gives the sign of the speed reference, ramps through zero, refuses an implausible
+    friction, and is clamped by the current limit in the speed and position cascades; the torque cascade has none.
   - The feed-forward reproduces a cogging sampled eight times a cycle within 3 %, wraps in either
     direction and scales with the torque constant.
   - The cascade asks for the cogging current at standstill once a map is loaded and stops when it
@@ -237,14 +270,14 @@ sequenceDiagram
   - The torque cascade adds the cogging current to the operator's setpoint, within the current
     limit, not to a calibration's current command, and reports the operator's demand.
 - **MIL and SIL.** On the bench plant, with the map a speed-mode calibration measured, a 0.12 A
-  torque command turns the rotor; without a map it stays in a detent (REQ-TRQ-012). The SIL
+  torque command turns the rotor; without a map it stays in a detent (REQ-CTL-001). The SIL
   scenario read 61.8 rad of travel in 2 s with the map and 0.010 rad without.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
-  - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
+  - the full calibration measures the cogging's peak within 10 % (REQ-CMS-001); it read 3.83 to
     3.90 mN·m against 4.0 across runs;
   - a cogging a quarter as deep, with the dry friction, is mapped within 30 % (it read 14.5 % high,
     the noise adding to a small map's peak), and with the dry friction and no cogging no map is
-    stored (REQ-CAL-018);
+    stored (REQ-CMS-001);
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
-    within 4 s and holds it for 2 s, and then 1.0 rad (REQ-POS-012). Without the map the PID,
+    within 4 s and holds it for 2 s, and then 1.0 rad (REQ-CTL-003). Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.

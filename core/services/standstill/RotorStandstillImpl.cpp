@@ -1,5 +1,6 @@
 #include "core/services/standstill/RotorStandstillImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 
 namespace services
@@ -37,12 +38,11 @@ namespace services
         onDone = nullptr;
     }
 
-    // Measured from where the window started rather than poll to poll, so a slow creep cannot pass one count at a time
     void RotorStandstillImpl::Poll()
     {
         const auto position = encoder.Read();
 
-        if (std::abs(foc::detail::PositionWithWrapAround((position - anchor).Value())) < bandRadians)
+        if (math::Abs(math::WrapToPi((position - anchor).Value())) < bandRadians)
             ++pollsInBand;
         else
         {

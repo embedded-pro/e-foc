@@ -140,6 +140,11 @@ inside the unit circle. Guaranteed by the DARE solution when the plant is contro
 **Relation to toolbox**: `Lqr<float,2,1>` provides the gain container. DARE computed at configuration
 time via `DiscreteAlgebraicRiccatiEquation`. `IntegralStateFeedbackLqi` provides the LQI variant.
 
+**Moving reference**: the designs regulate to a fixed reference, whose speed is zero. While a motion profile
+is active (`position-motion-profile.md`) the speed that belongs to zero error is $\dot r$, so the speed state
+is $(\omega - \dot r)\,T_o$ in both laws, and the acceleration feed-forward $J\ddot r / K_t$ is added to the
+q-axis current. The LQI integral state accumulates the deviation as before. Without a profile $\dot r = 0$.
+
 ```mermaid
 graph LR
     XREF["θ*, ω*"] --> ERR["Σ state error"]

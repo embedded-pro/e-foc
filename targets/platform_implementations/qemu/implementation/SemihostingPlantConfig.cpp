@@ -1,7 +1,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
+#include "hal/cortex_m/Semihosting.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Crc.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include <array>
 #include <cstring>
 
@@ -19,13 +19,13 @@ namespace application
 {
     std::optional<sil::SilPlantConfig> LoadSilPlantConfig(const char* filePath)
     {
-        const int handle = semihosting::FileOpen(filePath, semihosting::OpenMode::readBinary);
+        const auto handle = hal::cortex::SemihostingOpenFile(filePath, hal::cortex::SemihostingOpenMode::readBinary);
         if (handle < 0)
             return std::nullopt;
 
         std::array<uint8_t, sil::plantConfigRecordSize> record{};
-        const uint32_t notRead = semihosting::FileRead(handle, record.data(), record.size());
-        semihosting::FileClose(handle);
+        const uint32_t notRead = hal::cortex::SemihostingReadFile(handle, infra::MakeByteRange(record));
+        hal::cortex::SemihostingCloseFile(handle);
 
         if (notRead != 0)
             return std::nullopt;

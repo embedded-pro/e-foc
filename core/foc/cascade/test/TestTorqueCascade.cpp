@@ -1,10 +1,12 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "numerical/math/AngleUtilities.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
+#include <type_traits>
 
 namespace
 {
@@ -27,27 +29,56 @@ namespace
         return parameters;
     }
 
+    foc::PhaseCurrents ZeroCurrents()
+    {
+        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
+    foc::PhasePwmDutyCycles DutyAfterConstantSpeed(uint32_t dutyUpdateDelayPeriods, std::size_t polePairs, float mechanicalStep, float angleOffset)
+    {
+        auto parameters = MotorParameters(polePairs);
+        parameters.dutyUpdateDelayPeriods = dutyUpdateDelayPeriods;
+
+        foc::CurrentStream cascadeStream;
+        foc::TorqueCascade cascade{ foc::Ampere{ 10.0f }, cascadeStream };
+        cascade.Configure(parameters);
+        cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
+        cascade.SetPoint({ foc::Ampere{ 0.5f }, foc::Ampere{ 1.0f } });
+        cascade.Enable();
+
+        foc::PhasePwmDutyCycles duty{};
+        for (int sample = 0; sample != 400; ++sample)
+        {
+            foc::Radians position{ angleOffset + static_cast<float>(sample) * mechanicalStep };
+            duty = cascade.Calculate(ZeroCurrents(), position);
+        }
+        return duty;
+    }
+
+    void ExpectSameDuty(const foc::PhasePwmDutyCycles& actual, const foc::PhasePwmDutyCycles& expected)
+    {
+        EXPECT_NEAR(DutyPercent(actual.a), DutyPercent(expected.a), 0.05f);
+        EXPECT_NEAR(DutyPercent(actual.b), DutyPercent(expected.b), 0.05f);
+        EXPECT_NEAR(DutyPercent(actual.c), DutyPercent(expected.c), 0.05f);
+    }
+
     class TestTorqueCascade
         : public ::testing::Test
     {
     public:
         void SetUp() override
         {
-            focTorque.emplace(testMaxCurrent);
+            focTorque.emplace(testMaxCurrent, stream);
             focTorque->Configure(MotorParameters(polePairs));
             focTorque->Enable();
         }
 
         const foc::Ampere testMaxCurrent{ 10.0f };
 
+        foc::CurrentStream stream;
         std::optional<foc::TorqueCascade> focTorque;
         const std::size_t polePairs{ 7 };
     };
-
-    foc::PhaseCurrents ZeroCurrents()
-    {
-        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    }
 
     void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
     {
@@ -95,8 +126,6 @@ TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
     ExpectValidDuty(result);
 }
 
-// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
-// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
 TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 {
     const foc::PhaseCurrents currents{ foc::Ampere{ 0.4f }, foc::Ampere{ -0.1f }, foc::Ampere{ -0.3f } };
@@ -104,12 +133,14 @@ TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 
     for (std::size_t poles : { std::size_t{ 1 }, std::size_t{ 2 }, std::size_t{ 4 }, std::size_t{ 7 } })
     {
-        foc::TorqueCascade scaled{ testMaxCurrent };
+        foc::CurrentStream scaledStream;
+        foc::TorqueCascade scaled{ testMaxCurrent, scaledStream };
         scaled.Configure(MotorParameters(poles));
         scaled.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
         scaled.Enable();
 
-        foc::TorqueCascade reference{ testMaxCurrent };
+        foc::CurrentStream referenceStream;
+        foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
         reference.Configure(MotorParameters(1));
         reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
         reference.Enable();
@@ -239,7 +270,6 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
     focTorque->Enable();
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    // Torque mode has no outer loop, so the cascade must derive speed from the angle it is handed
     constexpr float mechanicalStepPerSample = 0.01f;
     float angle = 0.0f;
     foc::PhasePwmDutyCycles result{ hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0), hal::DutyCycle::FromPercent(0) };
@@ -248,7 +278,7 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
     {
         foc::Radians position{ angle };
         result = focTorque->Calculate(ZeroCurrents(), position);
-        angle = foc::detail::PositionWithWrapAround(angle + mechanicalStepPerSample);
+        angle = math::WrapToPi(angle + mechanicalStepPerSample);
     }
 
     const bool anyOffCentre = IsOffCentre(result);
@@ -263,7 +293,6 @@ TEST_F(TestTorqueCascade, the_speed_estimate_does_not_spike_on_the_first_sample_
     focTorque->Enable();
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    // A rotor parked far from zero must not read as a huge step on the first sample
     foc::Radians position{ 3.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
@@ -382,7 +411,8 @@ TEST_F(TestTorqueCascade, a_current_command_drives_the_q_axis_current_it_asks_fo
     foc::Radians position{ 0.0f };
     const auto commanded = focTorque->Calculate(ZeroCurrents(), position);
 
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     reference.Enable();
     reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 2.0f } });
@@ -435,10 +465,8 @@ TEST_F(TestTorqueCascade, outside_a_current_command_no_q_axis_voltage_is_kept)
     EXPECT_NEAR(focTorque->QuadratureVoltage().Value(), 0.0f, 1e-6f);
 }
 
-TEST_F(TestTorqueCascade, an_attached_stream_receives_the_measured_currents_and_the_mechanical_angle)
+TEST_F(TestTorqueCascade, the_stream_receives_the_measured_currents_and_the_mechanical_angle)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(1);
 
     foc::Radians position{ 0.0f };
@@ -453,8 +481,6 @@ TEST_F(TestTorqueCascade, an_attached_stream_receives_the_measured_currents_and_
 
 TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_stationary_ones)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(1);
 
     const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
@@ -468,10 +494,22 @@ TEST_F(TestTorqueCascade, the_stream_carries_the_rotor_frame_currents_not_the_st
     EXPECT_NEAR(sample->position.Value(), mechanicalAngle, 1e-6f);
 }
 
+TEST_F(TestTorqueCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
+{
+    const float mechanicalAngle = std::numbers::pi_v<float> / 2.0f / static_cast<float>(polePairs);
+    foc::Radians position{ mechanicalAngle };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, position);
+
+    EXPECT_NEAR(focTorque->MeasuredQuadratureCurrent().Value(), -1.0f, 1e-2f);
+
+    foc::Radians aligned{ 0.0f };
+    focTorque->Calculate({ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } }, aligned);
+
+    EXPECT_NEAR(focTorque->MeasuredQuadratureCurrent().Value(), 0.0f, 1e-2f);
+}
+
 TEST_F(TestTorqueCascade, enabling_restarts_the_stream_window)
 {
-    foc::CurrentStream stream;
-    focTorque->SetCurrentStream(stream);
     stream.Start(2);
 
     foc::Radians position{ 0.0f };
@@ -522,7 +560,7 @@ namespace
             {
                 foc::Radians position{ angle };
                 result = cascade.Calculate(ZeroCurrents(), position);
-                angle = foc::detail::PositionWithWrapAround(angle + step);
+                angle = math::WrapToPi(angle + step);
             }
 
             return result;
@@ -530,7 +568,8 @@ namespace
 
         foc::PhasePwmDutyCycles Unlimited(float quadrature, float mechanicalSpeed) const
         {
-            foc::TorqueCascade reference{ testMaxCurrent };
+            foc::CurrentStream referenceStream;
+            foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
             reference.Configure(MotorParameters(polePairs));
             EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
             reference.Enable();
@@ -578,7 +617,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_current_that_brakes_the_rotor_is_not_folde
 
 TEST_F(TestTorqueCascadeSpeedLimit, beyond_the_limit_no_current_pushes_the_rotor)
 {
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -597,7 +637,7 @@ TEST_F(TestTorqueCascadeSpeedLimit, beyond_the_limit_no_current_pushes_the_rotor
         foc::Radians referencePosition{ angle };
         limited = focTorque->Calculate(ZeroCurrents(), position);
         unlimited = reference.Calculate(ZeroCurrents(), referencePosition);
-        angle = foc::detail::PositionWithWrapAround(angle + step);
+        angle = math::WrapToPi(angle + step);
     }
 
     ExpectSameDuty(limited, unlimited);
@@ -702,7 +742,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_loaded_cogging_map_adds_the_cogging_curren
 
     foc::CoggingFeedForward feedForward;
     feedForward.Load(infra::MakeRange(torque), coggingScale, coggingTorqueConstant);
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -734,7 +775,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, the_cogging_current_is_held_within_the_curre
     foc::Radians position{ offPeakAngle };
     const auto limited = focTorque->Calculate(ZeroCurrents(), position);
 
-    foc::TorqueCascade reference{ testMaxCurrent };
+    foc::CurrentStream referenceStream;
+    foc::TorqueCascade reference{ testMaxCurrent, referenceStream };
     reference.Configure(MotorParameters(polePairs));
     EXPECT_EQ(reference.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
     reference.Enable();
@@ -757,7 +799,8 @@ TEST_F(TestTorqueCascadeSpeedLimit, a_calibration_current_command_is_not_compens
 
 TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_doubles_the_duty_for_the_same_command)
 {
-    foc::TorqueCascade nominal{ testMaxCurrent };
+    foc::CurrentStream nominalStream;
+    foc::TorqueCascade nominal{ testMaxCurrent, nominalStream };
     nominal.Configure(MotorParameters(polePairs));
     nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
     nominal.Enable();
@@ -780,7 +823,8 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_doubles_the_duty_
 
 TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_same_duties)
 {
-    foc::TorqueCascade nominal{ testMaxCurrent };
+    foc::CurrentStream nominalStream;
+    foc::TorqueCascade nominal{ testMaxCurrent, nominalStream };
     nominal.Configure(MotorParameters(polePairs));
     nominal.SetCurrentTunings(foc::CurrentLoopTunings{});
     nominal.Enable();
@@ -872,4 +916,79 @@ TEST_F(TestTorqueCascadeBraking, the_braking_current_drives_the_inverter)
     const auto braked = Spin(*focTorque, 40.0f);
 
     ExpectSameDuty(braked, Unlimited(-10.0f, 40.0f));
+}
+
+TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
+{
+    constexpr float step = 0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_negative_speed)
+{
+    constexpr float step = -0.005f;
+
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, step, 0.0f), DutyAfterConstantSpeed(0, polePairs, step, step));
+}
+
+TEST_F(TestTorqueCascade, the_advance_moves_the_voltage_once_the_rotor_turns)
+{
+    constexpr float step = 0.005f;
+
+    EXPECT_GT(std::abs(DutyPercent(DutyAfterConstantSpeed(1, polePairs, step, 0.0f).a) - DutyPercent(DutyAfterConstantSpeed(0, polePairs, step, 0.0f).a)), 0.1f);
+}
+
+TEST_F(TestTorqueCascade, a_duty_that_acts_later_leaves_the_voltage_at_standstill_unchanged)
+{
+    ExpectSameDuty(DutyAfterConstantSpeed(1, polePairs, 0.0f, 0.3f), DutyAfterConstantSpeed(0, polePairs, 0.0f, 0.3f));
+}
+
+TEST(TestTorqueCascadeFriction, the_torque_cascade_has_no_friction_feed_forward)
+{
+    static_assert(!std::is_base_of_v<foc::FrictionCompensable, foc::TorqueCascade>);
+    SUCCEED();
+}
+
+TEST_F(TestTorqueCascade, each_sample_hands_one_set_of_zero_vector_slopes_to_the_sink)
+{
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    focTorque->SetZeroVectorSlopeSink(sink);
+
+    EXPECT_CALL(sink, ZeroVectorSlopes(testing::_)).Times(2);
+    foc::Radians position{ 0.0f };
+    focTorque->Calculate(ZeroCurrents(), position);
+    focTorque->Calculate(ZeroCurrents(), position);
+}
+
+TEST(TestTorqueCascadeZeroVectorSlopes, after_each_sample_the_slopes_follow_the_model_at_the_measured_speed)
+{
+    constexpr float mechanicalStep{ 0.01f };
+    const auto parameters = MotorParameters(2);
+    foc::CurrentStream cascadeStream;
+    foc::TorqueCascade cascade{ foc::Ampere{ 10.0f }, cascadeStream };
+    testing::StrictMock<foc::ZeroVectorSlopeSinkMock> sink;
+    foc::PhaseCurrentSlopes slopes{};
+    EXPECT_CALL(sink, ZeroVectorSlopes(testing::_)).WillRepeatedly(testing::SaveArg<0>(&slopes));
+    cascade.SetZeroVectorSlopeSink(sink);
+    cascade.Configure(parameters);
+    cascade.Enable();
+
+    float angle{ 0.0f };
+    for (int sample = 0; sample != 400; ++sample)
+    {
+        angle = static_cast<float>(sample) * mechanicalStep;
+        foc::Radians position{ angle };
+        cascade.Calculate(ZeroCurrents(), position);
+    }
+
+    foc::ZeroVectorSlope reference;
+    reference.Configure(parameters);
+    const auto electricalAngle = math::WrapToPi(2.0f * angle);
+    const auto expected = reference.Next({ 0.0f, 0.0f }, 2.0f * mechanicalStep * 20000.0f, std::cos(electricalAngle), std::sin(electricalAngle));
+
+    EXPECT_NEAR(slopes.a.Value(), expected.a.Value(), 20.0f);
+    EXPECT_NEAR(slopes.b.Value(), expected.b.Value(), 20.0f);
+    EXPECT_NEAR(slopes.c.Value(), expected.c.Value(), 20.0f);
+    EXPECT_GT(std::abs(expected.a.Value()) + std::abs(expected.b.Value()), 1000.0f);
 }

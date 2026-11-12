@@ -12,7 +12,8 @@ target_link_libraries(e_foc.can_test PUBLIC
     e_foc.services.alignment_mock
     e_foc.services.current_offsets_mock
     e_foc.services.electrical_system_ident_mock
-    e_foc.services.firmware_upgrade_mock
+    e_foc.services.fault_history_mock
+    can_lite.categories.firmware_upgrade.session_test_doubles
     e_foc.services.mechanical_system_ident_mock
     e_foc.services.non_volatile_memory_mock
     e_foc.services.standstill_mock
@@ -24,22 +25,12 @@ target_link_libraries(e_foc.can_test PUBLIC
 )
 
 target_sources(e_foc.can_test PRIVATE
-    TestCanFrameOrigin.cpp
-    TestCanNodeAddress.cpp
     TestCanCommandTimeout.cpp
     TestCanLivenessWatchdog.cpp
-    TestFocMotorCategoryServer.cpp
-    TestFocMotorCategoryClient.cpp
     TestFocMotorCanBridge.cpp
-    TestFocMotorCanClient.cpp
     TestFocMotorCurrentStreamer.cpp
-    TestFocMotorWireContract.cpp
     TestFocMotorSettings.cpp
-    TestUntracedStreamCan.cpp
-    TestWireContractDocumentation.cpp
 )
-
-target_compile_definitions(e_foc.can_test PRIVATE E_FOC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 if (EMIL_ENABLE_COVERAGE)
     emil_enable_coverage_for(e_foc.can_test)

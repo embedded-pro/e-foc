@@ -15,7 +15,13 @@ target_link_libraries(e_foc.services.mechanical_system_ident PUBLIC
 )
 
 target_sources(e_foc.services.mechanical_system_ident PRIVATE
+    EncoderResolution.cpp
+    EncoderResolution.hpp
+    InertiaSettling.cpp
+    InertiaSettling.hpp
     MechanicalEstimatePolicy.hpp
+    MechanicalFit.cpp
+    MechanicalFit.hpp
     MechanicalWindowKinematics.cpp
     MechanicalWindowKinematics.hpp
     RealTimeFrictionAndInertiaEstimator.cpp
@@ -23,7 +29,13 @@ target_sources(e_foc.services.mechanical_system_ident PRIVATE
     MechanicalParametersIdentification.hpp
     MechanicalParametersIdentificationImpl.cpp
     MechanicalParametersIdentificationImpl.hpp
+    ObservationQueue.cpp
+    ObservationQueue.hpp
+    SampleWindow.cpp
+    SampleWindow.hpp
     SteadySpeedFrictionFit.hpp
+    TwoLevelSpeedProfile.cpp
+    TwoLevelSpeedProfile.hpp
 )
 
 add_subdirectory(test)

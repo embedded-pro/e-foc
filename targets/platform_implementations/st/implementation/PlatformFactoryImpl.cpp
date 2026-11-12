@@ -204,6 +204,11 @@ namespace application
         shuntReadout.Offsets(offsets);
     }
 
+    void PlatformFactoryImpl::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        shuntReadout.ZeroVectorSlopes(slopes);
+    }
+
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
     {
         if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
@@ -341,32 +346,32 @@ namespace application
         peripherals->encoder.emplace(resolution, Peripheral::EncoderTimerIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, config);
     }
 
-    CanBusAdapter::CanError PlatformFactoryImpl::ToAdapterError(hal::FdCanStm::Error error)
+    services::CanBusError PlatformFactoryImpl::ToAdapterError(hal::FdCanStm::Error error)
     {
         switch (error)
         {
             case hal::FdCanStm::Error::busOff:
-                return CanBusAdapter::CanError::busOff;
+                return services::CanBusError::busOff;
             case hal::FdCanStm::Error::errorPassive:
-                return CanBusAdapter::CanError::errorPassive;
+                return services::CanBusError::errorPassive;
             case hal::FdCanStm::Error::errorWarning:
-                return CanBusAdapter::CanError::errorWarning;
+                return services::CanBusError::errorWarning;
             case hal::FdCanStm::Error::messageLost:
-                return CanBusAdapter::CanError::messageLost;
+                return services::CanBusError::messageLost;
             case hal::FdCanStm::Error::ackError:
-                return CanBusAdapter::CanError::ackError;
+                return services::CanBusError::ackError;
             case hal::FdCanStm::Error::stuffError:
-                return CanBusAdapter::CanError::stuffError;
+                return services::CanBusError::stuffError;
             case hal::FdCanStm::Error::formError:
-                return CanBusAdapter::CanError::formError;
+                return services::CanBusError::formError;
             case hal::FdCanStm::Error::crcError:
-                return CanBusAdapter::CanError::crcError;
+                return services::CanBusError::crcError;
             case hal::FdCanStm::Error::bit0Error:
-                return CanBusAdapter::CanError::bit0Error;
+                return services::CanBusError::bit0Error;
             case hal::FdCanStm::Error::bit1Error:
-                return CanBusAdapter::CanError::bit1Error;
+                return services::CanBusError::bit1Error;
             default:
-                return CanBusAdapter::CanError::other;
+                return services::CanBusError::other;
         }
     }
 
@@ -391,7 +396,7 @@ namespace application
         diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
-    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    services::MonitoredCan& PlatformFactoryImpl::CanBus()
     {
         return *peripherals->canBus;
     }
@@ -446,6 +451,7 @@ namespace application
     void PlatformFactoryImpl::Stop()
     {
         peripherals->pwm->Stop();
+        shuntReadout.ClearSlopes();
         protectionTripped = false;
     }
 
@@ -471,6 +477,32 @@ namespace application
     {
         if (peripherals->encoder)
             encoderZero.SetZero(peripherals->encoder->Read());
+    }
+
+    std::optional<std::reference_wrapper<drivers::EncoderIndex>> PlatformFactoryImpl::EncoderIndexChannel()
+    {
+        return *this;
+    }
+
+    bool PlatformFactoryImpl::HasIndex() const
+    {
+        return peripherals->encoder.has_value();
+    }
+
+    void PlatformFactoryImpl::ArmIndex()
+    {
+        indexLatched = false;
+
+        if (peripherals->encoder)
+            peripherals->encoder->Encoder().EnableIndex();
+    }
+
+    bool PlatformFactoryImpl::IndexSeen()
+    {
+        if (peripherals->encoder && peripherals->encoder->Encoder().IndexAsserted())
+            indexLatched = true;
+
+        return indexLatched;
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()

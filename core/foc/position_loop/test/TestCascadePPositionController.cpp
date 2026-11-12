@@ -58,6 +58,15 @@ TEST_F(TestCascadePPositionController, the_proportional_gain_is_the_requested_ba
     EXPECT_NEAR(Command(-0.4f, 0.0f), -2.0f, tolerance);
 }
 
+TEST_F(TestCascadePPositionController, the_reference_speed_is_added_to_the_proportional_term)
+{
+    controller.SetTunings(TuningsWithBandwidth(5.0f));
+
+    const auto output = controller.Compute({ foc::Radians{ 0.0f }, foc::Radians{ 0.1f }, foc::RadiansPerSecond{ 0.0f }, false, foc::RadiansPerSecond{ 20.0f } });
+
+    EXPECT_NEAR(output.value, 0.5f + 20.0f, tolerance);
+}
+
 TEST_F(TestCascadePPositionController, a_zero_bandwidth_holds_the_speed_reference_at_zero)
 {
     controller.SetTunings(TuningsWithBandwidth(0.0f));

@@ -1,0 +1,35 @@
+- id: REQ-PLT-001
+  title: A stalled event loop leaves the motor safe and resets the drive
+  status: verified
+  verification: [sil, hil]
+  shall: >
+    Every MCU target shall run its event loop under a hardware watchdog that the application
+    cannot disable. When the event loop stops making progress, the drive shall cut the power stage
+    without relying on driver state, reset, and report Watchdog as the reset cause after it boots.
+
+- id: REQ-PLT-002
+  title: A processor fault leaves the motor safe and a post-mortem behind
+  status: verified
+  verification: hil
+  shall: >
+    On a processor fault the drive shall cut the power stage before anything else, save its
+    diagnostics, including the faulting program counter, where they survive the reset, and report
+    them once after it boots.
+
+- id: REQ-PLT-003
+  title: The cause of the last reset is reported
+  status: verified
+  verification: hil
+  shall: >
+    After every boot the drive shall report the cause of the last reset as power-up, brown-out,
+    software, hardware or watchdog.
+
+- id: REQ-PLT-004
+  title: The control interrupt keeps its time budget and reports its own timing
+  status: verified
+  verification: [sil, inspection]
+  shall: >
+    The control interrupt shall complete within 75 % of its 50 µs period, and the outer loop
+    within its 1 ms period, through calibration, alignment and closed-loop running in every mode.
+    The drive shall measure every control-interrupt execution and count, separately, executions
+    over budget, executions over the period and re-entries.

@@ -1,5 +1,5 @@
-#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
+#include "e-foc-protocol/foc/CommandLimits.hpp"
 #include <gtest/gtest.h>
 #include <limits>
 
@@ -111,6 +111,10 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.followingErrorTime = 20.0f;
     config.limits.speedAcceleration = -5.0f;
     config.limits.speedDeceleration = 2.0e5f;
+    config.limits.profileVelocity = 6000.0f;
+    config.limits.profileAcceleration = -1.0f;
+    config.limits.profileDeceleration = 2.0e5f;
+    config.limits.profileJerk = 2.0e7f;
     config.limits.commandTimeout = 61.0f;
     config.limits.continuousCurrent = -1.0f;
     config.limits.peakCurrent = 500.0f;
@@ -133,6 +137,10 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     EXPECT_NEAR(config.limits.followingErrorTime, services::LimitSettings{}.followingErrorTime, 1e-6f);
     EXPECT_NEAR(config.limits.speedAcceleration, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.speedDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileVelocity, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileAcceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileDeceleration, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.profileJerk, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.commandTimeout, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.continuousCurrent, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.peakCurrent, 0.0f, 1e-9f);
@@ -183,4 +191,26 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)
     state_machine::SanitizeSupervision(config);
 
     EXPECT_EQ(config.stallDetection, uint8_t{ 0 });
+}
+
+TEST_F(OperatorTuningsTest, sanitising_turns_an_unknown_homing_requirement_off_and_keeps_a_known_one)
+{
+    config.homingRequired = 2;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(uint8_t{ 0 }, config.homingRequired);
+
+    config.homingRequired = 1;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(uint8_t{ 1 }, config.homingRequired);
+}
+
+TEST_F(OperatorTuningsTest, sanitising_turns_an_unknown_recalibration_mode_off_and_keeps_a_known_one)
+{
+    config.recalibrationMode = 3;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(static_cast<uint8_t>(services::RecalibrationMode::off), config.recalibrationMode);
+
+    config.recalibrationMode = static_cast<uint8_t>(services::RecalibrationMode::automatic);
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(static_cast<uint8_t>(services::RecalibrationMode::automatic), config.recalibrationMode);
 }

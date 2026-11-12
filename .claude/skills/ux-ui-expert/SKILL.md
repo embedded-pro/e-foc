@@ -1,6 +1,6 @@
 ---
 name: ux-ui-expert
-description: UX/UI review and refactoring for e-foc's desktop tools (CAN Commander, simulator, hardware bridge) and their installers. Use when designing, reviewing or changing anything a person sees or operates under tools/ — Qt Widgets layouts, panels, menus, status/feedback, logging views, safety controls (emergency stop), installers, update notifications, error and issue-reporting flows. Produces a findings list ranked by user impact and, when asked, the refactor itself.
+description: UX/UI review and refactoring for e-foc's desktop tools (CAN Commander, Virtual Motor, hardware bridge) and their installers. Use when designing, reviewing or changing anything a person sees or operates under tools/ — Qt Widgets layouts, panels, menus, status/feedback, logging views, safety controls (emergency stop), installers, update notifications, error and issue-reporting flows. Produces a findings list ranked by user impact and, when asked, the refactor itself.
 ---
 
 # UX/UI expert — e-foc desktop tools

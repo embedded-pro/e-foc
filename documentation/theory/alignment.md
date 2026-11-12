@@ -2,9 +2,9 @@
 title: "Motor Alignment — Encoder Zero-Point Calibration"
 type: theory
 status: approved
-version: 1.0.2
+version: 1.1.0
 component: "service-alignment"
-date: 2026-10-29
+date: 2026-11-06
 ---
 
 | Field     | Value                                            |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Motor Alignment — Encoder Zero-Point Calibration |
 | Type      | theory                                           |
 | Status    | approved                                         |
-| Version   | 1.0.2                                            |
+| Version   | 1.1.0                                            |
 | Component | service-alignment                                |
-| Date      | 2026-10-29                                       |
+| Date      | 2026-11-06                                       |
 
 ## Overview
 
@@ -167,6 +167,46 @@ For example, a $10°$ mechanical offset with $p = 4$ gives a $40°$ electrical e
 to $\cos(40°) \approx 77\%$ of its potential. The d-axis also receives unwanted excitation,
 potentially demagnetising the permanent magnets under sustained high current.
 
+### 7. Index Reference — Keeping the Offset Across a Reset
+
+$\theta_{offset}$ is a reading of a counter that starts from an arbitrary value at every power-up, so
+it cannot be stored. An encoder with an index channel also carries a fixed mark: one pulse per
+revolution at a mechanical angle $\theta_m^{idx}$ that does not change with the power-up. Read in the
+aligned frame, the pulse sits at
+
+$$
+\theta_{idx} = \theta_m^{idx} - \theta_{offset} \pmod{2\pi}
+$$
+
+which is a property of how the encoder is mounted on the rotor, so it can be measured once, right
+after the alignment, and stored. After a reset the counter reads $\theta_m' = \theta_m + c$ for some
+unknown $c$. Turning the rotor until the pulse passes gives the reading $r_{idx} = \theta_m^{idx} + c$
+there, and shifting every later reading by $\theta_{idx} - r_{idx}$,
+
+$$
+\theta_m' - r_{idx} + \theta_{idx} = \theta_m - \theta_m^{idx} + \theta_{idx} = \theta_m - \theta_{offset}
+$$
+
+restores the aligned frame exactly: $c$ cancels, and so does the absolute position of the mark.
+
+Two properties make this better than aligning again:
+
+- **The reading is taken at the pulse, not at the field.** A rotor dragged by a turning field lags it
+  by the load angle that balances friction, cogging and load (§2), but the encoder reading at the
+  pulse is the same however far it lags. The alignment's settled position, by contrast, carries that
+  balance as an error.
+- **The pulse has a width.** It spans one count or one line, and a pulse met from the other side is
+  read one width away. Both the commissioning and the power-up search therefore turn the rotor
+  forward and are armed only after the rotor has snapped to the first field, so both meet the same edge.
+
+The precision is the encoder count plus the motion within one control period at the search speed:
+at half a revolution per second and 20 kHz that is 0.16 mrad, far below one count of a 4000-count
+encoder (1.57 mrad). The search moves the rotor by at most 1.25 revolutions; one always passes the index.
+
+The theory says nothing about the field the search uses: any field the rotor follows forward will do.
+The firmware uses an open-loop vector sized from the calibrated resistance, as the alignment does
+(`service-index-search.md`).
+
 ---
 
 ## Block Diagrams
@@ -196,14 +236,15 @@ stateDiagram-v2
 
 ## Numerical Properties
 
-| Property            | Value / Condition                                                                       |
-|---------------------|-----------------------------------------------------------------------------------------|
-| Field application   | Single fixed stator field at $\theta_e^{field} = 0$ (§3); no stepping                   |
-| Detection threshold | Position change $< \epsilon_{threshold}$ per check                                      |
-| Consecutive checks  | $M$ samples below threshold before declaring settled                                    |
-| Offset precision    | Limited by encoder resolution (e.g. ±0.5 count)                                         |
-| Torque cost         | The d-axis field produces the synchronising torque of §2; no $i_q$ is commanded         |
-| Worst-case duration | `AlignmentConfig::timeout` (default 2 s), or `maxSamples` samples if that elapses first |
+| Property            | Value / Condition                                                                        |
+|---------------------|------------------------------------------------------------------------------------------|
+| Field application   | Single fixed stator field at $\theta_e^{field} = 0$ (§3); no stepping                    |
+| Detection threshold | Position change $< \epsilon_{threshold}$ per check                                       |
+| Consecutive checks  | $M$ samples below threshold before declaring settled                                     |
+| Offset precision    | Limited by encoder resolution (e.g. ±0.5 count)                                          |
+| Torque cost         | The d-axis field produces the synchronising torque of §2; no $i_q$ is commanded          |
+| Worst-case duration | `AlignmentConfig::timeout` (default 2 s), or `maxSamples` samples if that elapses first  |
+| Index reference     | Index angle $\theta_{idx}$ stored once; restored by one forward pass over the index (§7) |
 
 ---
 
@@ -215,6 +256,8 @@ stateDiagram-v2
   Large initial misalignment or very low damping can cause incorrect convergence.
 - **Assumes**: Negligible cogging torque relative to $K_{mag} \cdot I_{align}$. High cogging torque
   motors may require a higher alignment current.
+- **Assumes** (§7): The index mark does not move relative to the rotor between commissioning and
+  power-up; an encoder that is remounted needs a new alignment, which measures the index again.
 - **Does not handle**: Repeated alignment without re-energising (thermal state must be considered).
 - **Does not handle**: Distribution of alignment offset across multiple electrical periods for motors
   where $p > 1$ and the mechanical step may span more than one electrical revolution.

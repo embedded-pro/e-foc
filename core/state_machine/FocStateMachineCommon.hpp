@@ -6,23 +6,24 @@
 #include "core/state_machine/CalibrationContext.hpp"
 #include "core/state_machine/CalibrationFlow.hpp"
 #include "core/state_machine/CommandRejections.hpp"
+#include "core/state_machine/CommissioningCommands.hpp"
+#include "core/state_machine/DefaultModeHooks.hpp"
+#include "core/state_machine/FluxLinkageIdentResolution.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/FocStateMachineDependencies.hpp"
 #include "core/state_machine/FocStateMachineEvents.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
 #include "core/state_machine/MaintenanceFlow.hpp"
-#include "core/state_machine/ModeHooks.hpp"
 #include "core/state_machine/NvmActivity.hpp"
 #include "core/state_machine/OperationFlow.hpp"
 #include "core/state_machine/PendingCommand.hpp"
-#include "core/state_machine/TransitionPolicies.hpp"
 #include "services/fsm/StateMachineTracer.hpp"
 
 namespace application
 {
     class FocStateMachineCommon
         : public state_machine::FocStateMachineBase
-        , protected ModeHooks
+        , protected DefaultModeHooks
     {
     public:
         using StateMachine = LifecycleMachine;
@@ -45,21 +46,18 @@ namespace application
         state_machine::CommandResult CmdEmergencyStop() override;
         state_machine::CommandResult CmdQuickStop() override;
         void SetQuickStopDeceleration(foc::RadiansPerSecondSquared deceleration);
+        foc::RadiansPerSecondSquared QuickStopDeceleration() const override;
 
-        void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
-        state_machine::CommandResult CmdReserveExternalCalibration();
-        state_machine::CommandResult CmdReleaseExternalCalibration();
-        void CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone);
-        void CmdSetMotorParameter(services::MotorParameter parameter, float value, const infra::Function<void(state_machine::CommandResult)>& onDone);
-        foc::Weber ActiveFluxLinkage() const;
-        const services::CalibrationData& CalibrationRecord() const;
-        float AutomaticCurrentLoopBandwidth() const;
+        void RequireHoming(bool required);
+        CommissioningCommands& Commissioning();
+        const CalibrationContext& Calibration() const;
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
+        void RegisterFaultEnteredHandler(const infra::Function<void(state_machine::FaultCode)>& onFaultEntered);
         const StateMachine& TransitionTable() const;
 
     protected:
-        FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
+        FocStateMachineCommon(services::Tracer& tracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
@@ -68,7 +66,6 @@ namespace application
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void ReleaseExternalResources();
-        void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
         void Boot(RotorReference rotorReference);
 
         void ProvisionalControlSuperseded() override;
@@ -76,36 +73,15 @@ namespace application
         void MarkProvisionalControlApplied();
         bool ApplyProvisionalCurrentControl(const services::CalibrationData& pending) override;
 
-        static services::FluxLinkageIdentification* ResolveFluxLinkageIdent(
-            const CalibrationServices& calibServices,
-            std::optional<services::FluxLinkageIdentificationImpl>& ownFluxIdent,
-            foc::CurrentCommandable& currentCommandable,
-            foc::Controllable& drive,
-            const foc::FocBase& motion,
-            drivers::ThreePhaseInverter& inverter);
-
-        bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
-        void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
-        bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
-        void PrepareForEnabled() override;
-        void AbortModeSpecificServices() override;
-        bool HasModeSpecificWorkPending() const override;
-        void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
-
         void SaveCalibration(state_machine::Calibrating& calibrating);
         services::DispatchResult Dispatch(const state_machine::Event& event);
 
         services::Tracer& GetTracer();
         const services::CalibrationData& GetCalibration() const;
-        foc::RadiansPerSecondSquared QuickStopDeceleration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
-        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage, foc::Ampere currentNoise);
+        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise);
 
     private:
-        static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
-
-    private:
-        services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         CalibrationContext calibrationContext;
         NvmActivity& nvmActivity;
@@ -119,6 +95,7 @@ namespace application
         StateMachine::WithStorage<eventQueueDepth> stateMachine;
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
         CommandRejections commandRejections;
+        CommissioningCommands commissioning;
         bool provisionalControlApplied{ false };
         foc::RadiansPerSecondSquared quickStopDeceleration{ 0.0f };
     };

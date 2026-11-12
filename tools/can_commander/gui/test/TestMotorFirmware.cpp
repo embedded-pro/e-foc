@@ -2,7 +2,7 @@
 #include "application/bootloader_image/Pack.hpp"
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "generated/Boards.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "tools/can_commander/gui/FirmwareTab.hpp"
@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <QApplication>
+#include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
@@ -92,7 +93,7 @@ namespace
         void BringCompatible(uint16_t node = 1)
         {
             Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, node, {});
-            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, CanCommandClient::firmwareContractMinor });
+            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, can::focContractVersionMinor });
         }
 
         void StoppedOn(const e_foc::boards::Board& board, services::FirmwareVersion staged = {})
@@ -194,6 +195,17 @@ TEST_F(TestMotorFirmware, download_and_apply_are_disabled_while_the_motor_runs)
     EXPECT_TRUE(Button(applyButton).toolTip().contains("Stop the motor first"));
 }
 
+TEST_F(TestMotorFirmware, a_motor_on_another_contract_version_is_offered_the_download_without_its_state)
+{
+    Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, 1, {});
+    Receive(can::focMotorCategoryId, can::focContractVersionResponseId, 1, { 2, 21 });
+    firmware.OnFirmwareIdentity(FirmwareIdentity{ { 1, 6, 0 }, e_foc::boards::ekTm4c1294xl.kind, {} });
+
+    EXPECT_TRUE(firmware.OfferPackFile(pack, "release 1.7.0"));
+
+    EXPECT_TRUE(Button(downloadButton).isEnabled());
+}
+
 TEST_F(TestMotorFirmware, download_and_apply_are_disabled_while_the_motor_has_a_command_pending)
 {
     StoppedOn(e_foc::boards::ekTm4c1294xl, { 1, 7, 0 });
@@ -286,7 +298,7 @@ TEST_F(TestMotorFirmware, the_emergency_stop_stays_available_to_a_motor_during_i
     MotorPanel panel{ client, transfer, 1, [](IssueSeverity, const QString&) {} };
     panel.SetBusConnected(true);
     BringCompatible();
-    panel.OnContractVersion(can::focContractVersionMajor, CanCommandClient::firmwareContractMinor, true);
+    panel.OnContractVersion(can::focContractVersionMajor, can::focContractVersionMinor, true);
     ASSERT_TRUE(transfer.StartDownload(1, *InspectPack(pack, *BoardOfKind(e_foc::boards::ekTm4c1294xl.kind)).pack));
 
     EXPECT_TRUE(panel.AcceptsEmergencyStop());
@@ -295,4 +307,36 @@ TEST_F(TestMotorFirmware, the_emergency_stop_stays_available_to_a_motor_during_i
                      {
                          return frame.category == can::focMotorCategoryId && frame.messageType == can::focEmergencyStopId;
                      }));
+}
+
+TEST_F(TestMotorFirmware, a_virtual_motor_shows_its_version_and_board_and_offers_nothing_to_install)
+{
+    StoppedOn(e_foc::boards::virtualBoard);
+
+    EXPECT_TRUE(firmware.IsVirtual());
+    EXPECT_FALSE(firmware.UpdateAvailable());
+    EXPECT_FALSE(Button(downloadButton).isEnabled());
+    EXPECT_FALSE(Button(applyButton).isEnabled());
+    EXPECT_TRUE(Button(downloadButton).toolTip().contains("runs the firmware it was built with"));
+    const auto labels = tab.findChildren<QLabel*>();
+    EXPECT_TRUE(std::ranges::any_of(labels, [](const QLabel* label)
+        {
+            return label->text() == "1.6.0 on a virtual motor on this machine";
+        }));
+}
+
+TEST_F(TestMotorFirmware, a_virtual_motor_is_marked_virtual_in_its_title_and_header)
+{
+    MotorPanel panel{ client, transfer, 1, [](IssueSeverity, const QString&) {} };
+    panel.SetBusConnected(true);
+    EXPECT_EQ(panel.Title(), "Motor 1");
+
+    panel.OnFirmwareIdentity(FirmwareIdentity{ { 1, 6, 0 }, e_foc::boards::virtualBoard.kind, {} });
+
+    EXPECT_EQ(panel.Title(), "Motor 1 · Virtual");
+    const auto labels = panel.findChildren<QLabel*>();
+    EXPECT_TRUE(std::ranges::any_of(labels, [](const QLabel* label)
+        {
+            return label->text() == "VIRTUAL" && !label->isHidden();
+        }));
 }

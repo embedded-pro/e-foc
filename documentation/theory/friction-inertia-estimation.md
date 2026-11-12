@@ -2,9 +2,9 @@
 title: "Mechanical Parameters Identification — Friction and Inertia"
 type: theory
 status: approved
-version: 1.0.0
+version: 1.0.1
 component: "service-mechanical-ident"
-date: 2025-01-01
+date: 2026-11-08
 ---
 
 | Field     | Value                                                       |
@@ -12,9 +12,9 @@ date: 2025-01-01
 | Title     | Mechanical Parameters Identification — Friction and Inertia |
 | Type      | theory                                                      |
 | Status    | approved                                                    |
-| Version   | 1.0.0                                                       |
+| Version   | 1.0.1                                                       |
 | Component | service-mechanical-ident                                    |
-| Date      | 2025-01-01                                                  |
+| Date      | 2026-11-08                                                  |
 
 ## Overview
 
@@ -40,8 +40,8 @@ true parameters as the motor is excited with varying speed profiles.
 | $\tau_{load}$     | External load torque (treated as disturbance)        | N·m       |
 | $\omega$          | Rotor mechanical angular velocity                    | rad/s     |
 | $\alpha$          | Rotor angular acceleration = $\dot\omega$            | rad/s²    |
-| $\mathbf{\theta}$ | Parameter vector $[J,\ B,\ \tau_0]^T$                | mixed     |
-| $\mathbf{\phi}$   | Regressor vector $[\alpha,\ \omega,\ 1]^T$           | mixed     |
+| $\mathbf{\theta}$ | Parameter vector $[\tau_0,\ J,\ B]^T$                | mixed     |
+| $\mathbf{\phi}$   | Regressor vector $[1,\ \alpha,\ \omega]^T$           | mixed     |
 | $\lambda$         | RLS forgetting factor                                | —         |
 | $\mathbf{P}$      | Error covariance matrix (3×3)                        | —         |
 | $\mathbf{K}$      | Kalman gain vector (3×1)                             | —         |
@@ -68,8 +68,8 @@ $$
 where:
 
 $$
-\mathbf{\phi} = \begin{pmatrix}\dot\omega \\ \omega \\ 1\end{pmatrix}, \qquad
-\mathbf{\theta} = \begin{pmatrix}J \\ B \\ \tau_0\end{pmatrix}
+\mathbf{\phi} = \begin{pmatrix}1 \\ \dot\omega \\ \omega\end{pmatrix}, \qquad
+\mathbf{\theta} = \begin{pmatrix}\tau_0 \\ J \\ B\end{pmatrix}
 $$
 
 The regression form makes the parameter vector $\mathbf{\theta}$ directly estimable from measured
@@ -260,7 +260,7 @@ no term of the model carries.
 ### 6. Observability Requirement
 
 RLS identifies $J$, $B$, and $\tau_0$ simultaneously only if the regressor matrix $\mathbf{\Phi}$
-is **persistently exciting** of order 3 — i.e. the columns $[\dot\omega, \omega, 1]$ are linearly
+is **persistently exciting** of order 3 — i.e. the columns $[1, \dot\omega, \omega]$ are linearly
 independent over the observation window. In practice this requires:
 
 - $\dot\omega \neq 0$: the motor must accelerate and decelerate (constant-speed operation cannot
@@ -283,7 +283,7 @@ graph TD
     SPD --> ACC[Acceleration α\nfinite difference]
     IQ[Current i_q] --> TRQ[Torque τ_e\n= K_T · i_q]
 
-    ACC --> REG[Regressor φ\n= &#91;α, ω, 1&#93;]
+    ACC --> REG[Regressor φ\n= &#91;1, α, ω&#93;]
     SPD --> REG
 
     REG --> KG[Gain K\n= P·φ / λ + φᵀPφ]
@@ -316,7 +316,7 @@ graph TD
 
 | Property                       | Value / Condition                                                                     |
 |--------------------------------|---------------------------------------------------------------------------------------|
-| Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
+| Parameter vector size          | 3: $[\tau_0,\ J,\ B]^T$                                                               |
 | Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
 | Forgetting factor (online)     | $\lambda = 0.9995$                                                                    |
 | Effective window (online)      | $N_{eff} = 1/(1-\lambda) = 2000$ observations (8 s at 4 ms observation windows)       |
@@ -348,15 +348,15 @@ $\tau_0 = 0.01\ \text{N·m}$, $K_T = 0.3\ \text{N·m/A}$, $f_s = 1\ \text{kHz}$.
 $i_q = 2\ \text{A}$:
 
 $$
-\mathbf{\phi} = \begin{pmatrix}50\\ 100\\ 1\end{pmatrix}, \quad
+\mathbf{\phi} = \begin{pmatrix}1\\ 50\\ 100\end{pmatrix}, \quad
 \tau_e = K_T\, i_q = 0.3 \times 2 = 0.6\ \text{N·m}
 $$
 
 **True output**:
 
 $$
-\mathbf{\phi}^T\mathbf{\theta}_{true} = 50 \times 2\times10^{-4} + 100 \times 5\times10^{-4} + 0.01
-= 0.01 + 0.05 + 0.01 = 0.07\ \text{N·m}
+\mathbf{\phi}^T\mathbf{\theta}_{true} = 0.01 + 50 \times 2\times10^{-4} + 100 \times 5\times10^{-4}
+= 0.01 + 0.01 + 0.05 = 0.07\ \text{N·m}
 $$
 
 The difference 0.6 − 0.07 = 0.53 N·m is the load torque $\tau_{load}$, which becomes the innovation

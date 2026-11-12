@@ -1,4 +1,5 @@
 #include "core/supervision/TargetReachedMonitor.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <variant>
 
@@ -27,16 +28,12 @@ namespace supervision
     {
         if (!WithinWindow())
         {
-            withinSince.reset();
+            within.Reset();
             reached = false;
             return;
         }
 
-        const auto now = infra::Now();
-        if (!withinSince.has_value())
-            withinSince = now;
-
-        reached = now - *withinSince >= settings().time;
+        reached = within.Held(true, infra::Now(), settings().time);
     }
 
     bool TargetReachedMonitor::WithinWindow() const
@@ -49,7 +46,7 @@ namespace supervision
             return false;
 
         const auto window = settings().window.Value();
-        return window > 0.0f && std::abs(drive->ObserveMotion().positionError.Value()) <= window;
+        return window > 0.0f && math::Abs(drive->ObserveMotion().targetError.Value()) <= window;
     }
 
     TargetReachedMonitor::Settings TargetReachedSettingsFrom(const services::ConfigData& config)

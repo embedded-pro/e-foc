@@ -39,9 +39,9 @@ namespace state_machine
         onFaultImmediate = onImmediate;
         onFaultDeferred = onDeferred;
 
-        platform.CanBus().SetOnError([this](application::CanBusAdapter::CanError error)
+        platform.CanBus().SetOnError([this](services::CanBusError error)
             {
-                if (error == application::CanBusAdapter::CanError::busOff)
+                if (error == services::CanBusError::busOff)
                     Notify(FaultCode::hardwareFault);
             });
     }

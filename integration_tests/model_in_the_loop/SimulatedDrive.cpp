@@ -1,6 +1,4 @@
 #include "integration_tests/model_in_the_loop/SimulatedDrive.hpp"
-#include "infra/util/ReallyAssert.hpp"
-#include "targets/platform_implementations/qemu/implementation/SilPlantModel.hpp"
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -10,13 +8,11 @@ namespace mil
 {
     namespace
     {
-        constexpr uint32_t shortestSampleHoldClocks = 4;
-        constexpr uint32_t millisecondsPerSecond = 1000;
-
-        hal::DutyCycle DutyOrFull(uint32_t percent)
-        {
-            return hal::DutyCycle::FromPercent(percent != 0 ? percent : 100);
-        }
+        const sil::PlantDriveDefaults defaults{
+            .motor = {},
+            .supplyVoltage = foc::Volts{ 0.0f },
+            .baseFrequency = hal::Hertz{ 20000 },
+        };
 
         long Milli(float value)
         {
@@ -58,75 +54,31 @@ namespace mil
     }
 
     SimulatedDrive::SimulatedDrive(const sil::SilPlantConfig& plant)
-        : plant{ plant }
-        , baseFrequency{ plant.baseFrequencyHz != 0 ? plant.baseFrequencyHz : 20000u }
-        , model{ sil::MotorParameters(plant), foc::Volts{ plant.powerSupplyVoltageVolts }, baseFrequency, std::nullopt, false }
-        , bootFaultInjection{ sil::BootFaultInjection(plant) }
-        , dutyDelayed{ plant.dutyDelayPeriods != 0 }
-        , maxReadableDuty{ DutyOrFull(plant.maxReadableDutyPercent) }
-        , maxDuty{ DutyOrFull(plant.maxDutyPercent) }
-        , shuntReadout{ maxReadableDuty }
-    {
-        sil::ConfigureModel(model, plant);
-        model.SetCurrentSense(sil::CurrentSense(plant, shortestSampleHoldClocks));
-
-        const uint32_t baseHz = baseFrequency.Value();
-        if (plant.responseSampleRateHz != 0)
-        {
-            really_assert(baseHz % plant.responseSampleRateHz == 0);
-            responseRecorder.Configure(baseHz / plant.responseSampleRateHz, plant.responseMaxSamples);
-        }
-
-        torqueStepTorque = foc::NewtonMeter{ plant.torqueStepNm };
-        const auto torqueStepDelay = static_cast<uint32_t>(static_cast<uint64_t>(plant.torqueStepDelayMs) * baseHz / millisecondsPerSecond);
-        torqueStep.Configure(plant.torqueStepNm != 0.0f ? std::make_optional(torqueStepDelay) : std::nullopt);
-
-        const auto encoderFreezeDelay = static_cast<uint32_t>(static_cast<uint64_t>(plant.encoderFreezeDelayCentiseconds) * 10u * baseHz / millisecondsPerSecond);
-        encoderFreeze.Configure(encoderFreezeDelay != 0 ? std::make_optional(encoderFreezeDelay) : std::nullopt);
-    }
+        : drive{ plant, defaults }
+    {}
 
     void SimulatedDrive::ControlTick()
     {
-        const uint32_t tick = ++controlTick;
-
-        if (torqueStep.Fire(tick))
-        {
-            model.SetExternalTorque(torqueStepTorque);
-            responseRecorder.Note(foc::PlantResponseKind::torqueStep, SampleAt(tick));
-        }
-
-        if (encoderFreeze.Fire(tick))
-        {
-            auto frozen = bootFaultInjection;
-            frozen.encoderStuck = true;
-            model.SetFaultInjection(frozen);
-            responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, SampleAt(tick));
-        }
-
-        const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
-        model.StepForTest(stepDuty);
-        shuntReadout.Applied(stepDuty);
-        appliedDutyPhases = lastDutyPhases;
-        responseRecorder.Capture(SampleAt(tick));
+        drive.Tick();
 
         if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
-            onPhaseCurrentsReady(shuntReadout.Read(model.LastMeasuredCurrents()));
+            onPhaseCurrentsReady(drive.ShuntCurrents());
             controlLoopEntered = false;
         }
     }
 
     uint32_t SimulatedDrive::Tick() const
     {
-        return controlTick;
+        return drive.TickCount();
     }
 
     void SimulatedDrive::AppendRecords(std::vector<std::string>& lines, std::size_t maxRecords)
     {
         for (std::size_t i = 0; i != maxRecords; ++i)
         {
-            const auto record = responseRecorder.Pop();
+            const auto record = drive.PopRecord();
             if (!record)
                 break;
 
@@ -136,22 +88,22 @@ namespace mil
 
     foc::ThreePhaseMotorModel& SimulatedDrive::Model()
     {
-        return model;
+        return drive.Model();
     }
 
     foc::Volts SimulatedDrive::PowerSupplyVoltage() const
     {
-        return model.EffectiveSupplyVoltage();
+        return supply.Voltage();
     }
 
     drivers::DeadTimeLoss SimulatedDrive::InverterDeadTimeLoss() const
     {
-        return { std::chrono::nanoseconds{ static_cast<int64_t>(plant.deadTimeCompensationNanoseconds + 0.5f) }, foc::Ampere{ plant.deadTimeCompensationKneeAmpere } };
+        return drive.InverterDeadTimeLoss();
     }
 
     uint32_t SimulatedDrive::DutyUpdateDelayPeriods() const
     {
-        return dutyDelayed ? 1 : 0;
+        return drive.DutyUpdateDelayPeriods();
     }
 
     void SimulatedDrive::PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
@@ -161,58 +113,56 @@ namespace mil
 
     void SimulatedDrive::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty);
+        drive.Output(dutyPhases);
     }
 
     void SimulatedDrive::Start()
     {
-        model.Start();
-        responseRecorder.Begin();
-        torqueStep.Begin();
-        encoderFreeze.Begin();
+        drive.Start();
     }
 
     void SimulatedDrive::Stop()
     {
-        model.Stop();
-        model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
-        model.SetFaultInjection(bootFaultInjection);
-        responseRecorder.End();
+        drive.Stop();
     }
 
     hal::Hertz SimulatedDrive::BaseFrequency() const
     {
-        return baseFrequency;
+        return drive.BaseFrequency();
     }
 
     foc::Ampere SimulatedDrive::MaxCurrentSupported() const
     {
-        return model.MaxCurrentSupported();
+        return plantModel.MaxCurrentSupported();
     }
 
     void SimulatedDrive::CurrentOffsets(const foc::PhaseCurrents& offsets)
     {
-        shuntReadout.Offsets(offsets);
+        drive.CurrentOffsets(offsets);
+    }
+
+    void SimulatedDrive::IgnoreSampleDelays()
+    {
+        drive.IgnoreSampleDelays();
+    }
+
+    void SimulatedDrive::ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes)
+    {
+        drive.ZeroVectorSlopes(slopes);
     }
 
     foc::Radians SimulatedDrive::Read()
     {
-        return model.Read();
+        return drive.Model().Encoder().Read();
     }
 
     void SimulatedDrive::Set(foc::Radians value)
     {
-        model.Set(value);
+        drive.Model().Encoder().Set(value);
     }
 
     void SimulatedDrive::SetZero()
     {
-        model.SetZero();
-    }
-
-    foc::PlantResponseSample SimulatedDrive::SampleAt(uint32_t tick) const
-    {
-        const auto dq = model.LastDqCurrents();
-        return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
+        drive.Model().Encoder().SetZero();
     }
 }

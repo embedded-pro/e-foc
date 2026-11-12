@@ -231,8 +231,7 @@
   status: verified
   verification: [sil, unit]
   shall: >
-    Contract version 2.16 shall add, without changing any 2.15 message, the command QuickStop
-    (0x1A), acknowledged once the deceleration starts and refused with invalidState while the
-    drive calibrates; the motor state stopping (6) while the drive decelerates; and the stored
-    setting quickStopDeceleration (0x32) in rad/s2, 0 to 100000, writable in any state and read
-    back unchanged after a restart.
+    The motor controller shall expose a quick stop command over CAN, acknowledged once the
+    deceleration starts and refused with invalid state while the drive calibrates; a stopping
+    motor state reported while the drive decelerates after a quick stop; and a stored quick-stop
+    deceleration setting, writable in any state and preserved across restarts.

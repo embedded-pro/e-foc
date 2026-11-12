@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -64,8 +64,10 @@ namespace tool
     std::span<const SettingPresentation> LoopSettings(can::FocControlLoop loop);
     std::span<const SettingPresentation> MotorParameterSettings();
     std::span<const SettingPresentation> StartupSettings();
+    std::span<const SettingPresentation> StreamSettings();
     std::span<const SettingPresentation> SupervisionSettings();
     std::span<const SettingPresentation> LimitSettings();
+    std::span<const SettingPresentation> MotionProfileSettings();
     std::span<const SettingPresentation> TargetWindowSettings();
     std::span<const SettingPresentation> TravelLimitSettings();
     std::span<const SettingPresentation> ThermalSettings();
@@ -74,16 +76,21 @@ namespace tool
     std::span<const SettingPresentation> QuickStopSettings();
     std::span<const SettingPresentation> Readings();
     std::span<const SettingPresentation> StatusReadings();
+    std::span<const SettingPresentation> RecalibrationSettings();
+    std::span<const SettingPresentation> RecalibrationReadings();
+    std::span<const SettingPresentation> HomingSettings();
+    std::span<const std::string_view> RecalibrationModes();
+    std::string_view RecalibrationModeName(float mode);
     std::string_view ResetCauseName(float cause);
     std::string_view BoardKindName(float kind);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm);
+    bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter);
     bool IsBandwidth(can::FocParameter parameter);
     bool IsInteger(can::FocParameter parameter);
     bool IsToggle(can::FocParameter parameter);
-    bool IsAcceptableEntry(can::FocParameter parameter, float value, bool legacy);
-    std::optional<uint8_t> LegacyCommandOf(can::FocParameter parameter);
-    uint8_t CommandTypeOf(const SettingChange& change, bool legacy);
+    bool IsAcceptableEntry(can::FocParameter parameter, float value);
+    uint8_t CommandTypeOf(const SettingChange& change);
 
     ChangePlan PlanLoop(const LoopEdits& edits);
 

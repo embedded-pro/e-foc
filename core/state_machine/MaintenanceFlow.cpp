@@ -1,6 +1,6 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/MotorParameterLimits.hpp"
+#include "e-foc-protocol/foc/ParameterValidation.hpp"
 #include <cmath>
 
 namespace application
@@ -75,7 +75,7 @@ namespace application
         if (env.context.Data().polePairs != previous.polePairs)
         {
             env.context.SetRotorReferenceValid(false);
-            env.tracer.Trace() << "[SM] Pole pairs changed; cogging map dropped; align the rotor before enabling";
+            env.tracer.Trace() << "[SM] Pole pairs changed; cogging map and index angle dropped; align the rotor before enabling";
         }
 
         if (calibration.HasValidCalibration())
@@ -116,6 +116,7 @@ namespace application
         {
             edited.coggingTorqueScale = 0.0f;
             edited.coggingTorque.fill(0);
+            services::ForgetEncoderIndexAngle(edited);
         }
 
         if (data.stage == services::CalibrationStage::complete || CompletesRecord(edited))

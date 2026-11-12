@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/cogging_compensation/CoggingMapBuilder.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
@@ -19,7 +18,7 @@ namespace services
     public:
         CoggingMappingImpl(foc::SpeedCommandable& controller, foc::Controllable& drive, foc::PhaseCurrentsObservable& observable, drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder);
 
-        void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, const Config& config, const infra::Function<void(std::optional<CoggingMap>)>& onDone) override;
+        void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone) override;
         bool IsRunning() const override;
         void Abort() override;
 
@@ -37,8 +36,9 @@ namespace services
             failed
         };
 
-        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases);
+        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, float quadratureCurrent, float position);
         void Advance(float electricalAngle, float quadratureCurrent, float rotation);
+        float TargetSpeedIn(Phase current) const;
         void StepSpeedCommand();
         void StopMotion();
         void ScheduleFinish();
@@ -52,18 +52,29 @@ namespace services
         float samplePeriod;
         foc::Ampere supportedCurrent;
 
+        struct Mechanics
+        {
+            foc::NewtonMeter torqueConstant{ 0.0f };
+            foc::NewtonMeterSecondSquared inertia{ 0.0f };
+            foc::NewtonMeterSecondPerRadian viscousFriction{ 0.0f };
+            std::size_t polePairs{ 0 };
+        };
+
         Config config;
-        foc::NewtonMeter torqueConstant{ 0.0f };
-        foc::NewtonMeterSecondSquared inertia{ 0.0f };
-        std::size_t polePairs{ 0 };
+        Mechanics mechanics;
         foc::Ampere currentEnvelope{ 0.0f };
-        infra::AutoResetFunction<void(std::optional<CoggingMap>)> onDone;
+        infra::AutoResetFunction<void(const CoggingMeasurement&)> onDone;
 
         CoggingMapBuilder builder;
-        [[no_unique_address]] foc::ClarkePark transform;
-        float previousPosition{ 0.0f };
-        float turned{ 0.0f };
-        float mark{ 0.0f };
+
+        struct Travel
+        {
+            float previousPosition{ 0.0f };
+            float turned{ 0.0f };
+            float mark{ 0.0f };
+        };
+
+        Travel travel;
         float commandedSpeed{ 0.0f };
         volatile Phase phase{ Phase::idle };
         uint32_t run{ 0 };

@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.2.3
+version: 0.4.0
 component: system
-date: 2026-11-05
+date: 2026-11-09
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | e-foc System Architecture |
 | Type      | architecture              |
 | Status    | draft                     |
-| Version   | 0.2.3                     |
+| Version   | 0.4.0                     |
 | Component | system                    |
-| Date      | 2026-11-05                |
+| Date      | 2026-11-09                |
 
 > **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
@@ -36,7 +36,8 @@ date: 2026-11-05
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
 - **Assumption**: Rotor position is measured by a quadrature encoder.
 - **Assumption**: All motor electrical and mechanical parameters (resistance, inductance, pole pairs, inertia, friction) can be identified at startup or loaded from non-volatile storage.
-- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle. The CLI command `active_mode` reports the currently active mode. No mode switch is permitted while the motor is enabled.
+- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode can be selected at runtime via CAN command (`SelectControlMode`) and persisted to NVM so it survives a power cycle.
+  The `SelectControlMode` response and the telemetry status report the active mode. No mode switch is permitted while the motor is enabled.
 
 ---
 
@@ -49,7 +50,7 @@ The system is structured in four tiers:
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
 2. **Core / Library tier** — the FOC algorithm library (`core/foc/`), service library (`core/services/`), and the Platform Abstraction Layer interface (`core/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
 3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `PlatformFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
-4. **Tools tier** — host-only desktop tools (simulator, CAN commander) that run on development machines only. Lives under `tools/`.
+4. **Tools tier** — host-only desktop tools (CAN commander, virtual motor) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
 graph TD
@@ -57,7 +58,7 @@ graph TD
         INST["Application / Instantiation"]
         PAL_TI["TI Target\nimplementation"]
         PAL_ST["ST Target\nimplementation"]
-        PAL_HOST["Host / Simulator\nimplementation"]
+        PAL_HOST["Host and Virtual\nimplementations"]
     end
 
     subgraph SRC["Core / Library Tier"]
@@ -76,7 +77,7 @@ graph TD
     end
 
     subgraph TOOLS["Tools Tier"]
-        SIM["Simulator"]
+        VM["Virtual Motor"]
         CANC["CAN Commander"]
     end
 
@@ -103,7 +104,7 @@ graph TD
     TOOLS --> FOC
 ```
 
-The simulator implements the same PAL contracts as real hardware. Control logic never needs to distinguish between running on a microcontroller or on the host; this enables full-fidelity closed-loop validation without hardware.
+The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a microcontroller or on the host, so the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
 
 ---
 
@@ -181,7 +182,7 @@ whose highest, is still above its limit is scaled down, along its own direction.
 readable the circle the modulator can trace shrank to 70 % of the hexagon's inner circle; now only the directions
 where two phases share the highest duty are held to the limit. The bench motor in simulation, which stopped near
 356 rad/s, reaches 420 rad/s with the same current ripple as at 340 rad/s and holds 460 rad/s within 1 rad/s
-(REQ-TRQ-009). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
+(REQ-CTL-001). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
 whatever its shunt shows outside the pulse.
 
 The window also has to hold every phase's conversion. The TI converter reads the three phases one after another in
@@ -196,7 +197,7 @@ then read within 2.5 % up to 69 % duty, and the standard deviation of a zero-cur
 per phase to 31 to 39 mA. Dropping the averaging instead read the phases as cleanly but raised that noise by 15 to
 25 %.
 
-`foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
+`math::IsFinite` from the numerical toolbox survives for the places where validation is affordable and worth having —
 `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
 applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
 calling `std::isnan`, which `-ffinite-math-only` licenses the compiler to fold to a constant; the embedded builds
@@ -212,19 +213,21 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                                           |
 | Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                                              |
 | Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                                             |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                                                                   |
+| CLI                              | The bring-up command line of `hardware_test` and the startup banner; the motor application is commanded over CAN only.                                                                                                                                                                                                                      |
 | Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                                  |
+| Fault History                    | Records every entry into `Fault` (code, power-up, uptime, control mode, filtered bus voltage, peak torque current of the last 10 ms) and keeps the eight newest across power cycles in a region of its own; read by age and cleared over CAN ([design](../design/service-fault-history.md)).                                                |
+| Status LEDs                      | Shows on three board LEDs whether the firmware runs, whether the motor is driven, commissioning activity and, in `Fault`, a flash code per fault class; event loop only ([design](../design/service-leds.md)).                                                                                                                              |
 | Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
 
 ### 3. CAN Service
 
-The CAN service layer (`core/can/`) provides the FOC motor CAN category as a server/client pair and the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
+The FOC motor CAN category — its wire contract, the server/client pair and `FocMotorCanClient` — comes from the e-foc-protocol library (`infra/e-foc-protocol/`), which every client of the drive shares. The CAN service layer (`core/can/`) adds the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
 
 **Server half** (runs on the embedded target):
-- `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire scaling (int16 ↔ physical unit) is contained entirely here.
+- `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire encoding (`float32` and the stream's `int16` scaling ↔ physical unit) is contained entirely here.
 - The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while a pack is received the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
-- `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
-  It also implements the PID bandwidth, identification, telemetry, and encoder-resolution commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
+- `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, the torque, speed and position setpoints, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
+  It also implements the identification, telemetry and settings commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetParameter`, `OnQueryParameter`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
 
 **Client half** (runs on the desktop host — CAN Commander, SIL tests):
 - `FocMotorCategoryClient` — a `CanCategoryClient` subclass. Encodes typed setpoints into CAN frames and decodes response frames into typed callbacks.
@@ -250,9 +253,10 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 Concrete implementations exist for:
 - **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
 - **ST STM32 (NUCLEO-G474RE, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`. The NUCLEO-G474RE drives E-FOC-HARDWARE; the NUCLEO-H563ZI still runs on peripheral stubs.
-- **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
+- **Host**: peripheral stubs that let the application build and link on a development machine, located under `targets/platform_implementations/host/`.
+- **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus; it runs the application as a virtual motor ([design](../design/virtual-motor.md)).
 
-On the Texas Instruments targets and the NUCLEO-G474RE the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
+On the Texas Instruments targets and the NUCLEO-G474RE the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
 A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
 RTT writes are non-blocking and drop when no probe is reading.
 
@@ -272,7 +276,7 @@ it should change the reason, not just the number:
 | CAN receive buffer (`canReceiveBufferSize`)       | 16 frames | A client's transport queues at most 8 frames; an overflow is counted as `messageLost`, not lost silently.                                                                                                                                                                                 |
 | Fault status (`faultStatusSize`)                  | 448 B     | `PersistentFaultData::kMaxFormattedSize` (444), enforced by a `static_assert`, so the boot fault dump is never truncated.                                                                                                                                                                 |
 
-`sync_foc_sensored` sizes its CLI command table to the 24 commands it registers. The TI linker script places `.bss`
+`sync_foc_sensored` has no command table: it registers no terminal commands. The TI linker script places `.bss`
 first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
 instead of forcing up to 1 KiB of padding after `.data`. The hal-ti `Gpio` driver keeps pin-interrupt handlers in a
 pool sized by the CMake cache variable `HAL_TI_GPIO_MAX_INTERRUPT_PINS` (default 8, 72 bytes each) and registers a
@@ -291,7 +295,7 @@ graph LR
     FOC_CORE["FOC Core\n+ Services"] -->|depends on| PAL_IF["PAL Interfaces\n(ThreePhaseInverter · Encoder\nLowPriorityInterrupt · …)"]
     PAL_IF --> TI["TI Target\nimpl"]
     PAL_IF --> ST["ST Target\nimpl"]
-    PAL_IF --> HOST["Host / Simulator\nimpl"]
+    PAL_IF --> HOST["Virtual board\nimpl"]
     TI --> HAL_TI["infra/hal/ti"]
     ST --> HAL_ST["infra/hal/st"]
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
@@ -308,7 +312,7 @@ identification for speed/position modes), and responds to hardware fault notific
 the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be
 enabled.
 
-In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. It registers the setpoint, bandwidth and algorithm-selection commands on the same terminal and dispatches them to the active control mode.
+`ControlModeStateMachine` is driven from CAN alone: the motor application registers no terminal commands (`service-cli.md`, Part A).
 
 ### 5. Tools (was §4)
 
@@ -316,7 +320,7 @@ Host-only tools that do not run on the embedded target:
 
 | Tool            | Responsibility                                                                                                                                                                                                                                                                     |
 |-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.                                                                                   |
+| Virtual Motor   | Starts virtual motors — the shipping application on the host against the simulation plant, one CAN node each on a virtual bus — and shows and disturbs their plant ([design](../design/tool-virtual-motor.md)).                                                                    |
 | CAN Commander   | Desktop application that commands and monitors the motor controllers on a CAN bus, one tab per node; keeps an issue log, checks for new releases, updates a controller's firmware over CAN and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
 | Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                                                                                                  |
 
@@ -412,7 +416,7 @@ The interface design reflects explicit SOLID choices:
 
 - **Single Responsibility**: Each interface (`FocTorque`, `FocSpeed`, `FocPosition`, `ThreePhaseInverter`, `Encoder`, `NonVolatileMemory`, …) is narrowly scoped to one concern. No interface carries unrelated responsibilities.
 - **Open/Closed**: New control modes are added by implementing a new derived control interface, not by modifying existing implementations. The PAL is similarly extended by creating a new platform factory implementation for a new board without touching the core.
-- **Liskov Substitution**: Every FOC controller instantiation (torque, speed, position) is fully substitutable wherever the base control interface is expected. The simulator's motor model is fully substitutable for the real PAL hardware.
+- **Liskov Substitution**: Every FOC controller instantiation (torque, speed, position) is fully substitutable wherever the base control interface is expected. The virtual board's simulation plant is fully substitutable for the real PAL hardware.
 - **Interface Segregation**: `FocBase` carries only the minimal common contract. Callers that need only torque control depend on `FocTorque`, not on `FocSpeed` or `FocPosition`. The PAL is similarly split — callers that only need an encoder do not depend on the PWM interface.
 - **Dependency Inversion**: The FOC core and all services depend exclusively on abstract interfaces. Concrete implementations are injected at application wiring time via the platform factory and constructor arguments. No global variables; no direct peripheral access from the control layer.
 
@@ -450,14 +454,14 @@ The commissioning data flow (run once at startup or on command):
 
 ```mermaid
 sequenceDiagram
-    participant CLI as CLI Terminal
+    participant Client as CAN client
     participant SM as Application Controller
     participant ELEC as Electrical Identification
     participant MECH as Mechanical Identification
     participant NVM as NonVolatileMemory
     participant PID as PID Auto-Tuner
 
-    CLI->>SM: identify electrical params
+    Client->>SM: Calibrate
     SM->>ELEC: EstimateResistanceAndInductance(config)
     ELEC-->>SM: (R, L) callback
     SM->>ELEC: EstimatePolePairs(config)
@@ -466,7 +470,7 @@ sequenceDiagram
     SM->>NVM: SaveCalibration(data)
     NVM-->>SM: Ok callback
 
-    CLI->>SM: identify mechanical params
+    Client->>SM: (same Calibrate, speed and position modes)
     SM->>MECH: EstimateFrictionAndInertia(torqueConst, polePairs, config)
     MECH-->>SM: (friction, inertia) callback
     SM->>NVM: SaveCalibration(updatedData)
@@ -478,7 +482,7 @@ sequenceDiagram
 The system uses two complementary asynchronous communication patterns, both supplied by `infra/embedded-infra-lib`:
 
 - **Zero-allocation closures** (from `embedded-infra-lib`) — used for one-shot or single-subscriber callbacks. All service operations (NVM, identification, alignment) deliver their results through this mechanism.
-- **Observer/Subject pattern** (from `embedded-infra-lib`) — a type-safe, heap-free mechanism where a subject notifies multiple observers. The simulator's motor model is a subject; views and loggers attach as observers. No raw event buses or dynamic dispatch lists are used.
+- **Observer/Subject pattern** (from `embedded-infra-lib`) — a type-safe, heap-free mechanism where a subject notifies multiple observers. The simulation plant's model is a subject; recorders attach as observers. No raw event buses or dynamic dispatch lists are used.
 
 These patterns eliminate polling, decouple producers from consumers, and allow the application to remain single-threaded and non-blocking.
 
@@ -494,7 +498,7 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` for debuggability.                 |
 | Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                     |
 | Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                     |
-| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware.                                                 |
+| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                     |
 
 ---
 

@@ -1,0 +1,49 @@
+- id: REQ-COM-001
+  title: Every function of the drive is reachable through one published CAN contract
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    Every command, setting, diagnostic and fault code of the drive, commissioning included, shall
+    be reachable over CAN through one published, versioned motor contract, so that no function
+    needs the serial terminal. The drive shall answer a contract-version query in every state,
+    refuse a frame of the wrong length or a value out of range without effect, acknowledge a
+    setting only once it is stored, and report every fault with a code of its own at emergency
+    priority. A minor version shall only add to the contract.
+  rationale: >
+    What each contract version added is recorded in the contract changelog of the CAN service
+    design, not here.
+
+- id: REQ-COM-002
+  title: Telemetry reports the drive's state, faults and motion
+  status: verified
+  verification: sil
+  shall: >
+    The drive shall broadcast its state, fault code and measured mechanical speed, send a fault
+    the moment it is raised without waiting for a request, and stream the measured d- and q-axis
+    currents and the rotor angle at the rate the operator configures while a client is online.
+
+- id: REQ-COM-003
+  title: Several controllers share one bus
+  status: implemented
+  verification: unit
+  shall: >
+    A controller shall answer on its configured base node ID plus the board ID its jumpers set at
+    start-up, so that boards with the same firmware and configuration can share a bus.
+
+- id: REQ-COM-004
+  title: Setpoints and motion telemetry resolve finer than the encoder
+  status: implemented
+  verification: unit
+  shall: >
+    A host shall be able to command a torque, speed or position setpoint and read back the measured
+    speed and position with a resolution of at most 1 mA, 0.01 rad/s and a tenth of an encoder count
+    of a 4000-count encoder, and the drive shall refuse a setpoint that is not a finite number.
+
+- id: REQ-COM-005
+  title: Torque can be commanded in newton-metres
+  status: implemented
+  verification: unit
+  shall: >
+    A host shall be able to command the shaft torque in newton-metres, which the drive shall
+    convert to the q-axis current with the torque constant of the calibrated motor, and the drive
+    shall refuse the request when it has no calibrated torque constant.

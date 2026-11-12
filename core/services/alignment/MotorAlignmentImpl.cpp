@@ -1,9 +1,10 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
-#include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -29,13 +30,11 @@ namespace services
         finishing = false;
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
-        settledSumA = 0.0f;
-        settledSumB = 0.0f;
-        settledSumC = 0.0f;
+        settledSums = {};
         failure = Failure::none;
         startingCurrents = {};
-        firstHold = config.followStep.has_value();
-        samplesInHold = 0;
+        hold.first = config.followStep.has_value();
+        hold.samples = 0;
         previousPosition = encoder.Read();
         onAlignmentDone = onDone;
 
@@ -50,7 +49,7 @@ namespace services
     void MotorAlignmentImpl::ApplyAlignmentVoltage()
     {
         driver.Stop();
-        OutputVector(firstHold ? alignmentAngle + alignmentConfig.followStep->Value() : alignmentAngle);
+        OutputVector(hold.first ? alignmentAngle + alignmentConfig.followStep->Value() : alignmentAngle);
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
@@ -77,22 +76,22 @@ namespace services
         auto voltage = foc::DutyFraction(alignmentConfig.testVoltage);
 
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle))));
     }
 
     void MotorAlignmentImpl::ProcessPosition(const foc::PhaseCurrents& currents)
     {
         auto currentPosition = encoder.Read();
-        auto positionChange = std::abs(foc::detail::PositionWithWrapAround((currentPosition - previousPosition).Value()));
+        auto positionChange = math::Abs(math::WrapToPi((currentPosition - previousPosition).Value()));
         previousPosition = currentPosition;
-        ++samplesInHold;
+        ++hold.samples;
 
         if (positionChange < alignmentConfig.settledThreshold.Value() && CountsSettlement())
         {
             consecutiveSettledSamples++;
-            settledSumA += currents.a.Value();
-            settledSumB += currents.b.Value();
-            settledSumC += currents.c.Value();
+            settledSums.a += currents.a.Value();
+            settledSums.b += currents.b.Value();
+            settledSums.c += currents.c.Value();
 
             if (consecutiveSettledSamples >= alignmentConfig.settledCount)
                 Settle();
@@ -100,20 +99,18 @@ namespace services
         else
         {
             consecutiveSettledSamples = 0;
-            settledSumA = 0.0f;
-            settledSumB = 0.0f;
-            settledSumC = 0.0f;
+            settledSums = {};
         }
     }
 
     bool MotorAlignmentImpl::CountsSettlement() const
     {
-        return firstHold || !alignmentConfig.followStep.has_value() || samplesInHold > alignmentConfig.followDwell;
+        return hold.first || !alignmentConfig.followStep.has_value() || hold.samples > alignmentConfig.followDwell;
     }
 
     void MotorAlignmentImpl::Settle()
     {
-        if (firstHold)
+        if (hold.first)
         {
             BeginFinalHold();
             return;
@@ -149,22 +146,20 @@ namespace services
 
     void MotorAlignmentImpl::BeginFinalHold()
     {
-        firstHold = false;
-        firstHoldPosition = previousPosition;
+        hold.first = false;
+        hold.firstPosition = previousPosition;
         const auto held = static_cast<float>(std::max<std::size_t>(consecutiveSettledSamples, 1));
-        startingCurrents = { settledSumA / held, settledSumB / held, settledSumC / held };
+        startingCurrents = { settledSums.a / held, settledSums.b / held, settledSums.c / held };
         currentSampleIndex = 0;
-        samplesInHold = 0;
+        hold.samples = 0;
         consecutiveSettledSamples = 0;
-        settledSumA = 0.0f;
-        settledSumB = 0.0f;
-        settledSumC = 0.0f;
+        settledSums = {};
         OutputVector(alignmentAngle);
     }
 
     bool MotorAlignmentImpl::FollowedField() const
     {
-        const auto travel = foc::detail::PositionWithWrapAround((previousPosition - firstHoldPosition).Value());
+        const auto travel = math::WrapToPi((previousPosition - hold.firstPosition).Value());
         const auto expected = -alignmentConfig.followStep->Value() / static_cast<float>(std::max<std::size_t>(polePairs, 1));
         const auto ratio = travel / expected;
 
@@ -174,15 +169,15 @@ namespace services
     bool MotorAlignmentImpl::CarriesNoCurrent() const
     {
         const auto samples = static_cast<float>(consecutiveSettledSamples);
-        const auto a = settledSumA / samples;
-        const auto b = settledSumB / samples;
-        const auto c = settledSumC / samples;
+        const auto a = settledSums.a / samples;
+        const auto b = settledSums.b / samples;
+        const auto c = settledSums.c / samples;
         const auto finalCurrent = ExpectedPhaseACurrent();
 
         if (!finalCurrent.has_value())
         {
-            const auto floor = missingFraction * 0.5f * std::abs(a);
-            return std::abs(b) < floor || std::abs(c) < floor;
+            const auto floor = missingFraction * 0.5f * math::Abs(a);
+            return math::Abs(b) < floor || math::Abs(c) < floor;
         }
 
         const auto risen = SettledShareOfFinalCurrent();
@@ -197,10 +192,10 @@ namespace services
         const auto expected = finalCurrent * risen + starting * (1.0f - risen);
         const auto crossing = starting * finalCurrent < 0.0f;
 
-        if (crossing && std::abs(expected) < missingFraction * std::abs(finalCurrent))
+        if (crossing && math::Abs(expected) < missingFraction * math::Abs(finalCurrent))
             return false;
 
-        return std::abs(measured) < missingFraction * std::abs(expected);
+        return math::Abs(measured) < missingFraction * math::Abs(expected);
     }
 
     std::optional<float> MotorAlignmentImpl::ExpectedPhaseACurrent() const
@@ -228,7 +223,7 @@ namespace services
         float share = 0.0f;
 
         for (auto sample = firstSample; sample <= settledEndSample; ++sample)
-            share += 1.0f - std::exp(-static_cast<float>(sample) / samplesPerTimeConstant);
+            share += 1.0f - math::Exp(-static_cast<float>(sample) / samplesPerTimeConstant);
 
         return share / static_cast<float>(consecutiveSettledSamples);
     }

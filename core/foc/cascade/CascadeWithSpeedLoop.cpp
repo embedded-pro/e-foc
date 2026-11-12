@@ -1,6 +1,6 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
-#include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/DelayCompensation.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include <algorithm>
 #include <chrono>
 
@@ -14,15 +14,15 @@ namespace foc
         constexpr std::chrono::seconds excitationCycle{ 60 };
     }
 
-    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
+    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
         : lowPriorityInterrupt(lowPriorityInterrupt)
         , maxCurrent{ maxCurrent }
-        , outerLoopFrequency{ lowPriorityFrequency }
+        , schedule{ lowPriorityFrequency, baseFrequency.Value() / lowPriorityFrequency.Value(), 0 }
         , speedDifferentiator{ lowPriorityFrequency }
-        , quadratureLimit{ maxCurrent.Value() }
-        , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
-        , estimatorWindow{ baseFrequency, prescaler, dutyUpdateDelayPeriods }
+        , command{ 0.0f, maxCurrent.Value(), false, QuadratureVoltageWindow{} }
+        , estimation{ EstimatorChannel{}, EstimatorWindowAccumulator{ baseFrequency, schedule.prescaler, dutyUpdateDelayPeriods }, 0.0f }
         , directAxisExcitation{ Ampere{ maxCurrent.Value() * excitationCurrentFraction }, excitationFrequency, lowPriorityFrequency, excitationBurst, excitationCycle }
+        , currentStream{ currentStream }
     {
         really_assert(maxCurrent.Value() > 0);
         really_assert(lowPriorityFrequency.Value() > 0);
@@ -37,16 +37,19 @@ namespace foc
 
     bool CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
     {
-        polePairs = static_cast<float>(parameters.polePairs);
-        vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
+        scaling.polePairs = static_cast<float>(parameters.polePairs);
+        scaling.vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         busRatio.Configure(parameters.busVoltage);
+        scaling.dutyDelay = DutyDelay(parameters.dutyUpdateDelayPeriods, static_cast<float>(parameters.samplingFrequency.Value()));
+        zeroVectorSlope.Configure(parameters);
         return currentLoop.Configure(parameters);
     }
 
     bool CascadeWithSpeedLoop::ConfigureMechanicsImpl(MechanicalModelParameters& parameters)
     {
         parameters.maxCurrent = maxCurrent;
-        parameters.samplingFrequency = outerLoopFrequency;
+        parameters.samplingFrequency = schedule.frequency;
+        accelerationCurrentGain = parameters.torqueConstant.Value() > 0.0f ? parameters.inertia.Value() / parameters.torqueConstant.Value() : 0.0f;
         return speedLoop.Configure(parameters);
     }
 
@@ -63,22 +66,23 @@ namespace foc
     void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
         quickStopping = false;
-        currentCommandActive = false;
-        voltageWindow.Close();
+        command.active = false;
+        command.voltageWindow.Close();
         currentLoop.Reset();
         speedLoop.Reset();
 
         speedDifferentiator.Restart();
-        estimatorWindow.Restart();
+        estimation.window.Restart();
         directAxisExcitation.Restart();
-        lastSpeedLoopOutput = 0.0f;
-        directCurrentReference = 0.0f;
-        lastElectricalSpeed = 0.0f;
-        lastMechanicalSpeed = 0.0f;
-        lastMeanIq = 0.0f;
-        triggerCounter = 0;
-        if (currentStream != nullptr)
-            currentStream->Restart();
+        zeroVectorSlope.Restart();
+        outer.speedLoopOutput = 0.0f;
+        outer.feedForwardCurrent = 0.0f;
+        outer.directCurrentReference = 0.0f;
+        outer.electricalSpeed = 0.0f;
+        outer.mechanicalSpeed = 0.0f;
+        estimation.meanIq = 0.0f;
+        schedule.triggerCounter = 0;
+        currentStream.Restart();
         enabled = true;
     }
 
@@ -86,11 +90,11 @@ namespace foc
     {
         quickStopping = false;
         enabled = false;
-        currentCommandActive = false;
-        voltageWindow.Close();
-        lastElectricalSpeed = 0.0f;
-        lastMechanicalSpeed = 0.0f;
-        lastMeanIq = 0.0f;
+        command.active = false;
+        command.voltageWindow.Close();
+        outer.electricalSpeed = 0.0f;
+        outer.mechanicalSpeed = 0.0f;
+        estimation.meanIq = 0.0f;
     }
 
     SelectResult CascadeWithSpeedLoop::SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm)
@@ -126,33 +130,36 @@ namespace foc
         const float ic = currentPhases.c.Value();
 
         auto mechanicalAngle = position.Value();
-        auto electricalAngle = mechanicalAngle * polePairs;
+        auto electricalAngle = mechanicalAngle * scaling.polePairs;
         speedDifferentiator.Track(mechanicalAngle);
 
-        auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
-        auto sinTheta = FastTrigonometry::Sine(electricalAngle);
+        auto cosTheta = math::FastCosine(electricalAngle);
+        auto sinTheta = math::FastSine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        if (currentStream != nullptr)
-            currentStream->Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
-        const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
-        const float limit = quadratureLimit;
-        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -limit, limit);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed, busRatio.Ratio() });
+        currentStream.Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
+        const auto coggingCurrent = feedForward.cogging.CurrentAt(electricalAngle);
+        const float limit = command.quadratureLimit;
+        const auto quadratureReference = std::clamp(outer.speedLoopOutput + outer.feedForwardCurrent + coggingCurrent, -limit, limit);
+        const float electricalSpeed = outer.electricalSpeed;
+        if (slopeSink != nullptr)
+            slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ outer.directCurrentReference, quadratureReference }, electricalSpeed, busRatio.Ratio() });
 
-        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta), busRatio.Inverse());
-        voltageWindow.Accumulate(voltage.q);
+        const auto applied = AdvanceRotation(cosTheta, sinTheta, electricalSpeed, scaling.dutyDelay);
+        const auto duties = spaceVectorModulator.Generate(park.Inverse(voltage, applied.cosine, applied.sine), busRatio.Inverse());
+        command.voltageWindow.Accumulate(voltage.q);
 
-        estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
+        estimation.window.Accumulate(idAndIq, voltage, mechanicalAngle, scaling.polePairs, coggingCurrent);
 
-        ++triggerCounter;
-        if (triggerCounter >= prescaler)
+        ++schedule.triggerCounter;
+        if (schedule.triggerCounter >= schedule.prescaler)
         {
-            triggerCounter = 0;
+            schedule.triggerCounter = 0;
             speedDifferentiator.CloseWindow();
-            const auto window = estimatorWindow.Close();
-            lastMeanIq = window.meanIq;
-            estimators.Publish(window);
+            const auto window = estimation.window.Close();
+            estimation.meanIq = window.meanIq;
+            estimation.channel.Publish(window);
             lowPriorityInterrupt.Trigger();
         }
 
@@ -166,31 +173,32 @@ namespace foc
 
     void CascadeWithSpeedLoop::LimitCurrentImpl(Ampere limit)
     {
-        quadratureLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
+        command.quadratureLimit = std::clamp(limit.Value(), 0.0f, maxCurrent.Value());
     }
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
     {
-        speedReference = reference.Value();
+        outer.speedReference = reference.Value();
     }
 
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
         const auto mechanicalSpeed = speedDifferentiator.Measure();
-        lastMechanicalSpeed = mechanicalSpeed;
-        lastElectricalSpeed = mechanicalSpeed * polePairs;
+        outer.mechanicalSpeed = mechanicalSpeed;
+        outer.electricalSpeed = mechanicalSpeed * scaling.polePairs;
         return mechanicalSpeed;
     }
 
-    void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
+    void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration)
     {
-        lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ speedReference } }).Value();
+        outer.speedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ outer.speedReference } }).Value();
+        outer.feedForwardCurrent = feedForward.friction.CurrentFor(outer.speedReference) + accelerationCurrentGain * referenceAcceleration;
     }
 
     void CascadeWithSpeedLoop::BeginQuickStop(RadiansPerSecondSquared deceleration)
     {
-        quickStopStep = deceleration.Value() / static_cast<float>(outerLoopFrequency.Value());
-        quickStopReference = lastMechanicalSpeed;
+        quickStopStep = deceleration.Value() / static_cast<float>(schedule.frequency.Value());
+        outer.speedReference = outer.mechanicalSpeed;
         quickStopping = true;
     }
 
@@ -204,44 +212,43 @@ namespace foc
         if (!quickStopping)
             return false;
 
-        const float reference = quickStopReference;
+        const float reference = outer.speedReference;
         const float step = quickStopStep;
-        const float next = step > 0.0f ? std::clamp(0.0f, reference - step, reference + step) : 0.0f;
-        quickStopReference = next;
-        speedReference = next;
+        outer.speedReference = step > 0.0f ? std::clamp(0.0f, reference - step, reference + step) : 0.0f;
         RunSpeedLoop(mechanicalSpeed);
         return true;
     }
 
-    void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
+    void CascadeWithSpeedLoop::SetDirectCurrentReference(float current, float referenceAcceleration)
     {
-        lastSpeedLoopOutput = current;
+        outer.speedLoopOutput = current;
+        outer.feedForwardCurrent = accelerationCurrentGain * referenceAcceleration;
     }
 
     void CascadeWithSpeedLoop::EnableCurrentCommandImpl()
     {
         EnableSpeedLoop();
-        commandedCurrent = 0.0f;
-        voltageWindow.Open(prescaler);
-        currentCommandActive = true;
+        command.current = 0.0f;
+        command.voltageWindow.Open(schedule.prescaler);
+        command.active = true;
     }
 
     void CascadeWithSpeedLoop::CommandCurrentImpl(Ampere quadrature)
     {
-        commandedCurrent = quadrature.Value();
+        command.current = quadrature.Value();
     }
 
     Volts CascadeWithSpeedLoop::QuadratureVoltageImpl() const
     {
-        return Volts{ voltageWindow.Mean() * vdcInvScale };
+        return Volts{ command.voltageWindow.Mean() * scaling.vdcInvScale };
     }
 
     bool CascadeWithSpeedLoop::HoldCommandedCurrent()
     {
-        if (!currentCommandActive)
+        if (!command.active)
             return false;
 
-        SetDirectCurrentReference(commandedCurrent);
+        SetDirectCurrentReference(command.current);
         return true;
     }
 
@@ -252,9 +259,9 @@ namespace foc
 
     MotionObservation CascadeWithSpeedLoop::ObserveSpeedLoopMotion() const
     {
-        const float limit = quadratureLimit;
-        const float demanded = lastSpeedLoopOutput;
-        return { RadiansPerSecond{ lastMechanicalSpeed }, Ampere{ lastMeanIq }, RadiansPerSecond{ speedReference }, Radians{ 0.0f }, Ampere{ std::clamp(demanded, -limit, limit) } };
+        const float limit = command.quadratureLimit;
+        const float demanded = outer.speedLoopOutput + outer.feedForwardCurrent;
+        return { RadiansPerSecond{ outer.mechanicalSpeed }, Ampere{ estimation.meanIq }, RadiansPerSecond{ outer.speedReference }, Radians{ 0.0f }, Ampere{ std::clamp(demanded, -limit, limit) } };
     }
 
     LowPriorityInterrupt& CascadeWithSpeedLoop::GetLowPriorityInterrupt()
@@ -264,40 +271,54 @@ namespace foc
 
     void CascadeWithSpeedLoop::SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator)
     {
-        estimators.SetMechanical(estimator);
+        estimation.channel.SetMechanical(estimator);
     }
 
     void CascadeWithSpeedLoop::SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator)
     {
-        estimators.SetElectrical(estimator);
+        estimation.channel.SetElectrical(estimator);
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator()
     {
-        estimators.UpdateMechanical();
+        estimation.channel.UpdateMechanical();
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator()
     {
-        if (!estimators.HasElectrical())
+        if (!estimation.channel.HasElectrical())
             return;
 
-        estimators.UpdateElectrical(vdcInvScale, Ampere{ directCurrentReference });
-        directCurrentReference = directAxisExcitation.Advance();
+        estimation.channel.UpdateElectrical(scaling.vdcInvScale, Ampere{ outer.directCurrentReference });
+        outer.directCurrentReference = directAxisExcitation.Advance();
+
+        if (const auto estimate = estimation.channel.SettledElectricalEstimate())
+            zeroVectorSlope.Track(estimate->first, estimate->second);
     }
 
     void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
     {
-        coggingFeedForward.Load(torque, torqueScale, torqueConstant);
+        feedForward.cogging.Load(torque, torqueScale, torqueConstant);
     }
 
     void CascadeWithSpeedLoop::ClearCoggingMapImpl()
     {
-        coggingFeedForward.Clear();
+        feedForward.cogging.Clear();
     }
 
-    void CascadeWithSpeedLoop::SetCurrentStream(CurrentStream& stream)
+    void CascadeWithSpeedLoop::LoadFrictionFeedForwardImpl(NewtonMeter coulomb, NewtonMeter torqueConstant)
     {
-        currentStream = &stream;
+        feedForward.friction.Load(coulomb, torqueConstant, maxCurrent);
+    }
+
+    void CascadeWithSpeedLoop::ClearFrictionFeedForwardImpl()
+    {
+        feedForward.friction.Clear();
+        outer.feedForwardCurrent = 0.0f;
+    }
+
+    void CascadeWithSpeedLoop::SetZeroVectorSlopeSink(ZeroVectorSlopeSink& sink)
+    {
+        slopeSink = &sink;
     }
 }

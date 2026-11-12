@@ -9,9 +9,9 @@ namespace tool
     namespace
     {
 #if defined(_WIN32)
-        constexpr const char* interfaceHint{ "CAN adapter to open: PCAN:<channel>, Kvaser:<channel>, slcan:<COM port> for a CANable or other slcan adapter, or candleLight:<number>" };
+        constexpr const char* interfaceHint{ "CAN adapter to open: PCAN:<channel>, Kvaser:<channel>, slcan:<COM port> for a CANable or other slcan adapter, candleLight:<number>, or virtual:<bus> for a virtual CAN bus on this machine" };
 #else
-        constexpr const char* interfaceHint{ "CAN adapter to open: a SocketCAN interface such as can0, or slcan:<serial port> for a CANable or other slcan adapter, e.g. slcan:/dev/ttyACM0" };
+        constexpr const char* interfaceHint{ "CAN adapter to open: a SocketCAN interface such as can0, slcan:<serial port> for a CANable or other slcan adapter, e.g. slcan:/dev/ttyACM0, or virtual:<bus> for a virtual CAN bus on this machine" };
 #endif
     }
 

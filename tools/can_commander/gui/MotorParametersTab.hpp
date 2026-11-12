@@ -15,7 +15,6 @@ namespace tool
     public:
         explicit MotorParametersTab(QWidget* parent = nullptr);
 
-        void SetLegacy(bool legacyContract) override;
         void SetActionsAvailable(const QString& reason);
         void SetMaintenanceUnavailable(const QString& reason);
 

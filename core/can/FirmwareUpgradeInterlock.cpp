@@ -8,7 +8,7 @@ namespace can
 
     bool FirmwareUpgradeInterlock::IsStoppedAndIdle() const
     {
-        return controlMode.IsStoppedAndIdle();
+        return controlMode.Settings().IsIdle();
     }
 
     void FirmwareUpgradeInterlock::Hold()

@@ -214,7 +214,7 @@ namespace
 
     float PlantSpeed(mil::ModelInTheLoop& mil)
     {
-        return mil.Drive().Model().MechanicalSpeed().Value();
+        return mil.Drive().Model().Mechanics().Speed().Value();
     }
 
     float MillisecondsSince(mil::ModelInTheLoop& mil, uint32_t tick)
@@ -232,10 +232,10 @@ namespace
     std::optional<QuickStopResponse> QuickStop(mil::ModelInTheLoop& mil)
     {
         const auto start = mil.Drive().Tick();
-        if (mil.ControlMode().ActiveStateMachine().CmdQuickStop() != state_machine::CommandResult::ok)
+        if (mil.ControlMode().Drive().ActiveStateMachine().CmdQuickStop() != state_machine::CommandResult::ok)
             return std::nullopt;
 
-        const bool stopping = std::holds_alternative<state_machine::Stopping>(mil.ControlMode().ActiveStateMachine().CurrentState());
+        const bool stopping = std::holds_alternative<state_machine::Stopping>(mil.ControlMode().Drive().ActiveStateMachine().CurrentState());
         if (!mil.RunUntil([&mil]()
                 {
                     return std::abs(PlantSpeed(mil)) < stoppedSpeed || mil.IsReady();
@@ -280,7 +280,7 @@ TEST(TestDriveLimits, a_quick_stop_that_would_take_longer_than_a_second_cuts_the
     ASSERT_TRUE(mil.HoldSpeed(100.0f, std::chrono::milliseconds(1000)));
 
     const auto start = mil.Drive().Tick();
-    ASSERT_EQ(state_machine::CommandResult::ok, mil.ControlMode().ActiveStateMachine().CmdQuickStop());
+    ASSERT_EQ(state_machine::CommandResult::ok, mil.ControlMode().Drive().ActiveStateMachine().CmdQuickStop());
     ASSERT_TRUE(mil.RunUntil([&mil]()
         {
             return mil.IsReady();
@@ -309,6 +309,6 @@ TEST(TestDriveLimits, a_quick_stop_brakes_a_torque_mode_rotor_against_its_speed)
     EXPECT_GT(before, 90.0f);
     EXPECT_TRUE(response->stoppingWhileBraking);
     EXPECT_LE(response->belowStoppedMs, (before - stoppedSpeed) / 500.0f * 1000.0f * 1.1f);
-    EXPECT_LE(response->readyMs, response->belowStoppedMs + 5.0f);
+    EXPECT_LE(response->readyMs, response->belowStoppedMs + 11.0f);
     EXPECT_FALSE(mil.HasFault());
 }

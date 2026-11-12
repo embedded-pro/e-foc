@@ -92,11 +92,11 @@ namespace
         NonCommandEvent{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::CalibrationInvalidated>(), idleReadyAndFault },
-        NonCommandEvent{ Event<state_machine::BootValidityChecked>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::MotorParameterSaved>(), idleReadyAndFault },
         NonCommandEvent{ Event<state_machine::OffsetsRefreshed>(), onlyReady },
         NonCommandEvent{ Event<state_machine::StopCompleted>(), onlyStopping },
+        NonCommandEvent{ Event<state_machine::IndexSearched>(), onlyReady },
         NonCommandEvent{ Event<state_machine::FaultDetected>(), everywhere },
         NonCommandEvent{ Event<state_machine::EmergencyStop>(), everywhere },
     };
@@ -114,18 +114,15 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Available()).Times(AnyNumber()).WillRepeatedly(Return(1000));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::CurrentStream currentStream;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -133,10 +130,12 @@ namespace
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
         infra::Execute setupMachineExpectations{ [this]()
             {
-                EXPECT_CALL(nvmMock, IsCalibrationValid(_)).WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(false);
-                    }));
+                EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                    .WillOnce(Invoke([](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
+                        {
+                            out = services::CalibrationData{};
+                            onDone(services::NvmStatus::InvalidData);
+                        }));
                 EXPECT_CALL(faultNotifierMock, Register(_, _));
                 EXPECT_CALL(faultNotifierMock, Unregister());
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
@@ -147,12 +146,11 @@ namespace
             } };
 
         application::TorqueStateMachine stateMachine{
-            application::TerminalAndTracer{ terminal, tracer },
-            application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+            tracer,
+            application::MotorHardware{ inverterMock, encoderMock, currentStream, foc::Volts{ 24.0f } },
             nvmMock,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
             faultNotifierMock,
-            state_machine::TransitionPolicy::Auto,
             nvmActivity
         };
     };

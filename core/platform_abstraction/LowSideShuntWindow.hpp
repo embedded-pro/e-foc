@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 
 namespace foc
@@ -44,6 +45,32 @@ namespace foc
         return PhasePwmDutyCycles{ keep(duties.a), keep(duties.b), keep(duties.c) };
     }
 
+    struct SequentialConverter
+    {
+        float converterClockHertz{ 0.0f };
+        uint32_t sampleHoldClocks{ 0 };
+        uint32_t conversionClocks{ 0 };
+        uint32_t averagedConversions{ 1 };
+        std::chrono::duration<float> triggerDelay{ 0.0f };
+    };
+
+    constexpr PhaseSampleDelays SequentialPhaseSampleDelays(const SequentialConverter& converter)
+    {
+        if (converter.converterClockHertz <= 0.0f)
+            return {};
+
+        const auto averaged = static_cast<float>(std::max(converter.averagedConversions, uint32_t{ 1 }));
+        const auto clocksPerConversion = static_cast<float>(converter.sampleHoldClocks + converter.conversionClocks);
+        const auto step = [&converter, averaged, clocksPerConversion](float index)
+        {
+            const auto meanConversion = index * averaged + 0.5f * (averaged - 1.0f);
+            const auto clocks = meanConversion * clocksPerConversion + static_cast<float>(converter.sampleHoldClocks);
+            return converter.triggerDelay + std::chrono::duration<float>{ clocks / converter.converterClockHertz };
+        };
+
+        return { step(0.0f), step(1.0f), step(2.0f) };
+    }
+
     // A phase is unreadable if either period around the PWM centre gave it a duty above the limit.
     class LowSideShuntReadout
     {
@@ -63,8 +90,26 @@ namespace foc
             offsetSum = offsets.a.Value() + offsets.b.Value() + offsets.c.Value();
         }
 
-        ALWAYS_INLINE_HOT PhaseCurrents Read(const PhaseCurrents& measured) const
+        void SampleDelays(const PhaseSampleDelays& sampleDelays)
         {
+            delays = sampleDelays;
+        }
+
+        ALWAYS_INLINE_HOT void ZeroVectorSlopes(const PhaseCurrentSlopes& slopes)
+        {
+            shift.a = slopes.a.Value() * delays.a.count();
+            shift.b = slopes.b.Value() * delays.b.count();
+            shift.c = slopes.c.Value() * delays.c.count();
+        }
+
+        void ClearSlopes()
+        {
+            shift = {};
+        }
+
+        ALWAYS_INLINE_HOT PhaseCurrents Read(const PhaseCurrents& sampled) const
+        {
+            const PhaseCurrents measured{ Ampere{ sampled.a.Value() - shift.a }, Ampere{ sampled.b.Value() - shift.b }, Ampere{ sampled.c.Value() - shift.c } };
             const auto a = std::max(previous.a.Value(), latest.a.Value());
             const auto b = std::max(previous.b.Value(), latest.b.Value());
             const auto c = std::max(previous.c.Value(), latest.c.Value());
@@ -83,6 +128,8 @@ namespace foc
         uint32_t maxReadable;
         // Written from the event loop, read in the control interrupt.
         float offsetSum{ 0.0f };
+        PhaseSampleDelays delays{};
+        ThreePhase shift{};
         PhasePwmDutyCycles previous{};
         PhasePwmDutyCycles latest{};
     };

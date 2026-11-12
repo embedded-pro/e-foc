@@ -1,7 +1,7 @@
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Crc.hpp"
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
@@ -121,10 +121,10 @@ namespace
             Fwu(services::fwuProgressResponseId, { static_cast<uint8_t>(state), static_cast<uint8_t>(received >> 8), static_cast<uint8_t>(received), static_cast<uint8_t>(total >> 8), static_cast<uint8_t>(total) });
         }
 
-        void BringCompatible(uint16_t node, uint8_t minor)
+        void BringCompatible(uint16_t node)
         {
             Receive(services::canSystemCategoryId, services::canHeartbeatMessageTypeId, node, {});
-            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, minor });
+            Receive(can::focMotorCategoryId, can::focContractVersionResponseId, node, { can::focContractVersionMajor, can::focContractVersionMinor });
         }
 
         std::vector<Sent> SentUpgradeFrames() const
@@ -476,7 +476,7 @@ TEST_F(TestFirmwareTransfer, activate_refused_reports_the_refusal)
 
 TEST_F(TestFirmwareTransfer, while_restarting_the_identity_is_read_again_every_five_seconds)
 {
-    BringCompatible(1, 8);
+    BringCompatible(1);
     ASSERT_TRUE(transfer.Apply(1, { 1, 7, 0 }));
     ActivateAnswered();
     const auto before = CountIdentityReads();

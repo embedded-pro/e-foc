@@ -1,5 +1,4 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <gtest/gtest.h>
 
@@ -9,13 +8,10 @@ namespace
         : public ::testing::Test
     {
     protected:
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
-            hal::Hertz{ 100000 },
-            std::optional<std::size_t>{}
+            hal::Hertz{ 100000 }
         };
     };
 }
@@ -23,11 +19,11 @@ namespace
 TEST_F(TestThermalModel, effective_resistance_scales_with_temperature)
 {
     constexpr float testTemp = 125.0f;
-    model.SetWindingTemperatureForTest(testTemp);
+    model.Thermal().SetTemperature(testTemp);
 
     const float rBase = foc::M_2310P_LN_04K::parameters.R.Value();
     const float expectedR = rBase * (1.0f + 0.00393f * (testTemp - 25.0f));
-    const float actualR = model.EffectiveResistance().Value();
+    const float actualR = foc::Ohm{ model.Winding().resistance }.Value();
 
     EXPECT_NEAR(actualR, expectedR, expectedR * 0.005f);
 }
@@ -43,13 +39,13 @@ TEST_F(TestThermalModel, temperature_rises_when_current_flows)
     for (int i = 0; i < cycles; ++i)
         model.StepForTest(duty);
 
-    EXPECT_GT(model.WindingTemperatureCelsius(), 25.0f);
+    EXPECT_GT(model.Thermal().Temperature(), 25.0f);
 }
 
 TEST_F(TestThermalModel, reset_temperature_restores_ambient)
 {
-    model.SetWindingTemperatureForTest(80.0f);
-    model.ResetTemperature();
+    model.Thermal().SetTemperature(80.0f);
+    model.Thermal().Reset();
 
-    EXPECT_NEAR(model.WindingTemperatureCelsius(), 25.0f, 1e-4f);
+    EXPECT_NEAR(model.Thermal().Temperature(), 25.0f, 1e-4f);
 }

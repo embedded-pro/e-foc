@@ -6,26 +6,33 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 ## Architecture
 
-- `core/foc/interfaces/` — FOC vocabulary/contracts (`Units.hpp`, `Signals.hpp`, `Foc.hpp`). No algorithms.
+- `core/foc/interfaces/` — FOC vocabulary/contracts (`Signals.hpp`, `Foc.hpp`). No algorithms. The unit types (`Units.hpp`), the accepted parameter ranges (`CommandLimits.hpp`) and their checks (`ParameterValidation.hpp`) come from `infra/e-foc-protocol/` (`e-foc-protocol/foc/…`)
 - `core/foc/transforms/` — Clarke/Park transforms, SVM (output straight to `PhasePwmDutyCycles`)
-- `core/foc/math/` — `FastTrigonometry.hpp`, `AngleWrap.hpp`, `FiniteGuard.hpp`, `ParameterValidation.hpp`, `CoggingFeedForward.hpp` (header-only)
+- `core/foc/math/` — `CoggingFeedForward.hpp`, `TravelLimits.hpp` (header-only); table sine and cosine, angle wrapping and finiteness come from the toolbox (`math::FastSine`, `math::FastCosine`, `math::WrapToPi`, `math::IsFinite`)
 - `core/foc/cascade/` — Cascade orchestration + gain design and the per-tick estimator windows; no hardware dependency
-- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `EncoderModel` and `PhaseCurrentSensor`) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`); host and QEMU only
+- `core/foc/model/` — Simulation plant (`ThreePhaseMotorModel`, built from `ElectricalPlant`, `MechanicalPlant`, `ThermalModel`, `SupplyModel`, `SimulatedEncoder` (the encoder port, over `EncoderModel`) and `PhaseCurrentSensor`, each reached through an accessor) and SIL instrumentation (`OneShotDelay`, `PlantResponseRecorder`);
+  `drive/` holds the plant description (`SilPlantConfig`), the `PlantDrive` that steps the plant once per control period for the QEMU platform, the model-in-the-loop tests and the virtual motor (`PlantEvents` for its scheduled disturbances), the `BoardProtectionSimulator`,
+  and `memory/`, the memory image builder (`BuildNvmImage`) and the calibration a plant would store (`CalibratedFor`) that the harnesses and the virtual motor share; host and QEMU only
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`) in `interfaces/Drivers.hpp`; `LowSideShuntWindow.hpp` for low-side shunt boards
-- `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
-- `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, firmware upgrade (download and staging of an upgrade pack, `firmware_upgrade/`), `injection_current_limit/`
-- `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
+- `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. It registers no terminal commands: `sync_foc_sensored` is commanded over CAN only, and only `hardware_test` has a command line.
+- `core/services/` — Alignment, CLI, system ID, NVM, standstill, current-offset measurement, inverter compensation (offsets and dead time), cogging compensation, fault history (`fault_history/`), `injection_current_limit/`, status LEDs (`leds/`)
+- `core/can/` — the firmware side of the FOC motor CAN category: `FocMotorCanBridge` (the server's observer), settings, current streamer, liveness watchdog, command timeout; `FirmwareUpgradeInterlock` holds the drive for can-lite's `services::FirmwareUpgradeSession` (download and staging of an upgrade pack)
 - `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`, `bootloader`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`, `peripheral_stubs` for host/ST)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
+- `infra/e-foc-protocol/` — the FOC motor CAN wire contract (`e-foc-protocol/contract/`), the category server and client and `FocMotorCanClient`, shared with every client of the drive. A contract change starts there (its `documentation/design/wire-contract.md`), then bumps the submodule here
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake; the upgrade pack components and the `bootloader` package (status journal, application header and image descriptor checks, checked installer, boot sequence, key slot) the bootloader is built from,
   with its `application.bootloader_image` host tool and the CMake steps that run it (`documentation/design/bootloader.md` Part J)
-- `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
+- `tools/virtual_motor/` — virtual motors (`documentation/design/virtual-motor.md`): `platform/` is the virtual board (`VirtualPlatform` over `PlantDrive`, a memory file,
+  a `virtual:` CAN port, a wall-clock `Pacer` under a pausable `RunLoop`, `PlantDisturbances` for live torque and noise, the motor side of the plant port),
+  `port/` the plant port's frames and messages, shared with the Virtual Motor app, `engine/` the headless `e-foc-virtual-motor` that runs `Logic` on it,
+  `app/` the e-foc Virtual Motor app (`documentation/design/tool-virtual-motor.md`): `logic/` the rig of motor processes and their plant ports, trace history, captures, the trace view and the modulation, rotor and encoder views, `gui/` the manager and motor windows
+- `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
 
-**Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR-reachable paths. Host tools, simulators, and tests may use heap.
+**Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR-reachable paths. Host tools and tests may use heap.
 
 Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion — stack usage must stay predictable. No virtual destructors (see Interfaces & errors).
 
@@ -35,11 +42,11 @@ Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStora
 
 `Calculate()` runs at 20 kHz in interrupt. Budget: **≤4500 cycles at 120 MHz** (inner loop, 75% of the 6000-cycle period); **≤20000** (1 kHz outer loop).
 
-Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp` or another lookup table. No blocking calls in any ISR-reachable code. `Calculate()` delegates to focused helper methods.
+Forbidden in hot path: virtual dispatch, heap, raw `sin`/`cos` — use `math::FastSine`/`math::FastCosine` from `numerical/math/FastTrigonometry.hpp` or another lookup table. No blocking calls in any ISR-reachable code. `Calculate()` delegates to focused helper methods.
 
 Also forbidden: per-sample validation — no plausibility check on the phase currents and no finiteness check on
 currents or duty cycles in the 20 kHz path. Sensor and power-stage failures belong to the hardware protection path.
-`foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
+`math::IsFinite` (`numerical/math/Math.hpp`) is for configuration-time and outer-loop checks only
 (`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
 
 Never give a function optimisation options of its own: no `#pragma GCC optimize`, no `optimize` attribute. GCC does not
@@ -64,6 +71,7 @@ with it enabled the macro's own `inline` would be a duplicate.
 - **Decoupling**: −ω·Lq·Iq feedforward on Vd; +ω·(Ld·Id + ψf) on Vq. The Vd term is negative and the Vq term positive — these cancel the coupling the plant adds, so getting the signs backwards doubles it
 - **SVM**: min-max common-mode injection; duty cycles bounded to [0, 1]
 - Reuse `Clarke`, `Park`, `ClarkePark` (`TransformsClarkePark.hpp`) and `SpaceVectorModulation` from `core/foc/transforms/`, and PID, filters and math from `infra/numerical-toolbox/` — do not reimplement
+- Math functions through the toolbox wrappers in `numerical/math/Math.hpp` (`math::Abs`, `math::Sqrt`, `math::Sin`, `math::Exp`, `math::Round`, `math::IsFinite`, ...), never `std::abs`, `std::sqrt` and the like: each wrapper can be overridden with a faster target implementation. `std::min`, `std::max` and `std::clamp` stay; tests may use `std::` as the reference
 - Unit types, never a raw `float` where one exists: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
 ## Style
@@ -145,14 +153,17 @@ standalone at the start of flash on every board and replaces the bootloader when
 
 `qemu-foc-sensored` builds `e_foc.bootloader.main` and `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting, laid out like a board with a bootloader. The application ELF with its `.image.bin` and `.descriptor.bin`, and the bootloader ELF, are uploaded as CI artifacts for the software-in-the-loop shards.
 
-**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
+**CI**: `ci.yml` is the build-and-test pipeline: it builds all targets and uploads `e_foc`, `e_foc.integration_tests`, `e_foc.virtual_motor`, `e_foc.sync_foc_sensored.qemu.elf` and `e_foc.bootloader.qemu.elf` as artifacts.
 Its `release_tools_build` job calls `build-tools.yml`, the same workflow the release uses, so every PR
 builds, packages and install-tests the Linux and Windows tools exactly as a release does (MSVC with
 warnings as errors and the release's Qt on `windows-latest`, the `.deb` on `ubuntu-latest`); signing
 stays release-only. The `software_in_the_loop_shard` jobs (three, run at once) run in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, download those artifacts, and
 run behavioral tests — never recompile. Do not add cmake build steps to them. Each runs the features `integration_tests/sil-shards.json` assigns it, after `integration_tests/sil-shard.py` checks the plan lists
 every feature with an `@sil` scenario exactly once; a new feature goes into the shard that keeps the three balanced. `software_in_the_loop_tests` gathers the shards' reports into the one
-`Software-in-the-Loop Test Results` check and fails unless every shard passed.
+`Software-in-the-Loop Test Results` check and fails unless every shard passed; a re-run shard replaces its report, so the check follows the latest attempt.
+
+**ccache**: every configure preset inherits `defaults`, which sets `ccache` as the C/C++ compiler launcher both as cache variables and in the environment (so the native `_native_bootloader_image` sub-build is cached too), with `CCACHE_BASEDIR` at the source tree.
+Every CI job that compiles restores a cache with `hendrikmuhs/ccache-action` (saved from `main` only); a job that configures without a preset, like the Windows tools build, passes the launcher itself. A new compiling job does the same.
 
 Beside `ci.yml`, every PR also runs `linting-formatting.yml` (MegaLinter), `static-analysis.yml` (SonarCloud), `requirements-validation.yml` and
 `submodule-check.yml` (submodules point to `main`), plus `documentation-validation.yml` and `build-booklet.yml` when `documentation/` changes.
@@ -187,19 +198,23 @@ QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebIn
 
 Authoritative cycle budget gate: the `cortex-cycle-budget` static analysis in `ci.yml`'s embedded build, on EK-TM4C1294XL (inner ≤ 4500, outer ≤ 20000, identification path ≤ 6000 at 120 MHz)
 and NUCLEO-G474RE (≤ 6375 / 28333 / 8500 at 170 MHz: the same time slices). Each MCU gets one cycle banner and one memory banner on the PR.
-It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json` (inner loop plus the identification observer) — an unlisted symbol is silently unmeasured, not flagged.
+It charges each path its worst case: the costliest path through the functions a config names and through everything they call directly.
+A call through a pointer (an `infra::Function` callback, a virtual call) is not followed, so a new one on a hot path means naming its target in
+`targets/sync_foc_sensored/main/cycle-analysis.json` (inner), `cycle-analysis-outer.json` (outer) or `cycle-analysis-identification.json`
+(inner loop plus the calibration observer). Alternatives of which one runs share a stage with `"combine": "max"`; a new loop needs a `loop_bounds`
+entry, and a change to the loops of a function whose entry is a list (one bound per loop, in address order) needs the list rewritten. The report's *Analysis Notes* list every call not followed and every loop without a bound: read them after changing a hot path.
+`CYCLE_BUDGET_PACKAGE` in `ci.yml` pins the analyser; `documentation/performance-optimization/README.md` (*What the static estimate charges*) has the rules.
 
-**Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
-`-Wall -Wextra`; with `CMAKE_COMPILE_WARNING_AS_ERROR` on, any warning in `core/`, `targets/`,
-`integration_tests/` or `tools/` fails the build. Third-party include directories are marked SYSTEM by
-`e_foc_mark_includes_system` from `cmake/MarkIncludesSystem.cmake`, so warnings in headers we do not own
-cannot. That call marks every target that exists when it runs, which is why the **call** sits after the
-submodule and FetchContent additions and **before** `add_subdirectory(core)`: move it later and it would
-mark this project's own targets SYSTEM, silencing the warnings the flags exist to catch; move it earlier and
-FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence a warning with a pragma —
+**Warnings**: EmIL's `emil_enable_warnings()` (`infra/embedded-infra-lib/cmake/emil_compiler_warnings.cmake`) enables
+`-Wall -Wextra`, minus the GCC/Clang false positives on EmIL and GoogleTest code; with `CMAKE_COMPILE_WARNING_AS_ERROR`
+on, any warning in `core/`, `targets/`, `integration_tests/` or `tools/` fails the build. Every submodule
+`add_subdirectory` and every `FetchContent_Declare` passes `SYSTEM`, so warnings in headers we do not own cannot;
+a new dependency must do the same. The call sits after the dependencies and **before** `add_subdirectory(core)`, so
+the flags reach our targets and not the dependencies' own sources. Never silence a warning with a pragma —
 fix it, or drop the parameter name if it is genuinely unused.
 
-**Optimisation**: `cmake/CompilerOptimizations.cmake` provides `e_foc_enable_embedded_optimizations()`, which adds
+**Optimisation**: the numerical toolbox's `numerical_toolbox_enable_embedded_optimizations()`
+(`infra/numerical-toolbox/cmake/NumericalCompilerOptions.cmake`), called when `E_FOC_EMBEDDED_BUILD` is on, adds
 `-ffast-math -fno-finite-math-only` to the configuration's level in the embedded and QEMU builds; `-fno-finite-math-only`
 keeps NaN and infinity checks meaningful. Its call sits next to the warnings call, after the
 submodules and before `add_subdirectory(core)`, so `core/` and `targets/` — and the toolbox code they include — get the
@@ -216,13 +231,18 @@ what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. T
 Clang has no `-Wmaybe-uninitialized`: in a Clang build the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
-**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware,
+and `@virtual` for the virtual motor runner (`--mode virtual`, the host build's `e-foc-virtual-motor`), a small functional set that keeps its `@sil` tag and that `ci.yml`'s `virtual_motor_tests` job runs.
+The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
 model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.
-Requirements carry an optional `status` (`draft`, `implemented`, `verified`, `retired`) and `verification` (`sil`, `hil`, `mil`, `unit`, `inspection`) in `documentation/requirements/`.
+Requirements are two tiers (`documentation/design/integration-testing.md`, *Feature-to-Requirements Mapping*): `documentation/requirements/*.yaml` holds the product requirements — solution-free promises
+observable at the drive's boundary, one per `shall`, no class or message names, no contract versions, no per-law limit tables — and the scenarios' `Examples:` tables hold the acceptance limits.
+A mechanism or design constraint goes in its design document, never in a requirement; a limit pinned from a `[METRIC]` line goes in the scenario only.
+Every requirement carries a `status` (`draft`, `implemented`, `verified`, `retired`) and a `verification` (`sil`, `hil`, `mil`, `unit`, `inspection`).
 A requirement is not required to have a scenario, but one marked `verified` must be cited by an `@REQ-...` tag. `documentation/tools/check-requirements-traceability.py` (run by `requirements-validation.yml`)
-fails on a `verified` requirement with no tag, a tag naming an unknown or retired ID, a duplicate ID, or a scenario kind the `verification` field omits.
+fails on a missing status or verification, a `shall` over 90 words or naming another requirement, a `verified` requirement with no tag, a tag naming an unknown or retired ID, a duplicate ID, or a scenario kind the `verification` field omits.
 It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to how `Logic` wires a service is made in `ModelInTheLoop` too. See `documentation/design/software-in-the-loop.md` Part N.
 
 Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
@@ -236,7 +256,7 @@ a shaft torque step is scheduled in the plant description, and `integration_test
 
 Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
 
-**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The SIL presets `teknic` and `anaheim` select them; `nominal` is the Teknic.
+**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The plant presets (`motor_parameters/PlantPresets.hpp`) `teknic` and `anaheim` select them for SIL, MIL and the virtual motor; `nominal` is the Teknic.
 
 **Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (the CAN electrical response, and the calibration record and online estimates read as contract 2.2 parameters) against the plant the scenario configured.
 

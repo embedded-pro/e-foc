@@ -106,7 +106,8 @@ namespace sil
 
     void QemuInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>& image)
     {
-        ASSERT_TRUE(session.WriteScenarioFile("eeprom.bin", image))
+        // The firmware rewrites eeprom.bin when its fault history loads, so the emulator BeforeScenario started must be gone first.
+        ASSERT_TRUE(WriteWhileStopped("eeprom.bin", image))
             << "[QEMU] could not write the NVM image";
     }
 

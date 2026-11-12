@@ -1,5 +1,5 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
-#include "core/can/FocMotorWireContract.hpp"
+#include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
 #include "tools/can_commander/support/IssueReport.hpp"
 #include "tools/can_commander/support/UpdateInstallation.hpp"
@@ -38,6 +38,8 @@ namespace tool
                 return "check that the candleLight adapter is plugged in and not used by another program";
             if (interfaceName.startsWith("PCAN:", Qt::CaseInsensitive) || interfaceName.startsWith("Kvaser:", Qt::CaseInsensitive))
                 return "check that the adapter is plugged in and the vendor driver is installed";
+            if (interfaceName.startsWith("virtual:", Qt::CaseInsensitive))
+                return "check that a virtual CAN hub is running on this machine and that every node on the bus uses the same bitrate";
             return "check that the interface exists and is up, e.g. sudo ip link set can0 up type can bitrate 1000000";
         }
 
@@ -179,7 +181,26 @@ namespace tool
                 CloseMotor(motorTabs->currentIndex());
             });
         motorMenu->addSeparator();
+        launchVirtualMotorAction = motorMenu->addAction("&Launch Virtual Motor…", this, &MainWindow::LaunchVirtualMotor);
+        SetVirtualMotorApp({});
+        motorMenu->addSeparator();
         emergencyStopAction = motorMenu->addAction("&Emergency Stop All Motors", QKeySequence{ Qt::Key_Escape }, this, &MainWindow::EmergencyStopAll);
+    }
+
+    void MainWindow::SetVirtualMotorApp(const QString& program)
+    {
+        virtualMotorApp = program;
+        launchVirtualMotorAction->setEnabled(!program.isEmpty());
+        launchVirtualMotorAction->setToolTip(program.isEmpty() ? "The e-foc Virtual Motor app is not installed next to this tool" : "Start the e-foc Virtual Motor app; its motors join the bus virtual:default");
+        launchVirtualMotorAction->setStatusTip(launchVirtualMotorAction->toolTip());
+    }
+
+    void MainWindow::LaunchVirtualMotor()
+    {
+        if (QProcess::startDetached(virtualMotorApp, {}))
+            Report(IssueSeverity::info, "e-foc Virtual Motor started; connect to virtual:default once a motor runs");
+        else
+            Report(IssueSeverity::warning, "The e-foc Virtual Motor app could not be started from " + virtualMotorApp);
     }
 
     void MainWindow::BuildHelpMenu()
@@ -592,7 +613,7 @@ namespace tool
         for (auto nodeId : targets)
         {
             auto* motor = Motor(nodeId);
-            const bool accepted = motor != nullptr ? motor->SendEmergencyStop() : client.SendEmergencyStop(nodeId);
+            const bool accepted = motor != nullptr ? motor->SendEmergencyStop() : client.Commands().SendEmergencyStop(nodeId);
             (accepted ? sent : refused).push_back(nodeId);
         }
 
@@ -665,7 +686,7 @@ namespace tool
     void MainWindow::ReportIssue()
     {
         Report(IssueSeverity::info, "Opening a pre-filled issue report in the browser");
-        const auto environment = CurrentIssueEnvironment(ToQt(application::version), issueLog.FilePath());
+        const auto environment = CurrentIssueEnvironment(IssueProduct{ ToQt(application::displayName), ToQt(application::name) }, ToQt(application::version), issueLog.FilePath());
         const auto url = BuildIssueUrl(QUrl{ ToQt(application::newIssueUrl) }, environment, issueLog.RecentLines(60));
 
         if (!QDesktopServices::openUrl(url))
@@ -805,12 +826,6 @@ namespace tool
     void MainWindow::OnFaultEventReceived(uint16_t, FocFaultCode)
     {}
 
-    void MainWindow::OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
-    {
-        if (auto* motor = Motor(nodeId))
-            motor->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
-    }
-
     void MainWindow::OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms)
     {
         if (auto* motor = Motor(nodeId))
@@ -821,6 +836,12 @@ namespace tool
     {
         if (auto* motor = Motor(nodeId))
             motor->OnParameter(parameter, value);
+    }
+
+    void MainWindow::OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnFaultRecord(record);
     }
 
     void MainWindow::OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity)

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/interfaces/LoopTunings.hpp"
-#include <array>
 #include <cstdint>
 #include <numbers>
 
@@ -48,6 +47,10 @@ namespace services
         float followingErrorTime = 0.1f;
         float speedAcceleration = 0.0f;
         float speedDeceleration = 0.0f;
+        float profileVelocity = 0.0f;
+        float profileAcceleration = 0.0f;
+        float profileDeceleration = 0.0f;
+        float profileJerk = 0.0f;
         float commandTimeout = 0.0f;
         float continuousCurrent = 0.0f;
         float peakCurrent = 0.0f;
@@ -63,6 +66,16 @@ namespace services
         float busVoltageMaximum = 0.0f;
         float quickStopDeceleration = 0.0f;
     };
+
+    enum class RecalibrationMode : uint8_t
+    {
+        off = 0,
+        onCommand = 1,
+        automatic = 2
+    };
+
+    inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
+    inline constexpr uint8_t ConfigLayoutVersion = 16;
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
@@ -82,13 +95,9 @@ namespace services
         uint8_t positionAlgorithm = 0;
         uint8_t currentTwoStepDeadbeat = 0;
         uint8_t stallDetection = 1;
-        std::array<uint8_t, 2> reserved{};
+        uint8_t recalibrationMode = 0;
+        uint8_t homingRequired = 0;
     };
 
-    static_assert(sizeof(ConfigData) == 172, "ConfigData layout must be free of implicit padding");
-
-    inline ConfigData MakeDefaultConfigData()
-    {
-        return ConfigData{};
-    }
+    static_assert(sizeof(ConfigData) == 188, "ConfigData layout must be free of implicit padding");
 }

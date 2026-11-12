@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/can/FocMotorMessages.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "tools/can_commander/gui/ConfigurationTab.hpp"
 #include "tools/can_commander/gui/ControllersTab.hpp"
 #include "tools/can_commander/gui/DiagnosticsTab.hpp"
@@ -68,6 +68,7 @@ namespace tool
         struct SetpointControls
         {
             can::FocMotorMode mode{ can::FocMotorMode::torque };
+            const SetpointAxis* axis{ nullptr };
             SetpointKnob* knob{ nullptr };
             QDoubleSpinBox* spin{ nullptr };
             QPushButton* apply{ nullptr };
@@ -80,10 +81,12 @@ namespace tool
         QGroupBox* CreateModeGroup();
         QStackedWidget* CreateSetpointStack();
         QGroupBox* CreateSetpointGroup(SetpointControls& controls, const char* title, const char* label);
-        QLayout* CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label, const QString& range);
+        QLayout* CreateSetpointEntry(SetpointControls& controls, const char* title, const char* label);
         void ConnectSetpoint(SetpointControls& controls);
         void SyncSetpoint(SetpointControls& controls, int32_t counts);
         void RefreshSetpointStatus(SetpointControls& controls);
+        void ApplyAxis(SetpointControls& controls);
+        static QString RangeText(const SetpointControls& controls);
 
         QLabel* hintLabel;
         QPushButton* quickStopButton{ nullptr };

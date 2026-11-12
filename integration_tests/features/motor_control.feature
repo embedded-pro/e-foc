@@ -7,11 +7,11 @@ Feature: FOC Motor Control Modes
   of Ready, report an incomplete calibration and refuse to enable.
 
   The first Start after power-up measures the current sensors' offsets again at rest
-  (REQ-CAL-022). A sensor that drifted a little since the calibration is corrected and
+  (REQ-CMS-003). A sensor that drifted a little since the calibration is corrected and
   the drive runs; one that drifted more than 50 mA refuses the Start, which asks for a
   new calibration.
 
-  @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-005 @REQ-SM-011 @REQ-CAN-014
+  @sil @virtual @REQ-CMS-001 @REQ-CMS-004 @REQ-COM-001
   Scenario: Torque mode runs motor with current setpoint
     Given the torque motor system is initialised with no valid calibration data
     When the torque control mode is selected
@@ -23,7 +23,7 @@ Feature: FOC Motor Control Modes
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
-  @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-006 @REQ-SM-011
+  @sil @virtual @REQ-CMS-001 @REQ-LCY-001 @REQ-CMS-004
   Scenario: Speed mode refuses to run without mechanical calibration
     Given the speed motor system is initialised with no valid calibration data
     When the speed control mode is selected
@@ -31,7 +31,7 @@ Feature: FOC Motor Control Modes
     Then the state machine shall report incomplete calibration
     And the motor shall refuse to enable
 
-  @sil @REQ-SM-003 @REQ-SM-004 @REQ-SM-007 @REQ-SM-011
+  @sil @virtual @REQ-CMS-001 @REQ-LCY-001 @REQ-CMS-004
   Scenario: Position mode refuses to run without mechanical calibration
     Given the position motor system is initialised with no valid calibration data
     When the position control mode is selected
@@ -39,7 +39,7 @@ Feature: FOC Motor Control Modes
     Then the state machine shall report incomplete calibration
     And the motor shall refuse to enable
 
-  @sil @REQ-CAL-022
+  @sil @virtual @REQ-CMS-003
   Scenario: A current sensor 20 mA from its calibrated offset still lets the first Start run the drive
     Given a nominal motor plant
     And the motor is already calibrated
@@ -50,7 +50,7 @@ Feature: FOC Motor Control Modes
     And the motor is enabled
     Then the state machine shall be in the running state
 
-  @sil @REQ-CAL-022
+  @sil @virtual @REQ-CMS-003
   Scenario: A current sensor 100 mA from its calibrated offset refuses the first Start
     Given a nominal motor plant
     And the motor is already calibrated

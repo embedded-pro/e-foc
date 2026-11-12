@@ -3,19 +3,15 @@
 
 namespace foc
 {
-    PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
-        : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency, dutyUpdateDelayPeriods)
+    PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
+        : SpeedLoopDrive(maxCurrent, baseFrequency, lowPriorityInterrupt, currentStream, lowPriorityFrequency, dutyUpdateDelayPeriods)
         , outerLoopFrequency(lowPriorityFrequency)
+        , profile(lowPriorityFrequency)
     {
         GetLowPriorityInterrupt().Register([this]()
             {
                 LowPriorityHandler();
             });
-    }
-
-    bool PositionCascade::Configure(const MotorModelParameters& parameters)
-    {
-        return ConfigureImpl(parameters);
     }
 
     bool PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
@@ -28,7 +24,7 @@ namespace foc
 
     void PositionCascade::SetPoint(Radians point)
     {
-        lastPositionSetPoint = point;
+        profile.SetTarget(point);
     }
 
     void PositionCascade::LimitTravel(Radians minimum, Radians maximum)
@@ -36,14 +32,9 @@ namespace foc
         travelLimits = TravelLimits{ minimum, maximum };
     }
 
-    void PositionCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
+    void PositionCascade::ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk)
     {
-        SetCurrentTuningsImpl(tunings);
-    }
-
-    SelectResult PositionCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
-    {
-        return SetSpeedTuningsImpl(tunings);
+        profile.Limit(velocity, acceleration, deceleration, jerk);
     }
 
     SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
@@ -52,26 +43,6 @@ namespace foc
             return SelectResult::busy;
 
         return positionLoop.TrySetTunings(tunings);
-    }
-
-    SelectResult PositionCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
-    {
-        return SelectCurrentAlgorithmImpl(algorithm);
-    }
-
-    CurrentAlgorithm PositionCascade::ActiveCurrentAlgorithm() const
-    {
-        return ActiveCurrentAlgorithmImpl();
-    }
-
-    SelectResult PositionCascade::SelectSpeedAlgorithm(SpeedAlgorithm algorithm)
-    {
-        return SelectSpeedAlgorithmImpl(algorithm);
-    }
-
-    SpeedAlgorithm PositionCascade::ActiveSpeedAlgorithm() const
-    {
-        return ActiveSpeedAlgorithmImpl();
     }
 
     SelectResult PositionCascade::SelectPositionAlgorithm(PositionAlgorithm algorithm)
@@ -87,22 +58,12 @@ namespace foc
         return positionLoop.Active();
     }
 
-    void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
-    {
-        SetOnlineMechanicalEstimatorImpl(estimator);
-    }
-
-    void PositionCascade::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
-    {
-        SetOnlineElectricalEstimatorImpl(estimator);
-    }
-
     void PositionCascade::Enable()
     {
         speedCommandActive = false;
         positionLoop.Reset();
         EnableSpeedLoop();
-        SetPoint(lastPositionSetPoint);
+        profile.Release();
         enabled = true;
     }
 
@@ -123,9 +84,7 @@ namespace foc
 
     void PositionCascade::DisableSpeedCommand()
     {
-        enabled = false;
-        speedCommandActive = false;
-        DisableSpeedLoop();
+        Disable();
     }
 
     void PositionCascade::EnableCurrentCommand()
@@ -138,16 +97,6 @@ namespace foc
     void PositionCascade::DisableCurrentCommand()
     {
         Disable();
-    }
-
-    void PositionCascade::CommandCurrent(Ampere quadrature)
-    {
-        CommandCurrentImpl(quadrature);
-    }
-
-    Volts PositionCascade::QuadratureVoltage() const
-    {
-        return QuadratureVoltageImpl();
     }
 
     void PositionCascade::CommandSpeed(RadiansPerSecond speed)
@@ -168,8 +117,8 @@ namespace foc
     MotionObservation PositionCascade::ObserveMotion() const
     {
         auto observation = ObserveSpeedLoopMotion();
-        const auto context = ControlContext(travelLimits, 0.0f);
-        observation.positionError = Radians{ PositionDifference(context.reference, context.measured, context.direct) };
+        observation.positionError = ErrorTo(profile.Reference());
+        observation.targetError = ErrorTo(profile.Target());
 
         // A law that commands the current leaves the speed reference wherever the speed loop's last user put it
         if (commandsCurrent)
@@ -178,12 +127,23 @@ namespace foc
         return observation;
     }
 
+    Radians PositionCascade::ErrorTo(Radians point) const
+    {
+        const Radians measured{ CurrentMechanicalAngle() };
+        const auto limits = travelLimits;
+        if (!limits.IsOn())
+            return Radians{ PositionDifference(point, measured, false) };
+
+        return Radians{ PositionDifference(limits.Hold(point), measured, true) };
+    }
+
     void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
 
         if (HoldCommandedCurrent())
         {
+            profile.Release();
             commandsCurrent = true;
             return;
         }
@@ -196,6 +156,7 @@ namespace foc
 
         if (speedCommandActive)
         {
+            profile.Release();
             commandsCurrent = false;
             SetSpeedReference(speedCommand);
             RunSpeedLoop(mechanicalSpeed);
@@ -205,16 +166,17 @@ namespace foc
         }
 
         const auto limits = travelLimits;
-        auto command = positionLoop.Compute(ControlContext(limits, mechanicalSpeed));
+        const auto reference = profile.Advance(limits, Radians{ CurrentMechanicalAngle() }, RadiansPerSecond{ mechanicalSpeed });
+        auto command = positionLoop.Compute(ControlContext(limits, reference, mechanicalSpeed));
         commandsCurrent = command.kind != PositionOutputKind::speedReference;
 
         if (command.kind == PositionOutputKind::speedReference)
         {
             SetSpeedReference(RadiansPerSecond{ command.value });
-            RunSpeedLoop(mechanicalSpeed);
+            RunSpeedLoop(mechanicalSpeed, reference.acceleration.Value());
         }
         else
-            SetDirectCurrentReference(command.value);
+            SetDirectCurrentReference(command.value, reference.acceleration.Value());
 
         UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
@@ -225,23 +187,4 @@ namespace foc
         return CalculateInnerLoop(currentPhases, position);
     }
 
-    void PositionCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
-    {
-        LoadCoggingMapImpl(torque, torqueScale, torqueConstant);
-    }
-
-    void PositionCascade::ClearCoggingMap()
-    {
-        ClearCoggingMapImpl();
-    }
-
-    void PositionCascade::TrackBusVoltage(Volts measured)
-    {
-        TrackBusVoltageImpl(measured);
-    }
-
-    void PositionCascade::LimitCurrent(Ampere limit)
-    {
-        LimitCurrentImpl(limit);
-    }
 }

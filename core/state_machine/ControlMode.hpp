@@ -1,8 +1,8 @@
 #pragma once
 
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include <cstdint>
 #include <optional>
 
@@ -83,14 +83,9 @@ namespace state_machine
 
     inline can::FocMotorCategoryError ToCategoryError(SelectResult result)
     {
-        switch (result)
-        {
-            case SelectResult::nvmFailed:
-                return can::FocMotorCategoryError::persistenceFailed;
-            case SelectResult::busy:
-            default:
-                return can::FocMotorCategoryError::busy;
-        }
+        if (result == SelectResult::nvmFailed)
+            return can::FocMotorCategoryError::persistenceFailed;
+        return can::FocMotorCategoryError::busy;
     }
 
     inline can::FocMotorCategoryError ToCategoryError(CommandResult result)

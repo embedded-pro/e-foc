@@ -4,13 +4,12 @@
 #include <type_traits>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/EncoderZero.hpp"
 #include "core/platform_abstraction/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
-#include "core/services/cli/SerialCommunicationMirror.hpp"
 #include "hal/cortex_m/DataWatchpointAndTrace.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -33,6 +32,7 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
+#include "services/util/SerialCommunicationMirror.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 
@@ -48,12 +48,20 @@ namespace application
         static constexpr auto pwmFault{ hal::cortex::InterruptPriority::highest };
         static constexpr auto can{ hal::cortex::InterruptPriority::normal };
         static constexpr auto uart{ hal::cortex::InterruptPriority::low };
-        // No higher than any interrupt that could hang, so a hung handler starves the refresh and the hardware resets
         static constexpr auto watchdogEarlyWarning{ hal::cortex::InterruptPriority::lowest };
     };
 
+    namespace detail
+    {
+        constexpr bool HeldAt(std::chrono::duration<float> delay, float microseconds)
+        {
+            return delay.count() > (microseconds - 0.001f) * 1e-6f && delay.count() < (microseconds + 0.001f) * 1e-6f;
+        }
+    }
+
     class PlatformFactoryImpl
         : public PlatformFactory
+        , public drivers::EncoderIndex
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -63,7 +71,7 @@ namespace application
         uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
-        CanBusAdapter& CanBus() override;
+        services::MonitoredCan& CanBus() override;
 
         void Run() override;
         services::Tracer& Tracer() override;
@@ -83,7 +91,8 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
-        std::optional<FirmwareStaging> Staging() override;
+        std::optional<services::FirmwareStaging> Staging() override;
+        std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel() override;
 
         void PhaseCurrentsReady(const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -92,17 +101,20 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
         void CurrentOffsets(const foc::PhaseCurrents& offsets) override;
+        void ZeroVectorSlopes(const foc::PhaseCurrentSlopes& slopes) override;
 
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
 
+        bool HasIndex() const override;
+        void ArmIndex() override;
+        bool IndexSeen() override;
+
     private:
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
 
-        // The UART hands the terminal a whole DMA half-buffer in one call from the ISR, and
-        // QueueForOneReaderOneIrqWriter copies the range without checking that it fits.
         static_assert(Resources::terminalQueueSize >= Resources::uartReceiveBufferSize / 2,
             "terminal queue must absorb a whole DMA half-buffer");
         static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
@@ -165,13 +177,20 @@ namespace application
                 hal::tiva::Adc::SampleAndHold::sampleAndHold32,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold256 } };
+            static constexpr std::array<uint32_t, 5> sampleHoldClocks{ { 4, 16, 32, 64, 256 } };
+            static constexpr float converterClockHertz{ 16.0e6f };
+            static constexpr uint32_t conversionClocks{ 12 };
+            static constexpr uint32_t averagedConversions{ 2 };
             static constexpr float adcToAmpereSlope = application::BoardCharacteristics::AdcToAmpereSlope(adcReferenceVoltage, adcResolution);
             static constexpr float adcToAmpereOffset = application::BoardCharacteristics::AdcToAmpereOffset(adcReferenceVoltage);
 
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
+            static_assert(currentSensingOversampling == hal::tiva::Adc::Oversampling::oversampling2 && averagedConversions == 2);
 
-            // Steps 0-2 fill the ADC FIFO; steps 3-5 feed digital comparators 0-2 and trip PWM FLTSRC1.
+            static constexpr auto shortestSampleDelays = foc::SequentialPhaseSampleDelays({ .converterClockHertz = converterClockHertz, .sampleHoldClocks = sampleHoldClocks[0], .conversionClocks = conversionClocks, .averagedConversions = averagedConversions });
+            static_assert(detail::HeldAt(shortestSampleDelays.a, 0.75f) && detail::HeldAt(shortestSampleDelays.b, 2.75f) && detail::HeldAt(shortestSampleDelays.c, 4.75f));
+
             static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
                 {},
                 {},
@@ -224,7 +243,6 @@ namespace application
         void OnPwmFault(hal::tiva::Pwm::FaultEvent event);
         void TripOverCurrent();
 
-        // Condition must depend on Config: a discarded if constexpr branch is still type-checked otherwise.
         template<typename Config>
         void EmplacePwm(Config& config)
         {
@@ -245,32 +263,32 @@ namespace application
                     config.pwmConfig);
         }
 
-        static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
+        static services::CanBusError ToAdapterError(hal::tiva::Can::Error error)
         {
             switch (error)
             {
                 case hal::tiva::Can::Error::busOff:
-                    return CanBusAdapter::CanError::busOff;
+                    return services::CanBusError::busOff;
                 case hal::tiva::Can::Error::errorPassive:
-                    return CanBusAdapter::CanError::errorPassive;
+                    return services::CanBusError::errorPassive;
                 case hal::tiva::Can::Error::errorWarning:
-                    return CanBusAdapter::CanError::errorWarning;
+                    return services::CanBusError::errorWarning;
                 case hal::tiva::Can::Error::messageLost:
-                    return CanBusAdapter::CanError::messageLost;
+                    return services::CanBusError::messageLost;
                 case hal::tiva::Can::Error::ackError:
-                    return CanBusAdapter::CanError::ackError;
+                    return services::CanBusError::ackError;
                 case hal::tiva::Can::Error::stuffError:
-                    return CanBusAdapter::CanError::stuffError;
+                    return services::CanBusError::stuffError;
                 case hal::tiva::Can::Error::formError:
-                    return CanBusAdapter::CanError::formError;
+                    return services::CanBusError::formError;
                 case hal::tiva::Can::Error::crcError:
-                    return CanBusAdapter::CanError::crcError;
+                    return services::CanBusError::crcError;
                 case hal::tiva::Can::Error::bit0Error:
-                    return CanBusAdapter::CanError::bit0Error;
+                    return services::CanBusError::bit0Error;
                 case hal::tiva::Can::Error::bit1Error:
-                    return CanBusAdapter::CanError::bit1Error;
+                    return services::CanBusError::bit1Error;
                 default:
-                    return CanBusAdapter::CanError::other;
+                    return services::CanBusError::other;
             }
         }
 
@@ -290,7 +308,7 @@ namespace application
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
-            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
+            std::optional<services::MonitoredCanImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
         };
 
         template<typename Fn>
@@ -310,7 +328,7 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         uint8_t boardId{ 0 };
         hal::cortex::DataWatchpointAndTrace cycleCounter;
-        ControlLoopMetrics controlLoopMetrics;
+        infra::ExecutionTimeStatistics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool overCurrentTripped{ false };
         volatile bool pwmFaultAsserted{ false };
@@ -318,6 +336,7 @@ namespace application
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         EncoderZero encoderZero;
+        static constexpr uint32_t qeiIndexPulse{ 0x00000001 };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;

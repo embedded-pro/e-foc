@@ -15,7 +15,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
   quantisation and encoder noise run in the host model-in-the-loop tests
   (integration_tests/model_in_the_loop) with the same limits.
 
-  @sil @REQ-CAL-012
+  @sil @REQ-CMS-001
   Scenario: Compensating the bench's dead time keeps the calibration resistance on the winding
     Given a bench motor plant
     And the plant drives its windings through the bench's power stage
@@ -25,7 +25,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
     And electrical identification is run
     Then the identified resistance shall be within 3 % of the plant
 
-  @sil @REQ-TRQ-008
+  @sil @REQ-CTL-001
   Scenario: Compensating the bench's dead time keeps the online resistance on the winding read through the current-sense chain
     Given a bench motor plant
     And the plant drives its windings through the bench's power stage
@@ -43,7 +43,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
     And the online estimates are read
     Then the online resistance estimate shall be within 5 % of the plant
 
-  @sil @REQ-CAL-013 @REQ-PERF-004
+  @sil @REQ-CMS-001 @REQ-PLT-004
   Scenario: The full calibration of the bench motor runs through its power stage and current-sense chain together
     Given a bench motor plant
     And the plant drives its windings through the bench's power stage
@@ -63,7 +63,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
     And the identified inertia shall be within 5 % of the plant
     And the control loop shall have stayed within its budget
 
-  @sil @REQ-CAL-013
+  @sil @REQ-CMS-001
   Scenario: The calibration of the bench motor fits inside a current-limited supply
     Given a bench motor plant
     And a motor plant with:

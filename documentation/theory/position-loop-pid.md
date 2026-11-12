@@ -190,6 +190,16 @@ holds the rotor, and the rotor creeps onto the setpoint as it does under Cascade
 rest: every speed law rejects a constant torque with no speed error, so no disturbance needs the
 position integral to hold a stationary rotor.
 
+### Profile velocity feed-forward
+
+While a motion profile is active (`position-motion-profile.md`) the reference is $r$ with velocity $\dot r$.
+The velocity-form PI keeps its state on the normalised error and its clamp as before; $\dot r$ is added to the
+speed reference after the clamped state, so the feed-forward cannot wind the integral up, and the acceleration
+feed-forward $J\ddot r / K_t$ joins the q-axis current. The reference weight $b = 0.75$ shapes the response to a step the
+loop is given whole; a profiled reference is already shaped and its velocity is fed forward, so $b = 1$ while
+a profile is active, which makes the output $K_p\,e$ plus the integral plus $\dot r$ and leaves no part of the
+reference for the integral to supply. Without a profile $\dot r = 0$, $b = 0.75$ and the output is unchanged.
+
 ### Output Limiting
 
 The speed reference is clamped to $\pm\omega_{m,max}$ to prevent demanding speeds beyond the
@@ -225,7 +235,7 @@ $$
   speed, 18.8 rad/s position) the loop's 0.046 N·m/rad is half the cogging's 0.096, and the
   rotor steps between the neighbouring detents instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
   map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
-  with it every position law holds 3.0 rad (REQ-POS-012).
+  with it every position law holds 3.0 rad (REQ-CTL-003).
 - No disturbance rejection beyond what the speed loop provides.
 - Encoder noise enters the position estimate. A state observer upstream improves robustness.
 

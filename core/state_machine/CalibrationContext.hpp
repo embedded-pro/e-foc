@@ -2,10 +2,10 @@
 
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -34,6 +34,8 @@ namespace application
 
         bool IsRotorReferenceValid() const;
         void SetRotorReferenceValid(bool valid);
+        bool IsHomed() const;
+        void SetHomed(bool homed);
 
         bool Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
         void ApplyCurrentOffsets();
@@ -41,7 +43,6 @@ namespace application
             foc::Ohm resistance,
             foc::MilliHenry inductance,
             std::size_t polePairs,
-            float bandwidth,
             foc::Weber fluxLinkage,
             foc::Ampere currentNoise,
             foc::FocBase& controller,
@@ -53,7 +54,7 @@ namespace application
         foc::Weber ActiveFluxLinkage() const;
 
         float DefaultCurrentLoopBandwidth(foc::MilliHenry inductance, foc::Ampere currentNoise) const;
-        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth, foc::MilliHenry inductance, foc::Ampere currentNoise) const;
+        float AutomaticCurrentLoopBandwidth() const;
 
     private:
         drivers::ThreePhaseInverter& inverter;
@@ -64,6 +65,7 @@ namespace application
 
         services::CalibrationData calibrationData{};
         bool rotorReferenceValid_{ false };
+        bool homed_{ false };
 
         static constexpr float nyquistFactor = 15.0f;
         static constexpr float inaudibleVoltageNoise = 0.08f;

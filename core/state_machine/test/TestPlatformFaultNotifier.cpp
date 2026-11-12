@@ -1,12 +1,11 @@
+#include "can-lite/core/test/MonitoredCanMock.hpp"
 #include "core/platform_abstraction/DecimatingThreePhaseInverter.hpp"
-#include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "core/platform_abstraction/test_doubles/PlatformFactoryMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
-#include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
@@ -30,7 +29,6 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -40,15 +38,12 @@ namespace
                 EXPECT_CALL(streamWriterMock, SaveState(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
                 EXPECT_CALL(streamWriterMock, RestoreState(_)).Times(AnyNumber());
                 EXPECT_CALL(streamWriterMock, Overwrite(_)).Times(AnyNumber()).WillRepeatedly(Return(infra::ByteRange{}));
-                EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
         application::DecimatingThreePhaseInverter inverter{ platformFactory };
-        StrictMock<application::CanBusAdapterMock> canBusMock;
-        infra::Function<void(application::CanBusAdapter::CanError)> storedCanErrorHandler;
+        StrictMock<services::MonitoredCanMock> canBusMock;
+        infra::Function<void(services::CanBusError)> storedCanErrorHandler;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -60,6 +55,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
             } };
 
+        foc::CurrentStream currentStream;
         foc::Volts vdc{ 24.0f };
 
         infra::Execute setupPlatformExpectations{ [this]()
@@ -89,14 +85,8 @@ namespace
             data.polePairs = 7;
             data.rPhase = 0.5f;
             data.lD = 1.0f;
-            data.lQ = 1.0f;
             data.stage = services::CalibrationStage::complete;
 
-            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
-                    {
-                        onDone(true);
-                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .WillOnce(Invoke([data](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
                     {
@@ -108,12 +98,11 @@ namespace
         application::TorqueStateMachine CreateStateMachine()
         {
             return application::TorqueStateMachine{
-                application::TerminalAndTracer{ terminal, tracer },
-                application::MotorHardware{ inverter, platformFactory, vdc },
+                tracer,
+                application::MotorHardware{ inverter, platformFactory, currentStream, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 *faultNotifier,
-                state_machine::TransitionPolicy::Cli,
                 nvmActivity
             };
         }
@@ -132,7 +121,7 @@ namespace
                     {
                         onDone(services::NvmStatus::Ok);
                     }));
-            sm.CmdReAlign([](state_machine::CommandResult) {});
+            sm.Commissioning().CmdReAlign([](state_machine::CommandResult) {});
         }
     };
 }
@@ -392,7 +381,7 @@ TEST_F(TestPlatformFaultNotifier, can_bus_off_error_raises_hardware_fault)
     auto sm = CreateStateMachine();
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
-    storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+    storedCanErrorHandler(services::CanBusError::busOff);
     ExecuteAllActions();
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -404,7 +393,7 @@ TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
     GivenCalibrationInNvm();
     auto sm = CreateStateMachine();
 
-    storedCanErrorHandler(application::CanBusAdapter::CanError::messageLost);
+    storedCanErrorHandler(services::CanBusError::messageLost);
     ExecuteAllActions();
 
     EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
@@ -412,9 +401,8 @@ TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
 
 TEST_F(TestPlatformFaultNotifier, can_error_before_registration_does_not_crash)
 {
-    // storedCanErrorHandler is empty before CreateStateMachine() calls Register()
     if (storedCanErrorHandler)
-        storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+        storedCanErrorHandler(services::CanBusError::busOff);
     SUCCEED();
 }
 

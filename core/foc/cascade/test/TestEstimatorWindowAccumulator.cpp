@@ -30,6 +30,26 @@ TEST_F(EstimatorWindowAccumulatorTest, a_duty_that_acts_a_period_late_is_paired_
     EXPECT_NEAR(MeanDirectVoltageOverRamp(1), (0.0f + 0.0f + 1.0f + 2.0f) / 4.0f, 1e-6f);
 }
 
+TEST_F(EstimatorWindowAccumulatorTest, the_quadrature_voltage_does_not_leak_into_the_direct_voltage_while_the_rotor_turns)
+{
+    constexpr uint32_t ticks = 4;
+
+    for (const uint32_t dutyUpdateDelayPeriods : { 0u, 1u })
+    {
+        foc::EstimatorWindowAccumulator turning{ hal::Hertz{ 20000 }, ticks, dutyUpdateDelayPeriods };
+        foc::EstimatorWindowAccumulator still{ hal::Hertz{ 20000 }, ticks, dutyUpdateDelayPeriods };
+
+        for (uint32_t tick = 0; tick != ticks; ++tick)
+        {
+            const float angle = 0.01f * static_cast<float>(tick);
+            turning.Accumulate(foc::RotatingFrame{ 0.0f, 0.0f }, foc::RotatingFrame{ 1.0f, 5.0f }, angle, 4.0f, 0.0f);
+            still.Accumulate(foc::RotatingFrame{ 0.0f, 0.0f }, foc::RotatingFrame{ 1.0f, 5.0f }, 0.0f, 4.0f, 0.0f);
+        }
+
+        EXPECT_NEAR(turning.Close().meanNormalizedVd, still.Close().meanNormalizedVd, 1e-6f);
+    }
+}
+
 TEST_F(EstimatorWindowAccumulatorTest, the_mechanical_window_leaves_out_the_current_that_holds_the_cogging)
 {
     constexpr uint32_t ticks = 4;

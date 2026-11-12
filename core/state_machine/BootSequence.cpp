@@ -10,22 +10,6 @@ namespace application
     void BootSequence::Begin()
     {
         env.nvmActivity.Begin();
-        env.nvm.IsCalibrationValid([this](bool valid)
-            {
-                OnValidityChecked(valid);
-            });
-    }
-
-    void BootSequence::Continue(bool valid)
-    {
-        if (!valid)
-        {
-            env.context.SetRotorReferenceValid(false);
-            env.tracer.Trace() << "[SM] NVM invalid, starting in Idle";
-            return;
-        }
-
-        env.nvmActivity.Begin();
         env.nvm.LoadCalibration(env.context.MutableData(), [this](services::NvmStatus status)
             {
                 OnCalibrationLoaded(status);
@@ -63,16 +47,23 @@ namespace application
         return calibration.ReadyState();
     }
 
+    bool BootSequence::ResumesFromIndex(services::NvmStatus status, const IndexReference& index) const
+    {
+        return status == services::NvmStatus::Ok && calibration.HasValidCalibration() && index.CanRestore(env.context.Data());
+    }
+
+    state_machine::Ready BootSequence::FinishFromIndex()
+    {
+        env.context.SetRotorReferenceValid(false);
+        env.tracer.Trace() << "[SM] Electrical parameters restored; the first enable restores the rotor reference from the encoder index";
+        ApplyRecord();
+        return calibration.ReadyState();
+    }
+
     void BootSequence::ApplyRecord()
     {
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
         env.mode.ApplyModeSpecificCalibration(env.context.Data());
-    }
-
-    void BootSequence::OnValidityChecked(bool valid)
-    {
-        env.nvmActivity.End();
-        env.machine.Dispatch(state_machine::BootValidityChecked{ valid });
     }
 
     void BootSequence::OnCalibrationLoaded(services::NvmStatus status)

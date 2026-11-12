@@ -1,33 +1,23 @@
 #include "tools/can_commander/gui/ConfigurationTab.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
-#include <algorithm>
-#include <span>
 
 namespace tool
 {
-    namespace
-    {
-        bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter)
-        {
-            return std::ranges::any_of(settings, [parameter](const SettingPresentation& setting)
-                {
-                    return setting.parameter == parameter;
-                });
-        }
-    }
-
     ConfigurationTab::ConfigurationTab(QWidget* parent)
         : SettingsPage(parent)
     {
         BuildStartupGroup();
+        BuildStreamGroup();
         BuildSupervisionGroup();
         BuildLimitsGroup();
+        BuildMotionProfileGroup();
         BuildTargetWindowGroup();
         BuildTravelLimitsGroup();
         BuildThermalGroup();
         BuildSupplyLimitsGroup();
         BuildQuickStopGroup();
+        BuildRecalibrationGroup();
         Content().addStretch();
 
         Refresh();
@@ -43,6 +33,18 @@ namespace tool
                                 "appears under another tab; after a new bitrate, reconnect at that bitrate to reach it.");
         note->setWordWrap(true);
         ui::backend::qt::StyleStatusLabel(*note, ui::theme::StatusLevel::Warning);
+        form.addRow(note);
+    }
+
+    void ConfigurationTab::BuildStreamGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Current Stream", group);
+        AddEditors(form, StreamSettings());
+
+        auto* note = new QLabel("Stored at once and in force within 1 ms, also while the motor runs; 0 stops the stream. Every "
+                                "controller's stream shares the bus: keep the rates of all of them together within its bitrate.");
+        note->setWordWrap(true);
         form.addRow(note);
     }
 
@@ -78,6 +80,20 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildMotionProfileGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Motion Profile", group);
+        AddEditors(form, MotionProfileSettings());
+
+        auto* note = new QLabel("Position mode plans a trapezoidal path to each setpoint within the velocity, acceleration and "
+                                "deceleration, and a new setpoint mid-move continues from the motion under way. The profile is off "
+                                "while the velocity or the acceleration is 0. The jerk is reserved for a later S-curve and has no "
+                                "effect yet. Stored at once and in force from the next control period.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::BuildTargetWindowGroup()
     {
         QGroupBox* group{ nullptr };
@@ -102,6 +118,12 @@ namespace tool
                                 "never across the angle outside them. Stored at once and in force from the next control period.");
         note->setWordWrap(true);
         form.addRow(note);
+
+        AddEditors(form, HomingSettings());
+        auto* homingNote = new QLabel("With homing required, position mode starts only once a calibration or the encoder index "
+                                      "has set the commissioned zero in this power-up. Speed and torque mode are not held back.");
+        homingNote->setWordWrap(true);
+        form.addRow(homingNote);
     }
 
     void ConfigurationTab::BuildThermalGroup()
@@ -145,12 +167,24 @@ namespace tool
         form.addRow(note);
     }
 
+    void ConfigurationTab::BuildRecalibrationGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Online Recalibration", group);
+        AddEditors(form, RecalibrationSettings());
+
+        auto* note = new QLabel("Speed and position mode re-estimate the motor while it runs. On command redesigns the loops from "
+                                "the settled estimates when Recalibrate is pressed on the Diagnostics tab; Automatic does it at every "
+                                "stop. The loops never change while the motor runs. Stored at once.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
     void ConfigurationTab::SetLegacy(bool legacyContract)
     {
-        legacyReason = legacyContract ? QString("Needs firmware contract 2.1 or newer: this controller has 2.0.") : QString{};
+        legacyReason = legacyContract ? tr("Not supported by this firmware version") : QString{};
         ShowAvailability();
-
-        SettingsPage::SetLegacy(legacyContract);
+        Refresh();
     }
 
     void ConfigurationTab::SetSupervisionUnavailable(const QString& reason)

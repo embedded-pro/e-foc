@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 
 namespace foc
 {
@@ -16,6 +16,15 @@ namespace foc
         Radians smallestStep{ 0.0f };
         bool first{ true };
     };
+
+    struct EstimateBand
+    {
+        float minimum;
+        float maximum;
+    };
+
+    constexpr EstimateBand resistanceEstimateBand{ 0.7f, 2.0f };
+    constexpr EstimateBand inductanceEstimateBand{ 0.5f, 1.5f };
 
     struct ElectricalWindow
     {
@@ -53,5 +62,6 @@ namespace foc
 
         virtual Ohm CurrentResistance() const = 0;
         virtual MilliHenry CurrentInductance() const = 0;
+        virtual bool HasSettled() const = 0;
     };
 }

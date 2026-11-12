@@ -1,10 +1,12 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/AngleUtilities.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
+#include "numerical/math/Math.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -130,7 +132,6 @@ namespace services
         }
     }
 
-    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void ElectricalParametersIdentificationImpl::FinishPolePairs()
     {
         driver.Stop();
@@ -175,9 +176,8 @@ namespace services
         const float voltage = foc::DutyFraction(polePairsConfig.testVoltage);
 
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, math::FastCosine(electricalAngle), math::FastSine(electricalAngle))));
 
-        // The interrupt can trip between this step's check and the write above, which would re-arm the bridge it stopped.
         if (polePairsFinishing)
         {
             driver.Stop();
@@ -189,12 +189,10 @@ namespace services
                 if (!polePairsRunning || polePairsFinishing)
                     return;
 
-                // A rotor on the first vector's null moves only once a later one pulls it; wait a turn.
                 const auto currentPosition = encoder.Read();
                 if (currentSampleIndex > leadInSteps)
                 {
-                    auto delta = currentPosition.Value() - previousPosition.Value();
-                    accumulatedRotation += delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);
+                    accumulatedRotation += math::AngleDifference(currentPosition.Value(), previousPosition.Value());
                 }
 
                 previousPosition = currentPosition;
@@ -210,7 +208,7 @@ namespace services
         if (!onPolePairsDone || polePairsFinishing)
             return;
 
-        const float mechanicalRotation = std::abs(accumulatedRotation);
+        const float mechanicalRotation = math::Abs(accumulatedRotation);
         polePairsRunning = false;
 
         if (mechanicalRotation <= minRotationThreshold)
@@ -220,9 +218,9 @@ namespace services
         }
 
         const float ratio = static_cast<float>(polePairsConfig.electricalRevolutions) * twoPi / mechanicalRotation;
-        const float polePairs = std::round(ratio);
+        const float polePairs = math::Round(ratio);
 
-        if (polePairs >= 1.0f && std::abs(ratio - polePairs) <= maxPolePairsDeviation)
+        if (polePairs >= 1.0f && math::Abs(ratio - polePairs) <= maxPolePairsDeviation)
             onPolePairsDone(std::make_optional<std::size_t>(static_cast<std::size_t>(polePairs)));
         else
             onPolePairsDone(std::nullopt);

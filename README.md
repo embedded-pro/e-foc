@@ -28,14 +28,16 @@ This project provides a production-ready motor control implementation designed f
 - **Platform Abstraction**: `PlatformFactory` interface with ST and TI implementations
 
 ### Simulation & Testing
-- **C++ Simulator**: Mathematical models for motor evaluation and curve plotting
+- **Software-in-the-Loop**: The shipping firmware under an emulator against a simulated motor plant
+- **Model-in-the-Loop**: The control-mode state machine and calibration services against the same plant on the host
+- **Virtual Motors**: The application on the host against the same plant, one node on a virtual CAN bus the CAN Commander connects to
 - **Unit Tests**: Comprehensive GoogleTest coverage for control algorithms
 - **Hardware-in-the-Loop Ready**: Mockable interfaces for testability
 
 ## Getting Started
 
 ### Prerequisites
-- CMake 3.24 or later
+- CMake 3.25 or later
 - Ninja, ccache, and Qt 6 (Core, Network, Widgets) for the host preset — the host build always configures `tools/`
 - Compatible toolchain for embedded targets (ARM GCC)
 - Development board: EK-TM4C1294XL (TI) or NUCLEO-G474RE (ST), with the E-FOC-HARDWARE power board
@@ -70,8 +72,8 @@ cmake --build --preset EK-TM4C1294XL-Debug
 e-foc/
 ├── core/                            # FOC library code (no application entry points)
 │   ├── foc/                         # Field-Oriented Control
-│   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, MotorModel.hpp, LoopTunings.hpp, Execution.hpp, Units.hpp)
-│   │   ├── math/                    # Generic numerics (FastTrigonometry.hpp, AngleWrap.hpp)
+│   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, MotorModel.hpp, LoopTunings.hpp, Execution.hpp)
+│   │   ├── math/                    # Generic numerics (CoggingFeedForward.hpp, TravelLimits.hpp)
 │   │   ├── transforms/              # Clarke/Park transforms and Space Vector Modulation
 │   │   ├── selection/               # Heap-free runtime controller selection
 │   │   ├── current_loop/            # PID/decoupled-PID/deadbeat/sliding-mode current regulators
@@ -82,7 +84,6 @@ e-foc/
 │   │   ├── interfaces/              # Hardware ports in namespace drivers (ThreePhaseInverter, Encoder)
 │   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
 │   │   ├── AdcPhaseCurrentMeasurement.hpp
-│   │   ├── CanBusAdapter.hpp
 │   │   └── QuadratureEncoderDecorator.hpp
 │   ├── services/                    # Application-level services
 │   │   ├── alignment/               # Motor alignment and offset detection
@@ -108,13 +109,14 @@ e-foc/
 │       ├── st/                      # STM32 platform implementation
 │       └── ti/                      # TI Tiva C platform implementation
 ├── tools/                           # Host-side developer tools
-│   ├── simulator/                   # C++ motor simulators (torque, speed, position control)
 │   ├── can_commander/               # CAN bus command interface tool
+│   ├── virtual_motor/               # Virtual motors: the application on the host on a virtual CAN bus
 │   └── hardware_bridge/             # Terminal/CAN/serial bridge client (Qt) for HIL tests
 ├── infra/                           # Infrastructure submodules
 │   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
 │   ├── numerical-toolbox/           # PID, filters, fixed-point algorithms
 │   ├── can-lite/                    # CAN protocol library
+│   ├── e-foc-protocol/              # FOC motor CAN wire contract, server and client categories
 │   └── hal/                         # Hardware abstraction layer (ST, TI)
 ├── documentation/                   # Architecture, design, theory, and requirements docs
 └── build/                           # Build artifacts (generated, not committed)
@@ -137,9 +139,9 @@ e-foc/
 - **Platform Abstraction**: Clean separation between application logic and hardware
 - **Interface-Driven Design**: Pure virtual interfaces enable mocking and testing
 
-## How to Run the Simulator
+## How to Run the Desktop Tools
 
-The simulator includes a Qt-based GUI for real-time visualization. Since the development environment runs inside a Dev Container, an X server on the host machine is required to display the GUI.
+The CAN Commander and the hardware bridge have Qt-based GUIs. Since the development environment runs inside a Dev Container, an X server on the host machine is required to display the GUI.
 
 ### Host Setup
 
@@ -172,19 +174,14 @@ cmake --preset host
 cmake --build --preset host-Debug
 ```
 
-Run the simulator:
+Run the CAN Commander:
 ```bash
-./build/host/bin/Debug/e_foc.tool.simulator
+./build/host/tools/can_commander/main/Debug/e-foc-can-commander
 ```
-
-On launch, a dialog asks which controller to simulate (Torque, Speed, or Position).
-The chosen controller assembles the corresponding loops; the main window provides
-tabbed Parameters/Configuration and Phase Signals/RLS Estimates panels around an
-always-visible SVPWM hexagon.
 
 ### The shared UI library
 
-The three desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
+The desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
 fetched at configure time and pinned in `CMakeLists.txt` to an exact commit. Consuming a
 newer ui-cpp is a deliberate edit to that pin, reviewed like any other change, rather than
 something a fresh configure does on its own; changing it re-fetches on the next configure.
@@ -204,6 +201,33 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
 | Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
+### Virtual motors
+
+A virtual motor runs the e-foc application on the development machine against the simulated motor plant,
+as one node on a virtual CAN bus ([design](documentation/design/virtual-motor.md)). The e-foc Virtual
+Motor app ([design](documentation/design/tool-virtual-motor.md)) hosts the bus, starts and stops motors,
+changes their load, disturbance torque and sensor noise while they run, and shows their currents,
+voltages, mechanics and supply on scopes, with full-rate triggered captures that save as CSV, along
+with the modulation hexagon, the turning rotor and the encoder's error, and runs disturbance profiles
+written in its Profile editor or loaded from a file:
+
+```bash
+./build/host/tools/virtual_motor/app/main/Debug/e-foc-virtual-motor-app
+```
+
+Add a motor, then connect the CAN Commander to `virtual:default` and command it as a board. A motor can
+also run headless, hosting the bus itself:
+
+```bash
+./build/host/tools/virtual_motor/engine/Debug/e-foc-virtual-motor --host-bus --node 1 --plant teknic
+```
+
+Further motors join the same bus with their own `--node`; `--plant anaheim` selects the other reference
+motor, `--factory-fresh` starts with erased memory and `--calibrated` with the calibration a bench run on
+its plant would store. `--help` lists every option. A virtual motor keeps
+its memory in `virtual-motor-<bus>-<node>.nvm` in its working directory, so it stays calibrated between
+runs; `--memory` names another file in that directory.
+
 ## Releases
 
 Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
@@ -213,7 +237,7 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 | `e_foc-firmware-<board>-<tag>.tar.gz`                          | `.elf` and `.hex` of every application built for the board                                                                                                                                          |
 | `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex`         | ready-to-flash images for the EK-TM4C1294XL: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed |
 | `e_foc-source-<tag>.tar.gz`                                    | the complete source with every submodule (GitHub's own source archives omit them)                                                                                                                   |
-| `e_foc-can_commander-*`, `e_foc-simulator-*`                   | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
+| `e_foc-can_commander-*`                                        | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
 | `eFocDesign.pdf`                                               | the complete design booklet                                                                                                                                                                         |
 | `e_foc-documentation-<tag>.zip`                                | the individual design, theory and requirements documents as PDFs                                                                                                                                    |
 | `e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-<tag>.upgrade` | the signed upgrade pack the CAN Commander sends to an EK-TM4C1294XL over CAN                                                                                                                        |
@@ -259,6 +283,7 @@ boards jumpered 0–7 become nodes 1–8. Jumpers are read at reset only.
 | candleLight (gs_usb firmware)    | Through SocketCAN | Yes, no driver to install          | `candleLight:1`                    |
 | PEAK PCAN-USB                    | Through SocketCAN | Yes, with the PEAK driver package  | `PCAN:1`                           |
 | Kvaser                           | Through SocketCAN | Yes, with the Kvaser CANlib driver | `Kvaser:0`                         |
+| Virtual motors on this machine   | Yes               | Yes                                | `virtual:default`                  |
 
 On Linux, slcan needs the user in the `dialout` group (`sudo usermod -aG dialout $USER`, then log in again).
 
@@ -275,6 +300,10 @@ The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation 
 (`.zip`, `.tar.gz`) remain available. On Linux, bring a SocketCAN interface up first, e.g.
 `sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
 version without opening a window (on Windows, run it from a console).
+
+Both installers also install the e-foc Virtual Motor app (`e-foc-virtual-motor-app`, *e-foc Virtual Motor*
+in the Start or applications menu) and its virtual motor program (`e-foc-virtual-motor`); the CAN Commander
+starts the app from Motor → Launch Virtual Motor….
 
 ### Issue log, bug reports and updates
 
@@ -325,15 +354,26 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
 | [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
+| [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
 | [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
+| [Virtual Motor](documentation/design/virtual-motor.md)                                   | Application on the host, on a virtual CAN    |
+| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                          | Plant views, disturbances and faults         |
 
 ### Requirements
 
-| Document                                                                                                       | Description                                        |
-|----------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
-| [State Machine Requirements](documentation/requirements/state-machine/state-machine.yaml)                      | Lifecycle state transitions and NVM boot behaviour |
-| [FOC Torque Controller Requirements](documentation/requirements/foc/torque-controller.yaml)                    | Torque control loop functional requirements        |
-| [CAN-to-State-Machine Integration Requirements](documentation/requirements/integration/can-state-machine.yaml) | CAN command to state machine mapping requirements  |
+| Document                                                                        | Description                                          |
+|---------------------------------------------------------------------------------|------------------------------------------------------|
+| [Lifecycle Requirements](documentation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
+| [Commissioning Requirements](documentation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
+| [Control Requirements](documentation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
+| [Protection Requirements](documentation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
+| [Platform Requirements](documentation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
+| [Communication Requirements](documentation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
+| [Firmware Update Requirements](documentation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
+| [Hardware Test Requirements](documentation/requirements/hardware-test.yaml)     | Board bring-up application                           |
+| [User Interface Requirements](documentation/requirements/user-interface.yaml)   | Status LEDs: running, commissioning, latched faults  |
+
+How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/design/integration-testing.md), *Feature-to-Requirements Mapping*.
 
 ### Theory
 
@@ -359,6 +399,7 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 | [Agent Instructions](AGENTS.md)                          | Development guidelines, patterns, and constraints         |
 | [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference   |
 | [numerical-toolbox](infra/numerical-toolbox/README.md)   | Reusable numerical algorithms (PID, filters, fixed-point) |
+| [e-foc-protocol](infra/e-foc-protocol/README.md)         | FOC motor CAN wire contract, server and client            |
 
 ## License
 

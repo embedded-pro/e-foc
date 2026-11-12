@@ -2,9 +2,9 @@
 title: "Closed-Loop Control of a PMSM"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.2.2
 component: "closed-loop-control"
-date: 2026-10-30
+date: 2026-11-08
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-10-30
 | Title     | Closed-Loop Control of a PMSM |
 | Type      | theory                        |
 | Status    | draft                         |
-| Version   | 0.2.0                         |
+| Version   | 0.2.2                         |
 | Component | closed-loop-control           |
-| Date      | 2026-10-30                    |
+| Date      | 2026-11-08                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -260,6 +260,12 @@ applies the voltage computed from it, time passes:
 | Zero-order hold                            | A duty held for a whole period acts on average half a period late                                                                                      | $T_s^i/2$ = 25 µs                |
 | **Total**                                  |                                                                                                                                                        | $T_d \approx 1.5\,T_s^i$ = 75 µs |
 
+The same delay lets the rotor turn $\omega_e T_d$ before the voltage lands. e-foc rotates the inverse Park by
+that angle, $(n + \tfrac12)\,\omega_e T_s^i$ with $n$ the platform's duty delay in periods, so the vector is
+aligned with the rotor over the hold and the voltage acts on the axis the controller meant
+([disturbances and noise](disturbances-and-noise.md) §5). That removes the speed-proportional angle error, not the
+phase the delay costs at crossover, which the table below still counts.
+
 A pure delay has unit gain and a phase of $-\omega T_d$. For a PI current controller that cancels the
 plant pole ([current-loop-pi.md](current-loop-pi.md)), the loop gain is
 $L(s) = \dfrac{\omega_{bw}}{s}\, e^{-s T_d}$, crossover is at $\omega_{bw}$, and
@@ -345,7 +351,7 @@ None of these is identified from the motor; the identified inductance and the me
 current loop. The calibration record has a current-loop and a speed-loop bandwidth field, and a value in
 range there replaces the automatic one, but calibration measures neither: it carries the current-loop
 field over from the record it replaces, zero on a first calibration, and writes a fixed 100 rad/s into the
-speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN or the CLI, inside the
+speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN, inside the
 bounds above; 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
 are the subject of the [controller chapter](advanced-controllers.md).
 

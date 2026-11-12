@@ -1,8 +1,8 @@
 #pragma once
 
+#include "can-lite/categories/firmware_upgrade/FirmwareStaging.hpp"
+#include "can-lite/core/MonitoredCan.hpp"
 #include "core/foc/interfaces/Execution.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/platform_abstraction/FirmwareStaging.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
@@ -13,6 +13,7 @@
 #include "services/util/Terminal.hpp"
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace application
@@ -35,6 +36,7 @@ namespace application
         nucleoG474re = 2,
         nucleoH563zi = 3,
         emulated = 5,
+        virtualBoard = 6,
     };
 
     class PlatformFactory
@@ -83,7 +85,7 @@ namespace application
 
         virtual void SetEncoderResolution(uint32_t resolution) = 0;
         virtual void ConfigureCanBus(uint32_t bitRate, bool testMode) = 0;
-        virtual CanBusAdapter& CanBus() = 0;
+        virtual services::MonitoredCan& CanBus() = 0;
 
         virtual void Run() = 0;
         virtual services::Tracer& Tracer() = 0;
@@ -107,7 +109,12 @@ namespace application
         virtual ResetCause GetResetCause() const = 0;
         virtual infra::BoundedConstString FaultStatus() const = 0;
 
-        virtual std::optional<FirmwareStaging> Staging()
+        virtual std::optional<services::FirmwareStaging> Staging()
+        {
+            return std::nullopt;
+        }
+
+        virtual std::optional<std::reference_wrapper<drivers::EncoderIndex>> EncoderIndexChannel()
         {
             return std::nullopt;
         }

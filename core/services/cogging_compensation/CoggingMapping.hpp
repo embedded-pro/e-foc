@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Units.hpp"
 #include "core/services/cogging_compensation/CoggingMap.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
 #include <chrono>
@@ -26,7 +26,7 @@ namespace services
             infra::Duration timeout{ std::chrono::seconds{ 10 } };
         };
 
-        virtual void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t polePairs, const Config& config, const infra::Function<void(std::optional<CoggingMap>)>& onDone) = 0;
+        virtual void Measure(foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian viscousFriction, std::size_t polePairs, const Config& config, const infra::Function<void(const CoggingMeasurement&)>& onDone) = 0;
         virtual bool IsRunning() const = 0;
         virtual void Abort() = 0;
     };

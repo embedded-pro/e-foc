@@ -29,6 +29,7 @@ namespace tool
         MotorFirmware(CanCommandClient& client, FirmwareTransfer& transfer, uint16_t nodeId, FirmwareTab& tab, Reporter reporter, Reason commandsUnavailable, QWidget* dialogParent);
 
         bool UpdateAvailable() const;
+        bool IsVirtual() const;
         QString UpdateSummary() const;
         bool IsDownloading() const;
 

@@ -1,5 +1,5 @@
 #include "core/foc/model/ElectricalPlant.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 
 namespace foc
 {
@@ -37,14 +37,14 @@ namespace foc
     foc::RotatingFrame ElectricalPlant::Step(const foc::ThreePhase& phaseVoltages, foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding, float dt)
     {
         const auto stepRotation = omega.Value() * dt;
-        const auto cosTheta = foc::FastTrigonometry::Cosine(theta.Value());
-        const auto sinTheta = foc::FastTrigonometry::Sine(theta.Value());
+        const auto cosTheta = math::FastCosine(theta.Value());
+        const auto sinTheta = math::FastSine(theta.Value());
         const auto midAngle = theta.Value() + 0.5f * stepRotation;
         const auto endAngle = theta.Value() + stepRotation;
-        const auto cosEnd = foc::FastTrigonometry::Cosine(endAngle);
-        const auto sinEnd = foc::FastTrigonometry::Sine(endAngle);
+        const auto cosEnd = math::FastCosine(endAngle);
+        const auto sinEnd = math::FastSine(endAngle);
 
-        const auto vDq = park.Forward(clarke.Forward(phaseVoltages), foc::FastTrigonometry::Cosine(midAngle), foc::FastTrigonometry::Sine(midAngle));
+        const auto vDq = park.Forward(clarke.Forward(phaseVoltages), math::FastCosine(midAngle), math::FastSine(midAngle));
         const auto iDqAtStart = park.Forward(clarke.Forward(foc::ThreePhase{ ia.Value(), ib.Value(), ic.Value() }), cosTheta, sinTheta);
 
         auto id = iDqAtStart.d;
@@ -78,6 +78,26 @@ namespace foc
     foc::PhaseCurrents ElectricalPlant::Currents() const
     {
         return { ia, ib, ic };
+    }
+
+    foc::PhaseCurrentSlopes ElectricalPlant::ZeroVectorSlopes(foc::Radians theta, foc::RadiansPerSecond omega, const WindingParameters& winding) const
+    {
+        const auto cosTheta = math::FastCosine(theta.Value());
+        const auto sinTheta = math::FastSine(theta.Value());
+        const auto current = park.Forward(clarke.Forward(foc::ThreePhase{ ia.Value(), ib.Value(), ic.Value() }), cosTheta, sinTheta);
+        const auto speed = omega.Value();
+
+        const foc::RotatingFrame rate{
+            (-winding.resistance * current.d + speed * winding.inductanceQ * current.q) / winding.inductanceD - speed * current.q,
+            (-winding.resistance * current.q - speed * winding.inductanceD * current.d - speed * winding.fluxLinkage) / winding.inductanceQ + speed * current.d
+        };
+        const auto phases = clarke.Inverse(park.Inverse(rate, cosTheta, sinTheta));
+
+        return {
+            foc::AmperePerSecond{ openPhases.a ? 0.0f : phases.a },
+            foc::AmperePerSecond{ openPhases.b ? 0.0f : phases.b },
+            foc::AmperePerSecond{ openPhases.c ? 0.0f : phases.c }
+        };
     }
 
     foc::RotatingFrame ElectricalPlant::LastDqCurrents() const

@@ -87,7 +87,7 @@ namespace
         state_machine::State state{ state_machine::Enabled{} };
         foc::MotionObservation observation{};
         float reading{ 1.0f };
-        supervision::EncoderPlausibilityMonitor::Config config{ supervision::ConfigFrom(services::MakeDefaultConfigData()) };
+        supervision::EncoderPlausibilityMonitor::Config config{ supervision::ConfigFrom(services::ConfigData{}) };
         std::vector<state_machine::FaultCode> faults;
         supervision::EncoderPlausibilityMonitor monitor{ encoder, foc::Ampere{ maxCurrent }, [this](state_machine::FaultCode code)
             {
@@ -329,7 +329,7 @@ TEST_F(EncoderPlausibilityMonitorTest, a_new_window_takes_effect_at_the_next_eva
 
 TEST(EncoderPlausibilityConfig, the_default_record_holds_the_documented_defaults)
 {
-    const auto config = supervision::ConfigFrom(services::MakeDefaultConfigData());
+    const auto config = supervision::ConfigFrom(services::ConfigData{});
 
     EXPECT_EQ(config.window, std::chrono::milliseconds(100));
     EXPECT_NEAR(config.minimumCurrentFraction, 0.05f, 1e-6f);
@@ -341,7 +341,7 @@ TEST(EncoderPlausibilityConfig, the_default_record_holds_the_documented_defaults
 
 TEST(EncoderPlausibilityConfig, stored_settings_are_taken_as_written)
 {
-    auto data = services::MakeDefaultConfigData();
+    auto data = services::ConfigData{};
     data.supervision = { 2.0f, 0.2f, 5.0f, 0.5f, 0.02f };
     data.stallDetection = 0;
 

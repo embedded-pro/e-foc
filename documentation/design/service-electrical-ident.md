@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.6.0
+version: 0.8.1
 component: service-electrical-ident
-date: 2026-11-05
+date: 2026-11-08
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.6.0                                         |
+| Version   | 0.8.1                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-11-05                                    |
+| Date      | 2026-11-08                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -397,9 +397,22 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
   rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
   much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
-  laws. The emulated board applying each duty a period late reproduces it (REQ-CAL-017).
-- The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
-  in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
+  laws. The emulated board applying each duty a period late reproduces it (REQ-CMS-003).
+- $V_d$ is the d component the command has *in the rotor frame* while it acts, and the cascades rotate the
+  command by the delay angle $(n + \tfrac12)\,\omega_e T_s$ before they apply it (`foc-transforms.md`, *Delay
+  compensation*). The vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$,
+  so its angle to the rotor runs from $-\tfrac12\Delta\theta_e$ to $+\tfrac12\Delta\theta_e$ about zero and
+  the tick's mean d component is $v_d\,\mathrm{sinc}(\tfrac12\Delta\theta_e) - 0\cdot v_q$: the term in $v_q$
+  is odd about the centre and averages out, the shortfall in $v_d$ is second order (0.07 % at 6000 rpm). The
+  window therefore takes $v_d$ as paired, with no cross-axis term. Before the advance the vector was
+  stationary relative to the sample instant: the rotor ran from $0$ to $\Delta\theta_e$ ahead of it, and the
+  mean of $v_d\cos x + v_q\sin x$ over that span is $v_d + \tfrac12\Delta\theta_e v_q$, which is the
+  correction the window used to add. Half was the right figure for a duty applied at once. For a duty applied a
+  period late the vector is a further $\Delta\theta_e$ behind when it lands, so the correct term was
+  $\tfrac32\Delta\theta_e v_q$ and the half left $\Delta\theta_e v_q$ uncorrected; the advance removes
+  the whole $(n + \tfrac12)\,\Delta\theta_e$ at the source, for both values of $n$. The estimate depends on the
+  advance only through the speed it is computed with: an error $\Delta\omega_e$ in that speed leaves
+  $(n + \tfrac12)\,\Delta\omega_e T_s\,v_q$, second order in the small figures.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,
   rather than the outer loop's last speed, which lags an accelerating rotor.
 
@@ -411,6 +424,20 @@ one. The speed and position cascades therefore add a d-axis square wave to the c
 estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 50 Hz. It produces no torque on a
 non-salient machine and a copper loss proportional to its square. An update is taken only while the
 reference exceeds 50 mA, so an amplitude of zero switches both the injection and resistance tracking off.
+
+An update is also skipped while the current does not follow the reference: when the window's mean current has not
+reached half of it. An open phase, or a loop held at its voltage limit, leaves the current behind while the loop
+applies its full voltage. Such a window has a regressor near zero, and the recursion has no information to take
+from it: without this check its gain grows by the forgetting factor at every window, and a current held at 1 mA
+against a ±0.5 A reference drove the resistance to 26 MΩ within 3000 windows. In the motor-disconnected scenario
+the winding temperature read from such a resistance tripped the drive with an over-temperature, on slower runners,
+before the phase-loss monitor could report the missing phase (`fault-supervision.md`, Part E).
+
+A step of the square wave lies inside one window, whose mean current is then near zero whether the current follows
+or not, and these are the windows that tell the inductance. A step window therefore keeps the decision of the window
+before it. The decision rests on the mean of a window's twenty samples rather than on any one of them: through the
+bench's current-sense chain a single sample carries about 35 mA of noise against a ±71 mA reference, and a check on
+it skipped windows by their noise and read the resistance 5.6 % low; the mean carries about 8 mA.
 
 Only the steps of the square wave tell the inductance: between them the current is held, and its change over a
 window is the sensor's noise alone. Each step is read through two single samples, so the estimate's scatter falls
@@ -424,9 +451,13 @@ up, as large as the torque current at light load. The cascades therefore run it 
 each enable, then the first 4 s of every 60 s, with the reference at zero in between. The 50 mA threshold above
 makes the estimator skip every window of a pause, so it neither updates nor forgets, and its estimates hold
 until the next burst. A burst holds two memories of the estimator, which converges within it from the wrong
-seeds of REQ-CAL-014; a winding that warms over minutes is still followed, a minute at a time. In simulation
+seeds of REQ-CMS-003; a winding that warms over minutes is still followed, a minute at a time. In simulation
 the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA RMS in the pause after it,
-while the speed reference steps between 30 and 50 rad/s (REQ-CAL-019).
+while the speed reference steps between 30 and 50 rad/s (REQ-CMS-003).
+
+The estimator reports itself settled once it has published, after the 200 updates it needs from its seed. Online
+recalibration (`online-recalibration.md`) adopts an estimate only once it has settled, and only while the drive is
+stopped; nothing else changes the current loop's design from it.
 
 ### Publication
 

@@ -1,9 +1,9 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/injection_current_limit/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/FastTrigonometry.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -60,25 +60,25 @@ namespace services
         const auto fs = static_cast<float>(samplingFrequency.Value());
         const auto fInj = static_cast<float>(activeConfig.injectionFrequency.Value());
         const auto samplesPerPeriod = fInj > 0.0f
-                                          ? static_cast<std::size_t>(std::round(fs / fInj))
+                                          ? static_cast<std::size_t>(math::Round(fs / fInj))
                                           : std::size_t{ 0 };
 
         if (samplesPerPeriod == 0)
             return false;
 
         omega = twoPi * fs / static_cast<float>(samplesPerPeriod);
-        phaseIncrement = omega / fs;
-        injectionPhase = 0.0f;
-        injectionAmplitude = foc::DutyFraction(activeConfig.injectionVoltage);
+        injection.phaseIncrement = omega / fs;
+        injection.phase = 0.0f;
+        injection.amplitude = foc::DutyFraction(activeConfig.injectionVoltage);
         terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                              ? deltaTerminalFactor
                              : wyeTerminalFactor;
-        warmupSamples = activeConfig.warmupPeriods * samplesPerPeriod;
-        measurementSamples = activeConfig.measurementPeriods * samplesPerPeriod;
+        samples.warmup = activeConfig.warmupPeriods * samplesPerPeriod;
+        samples.measurement = activeConfig.measurementPeriods * samplesPerPeriod;
         sampleCount = 0;
         sumSquared = 0.0f;
-        const auto binPhasor = foc::FastTrigonometry::AccurateSineAndCosine(phaseIncrement);
-        goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, measurementSamples);
+        const auto binPhasor = math::AccurateSineAndCosine(injection.phaseIncrement);
+        goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, samples.measurement);
 
         return true;
     }
@@ -94,7 +94,6 @@ namespace services
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
 
-        // The interrupt can trip between registering the callback and the write above, which would re-arm the bridge it stopped.
         if (finishing)
         {
             driver.Stop();
@@ -109,14 +108,12 @@ namespace services
         if (!onDone)
             return;
 
-        // Ended before the bridge stops: a sample taken in between would write the injection and re-arm it
         finishing = true;
         noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
     }
 
-    // Interrupt context: only the stop runs here; the run tag drops an aborted run's outcome.
     void SinusoidalInductanceEstimator::Finish(bool measured)
     {
         driver.Stop();
@@ -137,7 +134,7 @@ namespace services
     void SinusoidalInductanceEstimator::Complete()
     {
         noSampleTimer.Cancel();
-        vTerminalAmplitude = injectionAmplitude * 0.75f * 0.5f * (busAtInjectionStart + busVoltage().Value());
+        vTerminalAmplitude = injection.amplitude * 0.75f * 0.5f * (busAtInjectionStart + busVoltage().Value());
 
         if (onDone)
             onDone(measurementComplete ? ComputeResult() : Result{});
@@ -171,13 +168,13 @@ namespace services
     {
         sampleSeen = true;
 
-        const float vNorm = injectionAmplitude * foc::FastTrigonometry::Sine(injectionPhase);
+        const float vNorm = injection.amplitude * math::FastSine(injection.phase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));
 
-        injectionPhase += phaseIncrement;
-        if (injectionPhase >= twoPi)
-            injectionPhase -= twoPi;
+        injection.phase += injection.phaseIncrement;
+        if (injection.phase >= twoPi)
+            injection.phase -= twoPi;
 
         ++sampleCount;
     }
@@ -195,7 +192,7 @@ namespace services
 
         AdvanceInjection();
 
-        if (sampleCount <= warmupSamples)
+        if (sampleCount <= samples.warmup)
             return;
 
         const float iAlpha = currents.a.Value();
@@ -211,7 +208,7 @@ namespace services
         auto I = goertzel->Result();
 
         const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples) / static_cast<float>(samplingFrequency.Value());
-        const auto delay = foc::FastTrigonometry::AccurateSineAndCosine(delayAngle);
+        const auto delay = math::AccurateSineAndCosine(delayAngle);
         const float iRe = I.Real() * delay.cosine - I.Imaginary() * delay.sine;
         const float iIm = I.Real() * delay.sine + I.Imaginary() * delay.cosine;
 
@@ -219,7 +216,7 @@ namespace services
         if (magSquared < 1e-20f)
             return Result{};
 
-        const auto N = static_cast<float>(measurementSamples);
+        const auto N = static_cast<float>(samples.measurement);
         const float zImag = -vTerminalAmplitude * N / 2.0f * iRe / magSquared;
 
         const float fitQuality = (sumSquared > 0.0f)

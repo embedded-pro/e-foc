@@ -2,6 +2,7 @@
 #include "core/foc/position_loop/PositionController.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -36,14 +37,15 @@ namespace foc
         previousMeasured = context.measured.Value();
         primed = true;
 
-        const auto stationary = std::abs(context.measuredSpeed.Value()) < stationarySpeedRatio * SpeedEnvelope();
+        const auto stationary = math::Abs(context.measuredSpeed.Value()) < stationarySpeedRatio * SpeedEnvelope();
         const auto integral = stationary ? relaxationRate * (proportionalGain * error - output) : integralGain * error;
-        const auto referencePart = heldBackReference + proportionalGain * referenceWeight * referenceStep;
+        const auto weight = context.profiled ? 1.0f : referenceWeight;
+        const auto referencePart = heldBackReference + proportionalGain * weight * referenceStep;
         const auto candidate = output + referencePart - proportionalGain * measuredStep + integral;
         output = std::clamp(candidate, -1.0f, 1.0f);
         heldBackReference = HeldBack(candidate - output, referencePart);
 
-        return { PositionOutputKind::speedReference, output * SpeedEnvelope() };
+        return { PositionOutputKind::speedReference, output * SpeedEnvelope() + context.referenceSpeed.Value() };
     }
 
     float PidPositionController::HeldBack(float clamped, float referencePart)
@@ -51,7 +53,7 @@ namespace foc
         if (clamped * referencePart <= 0.0f)
             return 0.0f;
 
-        return std::copysign(std::min(std::abs(clamped), std::abs(referencePart)), referencePart);
+        return math::Copysign(std::min(math::Abs(clamped), math::Abs(referencePart)), referencePart);
     }
 
     float PidPositionController::SpeedEnvelope() const

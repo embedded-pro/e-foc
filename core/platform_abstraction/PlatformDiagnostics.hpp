@@ -1,23 +1,23 @@
 #pragma once
 
-#include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/platform_abstraction/ControlLoopMetrics.hpp"
+#include "can-lite/core/MonitoredCan.hpp"
+#include "infra/util/ExecutionTimeStatistics.hpp"
 
 namespace application
 {
     class PlatformDiagnostics
     {
     public:
-        explicit PlatformDiagnostics(ControlLoopMetrics& metrics);
+        explicit PlatformDiagnostics(infra::ExecutionTimeStatistics& metrics);
 
-        void AttachCanBus(CanBusAdapter& bus);
+        void AttachCanBus(services::MonitoredCan& bus);
 
-        ControlLoopMetrics::Snapshot ControlLoopStatistics() const;
-        const CanBusAdapter::ErrorCounters& CanStatistics() const;
+        infra::ExecutionTimeStatistics::Snapshot ControlLoopStatistics() const;
+        const services::CanBusErrorCounters& CanStatistics() const;
         void Reset();
 
     private:
-        ControlLoopMetrics& metrics;
-        CanBusAdapter* canBus{ nullptr };
+        infra::ExecutionTimeStatistics& metrics;
+        services::MonitoredCan* canBus{ nullptr };
     };
 }

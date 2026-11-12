@@ -38,6 +38,8 @@ namespace tool
         MainWindow(services::CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
         ~MainWindow() override;
 
+        void SetVirtualMotorApp(const QString& program);
+
         void StartAutomaticUpdateChecks();
 
         void ReportStartupProblem(const QString& title, const QString& message);
@@ -60,10 +62,10 @@ namespace tool
         void OnCurrentStreamReceived(uint16_t nodeId, uint8_t sequence, float idCurrent, float iqCurrent, float position) override;
         void OnSpeedPositionReceived(uint16_t nodeId, float speed, float position) override;
         void OnFaultEventReceived(uint16_t nodeId, FocFaultCode fault) override;
-        void OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
         void OnAlgorithmsReceived(uint16_t nodeId, const can::FocAlgorithms& algorithms) override;
         void OnParameterReceived(uint16_t nodeId, can::FocParameter parameter, can::FocParameterValue value) override;
         void OnFirmwareIdentityReceived(uint16_t nodeId, const FirmwareIdentity& identity) override;
+        void OnFaultRecordReceived(uint16_t nodeId, const can::FocFaultRecord& record) override;
 
         void OnTransferProgress(uint16_t nodeId, const TransferProgress& progress) override;
         void OnDownloadFinished(uint16_t nodeId, DownloadOutcome outcome, services::FwuError error) override;
@@ -75,6 +77,7 @@ namespace tool
         void BuildMenus();
         void BuildFileMenu();
         void BuildMotorMenu();
+        void LaunchVirtualMotor();
         void BuildHelpMenu();
         void BuildLayout();
         QWidget* BuildSafetyBar();
@@ -131,6 +134,8 @@ namespace tool
         QLabel* motorsStatus{ nullptr };
         QAction* addMotorAction{ nullptr };
         QAction* emergencyStopAction{ nullptr };
+        QAction* launchVirtualMotorAction{ nullptr };
+        QString virtualMotorApp;
         QAction* showFramesAction{ nullptr };
         QAction* automaticUpdatesAction{ nullptr };
 

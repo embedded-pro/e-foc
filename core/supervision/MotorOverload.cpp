@@ -7,11 +7,6 @@ namespace supervision
     namespace
     {
         constexpr float evaluationSeconds = std::chrono::duration<float>(MotorOverload::evaluationPeriod).count();
-
-        float ThermalTimeConstant(float continuous, float peak, float peakSeconds)
-        {
-            return peakSeconds / -std::log(1.0f - (continuous * continuous) / (peak * peak));
-        }
     }
 
     MotorOverload::MotorOverload(foc::Ampere boardLimit, const infra::Function<void(foc::Ampere)>& onLimit)
@@ -36,7 +31,7 @@ namespace supervision
 
     float MotorOverload::Load() const
     {
-        return continuousSquared > 0.0f ? squaredCurrentState / continuousSquared : 0.0f;
+        return continuousSquared > 0.0f ? thermalModel.State() / continuousSquared : 0.0f;
     }
 
     foc::Ampere MotorOverload::Limit() const
@@ -52,7 +47,7 @@ namespace supervision
 
         if (continuous <= 0.0f)
         {
-            squaredCurrentState = 0.0f;
+            thermalModel.Reset();
             continuousSquared = 0.0f;
             foldedBack = false;
             Apply(boardLimit);
@@ -78,14 +73,14 @@ namespace supervision
     void MotorOverload::Track(const Ratings& effective, float current)
     {
         const auto continuous = effective.continuous.Value();
-        const auto timeConstant = ThermalTimeConstant(continuous, effective.peak.Value(), std::chrono::duration<float>(effective.peakTime).count());
 
         continuousSquared = continuous * continuous;
-        squaredCurrentState += (current * current - squaredCurrentState) * (1.0f - std::exp(-evaluationSeconds / timeConstant));
+        thermalModel.Update(current, { continuous, effective.peak.Value(), std::chrono::duration<float>(effective.peakTime).count() }, evaluationSeconds);
 
-        if (!foldedBack && squaredCurrentState >= continuousSquared)
+        const auto state = thermalModel.State();
+        if (!foldedBack && state >= continuousSquared)
             foldedBack = true;
-        else if (foldedBack && squaredCurrentState < releaseFraction * continuousSquared)
+        else if (foldedBack && state < releaseFraction * continuousSquared)
             foldedBack = false;
     }
 

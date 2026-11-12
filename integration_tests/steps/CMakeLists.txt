@@ -7,6 +7,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     ControllerSettingsSteps.cpp
     CurrentStreamSteps.cpp
     EepromSteps.cpp
+    FaultHistorySteps.cpp
     FaultSteps.cpp
     FirmwareIdentitySteps.cpp
     FirmwareUpgradeSteps.cpp
@@ -33,6 +34,7 @@ target_link_libraries(e_foc.integration_tests.steps PUBLIC
     e_foc.integration_tests.support
     e_foc.integration_tests.interactor.hardware
     cucumber_cpp.runner
+    numerical.motion_profiles
     GTest::gtest
     GTest::gmock
 )

@@ -1,6 +1,6 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
-#include "core/foc/interfaces/Units.hpp"
-#include "core/foc/math/FiniteGuard.hpp"
+#include "e-foc-protocol/foc/Units.hpp"
+#include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -39,6 +39,7 @@ namespace services
     {
         currentInertia = inertia;
         currentFriction = friction;
+        settled = false;
         ReseedOnline();
     }
 
@@ -86,7 +87,7 @@ namespace services
         fit.outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - fit.outputPower);
 
         fit.excitation.CountAcceleration(observation->acceleration);
-        if (std::abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
+        if (math::Abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
             fit.excitation.CountSpeed(observation->speed);
         fit.periods = static_cast<uint16_t>(std::min<uint32_t>(fit.periods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
 
@@ -95,12 +96,12 @@ namespace services
 
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInDirection(float acceleration, float speed) const
     {
-        return IsMechanicallyObservable(speed) && std::abs(speed) > std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
+        return IsMechanicallyObservable(speed) && math::Abs(speed) > math::Abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
     }
 
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, const DirectionalFit& fit) const
     {
-        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
+        return math::Abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
     }
 
     bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled(const DirectionalFit& fit) const
@@ -116,7 +117,6 @@ namespace services
         if (!HasOnlineEstimateSettled(fit))
             return;
 
-        // Friction comes from the constant-speed runs; the full fit's viscous term takes transients too.
         const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
         const auto steadyFriction = SteadyFriction();
         const auto friction = steadyFriction.has_value() ? SettledFriction(*steadyFriction / parameterScale) : currentFriction.Value();
@@ -126,9 +126,14 @@ namespace services
 
         currentInertia = foc::NewtonMeterSecondSquared{ inertia };
         currentFriction = foc::NewtonMeterSecondPerRadian{ friction };
+        settled = true;
     }
 
-    // Viscous friction is the same both ways, so the slope is pooled over both directions' runs.
+    bool RealTimeFrictionAndInertiaEstimator::HasSettled() const
+    {
+        return settled;
+    }
+
     std::optional<float> RealTimeFrictionAndInertiaEstimator::SteadyFriction() const
     {
         auto variance = 0.0f;

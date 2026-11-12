@@ -2,11 +2,11 @@
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/test/CanMock.hpp"
 #include "can-lite/server/CanProtocolServer.hpp"
-#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorCurrentStreamer.hpp"
-#include "core/can/FocMotorMessages.hpp"
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "e-foc-protocol/server/FocMotorCategoryServer.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <gtest/gtest.h>
 #include <vector>
@@ -253,4 +253,17 @@ TEST_F(FocMotorCurrentStreamerTest, a_client_back_online_after_going_offline_res
     ForwardTime(std::chrono::milliseconds(1));
 
     EXPECT_EQ(frames.size(), 1u);
+}
+
+TEST(FocMotorCurrentStreamerFrames, only_the_current_stream_telemetry_is_a_stream_frame)
+{
+    const auto frame = [](uint8_t category, uint8_t messageType)
+    {
+        return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::telemetry, category, messageType, 1));
+    };
+
+    EXPECT_TRUE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(can::focMotorCategoryId, can::focTelemetryCurrentsId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(can::focMotorCategoryId, can::focTelemetryStatusResponseId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(frame(services::canSystemCategoryId, can::focTelemetryCurrentsId)));
+    EXPECT_FALSE(can::FocMotorCurrentStreamer::IsStreamFrame(hal::Can::Id::Create11BitId(0x123)));
 }
