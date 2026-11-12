@@ -764,6 +764,91 @@ TEST_F(TestPositionCascade, the_stream_receives_the_measured_currents_and_the_me
     EXPECT_NEAR(sample->position.Value(), 0.0f, 1e-6f);
 }
 
+namespace
+{
+    struct TurningPositionCascade
+    {
+        TurningPositionCascade(PositionCascadeUnderTest& underTest)
+            : underTest(underTest)
+        {
+            EXPECT_CALL(underTest.lowPriorityInterrupt, Trigger()).Times(testing::AnyNumber());
+        }
+
+        void Turn(float speed, uint32_t count)
+        {
+            const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+            const float step = speed / static_cast<float>(lowPriorityFrequency.Value());
+
+            for (uint32_t outer = 0; outer != count; ++outer)
+            {
+                angle += step;
+                for (uint32_t tick = 0; tick != prescaler; ++tick)
+                {
+                    foc::Radians held{ angle };
+                    underTest.cascade->Calculate(ZeroCurrents(), held);
+                }
+
+                underTest.lowPriorityInterrupt.TriggerHandler();
+            }
+        }
+
+        float DemandedSpeed() const
+        {
+            return underTest.cascade->ObserveMotion().demandedSpeed.Value();
+        }
+
+        PositionCascadeUnderTest& underTest;
+        float angle{ 0.0f };
+    };
+}
+
+TEST_F(TestPositionCascade, a_quick_stop_sets_the_position_law_aside_and_ramps_the_speed_to_zero)
+{
+    PositionCascadeUnderTest speedCommanding{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
+    TurningPositionCascade turning{ speedCommanding };
+    speedCommanding.cascade->Enable();
+    speedCommanding.cascade->SetPoint(foc::Radians{ 3.0f });
+    turning.Turn(10.0f, 3);
+
+    speedCommanding.cascade->QuickStop(foc::RadiansPerSecondSquared{ 1000.0f });
+    turning.Turn(10.0f, 1);
+    EXPECT_NEAR(turning.DemandedSpeed(), 9.5f, 1e-3f);
+
+    turning.Turn(10.0f, 3);
+    EXPECT_NEAR(turning.DemandedSpeed(), 8.0f, 1e-3f);
+}
+
+TEST_F(TestPositionCascade, a_current_commanding_algorithm_quick_stops_through_the_speed_loop)
+{
+    PositionCascadeUnderTest stateFeedback{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqi };
+    TurningPositionCascade turning{ stateFeedback };
+    stateFeedback.cascade->Enable();
+    stateFeedback.cascade->SetPoint(foc::Radians{ 3.0f });
+    turning.Turn(10.0f, 3);
+
+    stateFeedback.cascade->QuickStop(foc::RadiansPerSecondSquared{ 0.0f });
+    turning.Turn(10.0f, 1);
+
+    EXPECT_NEAR(turning.DemandedSpeed(), 0.0f, 1e-6f);
+    EXPECT_LT(stateFeedback.cascade->ObserveMotion().demandedTorqueCurrent.Value(), 0.0f);
+}
+
+TEST_F(TestPositionCascade, enable_ends_a_quick_stop_and_resumes_the_position_law)
+{
+    PositionCascadeUnderTest speedCommanding{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
+    TurningPositionCascade turning{ speedCommanding };
+    speedCommanding.cascade->Enable();
+    speedCommanding.cascade->SetPoint(foc::Radians{ 3.0f });
+    turning.Turn(10.0f, 3);
+    speedCommanding.cascade->QuickStop(foc::RadiansPerSecondSquared{ 0.0f });
+    turning.Turn(10.0f, 1);
+
+    speedCommanding.cascade->Enable();
+    turning.Turn(0.0f, 1);
+
+    EXPECT_GT(turning.DemandedSpeed(), 0.0f);
+}
+
 TEST_F(TestPositionCascade, the_measured_quadrature_current_is_the_rotor_frame_current_of_the_last_sample)
 {
     focPosition->Enable();

@@ -47,6 +47,8 @@ namespace foc
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration = 0.0f);
+        void BeginQuickStop(RadiansPerSecondSquared deceleration);
+        bool RunQuickStop(float mechanicalSpeed);
 
         void SetDirectCurrentReference(float current, float referenceAcceleration = 0.0f);
         float MeasureMechanicalSpeed();
@@ -131,6 +133,9 @@ namespace foc
         CurrentCommand command;
         float accelerationCurrentGain{ 0.0f };
         MotorScaling scaling{ 0.0f, 1.0f, 0.0f };
+        // Written by the event loop before quickStopping is set; mechanical rad/s per outer-loop period.
+        volatile float quickStopStep{ 0.0f };
+        volatile bool quickStopping{ false };
         BusVoltageRatio busRatio;
         volatile bool enabled{ false };
         Estimation estimation;

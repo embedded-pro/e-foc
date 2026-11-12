@@ -1,5 +1,6 @@
 #include "core/state_machine/OperationFlow.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "numerical/math/Math.hpp"
 
 namespace application
 {
@@ -165,9 +166,57 @@ namespace application
 
     state_machine::Ready OperationFlow::DisableToReady()
     {
+        quickStopTimer.Cancel();
         env.mode.GetFocControl().Stop();
         faultController.ResetClearCount();
         return calibration.ReadyState();
+    }
+
+    bool OperationFlow::CanBeginQuickStop() const
+    {
+        return env.mode.CanBeginQuickStop();
+    }
+
+    state_machine::Stopping OperationFlow::BeginQuickStop()
+    {
+        env.tracer.Trace() << "[SM] Quick stop";
+        quickStopStarted = infra::Now();
+
+        const auto initialSpeed = math::Abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
+        const auto deceleration = env.mode.QuickStopDeceleration().Value();
+        dynamicStopTimeout = deceleration > 0.0f
+                                 ? std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(initialSpeed / deceleration * 1.25f + 0.1f))
+                                 : quickStopTimeout;
+
+        if (env.mode.BeginQuickStop())
+            quickStopTimer.Start(quickStopCheckPeriod, [this]()
+                {
+                    CheckQuickStop();
+                });
+        else
+        {
+            env.tracer.Trace() << "[SM] Quick stop: this mode cannot brake without a calibrated inertia; power stage cut";
+            env.mode.GetFocControl().Stop();
+            env.machine.Dispatch(state_machine::StopCompleted{});
+        }
+
+        return state_machine::Stopping{};
+    }
+
+    void OperationFlow::CheckQuickStop()
+    {
+        const auto speed = math::Abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
+        if (speed >= quickStopSpeed && infra::Now() - quickStopStarted < dynamicStopTimeout)
+            return;
+
+        quickStopTimer.Cancel();
+        env.machine.Dispatch(state_machine::StopCompleted{});
+    }
+
+    state_machine::Ready OperationFlow::CompleteQuickStop()
+    {
+        env.tracer.Trace() << "[SM] Quick stop complete";
+        return DisableToReady();
     }
 
     state_machine::Fault OperationFlow::EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult)
@@ -181,6 +230,7 @@ namespace application
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
 
         faultDispatched = false;
+        quickStopTimer.Cancel();
         faultController.EnterFault();
         faultController.SampleCondition();
         AbortEnablePreparation();
@@ -242,6 +292,7 @@ namespace application
     void OperationFlow::AbortActiveWork()
     {
         env.tracer.Trace() << "[SM] Emergency stop";
+        quickStopTimer.Cancel();
         env.mode.GetFocControl().Stop();
         calibration.Abort();
         AbortEnablePreparation();

@@ -185,13 +185,21 @@ namespace foc
         virtual void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) = 0;
     };
 
+    class QuickStoppable
+    {
+    protected:
+        ~QuickStoppable() = default;
+
+    public:
+        virtual void QuickStop(RadiansPerSecondSquared deceleration) = 0;
+    };
+
     class PositionProfilable
     {
     protected:
         ~PositionProfilable() = default;
 
     public:
-        // Off while velocity or acceleration is zero; zero deceleration uses the acceleration; jerk is stored for a later S-curve.
         virtual void ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk) = 0;
     };
 

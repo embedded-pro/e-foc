@@ -423,8 +423,9 @@ TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
     EXPECT_TRUE(client.Commands().SendIdentifyElectrical(11));
     EXPECT_TRUE(client.Commands().SendSelectAlgorithm(12, can::FocControlLoop::speed, 1));
     EXPECT_TRUE(client.Commands().SendSetParameter(13, can::FocParameter::inertia, 1.0e-5f));
+    EXPECT_TRUE(client.Commands().SendQuickStop(14));
 
-    for (uint16_t node = 1; node <= 13; ++node)
+    for (uint16_t node = 1; node <= 14; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 

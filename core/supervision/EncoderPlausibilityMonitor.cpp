@@ -33,7 +33,7 @@ namespace supervision
 
         const auto& drive = activeDrive();
 
-        if (!std::holds_alternative<state_machine::Enabled>(drive.CurrentState()))
+        if (!state_machine::IsOperating(drive.CurrentState()))
         {
             Disarm();
             return;

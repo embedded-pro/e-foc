@@ -26,6 +26,7 @@ namespace tool
         void BuildTravelLimitsGroup();
         void BuildThermalGroup();
         void BuildSupplyLimitsGroup();
+        void BuildQuickStopGroup();
         void BuildRecalibrationGroup();
 
         QLabel* stallWarning{ nullptr };

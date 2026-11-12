@@ -33,7 +33,8 @@
       "combine": "max",
       "patterns": [
         "StaticInvoke<foc::(Speed|Position)Cascade::(Speed|Position)Cascade\\(",
-        "^foc::(Speed|Position)Cascade::LowPriorityHandler\\("
+        "^foc::(Speed|Position)Cascade::LowPriorityHandler\\(",
+        "^foc::CascadeWithSpeedLoop::RunQuickStop\\("
       ]
     },
     {

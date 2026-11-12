@@ -142,6 +142,23 @@ namespace application
         return state_machine::CommandResult::ok;
     }
 
+    state_machine::CommandResult FocStateMachineCommon::CmdQuickStop()
+    {
+        if (std::holds_alternative<state_machine::Enabled>(CurrentState()) && !operation.CanBeginQuickStop())
+            return state_machine::CommandResult::rejected;
+        return ToCommandResult(Dispatch(state_machine::QuickStop{}));
+    }
+
+    void FocStateMachineCommon::SetQuickStopDeceleration(foc::RadiansPerSecondSquared deceleration)
+    {
+        quickStopDeceleration = deceleration;
+    }
+
+    foc::RadiansPerSecondSquared FocStateMachineCommon::QuickStopDeceleration() const
+    {
+        return quickStopDeceleration;
+    }
+
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
     {
         operation.RegisterReadyHandler(onReady);
@@ -203,6 +220,16 @@ namespace application
     services::Tracer& FocStateMachineCommon::GetTracer()
     {
         return tracer;
+    }
+
+    const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
+    {
+        return calibrationContext.Data();
+    }
+
+    foc::Weber FocStateMachineCommon::EffectiveFluxLinkage(const services::CalibrationData& data) const
+    {
+        return calibrationContext.EffectiveFluxLinkage(data);
     }
 
     bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise)

@@ -25,6 +25,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -97,6 +98,16 @@ namespace
 
 TEST_F(EncoderPlausibilityMonitorTest, an_encoder_that_stays_put_while_current_pushes_for_motion_is_reported)
 {
+    PushWithoutMotion();
+
+    ForwardTime(std::chrono::milliseconds(150));
+
+    EXPECT_EQ(Count(state_machine::FaultCode::encoderLoss), 1u);
+}
+
+TEST_F(EncoderPlausibilityMonitorTest, a_stopping_drive_is_supervised_as_well)
+{
+    state = state_machine::Stopping{};
     PushWithoutMotion();
 
     ForwardTime(std::chrono::milliseconds(150));

@@ -163,6 +163,16 @@ namespace state_machine
         static constexpr const char* name{ "EmergencyStop" };
     };
 
+    struct QuickStop
+    {
+        static constexpr const char* name{ "QuickStop" };
+    };
+
+    struct StopCompleted
+    {
+        static constexpr const char* name{ "StopCompleted" };
+    };
+
     struct FaultDetected
     {
         static constexpr const char* name{ "FaultDetected" };
@@ -221,6 +231,8 @@ namespace state_machine
         Disable,
         ClearFault,
         EmergencyStop,
+        QuickStop,
+        StopCompleted,
         FaultDetected,
         ClearCalibration,
         CalibrationInvalidated,

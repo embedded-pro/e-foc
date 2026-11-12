@@ -94,6 +94,20 @@ THEN(R"(the state machine shall be in the running state)")
         << "Motor is not in running state over CAN telemetry";
 }
 
+THEN(R"(the state machine shall report the stopping state)")
+{
+    auto& fixture = context.Get<Fixture>();
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::stopping, std::chrono::milliseconds{ 500 }))
+        << "Motor did not report stopping after the quick stop";
+}
+
+THEN(R"(the state machine shall be in the ready state within {int} ms)", (int timeoutMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::ready, std::chrono::milliseconds{ timeoutMs }))
+        << "Motor did not reach ready within " << timeoutMs << " ms";
+}
+
 THEN(R"(the motor shall refuse to enable)")
 {
     auto& fixture = context.Get<Fixture>();

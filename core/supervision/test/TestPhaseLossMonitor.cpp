@@ -23,6 +23,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -80,6 +81,18 @@ namespace
 
 TEST_F(PhaseLossMonitorTest, a_demand_that_draws_no_current_at_standstill_is_a_missing_phase_50_ms_after_it_is_first_seen)
 {
+    Observe(0.0f, 0.01f, 5.0f);
+
+    Run(std::chrono::milliseconds(50));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(10));
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(PhaseLossMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
     Observe(0.0f, 0.01f, 5.0f);
 
     Run(std::chrono::milliseconds(50));

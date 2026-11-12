@@ -12,6 +12,7 @@ namespace foc
         : public SpeedLoopDrive<FocPosition>
         , public SpeedCommandable
         , public PositionLimitable
+        , public QuickStoppable
         , public PositionProfilable
     {
     public:
@@ -30,6 +31,7 @@ namespace foc
         void EnableSpeedCommand() override;
         void DisableSpeedCommand() override;
         void CommandSpeed(RadiansPerSecond speed) override;
+        void QuickStop(RadiansPerSecondSquared deceleration) override;
         hal::Hertz SpeedCommandFrequency() const override;
 
         void EnableCurrentCommand() override;

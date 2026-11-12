@@ -49,3 +49,14 @@
     shall also enter Fault with commandTimeout within 10 ms of the timeout running out without an
     accepted Start or setpoint command, whatever other traffic, the heartbeat included, the client
     keeps sending.
+
+- id: REQ-LCY-006
+  title: A quick stop brings the rotor to rest under control
+  status: verified
+  verification: [sil, mil, unit]
+  shall: >
+    On a quick stop while Enabled the drive shall keep driving the motor and decelerate the rotor
+    to rest at the operator's quick-stop deceleration, report that it is stopping, and then stop
+    driving the motor and report Ready. It shall supervise the motor during the stop as while
+    Enabled. When the drive cannot brake the rotor in its control mode it shall refuse the quick
+    stop and leave the motor running.

@@ -21,6 +21,7 @@ namespace tool
         bool SendSetPositionSetpoint(uint16_t nodeId, float positionRad);
         bool SendSetTorqueSetpointNewtonMeter(uint16_t nodeId, float torqueNewtonMeter);
 
+        bool SendQuickStop(uint16_t nodeId);
         bool SendClearFault(uint16_t nodeId);
         bool SendAlign(uint16_t nodeId);
         bool SendIdentifyElectrical(uint16_t nodeId);

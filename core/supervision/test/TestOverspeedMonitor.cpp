@@ -23,6 +23,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -73,6 +74,18 @@ namespace
 
 TEST_F(OverspeedMonitorTest, a_speed_beyond_110_percent_of_the_limit_for_five_evaluations_is_an_overspeed)
 {
+    speed = 111.0f;
+
+    Run(std::chrono::milliseconds(4));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(1));
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(OverspeedMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
     speed = 111.0f;
 
     Run(std::chrono::milliseconds(4));

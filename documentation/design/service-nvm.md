@@ -33,7 +33,8 @@ date: 2026-11-08
   encoder index angle) and system
   configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
   settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
-  target window, travel limits, temperature and bus voltage) across power cycles using MCU internal EEPROM
+  target window, travel limits, temperature, bus voltage and quick-stop deceleration) across power cycles using MCU
+  internal EEPROM
 - Persisting the fault history and the learned motor model, the inductance, inertia and friction online
   recalibration adopted (`online-recalibration.md`, Part F)
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
@@ -57,7 +58,7 @@ The service manages four independent EEPROM regions. Each region holds exactly o
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 100 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 184 bytes |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 188 bytes |
 | Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
 | Learned model | `0x1EA4ED0D` | learned model     | 26 bytes  |
 
@@ -70,7 +71,9 @@ Version 5's encoder index angle (`service-index-search.md`) had taken it from 10
 cogging map (`service-cogging-compensation.md`) had taken it from 56 to 108. A record without an index angle
 holds a NaN there; the 109-byte record fits the 128-byte calibration region.
 
-The configuration record's layout is at version 15. The motion profile's four limits (`foc-position.md`, Motion
+The configuration record's layout is at version 16. The quick-stop deceleration (`state-machine.md`, Quick Stop)
+took its data from 184 to 188 bytes, so a record written at version 15 reads as a version mismatch and the
+configuration returns to its defaults. Version 15's motion profile four limits (`foc-position.md`, Motion
 Profile) took its data from 168 to 184 bytes, with no padding, so a record written at version 14 reads as a version
 mismatch and the configuration returns to its defaults, which leave the profile off. Version 14's homing requirement (`foc-position.md`, Homing and the
 Position Reference) took the last reserved byte, so a record written at version 13 reads as a version mismatch and
@@ -285,39 +288,39 @@ stateDiagram-v2
 
 ### Error Codes
 
-| Status            | Meaning                                                                      |
-|-------------------|------------------------------------------------------------------------------|
-| `Ok`              | Operation completed successfully                                             |
-| `InvalidData`     | Magic, version or CRC-32 mismatch on read                                    |
-| `WriteFailed`     | An intact calibration record survived an invalidation's erase                |
-| `HardwareFault`   | The read-back after a write differs from what was written                    |
-| `Busy`            | Another operation is in flight; nothing was read or written                  |
+| Status          | Meaning                                                       |
+|-----------------|---------------------------------------------------------------|
+| `Ok`            | Operation completed successfully                              |
+| `InvalidData`   | Magic, version or CRC-32 mismatch on read                     |
+| `WriteFailed`   | An intact calibration record survived an invalidation's erase |
+| `HardwareFault` | The read-back after a write differs from what was written     |
+| `Busy`          | Another operation is in flight; nothing was read or written   |
 
 ### Calibration and Configuration Data Fields
 
 **CalibrationData** (100 bytes total, layout version 6):
 
-| Field                | Physical unit | Description                                                      |
-|----------------------|---------------|------------------------------------------------------------------|
-| rPhase               | Ω             | Measured phase resistance                                        |
-| lD                   | mH            | Measured phase inductance, used for both axes                    |
-| fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF                 |
-| currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor                |
-| inertia              | kg·m²         | Estimated rotor inertia                                          |
-| frictionCoulomb      | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
-| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                                     |
-| speedLoopBandwidth   | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
-| coggingTorqueScale   | N·m per count | Scale of the cogging map entries                                 |
-| encoderIndexAngle    | rad           | Encoder reading at the index in the aligned frame; NaN when none |
-| polePairs            | —             | Number of motor pole pairs                                       |
-| stage                | —             | Whether the calibration completed                                |
-| currentNoise         | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
-| coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins               |
+| Field              | Physical unit | Description                                                      |
+|--------------------|---------------|------------------------------------------------------------------|
+| rPhase             | Ω             | Measured phase resistance                                        |
+| lD                 | mH            | Measured phase inductance, used for both axes                    |
+| fluxLinkage        | Wb            | Rotor flux linkage, identified from the back-EMF                 |
+| currentOffsetA/B/C | A             | Zero-current reading of each phase current sensor                |
+| inertia            | kg·m²         | Estimated rotor inertia                                          |
+| frictionCoulomb    | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
+| frictionViscous    | N·m·s/rad     | Viscous friction coefficient                                     |
+| speedLoopBandwidth | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
+| coggingTorqueScale | N·m per count | Scale of the cogging map entries                                 |
+| encoderIndexAngle  | rad           | Encoder reading at the index in the aligned frame; NaN when none |
+| polePairs          | —             | Number of motor pole pairs                                       |
+| stage              | —             | Whether the calibration completed                                |
+| currentNoise       | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
+| coggingTorque      | counts        | Cogging torque over one electrical period, 48 bins               |
 
 The four-byte fields come first, then the current noise, the pole pairs and the stage, which fill one word,
 then the cogging map.
 
-**ConfigData** (184 bytes total):
+**ConfigData** (188 bytes total):
 
 | Field                  | Physical unit                   | Description                                                                                                    |
 |------------------------|---------------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -350,8 +353,9 @@ position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000
 0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, −3.2–3.2 rad,
 both 0 (off) by default (`foc-position.md` Software Position Limits); the calibration temperature,
 −40–100 °C, default 25; and the temperature limit, 40–200 °C, default 120, with its margin, 1–50 K, default 15
-(`fault-supervision.md` Part K); and the bus-voltage minimum and maximum, 0–100 V, both 0 (off) by default
-(`fault-supervision.md` Part L).
+(`fault-supervision.md` Part K); the bus-voltage minimum and maximum, 0–100 V, both 0 (off) by default
+(`fault-supervision.md` Part L); and the quick-stop deceleration, 0–100 000 rad/s², 0 (the current limit) by
+default (`state-machine.md`, Quick Stop).
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible
@@ -371,17 +375,17 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                           | Purpose                                                                       | Contract                                                                                                              |
-|-------------------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)`     | Writes the calibration record and verifies the read-back                      | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadCalibration(data, onDone)`     | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `InvalidData` with an empty record when the stored one is not intact          |
-| `InvalidateCalibration(onDone)`     | Erases the calibration region without writing a new record                    | A later load reports `InvalidData`; `onDone(NvmStatus)` fires exactly once                                            |
-| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadConfig(data, onDone)`          | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Ok` with the defaults when the stored record is not intact                   |
-| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part                            | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history                     |
-| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                                   | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model                  |
-| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| Interface                           | Purpose                                                    | Contract                                                                                                     |
+|-------------------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)`     | Writes the calibration record and verifies the read-back   | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadCalibration(data, onDone)`     | Reads and integrity-checks the calibration record          | `onDone(NvmStatus)` fires exactly once; `InvalidData` with an empty record when the stored one is not intact |
+| `InvalidateCalibration(onDone)`     | Erases the calibration region without writing a new record | A later load reports `InvalidData`; `onDone(NvmStatus)` fires exactly once                                   |
+| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region    | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadConfig(data, onDone)`          | Reads and integrity-checks the configuration record        | `onDone(NvmStatus)` fires exactly once; `Ok` with the defaults when the stored record is not intact          |
+| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part         | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history            |
+| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model         |
+| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
 
 ### Required
 

@@ -44,6 +44,9 @@ namespace application
         state_machine::CommandResult CmdClearFault() override;
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEmergencyStop() override;
+        state_machine::CommandResult CmdQuickStop() override;
+        void SetQuickStopDeceleration(foc::RadiansPerSecondSquared deceleration);
+        foc::RadiansPerSecondSquared QuickStopDeceleration() const override;
 
         void RequireHoming(bool required);
         CommissioningCommands& Commissioning();
@@ -74,6 +77,8 @@ namespace application
         services::DispatchResult Dispatch(const state_machine::Event& event);
 
         services::Tracer& GetTracer();
+        const services::CalibrationData& GetCalibration() const;
+        foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, foc::Weber fluxLinkage, foc::Ampere currentNoise);
 
     private:
@@ -92,5 +97,6 @@ namespace application
         CommandRejections commandRejections;
         CommissioningCommands commissioning;
         bool provisionalControlApplied{ false };
+        foc::RadiansPerSecondSquared quickStopDeceleration{ 0.0f };
     };
 }

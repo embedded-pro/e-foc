@@ -57,6 +57,25 @@ namespace application
         return focController.ObserveMotion();
     }
 
+    bool TorqueStateMachine::CanBeginQuickStop() const
+    {
+        const auto& data = GetCalibration();
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+        return foc::IsFinitePositive(data.inertia) && foc::IsFinitePositive(torqueConstant.Value());
+    }
+
+    bool TorqueStateMachine::BeginQuickStop()
+    {
+        const auto& data = GetCalibration();
+        const auto torqueConstant = foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+
+        if (!CanBeginQuickStop())
+            return false;
+
+        focController.Brake(QuickStopDeceleration(), data.inertia / torqueConstant.Value());
+        return true;
+    }
+
     foc::FocBase& TorqueStateMachine::GetFoc()
     {
         return focController;

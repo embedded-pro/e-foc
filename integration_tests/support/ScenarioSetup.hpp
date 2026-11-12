@@ -61,6 +61,7 @@ namespace integration
         sil::NvmImageSpec nvm{ .includeCalibration = false, .includeConfig = false };
         bool booted{ false };
         std::optional<Setpoint> lastSetpoint;
+        std::optional<Setpoint> quickStop;
         response::PlantTrace trace;
         IdentifiedParameters identified;
         IdentifiedParameters online;

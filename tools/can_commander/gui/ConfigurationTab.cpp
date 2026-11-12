@@ -16,6 +16,7 @@ namespace tool
         BuildTravelLimitsGroup();
         BuildThermalGroup();
         BuildSupplyLimitsGroup();
+        BuildQuickStopGroup();
         BuildRecalibrationGroup();
         Content().addStretch();
 
@@ -149,6 +150,19 @@ namespace tool
         auto* note = new QLabel("Each limit is off at 0. A running motor whose bus voltage, filtered over 50 ms, leaves them faults "
                                 "with undervoltage or overvoltage and coasts; a stopped motor is not watched. The board's own "
                                 "voltage trips stay in force. Stored at once and in force within 10 ms.");
+        note->setWordWrap(true);
+        form.addRow(note);
+    }
+
+    void ConfigurationTab::BuildQuickStopGroup()
+    {
+        QGroupBox* group{ nullptr };
+        auto& form = AddGroup("Quick Stop", group);
+        AddEditors(form, QuickStopSettings());
+
+        auto* note = new QLabel("Quick Stop decelerates a running motor at this rate and stops it once it is below 2 rad/s; 0 brakes at the "
+                                "current limit. Torque mode needs a calibrated inertia, otherwise the drive refuses Quick Stop. "
+                                "Stored at once and used by the next quick stop.");
         note->setWordWrap(true);
         form.addRow(note);
     }

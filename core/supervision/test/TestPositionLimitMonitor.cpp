@@ -24,6 +24,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -75,6 +76,16 @@ namespace
 
 TEST_F(PositionLimitMonitorTest, a_rotor_beyond_the_maximum_by_more_than_the_margin_faults_at_the_next_evaluation)
 {
+    position = 1.011f;
+
+    Run(std::chrono::milliseconds(1));
+
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(PositionLimitMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
     position = 1.011f;
 
     Run(std::chrono::milliseconds(1));

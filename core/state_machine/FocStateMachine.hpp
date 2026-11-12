@@ -64,6 +64,11 @@ namespace state_machine
         static constexpr const char* name{ "Enabled" };
     };
 
+    struct Stopping
+    {
+        static constexpr const char* name{ "Stopping" };
+    };
+
     struct Fault
     {
         static constexpr const char* name{ "Fault" };
@@ -71,7 +76,12 @@ namespace state_machine
         FaultCode code{ FaultCode::hardwareFault };
     };
 
-    using State = std::variant<Idle, Calibrating, Ready, Enabled, Fault>;
+    using State = std::variant<Idle, Calibrating, Ready, Enabled, Stopping, Fault>;
+
+    inline bool IsOperating(const State& state)
+    {
+        return std::holds_alternative<Enabled>(state) || std::holds_alternative<Stopping>(state);
+    }
 
     enum class CommandResult : uint8_t
     {
@@ -123,6 +133,7 @@ namespace state_machine
         virtual CommandResult CmdClearFault() = 0;
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEmergencyStop() = 0;
+        virtual CommandResult CmdQuickStop() = 0;
 
         virtual std::optional<OnlineEstimates> CurrentOnlineEstimates()
         {

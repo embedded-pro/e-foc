@@ -571,6 +571,34 @@ TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InEnabled_AcksSuccess)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnQuickStop_InEnabled_AcksSuccessAndReportsTheDriveStopping)
+{
+    ConstructFixtureInReady();
+    DispatchCommand(can::focStartId);
+    ResetCaptures();
+
+    DispatchCommand(can::focQuickStopId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+
+    DispatchCommand(can::focRequestTelemetryId);
+    ASSERT_TRUE(statusFrame.has_value());
+    ASSERT_GE(statusFrame->size(), 1u);
+    EXPECT_EQ((*statusFrame)[0], static_cast<uint8_t>(can::FocMotorState::stopping));
+    EXPECT_EQ(6u, static_cast<uint8_t>(can::FocMotorState::stopping));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnQuickStop_InIdle_AcksSuccess)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchCommand(can::focQuickStopId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
 TEST_F(FocMotorCanBridgeTest, OnClearFault_InFault_AcksSuccess)
 {
     ConstructFixtureInReady();

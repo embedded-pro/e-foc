@@ -128,6 +128,7 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.temperatureMargin = 0.5f;
     config.limits.busVoltageMinimum = -1.0f;
     config.limits.busVoltageMaximum = 101.0f;
+    config.limits.quickStopDeceleration = -1.0f;
 
     state_machine::SanitizeLimits(config);
 
@@ -153,6 +154,7 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     EXPECT_NEAR(config.limits.temperatureMargin, 15.0f, 1e-6f);
     EXPECT_NEAR(config.limits.busVoltageMinimum, 0.0f, 1e-9f);
     EXPECT_NEAR(config.limits.busVoltageMaximum, 0.0f, 1e-9f);
+    EXPECT_NEAR(config.limits.quickStopDeceleration, 0.0f, 1e-9f);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
@@ -166,6 +168,7 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
     config.limits.positionMaximum = 3.2f;
     config.limits.busVoltageMinimum = 18.0f;
     config.limits.busVoltageMaximum = 100.0f;
+    config.limits.quickStopDeceleration = 500.0f;
 
     state_machine::SanitizeLimits(config);
 
@@ -178,6 +181,7 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_a_limit_within_its_range)
     EXPECT_NEAR(config.limits.positionMaximum, 3.2f, 1e-6f);
     EXPECT_NEAR(config.limits.busVoltageMinimum, 18.0f, 1e-6f);
     EXPECT_NEAR(config.limits.busVoltageMaximum, 100.0f, 1e-6f);
+    EXPECT_NEAR(config.limits.quickStopDeceleration, 500.0f, 1e-6f);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)

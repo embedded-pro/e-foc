@@ -9,6 +9,7 @@ namespace foc
         : public SpeedLoopDrive<FocSpeed>
         , public SpeedCommandable
         , public SpeedRampable
+        , public QuickStoppable
     {
     public:
         explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, CurrentStream& currentStream, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 }, uint32_t dutyUpdateDelayPeriods = 0);
@@ -30,6 +31,7 @@ namespace foc
         void DisableCurrentCommand() override;
 
         void RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration) override;
+        void QuickStop(RadiansPerSecondSquared deceleration) override;
 
     private:
         void LowPriorityHandler();

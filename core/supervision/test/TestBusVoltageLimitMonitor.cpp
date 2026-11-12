@@ -21,6 +21,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -69,6 +70,14 @@ TEST_F(BusVoltageLimitMonitorTest, a_bus_within_the_limits_is_no_fault)
 
 TEST_F(BusVoltageLimitMonitorTest, a_bus_below_the_minimum_is_an_undervoltage)
 {
+    Measure(19.9f);
+
+    EXPECT_THAT(faults, ElementsAre(state_machine::FaultCode::undervoltage));
+}
+
+TEST_F(BusVoltageLimitMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
     Measure(19.9f);
 
     EXPECT_THAT(faults, ElementsAre(state_machine::FaultCode::undervoltage));

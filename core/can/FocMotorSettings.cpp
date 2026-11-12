@@ -134,6 +134,7 @@ namespace can
             case FocParameter::temperatureMargin:
             case FocParameter::busVoltageMinimum:
             case FocParameter::busVoltageMaximum:
+            case FocParameter::quickStopDeceleration:
                 return ParameterGroup::limits;
             default:
                 return ParameterGroup::motor;
@@ -367,6 +368,8 @@ namespace can
                 return config.limits.busVoltageMinimum;
             case FocParameter::busVoltageMaximum:
                 return config.limits.busVoltageMaximum;
+            case FocParameter::quickStopDeceleration:
+                return config.limits.quickStopDeceleration;
             case FocParameter::homingRequired:
                 return config.homingRequired != 0 ? 1.0f : 0.0f;
             default:
@@ -440,6 +443,9 @@ namespace can
                 break;
             case FocParameter::busVoltageMaximum:
                 config.limits.busVoltageMaximum = value;
+                break;
+            case FocParameter::quickStopDeceleration:
+                config.limits.quickStopDeceleration = value;
                 break;
             case FocParameter::homingRequired:
                 config.homingRequired = value != 0.0f ? 1 : 0;

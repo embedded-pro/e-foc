@@ -1,8 +1,8 @@
 #include "core/supervision/EncoderFreezeMonitor.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include "numerical/math/AngleUtilities.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
-#include <cmath>
 #include <numbers>
 #include <variant>
 
@@ -40,7 +40,7 @@ namespace supervision
         if (activeDrive == nullptr)
             return;
 
-        if (!std::holds_alternative<state_machine::Enabled>(activeDrive().CurrentState()))
+        if (!state_machine::IsOperating(activeDrive().CurrentState()))
         {
             Disarm();
             return;
@@ -134,8 +134,8 @@ namespace supervision
         constexpr float margin = 2.0f;
         constexpr float fallbackPerAmpere = 2.0e4f;
 
-        const auto torqueConstant = 1.5f * static_cast<float>(calibration.polePairs) * calibration.fluxLinkage;
-        const auto perAmpere = torqueConstant > 0.0f && calibration.inertia > 0.0f ? torqueConstant / calibration.inertia : fallbackPerAmpere;
+        const auto torqueConstant = foc::TorqueConstantFor(calibration.polePairs, foc::Weber{ calibration.fluxLinkage });
+        const auto perAmpere = torqueConstant.Value() > 0.0f && calibration.inertia > 0.0f ? torqueConstant.Value() / calibration.inertia : fallbackPerAmpere;
 
         return EncoderFreezeMonitor::Limits{
             .maximumDeceleration = foc::RadiansPerSecondSquared{ margin * perAmpere * maxCurrent.Value() },

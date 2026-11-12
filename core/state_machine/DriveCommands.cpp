@@ -76,9 +76,13 @@ namespace state_machine
         const foc::Radians positionMinimum{ config.limits.positionMinimum };
         const foc::Radians positionMaximum{ config.limits.positionMaximum };
         const bool homingRequired = config.homingRequired != 0;
+        const foc::RadiansPerSecondSquared quickStopDeceleration{ config.limits.quickStopDeceleration };
 
         drive.Visit([&]<class Machine>(Machine& sm)
             {
+                if constexpr (!std::is_same_v<Machine, std::monostate>)
+                    sm.SetQuickStopDeceleration(quickStopDeceleration);
+
                 if constexpr (std::is_same_v<Machine, application::TorqueStateMachine>)
                     sm.SpeedLimiter().LimitSpeed(overspeedLimit);
                 else if constexpr (!std::is_same_v<Machine, std::monostate>)

@@ -141,6 +141,13 @@ pending on it. It is enabled while the bus is open and at least one of those mot
 names the motors it reached and, separately, those it could not reach (incompatible firmware or a refused
 frame) with the advice to use the hardware stop.
 
+Beside Stop Motor each motor has **Quick Stop** (contract 3.2, `state-machine.md` Quick Stop), an ordinary motor
+command: it decelerates that motor at its quick-stop deceleration and leaves it Ready, where Stop Motor cuts the
+power stage and lets it coast. The status shows *Stopping*, as a warning, until it is Ready. It is
+enabled under the rule above, also while the last status says the motor is stopped,
+since a stale status must not hold back a stop; otherwise its tooltip says why. The emergency stop stays the stop
+of every motor at once and of a motor that calibrates.
+
 Input ranges and decimal places follow the wire contract: the limit is the smaller of the firmware's
 command limit and what the 16-bit wire field can carry, and the decimals match the wire resolution, so the
 tool never offers precision that the frame drops. Position is the exception: the firmware accepts ±2π,
@@ -189,6 +196,7 @@ the last status the controller reported:
 | Fault                         | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
 | Fault                         | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
 | Calibrating                   | any operating command                              | Wait until it finishes                                                                     | —                     |
+| Stopping                      | any operating command                              | Wait until it is Ready                                                                     | —                     |
 | Running                       | Align Rotor                                        | Stop the motor first                                                                       | Stop Motor            |
 | any                           | a setpoint for another control mode                | Select that mode while the motor is stopped                                                | —                     |
 
@@ -287,11 +295,13 @@ flowchart LR
   Part L). The group says each is off at 0, that a running drive faults with undervoltage or overvoltage when the
   bus leaves them while a stopped one is not watched, and that the board's own trips stay in force. They are
   stored at once and in force within 10 ms.
-  Its **Online Recalibration** group holds the recalibration mode of contract 2.17 (`online-recalibration.md`), chosen
+Its **Quick Stop** group holds the quick-stop deceleration of contract 3.2 (`state-machine.md`, Quick Stop): the
+  rate at which Quick Stop slows the motor down, zero braking at the current limit. It is stored at once and used
+  by the next quick stop.
+ Its **Online Recalibration** group holds the recalibration mode of contract 2.17 (`online-recalibration.md`), chosen
   by name: *Off*, *On command* or *Automatic*. The group says that speed and position mode re-estimate the motor while
   it runs, that *On command* redesigns the loops when Recalibrate is pressed on the Diagnostics tab and *Automatic* at
   every stop, and that the loops never change while the motor runs. It is stored at once.
-
 Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
 the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
 marked. Within a loop the settings go before the algorithm, so a law is designed with the settings it was
@@ -304,7 +314,7 @@ drops the edits and reads the values in force again.
 Controllers and motor parameters change only while the motor is stopped: their Apply is disabled, with the
 reason, while the last status says the motor runs or calibrates. Start-up settings can be stored at any time.
 
-A node is compatible only when its contract version equals the tool's (`wire-contract.md` of e-foc-protocol Part A), so every
+ node is compatible only when its contract version equals the tool's (`wire-contract.md` of e-foc-protocol Part A), so every
 setting, reading and command in this part is offered on every compatible node; the tool keeps no path for older
 firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
 firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot

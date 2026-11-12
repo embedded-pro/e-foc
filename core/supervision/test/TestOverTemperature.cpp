@@ -23,6 +23,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -154,6 +155,21 @@ TEST_F(OverTemperatureTest, an_unknown_temperature_keeps_the_board_limit_and_nev
 
 TEST_F(OverTemperatureTest, a_winding_at_the_limit_trips_once_five_seconds_after_the_enable)
 {
+    temperature = foc::Celsius{ 125.0f };
+
+    Run(std::chrono::milliseconds(4900));
+    EXPECT_EQ(0u, Trips());
+
+    Run(std::chrono::milliseconds(200));
+    EXPECT_EQ(1u, Trips());
+
+    Run(std::chrono::seconds(5));
+    EXPECT_EQ(1u, Trips());
+}
+
+TEST_F(OverTemperatureTest, a_stopping_drive_trips_as_well)
+{
+    state = state_machine::Stopping{};
     temperature = foc::Celsius{ 125.0f };
 
     Run(std::chrono::milliseconds(4900));

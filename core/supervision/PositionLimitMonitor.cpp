@@ -31,7 +31,7 @@ namespace supervision
     void PositionLimitMonitor::Evaluate()
     {
         const auto* drive = positionDrive != nullptr ? positionDrive() : nullptr;
-        if (drive == nullptr || !std::holds_alternative<state_machine::Enabled>(drive->CurrentState()))
+        if (drive == nullptr || !state_machine::IsOperating(drive->CurrentState()))
         {
             reported = false;
             return;

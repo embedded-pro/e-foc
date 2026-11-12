@@ -844,6 +844,80 @@ TEST_F(TestTorqueCascade, a_bus_at_half_the_configured_voltage_saturates_at_the_
     EXPECT_NEAR(DutyPercent(halved.c), DutyPercent(expected.c), 0.1f);
 }
 
+namespace
+{
+    class TestTorqueCascadeBraking
+        : public TestTorqueCascadeSpeedLimit
+    {
+    public:
+        static constexpr float inertiaOverTorqueConstant{ 0.001f };
+
+        float Demanded() const
+        {
+            return focTorque->ObserveMotion().demandedTorqueCurrent.Value();
+        }
+    };
+}
+
+TEST_F(TestTorqueCascadeBraking, braking_demands_a_current_against_the_speed_proportional_to_it)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.5f } });
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 0.0f }, inertiaOverTorqueConstant);
+
+    Spin(*focTorque, 4.0f);
+
+    EXPECT_NEAR(Demanded(), -500.0f * inertiaOverTorqueConstant * 4.0f, 1e-2f);
+}
+
+TEST_F(TestTorqueCascadeBraking, a_reversing_rotor_is_braked_the_other_way)
+{
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 0.0f }, inertiaOverTorqueConstant);
+
+    Spin(*focTorque, -4.0f);
+
+    EXPECT_NEAR(Demanded(), 500.0f * inertiaOverTorqueConstant * 4.0f, 1e-2f);
+}
+
+TEST_F(TestTorqueCascadeBraking, the_braking_current_is_capped_at_the_one_that_gives_the_deceleration)
+{
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 500.0f }, inertiaOverTorqueConstant);
+
+    Spin(*focTorque, 40.0f);
+
+    EXPECT_NEAR(Demanded(), -0.5f, 1e-3f);
+}
+
+TEST_F(TestTorqueCascadeBraking, without_a_deceleration_the_braking_current_is_capped_at_the_current_limit)
+{
+    focTorque->LimitCurrent(foc::Ampere{ 3.0f });
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 0.0f }, inertiaOverTorqueConstant);
+
+    Spin(*focTorque, 40.0f);
+
+    EXPECT_NEAR(Demanded(), -3.0f, 1e-3f);
+}
+
+TEST_F(TestTorqueCascadeBraking, enable_ends_the_braking)
+{
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.5f } });
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 0.0f }, inertiaOverTorqueConstant);
+    Spin(*focTorque, 4.0f);
+
+    focTorque->Enable();
+    Spin(*focTorque, 4.0f);
+
+    EXPECT_NEAR(Demanded(), 0.5f, 1e-6f);
+}
+
+TEST_F(TestTorqueCascadeBraking, the_braking_current_drives_the_inverter)
+{
+    focTorque->Brake(foc::RadiansPerSecondSquared{ 0.0f }, inertiaOverTorqueConstant);
+
+    const auto braked = Spin(*focTorque, 40.0f);
+
+    ExpectSameDuty(braked, Unlimited(-10.0f, 40.0f));
+}
+
 TEST_F(TestTorqueCascade, the_inverse_park_angle_is_advanced_by_the_duty_delay_and_the_hold_at_a_positive_speed)
 {
     constexpr float step = 0.005f;

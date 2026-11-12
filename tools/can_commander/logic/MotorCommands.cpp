@@ -41,6 +41,14 @@ namespace tool
             });
     }
 
+    bool MotorCommands::SendQuickStop(uint16_t nodeId)
+    {
+        return Tracked(nodeId, can::focQuickStopId, [this, nodeId]()
+            {
+                return category.SendQuickStop(nodeId);
+            });
+    }
+
     bool MotorCommands::SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode)
     {
         return Tracked(nodeId, can::focSelectControlModeId, [this, nodeId, mode]()

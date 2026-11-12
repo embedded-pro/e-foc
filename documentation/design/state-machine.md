@@ -48,15 +48,16 @@ date: 2026-11-08
 
 ### Motor Lifecycle States
 
-The state machine has five named states:
+The state machine has six named states:
 
-| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                                                                                                        |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and either a rotor reference kept by a control-mode switch or an index angle an index search can restore it from), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                   |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault)                                                                                       |
-| `Ready`       | Calibration data valid, rotor reference established or restorable from the encoder index; motor can be enabled                        | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true or the record's index angle can restore it; the first after power-up, a mode switch or a Fault re-measures the offsets, and one without a reference searches the index), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing) |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                                                                                                      |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                                                                                                                 |
+| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                      |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Ready` (boot load completes with a complete record and either a rotor reference kept by a control-mode switch or an index angle an index search can restore it from), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault) |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault)     |
+| `Ready`       | Calibration data valid, rotor reference established or restorable from the encoder index; motor can be enabled                        | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true; the first after power-up, a mode switch or a Fault re-measures the offsets), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)          |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Stopping` (CmdQuickStop), → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                       |
+| `Stopping`    | FOC controller active; the drive decelerates the rotor to a standstill under control (Quick Stop below)                               | → `Ready` (the rotor below 2 rad/s, the stop deadline, CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                        |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                               |
 
 ### State Diagram
 
@@ -86,6 +87,12 @@ stateDiagram-v2
     Enabled --> Ready : CmdEmergencyStop\n(calibration still valid)
     Enabled --> Idle : CmdEmergencyStop\n(no valid calibration)
     Enabled --> Fault : hardware fault
+    Enabled --> Stopping : CmdQuickStop
+
+    Stopping --> Ready : below 2 rad/s or deadline,\nCmdDisable
+    Stopping --> Ready : CmdEmergencyStop\n(calibration still valid)
+    Stopping --> Idle : CmdEmergencyStop\n(no valid calibration)
+    Stopping --> Fault : hardware fault
 
     Fault --> Ready : CmdClearFault\n(valid calibration held)
     Fault --> Idle : CmdClearFault\n(no valid calibration)
@@ -132,9 +139,10 @@ The table is the single source of truth for what the machine accepts:
   build, naming the offending row. A malformed lifecycle therefore never produces a binary.
 - `FocLifecycleTable::Rules()` declares which state changes the lifecycle may make, separately
   from the rows: `Idle` → `Calibrating`, `Ready` or `Idle`; `Ready` → `Calibrating`, `Enabled` or
-  `Idle`; `Calibrating`, `Enabled` and `Fault` → `Ready` or `Idle`; and any state → `Fault`.
-  `Enabled` is forbidden from every state except `Ready`, and `Fault` never leads straight
-  back to `Calibrating`. A row that makes any other transition, or an allowed transition that
+  `Idle`; `Enabled` → `Stopping`, `Ready` or `Idle`; `Calibrating`, `Stopping` and `Fault` → `Ready`
+  or `Idle`; and any state → `Fault`. `Enabled` is forbidden from every state except `Ready`,
+  `Stopping` from every state except `Enabled`, and `Fault` never leads straight back to
+  `Calibrating`. A row that makes any other transition, or an allowed transition that
   no row makes, is a compile error.
 
 Events are handled to completion. An event dispatched while another is being handled, for
@@ -202,12 +210,12 @@ concrete control mode.
 
 The resulting state depends on the state the command was issued from:
 
-| Issued from                | Resulting state | Rationale                                                                          |
-|----------------------------|-----------------|------------------------------------------------------------------------------------|
-| `Enabled` or `Calibrating` | `Ready`         | Calibration data in memory and NVM is still valid; the motor stays enableable      |
-| `Enabled` or `Calibrating` | `Idle`          | No valid calibration data is held, so the motor must be calibrated before enabling |
-| `Idle`, `Ready`            | unchanged       | The machine is already stopped; only the inverter stop is (re)issued               |
-| `Fault`                    | `Fault`         | The fault state is safe and must be cleared explicitly with `CmdClearFault`        |
+| Issued from                            | Resulting state | Rationale                                                                          |
+|----------------------------------------|-----------------|------------------------------------------------------------------------------------|
+| `Enabled`, `Stopping` or `Calibrating` | `Ready`         | Calibration data in memory and NVM is still valid; the motor stays enableable      |
+| `Enabled`, `Stopping` or `Calibrating` | `Idle`          | No valid calibration data is held, so the motor must be calibrated before enabling |
+| `Idle`, `Ready`                        | unchanged       | The machine is already stopped; only the inverter stop is (re)issued               |
+| `Fault`                                | `Fault`         | The fault state is safe and must be cleared explicitly with `CmdClearFault`        |
 
 `CmdClearFault` returns to `Ready` when valid calibration is held and to `Idle` when it is not — it
 does not unconditionally return to `Idle`. Clearing releases the latch, so the following `CmdEnable`
@@ -224,6 +232,50 @@ save succeeds — so a previously valid calibration survives an emergency stop d
 machine returns to `Ready`.
 
 Dropping to `Idle` on every emergency stop would force a full recalibration after each safety intervention, which is why the transition is conditional on calibration validity rather than unconditional.
+
+### Quick Stop
+
+An emergency stop cuts the power stage and leaves the rotor to coast, which takes as long as friction allows on a
+drive with inertia. `CmdQuickStop` stops it under control instead (REQ-LCY-006): from `Enabled` it enters
+`Stopping`, where the power stage stays on and the active mode decelerates the rotor towards a standstill at the
+quick-stop deceleration of the configuration record.
+
+| Setting                 | Default           | Range              | Meaning                                         |
+|-------------------------|-------------------|--------------------|-------------------------------------------------|
+| Quick-stop deceleration | 0 (current limit) | 0 – 100 000 rad/s² | Rate at which a quick stop slows the rotor down |
+
+- Speed and position mode ramp the speed reference from the measured speed to zero at the deceleration, and the
+  speed loop follows it within the current limit; a deceleration of zero steps the reference to zero, so the
+  loop brakes at the current limit. The position law and the speed ramp of the setpoint are suspended
+  (`foc-speed.md` and `foc-position.md`, Quick Stop).
+- Torque mode has no speed loop: the cascade brakes with a q-axis current against the measured speed, capped at
+  the current that decelerates the calibrated inertia at the deceleration, or at the current limit for zero
+  (`foc-torque.md`, Quick Stop). Without a calibrated inertia it cannot size the braking current, so
+  `CmdQuickStop` is rejected and the drive stays `Enabled`; the client falls back to the emergency stop.
+
+The event loop checks the measured speed every 10 ms. Once its magnitude is below 2 rad/s, or once the deadline
+has passed whatever the speed, the drive cuts the power stage and enters `Ready`; the remaining speed coasts out.
+The deadline is set on entry from the measured speed |ω₀| and the deceleration a: 1.25·|ω₀|/a + 100 ms, a quarter
+more than the ramp needs plus one outer settling time, so a slow ramp runs to the end and a stop that does not
+decelerate is still cut. A deceleration of zero brakes at the current limit and has a 1 s deadline.
+
+While `Stopping` the drive refuses setpoints, a mode switch and calibration. The fault supervisors that guard the
+power stage and the motor (bus voltage, over-temperature, overspeed, encoder freeze and plausibility, phase loss,
+travel limits) watch `Enabled` and `Stopping` alike (`state_machine::IsOperating`); the following-error and
+target-window monitors, the CAN liveness watchdog and the command timeout watch `Enabled` only, since the stop
+suspends the position law and takes no setpoints. `CmdDisable` and `CmdEmergencyStop` cut it short
+and cut the power stage at once, and a fault enters `Fault` from it as from `Enabled`. `CmdQuickStop` is
+accepted and changes nothing in `Stopping`, `Idle`, `Ready` and `Fault`, and is rejected in `Calibrating`, whose
+stop is the emergency stop.
+
+```mermaid
+stateDiagram-v2
+    Enabled --> Stopping : CmdQuickStop\n(mode starts braking)
+    Stopping --> Stopping : every 10 ms, |ω| ≥ 2 rad/s\nand before the deadline
+    Stopping --> Ready : |ω| < 2 rad/s or deadline\n(power stage cut)
+    Stopping --> Ready : CmdDisable or CmdEmergencyStop\n(power stage cut at once)
+    Stopping --> Fault : fault
+```
 
 ### Calibration Sequence
 
@@ -1148,21 +1200,23 @@ sequenceDiagram
 
 ### Provided
 
-| Interface                 | Purpose                                                                                | Contract                                                                                                                                                                                                                                                     |
-|---------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocStateMachineBase`     | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (a command without a row in the current state is rejected with a status and traced, never applied)                                                                     |
-| `CurrentState()`          | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
-| `LastFaultCode()`         | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
-| `CmdCalibrate()`          | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
-| `CmdReAlign()`            | Re-establishes the rotor reference without re-running R/L or mechanical identification | Only effective from `Idle` or `Ready` with valid electrical calibration loaded; enters `Calibrating` (alignment sub-step only), then `Ready` with `rotorReferenceValid` on success, or `Fault` on failure                                                    |
-| `CmdEnable()`             | Requests enabling the FOC controller                                                   | Only effective from `Ready` when `rotorReferenceValid` is true; rejected when the rotor reference has not been established since the last reset                                                                                                              |
-| `CmdDisable()`            | Requests disabling the FOC controller                                                  | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
-| `CmdClearFault()`         | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
-| `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
-| `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
-| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. Used by `ControlModeStateMachine` to refuse destroying the machine.                   |
-| `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
-| `ApplyModel(model)`       | Redesigns the current and speed loops from a motor model                               | Only effective while stopped; returns false otherwise. Keeps the estimators' state. Speed/position modes only (`online-recalibration.md`).                                                                                                                   |
+| Interface                 | Purpose                                                                                | Contract                                                                                                                                                                                                                                                                 |
+|---------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocStateMachineBase`     | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (a command without a row in the current state is rejected with a status and traced, never applied)                                                                                 |
+| `CurrentState()`          | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                                   |
+| `LastFaultCode()`         | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                                       |
+| `CmdCalibrate()`          | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                                     |
+| `CmdReAlign()`            | Re-establishes the rotor reference without re-running R/L or mechanical identification | Only effective from `Idle` or `Ready` with valid electrical calibration loaded; enters `Calibrating` (alignment sub-step only), then `Ready` with `rotorReferenceValid` on success, or `Fault` on failure                                                                |
+| `CmdEnable()`             | Requests enabling the FOC controller                                                   | Only effective from `Ready` when `rotorReferenceValid` is true; rejected when the rotor reference has not been established since the last reset                                                                                                                          |
+| `CmdDisable()`            | Requests disabling the FOC controller                                                  | Only effective from `Enabled` and `Stopping`; ignored from all other states                                                                                                                                                                                              |
+| `CmdClearFault()`         | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                               |
+| `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                                        |
+| `CmdQuickStop()`          | Decelerates the rotor under control, then stops PWM                                    | From `Enabled` enters `Stopping`, `ok`; `Ready` below 2 rad/s or at the deadline. Rejected when the mode cannot brake and in `Calibrating`; no effect in `Stopping`, `Idle`, `Ready`, `Fault`.                                                                           |
+| `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled`, `Stopping` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
+| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. Used by `ControlModeStateMachine` to refuse destroying the machine.                               |
+| `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                                |
+| `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                                     |
+| `ApplyModel(model)`       | Redesigns the current and speed loops from a motor model                               | Only effective while stopped; returns false otherwise. Keeps the estimators' state. Speed/position modes only (`online-recalibration.md`).                                                                                                                               |
 
 ### Required
 
@@ -1184,17 +1238,17 @@ sequenceDiagram
 
 ## Data Model
 
-| Entity            | Field                  | Type / Unit                    | Range     | Notes                                                                                                                                                                                                                   |
-|-------------------|------------------------|--------------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255     | Number of electrical pole pairs                                                                                                                                                                                         |
-| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0       | Phase resistance identified by electrical ident                                                                                                                                                                         |
-| `CalibrationData` | `lD`                   | mH (float)                     | > 0       | Phase inductance, used for both axes (anisotropy not estimated)                                                                                                                                                         |
-| `CalibrationData` | `encoderIndexAngle`    | rad (float), mechanical        | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                                          |
-| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
-| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
-| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                                        |
-| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                                               |
-| `FaultCode`       | —                      | enum (uint8)                   | 14 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout`, `positionLimit` |
+| Entity            | Field                | Type / Unit             | Range     | Notes                                                                                                                                                                                                                   |
+|-------------------|----------------------|-------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CalibrationData` | `polePairs`          | count (uint8)           | 1–255     | Number of electrical pole pairs                                                                                                                                                                                         |
+| `CalibrationData` | `rPhase`             | Ohm (float)             | > 0       | Phase resistance identified by electrical ident                                                                                                                                                                         |
+| `CalibrationData` | `lD`                 | mH (float)              | > 0       | Phase inductance, used for both axes (anisotropy not estimated)                                                                                                                                                         |
+| `CalibrationData` | `encoderIndexAngle`  | rad (float), mechanical | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                                          |
+| `CalibrationData` | `inertia`            | N·m·s² (float)          | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                                  |
+| `CalibrationData` | `frictionViscous`    | N·m·s/rad (float)       | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                                   |
+| `CalibrationData` | `frictionCoulomb`    | N·m (float)             | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                                        |
+| `CalibrationData` | `speedLoopBandwidth` | rad/s (float)           | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                                               |
+| `FaultCode`       | —                    | enum (uint8)            | 14 values | `none`, `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `hardwareFault`, `calibrationFailed`, `stall`, `phaseMissing`, `overspeed`, `followingError`, `commandTimeout`, `positionLimit` |
 
 A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt and the hardware
 resets the target, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the

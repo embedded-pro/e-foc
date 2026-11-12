@@ -9,6 +9,7 @@
       "integration_tests/features/fault_supervision.feature",
       "integration_tests/features/firmware_identity.feature",
       "integration_tests/features/firmware_upgrade.feature",
+      "integration_tests/features/quick_stop.feature",
       "integration_tests/features/thermal_protection.feature",
       "integration_tests/features/watchdog.feature"
     ],

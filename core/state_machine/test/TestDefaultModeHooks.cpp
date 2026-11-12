@@ -16,6 +16,9 @@ namespace
         MOCK_METHOD(void, RunPostAlignmentStep, (state_machine::Calibrating & calibrating), (override));
         MOCK_METHOD(void, ProvisionalControlSuperseded, (), (override));
         MOCK_METHOD(void, RestoreControlAfterProvisionalIdentification, (), (override));
+        MOCK_METHOD(foc::RadiansPerSecondSquared, QuickStopDeceleration, (), (const, override));
+        MOCK_METHOD(bool, CanBeginQuickStop, (), (const, override));
+        MOCK_METHOD(bool, BeginQuickStop, (), (override));
     };
 }
 

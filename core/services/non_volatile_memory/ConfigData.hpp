@@ -64,6 +64,7 @@ namespace services
         float temperatureMargin = 15.0f;
         float busVoltageMinimum = 0.0f;
         float busVoltageMaximum = 0.0f;
+        float quickStopDeceleration = 0.0f;
     };
 
     enum class RecalibrationMode : uint8_t
@@ -74,7 +75,7 @@ namespace services
     };
 
     inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
-    inline constexpr uint8_t ConfigLayoutVersion = 15;
+    inline constexpr uint8_t ConfigLayoutVersion = 16;
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
@@ -98,5 +99,5 @@ namespace services
         uint8_t homingRequired = 0;
     };
 
-    static_assert(sizeof(ConfigData) == 184, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 188, "ConfigData layout must be free of implicit padding");
 }

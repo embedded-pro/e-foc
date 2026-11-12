@@ -38,7 +38,7 @@ namespace foc
 
         Ampere MeasuredQuadratureCurrent() const final
         {
-            return Ampere{ lastIq };
+            return Ampere{ last.quadratureCurrent };
         }
 
         MotionObservation ObserveMotion() const override;
@@ -55,11 +55,15 @@ namespace foc
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;
 
+        // Brakes against the measured speed until the next Enable or Disable; J / Kt in kg·m²·A/(N·m), zero deceleration caps at the current limit.
+        void Brake(RadiansPerSecondSquared deceleration, float inertiaOverTorqueConstant);
+
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
         void UpdateSpeedLimit();
         IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;
         float LimitedQuadrature(float quadrature, float electricalSpeed, float feedForward) const;
+        float RequestedQuadrature(float setPoint, float electricalSpeed) const;
 
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
@@ -93,12 +97,27 @@ namespace foc
             volatile float current{ 0.0f };
         };
 
+        struct Braking
+        {
+            // Written by the event loop before active is set, read by the control interrupt; amperes per electrical rad/s.
+            volatile float gain{ 0.0f };
+            volatile float current{ 0.0f };
+            volatile bool active{ false };
+        };
+
         SpeedMeasurement speedMeasurement;
+        Braking braking;
         QuadratureVoltageWindow voltageWindow;
         float voltageScale{ 0.0f };
         uint32_t samplesPerMillisecond{ 1 };
-        volatile float lastElectricalSpeed{ 0.0f };
-        volatile float lastIq{ 0.0f };
+
+        struct LastSample
+        {
+            volatile float electricalSpeed{ 0.0f };
+            volatile float quadratureCurrent{ 0.0f };
+        };
+
+        LastSample last;
         DriveLimits limits;
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;

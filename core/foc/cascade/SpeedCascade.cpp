@@ -50,6 +50,11 @@ namespace foc
             ApplyReference(point.Value());
     }
 
+    void SpeedCascade::QuickStop(RadiansPerSecondSquared deceleration)
+    {
+        BeginQuickStop(deceleration);
+    }
+
     void SpeedCascade::RampSpeed(RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration)
     {
         const auto frequency = static_cast<float>(outerLoopFrequency.Value());
@@ -95,7 +100,7 @@ namespace foc
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
 
-        if (HoldCommandedCurrent())
+        if (HoldCommandedCurrent() || RunQuickStop(mechanicalSpeed))
             return;
 
         RampReference();

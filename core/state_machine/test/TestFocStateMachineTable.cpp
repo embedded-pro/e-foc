@@ -45,6 +45,12 @@ namespace
         Edge{ State<state_machine::Calibrating>(), Event<state_machine::CompleteExternalCalibration>() },
         Edge{ State<state_machine::Calibrating>(), Event<state_machine::ReleaseExternalCalibration>() },
         Edge{ State<state_machine::Enabled>(), Event<state_machine::Disable>() },
+        Edge{ State<state_machine::Enabled>(), Event<state_machine::QuickStop>() },
+        Edge{ State<state_machine::Stopping>(), Event<state_machine::Disable>() },
+        Edge{ State<state_machine::Stopping>(), Event<state_machine::QuickStop>() },
+        Edge{ State<state_machine::Idle>(), Event<state_machine::QuickStop>() },
+        Edge{ State<state_machine::Ready>(), Event<state_machine::QuickStop>() },
+        Edge{ State<state_machine::Fault>(), Event<state_machine::QuickStop>() },
         Edge{ State<state_machine::Fault>(), Event<state_machine::ClearFault>() },
     };
 
@@ -59,6 +65,7 @@ namespace
         Event<state_machine::Enable>(),
         Event<state_machine::Disable>(),
         Event<state_machine::ClearFault>(),
+        Event<state_machine::QuickStop>(),
     };
 
     struct NonCommandEvent
@@ -67,11 +74,12 @@ namespace
         std::array<bool, StateId::count> handledIn;
     };
 
-    constexpr std::array<bool, StateId::count> onlyIdle{ true, false, false, false, false };
-    constexpr std::array<bool, StateId::count> onlyCalibrating{ false, true, false, false, false };
-    constexpr std::array<bool, StateId::count> onlyReady{ false, false, true, false, false };
-    constexpr std::array<bool, StateId::count> idleReadyAndFault{ true, false, true, false, true };
-    constexpr std::array<bool, StateId::count> everywhere{ true, true, true, true, true };
+    constexpr std::array<bool, StateId::count> onlyIdle{ true, false, false, false, false, false };
+    constexpr std::array<bool, StateId::count> onlyCalibrating{ false, true, false, false, false, false };
+    constexpr std::array<bool, StateId::count> onlyReady{ false, false, true, false, false, false };
+    constexpr std::array<bool, StateId::count> onlyStopping{ false, false, false, false, true, false };
+    constexpr std::array<bool, StateId::count> idleReadyAndFault{ true, false, true, false, false, true };
+    constexpr std::array<bool, StateId::count> everywhere{ true, true, true, true, true, true };
 
     constexpr std::array nonCommandEvents{
         NonCommandEvent{ Event<state_machine::CalibrationStepChanged>(), onlyCalibrating },
@@ -87,6 +95,7 @@ namespace
         NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
         NonCommandEvent{ Event<state_machine::MotorParameterSaved>(), idleReadyAndFault },
         NonCommandEvent{ Event<state_machine::OffsetsRefreshed>(), onlyReady },
+        NonCommandEvent{ Event<state_machine::StopCompleted>(), onlyStopping },
         NonCommandEvent{ Event<state_machine::IndexSearched>(), onlyReady },
         NonCommandEvent{ Event<state_machine::FaultDetected>(), everywhere },
         NonCommandEvent{ Event<state_machine::EmergencyStop>(), everywhere },

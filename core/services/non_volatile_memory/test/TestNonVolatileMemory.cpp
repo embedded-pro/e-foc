@@ -537,9 +537,9 @@ TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
     EXPECT_EQ(loaded.homingRequired, uint8_t{ 1 });
 }
 
-TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_15)
+TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_16)
 {
-    EXPECT_EQ(services::ConfigLayoutVersion, 15);
+    EXPECT_EQ(services::ConfigLayoutVersion, 16);
 }
 
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)

@@ -55,7 +55,7 @@ date: 2026-11-11
 
 ### Part A — FOC Motor Message Catalogue
 
-The category's message catalogue, scale factors, parameter table and contract version are defined by the
+he category's message catalogue, scale factors, parameter table and contract version are defined by the
 e-foc-protocol library, in `infra/e-foc-protocol/documentation/design/wire-contract.md` Part A. This firmware
 restates none of it.
 
@@ -76,14 +76,14 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
-- `OnQueryFaultHistory(age)` → the fault history's record of that age, answered with both responses.
+ `OnQueryFaultHistory(age)` → the fault history's record of that age, answered with both responses.
 - `OnClearFaultHistory` → clears the fault history; the acknowledgement follows the store.
+- `OnQuickStop` → `CmdQuickStop()`; a refusal in `Calibrating` answers `invalidState`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetSetpoint` → validate mode, range and state, then delegate to `TrySet*` on the state machine; the N·m kind first converts with the torque constant of Part A (contract 2.21) and is refused `invalidState` when there is none.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); wait for standstill, measure and apply the current offsets; run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, with the offsets in `data`, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate (or one that does not fit the calibration record's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
 - `OnRequestTelemetry` → broadcast the current state and fault code via `focTelemetryStatusResponseId`, then the measured speed and measured position via `focTelemetryMotionId`; always succeeds.
-  `ToCanMotorState` maps `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
-- `OnSelectAlgorithm` → the control mode's selection for that loop, then the configuration record is stored;
+  `ToCanMotorState` maps `Stopping` to `FocMotorState::stopping`, `Ready` to `FocMotorState::ready`, and `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).- `OnSelectAlgorithm` → the control mode's selection for that loop, then the configuration record is stored;
   the response and acknowledgement follow the write. `AlgorithmsResponse` reports what the selectors run, so
   a refused selection is visible as the unchanged algorithm.
 - `OnSetParameter` → by parameter group:

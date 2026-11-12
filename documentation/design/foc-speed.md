@@ -2,7 +2,7 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: foc-speed
 date: 2026-11-08
 ---
@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | FOC Speed Control |
 | Type      | design            |
 | Status    | draft             |
-| Version   | 0.3.1             |
+| Version   | 0.4.0             |
 | Component | foc-speed         |
 | Date      | 2026-11-08        |
 
@@ -177,11 +177,25 @@ accel away from 0, decel towards 0"}
     REF --> R
 ```
 
+### Quick Stop
+
+A quick stop (`state-machine.md`, Quick Stop) hands the cascade a deceleration a and makes the outer loop
+own the speed reference until the next Enable or Disable. The reference starts from the measured speed, so a
+loop that lags its setpoint is not first driven back up to it, and each tick moves it towards zero by at most
+a over one outer-loop period; at a = 0 it is zero from the first tick, and the loop brakes at the current
+limit. The speed law follows the reference within the current limit as it follows a setpoint, and the
+setpoint and its ramp are set aside: a setpoint arriving meanwhile is stored for the next Enable, not applied.
+The online estimators keep their last estimates while the stop runs.
+
+The deceleration reaches the outer loop as two single-precision stores, the step and then the flag that
+starts the stop, so the outer loop never sees one without the other. From 100 rad/s at 500 rad/s² the
+reference reaches 2 rad/s after 196 ms.
+
 ### Enable and Disable
 
-**Enable**: resets and arms all three PID controllers (speed, d-axis, q-axis). The last speed setpoint is preserved so the motor resumes commanding toward the previous target; with a ramp set, the reference starts from zero and ramps towards it.
+**Enable**: ends a quick stop, resets and arms all three PID controllers (speed, d-axis, q-axis). The last speed setpoint is preserved so the motor resumes commanding toward the previous target; with a ramp set, the reference starts from zero and ramps towards it.
 
-**Disable**: disarms all three PIDs. `Calculate()` returns zero duty cycles. The outer loop continues to receive its LPI callbacks but produces no Iq output while disarmed.
+**Disable**: ends a quick stop and disarms all three PIDs. `Calculate()` returns zero duty cycles. The outer loop continues to receive its LPI callbacks but produces no Iq output while disarmed.
 
 ```mermaid
 stateDiagram-v2

@@ -145,9 +145,10 @@ namespace tool
     void TelemetryPanel::OnMotorStatus(FocMotorState state, FocFaultCode fault)
     {
         motorStateLabel->setText(MotorStateName(state));
-        const auto level = state == FocMotorState::fault     ? ui::theme::StatusLevel::Fault
-                           : state == FocMotorState::running ? ui::theme::StatusLevel::Ok
-                                                             : ui::theme::StatusLevel::Neutral;
+        const auto level = state == FocMotorState::fault      ? ui::theme::StatusLevel::Fault
+                           : state == FocMotorState::running  ? ui::theme::StatusLevel::Ok
+                           : state == FocMotorState::stopping ? ui::theme::StatusLevel::Warning
+                                                              : ui::theme::StatusLevel::Neutral;
         ui::backend::qt::StyleStatusLabel(*motorStateLabel, level);
         ShowFault(fault);
     }
@@ -230,6 +231,8 @@ namespace tool
                 return "Partially calibrated";
             case FocMotorState::ready:
                 return "Ready";
+            case FocMotorState::stopping:
+                return "Stopping";
             default:
                 return "Unknown";
         }

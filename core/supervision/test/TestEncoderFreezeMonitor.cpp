@@ -27,6 +27,7 @@ namespace
         MOCK_METHOD(state_machine::CommandResult, CmdClearFault, (), (override));
         MOCK_METHOD(void, CmdClearCalibration, (const infra::Function<void(state_machine::CommandResult)>& onDone), (override));
         MOCK_METHOD(state_machine::CommandResult, CmdEmergencyStop, (), (override));
+        MOCK_METHOD(state_machine::CommandResult, CmdQuickStop, (), (override));
         MOCK_METHOD(foc::MotionObservation, ObserveMotion, (), (const, override));
     };
 
@@ -102,6 +103,18 @@ namespace
 
 TEST_F(EncoderFreezeMonitorTest, a_reading_that_stops_dead_at_speed_is_an_encoder_loss_after_5_ms)
 {
+    rotor = TurningUntil(100.0f, 0.050f);
+
+    Run(std::chrono::milliseconds(54));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(2));
+    EXPECT_EQ(1u, Reports());
+}
+
+TEST_F(EncoderFreezeMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
     rotor = TurningUntil(100.0f, 0.050f);
 
     Run(std::chrono::milliseconds(54));

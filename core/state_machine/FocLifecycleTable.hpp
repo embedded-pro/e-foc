@@ -13,7 +13,7 @@ namespace application
         using Initial = state_machine::Idle;
 
         static services::ValidatedTable<LifecycleMachine> Table();
-        static constexpr std::array<LifecycleMachine::Transition, 57> Rows();
+        static constexpr std::array<LifecycleMachine::Transition, 66> Rows();
         static constexpr LifecycleMachine::Rules Rules();
         static void RegisterEnteredHooks(LifecycleMachine& machine);
 
@@ -23,7 +23,8 @@ namespace application
         static constexpr std::array<Transition, 16> CalibrationRows();
         static constexpr std::array<Transition, 4> CalibrationCompletionRows();
         static constexpr std::array<Transition, 9> OperationRows();
-        static constexpr std::array<Transition, 10> SafetyRows();
+        static constexpr std::array<Transition, 7> QuickStopRows();
+        static constexpr std::array<Transition, 12> SafetyRows();
         static constexpr std::array<Transition, 15> MaintenanceRows();
         static constexpr std::array<Transition, 3> FaultReconciliationRows();
         static constexpr std::array<Transition, 3> BootRows();

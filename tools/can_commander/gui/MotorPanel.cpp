@@ -189,6 +189,7 @@ namespace tool
                     });
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, this, &MotorPanel::SendStopMotor);
+        connect(commandPanel, &CommandPanel::QuickStopRequested, this, &MotorPanel::SendQuickStop);
         connect(commandPanel, &CommandPanel::ClearFaultRequested, this, &MotorPanel::SendClearFault);
         connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
             {
@@ -209,6 +210,14 @@ namespace tool
         Send("Stop Motor", can::focStopId, [this]()
             {
                 return client.Commands().SendStopMotor(nodeId);
+            });
+    }
+
+    void MotorPanel::SendQuickStop()
+    {
+        Send("Quick Stop", can::focQuickStopId, [this]()
+            {
+                return client.Commands().SendQuickStop(nodeId);
             });
     }
 
@@ -530,7 +539,7 @@ namespace tool
     {
         if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
             return reason;
-        if (lastState == FocMotorState::running)
+        if (lastState == FocMotorState::running || lastState == FocMotorState::stopping)
             return "Stop the motor to change its controllers or motor parameters.";
         if (lastState == FocMotorState::calibrating)
             return "Wait for the calibration to finish.";
@@ -563,6 +572,7 @@ namespace tool
     {
         const auto commandsReason = CommandsUnavailableReason();
         commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
+        commandPanel->SetQuickStopAvailable(commandsReason);
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
         commandPanel->Diagnostics().SetUnavailable(commandsReason);
         commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason);

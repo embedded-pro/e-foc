@@ -60,6 +60,7 @@ namespace can
         void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnQuickStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnSelectControlMode(FocMotorMode mode, const infra::Function<void(FocMotorMode)>& onActivated) override;
         void OnSetSetpoint(const FocSetpoint& setpoint, const infra::Function<void()>& onDone) override;
 

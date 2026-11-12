@@ -1031,6 +1031,36 @@ TEST_F(TestSpeedCascade, a_bus_at_half_the_configured_voltage_doubles_the_inner_
 
 namespace
 {
+    class TestSpeedCascadeQuickStop
+        : public TestSpeedCascadeRamp
+    {
+    public:
+        void Turn(float speed, uint32_t count)
+        {
+            const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+            const float step = speed / static_cast<float>(lowPriorityFrequency.Value());
+
+            for (uint32_t outer = 0; outer != count; ++outer)
+            {
+                angle += step;
+                for (uint32_t tick = 0; tick != prescaler; ++tick)
+                {
+                    foc::Radians held{ angle };
+                    focSpeed->Calculate(ZeroCurrents(), held);
+                }
+
+                lowPriorityInterruptMock.TriggerHandler();
+            }
+        }
+
+        void QuickStop(float deceleration)
+        {
+            focSpeed->QuickStop(foc::RadiansPerSecondSquared{ deceleration });
+        }
+
+        float angle{ 0.0f };
+    };
+
     constexpr float frictionTorque{ 0.5f };
     constexpr float justBeyondTheRamp{ 1.25f * foc::FrictionFeedForward::rampWidth };
 
@@ -1056,6 +1086,86 @@ namespace
 
         return QuadratureDrive(FirstDutyAfterSpeedStep(withFriction, setPoint)) - QuadratureDrive(FirstDutyAfterSpeedStep(withoutFriction, setPoint));
     }
+}
+
+TEST_F(TestSpeedCascadeQuickStop, a_quick_stop_ramps_the_reference_from_the_measured_speed_to_zero)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 20.0f });
+    Turn(10.0f, 3);
+
+    QuickStop(1000.0f);
+    Turn(10.0f, 1);
+    EXPECT_NEAR(Reference(), 9.5f, 1e-3f);
+
+    Turn(10.0f, 3);
+    EXPECT_NEAR(Reference(), 8.0f, 1e-3f);
+}
+
+TEST_F(TestSpeedCascadeQuickStop, the_reference_stays_at_zero_once_it_reaches_it)
+{
+    focSpeed->Enable();
+    Turn(-1.0f, 3);
+
+    QuickStop(500.0f);
+    Turn(-1.0f, 5);
+
+    EXPECT_NEAR(Reference(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascadeQuickStop, a_quick_stop_without_a_deceleration_steps_the_reference_to_zero)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    Turn(10.0f, 3);
+
+    QuickStop(0.0f);
+    Turn(10.0f, 1);
+
+    EXPECT_NEAR(Reference(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascadeQuickStop, the_setpoint_ramp_does_not_slow_a_quick_stop)
+{
+    Ramp(1000.0f, 10.0f);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    Turn(10.0f, 30);
+
+    QuickStop(1000.0f);
+    Turn(10.0f, 2);
+
+    EXPECT_NEAR(Reference(), 9.0f, 1e-3f);
+}
+
+TEST_F(TestSpeedCascadeQuickStop, a_setpoint_during_a_quick_stop_waits_for_the_next_enable)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    Turn(10.0f, 3);
+    QuickStop(1000.0f);
+
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 30.0f });
+    Turn(10.0f, 1);
+    EXPECT_NEAR(Reference(), 9.5f, 1e-3f);
+
+    focSpeed->Disable();
+    focSpeed->Enable();
+    EXPECT_NEAR(Reference(), 30.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascadeQuickStop, enable_ends_a_quick_stop)
+{
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    Turn(10.0f, 3);
+    QuickStop(0.0f);
+    Turn(10.0f, 1);
+
+    focSpeed->Enable();
+    Turn(10.0f, 1);
+
+    EXPECT_NEAR(Reference(), 10.0f, 1e-6f);
 }
 
 TEST_F(TestSpeedCascade, a_forward_speed_reference_adds_the_friction_current_to_the_quadrature_reference)
