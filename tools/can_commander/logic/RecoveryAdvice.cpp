@@ -70,7 +70,7 @@ namespace tool
                 case FocMotorState::calibrating:
                     return RecoveryAdvice{ "The motor is calibrating. Wait until it finishes; the motor status shows when it is done.", RecoveryAction::none };
                 case FocMotorState::stopping:
-                    return RecoveryAdvice{ "The motor is stopping after a quick stop. Wait until it is Ready, at most a second, then send the command again.", RecoveryAction::none };
+                    return RecoveryAdvice{ "The motor is stopping after a quick stop. Wait until it is Ready, then send the command again.", RecoveryAction::none };
                 case FocMotorState::partialCalibration:
                     return RecoveryAdvice{ "The calibration is incomplete for " + ModeName(refused.mode) +
                                                ": speed and position mode need the inertia and the friction. Identify them or enter them in Motor Parameters, "

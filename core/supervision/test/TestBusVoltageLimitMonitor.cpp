@@ -75,6 +75,14 @@ TEST_F(BusVoltageLimitMonitorTest, a_bus_below_the_minimum_is_an_undervoltage)
     EXPECT_THAT(faults, ElementsAre(state_machine::FaultCode::undervoltage));
 }
 
+TEST_F(BusVoltageLimitMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
+    Measure(19.9f);
+
+    EXPECT_THAT(faults, ElementsAre(state_machine::FaultCode::undervoltage));
+}
+
 TEST_F(BusVoltageLimitMonitorTest, a_bus_above_the_maximum_is_an_overvoltage)
 {
     Measure(30.1f);

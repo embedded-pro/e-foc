@@ -86,15 +86,6 @@ namespace tool
         QString CommandsUnavailableReason() const;
         QString FirmwareUnavailableReason() const;
         QString SettingsUnavailableReason() const;
-        QString DiagnosticsUnavailableReason() const;
-        QString SupervisionUnavailableReason() const;
-        QString LimitsUnavailableReason() const;
-        QString TargetWindowUnavailableReason() const;
-        QString TravelLimitsUnavailableReason() const;
-        QString ThermalUnavailableReason() const;
-        QString OverTemperatureUnavailableReason() const;
-        QString BusVoltageLimitsUnavailableReason() const;
-        QString QuickStopUnavailableReason() const;
         QString RecalibrateUnavailableReason() const;
         QString ResetModelUnavailableReason() const;
         void Refresh();

@@ -160,8 +160,8 @@ namespace tool
         auto& form = AddGroup("Quick Stop", group);
         AddEditors(form, QuickStopSettings());
 
-        auto* note = new QLabel("Quick Stop decelerates a running motor at this rate and stops it once it is below 2 rad/s, at most a "
-                                "second later; 0 brakes at the current limit. Torque mode without a calibrated inertia stops at once. "
+        auto* note = new QLabel("Quick Stop decelerates a running motor at this rate and stops it once it is below 2 rad/s; 0 brakes at the "
+                                "current limit. Torque mode needs a calibrated inertia, otherwise the drive refuses Quick Stop. "
                                 "Stored at once and used by the next quick stop.");
         note->setWordWrap(true);
         form.addRow(note);
@@ -180,121 +180,11 @@ namespace tool
         form.addRow(note);
     }
 
-    void ConfigurationTab::SetLegacy(bool legacyContract)
-    {
-        legacyReason = legacyContract ? tr("Not supported by this firmware version") : QString{};
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetSupervisionUnavailable(const QString& reason)
-    {
-        if (reason == supervisionReason)
-            return;
-
-        supervisionReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetLimitsUnavailable(const QString& reason)
-    {
-        if (reason == limitsReason)
-            return;
-
-        limitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetThermalUnavailable(const QString& reason)
-    {
-        if (reason == thermalReason)
-            return;
-
-        thermalReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetOverTemperatureUnavailable(const QString& reason)
-    {
-        if (reason == overTemperatureReason)
-            return;
-
-        overTemperatureReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetBusVoltageLimitsUnavailable(const QString& reason)
-    {
-        if (reason == busVoltageLimitsReason)
-            return;
-
-        busVoltageLimitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetQuickStopUnavailable(const QString& reason)
-    {
-        if (reason == quickStopReason)
-            return;
-
-        quickStopReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetTravelLimitsUnavailable(const QString& reason)
-    {
-        if (reason == travelLimitsReason)
-            return;
-
-        travelLimitsReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
-    void ConfigurationTab::SetTargetWindowUnavailable(const QString& reason)
-    {
-        if (reason == targetWindowReason)
-            return;
-
-        targetWindowReason = reason;
-        ShowAvailability();
-        Refresh();
-    }
-
     void ConfigurationTab::Refresh()
     {
         const auto* stall = EditorFor(can::FocParameter::stallDetection);
         stallWarning->setVisible(stall->IsAvailable() && stall->Held().has_value() && stall->EditedValue() < 0.5f);
 
         SettingsPage::Refresh();
-    }
-
-    void ConfigurationTab::ShowAvailability()
-    {
-        for (auto* editor : Editors())
-            if (IsIn(SupervisionSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? supervisionReason : legacyReason);
-            else if (IsIn(LimitSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? limitsReason : legacyReason);
-            else if (IsIn(TargetWindowSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? targetWindowReason : legacyReason);
-            else if (IsIn(TravelLimitSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? travelLimitsReason : legacyReason);
-            else if (IsIn(ThermalSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? thermalReason : legacyReason);
-            else if (IsIn(OverTemperatureSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? overTemperatureReason : legacyReason);
-            else if (IsIn(BusVoltageSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? busVoltageLimitsReason : legacyReason);
-            else if (IsIn(QuickStopSettings(), editor->Parameter()))
-                editor->SetUnavailable(legacyReason.isEmpty() ? quickStopReason : legacyReason);
-            else if (editor->Parameter() != can::FocParameter::encoderResolution)
-                editor->SetUnavailable(legacyReason);
     }
 }

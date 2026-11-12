@@ -85,7 +85,6 @@ namespace tool
     std::string_view BoardKindName(float kind);
     const SettingPresentation& PresentationOf(can::FocParameter parameter);
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm);
-    bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter);
     bool IsBandwidth(can::FocParameter parameter);
     bool IsInteger(can::FocParameter parameter);
     bool IsToggle(can::FocParameter parameter);

@@ -78,6 +78,11 @@ namespace state_machine
 
     using State = std::variant<Idle, Calibrating, Ready, Enabled, Stopping, Fault>;
 
+    inline bool IsOperating(const State& state)
+    {
+        return std::holds_alternative<Enabled>(state) || std::holds_alternative<Stopping>(state);
+    }
+
     enum class CommandResult : uint8_t
     {
         ok,

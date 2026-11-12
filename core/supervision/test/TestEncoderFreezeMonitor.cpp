@@ -112,6 +112,18 @@ TEST_F(EncoderFreezeMonitorTest, a_reading_that_stops_dead_at_speed_is_an_encode
     EXPECT_EQ(1u, Reports());
 }
 
+TEST_F(EncoderFreezeMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
+    rotor = TurningUntil(100.0f, 0.050f);
+
+    Run(std::chrono::milliseconds(54));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(2));
+    EXPECT_EQ(1u, Reports());
+}
+
 TEST_F(EncoderFreezeMonitorTest, a_freeze_part_way_through_a_period_is_judged_on_the_full_period_before_it)
 {
     rotor = TurningUntil(100.0f, 0.0503f);

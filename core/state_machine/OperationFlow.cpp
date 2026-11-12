@@ -185,8 +185,8 @@ namespace application
         const auto initialSpeed = math::Abs(env.mode.GetFoc().ObserveMotion().measuredSpeed.Value());
         const auto deceleration = env.mode.QuickStopDeceleration().Value();
         dynamicStopTimeout = deceleration > 0.0f
-            ? std::min(std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(initialSpeed / deceleration * 1.25f + 0.1f)), quickStopTimeout)
-            : quickStopTimeout;
+                                 ? std::chrono::duration_cast<infra::Duration>(std::chrono::duration<float>(initialSpeed / deceleration * 1.25f + 0.1f))
+                                 : quickStopTimeout;
 
         if (env.mode.BeginQuickStop())
             quickStopTimer.Start(quickStopCheckPeriod, [this]()

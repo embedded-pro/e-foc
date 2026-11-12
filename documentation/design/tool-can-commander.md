@@ -141,10 +141,10 @@ pending on it. It is enabled while the bus is open and at least one of those mot
 names the motors it reached and, separately, those it could not reach (incompatible firmware or a refused
 frame) with the advice to use the hardware stop.
 
-Beside Stop Motor each motor has **Quick Stop** (contract 2.16, `state-machine.md` Quick Stop), an ordinary motor
+Beside Stop Motor each motor has **Quick Stop** (contract 3.2, `state-machine.md` Quick Stop), an ordinary motor
 command: it decelerates that motor at its quick-stop deceleration and leaves it Ready, where Stop Motor cuts the
-power stage and lets it coast. The status shows *Stopping*, as a warning, until it is Ready, at most a second. It is
-enabled under the rule above when the controller has 2.16, also while the last status says the motor is stopped,
+power stage and lets it coast. The status shows *Stopping*, as a warning, until it is Ready. It is
+enabled under the rule above, also while the last status says the motor is stopped,
 since a stale status must not hold back a stop; otherwise its tooltip says why. The emergency stop stays the stop
 of every motor at once and of a motor that calibrates.
 
@@ -196,7 +196,7 @@ the last status the controller reported:
 | Fault                         | any operating command but Clear Fault              | Clear the fault, then start again                                                          | Clear Fault           |
 | Fault                         | Clear Fault                                        | Remove the cause and restart the controller: the clear limit was reached                   | —                     |
 | Calibrating                   | any operating command                              | Wait until it finishes                                                                     | —                     |
-| Stopping                      | any operating command                              | Wait until it is Ready, at most a second                                                   | —                     |
+| Stopping                      | any operating command                              | Wait until it is Ready                                                                     | —                     |
 | Running                       | Align Rotor                                        | Stop the motor first                                                                       | Stop Motor            |
 | any                           | a setpoint for another control mode                | Select that mode while the motor is stopped                                                | —                     |
 
@@ -295,7 +295,7 @@ flowchart LR
   Part L). The group says each is off at 0, that a running drive faults with undervoltage or overvoltage when the
   bus leaves them while a stopped one is not watched, and that the board's own trips stay in force. They are
   stored at once and in force within 10 ms.
-Its **Quick Stop** group holds the quick-stop deceleration of contract 2.16 (`state-machine.md`, Quick Stop): the
+Its **Quick Stop** group holds the quick-stop deceleration of contract 3.2 (`state-machine.md`, Quick Stop): the
   rate at which Quick Stop slows the motor down, zero braking at the current limit. It is stored at once and used
   by the next quick stop.
  Its **Online Recalibration** group holds the recalibration mode of contract 2.17 (`online-recalibration.md`), chosen

@@ -83,6 +83,16 @@ TEST_F(PositionLimitMonitorTest, a_rotor_beyond_the_maximum_by_more_than_the_mar
     EXPECT_EQ(1u, Reports());
 }
 
+TEST_F(PositionLimitMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
+    position = 1.011f;
+
+    Run(std::chrono::milliseconds(1));
+
+    EXPECT_EQ(1u, Reports());
+}
+
 TEST_F(PositionLimitMonitorTest, a_rotor_beyond_the_minimum_by_more_than_the_margin_faults_as_well)
 {
     position = -1.011f;

@@ -167,6 +167,21 @@ TEST_F(OverTemperatureTest, a_winding_at_the_limit_trips_once_five_seconds_after
     EXPECT_EQ(1u, Trips());
 }
 
+TEST_F(OverTemperatureTest, a_stopping_drive_trips_as_well)
+{
+    state = state_machine::Stopping{};
+    temperature = foc::Celsius{ 125.0f };
+
+    Run(std::chrono::milliseconds(4900));
+    EXPECT_EQ(0u, Trips());
+
+    Run(std::chrono::milliseconds(200));
+    EXPECT_EQ(1u, Trips());
+
+    Run(std::chrono::seconds(5));
+    EXPECT_EQ(1u, Trips());
+}
+
 TEST_F(OverTemperatureTest, a_winding_below_the_limit_does_not_trip)
 {
     temperature = foc::Celsius{ 119.0f };

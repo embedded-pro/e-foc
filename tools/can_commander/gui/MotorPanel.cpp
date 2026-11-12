@@ -217,7 +217,7 @@ namespace tool
     {
         Send("Quick Stop", can::focQuickStopId, [this]()
             {
-                return client.SendQuickStop(nodeId);
+                return client.Commands().SendQuickStop(nodeId);
             });
     }
 
@@ -535,62 +535,6 @@ namespace tool
         return {};
     }
 
-    QString MotorPanel::DiagnosticsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsDiagnostics(nodeId))
-            return QString("Needs firmware contract 2.2 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::SupervisionUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsSupervision(nodeId))
-            return QString("Needs firmware contract 2.4 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::LimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsLimits(nodeId))
-            return QString("Needs firmware contract 2.9 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::TargetWindowUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTargetWindow(nodeId))
-            return QString("Needs firmware contract 2.10 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::TravelLimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsTravelLimits(nodeId))
-            return QString("Needs firmware contract 2.11 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::ThermalUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsThermal(nodeId))
-            return QString("Needs firmware contract 2.13 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::OverTemperatureUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsOverTemperature(nodeId))
-            return QString("Needs firmware contract 2.14 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
-    QString MotorPanel::BusVoltageLimitsUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && client.SupportsSettings(nodeId) && !client.SupportsBusVoltageLimits(nodeId))
-            return QString("Needs firmware contract 2.15 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
     QString MotorPanel::SettingsUnavailableReason() const
     {
         if (auto reason = CommandsUnavailableReason(); !reason.isEmpty())
@@ -624,32 +568,15 @@ namespace tool
         return {};
     }
 
-    QString MotorPanel::QuickStopUnavailableReason() const
-    {
-        if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsQuickStop(nodeId))
-            return QString("Needs firmware contract 2.16 or newer: this controller has %1. Stop Motor cuts the power at once.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
-        return {};
-    }
-
     void MotorPanel::Refresh()
     {
         const auto commandsReason = CommandsUnavailableReason();
-        const auto diagnosticsReason = DiagnosticsUnavailableReason();
         commandPanel->SetCommandsAvailable(commandsReason, !client.IsBusy(nodeId));
-        commandPanel->SetQuickStopAvailable(commandsReason.isEmpty() ? QuickStopUnavailableReason() : commandsReason);
+        commandPanel->SetQuickStopAvailable(commandsReason);
         commandPanel->SetSettingsAvailable(SettingsUnavailableReason());
-        commandPanel->MotorParameters().SetMaintenanceUnavailable(diagnosticsReason);
-        commandPanel->Diagnostics().SetUnavailable(commandsReason.isEmpty() ? diagnosticsReason : commandsReason);
+        commandPanel->Diagnostics().SetUnavailable(commandsReason);
         commandPanel->Diagnostics().SetFaultHistoryUnavailable(commandsReason);
         commandPanel->Diagnostics().SetRecalibrationUnavailable(RecalibrateUnavailableReason(), ResetModelUnavailableReason());
-        commandPanel->Configuration().SetSupervisionUnavailable(SupervisionUnavailableReason());
-        commandPanel->Configuration().SetLimitsUnavailable(LimitsUnavailableReason());
-        commandPanel->Configuration().SetTargetWindowUnavailable(TargetWindowUnavailableReason());
-        commandPanel->Configuration().SetTravelLimitsUnavailable(TravelLimitsUnavailableReason());
-        commandPanel->Configuration().SetThermalUnavailable(ThermalUnavailableReason());
-        commandPanel->Configuration().SetOverTemperatureUnavailable(OverTemperatureUnavailableReason());
-        commandPanel->Configuration().SetBusVoltageLimitsUnavailable(BusVoltageLimitsUnavailableReason());
-        commandPanel->Configuration().SetQuickStopUnavailable(QuickStopUnavailableReason());
         firmware->Refresh();
         RefreshHeader();
         emit StatusChanged();

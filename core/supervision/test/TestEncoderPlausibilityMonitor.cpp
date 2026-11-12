@@ -105,6 +105,16 @@ TEST_F(EncoderPlausibilityMonitorTest, an_encoder_that_stays_put_while_current_p
     EXPECT_EQ(Count(state_machine::FaultCode::encoderLoss), 1u);
 }
 
+TEST_F(EncoderPlausibilityMonitorTest, a_stopping_drive_is_supervised_as_well)
+{
+    state = state_machine::Stopping{};
+    PushWithoutMotion();
+
+    ForwardTime(std::chrono::milliseconds(150));
+
+    EXPECT_EQ(Count(state_machine::FaultCode::encoderLoss), 1u);
+}
+
 TEST_F(EncoderPlausibilityMonitorTest, the_loss_is_reported_once_per_enable)
 {
     PushWithoutMotion();

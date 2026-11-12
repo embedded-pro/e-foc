@@ -444,14 +444,6 @@ namespace tool
         return algorithm < std::numeric_limits<uint32_t>::digits && (setting.usedBy & (1u << algorithm)) != 0;
     }
 
-    bool IsIn(std::span<const SettingPresentation> settings, can::FocParameter parameter)
-    {
-        return std::ranges::any_of(settings, [parameter](const SettingPresentation& s)
-            {
-                return s.parameter == parameter;
-            });
-    }
-
     bool IsBandwidth(can::FocParameter parameter)
     {
         return parameter == FocParameter::currentBandwidth || parameter == FocParameter::speedBandwidth || parameter == FocParameter::positionBandwidth;

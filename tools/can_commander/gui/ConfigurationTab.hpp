@@ -13,17 +13,6 @@ namespace tool
     public:
         explicit ConfigurationTab(QWidget* parent = nullptr);
 
-        void SetLegacy(bool legacyContract);
-        void SetSupervisionUnavailable(const QString& reason);
-        void SetLimitsUnavailable(const QString& reason);
-        void SetTargetWindowUnavailable(const QString& reason);
-        void SetTravelLimitsUnavailable(const QString& reason);
-        void SetThermalUnavailable(const QString& reason);
-        void SetOverTemperatureUnavailable(const QString& reason);
-        void SetBusVoltageLimitsUnavailable(const QString& reason);
-        void SetQuickStopUnavailable(const QString& reason);
-
-
     protected:
         void Refresh() override;
 
@@ -39,17 +28,7 @@ namespace tool
         void BuildSupplyLimitsGroup();
         void BuildQuickStopGroup();
         void BuildRecalibrationGroup();
-        void ShowAvailability();
 
         QLabel* stallWarning{ nullptr };
-        QString legacyReason;
-        QString supervisionReason;
-        QString limitsReason;
-        QString targetWindowReason;
-        QString travelLimitsReason;
-        QString thermalReason;
-        QString overTemperatureReason;
-        QString busVoltageLimitsReason;
-        QString quickStopReason;
     };
 }

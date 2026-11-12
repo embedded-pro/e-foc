@@ -90,6 +90,18 @@ TEST_F(PhaseLossMonitorTest, a_demand_that_draws_no_current_at_standstill_is_a_m
     EXPECT_EQ(1u, Reports());
 }
 
+TEST_F(PhaseLossMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
+    Observe(0.0f, 0.01f, 5.0f);
+
+    Run(std::chrono::milliseconds(50));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(10));
+    EXPECT_EQ(1u, Reports());
+}
+
 TEST_F(PhaseLossMonitorTest, a_shortfall_that_lasts_less_than_50_ms_is_not_reported_even_when_it_starts_just_before_an_evaluation)
 {
     Run(std::chrono::milliseconds(9));

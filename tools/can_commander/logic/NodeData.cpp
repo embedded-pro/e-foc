@@ -1,5 +1,4 @@
 #include "tools/can_commander/logic/NodeData.hpp"
-#include "core/can/FocMotorSettings.hpp"
 #include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 
 namespace tool
@@ -17,11 +16,6 @@ namespace tool
         return category.SendQueryContractVersion(nodeId);
     }
 
-    void NodeData::SetMinor(uint16_t nodeId, uint8_t minor)
-    {
-        nodeMinors[nodeId] = minor;
-    }
-
     void NodeData::RequestSettings(uint16_t nodeId)
     {
         if (!IsCompatible(nodeId))
@@ -29,7 +23,7 @@ namespace tool
 
         reads.Queue(nodeId, NodeRead{ can::focQueryAlgorithmsId });
         for (const auto& descriptor : can::focParameters)
-            if (!descriptor.readOnly && SupportsSetting(nodeId, descriptor.id))
+            if (!descriptor.readOnly)
                 reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, descriptor.id });
     }
 
@@ -49,12 +43,9 @@ namespace tool
             return;
 
         reads.Queue(nodeId, NodeRead{ can::focRequestTelemetryId });
-        if (SupportsFeature(nodeId, targetWindowContractMinor))
-            reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::targetReached });
-        if (SupportsFeature(nodeId, thermalContractMinor))
-            reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::windingTemperature });
-        if (SupportsFeature(nodeId, limitsContractMinor))
-            reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::homed });
+        reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::targetReached });
+        reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::windingTemperature });
+        reads.Queue(nodeId, NodeRead{ can::focQueryParameterId, can::FocParameter::homed });
     }
 
     void NodeData::RequestFirmwareIdentity(uint16_t nodeId)
@@ -152,43 +143,11 @@ namespace tool
         identities.Forget(nodeId);
         faultRecords.Forget(nodeId);
         reads.Forget(nodeId);
-        nodeMinors.erase(nodeId);
     }
 
     bool NodeData::IsCompatible(uint16_t nodeId) const
     {
-        return nodeMinors.contains(nodeId);
-    }
-
-    bool NodeData::SupportsFeature(uint16_t nodeId, uint8_t threshold) const
-    {
-        const auto it = nodeMinors.find(nodeId);
-        return it != nodeMinors.end() && it->second >= threshold;
-    }
-
-    bool NodeData::SupportsSetting(uint16_t nodeId, can::FocParameter parameter) const
-    {
-        if (parameter == can::FocParameter::positionWindow || parameter == can::FocParameter::positionWindowTime)
-            return SupportsFeature(nodeId, targetWindowContractMinor);
-        if (parameter == can::FocParameter::positionMinimum || parameter == can::FocParameter::positionMaximum)
-            return SupportsFeature(nodeId, travelLimitsContractMinor);
-        if (parameter == can::FocParameter::calibrationTemperature)
-            return SupportsFeature(nodeId, thermalContractMinor);
-        if (parameter == can::FocParameter::temperatureLimit || parameter == can::FocParameter::temperatureMargin)
-            return SupportsFeature(nodeId, overTemperatureContractMinor);
-        if (parameter == can::FocParameter::busVoltageMinimum || parameter == can::FocParameter::busVoltageMaximum)
-            return SupportsFeature(nodeId, busVoltageLimitsContractMinor);
-        if (parameter == can::FocParameter::quickStopDeceleration)
-            return SupportsFeature(nodeId, quickStopContractMinor);
-        switch (can::GroupOf(parameter))
-        {
-            case can::ParameterGroup::supervision:
-                return SupportsFeature(nodeId, supervisionContractMinor);
-            case can::ParameterGroup::limits:
-                return SupportsFeature(nodeId, limitsContractMinor);
-            default:
-                return true;
-        }
+        return category.Compatibility(nodeId) == can::ContractCompatibility::compatible;
     }
 
     bool NodeData::IsIdentityQueued(uint16_t nodeId) const

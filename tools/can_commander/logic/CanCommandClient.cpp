@@ -61,72 +61,6 @@ namespace tool
         return focClient.CategoryClient().Compatibility(nodeId);
     }
 
-    bool CanCommandClient::SupportsSettings(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, settingsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsDiagnostics(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, diagnosticsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsSupervision(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, supervisionContractMinor);
-    }
-
-    bool CanCommandClient::SupportsFirmwareIdentity(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, firmwareContractMinor);
-    }
-
-    bool CanCommandClient::SupportsLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, limitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsTargetWindow(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, targetWindowContractMinor);
-    }
-
-    bool CanCommandClient::SupportsTravelLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, travelLimitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsThermal(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, thermalContractMinor);
-    }
-
-    bool CanCommandClient::SupportsOverTemperature(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, overTemperatureContractMinor);
-    }
-
-    bool CanCommandClient::SupportsBusVoltageLimits(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, busVoltageLimitsContractMinor);
-    }
-
-    bool CanCommandClient::SupportsQuickStop(uint16_t nodeId) const
-    {
-        return SupportsMinor(nodeId, quickStopContractMinor);
-    }
-
-    bool CanCommandClient::SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const
-    {
-        const auto it = contractMinors.find(nodeId);
-        return Compatibility(nodeId) == can::ContractCompatibility::compatible && it != contractMinors.end() && it->second >= minimumMinor;
-    }
-
-    infra::Duration CanCommandClient::TimeoutFor(uint8_t commandType)
-    {
-        return CommandTracker::TimeoutFor(commandType);
-    }
-
     MotorCommands& CanCommandClient::Commands()
     {
         return commands;
@@ -135,133 +69,6 @@ namespace tool
     NodeData& CanCommandClient::Data()
     {
         return nodeData;
-    }
-
-    bool CanCommandClient::SendStartMotor(uint16_t nodeId)
-    {
-        return commands.SendStartMotor(nodeId);
-    }
-
-    bool CanCommandClient::SendStopMotor(uint16_t nodeId)
-    {
-        return commands.SendStopMotor(nodeId);
-    }
-
-    bool CanCommandClient::SendEmergencyStop(uint16_t nodeId)
-    {
-        return commands.SendEmergencyStop(nodeId);
-    }
-
-    bool CanCommandClient::SendQuickStop(uint16_t nodeId)
-    {
-        if (!SupportsQuickStop(nodeId))
-            return false;
-        return commands.SendQuickStop(nodeId);
-    }
-
-    bool CanCommandClient::SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode)
-    {
-        return commands.SendSetControlMode(nodeId, mode);
-    }
-
-    bool CanCommandClient::SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent)
-    {
-        return commands.SendSetTorqueSetpoint(nodeId, iqCurrent);
-    }
-
-    bool CanCommandClient::SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec)
-    {
-        return commands.SendSetSpeedSetpoint(nodeId, speedRadPerSec);
-    }
-
-    bool CanCommandClient::SendSetPositionSetpoint(uint16_t nodeId, float positionRad)
-    {
-        return commands.SendSetPositionSetpoint(nodeId, positionRad);
-    }
-
-    bool CanCommandClient::SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return commands.SendSetParameter(nodeId, can::FocParameter::currentBandwidth, bandwidth);
-    }
-
-    bool CanCommandClient::SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return commands.SendSetParameter(nodeId, can::FocParameter::speedBandwidth, bandwidth);
-    }
-
-    bool CanCommandClient::SendSetPositionBandwidth(uint16_t nodeId, float bandwidth)
-    {
-        return commands.SendSetParameter(nodeId, can::FocParameter::positionBandwidth, bandwidth);
-    }
-
-    bool CanCommandClient::SendClearFault(uint16_t nodeId)
-    {
-        return commands.SendClearFault(nodeId);
-    }
-
-    bool CanCommandClient::SendAlign(uint16_t nodeId)
-    {
-        return commands.SendAlign(nodeId);
-    }
-
-    bool CanCommandClient::SendIdentifyElectrical(uint16_t nodeId)
-    {
-        return commands.SendIdentifyElectrical(nodeId);
-    }
-
-    bool CanCommandClient::SendCalibrate(uint16_t nodeId)
-    {
-        return commands.SendCalibrate(nodeId);
-    }
-
-    bool CanCommandClient::SendClearCalibration(uint16_t nodeId)
-    {
-        return commands.SendClearCalibration(nodeId);
-    }
-
-    bool CanCommandClient::SendClearDiagnostics(uint16_t nodeId)
-    {
-        return commands.SendClearDiagnostics(nodeId);
-    }
-
-    bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
-    {
-        return commands.SendSetParameter(nodeId, can::FocParameter::encoderResolution, static_cast<float>(countsPerRevolution));
-    }
-
-    bool CanCommandClient::SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm)
-    {
-        return commands.SendSelectAlgorithm(nodeId, loop, algorithm);
-    }
-
-    bool CanCommandClient::SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value)
-    {
-        return commands.SendSetParameter(nodeId, parameter, value);
-    }
-
-    bool CanCommandClient::RequestData(uint16_t nodeId)
-    {
-        return nodeData.RequestData(nodeId);
-    }
-
-    void CanCommandClient::RequestSettings(uint16_t nodeId)
-    {
-        nodeData.RequestSettings(nodeId);
-    }
-
-    void CanCommandClient::RequestReadings(uint16_t nodeId)
-    {
-        nodeData.RequestReadings(nodeId);
-    }
-
-    void CanCommandClient::RequestFirmwareIdentity(uint16_t nodeId)
-    {
-        nodeData.RequestFirmwareIdentity(nodeId);
-    }
-
-    void CanCommandClient::RequestFaultHistory(uint16_t nodeId)
-    {
-        nodeData.RequestFaultHistory(nodeId);
     }
 
     services::FirmwareUpgradeCategoryClient& CanCommandClient::FirmwareUpgrade()
@@ -309,7 +116,6 @@ namespace tool
             return;
 
         tracker.Clear(nodeId);
-        contractMinors.erase(nodeId);
         nodeData.Forget(nodeId);
         NotifyObservers([nodeId](auto& observer)
             {
@@ -386,11 +192,7 @@ namespace tool
 
     void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
     {
-        contractMinors[nodeId] = minor;
         const bool compatible = can::IsCompatibleContract(major, minor);
-
-        if (compatible)
-            nodeData.SetMinor(nodeId, minor);
 
         NotifyObservers([nodeId, major, minor, compatible](auto& observer)
             {

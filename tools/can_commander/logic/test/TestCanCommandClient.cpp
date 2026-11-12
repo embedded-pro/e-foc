@@ -1,6 +1,5 @@
 #include "can-lite/categories/firmware_upgrade/FirmwareUpgradeDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/can/FocMotorSettings.hpp"
 #include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "hal/interfaces/Can.hpp"
@@ -180,21 +179,7 @@ namespace
             return can::focParameters.size() - WritableParameterCount();
         }
 
-        static std::size_t LimitParameterCount()
-        {
-            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::limits;
-                }));
-        }
-
-        static constexpr std::size_t targetWindowParameterCount{ 3 };
-        static constexpr std::size_t travelLimitParameterCount{ 2 };
         static constexpr std::size_t readWithTheStatus{ 3 };
-        static constexpr std::size_t thermalParameterCount{ 2 };
-        static constexpr std::size_t overTemperatureParameterCount{ 2 };
-        static constexpr std::size_t busVoltageLimitParameterCount{ 2 };
-        static constexpr std::size_t quickStopParameterCount{ 1 };
 
         bool Queried(can::FocParameter parameter) const
         {
@@ -229,46 +214,9 @@ namespace
 
         void BringCompatible(uint16_t node)
         {
-            BringCompatible(node, can::focContractVersionMinor);
-        }
-
-        void BringCompatible(uint16_t node, uint8_t minor)
-        {
             BringOnline(node);
-            EXPECT_CALL(observer, OnContractVersion(node, can::focContractVersionMajor, minor, true));
-            DeliverContract(can::focContractVersionMajor, node, minor);
-        }
-
-        static std::size_t SupervisionParameterCount()
-        {
-            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::supervision;
-                }));
-        }
-
-        bool QueriedAReadOnlyParameter() const
-        {
-            return std::ranges::any_of(can::focParameters, [this](const can::ParameterDescriptor& descriptor)
-                {
-                    return descriptor.readOnly && Queried(descriptor.id);
-                });
-        }
-
-        bool QueriedASupervisionParameter() const
-        {
-            return std::ranges::any_of(can::focParameters, [this](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::supervision && Queried(descriptor.id);
-                });
-        }
-
-        bool QueriedALimit() const
-        {
-            return std::ranges::any_of(can::focParameters, [this](const can::ParameterDescriptor& descriptor)
-                {
-                    return can::GroupOf(descriptor.id) == can::ParameterGroup::limits && Queried(descriptor.id);
-                });
+            EXPECT_CALL(observer, OnContractVersion(node, can::focContractVersionMajor, can::focContractVersionMinor, true));
+            DeliverContract(can::focContractVersionMajor, node);
         }
 
         void DeliverTelemetryStatus(uint16_t node, FocMotorState state, FocFaultCode fault)
@@ -475,8 +423,9 @@ TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
     EXPECT_TRUE(client.Commands().SendIdentifyElectrical(11));
     EXPECT_TRUE(client.Commands().SendSelectAlgorithm(12, can::FocControlLoop::speed, 1));
     EXPECT_TRUE(client.Commands().SendSetParameter(13, can::FocParameter::inertia, 1.0e-5f));
+    EXPECT_TRUE(client.Commands().SendQuickStop(14));
 
-    for (uint16_t node = 1; node <= 13; ++node)
+    for (uint16_t node = 1; node <= 14; ++node)
         EXPECT_TRUE(client.IsBusy(node)) << node;
 }
 
@@ -1083,178 +1032,8 @@ TEST_F(TestCanCommandClient, a_start_waits_long_enough_for_the_rotor_to_rest_and
 TEST_F(TestCanCommandClient, a_refresh_of_the_readings_leaves_the_homed_flag_to_the_status)
 {
     RecordSends();
-    BringCompatible(1, 2);
-
+    BringCompatible(1);
     AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsDiagnostics(1));
-    EXPECT_EQ(can::focParameters.size() - SupervisionParameterCount() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
-    EXPECT_TRUE(QueriedAReadOnlyParameter());
-}
-
-TEST_F(TestCanCommandClient, a_2_3_node_is_not_asked_for_its_supervision_settings)
-{
-    RecordSends();
-    BringCompatible(1, 3);
-
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsSupervision(1));
-    EXPECT_FALSE(QueriedASupervisionParameter());
-}
-
-TEST_F(TestCanCommandClient, a_2_4_node_is_also_read_for_its_supervision_settings)
-{
-    RecordSends();
-    BringCompatible(1, 4);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsSupervision(1));
-    EXPECT_EQ(can::focParameters.size() - LimitParameterCount() - readWithTheStatus, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_8_node_is_not_asked_for_its_limits)
-{
-    RecordSends();
-    BringCompatible(1, 8);
-
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsLimits(1));
-    EXPECT_FALSE(QueriedALimit());
-}
-
-TEST_F(TestCanCommandClient, a_2_9_node_is_also_read_for_its_limits)
-{
-    RecordSends();
-    BringCompatible(1, 9);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsLimits(1));
-    EXPECT_EQ(can::focParameters.size() - targetWindowParameterCount - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - quickStopParameterCount, Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_2_9_node_is_not_asked_for_its_target_window)
-{
-    RecordSends();
-    BringCompatible(1, 9);
-
-    AnswerAllReads();
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_FALSE(client.SupportsTargetWindow(1));
-    EXPECT_FALSE(Queried(can::FocParameter::positionWindow));
-    EXPECT_FALSE(Queried(can::FocParameter::positionWindowTime));
-    EXPECT_FALSE(Queried(can::FocParameter::targetReached));
-}
-
-TEST_F(TestCanCommandClient, a_2_10_node_is_not_asked_for_its_travel_limits)
-{
-    RecordSends();
-    BringCompatible(1, 10);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsTargetWindow(1));
-    EXPECT_FALSE(client.SupportsTravelLimits(1));
-    EXPECT_EQ(can::focParameters.size() - travelLimitParameterCount - thermalParameterCount - overTemperatureParameterCount - busVoltageLimitParameterCount - quickStopParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::positionMinimum));
-    EXPECT_FALSE(Queried(can::FocParameter::positionMaximum));
-}
-
-TEST_F(TestCanCommandClient, a_2_12_node_is_not_asked_for_its_winding_temperature)
-{
-    RecordSends();
-    BringCompatible(1, 12);
-
-    AnswerAllReads();
-    ForwardTime(CanCommandClient::statusRefreshInterval);
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsTravelLimits(1));
-    EXPECT_FALSE(client.SupportsThermal(1));
-    EXPECT_FALSE(Queried(can::FocParameter::calibrationTemperature));
-    EXPECT_FALSE(Queried(can::FocParameter::windingTemperature));
-}
-
-TEST_F(TestCanCommandClient, a_2_13_node_is_not_asked_for_its_temperature_limit)
-{
-    RecordSends();
-    BringCompatible(1, 13);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsThermal(1));
-    EXPECT_FALSE(client.SupportsOverTemperature(1));
-    EXPECT_EQ(can::focParameters.size() - overTemperatureParameterCount - busVoltageLimitParameterCount - quickStopParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::temperatureLimit));
-}
-
-TEST_F(TestCanCommandClient, a_2_14_node_is_not_asked_for_its_bus_voltage_limits)
-{
-    RecordSends();
-    BringCompatible(1, 14);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsOverTemperature(1));
-    EXPECT_FALSE(client.SupportsBusVoltageLimits(1));
-    EXPECT_EQ(can::focParameters.size() - busVoltageLimitParameterCount - quickStopParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::busVoltageMinimum));
-    EXPECT_FALSE(Queried(can::FocParameter::busVoltageMaximum));
-}
-
-TEST_F(TestCanCommandClient, a_2_15_node_is_not_asked_for_its_quick_stop_deceleration)
-{
-    RecordSends();
-    BringCompatible(1, 15);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsBusVoltageLimits(1));
-    EXPECT_FALSE(client.SupportsQuickStop(1));
-    EXPECT_EQ(can::focParameters.size() - quickStopParameterCount, Count(can::focQueryParameterId));
-    EXPECT_FALSE(Queried(can::FocParameter::quickStopDeceleration));
-}
-
-TEST_F(TestCanCommandClient, a_2_16_node_is_read_for_every_parameter_once)
-{
-    RecordSends();
-    BringCompatible(1, 16);
-
-    AnswerAllReads();
-
-    EXPECT_TRUE(client.SupportsQuickStop(1));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
-}
-
-TEST_F(TestCanCommandClient, a_quick_stop_is_refused_locally_for_a_node_older_than_2_16)
-{
-    BringCompatible(1, 15);
-    RecordSends();
-
-    EXPECT_FALSE(client.SendQuickStop(1));
-    EXPECT_EQ(0u, Count(can::focQuickStopId));
-}
-
-TEST_F(TestCanCommandClient, a_quick_stop_is_sent_to_a_2_16_node)
-{
-    BringCompatible(1, 16);
-    AnswerAllReads();
-    RecordSends();
-
-    EXPECT_TRUE(client.SendQuickStop(1));
-    EXPECT_EQ(1u, Count(can::focQuickStopId));
-}
-
-TEST_F(TestCanCommandClient, a_2_13_node_is_asked_for_its_winding_temperature_with_every_status)
-{
-    RecordSends();
-    BringCompatible(1, 13);    AnswerAllReads();
     sent.clear();
 
     client.Data().RequestReadings(1);

@@ -38,7 +38,7 @@ namespace supervision
         if (activeDrive == nullptr || temperature == nullptr)
             return;
 
-        const auto enabled = std::holds_alternative<state_machine::Enabled>(activeDrive().CurrentState());
+        const auto enabled = state_machine::IsOperating(activeDrive().CurrentState());
         const auto measured = Filtered(temperature());
         const auto current = settings();
 

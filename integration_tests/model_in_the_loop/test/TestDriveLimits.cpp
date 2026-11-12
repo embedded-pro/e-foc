@@ -240,7 +240,7 @@ namespace
                 {
                     return std::abs(PlantSpeed(mil)) < stoppedSpeed || mil.IsReady();
                 },
-                std::chrono::seconds(2)))
+                std::chrono::seconds(4)))
             return std::nullopt;
 
         const auto belowStopped = MillisecondsSince(mil, start);
@@ -272,25 +272,21 @@ TEST(TestDriveLimits, a_quick_stop_at_500_rad_per_s2_brings_a_speed_mode_rotor_f
     EXPECT_FALSE(mil.HasFault());
 }
 
-TEST(TestDriveLimits, a_quick_stop_that_would_take_longer_than_a_second_cuts_the_power_stage_after_one)
+TEST(TestDriveLimits, a_slow_quick_stop_runs_to_a_standstill_past_one_second)
 {
     mil::ModelInTheLoop mil{ QuickStopScenario(state_machine::ControlMode::speed, 50.0f) };
     ASSERT_TRUE(mil.Align());
     ASSERT_TRUE(mil.Enable());
     ASSERT_TRUE(mil.HoldSpeed(100.0f, std::chrono::milliseconds(1000)));
 
-    const auto start = mil.Drive().Tick();
-    ASSERT_EQ(state_machine::CommandResult::ok, mil.ControlMode().Drive().ActiveStateMachine().CmdQuickStop());
-    ASSERT_TRUE(mil.RunUntil([&mil]()
-        {
-            return mil.IsReady();
-        },
-        std::chrono::seconds(2)));
-    const auto readyMs = MillisecondsSince(mil, start);
-    std::fprintf(stderr, "[METRIC] mil limits quick_stop_timeout ready=%.1f speed=%.2f\n", readyMs, PlantSpeed(mil));
+    const auto response = QuickStop(mil);
+    ASSERT_TRUE(response.has_value());
+    std::fprintf(stderr, "[METRIC] mil limits quick_stop_slow below=%.1f ready=%.1f\n", response->belowStoppedMs, response->readyMs);
 
-    EXPECT_NEAR(readyMs, 1000.0f, 5.0f);
-    EXPECT_GT(PlantSpeed(mil), stoppedSpeed);
+    EXPECT_TRUE(response->stoppingWhileBraking);
+    EXPECT_NEAR(response->belowStoppedMs, 1960.0f, 196.0f);
+    EXPECT_LE(response->readyMs, response->belowStoppedMs + 11.0f);
+    EXPECT_FALSE(mil.HasFault());
 }
 
 TEST(TestDriveLimits, a_quick_stop_brakes_a_torque_mode_rotor_against_its_speed)

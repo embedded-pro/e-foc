@@ -22,7 +22,7 @@ namespace supervision
         if (activeDrive == nullptr || settings == nullptr)
             return;
 
-        if (!std::holds_alternative<state_machine::Enabled>(activeDrive().CurrentState()))
+        if (!state_machine::IsOperating(activeDrive().CurrentState()))
         {
             reported = false;
             return;

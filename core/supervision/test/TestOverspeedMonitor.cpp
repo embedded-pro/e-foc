@@ -83,6 +83,18 @@ TEST_F(OverspeedMonitorTest, a_speed_beyond_110_percent_of_the_limit_for_five_ev
     EXPECT_EQ(1u, Reports());
 }
 
+TEST_F(OverspeedMonitorTest, a_stopping_drive_is_watched_as_well)
+{
+    state = state_machine::Stopping{};
+    speed = 111.0f;
+
+    Run(std::chrono::milliseconds(4));
+    EXPECT_EQ(0u, Reports());
+
+    Run(std::chrono::milliseconds(1));
+    EXPECT_EQ(1u, Reports());
+}
+
 TEST_F(OverspeedMonitorTest, a_speed_at_110_percent_of_the_limit_is_not_an_overspeed)
 {
     speed = 110.0f;

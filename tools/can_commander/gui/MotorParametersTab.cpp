@@ -71,12 +71,6 @@ namespace tool
         Refresh();
     }
 
-    void MotorParametersTab::SetMaintenanceUnavailable(const QString& reason)
-    {
-        maintenanceUnavailable = reason;
-        Refresh();
-    }
-
     void MotorParametersTab::Refresh()
     {
         polePairsHint->setVisible(EditorFor(can::FocParameter::polePairs)->IsEdited());
@@ -87,11 +81,10 @@ namespace tool
         identifyElectricalButton->setEnabled(available);
         identifyElectricalButton->setToolTip(available ? QString("Measure resistance, inductance and pole pairs, then align the rotor") : actionsUnavailable);
 
-        const auto& maintenanceReason = available ? maintenanceUnavailable : actionsUnavailable;
-        calibrateButton->setEnabled(maintenanceReason.isEmpty());
-        calibrateButton->setToolTip(maintenanceReason.isEmpty() ? QString(calibrateHint) : maintenanceReason);
-        clearCalibrationButton->setEnabled(maintenanceReason.isEmpty());
-        clearCalibrationButton->setToolTip(maintenanceReason.isEmpty() ? QString(clearCalibrationHint) : maintenanceReason);
+        calibrateButton->setEnabled(available);
+        calibrateButton->setToolTip(available ? QString(calibrateHint) : actionsUnavailable);
+        clearCalibrationButton->setEnabled(available);
+        clearCalibrationButton->setToolTip(available ? QString(clearCalibrationHint) : actionsUnavailable);
 
         SettingsPage::Refresh();
     }

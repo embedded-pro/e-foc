@@ -16,7 +16,6 @@ namespace tool
         explicit MotorParametersTab(QWidget* parent = nullptr);
 
         void SetActionsAvailable(const QString& reason);
-        void SetMaintenanceUnavailable(const QString& reason);
 
     signals:
         void AlignRequested();
@@ -36,6 +35,5 @@ namespace tool
         QPushButton* calibrateButton{ nullptr };
         QPushButton* clearCalibrationButton{ nullptr };
         QString actionsUnavailable;
-        QString maintenanceUnavailable;
     };
 }

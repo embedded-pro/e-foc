@@ -14,7 +14,6 @@
 #include "tools/can_commander/logic/MotorCommands.hpp"
 #include "tools/can_commander/logic/NodeData.hpp"
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <set>
 
@@ -61,17 +60,6 @@ namespace tool
     {
     public:
         static constexpr infra::Duration statusRefreshInterval{ std::chrono::seconds(1) };
-        static constexpr uint8_t settingsContractMinor{ 1 };
-        static constexpr uint8_t diagnosticsContractMinor{ 2 };
-        static constexpr uint8_t supervisionContractMinor{ 4 };
-        static constexpr uint8_t firmwareContractMinor{ 6 };
-        static constexpr uint8_t limitsContractMinor{ 9 };
-        static constexpr uint8_t targetWindowContractMinor{ 10 };
-        static constexpr uint8_t travelLimitsContractMinor{ 11 };
-        static constexpr uint8_t thermalContractMinor{ 13 };
-        static constexpr uint8_t overTemperatureContractMinor{ 14 };
-        static constexpr uint8_t busVoltageLimitsContractMinor{ 15 };
-        static constexpr uint8_t quickStopContractMinor{ 16 };
 
         explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
@@ -80,48 +68,6 @@ namespace tool
         bool IsOnline(uint16_t nodeId) const;
         std::set<uint16_t> OnlineNodes() const;
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
-        bool SupportsSettings(uint16_t nodeId) const;
-        bool SupportsDiagnostics(uint16_t nodeId) const;
-        bool SupportsSupervision(uint16_t nodeId) const;
-        bool SupportsFirmwareIdentity(uint16_t nodeId) const;
-        bool SupportsLimits(uint16_t nodeId) const;
-        bool SupportsTargetWindow(uint16_t nodeId) const;
-        bool SupportsTravelLimits(uint16_t nodeId) const;
-        bool SupportsThermal(uint16_t nodeId) const;
-        bool SupportsOverTemperature(uint16_t nodeId) const;
-        bool SupportsBusVoltageLimits(uint16_t nodeId) const;
-        bool SupportsQuickStop(uint16_t nodeId) const;
-        static infra::Duration TimeoutFor(uint8_t commandType);
-
-        bool SendStartMotor(uint16_t nodeId);
-        bool SendStopMotor(uint16_t nodeId);
-        bool SendEmergencyStop(uint16_t nodeId);
-        bool SendQuickStop(uint16_t nodeId);
-        bool SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode);
-        bool SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent);
-        bool SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec);
-        bool SendSetPositionSetpoint(uint16_t nodeId, float positionRad);
-
-        bool SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth);
-        bool SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth);
-        bool SendSetPositionBandwidth(uint16_t nodeId, float bandwidth);
-
-        bool SendClearFault(uint16_t nodeId);
-        bool SendAlign(uint16_t nodeId);
-        bool SendIdentifyElectrical(uint16_t nodeId);
-        bool SendCalibrate(uint16_t nodeId);
-        bool SendClearCalibration(uint16_t nodeId);
-        bool SendClearDiagnostics(uint16_t nodeId);
-        bool SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution);
-        bool SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm);
-        bool SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value);
-
-        bool RequestData(uint16_t nodeId);
-        void RequestSettings(uint16_t nodeId);
-        void RequestReadings(uint16_t nodeId);
-        void RequestStatus(uint16_t nodeId);
-        void RequestFirmwareIdentity(uint16_t nodeId);
-        void RequestFaultHistory(uint16_t nodeId);
 
         MotorCommands& Commands();
         NodeData& Data();
@@ -129,7 +75,6 @@ namespace tool
         const services::CanFrameOrigin& FrameOrigin() const;
 
     private:
-        bool SupportsMinor(uint16_t nodeId, uint8_t minimumMinor) const;
         void MarkOnline(uint16_t nodeId);
         void MarkOffline(uint16_t nodeId);
         void RefreshStatus();
@@ -160,7 +105,6 @@ namespace tool
         CommandTracker tracker;
         MotorCommands commands{ focClient.CategoryClient(), tracker };
         NodeData nodeData{ focClient.CategoryClient() };
-        std::map<uint16_t, uint8_t> contractMinors;
         std::set<uint16_t> onlineNodes;
         infra::TimerRepeating statusRefresh;
     };
