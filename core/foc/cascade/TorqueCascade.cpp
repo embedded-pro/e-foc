@@ -41,8 +41,8 @@ namespace foc
         enabled = true;
         speedMeasurement.filter.Reset();
         speedMeasurement.previousAngleValid = false;
-        lastElectricalSpeed = 0.0f;
-        lastIq = 0.0f;
+        last.electricalSpeed = 0.0f;
+        last.quadratureCurrent = 0.0f;
         currentStream.Restart();
         SetPoint(requestedSetPoint);
     }
@@ -53,8 +53,8 @@ namespace foc
         enabled = false;
         currentCommandActive = false;
         voltageWindow.Close();
-        lastElectricalSpeed = 0.0f;
-        lastIq = 0.0f;
+        last.electricalSpeed = 0.0f;
+        last.quadratureCurrent = 0.0f;
     }
 
     SelectResult TorqueCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
@@ -115,11 +115,11 @@ namespace foc
 
     MotionObservation TorqueCascade::ObserveMotion() const
     {
-        const auto mechanicalSpeed = motor.polePairs > 0.0f ? lastElectricalSpeed / motor.polePairs : 0.0f;
+        const auto mechanicalSpeed = motor.polePairs > 0.0f ? last.electricalSpeed / motor.polePairs : 0.0f;
 
-        const auto demanded = LimitedQuadrature(RequestedQuadrature(requestedSetPoint.second.Value(), lastElectricalSpeed), lastElectricalSpeed, 0.0f);
+        const auto demanded = LimitedQuadrature(RequestedQuadrature(requestedSetPoint.second.Value(), last.electricalSpeed), last.electricalSpeed, 0.0f);
 
-        return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f }, Ampere{ demanded } };
+        return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ last.quadratureCurrent }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f }, Ampere{ demanded } };
     }
 
     void TorqueCascade::LimitSpeed(RadiansPerSecond limit)
@@ -221,8 +221,8 @@ namespace foc
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
         if (slopeSink != nullptr)
             slopeSink->ZeroVectorSlopes(zeroVectorSlope.Next(idAndIq, electricalSpeed, cosTheta, sinTheta));
-        lastElectricalSpeed = electricalSpeed;
-        lastIq = idAndIq.q;
+        last.electricalSpeed = electricalSpeed;
+        last.quadratureCurrent = idAndIq.q;
         currentStream.Accumulate(idAndIq.d, idAndIq.q, mechanicalAngle);
         const auto& [directSetPoint, quadratureSetPoint] = setPointBuffer.Acquire();
         const auto coggingCurrent = currentCommandActive ? 0.0f : coggingFeedForward.CurrentAt(electricalAngle);

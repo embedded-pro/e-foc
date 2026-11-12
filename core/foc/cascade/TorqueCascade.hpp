@@ -38,7 +38,7 @@ namespace foc
 
         Ampere MeasuredQuadratureCurrent() const final
         {
-            return Ampere{ lastIq };
+            return Ampere{ last.quadratureCurrent };
         }
 
         MotionObservation ObserveMotion() const override;
@@ -110,8 +110,14 @@ namespace foc
         QuadratureVoltageWindow voltageWindow;
         float voltageScale{ 0.0f };
         uint32_t samplesPerMillisecond{ 1 };
-        volatile float lastElectricalSpeed{ 0.0f };
-        volatile float lastIq{ 0.0f };
+
+        struct LastSample
+        {
+            volatile float electricalSpeed{ 0.0f };
+            volatile float quadratureCurrent{ 0.0f };
+        };
+
+        LastSample last;
         DriveLimits limits;
         BusVoltageRatio busRatio;
         CoggingFeedForward coggingFeedForward;

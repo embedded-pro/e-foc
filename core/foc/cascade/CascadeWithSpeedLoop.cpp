@@ -178,7 +178,8 @@ namespace foc
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
     {
-        outer.speedReference = reference.Value();
+        if (!quickStopping)
+            outer.speedReference = reference.Value();
     }
 
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
@@ -200,11 +201,6 @@ namespace foc
         quickStopStep = deceleration.Value() / static_cast<float>(schedule.frequency.Value());
         outer.speedReference = outer.mechanicalSpeed;
         quickStopping = true;
-    }
-
-    bool CascadeWithSpeedLoop::IsQuickStopping() const
-    {
-        return quickStopping;
     }
 
     bool CascadeWithSpeedLoop::RunQuickStop(float mechanicalSpeed)

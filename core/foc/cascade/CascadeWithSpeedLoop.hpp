@@ -48,7 +48,6 @@ namespace foc
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed, float referenceAcceleration = 0.0f);
         void BeginQuickStop(RadiansPerSecondSquared deceleration);
-        bool IsQuickStopping() const;
         bool RunQuickStop(float mechanicalSpeed);
 
         void SetDirectCurrentReference(float current, float referenceAcceleration = 0.0f);

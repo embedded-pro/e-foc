@@ -46,7 +46,7 @@ namespace foc
         lastSpeedSetPoint = point;
         target = point.Value();
 
-        if (!IsRamped() && !IsQuickStopping())
+        if (!IsRamped())
             ApplyReference(point.Value());
     }
 
@@ -61,7 +61,7 @@ namespace foc
         accelerationStep = std::max(0.0f, acceleration.Value()) / frequency;
         decelerationStep = std::max(0.0f, deceleration.Value()) / frequency;
 
-        if (!IsRamped() && !IsQuickStopping())
+        if (!IsRamped())
             ApplyReference(target);
     }
 
