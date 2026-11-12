@@ -28,7 +28,6 @@ project(e_foc LANGUAGES C CXX ASM VERSION 2.0.1) # x-release-please-version
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-# newlib's assert() stores __PRETTY_FUNCTION__ in flash; the target __assert_func handlers ignore it
 if(E_FOC_EMBEDDED_BUILD)
     add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:__ASSERT_FUNC=nullptr>)
 endif()
@@ -104,7 +103,6 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     endforeach()
 endif()
 
-# After the submodules, which force -Og: embedded Debug uses -O1, at -Og the TM4C129 image overflows its application slot
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     if(E_FOC_EMBEDDED_BUILD)
         set(e_foc_debug_level "-O1")
