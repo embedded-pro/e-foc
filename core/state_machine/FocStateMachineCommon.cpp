@@ -159,7 +159,6 @@ namespace application
         return quickStopDeceleration;
     }
 
-
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
     {
         operation.RegisterReadyHandler(onReady);

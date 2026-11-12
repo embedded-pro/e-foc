@@ -1088,7 +1088,6 @@ namespace
     }
 }
 
-
 TEST_F(TestSpeedCascadeQuickStop, a_quick_stop_ramps_the_reference_from_the_measured_speed_to_zero)
 {
     focSpeed->Enable();

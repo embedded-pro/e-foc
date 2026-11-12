@@ -104,8 +104,6 @@ namespace can
         return FocFaultCode::none;
     }
 
-
-
     void FocMotorCanBridge::ObserveCommands(const infra::Function<void()>& onAccepted)
     {
         commandAccepted = onAccepted;

@@ -288,34 +288,34 @@ stateDiagram-v2
 
 ### Error Codes
 
-| Status            | Meaning                                                                      |
-|-------------------|------------------------------------------------------------------------------|
-| `Ok`              | Operation completed successfully                                             |
-| `InvalidData`     | Magic, version or CRC-32 mismatch on read                                    |
-| `WriteFailed`     | An intact calibration record survived an invalidation's erase                |
-| `HardwareFault`   | The read-back after a write differs from what was written                    |
-| `Busy`            | Another operation is in flight; nothing was read or written                  |
+| Status          | Meaning                                                       |
+|-----------------|---------------------------------------------------------------|
+| `Ok`            | Operation completed successfully                              |
+| `InvalidData`   | Magic, version or CRC-32 mismatch on read                     |
+| `WriteFailed`   | An intact calibration record survived an invalidation's erase |
+| `HardwareFault` | The read-back after a write differs from what was written     |
+| `Busy`          | Another operation is in flight; nothing was read or written   |
 
 ### Calibration and Configuration Data Fields
 
 **CalibrationData** (100 bytes total, layout version 6):
 
-| Field                | Physical unit | Description                                                      |
-|----------------------|---------------|------------------------------------------------------------------|
-| rPhase               | Ω             | Measured phase resistance                                        |
-| lD                   | mH            | Measured phase inductance, used for both axes                    |
-| fluxLinkage          | Wb            | Rotor flux linkage, identified from the back-EMF                 |
-| currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor                |
-| inertia              | kg·m²         | Estimated rotor inertia                                          |
-| frictionCoulomb      | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
-| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                                     |
-| speedLoopBandwidth   | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
-| coggingTorqueScale   | N·m per count | Scale of the cogging map entries                                 |
-| encoderIndexAngle    | rad           | Encoder reading at the index in the aligned frame; NaN when none |
-| polePairs            | —             | Number of motor pole pairs                                       |
-| stage                | —             | Whether the calibration completed                                |
-| currentNoise         | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
-| coggingTorque        | counts        | Cogging torque over one electrical period, 48 bins               |
+| Field              | Physical unit | Description                                                      |
+|--------------------|---------------|------------------------------------------------------------------|
+| rPhase             | Ω             | Measured phase resistance                                        |
+| lD                 | mH            | Measured phase inductance, used for both axes                    |
+| fluxLinkage        | Wb            | Rotor flux linkage, identified from the back-EMF                 |
+| currentOffsetA/B/C | A             | Zero-current reading of each phase current sensor                |
+| inertia            | kg·m²         | Estimated rotor inertia                                          |
+| frictionCoulomb    | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
+| frictionViscous    | N·m·s/rad     | Viscous friction coefficient                                     |
+| speedLoopBandwidth | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
+| coggingTorqueScale | N·m per count | Scale of the cogging map entries                                 |
+| encoderIndexAngle  | rad           | Encoder reading at the index in the aligned frame; NaN when none |
+| polePairs          | —             | Number of motor pole pairs                                       |
+| stage              | —             | Whether the calibration completed                                |
+| currentNoise       | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
+| coggingTorque      | counts        | Cogging torque over one electrical period, 48 bins               |
 
 The four-byte fields come first, then the current noise, the pole pairs and the stage, which fill one word,
 then the cogging map.
@@ -375,17 +375,17 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                           | Purpose                                                                       | Contract                                                                                                              |
-|-------------------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)`     | Writes the calibration record and verifies the read-back                      | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadCalibration(data, onDone)`     | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `InvalidData` with an empty record when the stored one is not intact          |
-| `InvalidateCalibration(onDone)`     | Erases the calibration region without writing a new record                    | A later load reports `InvalidData`; `onDone(NvmStatus)` fires exactly once                                            |
-| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadConfig(data, onDone)`          | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Ok` with the defaults when the stored record is not intact                   |
-| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part                            | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history                     |
-| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
-| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                                   | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model                  |
-| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back                     | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                              |
+| Interface                           | Purpose                                                    | Contract                                                                                                     |
+|-------------------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)`     | Writes the calibration record and verifies the read-back   | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadCalibration(data, onDone)`     | Reads and integrity-checks the calibration record          | `onDone(NvmStatus)` fires exactly once; `InvalidData` with an empty record when the stored one is not intact |
+| `InvalidateCalibration(onDone)`     | Erases the calibration region without writing a new record | A later load reports `InvalidData`; `onDone(NvmStatus)` fires exactly once                                   |
+| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region    | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadConfig(data, onDone)`          | Reads and integrity-checks the configuration record        | `onDone(NvmStatus)` fires exactly once; `Ok` with the defaults when the stored record is not intact          |
+| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part         | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history            |
+| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model         |
+| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
 
 ### Required
 

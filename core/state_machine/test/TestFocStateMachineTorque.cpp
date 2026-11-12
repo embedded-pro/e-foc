@@ -3673,7 +3673,6 @@ TEST_F(FocStateMachineTorqueTest, an_asynchronous_enable_that_faults_as_the_brid
     EXPECT_EQ(state_machine::CommandResult::abortedByFault, enableResult);
 }
 
-
 namespace
 {
     class FocStateMachineTorqueQuickStopTest

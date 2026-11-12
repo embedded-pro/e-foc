@@ -12,7 +12,7 @@ date: 2026-11-08
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.5.0             |
+| Version   | 0.5.0              |
 | Component | foc-torque         |
 | Date      | 2026-11-08         |
 
