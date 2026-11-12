@@ -52,3 +52,26 @@ Feature: Quick Stop
     And the quickStopDeceleration is set to 750 over CAN
     And the target restarts
     Then the quickStopDeceleration read over CAN shall be 750
+
+  @hil_motor @REQ-LCY-006
+  Scenario: A quick stop at 500 rad/s2 brings the board's speed-mode rotor from 50 rad/s below 2 rad/s
+    On the board the speed-mode rotor turns at 50 rad/s, within the bench's 60 rad/s, and the speed is
+    polled over CAN from the quick stop's acknowledgement: the reference reaches 2 rad/s after 96 ms,
+    and the limits are pinned from the bench's [METRIC] lines with a margin.
+
+    Given the speed motor system is initialised with no valid calibration data
+    When the speed control mode is selected
+    And the full calibration is run
+    And the quickStopDeceleration is set to 500 over CAN
+    And the motor is enabled
+    And a speed setpoint of 50 rad/s is applied
+    Then the measured speed shall settle at 50 rad/s within 4 rad/s in 3000 ms
+    When a quick stop is issued over CAN
+    Then the measured speed shall fall below 2 rad/s between 90 and 135 ms after the quick stop
+    And the state machine shall be in the ready state within 1000 ms
+
+  @hil_motor @REQ-LCY-006
+  Scenario: The board stores the quick-stop deceleration and reads it back after a restart
+    When the quickStopDeceleration is set to 750 over CAN
+    And the target restarts
+    Then the quickStopDeceleration read over CAN shall be 750

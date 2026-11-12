@@ -18,6 +18,7 @@ namespace hil
         std::string gdbExe;
         std::string gdbTarget;
         std::string firmwareElf;
+        std::string bootloaderElf;
         bool skipFlash{ false };
         bool restartPerScenario{ false };
 

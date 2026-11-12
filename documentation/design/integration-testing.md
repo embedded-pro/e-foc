@@ -102,9 +102,11 @@ interactor implements, and a fixture of its own, which exists only in a scenario
 *Out of scope: the bring-up image*). A motor-controller step has no terminal to write to and no trace
 to read, and on the emulator there is no terminal interactor at all.
 
-The simulation seam — describe the plant, describe stored memory, restart — defaults to doing
-nothing and to reporting that simulation is unsupported. A hardware target inherits that default,
-and a scenario that configures a plant fails loudly rather than quietly testing something else.
+The simulation seam — describe the plant, describe stored memory — defaults to doing nothing and
+to reporting that simulation is unsupported. A hardware target inherits that default, and a scenario
+that configures a plant fails loudly rather than quietly testing something else. Restarting is not
+part of it: every target can restart, a hardware target through its debugger (see *The hardware
+motor target*).
 
 ### Scenario lifecycle
 
@@ -395,6 +397,34 @@ Every new message is a product diagnostic that the CAN Commander shows as well: 
 engineer needs the estimates, the loop statistics and the reset cause as much as a test does, so no
 message exists only for testing. Stalling the event loop is the one injected fault, and
 it is not a command: it is part of the simulated world and exists only on the emulator.
+
+### The hardware motor target
+
+A scenario tagged `@hil_motor` runs the bootloader and the motor-controller application on the
+board, and reaches it through the hardware bridge over CAN alone.
+
+- **Programming.** The runner loads the application ELF through the debugger and then writes the
+  application's `.image.bin` over the application slot. The probe keeps whatever a programmed sector
+  held outside the ELF's sections, such as the gap between the vector table and the application
+  header, while the bootloader hashes the whole image. Without the second write, a slot that last held
+  the bring-up image fails that hash, and the bootloader never starts the application. The bring-up
+  image replaces the bootloader too, so `--bootloader-elf` names a bootloader ELF, its keys injected,
+  that the runner programs first. With both, a `@hil` run and a `@hil_motor` run follow each other on
+  one board without manual steps.
+- **Restart.** `When the target restarts` resets the board through the debugger and waits for the
+  application's heartbeat. The persistence scenarios use it the way the emulated scenarios do.
+- **Stored settings.** A board keeps its stored settings from one scenario to the next, where an
+  emulated target starts from the memory image its scenario describes. On hardware, a step that sets
+  a parameter over CAN first reads the value the drive holds. After a `@hil_motor` scenario, a hook
+  writes every such value back, even when the scenario failed. A motor parameter that was never
+  identified reads 0, which no write accepts, so the hook clears the calibration instead.
+- **Bench limits.** The rotor runs free with an inertia disk, so a motion scenario keeps to a few
+  tenths of an ampere for a bounded time, or to 0 A, and to at most 60 rad/s. A scenario that
+  accelerates the rotor in torque mode prints its peak speed as a `[METRIC]` line, and its limit is
+  pinned from that line. Timing limits use speed polled over CAN, which resolves a few milliseconds.
+- **Not on the bench.** The bench encoder has no index channel (calibration reports none found), so
+  the index-start scenarios stay emulated. Firmware-upgrade failure cases stay emulated and
+  unit-tested: only the happy-path apply runs on the board.
 
 ### Out of scope: the bring-up image
 

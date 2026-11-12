@@ -1,12 +1,14 @@
 #pragma once
 
 #include "core/foc/model/drive/memory/NvmImageBuilder.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
 #include "integration_tests/support/response/PlantTrace.hpp"
 #include "motor_parameters/PlantPresets.hpp"
 #include <chrono>
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace integration
@@ -62,11 +64,14 @@ namespace integration
         bool booted{ false };
         std::optional<Setpoint> lastSetpoint;
         std::optional<Setpoint> quickStop;
+        std::optional<std::chrono::steady_clock::time_point> quickStopAcknowledgedAt;
         response::PlantTrace trace;
         IdentifiedParameters identified;
         IdentifiedParameters online;
         IdentifiedParameters inUse;
         std::vector<StreamedCurrent> streamedCurrents;
         FirmwareDownload download;
+        // A board keeps its stored settings from one scenario to the next, unlike an emulated target
+        std::vector<std::pair<can::FocParameter, can::FocParameterValue>> storedSettingsToRestore;
     };
 }

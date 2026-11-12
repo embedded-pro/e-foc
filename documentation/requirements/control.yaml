@@ -56,7 +56,7 @@
 - id: REQ-CTL-006
   title: Each loop is tuned by its bandwidth
   status: verified
-  verification: sil
+  verification: [sil, hil]
   shall: >
     Each loop shall derive its gains from the identified motor model and a bandwidth, which the
     operator may set or leave automatic, together with its law's own settings. The drive shall
@@ -97,7 +97,7 @@
 - id: REQ-CTL-010
   title: Position moves follow a profile within the operator's limits
   status: verified
-  verification: [sil, mil, unit]
+  verification: [sil, mil, hil, unit]
   shall: >
     With a profile velocity and acceleration set, position mode shall move the rotor to a new
     setpoint along a path whose speed, acceleration and deceleration stay within the operator's

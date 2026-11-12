@@ -1,6 +1,7 @@
 #include "integration_tests/support/CanParameters.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "e-foc-protocol/contract/FocMotorWireContract.hpp"
+#include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <bit>
 #include <chrono>
 
@@ -78,5 +79,41 @@ namespace integration
         if (!response.has_value() || response->size() != kAlgorithmsResponseBytes)
             return std::nullopt;
         return response;
+    }
+
+    void NoteStoredSettingOnHardware(Fixture& fixture, ScenarioSetup& setup, can::FocParameter parameter)
+    {
+        if (TargetInteractor::Instance().SupportsSimulatedPlant())
+            return;
+
+        for (const auto& [noted, original] : setup.storedSettingsToRestore)
+            if (noted == parameter)
+                return;
+
+        if (const auto held = ReadParameter(fixture, parameter))
+            setup.storedSettingsToRestore.emplace_back(parameter, *held);
+    }
+
+    bool RestoreStoredSettings(Fixture& fixture, ScenarioSetup& setup)
+    {
+        bool restored = true;
+        bool unidentifiedMotorParameter = false;
+        for (auto noted = setup.storedSettingsToRestore.rbegin(); noted != setup.storedSettingsToRestore.rend(); ++noted)
+        {
+            if (WriteParameter(fixture, noted->first, noted->second.automatic ? 0.0f : noted->second.value))
+                continue;
+
+            // A motor parameter that was never identified reads 0, which no write accepts; clearing the calibration restores it
+            if (!noted->second.automatic && noted->second.value == 0.0f)
+                unidentifiedMotorParameter = true;
+            else
+                restored = false;
+        }
+
+        if (unidentifiedMotorParameter)
+            restored = fixture.SendCanCommand(can::focMotorCategoryId, can::focClearCalibrationId, {}, kSettingTimeout) && restored;
+
+        setup.storedSettingsToRestore.clear();
+        return restored;
     }
 }

@@ -63,6 +63,7 @@ int main(int argc, char** argv)
     cli.add_option("--gdb-exe", g_bridgeConfig.gdbExe, "GDB client executable (mode=hil)");
     cli.add_option("--gdb-target", g_bridgeConfig.gdbTarget, "GDB remote target host:port (mode=hil)");
     cli.add_option("--firmware-elf", g_bridgeConfig.firmwareElf, "Firmware ELF to flash (mode=hil)");
+    cli.add_option("--bootloader-elf", g_bridgeConfig.bootloaderElf, "Bootloader ELF, with its keys injected, to program before the firmware (mode=hil)");
     cli.add_flag("--skip-flash", g_bridgeConfig.skipFlash, "Skip GDB flash step (mode=hil)");
     cli.add_flag("--restart-per-scenario", g_bridgeConfig.restartPerScenario, "Reset the target before every scenario so CAN sequence numbers and state machine start clean (mode=hil)");
 

@@ -1,9 +1,11 @@
 #include "integration_tests/support/interactor/hardware/GdbFlasher.hpp"
+#include "integration_tests/support/interactor/hardware/GdbScript.hpp"
 #include <array>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #ifdef _WIN32
@@ -61,37 +63,6 @@ namespace hil
                 throw std::runtime_error{ "Short write to " + path };
         }
 
-        std::string BuildScript(const BridgeConfig& cfg)
-        {
-            std::string script;
-            script += "set pagination off\n";
-            script += "set confirm off\n";
-            script += "set print thread-events off\n";
-            script += "target extended-remote " + cfg.gdbTarget + "\n";
-            script += "monitor reset\n";
-            script += "monitor halt\n";
-            script += "load\n";
-            script += "compare-sections\n";
-            script += "monitor reset\n";
-            script += "monitor go\n";
-            script += "disconnect\n";
-            script += "quit\n";
-            return script;
-        }
-
-        std::string BuildResetScript(const BridgeConfig& cfg)
-        {
-            std::string script;
-            script += "set pagination off\n";
-            script += "set confirm off\n";
-            script += "target extended-remote " + cfg.gdbTarget + "\n";
-            script += "monitor reset\n";
-            script += "monitor go\n";
-            script += "disconnect\n";
-            script += "quit\n";
-            return script;
-        }
-
         int RunAndCapture(const std::string& command, std::string& outOutput)
         {
             outOutput.clear();
@@ -137,7 +108,7 @@ namespace hil
             throw std::runtime_error{ "GdbFlasher: gdbExe, gdbTarget and firmwareElf must be set" };
 
         ScopedTempFile script;
-        WriteFile(script.path, BuildScript(config));
+        WriteFile(script.path, FlashScript(config.gdbTarget, config.bootloaderElf.empty() ? std::nullopt : std::optional<std::string>{ config.bootloaderElf }, SlotImageOf(config.firmwareElf)));
 
         const std::string command = config.gdbExe +
                                     " --batch --nx" +
@@ -163,7 +134,7 @@ namespace hil
             throw std::runtime_error{ "GdbFlasher: gdbExe and gdbTarget must be set to reset the target" };
 
         ScopedTempFile script;
-        WriteFile(script.path, BuildResetScript(config));
+        WriteFile(script.path, ResetScript(config.gdbTarget));
 
         std::string output;
         const int exitCode = RunAndCapture(config.gdbExe + " --batch --nx -x " + script.path + " 2>&1", output);

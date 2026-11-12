@@ -26,6 +26,11 @@ namespace integration
         return false;
     }
 
+    bool TargetInteractor::SupportsRestart() const
+    {
+        return false;
+    }
+
     void TargetInteractor::ConfigurePlant(const std::vector<uint8_t>&)
     {}
 

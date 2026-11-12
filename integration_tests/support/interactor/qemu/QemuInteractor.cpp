@@ -98,6 +98,11 @@ namespace sil
         return true;
     }
 
+    bool QemuInteractor::SupportsRestart() const
+    {
+        return true;
+    }
+
     void QemuInteractor::ConfigurePlant(const std::vector<uint8_t>& record)
     {
         ASSERT_TRUE(session.WriteScenarioFile("plant.bin", record))

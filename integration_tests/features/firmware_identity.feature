@@ -9,3 +9,7 @@ Feature: Firmware Identity
     When the target boots
     Then the target shall report the firmware version of this build
     And the target shall report board kind 5
+
+  @hil_motor @REQ-FWU-003
+  Scenario: The board reports its firmware version and board kind
+    Then the drive reports the version of its build and its board kind

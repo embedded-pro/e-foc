@@ -30,6 +30,7 @@ namespace sil
         void AfterScenario() override;
 
         bool SupportsSimulatedPlant() const override;
+        bool SupportsRestart() const override;
         void ConfigurePlant(const std::vector<uint8_t>& record) override;
         void ConfigureNonVolatileMemory(const std::vector<uint8_t>& image) override;
         void RestartTarget() override;

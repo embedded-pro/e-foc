@@ -57,6 +57,7 @@ namespace
 WHEN(R"(the telemetry rate is set to {int} Hz)", (int rateHz))
 {
     auto& fixture = context.Get<Fixture>();
+    NoteStoredSettingOnHardware(fixture, context.Get<ScenarioSetup>(), can::FocParameter::telemetryRate);
     ASSERT_TRUE(WriteParameter(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz)))
         << "Telemetry rate " << rateHz << " Hz was refused";
 }

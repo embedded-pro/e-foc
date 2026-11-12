@@ -1,4 +1,6 @@
 #include "cucumber_cpp/Steps.hpp"
+#include "e-foc-protocol/contract/FocMotorMessages.hpp"
+#include "integration_tests/support/CanParameters.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/TerminalFixture.hpp"
@@ -59,4 +61,16 @@ HOOK_AFTER_SCENARIO()
             Attach(std::move(log), cucumber_cpp::library::engine::AttachOptions{ "text/plain", "target-debug-output.log" });
 
     interactor.AfterScenario();
+}
+
+HOOK_AFTER_SCENARIO(.expression = "@hil_motor", .name = "Restore stored settings")
+{
+    auto& setup = context.Get<integration::ScenarioSetup>();
+    if (setup.storedSettingsToRestore.empty())
+        return;
+
+    auto& fixture = context.Get<integration::Fixture>();
+    ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "The board did not answer, so the settings this scenario changed stay changed";
+    (void)fixture.SendCanCommand(can::focMotorCategoryId, can::focStopId);
+    EXPECT_TRUE(integration::RestoreStoredSettings(fixture, setup)) << "The board refused a setting this scenario changed";
 }

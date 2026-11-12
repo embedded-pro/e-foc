@@ -1,7 +1,7 @@
 - id: REQ-PRO-001
   title: The motor current stays within the inverter and motor ratings
   status: verified
-  verification: [sil, unit]
+  verification: [sil, hil, unit]
   shall: >
     The drive shall bound the commanded current vector to the inverter's maximum current, keeping
     the ratio between its axes. With the operator's continuous and peak current ratings set, it
@@ -31,7 +31,7 @@
 - id: REQ-PRO-004
   title: Overspeed and following error are supervised
   status: verified
-  verification: [sil, mil]
+  verification: [sil, mil, hil]
   shall: >
     The drive shall limit torque and speed demands towards the operator's overspeed limit and
     enter Fault with overspeed when the speed exceeds it by 10 %. In position mode, with a
@@ -41,7 +41,7 @@
 - id: REQ-PRO-005
   title: A lost encoder, a stalled rotor and a missing phase are reported
   status: verified
-  verification: sil
+  verification: [sil, hil]
   shall: >
     The drive shall enter Fault with encoderLoss when the encoder stops reporting a rotor the drive
     is moving, with stall when an outside force holds or reverses the rotor against the drive, and
@@ -52,7 +52,7 @@
 - id: REQ-PRO-006
   title: The recent faults survive a power cycle
   status: verified
-  verification: [sil, unit]
+  verification: [sil, hil, unit]
   shall: >
     The drive shall record, for each new fault, its code, the power-up count, the time since
     power-up, the control mode, the bus voltage and the peak torque current, keep the eight newest

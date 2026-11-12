@@ -105,6 +105,30 @@ THEN(R"(fault record {int} shall be a(n) {word} fault in {word} mode from power-
     EXPECT_EQ(powerUp, record->powerUp) << "power-up of record " << age;
 }
 
+THEN(R"(fault record {int} shall be a(n) {word} fault in {word} mode)", (int age, std::string fault, std::string mode))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto expectedCode = RecordedFaultNamed(fault);
+    const auto expectedMode = ModeNamed(mode);
+    ASSERT_TRUE(expectedCode.has_value()) << "Unknown fault: " << fault;
+    ASSERT_TRUE(expectedMode.has_value()) << "Unknown mode: " << mode;
+
+    const auto record = QueryFaultRecord(fixture, static_cast<uint8_t>(age));
+    ASSERT_TRUE(record.has_value()) << "The target did not answer the fault history query for age " << age;
+    EXPECT_EQ(static_cast<int>(*expectedCode), static_cast<int>(record->code)) << "fault code of record " << age;
+    EXPECT_EQ(static_cast<int>(*expectedMode), static_cast<int>(record->mode)) << "control mode of record " << age;
+}
+
+THEN(R"(fault record {int} shall come from the power-up before that of record {int})", (int older, int newer))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto olderRecord = QueryFaultRecord(fixture, static_cast<uint8_t>(older));
+    const auto newerRecord = QueryFaultRecord(fixture, static_cast<uint8_t>(newer));
+    ASSERT_TRUE(olderRecord.has_value() && newerRecord.has_value()) << "The target did not answer the fault history queries";
+    std::printf("[METRIC] hil fault_record_power_ups older=%d newer=%d\n", olderRecord->powerUp, newerRecord->powerUp);
+    EXPECT_EQ(newerRecord->powerUp - 1, olderRecord->powerUp);
+}
+
 THEN(R"(fault record {int} shall carry a bus voltage within {float} V of {float} V)", (int age, float tolerance, float expected))
 {
     auto& fixture = context.Get<Fixture>();

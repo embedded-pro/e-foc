@@ -35,6 +35,11 @@ namespace hil
             RestartTarget();
     }
 
+    bool HardwareInteractor::SupportsRestart() const
+    {
+        return true;
+    }
+
     void HardwareInteractor::RestartTarget()
     {
         auto& session = BridgeSession::Instance();
