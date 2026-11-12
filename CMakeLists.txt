@@ -28,10 +28,6 @@ project(e_foc LANGUAGES C CXX ASM VERSION 2.0.1) # x-release-please-version
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-if(E_FOC_EMBEDDED_BUILD)
-    add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:__ASSERT_FUNC=nullptr>)
-endif()
-
 set_directory_properties(PROPERTY USE_FOLDERS ON)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")

@@ -306,9 +306,10 @@ to about the RelWithDebInfo size, at the cost of more variables showing as optim
 `OPTIMIZE_FOR_SPEED` still force-inlines the header-defined hot functions, and embedded Debug builds keep
 `-ffast-math -fno-finite-math-only`.
 
-Embedded builds also define `__ASSERT_FUNC=nullptr` for C++. newlib's `assert()` otherwise stores each enclosing
-function's `__PRETTY_FUNCTION__` in flash (about 60 KB on the TM4C129), and the target `__assert_func` handlers ignore
-every argument they receive. File name, line and expression are unchanged.
+EmIL's ARM toolchain file (`cmake/toolchain-arm-gcc.cmake`) defines `__ASSERT_FUNC=nullptr` for C++. newlib's `assert()`
+otherwise stores each enclosing function's `__PRETTY_FUNCTION__` in flash (about 60 KB on the TM4C129), and the target
+`__assert_func` handlers ignore every argument they receive. File name, line and expression are unchanged;
+`-DEMIL_ASSERT_FUNCTION_NAMES=On` keeps the names.
 
 Do not raise single functions to `O3` with a pragma or an `optimize` attribute to speed a Debug build up: such a
 function cannot inline any helper built at the Debug level, so the hot path costs no less with it than without it. When a
