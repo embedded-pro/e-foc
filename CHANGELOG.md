@@ -1,5 +1,76 @@
 # Changelog
 
+## [3.0.0](https://github.com/embedded-pro/e-foc/compare/v2.0.1...v3.0.0) (2026-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **nvm:** one record path, no unused operations or fields ([#660](https://github.com/embedded-pro/e-foc/issues/660))
+* **can:** contract 3.0 — one form per command ([#659](https://github.com/embedded-pro/e-foc/issues/659))
+
+### Features
+
+* **can_commander:** Mark virtual motors and launch the Virtual Motor app ([#699](https://github.com/embedded-pro/e-foc/issues/699)) ([c60741c](https://github.com/embedded-pro/e-foc/commit/c60741cd98f68d19ee51ab3a33b8d082a61f7e6b))
+* **can_commander:** Reach virtual motors as virtual:&lt;bus&gt; ([#689](https://github.com/embedded-pro/e-foc/issues/689)) ([dc8416e](https://github.com/embedded-pro/e-foc/commit/dc8416ed922714272f81136058f5409b851e6758))
+* **can-commander:** Choose the recalibration mode, show the model in use, recalibrate and reset it ([#650](https://github.com/embedded-pro/e-foc/issues/650)) ([a64dc1c](https://github.com/embedded-pro/e-foc/commit/a64dc1c67804c9d0d3b14b7def1138433c4071d6))
+* **can:** Contract 3.0 — one form per command ([#659](https://github.com/embedded-pro/e-foc/issues/659)) ([d4de54a](https://github.com/embedded-pro/e-foc/commit/d4de54a69c89e93dbf2fb3f3711dbb95410acf38))
+* **can:** Float32 setpoints and telemetry, and torque in N·m ([#657](https://github.com/embedded-pro/e-foc/issues/657)) ([e98bb32](https://github.com/embedded-pro/e-foc/commit/e98bb329d2250b92cc56cedc7b1d53c0d47c46e6))
+* Correct the ADC sampling skew between phases ([#688](https://github.com/embedded-pro/e-foc/issues/688)) ([1861d64](https://github.com/embedded-pro/e-foc/commit/1861d64e021db83b1abf7ae5e122bc222b336dd2))
+* **foc:** Advance the inverse Park angle by the duty and PWM hold delay ([#655](https://github.com/embedded-pro/e-foc/issues/655)) ([380dd8f](https://github.com/embedded-pro/e-foc/commit/380dd8f9330a21b496678b40e172e50c6002db4d))
+* **foc:** Coulomb friction feed-forward from the calibrated dry friction ([#653](https://github.com/embedded-pro/e-foc/issues/653)) ([9187bad](https://github.com/embedded-pro/e-foc/commit/9187bad4a6815723b46168e93c8fe6913c0ba5a3))
+* **position:** Jerk-limited S-curve motion profile ([#715](https://github.com/embedded-pro/e-foc/issues/715)) ([64e5c16](https://github.com/embedded-pro/e-foc/commit/64e5c16be560696a28040894905eb9fc9586e03d))
+* **position:** Trapezoidal motion profile with velocity and acceleration feed-forward ([#714](https://github.com/embedded-pro/e-foc/issues/714)) ([27b3526](https://github.com/embedded-pro/e-foc/commit/27b3526c4b2431a9d3013a43ba4f7bcb863fa594))
+* **services:** Status LEDs for running, commissioning and latched faults ([#656](https://github.com/embedded-pro/e-foc/issues/656)) ([59101cf](https://github.com/embedded-pro/e-foc/commit/59101cfe6c8d89f3ff8c1e600d93fefd4b8b1a1f))
+* **state-machine:** A quick stop decelerates the rotor under control and leaves the drive Ready ([#627](https://github.com/embedded-pro/e-foc/issues/627)) ([26367f5](https://github.com/embedded-pro/e-foc/commit/26367f51bb7b2171c848a83ada74ece13ca7dddf))
+* **state-machine:** Report whether the position reference is the commissioned one and optionally require it in position mode ([#652](https://github.com/embedded-pro/e-foc/issues/652)) ([7f1863d](https://github.com/embedded-pro/e-foc/commit/7f1863dd2cbfb3f7e64adabba89639fac3ad6127))
+* **virtual_motor:** Add the e-foc Virtual Motor app to run and disturb virtual motors ([#695](https://github.com/embedded-pro/e-foc/issues/695)) ([ff01277](https://github.com/embedded-pro/e-foc/commit/ff01277b9627530fd65a4b79d0be6ac073b3937c))
+* **virtual_motor:** Capture the plant at full rate and run disturbance profiles ([#694](https://github.com/embedded-pro/e-foc/issues/694)) ([7c41eba](https://github.com/embedded-pro/e-foc/commit/7c41ebad77f95114d7d95b52b3dfbfd1ed95ded1))
+* **virtual_motor:** Give each virtual motor a fixed current-sense offset per phase ([#698](https://github.com/embedded-pro/e-foc/issues/698)) ([f66a80f](https://github.com/embedded-pro/e-foc/commit/f66a80fa333e26f63ecddb46c98ef920088f736b))
+* **virtual_motor:** Issue log, Help menu and About, and eight motors per bus ([#706](https://github.com/embedded-pro/e-foc/issues/706)) ([ccb0dce](https://github.com/embedded-pro/e-foc/commit/ccb0dce3e25d83402d29092bdee480518e734583))
+* **virtual_motor:** Plant port for pause, step and live torque and noise ([#691](https://github.com/embedded-pro/e-foc/issues/691)) ([be58302](https://github.com/embedded-pro/e-foc/commit/be58302aec572b443270f02865fab774e9c5741d))
+* **virtual_motor:** Run the application as a virtual motor on a virtual CAN bus ([#690](https://github.com/embedded-pro/e-foc/issues/690)) ([95ea1f3](https://github.com/embedded-pro/e-foc/commit/95ea1f322785173a29098259f69fbc560672b2c3))
+* **virtual_motor:** Ship the Virtual Motor app and its virtual motor program in the Debian package ([#702](https://github.com/embedded-pro/e-foc/issues/702)) ([31a3ff1](https://github.com/embedded-pro/e-foc/commit/31a3ff12a02845a11e733f72cc8d37a1636f0bfe))
+* **virtual_motor:** Ship the Virtual Motor app and its virtual motor program in the Windows installer ([#704](https://github.com/embedded-pro/e-foc/issues/704)) ([a4467cd](https://github.com/embedded-pro/e-foc/commit/a4467cd3af4b997d05e97dd6e3e0952820fb35d4))
+* **virtual_motor:** Show a virtual motor's plant on scopes with triggered captures ([#696](https://github.com/embedded-pro/e-foc/issues/696)) ([3b260e3](https://github.com/embedded-pro/e-foc/commit/3b260e3f0eb44a047a45601064392166aa61fb9c))
+* **virtual_motor:** Show the modulation hexagon, the turning rotor and the encoder's error ([#697](https://github.com/embedded-pro/e-foc/issues/697)) ([6916f68](https://github.com/embedded-pro/e-foc/commit/6916f6876ec68a70fc24a5cc8ec09f3319fe49b8))
+* **virtual_motor:** Start a virtual motor calibrated for its plant ([#708](https://github.com/embedded-pro/e-foc/issues/708)) ([e016a87](https://github.com/embedded-pro/e-foc/commit/e016a877392cf9a2e1ddd58c66a07d319d4955c0))
+* **virtual_motor:** Stream the plant's signals through the plant port ([#693](https://github.com/embedded-pro/e-foc/issues/693)) ([d5904b6](https://github.com/embedded-pro/e-foc/commit/d5904b64f6ff51159b1717658973ef4cc0cfa731))
+* **virtual_motor:** Write, load, save and run disturbance profiles from the motor window ([#701](https://github.com/embedded-pro/e-foc/issues/701)) ([27755a4](https://github.com/embedded-pro/e-foc/commit/27755a4358d2f76adbc5296915a809d323245bf9))
+
+
+### Performance Improvements
+
+* **foc:** Cheaper calibration observers and a constructor-injected current stream ([#712](https://github.com/embedded-pro/e-foc/issues/712)) ([6f22aaf](https://github.com/embedded-pro/e-foc/commit/6f22aaf072235556e0375e03b222ecb79a563ecf))
+* Pick up the shorter ADC and PWM interrupt paths of the HALs ([#709](https://github.com/embedded-pro/e-foc/issues/709)) ([47479ec](https://github.com/embedded-pro/e-foc/commit/47479ec32fccbf7c8e85656d3dbf708379d16cda))
+
+
+### Documentation
+
+* State the single-turn position limit in REQ-CTL-003 ([#687](https://github.com/embedded-pro/e-foc/issues/687)) ([49509c2](https://github.com/embedded-pro/e-foc/commit/49509c29f2dffbae46a5f12996eb7dc7a3e75469)), closes [#497](https://github.com/embedded-pro/e-foc/issues/497)
+
+
+### Build System
+
+* **cmake:** Use EmIL and toolbox compiler helpers, mark dependencies SYSTEM ([#658](https://github.com/embedded-pro/e-foc/issues/658)) ([2f28fb2](https://github.com/embedded-pro/e-foc/commit/2f28fb24f81be974202908b95efaee7bfd94dfd6))
+* **deps:** Bump gabrielfrasantos/embedded-devcontainer-cpp ([#707](https://github.com/embedded-pro/e-foc/issues/707)) ([347593c](https://github.com/embedded-pro/e-foc/commit/347593c1e374bebd805f210e9c626c0255a7b752))
+* **deps:** Bump infra/hal/st from `598c730` to `b3c02f1` ([#668](https://github.com/embedded-pro/e-foc/issues/668)) ([74270e0](https://github.com/embedded-pro/e-foc/commit/74270e01be3a21a4eae060142724dfc2fd02543d))
+* **deps:** Bump infra/hal/ti from `20c4592` to `f6d17e4` ([#667](https://github.com/embedded-pro/e-foc/issues/667)) ([7deceb7](https://github.com/embedded-pro/e-foc/commit/7deceb7eaa102ac52022fffa8cf33967fda822ae))
+* **deps:** Bump the patch-minor-action-updates group with 3 updates ([#669](https://github.com/embedded-pro/e-foc/issues/669)) ([c6cf87f](https://github.com/embedded-pro/e-foc/commit/c6cf87ff2e36ec2491e48d2de1e595d254674c38))
+* Fit the embedded Debug image in the TM4C129 application slot ([#716](https://github.com/embedded-pro/e-foc/issues/716)) ([3c6d974](https://github.com/embedded-pro/e-foc/commit/3c6d974c619f715e23177ad131d484eb83411cec))
+* **tools:** Remove the desktop simulator in favour of virtual motors ([#685](https://github.com/embedded-pro/e-foc/issues/685)) ([a622458](https://github.com/embedded-pro/e-foc/commit/a6224580f3d5653d53316d0ab65b42f92a4f6c09))
+
+
+### Continuous Integration
+
+* Gate the cycle budget on the worst path ([#692](https://github.com/embedded-pro/e-foc/issues/692)) ([4db414b](https://github.com/embedded-pro/e-foc/commit/4db414bb484090fd2e037d982bd1a93fb0c23110))
+* Give each loop of the estimators its own bound in the cycle gate ([#710](https://github.com/embedded-pro/e-foc/issues/710)) ([d9803a2](https://github.com/embedded-pro/e-foc/commit/d9803a23c2009f7063a73789bbc29ce05d8b1634))
+* Use ccache in every compiling job and the native tool sub-build ([#700](https://github.com/embedded-pro/e-foc/issues/700)) ([3811889](https://github.com/embedded-pro/e-foc/commit/381188995a195a10a05e65f2390273ac11f964db))
+
+
+### Code Refactoring
+
+* **nvm:** One record path, no unused operations or fields ([#660](https://github.com/embedded-pro/e-foc/issues/660)) ([b61aa97](https://github.com/embedded-pro/e-foc/commit/b61aa97123cf9258e29939d79f79d68c1830f30b))
+
 ## [2.0.1](https://github.com/embedded-pro/e-foc/compare/v2.0.0...v2.0.1) (2026-11-07)
 
 
