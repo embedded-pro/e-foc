@@ -219,6 +219,10 @@ fix it, or drop the parameter name if it is genuinely unused.
 keeps NaN and infinity checks meaningful. Its call sits next to the warnings call, after the
 submodules and before `add_subdirectory(core)`, so `core/` and `targets/` — and the toolbox code they include — get the
 options while the infrastructure libraries and HALs keep their own.
+The configuration's level for Debug is `-Og` on the host and `-O1` with `E_FOC_EMBEDDED_BUILD` (an `-Og` image overflows
+the EK-TM4C1294XL application slot), and embedded builds define `__ASSERT_FUNC=nullptr` for C++ so newlib's `assert()`
+stores no function names in flash; both are set in the root `CMakeLists.txt` and reach every library
+(`documentation/performance-optimization/README.md`, *Debug Builds*).
 
 Neither belongs in `CMakePresets.json`. A preset condition is evaluated before configure, so it cannot
 branch on `CMAKE_CXX_COMPILER_ID`, and both guards are load-bearing — see below.

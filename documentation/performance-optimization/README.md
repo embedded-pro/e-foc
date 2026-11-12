@@ -288,18 +288,30 @@ loop, not in the interrupt: one scaled, clamped multiply of the speed reference 
 By default, Debug builds (`-O0`) disable all optimisations, making code 3–10× slower than Release.
 This breaks real-time deadlines for FOC ISRs during debugging sessions.
 
-e-foc's Debug builds use `-Og`:
+Host Debug builds use `-Og`; embedded Debug builds use `-O1`:
 
 ```cmake
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "Debug flags" FORCE)
+if(E_FOC_EMBEDDED_BUILD)
+    set(CMAKE_CXX_FLAGS_DEBUG "-O1 -g" CACHE STRING "C++ Debug flags" FORCE)
+else()
+    set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "C++ Debug flags" FORCE)
+endif()
 ```
 
 `-Og` provides: basic inlining, dead-code elimination, register allocation — while keeping full
-debuggability (variable inspection, correct stack trace). `OPTIMIZE_FOR_SPEED` still force-inlines the
-header-defined hot functions, and embedded Debug builds keep `-ffast-math -fno-finite-math-only`.
+debuggability (variable inspection, correct stack trace). An EK-TM4C1294XL Debug image built at `-Og` does not fit
+the 320 KB application slot behind the bootloader, even with every assert compiled out: `-Og` keeps thousands of small
+helpers (unit accessors, `infra::Function`, `MemoryRange`) out of line. `-O1` inlines them and brings the Debug image
+to about the RelWithDebInfo size, at the cost of more variables showing as optimised out in the debugger.
+`OPTIMIZE_FOR_SPEED` still force-inlines the header-defined hot functions, and embedded Debug builds keep
+`-ffast-math -fno-finite-math-only`.
+
+Embedded builds also define `__ASSERT_FUNC=nullptr` for C++. newlib's `assert()` otherwise stores each enclosing
+function's `__PRETTY_FUNCTION__` in flash (about 60 KB on the TM4C129), and the target `__assert_func` handlers ignore
+every argument they receive. File name, line and expression are unchanged.
 
 Do not raise single functions to `O3` with a pragma or an `optimize` attribute to speed a Debug build up: such a
-function cannot inline any helper built at `-Og`, so the hot path costs no less with it than without it. When a
+function cannot inline any helper built at the Debug level, so the hot path costs no less with it than without it. When a
 Debug build must be faster, raise the level of whole translation units instead:
 
 ```cmake
