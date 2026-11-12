@@ -23,6 +23,7 @@ namespace hil
         void Teardown() override;
         void BeforeScenario() override;
         void AfterScenario() override;
+        bool SupportsRestart() const override;
         void RestartTarget() override;
 
         bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) override;

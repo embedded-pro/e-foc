@@ -50,6 +50,7 @@ WHEN(R"(the {word} is set to {float} over CAN)", (std::string name, float value)
     auto& fixture = context.Get<Fixture>();
     const auto parameter = ParameterNamed(name);
     ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+    NoteStoredSettingOnHardware(fixture, context.Get<ScenarioSetup>(), *parameter);
     ASSERT_TRUE(WriteParameter(fixture, *parameter, value)) << "The target refused " << name << " = " << value;
 }
 
@@ -58,12 +59,13 @@ WHEN(R"(the {word} is set to automatic over CAN)", (std::string name))
     auto& fixture = context.Get<Fixture>();
     const auto parameter = ParameterNamed(name);
     ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
+    NoteStoredSettingOnHardware(fixture, context.Get<ScenarioSetup>(), *parameter);
     ASSERT_TRUE(WriteParameter(fixture, *parameter, 0.0f)) << "The target refused an automatic " << name;
 }
 
 WHEN(R"(the target restarts)")
 {
-    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Only a simulated target can be restarted by a step";
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsRestart()) << "This target cannot be restarted by a step";
     TargetInteractor::Instance().RestartTarget();
 
     auto& fixture = context.Get<Fixture>();

@@ -22,6 +22,7 @@ namespace integration
         virtual void AfterScenario() = 0;
 
         virtual bool SupportsSimulatedPlant() const;
+        virtual bool SupportsRestart() const;
         virtual void ConfigurePlant(const std::vector<uint8_t>& record);
         virtual void ConfigureNonVolatileMemory(const std::vector<uint8_t>& image);
         virtual void RestartTarget();

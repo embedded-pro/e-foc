@@ -92,6 +92,11 @@ namespace virtual_motor
         return true;
     }
 
+    bool VirtualMotorInteractor::SupportsRestart() const
+    {
+        return true;
+    }
+
     void VirtualMotorInteractor::ConfigurePlant(const std::vector<uint8_t>& record)
     {
         plantDescribed = WriteFile(plantFile, record);
