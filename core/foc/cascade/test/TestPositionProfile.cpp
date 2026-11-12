@@ -13,9 +13,9 @@ namespace
         : public ::testing::Test
     {
     public:
-        void Profile(float velocity, float acceleration, float deceleration = 0.0f)
+        void Profile(float velocity, float acceleration, float deceleration = 0.0f, float jerk = 0.0f)
         {
-            profile.Limit(foc::RadiansPerSecond{ velocity }, foc::RadiansPerSecondSquared{ acceleration }, foc::RadiansPerSecondSquared{ deceleration });
+            profile.Limit(foc::RadiansPerSecond{ velocity }, foc::RadiansPerSecondSquared{ acceleration }, foc::RadiansPerSecondSquared{ deceleration }, foc::RadiansPerSecondCubed{ jerk });
         }
 
         foc::ProfiledReference Advance(float measured = 0.0f, float measuredSpeed = 0.0f)
@@ -250,4 +250,81 @@ TEST_F(TestPositionProfile, switching_the_profile_off_returns_the_target)
 
     EXPECT_EQ(reference.position.Value(), 3.0f);
     EXPECT_EQ(reference.velocity.Value(), 0.0f);
+}
+
+TEST_F(TestPositionProfile, with_jerk_the_acceleration_ramps_smoothly)
+{
+    Profile(20.0f, 400.0f, 0.0f, 20000.0f);
+    profile.SetTarget(foc::Radians{ 1.5f });
+
+    float prevAcceleration{ 0.0f };
+    float maxAccelerationStep{ 0.0f };
+    for (std::size_t tick = 0; tick != 200; ++tick)
+    {
+        const auto reference = Advance();
+        const float step = std::abs(reference.acceleration.Value() - prevAcceleration);
+        maxAccelerationStep = std::max(maxAccelerationStep, step);
+        prevAcceleration = reference.acceleration.Value();
+    }
+
+    EXPECT_LE(maxAccelerationStep, 20000.0f * period + 1.0f);
+}
+
+TEST_F(TestPositionProfile, with_jerk_zero_the_behaviour_is_identical_to_trapezoid)
+{
+    Profile(20.0f, 400.0f);
+    profile.SetTarget(foc::Radians{ 1.5f });
+
+    foc::PositionProfile trapezoidProfile{ outerFrequency };
+    trapezoidProfile.Limit(foc::RadiansPerSecond{ 20.0f }, foc::RadiansPerSecondSquared{ 400.0f }, foc::RadiansPerSecondSquared{ 0.0f }, foc::RadiansPerSecondCubed{ 0.0f });
+    trapezoidProfile.SetTarget(foc::Radians{ 1.5f });
+    foc::TravelLimits noTravel;
+
+    for (std::size_t tick = 0; tick != 200; ++tick)
+    {
+        const auto a = Advance();
+        const auto b = trapezoidProfile.Advance(noTravel, foc::Radians{ 0.0f }, foc::RadiansPerSecond{ 0.0f });
+        EXPECT_EQ(a.position.Value(), b.position.Value());
+        EXPECT_EQ(a.velocity.Value(), b.velocity.Value());
+    }
+}
+
+TEST_F(TestPositionProfile, with_jerk_a_mid_move_replan_changes_acceleration_by_at_most_one_jerk_step)
+{
+    Profile(20.0f, 400.0f, 0.0f, 20000.0f);
+    profile.SetTarget(foc::Radians{ 3.0f });
+    const auto before = Run(60);
+
+    profile.SetTarget(foc::Radians{ 0.0f });
+    const auto after = Advance();
+
+    EXPECT_LE(std::abs(after.acceleration.Value() - before.acceleration.Value()), 20000.0f * period + 1.0f);
+}
+
+TEST_F(TestPositionProfile, with_jerk_the_move_reaches_the_target_in_about_145_ms)
+{
+    Profile(20.0f, 400.0f, 0.0f, 20000.0f);
+    profile.SetTarget(foc::Radians{ 1.5f });
+
+    std::size_t ticks{ 0 };
+    foc::ProfiledReference reference;
+    do
+    {
+        reference = Advance();
+        ++ticks;
+    } while (reference.position.Value() < 1.5f - 1e-4f && ticks < 400);
+
+    EXPECT_NEAR(static_cast<float>(ticks) * period, 0.145f, 0.005f);
+}
+
+TEST_F(TestPositionProfile, reseed_with_jerk_clamps_initial_acceleration)
+{
+    Profile(20.0f, 400.0f, 0.0f, 20000.0f);
+    profile.SetTarget(foc::Radians{ 1.5f });
+    Run(50);
+
+    Profile(20.0f, 200.0f, 0.0f, 20000.0f);
+    profile.Release();
+
+    EXPECT_NO_FATAL_FAILURE(Advance());
 }

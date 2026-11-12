@@ -540,12 +540,15 @@ the next sample before the rebuild. `ZeroVectorSlope::Next` is inlined into `Cal
 
 The position motion profile (`documentation/theory/position-motion-profile.md`) runs in the 1 kHz outer loop, ahead
 of the position law, so it is charged to the outer-loop budget and not to the 20 kHz one. A sample is a handful of
-multiplications and compares on a closed-form trapezoid with no loop and no division; a replan, which happens once
-per setpoint change, adds the planner's few divisions and one square root for a move too short to reach the
-profile velocity, and one wrapped difference whose `fmodf` the existing loop bound already covers. The plan is a
-plain member, not an `std::optional`, and the acceleration feed-forward is one multiply-add stored beside the
-friction current, so the 20 kHz inner loop is unchanged. The cycle gate follows the calls from
-`PositionCascade::LowPriorityHandler` directly, so `cycle-analysis-outer.json` needs no new entry.
+multiplications and compares on a closed-form plan with no loop and no division. A trapezoidal replan (jerk = 0)
+adds a few divisions and one square root for a move too short to reach the profile velocity. An S-curve replan
+(jerk > 0) runs a 32-step bisection search: each of the 32 iterations evaluates two ramp integrals, each costing
+about one sqrt and three divisions on a Cortex-M4F. The static estimate charges the S-curve plan 3 182 cycles: the
+outer-loop handler goes from 4 413 to 7 595 and the outer loop from 8 133 to **11 315 cycles**, against 20 000 on
+EK-TM4C1294XL and 28 333 on NUCLEO-G474RE. The bisection loop in `SCurveProfileFromState::Bisect` requires a
+`loop_bounds` entry of 32 iterations in `cycle-analysis-outer.json`, and `PositionProfile::Replan` must be
+reachable as a direct call from the stage that covers `PositionCascade::LowPriorityHandler`.
+The plan is held in a `std::variant` member, so the 20 kHz inner loop is unchanged.
 
 ### Key Performance Sensitivities
 
