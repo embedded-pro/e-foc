@@ -276,6 +276,13 @@ a compare to the cascade and to each difference the position law takes, and a wr
 they are on. All of it is inlined into `PositionCascade::LowPriorityHandler`, which the static estimate of the time, a sum over the whole function, put at
 976–1295 cycles against 858–1140 before on the NUCLEO-G474RE, far inside the outer loop's budget.
 
+Multi-turn position (`documentation/design/foc-position.md`, *Multi-Turn Position*) counts turns in the outer loop,
+not in the interrupt: one subtraction, two compares and at most one increment per period, and two writes of the count
+for the event loop, each a sequence number bumped around two stores. In linear mode the position law's difference is a
+plain subtraction, so it calls no `remainder`; circular mode keeps the single-turn `remainder` the loop bound above
+covers. Everything is inlined into `PositionCascade::LowPriorityHandler`, and the 20 kHz path is unchanged. The
+reads that retry when the outer loop pre-empts them run on the event loop only.
+
 The Coulomb friction feed-forward (`documentation/theory/disturbances-and-noise.md`, *Friction*) is computed in the outer
 loop, not in the interrupt: one scaled, clamped multiply of the speed reference per period, inlined into
 `CascadeWithSpeedLoop::RunSpeedLoop`, which the outer-loop gate charges through the low-priority handler. The
