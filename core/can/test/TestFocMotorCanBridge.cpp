@@ -5,6 +5,7 @@
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/can/FirmwareUpgradeInterlock.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
+#include "core/foc/cascade/TurnHandover.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
@@ -242,7 +243,7 @@ namespace
             if (bridgeHasFaultHistory)
                 faultHistory = faultLogMock;
 
-            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, offsets, rest, upgrade, faultHistory }, tracer);
+            bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, positionTracker, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, offsets, rest, upgrade, faultHistory }, tracer);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -379,6 +380,7 @@ namespace
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
+        foc::TurnHandover positionTracker;
         foc::CurrentStream currentStream;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
@@ -706,6 +708,59 @@ TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_OutsideTheTravelLimits_Rejec
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
     EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_ThreeTurnsAway_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 6.0f * std::numbers::pi_v<float>);
+
+    ExpectAcknowledged(can::focSetPositionSetpointId, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_BeyondAThousandTurns_RejectsInvalidPayload)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, foc::CommandLimits::maxPositionSetpoint * 1.001f);
+
+    ExpectAcknowledged(can::focSetPositionSetpointId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InLinearMode_ChecksTheTravelLimitsWithoutTakingTheSetpointModuloATurn)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    coordinator->Config().limits.positionMinimum = -0.5f;
+    coordinator->Config().limits.positionMaximum = 0.5f;
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 0.4f + 2.0f * std::numbers::pi_v<float>);
+
+    ExpectAcknowledged(can::focSetPositionSetpointId, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InCircularMode_ChecksTheTravelLimitsOnTheSetpointModuloATurn)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    coordinator->Config().limits.positionMinimum = -0.5f;
+    coordinator->Config().limits.positionMaximum = 0.5f;
+    coordinator->Config().positionCircular = 1;
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 0.4f + 2.0f * std::numbers::pi_v<float>);
+
+    ExpectAcknowledged(can::focSetPositionSetpointId, services::CanAckStatus::success);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_WithinTheTravelLimits_AcksSuccess)
@@ -1715,7 +1770,7 @@ TEST_F(FocMotorCanBridgeTest, OnSetSetpoint_TorqueInNewtonMetres_WhenUncalibrate
 TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_BroadcastsTheStatusThenSpeedAndPositionAsFloats)
 {
     ConstructFixtureInReady();
-    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.00123f }));
+    positionTracker.Track(0.00123f);
     ResetCaptures();
 
     DispatchCommand(can::focRequestTelemetryId);
@@ -1726,6 +1781,18 @@ TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_BroadcastsTheStatusThenSpeedAnd
     EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentData, 0)), 0.0f);
     EXPECT_EQ(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentData, 4)), 0.00123f);
     ExpectAcknowledged(can::focRequestTelemetryId, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_ReportsTheMultiTurnPosition)
+{
+    ConstructFixtureInReady();
+    for (const float angle : { 0.0f, 2.0f, -2.0f, 0.5f })
+        positionTracker.Track(angle);
+    ResetCaptures();
+
+    DispatchCommand(can::focRequestTelemetryId);
+
+    EXPECT_NEAR(std::bit_cast<float>(services::CanFrameCodec::ReadUInt32(lastSentData, 4)), 2.0f * std::numbers::pi_v<float> + 0.5f, 1e-5f);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InCalibrating_BroadcastsCalibratingStatus)
@@ -1782,7 +1849,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, encoderMock, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, std::nullopt, std::nullopt, std::nullopt }, tracer);
+    bridge.emplace(*motorServer, *coordinator, can::FocMotorCanBridge::Platform{ inverterMock, positionTracker, diagnostics, can::FocResetCause::watchdog, can::FocFirmwareIdentity{ 1, 6, 2, 5 } }, can::FocMotorCanBridge::Services{ electricalIdentMock, std::nullopt, std::nullopt, std::nullopt }, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }
@@ -2100,6 +2167,23 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_StallDetectionOff_IsAcceptedWhileTheD
     ASSERT_TRUE(savedConfig.has_value());
     EXPECT_EQ(savedConfig->stallDetection, uint8_t{ 0 });
     ExpectAnswered(0.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, SetParameter_PositionCircular_IsStoredAndAnswered)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    ExpectConfigSaved();
+    DispatchSetParameter(can::FocParameter::positionCircular, 1.0f);
+
+    ASSERT_TRUE(savedConfig.has_value());
+    EXPECT_EQ(savedConfig->positionCircular, uint8_t{ 1 });
+    EXPECT_EQ(coordinator->Config().positionCircular, uint8_t{ 1 });
+    ExpectAnswered(1.0f, false);
+
+    DispatchQueryParameter(can::FocParameter::positionCircular);
+    ExpectAnswered(1.0f, false);
 }
 
 TEST_F(FocMotorCanBridgeTest, SetParameter_HomingRequired_IsStoredAndAnswered)

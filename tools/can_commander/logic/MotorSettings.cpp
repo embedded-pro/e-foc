@@ -36,7 +36,7 @@ namespace tool
         constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
         constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 90> presentations{ {
+        constexpr std::array<SettingPresentation, 91> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop; deadbeat estimates its voltage error at this bandwidth. Automatic takes it from the calibration record, or from the PWM rate without one, held low enough that the current-sensor noise the calibration measured stays inaudible.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::deadbeat, Current::slidingMode }) },
@@ -150,6 +150,7 @@ namespace tool
             { FocParameter::recalibrationsRejected, "Recalibrations rejected", "Rejected:", {}, "Settled readings outside their plausibility band since power-up.", {} },
             { FocParameter::recalibrationsStored, "Recalibrations stored", "Stored:", {}, "Stores of the recalibrated inductance, inertia and friction since power-up, at most one every 15 minutes.", {} },
             { FocParameter::homingRequired, "Homing required", "Require homing:", {}, "Refuse to enable position mode until the drive is homed, that is until a calibration or a reference restored from the encoder index has defined the commissioned position zero in this power-up. Speed and torque mode are never held back.", {} },
+            { FocParameter::positionCircular, "Circular positioning", "Circular positioning:", {}, "Off (the default): a position setpoint counts whole turns from the position zero and the rotor turns the direct way to it. On: the setpoint is an angle within one turn and the rotor takes the shorter way round. In force from the next Start.", {} },
         } };
 
         constexpr bool MatchesWireContract()
@@ -390,7 +391,7 @@ namespace tool
 
     std::span<const SettingPresentation> HomingSettings()
     {
-        return Slice(89, 1);
+        return Slice(89, 2);
     }
 
     namespace

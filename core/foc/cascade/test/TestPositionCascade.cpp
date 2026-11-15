@@ -1,6 +1,7 @@
 #include "core/foc/cascade/CurrentStream.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TurnHandover.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
@@ -58,6 +59,11 @@ namespace
         return parameters;
     }
 
+    foc::PhaseCurrents ZeroCurrents()
+    {
+        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
     class TestPositionCascade
         : public ::testing::Test
     {
@@ -75,16 +81,32 @@ namespace
             focPosition->SetPositionTunings(foc::PositionLoopTunings{});
         }
 
+        void SampleFor(float angle, uint32_t samples)
+        {
+            for (uint32_t sample = 0; sample != samples; ++sample)
+            {
+                foc::Radians held{ angle };
+                focPosition->Calculate(ZeroCurrents(), held);
+            }
+        }
+
+        void OuterTickAt(float angle)
+        {
+            SampleFor(angle, baseFrequency.Value() / lowPriorityFrequency.Value());
+            lowPriorityInterruptMock.TriggerHandler();
+        }
+
+        void TurnForward(float from, int32_t quarterTurns)
+        {
+            for (int32_t step = 0; step <= quarterTurns; ++step)
+                OuterTickAt(std::remainder(from + static_cast<float>(step) * std::numbers::pi_v<float> / 2.0f, 2.0f * std::numbers::pi_v<float>));
+        }
+
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         foc::CurrentStream stream;
         std::optional<foc::PositionCascade> focPosition;
         const std::size_t polePairs{ 7 };
     };
-
-    foc::PhaseCurrents ZeroCurrents()
-    {
-        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    }
 
     const foc::PhasePwmDutyCycles centredDuty{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
 
@@ -450,7 +472,7 @@ TEST_F(TestPositionCascade, a_non_positive_reference_time_constant_leaves_the_tw
     EXPECT_TRUE(DutiesDiffer(DutyAfterOuterCycles(shaped, observableError, 0.0f), withoutPrefilter));
 }
 
-TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_way)
+TEST_F(TestPositionCascade, in_circular_mode_a_setpoint_across_the_encoder_seam_moves_the_short_way)
 {
     constexpr float pi = std::numbers::pi_v<float>;
     constexpr float shortWay{ 0.5f };
@@ -461,6 +483,8 @@ TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_w
     PositionCascadeUnderTest acrossTheSeam{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest forward{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest backward{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    for (auto* underTest : { &acrossTheSeam, &forward, &backward })
+        underTest->cascade->PositionCircular(true);
 
     auto seamResult = DutyAfterOuterCycles(acrossTheSeam, -pi + (shortWay - 0.001f), measured, outerCycles);
     auto forwardResult = DutyAfterOuterCycles(forward, measured + shortWay, measured, outerCycles);
@@ -645,11 +669,12 @@ TEST_F(TestPositionCascade, a_setpoint_beyond_the_travel_limits_is_held_at_the_n
     EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 0.5f, 1e-5f);
 }
 
-TEST_F(TestPositionCascade, travel_limits_that_are_off_leave_the_short_way_across_the_seam)
+TEST_F(TestPositionCascade, in_circular_mode_travel_limits_that_are_off_leave_the_short_way_across_the_seam)
 {
     const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
     EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
 
+    focPosition->PositionCircular(true);
     focPosition->LimitTravel(foc::Radians{ -3.1f }, foc::Radians{ 3.1f });
     focPosition->LimitTravel(foc::Radians{ 0.0f }, foc::Radians{ 0.0f });
     focPosition->Enable();
@@ -664,11 +689,13 @@ TEST_F(TestPositionCascade, travel_limits_that_are_off_leave_the_short_way_acros
     EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 2.0f * std::numbers::pi_v<float> - 6.0f, 1e-5f);
 }
 
-TEST_F(TestPositionCascade, within_travel_limits_a_setpoint_across_the_seam_drives_the_direct_way)
+TEST_F(TestPositionCascade, in_circular_mode_within_travel_limits_a_setpoint_across_the_seam_drives_the_direct_way)
 {
     PositionCascadeUnderTest limited{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest acrossTheSeam{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest backward{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
+    for (auto* underTest : { &limited, &acrossTheSeam, &backward })
+        underTest->cascade->PositionCircular(true);
     limited.cascade->LimitTravel(foc::Radians{ -3.1f }, foc::Radians{ 3.1f });
 
     const auto limitedResult = DutyAfterOuterCycles(limited, -3.0f, 3.0f, 2);
@@ -677,6 +704,149 @@ TEST_F(TestPositionCascade, within_travel_limits_a_setpoint_across_the_seam_driv
 
     ExpectSameDuty(limitedResult, backwardResult);
     EXPECT_TRUE(DutiesDiffer(limitedResult, seamResult));
+}
+
+TEST_F(TestPositionCascade, in_linear_mode_the_observed_error_to_a_setpoint_across_the_seam_is_the_direct_way)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ -3.0f });
+    SampleFor(3.0f, 10);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), -6.0f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, in_linear_mode_a_setpoint_three_turns_away_is_three_turns_of_error)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 3.0f * turn + 0.5f });
+    OuterTickAt(0.5f);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().targetError.Value(), 3.0f * turn, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, the_turns_the_rotor_makes_count_into_the_measured_position)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.0f });
+    TurnForward(0.25f, 8);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().measuredPosition.Value(), 2.0f * turn + 0.25f, 1e-4f);
+    EXPECT_NEAR(focPosition->ObserveMotion().targetError.Value(), -(2.0f * turn + 0.25f), 1e-4f);
+}
+
+TEST_F(TestPositionCascade, a_seam_crossing_since_the_last_outer_tick_is_counted_in_the_observation)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    OuterTickAt(3.0f);
+    SampleFor(-3.0f, 1);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().measuredPosition.Value(), turn - 3.0f, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, in_circular_mode_the_measured_position_is_the_angle_within_the_turn)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->PositionCircular(true);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ -3.0f });
+    TurnForward(0.25f, 8);
+    OuterTickAt(3.0f);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().measuredPosition.Value(), 3.0f, 1e-5f);
+    EXPECT_NEAR(focPosition->ObserveMotion().targetError.Value(), 2.0f * std::numbers::pi_v<float> - 6.0f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, circular_mode_is_latched_at_the_next_enable)
+{
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    focPosition->PositionCircular(true);
+    focPosition->SetPoint(foc::Radians{ -3.0f });
+    SampleFor(3.0f, 10);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().targetError.Value(), -6.0f, 1e-5f);
+
+    focPosition->Disable();
+    focPosition->Enable();
+    SampleFor(3.0f, 10);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().targetError.Value(), 2.0f * std::numbers::pi_v<float> - 6.0f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, an_enable_takes_the_turns_the_position_tracker_counted)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    foc::TurnHandover tracker;
+    for (const float angle : { 0.0f, 2.0f, -2.0f, 0.0f, 2.0f, -2.0f, 0.0f })
+        tracker.Track(angle);
+
+    focPosition->SetPositionTracker(tracker);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.0f });
+    OuterTickAt(0.0f);
+
+    EXPECT_NEAR(focPosition->ObserveMotion().measuredPosition.Value(), 2.0f * turn, 1e-4f);
+    EXPECT_NEAR(tracker.Position().Value(), 2.0f * turn, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, while_enabled_the_position_tracker_reports_the_turns_the_cascade_counts)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    foc::TurnHandover tracker;
+    tracker.Track(0.25f);
+
+    focPosition->SetPositionTracker(tracker);
+    focPosition->Enable();
+    TurnForward(0.25f, 4);
+
+    EXPECT_NEAR(tracker.Position().Value(), turn + 0.25f, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, a_disable_hands_the_turns_back_to_the_position_tracker)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    foc::TurnHandover tracker;
+    tracker.Track(0.25f);
+
+    focPosition->SetPositionTracker(tracker);
+    focPosition->Enable();
+    TurnForward(0.25f, 4);
+    focPosition->Disable();
+    tracker.Track(1.0f);
+
+    EXPECT_NEAR(tracker.Position().Value(), turn + 1.0f, 1e-4f);
+}
+
+TEST_F(TestPositionCascade, a_speed_command_after_an_enable_keeps_the_turns_counted)
+{
+    constexpr float turn = 2.0f * std::numbers::pi_v<float>;
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+    foc::TurnHandover tracker;
+    tracker.Track(0.25f);
+
+    focPosition->SetPositionTracker(tracker);
+    focPosition->Enable();
+    TurnForward(0.25f, 4);
+    focPosition->EnableSpeedCommand();
+    OuterTickAt(0.25f);
+
+    EXPECT_NEAR(tracker.Position().Value(), turn + 0.25f, 1e-4f);
 }
 
 TEST_F(TestPositionCascade, a_loaded_cogging_map_drives_the_winding_while_the_rotor_holds_its_setpoint)

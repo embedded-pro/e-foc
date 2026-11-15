@@ -166,7 +166,7 @@ namespace application
             },
             [this]()
             {
-                return static_cast<drivers::Encoder&>(hardware).Read();
+                return Control().Drive().ActiveStateMachine().ObserveMotion().measuredPosition;
             });
         positionLimit.Enable([this]()
             {

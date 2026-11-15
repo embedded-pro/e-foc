@@ -34,7 +34,7 @@ namespace application
             {
                 hardware.Reset();
             } }
-        , canBridge{ wiring.canStack.motorCanServer, wiring.controlMode, can::FocMotorCanBridge::Platform{ wiring.inverter, wiring.hardware, wiring.hardware.Diagnostics(), ToCanResetCause(wiring.hardware.GetResetCause()), FirmwareIdentityOf(wiring.hardware.GetBoardKind()) }, can::FocMotorCanBridge::Services{ *wiring.calibration.electricalIdent, wiring.calibration.confirmedCurrentOffsets, wiring.calibration.rotorStandstill, firmwareUpgrade, wiring.faultHistory }, wiring.hardware.Tracer() }
+        , canBridge{ wiring.canStack.motorCanServer, wiring.controlMode, can::FocMotorCanBridge::Platform{ wiring.inverter, wiring.calibration.positionTracker.Handover(), wiring.hardware.Diagnostics(), ToCanResetCause(wiring.hardware.GetResetCause()), FirmwareIdentityOf(wiring.hardware.GetBoardKind()) }, can::FocMotorCanBridge::Services{ *wiring.calibration.electricalIdent, wiring.calibration.confirmedCurrentOffsets, wiring.calibration.rotorStandstill, firmwareUpgrade, wiring.faultHistory }, wiring.hardware.Tracer() }
         , canLivenessWatchdog{ wiring.canStack.canServer, wiring.controlMode, wiring.hardware.Tracer() }
         , currentStreamer{ wiring.canStack.canServer, wiring.canStack.motorCanServer, wiring.currentStream, wiring.controlMode.Config(), wiring.baseFrequency }
     {}

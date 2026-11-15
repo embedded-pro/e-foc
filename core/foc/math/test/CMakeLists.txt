@@ -11,5 +11,6 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestCoggingFeedForward.cpp
     TestFrictionFeedForward.cpp
     TestTravelLimits.cpp
+    TestTurnCounter.cpp
     TestWindingTemperature.cpp
 )

@@ -22,6 +22,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.services.index_search
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
+    e_foc.services.position_tracking
     e_foc.services.bus_voltage
     e_foc.services.leds
     numerical.controllers.implementations

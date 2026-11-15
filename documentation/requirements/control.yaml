@@ -28,11 +28,12 @@
   verification: [sil, mil, hil, unit]
   shall: >
     In position mode the drive shall move the rotor to the operator's position setpoint, a
-    single-turn mechanical angle, and hold it with every selectable position law, within the step
-    and disturbance envelopes its acceptance criteria give, also against cogging and dry friction.
-    Without software position limits it shall take the shorter way round. It shall report the
-    target reached once the error has stayed within the position window for the position-window
-    time, and shall report the position in the setpoint's own turn.
+    mechanical angle counting whole turns from the position zero, the direct way however many
+    turns away it is, and hold it with every selectable position law, within the step and
+    disturbance envelopes its acceptance criteria give, also against cogging and dry friction. It
+    shall report the target reached once the error has stayed within the position window for the
+    position-window time, and shall report the position counting whole turns from the position
+    zero.
 
 - id: REQ-CTL-004
   title: The control laws stay stable on motors other than the nominal one
@@ -114,3 +115,15 @@
     plan the reference so that the rate of change of its acceleration does not exceed the jerk
     limit throughout the move, starting from the acceleration already under way when the setpoint
     changes, and shall reach the target within the duration its acceptance criteria give.
+
+- id: REQ-CTL-012
+  title: Circular positioning takes the shorter way round
+  status: verified
+  verification: [sil, unit]
+  shall: >
+    With circular positioning selected, position mode shall take the operator's setpoint as an
+    angle within one turn and, without software position limits, shall turn the rotor the shorter
+    way round to it.
+  rationale: >
+    A rotary axis that turns without end, such as an indexing table, wants the nearest turn of the
+    setpoint, not a count of turns that grows with every cycle.

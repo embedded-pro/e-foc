@@ -19,8 +19,9 @@ namespace application
             {
                 return this->hardware.PowerSupplyVoltage();
             } }
-        , motorAlignment{ inverterCompensation, hardware }
-        , indexSearch{ inverterCompensation, hardware, IndexChannelOr(hardware, noEncoderIndex) }
+        , positionTracker{ hardware }
+        , motorAlignment{ inverterCompensation, positionTracker }
+        , indexSearch{ inverterCompensation, positionTracker, IndexChannelOr(hardware, noEncoderIndex) }
         , rotorStandstill{ hardware }
     {}
 }

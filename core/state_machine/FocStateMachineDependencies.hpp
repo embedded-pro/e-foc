@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/cascade/CurrentStream.hpp"
+#include "core/foc/cascade/TurnHandover.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
@@ -26,6 +27,7 @@ namespace application
         foc::Volts vdc;
         uint32_t dutyUpdateDelayPeriods{ 0 };
         foc::ZeroVectorSlopeSink* zeroVectorSlopes{ nullptr };
+        foc::TurnHandover* positionTracker{ nullptr };
     };
 
     // Kept across a mode switch out of an aligned Ready: the encoder zero is shared hardware.

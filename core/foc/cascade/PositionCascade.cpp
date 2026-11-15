@@ -32,6 +32,16 @@ namespace foc
         travelLimits = TravelLimits{ minimum, maximum };
     }
 
+    void PositionCascade::PositionCircular(bool circular)
+    {
+        requestedCircular = circular;
+    }
+
+    void PositionCascade::SetPositionTracker(TurnHandover& tracker)
+    {
+        this->tracker = &tracker;
+    }
+
     void PositionCascade::ProfileMotion(RadiansPerSecond velocity, RadiansPerSecondSquared acceleration, RadiansPerSecondSquared deceleration, RadiansPerSecondCubed jerk)
     {
         profile.Limit(velocity, acceleration, deceleration, jerk);
@@ -60,6 +70,7 @@ namespace foc
 
     void PositionCascade::Enable()
     {
+        TakeOverTurns();
         speedCommandActive = false;
         positionLoop.Reset();
         EnableSpeedLoop();
@@ -69,6 +80,7 @@ namespace foc
 
     void PositionCascade::Disable()
     {
+        HandBackTurns();
         enabled = false;
         speedCommandActive = false;
         DisableSpeedLoop();
@@ -76,6 +88,7 @@ namespace foc
 
     void PositionCascade::EnableSpeedCommand()
     {
+        TakeOverTurns();
         speedCommand = RadiansPerSecond{ 0.0f };
         speedCommandActive = true;
         EnableSpeedLoop();
@@ -89,6 +102,7 @@ namespace foc
 
     void PositionCascade::EnableCurrentCommand()
     {
+        TakeOverTurns();
         speedCommandActive = false;
         EnableCurrentCommandImpl();
         enabled = true;
@@ -117,8 +131,10 @@ namespace foc
     MotionObservation PositionCascade::ObserveMotion() const
     {
         auto observation = ObserveSpeedLoopMotion();
-        observation.positionError = ErrorTo(profile.Reference());
-        observation.targetError = ErrorTo(profile.Target());
+        const auto measured = ObservedPosition();
+        observation.positionError = ErrorTo(profile.Reference(), measured);
+        observation.targetError = ErrorTo(profile.Target(), measured);
+        observation.measuredPosition = measured;
 
         // A law that commands the current leaves the speed reference wherever the speed loop's last user put it
         if (commandsCurrent)
@@ -127,12 +143,56 @@ namespace foc
         return observation;
     }
 
-    Radians PositionCascade::ErrorTo(Radians point) const
+    void PositionCascade::TakeOverTurns()
     {
-        const Radians measured{ CurrentMechanicalAngle() };
-        const auto limits = travelLimits;
+        if (enabled)
+            return;
+
+        circular = requestedCircular;
+        const auto held = tracker != nullptr ? tracker->Hold() : std::nullopt;
+        if (held)
+        {
+            turns.Seed(*held);
+            publishedTurns.Write(*held);
+        }
+        else
+        {
+            turns.Restart();
+            publishedTurns.Clear();
+        }
+    }
+
+    void PositionCascade::HandBackTurns()
+    {
+        if (enabled && tracker != nullptr)
+            tracker->Release();
+    }
+
+    TravelLimits PositionCascade::CurrentLimits() const
+    {
+        auto limits = travelLimits;
+        limits.circular = circular;
+        return limits;
+    }
+
+    Radians PositionCascade::ObservedPosition() const
+    {
+        const auto angle = CurrentMechanicalAngle();
+        if (circular)
+            return Radians{ angle };
+
+        TurnCounter counter;
+        if (const auto last = publishedTurns.Read())
+            counter.Seed(*last);
+        counter.Track(angle);
+        return Radians{ PositionOf(counter.Count()) };
+    }
+
+    Radians PositionCascade::ErrorTo(Radians point, Radians measured) const
+    {
+        const auto limits = CurrentLimits();
         if (!limits.IsOn())
-            return Radians{ PositionDifference(point, measured, false) };
+            return Radians{ PositionDifference(point, measured, !limits.Folds()) };
 
         return Radians{ PositionDifference(limits.Hold(point), measured, true) };
     }
@@ -140,6 +200,7 @@ namespace foc
     void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
+        CountTurns();
 
         if (HoldCommandedCurrent())
         {
@@ -165,8 +226,8 @@ namespace foc
             return;
         }
 
-        const auto limits = travelLimits;
-        const auto reference = profile.Advance(limits, Radians{ CurrentMechanicalAngle() }, RadiansPerSecond{ mechanicalSpeed });
+        const auto limits = CurrentLimits();
+        const auto reference = profile.Advance(limits, MeasuredPosition(), RadiansPerSecond{ mechanicalSpeed });
         auto command = positionLoop.Compute(ControlContext(limits, reference, mechanicalSpeed));
         commandsCurrent = command.kind != PositionOutputKind::speedReference;
 

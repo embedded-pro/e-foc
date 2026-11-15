@@ -41,7 +41,8 @@ namespace foc
                 seeded = true;
             }
 
-            shapedReference = math::WrapToPi(shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct));
+            const auto shaped = shapedReference + alpha * PositionDifference(context.reference, Radians{ shapedReference }, context.direct);
+            shapedReference = context.direct ? shaped : math::WrapToPi(shaped);
 
             return Radians{ shapedReference };
         }

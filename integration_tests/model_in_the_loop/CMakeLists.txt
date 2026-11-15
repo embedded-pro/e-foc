@@ -23,6 +23,7 @@ target_link_libraries(e_foc.model_in_the_loop PUBLIC
     e_foc.services.fault_history
     e_foc.services.non_volatile_memory
     e_foc.services.standstill
+    e_foc.services.position_tracking
     e_foc.services.bus_voltage
     e_foc.supervision
     e_foc.integration_tests.plant

@@ -14,6 +14,7 @@ target_sources(e_foc.foc.math INTERFACE
     CoggingFeedForward.hpp
     FrictionFeedForward.hpp
     TravelLimits.hpp
+    TurnCounter.hpp
     WindingTemperature.hpp
 )
 

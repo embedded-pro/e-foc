@@ -8,7 +8,6 @@
 #include <cmath>
 #include <cstdio>
 #include <gtest/gtest.h>
-#include <numbers>
 #include <optional>
 #include <thread>
 
@@ -18,17 +17,6 @@ namespace
 {
     constexpr float kMicroPerUnit = 1.0e6f;
     constexpr auto kPollInterval = std::chrono::milliseconds{ 20 };
-
-    float WrappedDifference(float a, float b)
-    {
-        constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
-        float d = std::fmod(a - b, twoPi);
-        if (d > std::numbers::pi_v<float>)
-            d -= twoPi;
-        else if (d < -std::numbers::pi_v<float>)
-            d += twoPi;
-        return d;
-    }
 }
 
 WHEN(R"(the {word} loop algorithm is set to {word})", (std::string loopName, std::string algorithmName))
@@ -106,7 +94,7 @@ THEN(R"(the measured position shall settle at {float} rad within {float} rad in 
         const auto position = fixture.ReadMeasuredPosition();
         ASSERT_TRUE(position.has_value()) << "No position telemetry";
         last = *position;
-        consecutive = std::fabs(WrappedDifference(last, expected)) <= tolerance ? consecutive + 1 : 0;
+        consecutive = std::fabs(last - expected) <= tolerance ? consecutive + 1 : 0;
         if (consecutive >= 3)
             return;
         std::this_thread::sleep_for(kPollInterval);
@@ -126,7 +114,7 @@ THEN(R"(the measured position shall hold at {float} rad within {float} rad for {
     {
         const auto position = fixture.ReadMeasuredPosition();
         ASSERT_TRUE(position.has_value()) << "No position telemetry";
-        const float error = std::fabs(WrappedDifference(*position, expected));
+        const float error = std::fabs(*position - expected);
         if (error > worst)
         {
             worst = error;
@@ -143,7 +131,7 @@ THEN(R"(the reported position shall read {float} rad within {float} rad without 
     auto& fixture = context.Get<Fixture>();
     const auto position = fixture.ReadMeasuredPosition();
     ASSERT_TRUE(position.has_value()) << "No position telemetry";
-    EXPECT_NEAR(*position, expected, tolerance) << "The reported position is not in the setpoint's turn";
+    EXPECT_NEAR(*position, expected, tolerance) << "The reported position is not the setpoint's multi-turn position";
 }
 
 THEN(R"(the measured speed shall exceed {float} rad\/s within {int} ms)", (float threshold, int timeoutMs))

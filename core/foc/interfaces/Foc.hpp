@@ -21,6 +21,8 @@ namespace foc
         Radians positionError{ 0.0f };
         Ampere demandedTorqueCurrent{ 0.0f };
         Radians targetError{ 0.0f };
+        // The position the position law works on: multi-turn in linear mode, within the turn in circular mode.
+        Radians measuredPosition{ 0.0f };
     };
 
     class FocBase
@@ -174,6 +176,8 @@ namespace foc
     public:
         // Off while minimum is not below maximum.
         virtual void LimitTravel(Radians minimum, Radians maximum) = 0;
+        // Latched at the next Enable.
+        virtual void PositionCircular(bool circular) = 0;
     };
 
     class SpeedRampable

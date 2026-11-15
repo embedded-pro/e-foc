@@ -11,10 +11,17 @@ namespace foc
     {
         Radians minimum{ 0.0f };
         Radians maximum{ 0.0f };
+        // Circular mode: positions are angles within the turn; linear mode: multi-turn positions.
+        bool circular{ false };
 
         bool IsOn() const
         {
             return minimum.Value() < maximum.Value();
+        }
+
+        bool Folds() const
+        {
+            return circular && !IsOn();
         }
 
         bool Admits(Radians setpoint) const
@@ -22,13 +29,19 @@ namespace foc
             if (!IsOn())
                 return true;
 
-            const auto folded = math::WrapToPi(setpoint.Value());
-            return folded >= minimum.Value() && folded <= maximum.Value();
+            const auto position = InFrame(setpoint.Value());
+            return position >= minimum.Value() && position <= maximum.Value();
         }
 
         OPTIMIZE_FOR_SPEED Radians Hold(Radians reference) const
         {
-            return Radians{ std::clamp(math::WrapToPi(reference.Value()), minimum.Value(), maximum.Value()) };
+            return Radians{ std::clamp(InFrame(reference.Value()), minimum.Value(), maximum.Value()) };
+        }
+
+    private:
+        OPTIMIZE_FOR_SPEED float InFrame(float position) const
+        {
+            return circular ? math::WrapToPi(position) : position;
         }
     };
 }

@@ -397,14 +397,16 @@ stateDiagram-v2
 
 The software position limits keep the reference and the way to it between the position minimum and maximum
 (`foc-position.md`, Software Position Limits), but an outside force, or an overshoot, can still carry the rotor
-past them. A sixth watch, the position-limit monitor, reads the encoder's mechanical angle every 1 ms on the event
+past them. A sixth watch, the position-limit monitor, reads the position the loop works on every 1 ms on the event
 loop while position mode is the active mode, the drive is `Enabled` and the limits are on. When the angle lies
 more than four encoder counts outside the limits — 2π · 4 / resolution, 6.28 mrad with the default 4000-count
 encoder — the monitor raises `positionLimit` (REQ-CTL-007) once and stays silent until the drive leaves
 `Enabled`. The four counts keep a rotor settled on a limit, whose reading dithers by a count, from faulting.
 
-The angle is the one the loop works on, wrapped to [−π, π), so a rotor pushed past a limit and across the encoder
-seam reads as far outside the other limit and still faults. The limits and the encoder resolution are read at
+The position is the one the loop works on (`foc-position.md`, Multi-Turn Position): the multi-turn position in
+linear mode, so a rotor pushed past a limit reads as outside it however many turns it is carried; the angle wrapped
+to [−π, π) in circular mode, so a rotor pushed past a limit and across the encoder seam reads as far outside the
+other limit and still faults. The limits and the encoder resolution are read at
 every evaluation, so a limit written over CAN is in force from the next one. Torque and speed mode are not
 watched: their travel is not bounded by the limits. The fault is raised through the same notifier as the other
 watches, so the drive cuts its power stage and coasts.

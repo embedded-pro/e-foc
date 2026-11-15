@@ -111,8 +111,9 @@ TEST_F(TestPositionProfile, the_profile_starts_from_the_measured_position)
     EXPECT_LT(reference.position.Value(), 0.801f);
 }
 
-TEST_F(TestPositionProfile, a_target_across_the_wrap_takes_the_shorter_way)
+TEST_F(TestPositionProfile, in_circular_mode_a_target_across_the_wrap_takes_the_shorter_way)
 {
+    travel = foc::TravelLimits{ foc::Radians{ 0.0f }, foc::Radians{ 0.0f }, true };
     Profile(20.0f, 400.0f);
     profile.SetTarget(foc::Radians{ -pi + 0.2f });
 
@@ -123,8 +124,33 @@ TEST_F(TestPositionProfile, a_target_across_the_wrap_takes_the_shorter_way)
     EXPECT_NEAR(std::remainder(last.position.Value() - (-pi + 0.2f), 2.0f * pi), 0.0f, 1e-4f);
 }
 
-TEST_F(TestPositionProfile, the_reference_stays_inside_one_turn)
+TEST_F(TestPositionProfile, in_linear_mode_a_target_across_the_wrap_takes_the_direct_way)
 {
+    Profile(20.0f, 400.0f);
+    profile.SetTarget(foc::Radians{ -pi + 0.2f });
+
+    const auto first = Advance(pi - 0.2f);
+    const auto last = Run(500, pi - 0.2f);
+
+    EXPECT_LT(first.velocity.Value(), 0.0f);
+    EXPECT_NEAR(last.position.Value(), -pi + 0.2f, 1e-4f);
+}
+
+TEST_F(TestPositionProfile, in_linear_mode_a_target_turns_away_is_planned_the_whole_way)
+{
+    Profile(20.0f, 400.0f);
+    profile.SetTarget(foc::Radians{ 6.0f * pi + 0.5f });
+
+    const auto first = Advance(0.5f);
+    const auto last = Run(2000, 0.5f);
+
+    EXPECT_GT(first.velocity.Value(), 0.0f);
+    EXPECT_NEAR(last.position.Value(), 6.0f * pi + 0.5f, 1e-4f);
+}
+
+TEST_F(TestPositionProfile, in_circular_mode_the_reference_stays_inside_one_turn)
+{
+    travel = foc::TravelLimits{ foc::Radians{ 0.0f }, foc::Radians{ 0.0f }, true };
     Profile(20.0f, 400.0f);
     profile.SetTarget(foc::Radians{ -pi + 0.2f });
     Advance(pi - 0.2f);

@@ -150,11 +150,13 @@ of every motor at once and of a motor that calibrates.
 
 Input ranges and decimal places follow the wire contract: the limit is the smaller of the firmware's
 command limit and what the 16-bit wire field can carry, and the decimals match the wire resolution, so the
-tool never offers precision that the frame drops. Position is the exception: the firmware accepts ±2π,
-but the position loop is single-turn and goes to the setpoint modulo one turn
-(`documentation/design/foc-position.md`), so ±360° would name every target twice, and a setpoint of 270°
-would settle where the measured position reads −90°. The tool offers one turn instead, ±179.9° from the
-alignment zero, the same half turn either side that the measured position is reported in.
+tool never offers precision that the frame drops. Position offers the firmware's whole range since contract
+4.0, ±1000 turns (±360 000°) from the position zero (`documentation/design/foc-position.md`, Multi-Turn
+Position), the range the measured position is reported in too. With circular positioning on, the drive takes
+the setpoint modulo one turn, so the operator stays within ±180° to name each target once. The measured position
+reads the multi-turn position of the motion telemetry only: the current stream's position is the angle within
+the turn, which places the waveforms, and painting it in the same read-out would make the reading jump by whole
+turns.
 
 The setpoint of the active control mode is chosen with a knob and the number box beside it, which follow
 each other: torque in amperes, speed in revolutions per minute, position in degrees. The wire still carries
@@ -279,14 +281,16 @@ flowchart LR
   Target Reached): position mode reports the target reached once its error has stayed within the window for
   the time, and a window of zero keeps the report off, as the group says. They are stored at once and in force
   within 1 ms, in any state.
-  Its **Travel Limits** group holds the position minimum and maximum of contract 2.11 (`foc-position.md`,
-  Software Position Limits). The group says they are measured from the alignment zero and are off while the
-  minimum is not below the maximum, and that when on, position mode refuses a setpoint outside them and moves
-  the direct way between them. They are stored at once and in force from the next control period. The same group
+  Its **Travel Limits** group holds the position minimum and maximum of contract 2.11, ±1000 turns since
+  contract 4.0 (`foc-position.md`, Software Position Limits). The group says they are measured from the position
+  zero, counting whole turns unless circular positioning is on, and are off while the minimum is not below the
+  maximum, and that when on, position mode refuses a setpoint outside them and moves the direct way between them. They are stored at once and in force from the next control period. The same group
   holds the **Require homing** toggle of contract 2.19 (`foc-position.md`, Homing and the Position Reference)
   with a note: position mode then starts only once a calibration or the encoder index has set the commissioned
-  zero in this power-up, and speed and torque mode are not held back. The Motor Status group shows the *Homed*
-  reading next to *Target reached*.
+  zero in this power-up, and speed and torque mode are not held back. It also holds the **Circular positioning**
+  toggle of contract 4.0 (`foc-position.md`, Multi-Turn Position), off by default, with a note: on, a setpoint is
+  an angle within one turn and the rotor takes the shorter way round, from the next Start. The Motor Status group
+  shows the *Homed* reading next to *Target reached*.
   Its **Thermal** group holds the calibration temperature of contract 2.13 (`fault-supervision.md` Part K): the
   winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
   from; and the temperature limit and margin of contract 2.14, over which speed and position mode derate the current

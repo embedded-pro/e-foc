@@ -22,4 +22,5 @@ target_sources(e_foc.foc.cascade_test PRIVATE
     TestSpeedCascade.cpp
     TestSpeedDifferentiator.cpp
     TestTorqueCascade.cpp
+    TestTurnHandover.cpp
 )
