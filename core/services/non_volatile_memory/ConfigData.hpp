@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/LoopTunings.hpp"
+#include <array>
 #include <cstdint>
 #include <numbers>
 
@@ -75,7 +76,7 @@ namespace services
     };
 
     inline constexpr uint32_t ConfigMagic = 0xDEADBEEF;
-    inline constexpr uint8_t ConfigLayoutVersion = 16;
+    inline constexpr uint8_t ConfigLayoutVersion = 17;
 
     // Padding-free storage schema: four-byte fields first; see service-nvm.md.
     struct ConfigData
@@ -97,7 +98,9 @@ namespace services
         uint8_t stallDetection = 1;
         uint8_t recalibrationMode = 0;
         uint8_t homingRequired = 0;
+        uint8_t positionCircular = 0;
+        std::array<uint8_t, 3> reserved{};
     };
 
-    static_assert(sizeof(ConfigData) == 188, "ConfigData layout must be free of implicit padding");
+    static_assert(sizeof(ConfigData) == 192, "ConfigData layout must be free of implicit padding");
 }

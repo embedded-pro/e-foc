@@ -13,6 +13,7 @@
 #include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
+#include "core/services/position_tracking/PositionTracker.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/supervision/PeakCurrent.hpp"
@@ -175,6 +176,7 @@ namespace mil
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
+        services::PositionTracker positionTracker;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         application::NoEncoderIndex noEncoderIndex;
         infra::WithSharedAccess<services::IndexSearchImpl> indexSearch;

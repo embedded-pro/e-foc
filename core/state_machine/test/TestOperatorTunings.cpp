@@ -121,8 +121,8 @@ TEST_F(OperatorTuningsTest, sanitising_replaces_a_limit_outside_its_range_by_its
     config.limits.peakCurrentTime = 0.0f;
     config.limits.positionWindow = 3.3f;
     config.limits.positionWindowTime = -0.01f;
-    config.limits.positionMinimum = -3.3f;
-    config.limits.positionMaximum = 3.3f;
+    config.limits.positionMinimum = -6300.0f;
+    config.limits.positionMaximum = 6300.0f;
     config.limits.calibrationTemperature = 101.0f;
     config.limits.temperatureLimit = 30.0f;
     config.limits.temperatureMargin = 0.5f;
@@ -191,6 +191,17 @@ TEST_F(OperatorTuningsTest, sanitising_keeps_stall_reporting_turned_off)
     state_machine::SanitizeSupervision(config);
 
     EXPECT_EQ(config.stallDetection, uint8_t{ 0 });
+}
+
+TEST_F(OperatorTuningsTest, sanitising_turns_an_unknown_positioning_to_linear_and_keeps_a_known_one)
+{
+    config.positionCircular = 2;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(uint8_t{ 0 }, config.positionCircular);
+
+    config.positionCircular = 1;
+    state_machine::SanitizeSupervision(config);
+    EXPECT_EQ(uint8_t{ 1 }, config.positionCircular);
 }
 
 TEST_F(OperatorTuningsTest, sanitising_turns_an_unknown_homing_requirement_off_and_keeps_a_known_one)

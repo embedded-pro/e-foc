@@ -469,13 +469,13 @@ graph LR
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                                                             |
 | One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                                                         |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                                                            |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2000π rad, 1000 turns (contract 4.0)                             |
 | Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                                                         |
 | Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`                                                      |
 | NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`                                                      |
 | Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                                                                      |
 | Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop                                          |
-| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder angle from the alignment zero, in [−π, π) |
+| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the position tracker's multi-turn position (4.0)     |
 | Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)                   |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                                  |
 | Firmware download       | Configuration writes answered `busy`, the drive held stopped, while a pack is received (Part K)                                                    |

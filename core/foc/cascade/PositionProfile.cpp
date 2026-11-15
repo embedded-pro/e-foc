@@ -84,10 +84,21 @@ namespace foc
         position = sample.position;
         velocity = sample.velocity;
         acceleration = sample.acceleration;
-        reference = travel.IsOn() ? position : math::WrapToPi(position);
+        reference = travel.Folds() ? math::WrapToPi(position) : position;
         seeded = true;
 
         return { Radians{ reference }, RadiansPerSecond{ velocity }, RadiansPerSecondSquared{ acceleration } };
+    }
+
+    float PositionProfile::Goal(const TravelLimits& travel, Radians point, float start)
+    {
+        if (travel.IsOn())
+            return travel.Hold(point).Value();
+
+        if (travel.Folds())
+            return start + WrappedPositionError(point, Radians{ start });
+
+        return point.Value();
     }
 
     void PositionProfile::Replan(const TravelLimits& travel, Radians measured, RadiansPerSecond measuredSpeed)
@@ -102,27 +113,13 @@ namespace foc
         plannedSequence = targetSequence;
         const Radians point{ target };
 
+        const auto start = travel.Folds() ? math::WrapToPi(position) : position;
+        const auto goal = Goal(travel, point, start);
+
         if (IsScurve())
-        {
-            const float a0 = ClampedAcceleration();
-            if (travel.IsOn())
-                plan.emplace<SCurvePlan>(position, velocity, a0, travel.Hold(point).Value(), SCurveCurrentLimits());
-            else
-            {
-                const auto start = math::WrapToPi(position);
-                plan.emplace<SCurvePlan>(start, velocity, a0, start + WrappedPositionError(point, Radians{ start }), SCurveCurrentLimits());
-            }
-        }
+            plan.emplace<SCurvePlan>(start, velocity, ClampedAcceleration(), goal, SCurveCurrentLimits());
         else
-        {
-            if (travel.IsOn())
-                plan.emplace<TrapezoidalPlan>(position, velocity, travel.Hold(point).Value(), TrapezoidalCurrentLimits());
-            else
-            {
-                const auto start = math::WrapToPi(position);
-                plan.emplace<TrapezoidalPlan>(start, velocity, start + WrappedPositionError(point, Radians{ start }), TrapezoidalCurrentLimits());
-            }
-        }
+            plan.emplace<TrapezoidalPlan>(start, velocity, goal, TrapezoidalCurrentLimits());
 
         elapsed = 0.0f;
         duration = std::visit([](const auto& p)

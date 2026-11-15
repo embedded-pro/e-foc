@@ -951,6 +951,10 @@ runs during the preparation of the `Enable` and homes the drive; if the search f
 refused with `calibrationFailed` as before. The guard refusal is answered `rejected` and traced as "position mode
 requires homing; calibrate or restore the reference from the encoder index".
 
+The stored setting `positionCircular` (`service-nvm.md`) is handed to the position-mode machine with the travel
+limits, on every activation and every change, and the speed and torque machines never see it either. The cascade
+latches it at each `Enable`, so a change takes effect at the next Start (`foc-position.md`, Multi-Turn Position).
+
 ```mermaid
 flowchart TD
     E["Enable in Ready"] --> A{"board protection,\nrotor reference"}

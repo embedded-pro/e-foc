@@ -9,6 +9,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/index_search/IndexSearchImpl.hpp"
 #include "core/services/inverter_compensation/InverterCompensation.hpp"
+#include "core/services/position_tracking/PositionTracker.hpp"
 #include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 
@@ -22,6 +23,7 @@ namespace application
         infra::WithSharedAccess<services::PhaseCurrentOffsetMeasurement> currentOffsets;
         services::ConfirmedPhaseCurrentOffsets confirmedCurrentOffsets;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
+        services::PositionTracker positionTracker;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         NoEncoderIndex noEncoderIndex;
         infra::WithSharedAccess<services::IndexSearchImpl> indexSearch;

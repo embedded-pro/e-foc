@@ -124,6 +124,8 @@ namespace state_machine
             config.recalibrationMode = services::ConfigData{}.recalibrationMode;
         if (config.homingRequired > 1)
             config.homingRequired = services::ConfigData{}.homingRequired;
+        if (config.positionCircular > 1)
+            config.positionCircular = services::ConfigData{}.positionCircular;
     }
 
     void SanitizeLimits(services::ConfigData& config)

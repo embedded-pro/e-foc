@@ -12,15 +12,13 @@ namespace tool
         constexpr double degreesPerRadian{ 180.0 / std::numbers::pi };
         constexpr const char* firmwareRange{ "Accepted by the firmware" };
 
-        constexpr float halfTurn{ std::numbers::pi_v<float> };
-
         constexpr int32_t torqueCountsPerAmpere{ 1000 };
         constexpr int32_t speedCountsPerRadPerSecond{ 100 };
         constexpr int32_t positionCountsPerRadian{ 1000 };
 
         constexpr SetpointAxis torqueAxis{ " A", 1.0, torqueCountsPerAmpere, foc::CommandLimits::maxTorqueSetpoint, firmwareRange };
         constexpr SetpointAxis speedAxis{ " rpm", rpmPerRadPerSecond, speedCountsPerRadPerSecond, foc::CommandLimits::maxSpeedSetpoint, firmwareRange };
-        constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, positionCountsPerRadian, halfTurn, "One turn from the alignment zero" };
+        constexpr SetpointAxis positionAxis{ "\xC2\xB0", degreesPerRadian, positionCountsPerRadian, foc::CommandLimits::maxPositionSetpoint, "1000 turns either way from the position zero" };
     }
 
     std::string_view SetpointAxis::Suffix() const

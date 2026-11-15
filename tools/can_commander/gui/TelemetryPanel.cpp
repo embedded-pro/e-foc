@@ -153,9 +153,11 @@ namespace tool
         ShowFault(fault);
     }
 
-    void TelemetryPanel::OnCurrentStream(float idCurrentValue, float iqCurrentValue, float positionValue)
+    // The stream's position is the angle within the turn, which places the waveforms; the read-out shows the
+    // multi-turn position of the motion telemetry.
+    void TelemetryPanel::OnCurrentStream(float idCurrentValue, float iqCurrentValue, float)
     {
-        latestStreamSample = StreamSample{ idCurrentValue, iqCurrentValue, positionValue };
+        latestStreamSample = StreamSample{ idCurrentValue, iqCurrentValue };
         if (!streamRefresh.isActive())
             streamRefresh.start();
     }
@@ -167,7 +169,6 @@ namespace tool
 
         Show(measurements, idCurrent, static_cast<double>(latestStreamSample->idCurrent));
         Show(measurements, iqCurrent, static_cast<double>(latestStreamSample->iqCurrent));
-        Show(measurements, position, PositionAxis().DisplayOfSi(latestStreamSample->position));
         latestStreamSample.reset();
     }
 

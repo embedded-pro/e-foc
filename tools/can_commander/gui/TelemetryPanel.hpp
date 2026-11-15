@@ -62,7 +62,6 @@ namespace tool
         {
             float idCurrent{ 0.0f };
             float iqCurrent{ 0.0f };
-            float position{ 0.0f };
         };
 
         // Up to 1000 stream samples per second arrive per node; only the latest is painted, at the refresh rate.

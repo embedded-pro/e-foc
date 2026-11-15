@@ -39,9 +39,9 @@ TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mod
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_188)
+TEST_F(TestConfigData, config_data_sizeof_is_192)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 188 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 192 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_limits)
@@ -86,6 +86,11 @@ TEST_F(TestConfigData, make_default_config_data_holds_the_default_supervision_se
 TEST_F(TestConfigData, make_default_config_data_does_not_require_homing)
 {
     EXPECT_EQ(services::ConfigData{}.homingRequired, uint8_t{ 0 });
+}
+
+TEST_F(TestConfigData, make_default_config_data_selects_linear_positioning)
+{
+    EXPECT_EQ(services::ConfigData{}.positionCircular, uint8_t{ 0 });
 }
 
 TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic)

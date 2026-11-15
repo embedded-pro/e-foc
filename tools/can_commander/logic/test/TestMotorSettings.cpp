@@ -95,7 +95,8 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::homed, StatusReadings().back().parameter);
     EXPECT_EQ(3u, StatusReadings().size());
     EXPECT_EQ(FocParameter::homingRequired, HomingSettings().front().parameter);
-    EXPECT_EQ(1u, HomingSettings().size());
+    EXPECT_EQ(FocParameter::positionCircular, HomingSettings().back().parameter);
+    EXPECT_EQ(2u, HomingSettings().size());
     EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
     EXPECT_EQ(FocParameter::stagedVersionPatch, Readings().back().parameter);
 }
@@ -135,6 +136,7 @@ TEST_F(TestMotorSettings, the_on_off_settings_are_toggles)
     EXPECT_TRUE(IsToggle(FocParameter::currentTwoStepDeadbeat));
     EXPECT_TRUE(IsToggle(FocParameter::stallDetection));
     EXPECT_TRUE(IsToggle(FocParameter::homingRequired));
+    EXPECT_TRUE(IsToggle(FocParameter::positionCircular));
     EXPECT_FALSE(IsToggle(FocParameter::supervisionWindow));
     EXPECT_FALSE(IsToggle(FocParameter::polePairs));
     EXPECT_FALSE(IsToggle(FocParameter::resetCause));

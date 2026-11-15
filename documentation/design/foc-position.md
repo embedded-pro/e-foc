@@ -2,9 +2,9 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: foc-position
-date: 2026-11-08
+date: 2026-11-15
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.5.0                |
+| Version   | 0.6.0                |
 | Component | foc-position         |
-| Date      | 2026-11-08           |
+| Date      | 2026-11-15           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -30,7 +30,8 @@ date: 2026-11-08
 
 **Is responsible for:**
 - Executing the FOC cascade: an outermost position loop and a middle speed loop (both at 1 kHz within the same LPI callback), and the innermost current control loop (20 kHz)
-- Regulating rotor mechanical position to a commanded setpoint in radians
+- Regulating rotor mechanical position to a commanded setpoint in radians, a multi-turn angle from the position zero in linear mode and an angle within the turn in circular mode
+- Counting turns while it drives the rotor, taking the count from the position tracker when it starts and handing it back when it stops (Multi-Turn Position)
 - Dispatching to the selected position algorithm and routing its output to either the speed loop or, for the state feedback laws, straight to the current loop
 - Estimating rotor angular velocity from consecutive mechanical angle samples (same wrap-around compensation as speed control) for the middle loop
 - Resetting the position, speed and current controller state on Enable / Disable
@@ -41,7 +42,7 @@ date: 2026-11-08
 **Is NOT responsible for:**
 - Reading phase currents or encoder position directly from hardware — these are supplied by the Runner
 - Writing duty cycles to the PWM hardware — duty cycles are returned to the Runner
-- Multi-turn position tracking — the setpoint is a single-turn mechanical angle, and without software position limits the loop takes the shorter way round to it
+- Counting turns while the cascade does not run — the position tracker does that on the event loop (Multi-Turn Position)
 - Flux weakening (Id is always commanded to 0 A)
 
 ---
@@ -77,7 +78,7 @@ graph TB
 
 ### Outer Loop — Selectable Position Law
 
-The position error is always the wrapped difference between the setpoint and the current mechanical angle θm, folded into [−π, π] so a move across the encoder seam takes the shorter way round rather than most of a turn backwards.
+The position error is the difference between the reference and the measured position θ. In linear mode, the default, θ is the multi-turn position and the difference is plain, so the rotor takes the direct way however many turns away the reference is. In circular mode θ is the angle within the turn θm and, without software position limits, the difference is folded into [−π, π], so a move across the encoder seam takes the shorter way round rather than most of a turn backwards (Multi-Turn Position).
 
 `PositionControllerSelector` holds every position algorithm in a `std::variant` and dispatches through `std::visit`, exactly as the current and speed loops do. Each algorithm declares the kind of output it produces:
 
@@ -133,8 +134,8 @@ stateDiagram-v2
 ### Target Reached
 
 A host that sequences moves needs to know when one is done. The drive reports the target reached once the
-target error — the wrapped difference between the final setpoint and θm, which the motion profile (Motion
-Profile) does not shorten — has stayed within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
+target error — the difference between the final setpoint and θ, taken as the position law takes it, which the
+motion profile (Motion Profile) does not shorten — has stayed within the position window for the position-window time (REQ-CTL-003). An evaluation on the event loop every
 1 ms keeps that count in a `SustainedCondition` (`core/supervision/`), and the error is read again when a host asks: a setpoint the drive has accepted is
 never answered with the previous move's flag, because a target outside the window clears it at once, and the
 count starts over when the rotor arrives.
@@ -172,15 +173,16 @@ are contract 3.1 parameters and drive-wide limits (`service-can.md`, `service-nv
   deceleration, then turns round; the speed and rates stay within the limits throughout.
 - **Seed.** On Enable, after a speed or current command, and when the profile is switched on, the reference
   starts from the measured position and speed.
-- **Circle and limits.** Without travel limits the goal is placed by the wrapped difference, the shorter way
-  round the seam. With travel limits it is the setpoint held between them and the move goes the direct way.
+- **Turns and limits.** In linear mode the goal is the setpoint, held between the travel limits when they are
+  on, and the move goes the direct way. In circular mode without travel limits the goal is placed by the
+  wrapped difference, the shorter way round the seam; with travel limits it is the setpoint held between them.
 - **Feed-forward.** The reference velocity feeds each position law (speed reference for PID, Cascade P and
   Two-DOF; the speed state of LQR and LQI), and the acceleration feeds the q-axis current as J·a/Kt beside the
   friction feed-forward, under the same current limit. The Two-DOF law bypasses its reference pre-filter while the
   profile is on.
-- **Errors.** The drive reports two position errors: the *position error*, profiled reference minus θm, which
+- **Errors.** The drive reports two position errors: the *position error*, profiled reference minus θ, which
   the following-error monitor and the encoder plausibility monitor measure (`fault-supervision.md` Parts H and
-  K), and the *target error*, final setpoint minus θm, which the target-reached check measures. The target is
+  K), and the *target error*, final setpoint minus θ, which the target-reached check measures. The target is
   therefore not reported reached while the reference is on its way.
 
 ```mermaid
@@ -228,24 +230,71 @@ stateDiagram-v2
     Homed --> Homed : control-mode switch
 ```
 
+### Multi-Turn Position
+
+The position the drive reports and, in linear mode, controls is a multi-turn angle θ = 2π·n + θm from the
+position zero: θm is the encoder angle within the turn, in [−π, π), and n counts the turns since the zero
+(REQ-CTL-003). Turns are counted by unwrapping consecutive samples of θm: a step below −π is a forward crossing
+of the encoder seam (n + 1), a step above π a backward one (n − 1). The count is exact while the rotor turns
+less than half a turn between two samples.
+
+Two counters keep n, and exactly one of them counts at any time:
+
+- **The cascade**, while it runs — position mode Enabled, its quick stop, and the speed and current commands a
+  calibration gives in position mode. It counts at its 1 kHz tick from the angle of the latest inner-loop sample,
+  exact up to 500 turns per second, beyond any motor this drive is built for, and publishes the count every tick.
+- **The position tracker** at all other times, on the event loop, from an encoder reading every 1 ms. An event
+  loop held up for longer than half a turn of the rotor loses a turn: 7.5 ms at the 4000 rpm of the faster
+  reference motor.
+- **Handover.** When the cascade starts it takes the tracker's count together with the angle it was counted at,
+  so a seam crossing in between is still counted; when it stops it hands its count back. While the cascade
+  counts, the tracker reports the count the cascade published.
+
+The count starts at turn 0 at power-up and whenever the drive sets the position zero — an alignment or an index
+restore (Homing and the Position Reference) — so the multi-turn position, like the angle, is measured from the
+zero the drive last set. The turns are a 32-bit count and do not wrap in practice. Reported as a `float32` over
+CAN, the position resolves finer than 0.001 rad within ±1300 turns.
+
+**Linear and circular mode.** The stored drive-wide setting `positionCircular` (contract 4.0, `service-can.md`),
+off by default, selects how position mode treats a setpoint. The cascade latches it at each Enable, so a change
+takes effect at the next Start:
+
+| Position mode            | Linear (default)              | Circular                                           |
+|--------------------------|-------------------------------|----------------------------------------------------|
+| Setpoint                 | θ, within ±1000 turns         | taken modulo 2π                                    |
+| Measured position θ      | the multi-turn position       | the angle within the turn θm                       |
+| Way to the setpoint      | direct                        | the shorter way round, unless travel limits are on |
+| Software position limits | bound the multi-turn position | bound θm, so a limit beyond ±π never binds         |
+
+The tracker reports the multi-turn position in both modes and in every control mode and state (`service-can.md`,
+telemetry); the position of the current stream stays θm, since it places the electrical waveforms.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Tracker : power-up, turn 0
+    Tracker --> Cascade : cascade starts, takes the count
+    Cascade --> Tracker : cascade stops, hands the count back
+    Tracker --> Tracker : position zero set, turn 0
+```
+
 ### Software Position Limits
 
 Machines rely on software travel limits to protect their mechanics (REQ-CTL-007). Two stored drive-wide
-limits, the position minimum and maximum, bound the travel in the frame the position is measured in: the
-mechanical angle from the alignment zero, in [−π, π). They are off while the minimum is not below the
-maximum, as both are 0 by default. Once the drive is homed (Homing and the Position Reference) the same limits are absolute.
+limits, the position minimum and maximum, bound the travel in the frame the position law measures in: the
+multi-turn position θ in linear mode, the angle within the turn θm in circular mode (Multi-Turn Position). They
+are off while the minimum is not below the maximum, as both are 0 by default. Once the drive is homed (Homing and the Position Reference) the same limits are absolute.
 
 With the limits on:
 
-- A position setpoint outside them, taken modulo 2π into [−π, π), is refused and the previous one stays in
-  force (`service-can.md`, contract 2.11).
+- A position setpoint outside them is refused and the previous one stays in force (`service-can.md`, contract
+  4.0); in circular mode the setpoint is taken modulo 2π into [−π, π) before the check.
 - The cascade holds its reference within them, so a setpoint accepted before the limits were narrowed takes
   the rotor to the nearer limit, never beyond it.
-- The position law takes the plain difference between the reference and θm instead of folding it into
-  [−π, π]. The interval between the limits never contains the encoder seam, so the plain difference is the
-  way that stays inside: from 2.9 rad to −2.9 rad within limits of ±3 rad the rotor turns 5.8 rad back
-  through zero rather than 0.48 rad across the seam. The position error the drive reports to its monitors is
-  the same difference.
+- The position law takes the plain difference between the reference and θ, as it always does in linear
+  mode. In circular mode it no longer folds the difference into [−π, π]: the interval between the limits never
+  contains the encoder seam, so the plain difference is the way that stays inside: from 2.9 rad to −2.9 rad
+  within limits of ±3 rad the rotor turns 5.8 rad back through zero rather than 0.48 rad across the seam. The
+  position error the drive reports to its monitors is the same difference.
 
 The cascade takes new limits at its next 1 kHz tick after they are stored, and on every mode activation. A rotor
 that an outside force or an overshoot carries more than four encoder counts past them faults the drive with
@@ -253,20 +302,27 @@ that an outside force or an overshoot carries more than four encoder counts past
 
 ```mermaid
 flowchart LR
-    SP["setpoint, modulo 2π"] --> L{"limits on?"}
+    SP["setpoint"] --> M{"circular?"}
+    M -- no --> LL{"limits on?"}
+    LL -- no --> D["plain difference to θ"]
+    LL -- yes --> CL["reference held in [min, max]"]
+    CL --> D
+    M -- yes --> L{"limits on?"}
     L -- no --> W["error folded into [−π, π]"]
-    L -- yes --> C["reference held in [min, max]"]
-    C --> D["plain difference to θm"]
+    L -- yes --> C["setpoint modulo 2π,\nheld in [min, max]"]
+    C --> DM["plain difference to θm"]
     W --> LAW["position law"]
     D --> LAW
+    DM --> LAW
 ```
 
 ### LPI Callback Execution Order Within One 1 kHz Tick
 
 Within a single LPI callback, the position and speed loops execute in strict order:
 
-1. **Motion profile fires first** (Motion Profile): replans on a new setpoint and samples the reference position, velocity and acceleration for this tick; with the profile off it passes the setpoint through.
-2. **Position law fires second**: reads θm, computes the wrapped position error to the reference, produces either a speed setpoint or an Iq setpoint.
+0. **Turns are counted first** (Multi-Turn Position): the count advances from the latest angle and is published to the position tracker.
+1. **Motion profile fires next** (Motion Profile): replans on a new setpoint and samples the reference position, velocity and acceleration for this tick; with the profile off it passes the setpoint through.
+2. **Position law fires second**: reads θ, computes the position error to the reference (plain, or folded in circular mode without limits), produces either a speed setpoint or an Iq setpoint.
 3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint, computes speed error using Δθ/Δt, produces and clamps the Iq setpoint. A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
 4. Callback returns. On the next 20 kHz ISR cycle, the inner loop picks up the updated Iq setpoint.
 
@@ -287,10 +343,12 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.                                                                                  | Speed loop output clamped to ± maxCurrent.                                                                                                                                                                                                          |
 | SetPositionTunings      | Sets the position loop bandwidth and cost weights.                                                                          | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live.                                                         |
 | SelectPositionAlgorithm | Selects the position algorithm.                                                                                             | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                                                                                      |
-| SetPoint                | Sets the target position in mechanical radians.                                                                             | Written atomically; used on the next outer-loop cycle; with a motion profile on it starts a replan.                                                                                                                                                 |
+| SetPoint                | Sets the target position in mechanical radians, multi-turn from the position zero.                                          | Written atomically; used on the next outer-loop cycle; with a motion profile on it starts a replan.                                                                                                                                                 |
 | ProfileMotion           | Sets the motion profile: velocity, acceleration, deceleration and jerk.                                                     | Applied with the other limits at the next outer-loop period. Off while the velocity or the acceleration is zero; a deceleration of zero uses the acceleration; a jerk of zero plans a trapezoid, above zero an S-curve.                             |
 | Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle.                                                                    | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                              |
 | ObserveMotion           | Reports the motion the drive asks for and gets.                                                                             | Window speed, mean q-axis current, demanded speed, the position error to the reference and the target error to the final setpoint, for REQ-PRO-005. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one. |
+| PositionCircular        | Selects circular instead of linear mode.                                                                                    | Latched at the next Enable.                                                                                                                                                                                                                         |
+| SetPositionTracker      | Attaches the position tracker the cascade takes the turn count from and hands it back to.                                   | Optional; without one the cascade counts from turn 0 at each Enable.                                                                                                                                                                                |
 | Current command         | Bypasses the position and speed loops and runs the cascade on a q-axis current; reports the mean q-axis voltage it applies. | Starts from 0 A. Ends with Enable, Disable or a speed command. The voltage is the mean over the last millisecond, in volts.                                                                                                                         |
 
 ### Required
@@ -305,8 +363,10 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 | Entity              | Field               | Type / Unit              | Range                                    | Notes                                                                            |
 |---------------------|---------------------|--------------------------|------------------------------------------|----------------------------------------------------------------------------------|
-| Position setpoint   | θ_sp                | Radians (float)          | ±2π over CAN                             | Not wrapped, but taken modulo 2π: θ_sp and θ_sp ± 2π are the same target         |
-| Actual position     | θm                  | Radians (float)          | [−π, π)                                  | Mechanical angle from the alignment zero, wrapped by the platform (REQ-CTL-003)  |
+| Position setpoint   | θ_sp                | Radians (float)          | ±2000π over CAN                          | Multi-turn in linear mode; taken modulo 2π in circular mode                      |
+| Actual position     | θ                   | Radians (float)          | 2π·n + θm                                | Multi-turn position from the position zero; θm in circular mode (REQ-CTL-003)    |
+| Angle within a turn | θm                  | Radians (float)          | [−π, π)                                  | Mechanical angle from the position zero, wrapped by the platform                 |
+| Turn count          | n                   | int32                    | ±2³¹                                     | Counted by the cascade while it runs, by the position tracker otherwise          |
 | Position PID output | ω_sp                | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s                     | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
 | Estimated speed     | ω                   | RadiansPerSecond (float) | computed from Δθ/Δt                      | Finite difference with ±π wrap correction                                        |
 | Speed PID output    | Iq_sp               | Ampere (float)           | ± maxCurrent                             | Written to inner loop                                                            |
@@ -331,7 +391,7 @@ sequenceDiagram
     participant Inner as Torque Inner Loop (20 kHz)
 
     LPI->>PosLoop: LowPriorityHandler fires
-    PosLoop->>PosLoop: Read θm (current position)
+    PosLoop->>PosLoop: Count turns, read θ (current position)
     PosLoop->>PosLoop: error = θ_setpoint − θm
     PosLoop->>PosLoop: ω_setpoint = PositionPID(error), clamped ± bandwidth·π rad/s
     PosLoop->>SpdLoop: Write ω_setpoint
@@ -363,16 +423,16 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                      | Value / Description                                                                                                                 |
-|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                 | 20 kHz — called from the FOC ISR once per PWM period.                                                                               |
-| Outer loop rate                 | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                              |
-| Speed-reference clamp           | One loop bandwidth of speed per π radians of error, which bounds the approach speed at any position error.                          |
-| No multi-turn tracking          | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                                           |
-| Position wrap-around correction | Folded into [−π, π] so a move across the seam takes the short way, except within software position limits.                          |
-| LPI callback order              | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
-| No flux weakening               | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
-| Cycle budget (inner loop)       | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |
-| Controller state at Enable      | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
-| Target reached                  | Window and time from the configuration record, checked every 1 ms on the event loop and when asked.                                 |
-| Setpoint atomicity              | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |
+| Constraint                 | Value / Description                                                                                                                 |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| Inner loop rate            | 20 kHz — called from the FOC ISR once per PWM period.                                                                               |
+| Outer loop rate            | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                              |
+| Speed-reference clamp      | One loop bandwidth of speed per π radians of error, which bounds the approach speed at any position error.                          |
+| Turn counting              | Exact while the rotor turns less than half a turn per count: 1 ms in the cascade, one event-loop pass in the position tracker.      |
+| Position error             | Plain in linear mode; folded into [−π, π] in circular mode without software position limits, so the move takes the short way.       |
+| LPI callback order         | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
+| No flux weakening          | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
+| Cycle budget (inner loop)  | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |
+| Controller state at Enable | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
+| Target reached             | Window and time from the configuration record, checked every 1 ms on the event loop and when asked.                                 |
+| Setpoint atomicity         | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |

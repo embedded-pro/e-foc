@@ -42,6 +42,8 @@ target_sources(e_foc.foc.cascade PRIVATE
     SpeedLoopDrive.hpp
     TorqueCascade.cpp
     TorqueCascade.hpp
+    TurnHandover.cpp
+    TurnHandover.hpp
 )
 
 add_subdirectory(test)

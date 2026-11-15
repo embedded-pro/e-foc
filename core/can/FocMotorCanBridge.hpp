@@ -2,6 +2,7 @@
 
 #include "core/can/FocMotorCommissioningBridge.hpp"
 #include "core/can/FocMotorSettingsBridge.hpp"
+#include "core/foc/cascade/TurnHandover.hpp"
 #include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
@@ -25,7 +26,7 @@ namespace can
         struct Platform
         {
             const drivers::ThreePhaseInverter& inverter;
-            drivers::Encoder& encoder;
+            const foc::TurnHandover& position;
             application::PlatformDiagnostics& diagnostics;
             FocResetCause resetCause;
             FocFirmwareIdentity firmware;
@@ -91,7 +92,7 @@ namespace can
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
         const drivers::ThreePhaseInverter& inverter;
-        drivers::Encoder& encoder;
+        const foc::TurnHandover& position;
         FocMotorCommissioningBridge commissioning;
         FocMotorSettingsBridge settings;
         FocMotorSettingsBridge::FirmwareUpgrade firmwareUpgrade;

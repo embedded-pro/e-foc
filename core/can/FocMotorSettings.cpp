@@ -129,6 +129,7 @@ namespace can
             case FocParameter::positionMinimum:
             case FocParameter::positionMaximum:
             case FocParameter::homingRequired:
+            case FocParameter::positionCircular:
             case FocParameter::calibrationTemperature:
             case FocParameter::temperatureLimit:
             case FocParameter::temperatureMargin:
@@ -372,6 +373,8 @@ namespace can
                 return config.limits.quickStopDeceleration;
             case FocParameter::homingRequired:
                 return config.homingRequired != 0 ? 1.0f : 0.0f;
+            case FocParameter::positionCircular:
+                return config.positionCircular != 0 ? 1.0f : 0.0f;
             default:
                 return config.limits.overspeedLimit;
         }
@@ -449,6 +452,9 @@ namespace can
                 break;
             case FocParameter::homingRequired:
                 config.homingRequired = value != 0.0f ? 1 : 0;
+                break;
+            case FocParameter::positionCircular:
+                config.positionCircular = value != 0.0f ? 1 : 0;
                 break;
             default:
                 config.limits.overspeedLimit = value;

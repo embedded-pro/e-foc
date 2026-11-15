@@ -43,6 +43,7 @@ namespace foc
         SCurveLimits SCurveCurrentLimits() const;
         float ClampedAcceleration() const;
         void Replan(const TravelLimits& travel, Radians measured, RadiansPerSecond measuredSpeed);
+        static float Goal(const TravelLimits& travel, Radians point, float start);
 
         float samplePeriod;
         // Written by the event loop, read by the outer-loop tick that replans on a changed sequence.

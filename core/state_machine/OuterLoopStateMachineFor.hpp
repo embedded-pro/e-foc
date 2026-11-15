@@ -34,6 +34,9 @@ namespace application
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
             if (hardware.zeroVectorSlopes != nullptr)
                 focController.SetZeroVectorSlopeSink(*hardware.zeroVectorSlopes);
+            if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)
+                if (hardware.positionTracker != nullptr)
+                    focController.SetPositionTracker(*hardware.positionTracker);
             RegisterFaultHandler(faultNotifier);
             Boot(outerLoopArgs.rotorReference);
         }
@@ -79,6 +82,12 @@ namespace application
         {
             if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)
                 focController.LimitTravel(minimum, maximum);
+        }
+
+        void PositionCircular(bool circular)
+        {
+            if constexpr (std::is_base_of_v<foc::PositionLimitable, Cascade>)
+                focController.PositionCircular(circular);
         }
 
         foc::MotionObservation ObserveMotion() const override

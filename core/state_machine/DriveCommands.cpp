@@ -76,6 +76,7 @@ namespace state_machine
         const foc::Radians positionMinimum{ config.limits.positionMinimum };
         const foc::Radians positionMaximum{ config.limits.positionMaximum };
         const bool homingRequired = config.homingRequired != 0;
+        const bool positionCircular = config.positionCircular != 0;
         const foc::RadiansPerSecondSquared quickStopDeceleration{ config.limits.quickStopDeceleration };
 
         drive.Visit([&]<class Machine>(Machine& sm)
@@ -90,6 +91,7 @@ namespace state_machine
                     sm.RampSpeed(acceleration, deceleration);
                     sm.ProfileMotion(profileVelocity, profileAcceleration, profileDeceleration, profileJerk);
                     sm.LimitTravel(positionMinimum, positionMaximum);
+                    sm.PositionCircular(positionCircular);
                     if constexpr (std::is_same_v<Machine, application::PositionStateMachine>)
                         sm.RequireHoming(homingRequired);
                 }

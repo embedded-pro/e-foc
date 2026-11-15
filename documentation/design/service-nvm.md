@@ -58,7 +58,7 @@ The service manages four independent EEPROM regions. Each region holds exactly o
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 100 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 188 bytes |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 192 bytes |
 | Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
 | Learned model | `0x1EA4ED0D` | learned model     | 26 bytes  |
 
@@ -71,7 +71,10 @@ Version 5's encoder index angle (`service-index-search.md`) had taken it from 10
 cogging map (`service-cogging-compensation.md`) had taken it from 56 to 108. A record without an index angle
 holds a NaN there; the 109-byte record fits the 128-byte calibration region.
 
-The configuration record's layout is at version 16. The quick-stop deceleration (`state-machine.md`, Quick Stop)
+The configuration record's layout is at version 17. The circular-positioning toggle (`foc-position.md`, Multi-Turn
+Position) took its data from 188 to 192 bytes, one byte for the toggle and three reserved, so a record written at
+version 16 reads as a version mismatch and the configuration returns to its defaults, which select linear position
+mode. Version 16's quick-stop deceleration (`state-machine.md`, Quick Stop)
 took its data from 184 to 188 bytes, so a record written at version 15 reads as a version mismatch and the
 configuration returns to its defaults. Version 15's motion profile four limits (`foc-position.md`, Motion
 Profile) took its data from 168 to 184 bytes, with no padding, so a record written at version 14 reads as a version
@@ -341,6 +344,7 @@ then the cogging map.
 | stallDetection         | —                               | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
 | recalibrationMode      | —                               | Online recalibration: 0 off (the default), 1 on command, 2 automatic (`online-recalibration.md`)               |
 | homingRequired         | —                               | Whether position mode starts only once the drive is homed: 0 no (the default), 1 yes (`foc-position.md`)       |
+| positionCircular       | —                               | Position mode: 0 linear, multi-turn (the default), 1 circular, within one turn (`foc-position.md`)             |
 
 The limits are the overspeed limit (`fault-supervision.md` Part G), 1–5000 rad/s, default 1000; the
 following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H); the speed
@@ -350,7 +354,7 @@ default, which turns the profile off (`foc-position.md`, Motion Profile); the co
 0–60 s, 0 (off) by default (`service-can.md` Part F); and the continuous and peak current, 0–100 A, 0 by default
 (off, and the board limit), with the peak time, 0.1–60 s, default 1 (`fault-supervision.md` Part I); and the
 position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000-count encoder), with its time,
-0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, −3.2–3.2 rad,
+0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, ±2000π rad (1000 turns),
 both 0 (off) by default (`foc-position.md` Software Position Limits); the calibration temperature,
 −40–100 °C, default 25; and the temperature limit, 40–200 °C, default 120, with its margin, 1–50 K, default 15
 (`fault-supervision.md` Part K); the bus-voltage minimum and maximum, 0–100 V, both 0 (off) by default

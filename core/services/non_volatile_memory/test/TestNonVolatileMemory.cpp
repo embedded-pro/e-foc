@@ -537,9 +537,31 @@ TEST_F(NonVolatileMemoryTest, the_homing_requirement_survives_a_save_and_a_load)
     EXPECT_EQ(loaded.homingRequired, uint8_t{ 1 });
 }
 
-TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_16)
+TEST_F(NonVolatileMemoryTest, circular_positioning_survives_a_save_and_a_load)
 {
-    EXPECT_EQ(services::ConfigLayoutVersion, 16);
+    auto written = MakeTestConfig();
+    written.positionCircular = 1;
+    bool saveDone = false;
+    nvm.SaveConfig(written, [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData loaded{};
+    bool done = false;
+    nvm.LoadConfig(loaded, [&](auto)
+        {
+            done = true;
+        });
+    RunUntilDone(done);
+
+    EXPECT_EQ(loaded.positionCircular, uint8_t{ 1 });
+}
+
+TEST_F(NonVolatileMemoryTest, the_config_layout_is_version_17)
+{
+    EXPECT_EQ(services::ConfigLayoutVersion, 17);
 }
 
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)

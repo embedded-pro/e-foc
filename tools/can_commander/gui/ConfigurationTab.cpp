@@ -113,15 +113,18 @@ namespace tool
         auto& form = AddGroup("Travel Limits", group);
         AddEditors(form, TravelLimitSettings());
 
-        auto* note = new QLabel("Measured from the alignment zero, and off while the minimum is not below the maximum. When "
-                                "on, position mode refuses a setpoint outside them and moves the direct way between them, "
-                                "never across the angle outside them. Stored at once and in force from the next control period.");
+        auto* note = new QLabel("Measured from the position zero, counting whole turns unless circular positioning is on, and "
+                                "off while the minimum is not below the maximum. When on, position mode refuses a setpoint "
+                                "outside them and moves the direct way between them, never across the angle outside them. "
+                                "Stored at once and in force from the next control period.");
         note->setWordWrap(true);
         form.addRow(note);
 
         AddEditors(form, HomingSettings());
         auto* homingNote = new QLabel("With homing required, position mode starts only once a calibration or the encoder index "
-                                      "has set the commissioned zero in this power-up. Speed and torque mode are not held back.");
+                                      "has set the commissioned zero in this power-up. Speed and torque mode are not held back. "
+                                      "With circular positioning, a setpoint is an angle within one turn and the rotor takes the "
+                                      "shorter way round, from the next Start.");
         homingNote->setWordWrap(true);
         form.addRow(homingNote);
     }

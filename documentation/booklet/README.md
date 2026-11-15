@@ -70,6 +70,7 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [FOC Torque Control](../design/foc-torque.md)                                          | Current-loop component design, PI anti-windup, ISR flow                                |
 | [FOC Speed Control](../design/foc-speed.md)                                            | Speed-loop component design, 1 kHz handler flow                                        |
 | [FOC Position Control](../design/foc-position.md)                                      | Position-loop component design, handler flow                                           |
+| [Position Tracker](../design/position-tracker.md)                                      | Multi-turn position: turn counting and its handover with the position cascade          |
 | [Runtime Controller Selection](../design/controller-selection.md)                      | Heap-free variant storage, std::visit dispatch, state gating                           |
 | [Service: FOC State Machine](../design/state-machine.md)                               | States, transitions, guards, and the enable/disable lifecycle                          |
 | [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                              |

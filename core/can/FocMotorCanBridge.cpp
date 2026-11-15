@@ -53,7 +53,7 @@ namespace can
         , server(server)
         , controlMode(controlMode)
         , inverter(platform.inverter)
-        , encoder(platform.encoder)
+        , position(platform.position)
         , commissioning(server, controlMode, motorServices.electricalIdent, motorServices.currentOffsets, motorServices.standstill)
         , settings(server, controlMode, platform.diagnostics, platform.resetCause, platform.firmware, motorServices.firmwareUpgrade)
         , firmwareUpgrade(motorServices.firmwareUpgrade)
@@ -255,7 +255,8 @@ namespace can
 
     void FocMotorCanBridge::ApplyPositionSetpoint(uint8_t commandId, foc::Radians value, const infra::Function<void()>& onDone)
     {
-        const foc::TravelLimits limits{ foc::Radians{ controlMode.Config().limits.positionMinimum }, foc::Radians{ controlMode.Config().limits.positionMaximum } };
+        const auto& config = controlMode.Config();
+        const foc::TravelLimits limits{ foc::Radians{ config.limits.positionMinimum }, foc::Radians{ config.limits.positionMaximum }, config.positionCircular != 0 };
         if (SetpointRejected(commandId, state_machine::ControlMode::position,
                 math::Abs(value.Value()) <= maxPositionSetpoint && limits.Admits(value)))
             return;
@@ -355,7 +356,7 @@ namespace can
                                    : FocFaultCode::none;
 
         server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.Drive().ActiveStateMachine().HasPartialCalibration()), faultCode);
-        server.BroadcastTelemetryMotion(controlMode.Drive().ActiveStateMachine().MeasuredSpeed(), encoder.Read());
+        server.BroadcastTelemetryMotion(controlMode.Drive().ActiveStateMachine().MeasuredSpeed(), position.Position());
         onDone();
     }
 
