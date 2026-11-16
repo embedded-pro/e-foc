@@ -2,9 +2,9 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.10.0
+version: 0.11.0
 component: "virtual-motor"
-date: 2026-11-10
+date: 2026-11-16
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.10.0               |
+| Version   | 0.11.0               |
 | Component | virtual-motor        |
-| Date      | 2026-11-10           |
+| Date      | 2026-11-16           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -112,13 +112,38 @@ A virtual motor is started with:
 |----------------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | Bus            | Name of the virtual CAN bus to join: letters, digits, `-` and `_`                                                               | `default`                 |
 | Node           | The board ID the CAN node address is built from (`service-can.md` Part I)                                                       | 0                         |
-| Plant          | A reference motor preset (`teknic`, `anaheim`) or a plant description file                                                      | `teknic`                  |
+| Plant          | A reference motor preset (`teknic`, `anaheim`), a text plant description or the emulated target's plant file                    | `teknic`                  |
 | Memory         | The file holding its non-volatile memory, a name in the working directory                                                       | one file per bus and node |
 | Start from     | Keep the memory file, start factory-fresh, or start calibrated for the plant                                                    | keep                      |
 | Seed           | Seed of every noise source, so a run replays exactly                                                                            | fixed                     |
 | Current offset | The offset the current-sense chain adds to the measured phase currents a, b and c, in A, as a board's conditioning circuit does | the plant description's   |
 | Host the bus   | Open the hub for the named bus if no hub is listening yet                                                                       | off                       |
 | Plant port     | The loopback port the Virtual Motor app's plant port listens on (Part F)                                                        | none: no plant port       |
+
+A **text plant description** lets a tool that does not build e-foc describe a motor, such as a robot arm that
+gives each joint's motor the inertia of the links it drives. It is a text file of lines; the first reads
+`e-foc plant description 1`, and every other line is a key and a value separated by spaces. Blank lines are
+ignored. It starts from a preset, `teknic` unless a `preset` line names another, and each key below replaces one
+value of it. Load inertia is added to the rotor inertia, whichever line comes first.
+
+| Key                   | Value                                            | Unit      |
+|-----------------------|--------------------------------------------------|-----------|
+| `preset`              | A preset name; at most once, before any value    | —         |
+| `resistance`          | Stator resistance                                | Ω         |
+| `inductance`          | d- and q-axis inductance                         | H         |
+| `flux-linkage`        | Permanent-magnet flux linkage                    | Wb        |
+| `pole-pairs`          | A whole number from 1 to 255                     | —         |
+| `rotor-inertia`       | Rotor inertia                                    | kg·m²     |
+| `load-inertia`        | Inertia the shaft drives, seen at the shaft      | kg·m²     |
+| `viscous-friction`    | Viscous damping                                  | N·m·s/rad |
+| `coulomb-friction`    | Coulomb friction                                 | N·m       |
+| `max-current`         | The largest current the motor supports           | A         |
+| `supply-voltage`      | The supply's voltage                             | V         |
+
+Every value except load inertia, viscous and Coulomb friction is finite and above zero; those three are finite
+and not negative. A file with an unknown key, a key given twice, a value that is not a number in range or a line
+without a value is refused, and the motor does not start: a mistake in a description never runs a different
+motor.
 
 ### Part B — The virtual board
 
