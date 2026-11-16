@@ -126,19 +126,19 @@ gives each joint's motor the inertia of the links it drives. It is a text file o
 ignored. It starts from a preset, `teknic` unless a `preset` line names another, and each key below replaces one
 value of it. Load inertia is added to the rotor inertia, whichever line comes first.
 
-| Key                   | Value                                            | Unit      |
-|-----------------------|--------------------------------------------------|-----------|
-| `preset`              | A preset name; at most once, before any value    | —         |
-| `resistance`          | Stator resistance                                | Ω         |
-| `inductance`          | d- and q-axis inductance                         | H         |
-| `flux-linkage`        | Permanent-magnet flux linkage                    | Wb        |
-| `pole-pairs`          | A whole number from 1 to 255                     | —         |
-| `rotor-inertia`       | Rotor inertia                                    | kg·m²     |
-| `load-inertia`        | Inertia the shaft drives, seen at the shaft      | kg·m²     |
-| `viscous-friction`    | Viscous damping                                  | N·m·s/rad |
-| `coulomb-friction`    | Coulomb friction                                 | N·m       |
-| `max-current`         | The largest current the motor supports           | A         |
-| `supply-voltage`      | The supply's voltage                             | V         |
+| Key                | Value                                         | Unit      |
+|--------------------|-----------------------------------------------|-----------|
+| `preset`           | A preset name; at most once, before any value | —         |
+| `resistance`       | Stator resistance                             | Ω         |
+| `inductance`       | d- and q-axis inductance                      | H         |
+| `flux-linkage`     | Permanent-magnet flux linkage                 | Wb        |
+| `pole-pairs`       | A whole number from 1 to 255                  | —         |
+| `rotor-inertia`    | Rotor inertia                                 | kg·m²     |
+| `load-inertia`     | Inertia the shaft drives, seen at the shaft   | kg·m²     |
+| `viscous-friction` | Viscous damping                               | N·m·s/rad |
+| `coulomb-friction` | Coulomb friction                              | N·m       |
+| `max-current`      | The largest current the motor supports        | A         |
+| `supply-voltage`   | The supply's voltage                          | V         |
 
 Every value except load inertia, viscous and Coulomb friction is finite and above zero; those three are finite
 and not negative. A file with an unknown key, a key given twice, a value that is not a number in range or a line
