@@ -54,14 +54,38 @@ TEST(TestPlantPortCodec, status_carries_time_pacing_leds_and_protection)
 
 TEST(TestPlantPortCodec, changes_carry_every_value_in_force_and_which_differ)
 {
-    const auto changes = RoundTrip(Changes{ 0.1f, ExternalTorque{ TorqueForm::sine, { 0.01f, 0.05f, 2.0f, 0.0f } }, 0.02f, 0.001f, 0b0110 });
+    const auto changes = RoundTrip(Changes{ 0.1f, ExternalTorque{ TorqueForm::sine, { 0.01f, 0.05f, 2.0f, 0.0f } }, 0.02f, 0.001f, 0b1'0110, true, 4.5f });
 
     EXPECT_FLOAT_EQ(changes.loadTorque, 0.1f);
     EXPECT_EQ(changes.externalTorque.form, TorqueForm::sine);
     EXPECT_THAT(changes.externalTorque.parameters, testing::ElementsAre(0.01f, 0.05f, 2.0f, 0.0f));
     EXPECT_FLOAT_EQ(changes.currentNoise, 0.02f);
     EXPECT_FLOAT_EQ(changes.encoderNoise, 0.001f);
-    EXPECT_EQ(changes.differs, 0b0110);
+    EXPECT_EQ(changes.differs, 0b1'0110);
+    EXPECT_TRUE(changes.shaftDriven);
+    EXPECT_FLOAT_EQ(changes.shaftSpeed, 4.5f);
+}
+
+TEST(TestPlantPortCodec, changes_end_with_the_shaft_drive_after_which_values_differ)
+{
+    const std::vector<uint8_t> expected{ 0x03, 35, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0x10, 0x01, 0x00, 0x00, 0x00, 0xc0 };
+
+    EXPECT_EQ(Encode(Changes{ 0.0f, {}, 0.0f, 0.0f, differs::shaftDriven, true, -2.0f }), expected);
+}
+
+TEST(TestPlantPortCodec, shaft_speed_is_the_drive_flag_then_the_speed)
+{
+    EXPECT_THAT(Encode(ShaftSpeed{ true, 1.5f }), testing::ElementsAre(0x89, 5, 0, 0x01, 0x00, 0x00, 0xc0, 0x3f));
+    EXPECT_THAT(Encode(ShaftSpeed{ false, 0.0f }), testing::ElementsAre(0x89, 5, 0, 0x00, 0x00, 0x00, 0x00, 0x00));
+
+    const auto request = RoundTrip(ShaftSpeed{ true, -3.25f });
+    EXPECT_TRUE(request.drive);
+    EXPECT_FLOAT_EQ(request.radiansPerSecond, -3.25f);
 }
 
 TEST(TestPlantPortCodec, requests_and_refusals_round_trip)

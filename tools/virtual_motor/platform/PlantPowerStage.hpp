@@ -61,6 +61,7 @@ namespace virtual_motor
             void SetExternalTorque(foc::NewtonMeter torque) override;
             void SetCurrentNoise(foc::Ampere sigma) override;
             void SetEncoderNoise(foc::Radians sigma) override;
+            void SetShaftSpeed(std::optional<foc::RadiansPerSecond> speed) override;
 
         private:
             foc::ThreePhaseMotorModel& model;

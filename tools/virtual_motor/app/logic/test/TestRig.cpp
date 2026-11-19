@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <format>
 #include <thread>
 
 namespace
@@ -405,7 +406,7 @@ TEST_F(TestRig, a_motor_speaking_another_protocol_is_powered_off_and_says_why)
     PollFor(30);
 
     EXPECT_THAT(processes.stopped, testing::ElementsAre(1u));
-    EXPECT_THAT(rig.Find(2)->Log(), testing::Contains(testing::HasSubstr("plant port protocol 1 and this app 2")));
+    EXPECT_THAT(rig.Find(2)->Log(), testing::Contains(testing::HasSubstr(std::format("plant port protocol 1 and this app {}", port::protocolVersion))));
     EXPECT_NE(rig.Find(2)->State(), MotorState::running);
 }
 

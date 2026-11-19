@@ -15,6 +15,7 @@ namespace
         MOCK_METHOD(void, SetExternalTorque, (foc::NewtonMeter torque), (override));
         MOCK_METHOD(void, SetCurrentNoise, (foc::Ampere sigma), (override));
         MOCK_METHOD(void, SetEncoderNoise, (foc::Radians sigma), (override));
+        MOCK_METHOD(void, SetShaftSpeed, (std::optional<foc::RadiansPerSecond> speed), (override));
     };
 
     class TestPlantInstruments

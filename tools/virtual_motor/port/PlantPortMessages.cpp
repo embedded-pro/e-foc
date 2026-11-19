@@ -66,6 +66,8 @@ namespace virtual_motor::port
         writer.F32(currentNoise);
         writer.F32(encoderNoise);
         writer.U8(differs);
+        writer.U8(shaftDriven ? 1 : 0);
+        writer.F32(shaftSpeed);
     }
 
     Changes Changes::ReadFrom(PayloadReader& reader)
@@ -76,6 +78,8 @@ namespace virtual_motor::port
         changes.currentNoise = reader.F32();
         changes.encoderNoise = reader.F32();
         changes.differs = reader.U8();
+        changes.shaftDriven = reader.U8() != 0;
+        changes.shaftSpeed = reader.F32();
         return changes;
     }
 
@@ -125,6 +129,20 @@ namespace virtual_motor::port
     LoadTorque LoadTorque::ReadFrom(PayloadReader& reader)
     {
         return { reader.F32() };
+    }
+
+    void ShaftSpeed::WriteTo(PayloadWriter& writer) const
+    {
+        writer.U8(drive ? 1 : 0);
+        writer.F32(radiansPerSecond);
+    }
+
+    ShaftSpeed ShaftSpeed::ReadFrom(PayloadReader& reader)
+    {
+        ShaftSpeed request;
+        request.drive = reader.U8() != 0;
+        request.radiansPerSecond = reader.F32();
+        return request;
     }
 
     void ExternalTorqueRequest::WriteTo(PayloadWriter& writer) const
