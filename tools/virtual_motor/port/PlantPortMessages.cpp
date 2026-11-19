@@ -135,6 +135,9 @@ namespace virtual_motor::port
     {
         writer.U8(drive ? 1 : 0);
         writer.F32(radiansPerSecond);
+        writer.U64(period);
+        writer.F32(torque);
+        writer.F32(inertia);
     }
 
     ShaftSpeed ShaftSpeed::ReadFrom(PayloadReader& reader)
@@ -142,6 +145,9 @@ namespace virtual_motor::port
         ShaftSpeed request;
         request.drive = reader.U8() != 0;
         request.radiansPerSecond = reader.F32();
+        request.period = reader.U64();
+        request.torque = reader.F32();
+        request.inertia = reader.F32();
         return request;
     }
 

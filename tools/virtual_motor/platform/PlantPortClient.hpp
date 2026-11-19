@@ -1,6 +1,7 @@
 #pragma once
 
 #include "infra/util/ByteRange.hpp"
+#include "tools/virtual_motor/platform/DrivenShaft.hpp"
 #include "tools/virtual_motor/platform/InstrumentReports.hpp"
 #include "tools/virtual_motor/port/PlantPortCodec.hpp"
 #include <cstdint>
@@ -24,7 +25,7 @@ namespace virtual_motor
         virtual std::optional<port::RefusalReason> SetExternalTorque(const port::ExternalTorque& torque) = 0;
         virtual std::optional<port::RefusalReason> SetCurrentNoise(float ampere) = 0;
         virtual std::optional<port::RefusalReason> SetEncoderNoise(float radians) = 0;
-        virtual std::optional<port::RefusalReason> SetShaftSpeed(std::optional<float> radiansPerSecond) = 0;
+        virtual std::optional<port::RefusalReason> SetShaftSpeed(const std::optional<ShaftDrive>& drive) = 0;
         virtual void ClearAll() = 0;
 
         virtual void Attach(InstrumentReports& reports) = 0;

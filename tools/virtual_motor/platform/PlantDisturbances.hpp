@@ -1,6 +1,7 @@
 #pragma once
 
 #include "e-foc-protocol/foc/Units.hpp"
+#include "tools/virtual_motor/platform/DrivenShaft.hpp"
 #include "tools/virtual_motor/port/PlantPortMessages.hpp"
 #include <cstdint>
 #include <optional>
@@ -14,7 +15,7 @@ namespace virtual_motor
         virtual void SetExternalTorque(foc::NewtonMeter torque) = 0;
         virtual void SetCurrentNoise(foc::Ampere sigma) = 0;
         virtual void SetEncoderNoise(foc::Radians sigma) = 0;
-        virtual void SetShaftSpeed(std::optional<foc::RadiansPerSecond> speed) = 0;
+        virtual void SetShaftDrive(const std::optional<ShaftDrive>& drive) = 0;
 
     protected:
         ~DisturbanceInputs() = default;
@@ -36,7 +37,7 @@ namespace virtual_motor
         std::optional<port::RefusalReason> SetExternalTorque(const port::ExternalTorque& torque);
         std::optional<port::RefusalReason> SetCurrentNoise(float ampere);
         std::optional<port::RefusalReason> SetEncoderNoise(float radians);
-        std::optional<port::RefusalReason> SetShaftSpeed(std::optional<float> radiansPerSecond);
+        std::optional<port::RefusalReason> SetShaftSpeed(const std::optional<ShaftDrive>& drive);
         void ClearAll();
 
         std::optional<port::RefusalReason> Check(const port::ProfileStep& step) const;
@@ -47,6 +48,7 @@ namespace virtual_motor
 
     private:
         std::optional<port::RefusalReason> Validate(const port::ExternalTorque& torque) const;
+        static std::optional<port::RefusalReason> Validate(const std::optional<ShaftDrive>& drive);
         float ExternalTorqueAt(float seconds) const;
 
         DisturbanceInputs& inputs;

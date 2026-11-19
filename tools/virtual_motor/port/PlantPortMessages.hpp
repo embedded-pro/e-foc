@@ -235,6 +235,9 @@ namespace virtual_motor::port
 
         bool drive{ false };
         float radiansPerSecond{ 0.0f };
+        uint64_t period{ 0 };
+        float torque{ 0.0f };
+        float inertia{ 0.0f };
 
         void WriteTo(PayloadWriter& writer) const;
         static ShaftSpeed ReadFrom(PayloadReader& reader);

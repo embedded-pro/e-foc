@@ -24,13 +24,18 @@ namespace
         MOCK_METHOD(void, SetExternalTorque, (foc::NewtonMeter torque), (override));
         MOCK_METHOD(void, SetCurrentNoise, (foc::Ampere sigma), (override));
         MOCK_METHOD(void, SetEncoderNoise, (foc::Radians sigma), (override));
-        MOCK_METHOD(void, SetShaftSpeed, (std::optional<foc::RadiansPerSecond> speed), (override));
+        MOCK_METHOD(void, SetShaftDrive, (const std::optional<virtual_motor::ShaftDrive>& drive), (override));
     };
 
     class TestPlantDisturbances
         : public testing::Test
     {
     public:
+        static virtual_motor::ShaftDrive Drive(float speed, float torque = 0.0f, float inertia = 1.0e-5f)
+        {
+            return { foc::RadiansPerSecond{ speed }, 0, foc::NewtonMeter{ torque }, foc::KilogramMeterSquared{ inertia } };
+        }
+
         void ExpectExternalTorques(std::initializer_list<float> torques)
         {
             testing::InSequence sequence;
@@ -145,7 +150,7 @@ TEST_F(TestPlantDisturbances, clear_all_returns_the_plant_to_its_description)
     EXPECT_CALL(inputs, SetCurrentNoise(IsNear(0.02f)));
     EXPECT_CALL(inputs, SetEncoderNoise(IsNear(0.001f)));
     EXPECT_CALL(inputs, SetExternalTorque(IsNear(0.0f)));
-    EXPECT_CALL(inputs, SetShaftSpeed(std::optional<foc::RadiansPerSecond>{}));
+    EXPECT_CALL(inputs, SetShaftDrive(testing::Eq(std::nullopt)));
     disturbances.ClearAll();
     disturbances.Apply();
 
@@ -154,15 +159,15 @@ TEST_F(TestPlantDisturbances, clear_all_returns_the_plant_to_its_description)
 
 TEST_F(TestPlantDisturbances, a_driven_shaft_turns_at_the_speed_sent_until_released)
 {
-    EXPECT_CALL(inputs, SetShaftSpeed(std::optional<foc::RadiansPerSecond>{ foc::RadiansPerSecond{ -3.5f } }));
-    EXPECT_FALSE(disturbances.SetShaftSpeed(-3.5f).has_value());
+    EXPECT_CALL(inputs, SetShaftDrive(std::optional{ Drive(-3.5f) }));
+    EXPECT_FALSE(disturbances.SetShaftSpeed(Drive(-3.5f)).has_value());
 
     auto changes = disturbances.InForce();
     EXPECT_TRUE(changes.shaftDriven);
     EXPECT_FLOAT_EQ(changes.shaftSpeed, -3.5f);
     EXPECT_EQ(changes.differs, differs::shaftDriven);
 
-    EXPECT_CALL(inputs, SetShaftSpeed(std::optional<foc::RadiansPerSecond>{}));
+    EXPECT_CALL(inputs, SetShaftDrive(testing::Eq(std::nullopt)));
     EXPECT_FALSE(disturbances.SetShaftSpeed(std::nullopt).has_value());
 
     changes = disturbances.InForce();
@@ -173,14 +178,14 @@ TEST_F(TestPlantDisturbances, a_driven_shaft_turns_at_the_speed_sent_until_relea
 
 TEST_F(TestPlantDisturbances, clear_all_releases_a_driven_shaft)
 {
-    EXPECT_CALL(inputs, SetShaftSpeed(testing::_));
-    disturbances.SetShaftSpeed(2.0f);
+    EXPECT_CALL(inputs, SetShaftDrive(testing::_));
+    disturbances.SetShaftSpeed(Drive(2.0f));
     testing::Mock::VerifyAndClearExpectations(&inputs);
 
     EXPECT_CALL(inputs, SetLoadTorque(testing::_));
     EXPECT_CALL(inputs, SetCurrentNoise(testing::_));
     EXPECT_CALL(inputs, SetEncoderNoise(testing::_));
-    EXPECT_CALL(inputs, SetShaftSpeed(std::optional<foc::RadiansPerSecond>{}));
+    EXPECT_CALL(inputs, SetShaftDrive(testing::Eq(std::nullopt)));
     disturbances.ClearAll();
 
     EXPECT_FALSE(disturbances.InForce().shaftDriven);
@@ -197,8 +202,12 @@ TEST_F(TestPlantDisturbances, refuses_values_out_of_range_and_leaves_the_plant_a
     EXPECT_EQ(disturbances.SetExternalTorque(ExternalTorque{ TorqueForm::sine, { 0.0f, 0.1f, 0.0f } }), RefusalReason::outOfRange);
     EXPECT_EQ(disturbances.SetExternalTorque(ExternalTorque{ TorqueForm::sine, { 0.0f, 0.1f, 101.0f } }), RefusalReason::outOfRange);
     EXPECT_EQ(disturbances.SetExternalTorque(ExternalTorque{ static_cast<TorqueForm>(9) }), RefusalReason::unknownForm);
-    EXPECT_EQ(disturbances.SetShaftSpeed(nan), RefusalReason::outOfRange);
-    EXPECT_EQ(disturbances.SetShaftSpeed(std::numeric_limits<float>::infinity()), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(nan)), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(std::numeric_limits<float>::infinity())), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(1.0f, nan)), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(1.0f, 0.0f, 0.0f)), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(1.0f, 0.0f, -1.0e-5f)), RefusalReason::outOfRange);
+    EXPECT_EQ(disturbances.SetShaftSpeed(Drive(1.0f, 0.0f, std::numeric_limits<float>::infinity())), RefusalReason::outOfRange);
 
     disturbances.Apply();
     EXPECT_EQ(disturbances.InForce().differs, 0);

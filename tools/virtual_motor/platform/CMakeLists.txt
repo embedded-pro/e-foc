@@ -25,6 +25,8 @@ target_sources(e_foc.tool.virtual_motor.platform PRIVATE
     BoardPeripherals.hpp
     CaptureRecorder.cpp
     CaptureRecorder.hpp
+    DrivenShaft.cpp
+    DrivenShaft.hpp
     FileEeprom.cpp
     FileEeprom.hpp
     InstrumentReports.hpp

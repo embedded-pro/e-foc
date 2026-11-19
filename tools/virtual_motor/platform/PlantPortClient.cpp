@@ -9,6 +9,14 @@ namespace virtual_motor
     {
         constexpr uint32_t statusIntervalMilliseconds{ 100 };
 
+        std::optional<ShaftDrive> ShaftDriveOf(const port::ShaftSpeed& request)
+        {
+            if (!request.drive)
+                return std::nullopt;
+
+            return ShaftDrive{ foc::RadiansPerSecond{ request.radiansPerSecond }, request.period, foc::NewtonMeter{ request.torque }, foc::KilogramMeterSquared{ request.inertia } };
+        }
+
         template<class Request>
         std::optional<Request> Read(const port::Frame& frame, bool& valid)
         {
@@ -219,7 +227,7 @@ namespace virtual_motor
                 break;
             case port::MessageType::shaftSpeed:
                 if (auto request = Read<port::ShaftSpeed>(frame, valid))
-                    Answer(port::MessageType::shaftSpeed, target.SetShaftSpeed(request->drive ? std::optional{ request->radiansPerSecond } : std::nullopt), false);
+                    Answer(port::MessageType::shaftSpeed, target.SetShaftSpeed(ShaftDriveOf(*request)), false);
                 break;
             case port::MessageType::clearAll:
                 target.ClearAll();
