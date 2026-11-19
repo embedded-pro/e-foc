@@ -28,7 +28,7 @@ namespace
         MOCK_METHOD(std::optional<RefusalReason>, SetExternalTorque, (const ExternalTorque& torque), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetCurrentNoise, (float ampere), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetEncoderNoise, (float radians), (override));
-        MOCK_METHOD(std::optional<RefusalReason>, SetShaftSpeed, (std::optional<float> radiansPerSecond), (override));
+        MOCK_METHOD(std::optional<RefusalReason>, SetShaftSpeed, (const std::optional<virtual_motor::ShaftDrive>& drive), (override));
         MOCK_METHOD(void, ClearAll, (), (override));
         MOCK_METHOD(void, Attach, (virtual_motor::InstrumentReports & reports), (override));
         MOCK_METHOD(void, Detach, (), (override));
@@ -178,16 +178,17 @@ TEST_F(TestPlantPortClient, a_shaft_speed_drives_the_shaft_or_releases_it_and_an
 {
     Attach();
 
-    EXPECT_CALL(target, SetShaftSpeed(std::optional<float>{ 4.0f })).WillOnce(testing::Return(std::nullopt));
-    SendToMotor(Encode(ShaftSpeed{ true, 4.0f }));
+    const virtual_motor::ShaftDrive drive{ foc::RadiansPerSecond{ 4.0f }, 1234, foc::NewtonMeter{ -0.25f }, foc::KilogramMeterSquared{ 2.0e-5f } };
+    EXPECT_CALL(target, SetShaftSpeed(std::optional{ drive })).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(ShaftSpeed{ true, 4.0f, 1234, -0.25f, 2.0e-5f }));
     EXPECT_TRUE(Decode<Changes>(Received(1).at(0)).has_value());
 
-    EXPECT_CALL(target, SetShaftSpeed(std::optional<float>{})).WillOnce(testing::Return(std::nullopt));
-    SendToMotor(Encode(ShaftSpeed{ false, 4.0f }));
+    EXPECT_CALL(target, SetShaftSpeed(testing::Eq(std::nullopt))).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(ShaftSpeed{ false, 4.0f, 1234, -0.25f, 2.0e-5f }));
     EXPECT_TRUE(Decode<Changes>(Received(1).at(0)).has_value());
 
     EXPECT_CALL(target, SetShaftSpeed(testing::_)).WillOnce(testing::Return(RefusalReason::outOfRange));
-    SendToMotor(Encode(ShaftSpeed{ true, 1.0f }));
+    SendToMotor(Encode(ShaftSpeed{ true, 1.0f, 0, 0.0f, 0.0f }));
     const auto refused = Decode<Refused>(Received(1).at(0));
     ASSERT_TRUE(refused.has_value());
     EXPECT_EQ(refused->request, static_cast<uint8_t>(MessageType::shaftSpeed));

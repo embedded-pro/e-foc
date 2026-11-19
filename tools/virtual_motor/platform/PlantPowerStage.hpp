@@ -3,6 +3,7 @@
 #include "core/foc/model/drive/BoardProtectionSimulator.hpp"
 #include "core/foc/model/drive/PlantDrive.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "tools/virtual_motor/platform/DrivenShaft.hpp"
 #include "tools/virtual_motor/platform/PlantDisturbances.hpp"
 #include "tools/virtual_motor/platform/PlantSignals.hpp"
 
@@ -51,21 +52,24 @@ namespace virtual_motor
         void DeliverPendingProtection();
 
     private:
+        void DriveShaft();
+
         class ModelInputs
             : public DisturbanceInputs
         {
         public:
-            ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant);
+            ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant, DrivenShaft& shaft);
 
             void SetLoadTorque(foc::NewtonMeter torque) override;
             void SetExternalTorque(foc::NewtonMeter torque) override;
             void SetCurrentNoise(foc::Ampere sigma) override;
             void SetEncoderNoise(foc::Radians sigma) override;
-            void SetShaftSpeed(std::optional<foc::RadiansPerSecond> speed) override;
+            void SetShaftDrive(const std::optional<ShaftDrive>& drive) override;
 
         private:
             foc::ThreePhaseMotorModel& model;
             const sil::SilPlantConfig& plant;
+            DrivenShaft& shaft;
         };
 
         sil::PlantDrive drive;
@@ -73,7 +77,9 @@ namespace virtual_motor
         const foc::SimulatedEncoder& plantEncoder{ drive.Model().Encoder() };
         application::BoardProtectionSimulator boardProtection;
         sil::SilPlantConfig plant;
-        ModelInputs modelInputs{ drive.Model(), plant };
+        DrivenShaft shaft{ 1.0f / static_cast<float>(drive.BaseFrequency().Value()) };
+        bool shaftDriven{ false };
+        ModelInputs modelInputs{ drive.Model(), plant, shaft };
         PlantDisturbances disturbances;
         PlantSignals signals;
 

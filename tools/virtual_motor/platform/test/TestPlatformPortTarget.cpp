@@ -3,6 +3,7 @@
 #include "motor_parameters/PlantPresets.hpp"
 #include "tools/virtual_motor/platform/PlatformPortTarget.hpp"
 #include "gtest/gtest.h"
+#include <cmath>
 #include <filesystem>
 #include <limits>
 #include <string>
@@ -65,11 +66,34 @@ namespace
             platform->FailureLed().Set(false);
         }
 
+        static virtual_motor::ShaftDrive Drive(float speed, uint64_t period, float torque, float inertia)
+        {
+            return { foc::RadiansPerSecond{ speed }, period, foc::NewtonMeter{ torque }, foc::KilogramMeterSquared{ inertia } };
+        }
+
+        static uint64_t Now()
+        {
+            return target->CurrentStatus().controlPeriods;
+        }
+
+        static float Signal(const Sample& sample, virtual_motor::Signal signal)
+        {
+            return sample[static_cast<std::size_t>(signal)];
+        }
+
+        static float RotorSpeedAfterOnePeriod()
+        {
+            target->Step(StepUnit::controlPeriod, 1);
+            return Signal(platform->SamplePlant(), virtual_motor::Signal::rotorSpeed);
+        }
+
         static std::string MemoryFile()
         {
             return (std::filesystem::temp_directory_path() / "e-foc-virtual-motor-board-test.nvm").string();
         }
 
+        static constexpr float heavyInertia{ 1.0e3f };
+        static constexpr float armInertia{ 1.0e-4f };
         static infra::StaticStorage<virtual_motor::VirtualPlatform> platform;
         static infra::StaticStorage<virtual_motor::PlatformPortTarget> target;
     };
@@ -135,8 +159,9 @@ TEST_F(TestPlatformPortTarget, a_driven_shaft_turns_at_the_speed_sent_from_the_n
     Reports reports;
     target->Attach(reports);
     target->Pause();
-    EXPECT_FALSE(target->SetShaftSpeed(5.0f).has_value());
-    EXPECT_EQ(target->SetShaftSpeed(std::numeric_limits<float>::quiet_NaN()), RefusalReason::outOfRange);
+    EXPECT_FALSE(target->SetShaftSpeed(Drive(5.0f, Now(), 0.0f, heavyInertia)).has_value());
+    EXPECT_EQ(target->SetShaftSpeed(Drive(std::numeric_limits<float>::quiet_NaN(), Now(), 0.0f, heavyInertia)), RefusalReason::outOfRange);
+    EXPECT_EQ(target->SetShaftSpeed(Drive(5.0f, Now(), 0.0f, 0.0f)), RefusalReason::outOfRange);
     EXPECT_TRUE(target->ChangesInForce().shaftDriven);
 
     target->Stream(true);
@@ -149,10 +174,62 @@ TEST_F(TestPlatformPortTarget, a_driven_shaft_turns_at_the_speed_sent_from_the_n
     EXPECT_NEAR(reports.windows[0].minimum[rotorSpeed], 5.0f, 1e-4f);
     EXPECT_NEAR(reports.windows[0].maximum[rotorSpeed], 5.0f, 1e-4f);
 
-    target->SetShaftSpeed(0.0f);
+    target->SetShaftSpeed(Drive(0.0f, Now(), 0.0f, heavyInertia));
     target->Step(StepUnit::controlPeriod, 1);
     target->ClearAll();
     EXPECT_FALSE(target->ChangesInForce().shaftDriven);
+}
+
+TEST_F(TestPlatformPortTarget, a_driven_shaft_adds_the_electrical_torque_it_was_not_sent_since_the_period_used)
+{
+    Reports reports;
+    target->Attach(reports);
+    target->Pause();
+    target->SetShaftSpeed(Drive(20.0f, Now(), 0.0f, heavyInertia));
+    const auto first = Now();
+    target->Capture(CaptureRequest{ Trigger{ TriggerKind::immediately }, 0, 40 });
+    target->Step(StepUnit::controlPeriod, 40);
+    target->Detach();
+    ASSERT_EQ(reports.chunks.size(), 1u);
+    ASSERT_EQ(reports.chunks[0].firstPeriod, first);
+    ASSERT_EQ(reports.chunks[0].periods.size(), 40u);
+
+    const auto now = Now();
+    const auto used = now - 31;
+    const auto periodSeconds = 1.0f / static_cast<float>(platform->BaseFrequency().Value());
+    float unseenImpulse{ 0.0f };
+    for (auto period = used + 1; period != now; ++period)
+        unseenImpulse += Signal(reports.chunks[0].periods[period - first], virtual_motor::Signal::electricalTorque) * periodSeconds;
+    const auto expected = 20.0f + unseenImpulse / armInertia;
+    ASSERT_GT(std::abs(expected - 20.0f), 0.1f);
+
+    target->SetShaftSpeed(Drive(20.0f, used, 0.0f, armInertia));
+
+    EXPECT_NEAR(RotorSpeedAfterOnePeriod(), expected, 1e-4f);
+}
+
+TEST_F(TestPlatformPortTarget, a_driven_shaft_sent_the_electrical_torque_it_has_holds_the_speed_sent)
+{
+    Reports reports;
+    target->Attach(reports);
+    target->Pause();
+    target->SetShaftSpeed(Drive(20.0f, Now(), 0.0f, heavyInertia));
+    target->Step(StepUnit::controlPeriod, 400);
+    target->Stream(true);
+    target->Step(StepUnit::controlPeriod, 10);
+    target->Stream(false);
+    target->Step(StepUnit::controlPeriod, 30);
+    target->Detach();
+    ASSERT_EQ(reports.windows.size(), 1u);
+
+    const auto& window = reports.windows[0];
+    const auto used = window.firstPeriod + window.periods - 1;
+    const auto torque = Signal(window.last, virtual_motor::Signal::electricalTorque);
+    ASSERT_GT(std::abs(torque), 0.01f);
+
+    target->SetShaftSpeed(Drive(20.0f, used, torque, armInertia));
+
+    EXPECT_NEAR(RotorSpeedAfterOnePeriod(), 20.0f, 1e-3f);
 }
 
 TEST_F(TestPlatformPortTarget, a_stream_closes_a_window_every_ten_control_periods)

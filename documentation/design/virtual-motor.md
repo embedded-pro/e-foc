@@ -120,8 +120,8 @@ A virtual motor is started with:
 | Host the bus   | Open the hub for the named bus if no hub is listening yet                                                                       | off                       |
 | Plant port     | The loopback port the Virtual Motor app's plant port listens on (Part F)                                                        | none: no plant port       |
 
-A **text plant description** lets a tool that does not build e-foc describe a motor, such as a robot arm that
-gives each joint's motor the inertia of the links it drives. It is a text file of lines; the first reads
+A **text plant description** lets a tool that does not build e-foc describe a motor, including a load inertia on
+its shaft. It is a text file of lines; the first reads
 `e-foc plant description 1`, and every other line is a key and a value separated by spaces. Blank lines are
 ignored. It starts from a preset, `teknic` unless a `preset` line names another, and each key below replaces one
 value of it. Load inertia is added to the rotor inertia, whichever line comes first.
@@ -270,14 +270,35 @@ negative, a delay is negative, a duration is not positive, or a frequency is not
 tenth of the control rate. While an external torque is in force it replaces the torque steps the plant
 description schedules.
 
-**Shaft drive.** A machine the motor is coupled to — the virtual arm, which integrates the dynamics of
-all its joints — can drive the shaft at a speed it sends. While driven, the shaft turns at the speed last
-sent and its angle advances from it; the plant's inertia, friction, load, external torque and cogging no
-longer move it. The motor still computes its electrical torque and streams it, which is what the driving
-machine reads back. A drive or release takes effect at the start of the next control period, as every
-change does; a release returns the shaft to the plant's own dynamics, starting from the speed it had. A
-speed that is not finite is refused. Clear all releases the shaft, and profiles do not carry the drive:
-it belongs to the machine that sends it, not to a bench disturbance.
+**Shaft drive.** A machine the motor is coupled to, one that integrates its own dynamics, can drive the
+shaft at a speed it sends. While driven, the shaft's speed is set every
+control period and its angle advances from it; the plant's inertia, friction, load, external torque and
+cogging no longer move it. The motor still computes its electrical torque and streams it, which is what
+the driving machine reads back. A drive or release takes effect at the start of the next control period,
+as every change does; a release returns the shaft to the plant's own dynamics, starting from the speed it
+had. Clear all releases the shaft, and profiles do not carry the drive: it belongs to the machine that
+sends it, not to a bench disturbance.
+
+The driving machine computes each speed from an electrical torque it read in a window, and the plant
+port is serviced once per millisecond, so the speed arrives one to two milliseconds after the torque it
+was computed from. That lag sits inside the motor's own fast mechanical loop: while the alignment holds
+the rotor on a stiff electrical spring, a torque that reaches the shaft's speed late acts as negative
+damping, so the rotor rings and the alignment can fail. The motor therefore closes the gap itself. With
+the speed, the machine sends the control period of the sample it used (a window's first period plus its
+periods minus one), the electrical torque it used, and the shaft's apparent inertia $J$. In every
+control period $n$ the shaft is driven, its speed is
+
+$$
+\omega(n) = \omega_{sent} + \frac{\Delta t}{J} \sum_{k_{used} < k < n} \left(\tau_e(k) - \tau_{used}\right)
+$$
+
+where $\tau_e(k)$ is the electrical torque of the Data Model in period $k$ and $\Delta t$ is one control
+period: the speed the machine would have reached had it seen every torque since its sample. The motor
+keeps the electrical torque of its last 1,024 control periods, and older periods add nothing; a used
+period not yet reached adds nothing either. Between two requests the sum grows by one term each period.
+The speed listed in the changes in force is the speed sent. A drive whose speed or torque is not finite,
+or whose inertia is not finite and positive, is refused; a release ignores every field but the drive
+flag.
 
 The motor's intrinsic parameters — resistance, inductances, flux linkage, pole pairs, inertia,
 friction, cogging — and its non-idealities and wiring faults (sensor bias, encoder resolution, a stuck
@@ -381,7 +402,7 @@ App to motor:
 | `0x86` | Current noise   | Standard deviation in A                                                                                                                                                              |
 | `0x87` | Encoder noise   | Standard deviation in rad                                                                                                                                                            |
 | `0x88` | Clear all       | None: the plant returns to its description, the shaft released                                                                                                                       |
-| `0x89` | Shaft speed     | Drive: release (0) or drive (1), then the speed in rad/s, sent whatever the drive                                                                                                    |
+| `0x89` | Shaft speed     | Drive: release (0) or drive (1), speed in rad/s, the used control period (8 bytes), the used electrical torque in N·m, the inertia in kg·m²; all sent whatever the drive             |
 | `0x90` | Stream          | On (1) or off (0)                                                                                                                                                                    |
 | `0x91` | Capture         | Trigger, pre-trigger share in percent, length in control periods (2 bytes, 1 to 16,384)                                                                                              |
 | `0x92` | Cancel capture  | None                                                                                                                                                                                 |

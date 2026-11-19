@@ -78,14 +78,30 @@ TEST(TestPlantPortCodec, changes_end_with_the_shaft_drive_after_which_values_dif
     EXPECT_EQ(Encode(Changes{ 0.0f, {}, 0.0f, 0.0f, differs::shaftDriven, true, -2.0f }), expected);
 }
 
-TEST(TestPlantPortCodec, shaft_speed_is_the_drive_flag_then_the_speed)
+TEST(TestPlantPortCodec, shaft_speed_is_the_drive_flag_the_speed_then_the_used_period_torque_and_inertia)
 {
-    EXPECT_THAT(Encode(ShaftSpeed{ true, 1.5f }), testing::ElementsAre(0x89, 5, 0, 0x01, 0x00, 0x00, 0xc0, 0x3f));
-    EXPECT_THAT(Encode(ShaftSpeed{ false, 0.0f }), testing::ElementsAre(0x89, 5, 0, 0x00, 0x00, 0x00, 0x00, 0x00));
+    const std::vector<uint8_t> driven{ 0x89, 21, 0,
+        0x01,
+        0x00, 0x00, 0xc0, 0x3f,
+        0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
+        0x00, 0x00, 0x80, 0x3e,
+        0x00, 0x00, 0x00, 0x40 };
+    const std::vector<uint8_t> released{ 0x89, 21, 0,
+        0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00 };
 
-    const auto request = RoundTrip(ShaftSpeed{ true, -3.25f });
+    EXPECT_EQ(Encode(ShaftSpeed{ true, 1.5f, 0x0102'0304'0506'0708ull, 0.25f, 2.0f }), driven);
+    EXPECT_EQ(Encode(ShaftSpeed{}), released);
+
+    const auto request = RoundTrip(ShaftSpeed{ true, -3.25f, 1234, -0.125f, 0.5f });
     EXPECT_TRUE(request.drive);
     EXPECT_FLOAT_EQ(request.radiansPerSecond, -3.25f);
+    EXPECT_EQ(request.period, 1234u);
+    EXPECT_FLOAT_EQ(request.torque, -0.125f);
+    EXPECT_FLOAT_EQ(request.inertia, 0.5f);
 }
 
 TEST(TestPlantPortCodec, requests_and_refusals_round_trip)

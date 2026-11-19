@@ -33,7 +33,9 @@ namespace virtual_motor
     void PlantPowerStage::StepPlant()
     {
         disturbances.Apply();
+        DriveShaft();
         drive.Tick();
+        shaft.Record(signals.ElectricalTorque());
 
         if (onPhaseCurrentsReady && !controlLoopEntered)
         {
@@ -44,6 +46,14 @@ namespace virtual_motor
 
         auto& model = drive.Model();
         boardProtection.Evaluate(model.CurrentSensor().Last(), model.Supply().Voltage().Value(), model.Thermal().Temperature());
+    }
+
+    void PlantPowerStage::DriveShaft()
+    {
+        const auto speed = shaft.Speed();
+        if (speed || shaftDriven)
+            drive.Model().Mechanics().Grip(speed);
+        shaftDriven = speed.has_value();
     }
 
     PlantDisturbances& PlantPowerStage::Disturbances()
@@ -171,9 +181,10 @@ namespace virtual_motor
         return drive.IndexSeen();
     }
 
-    PlantPowerStage::ModelInputs::ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant)
+    PlantPowerStage::ModelInputs::ModelInputs(foc::ThreePhaseMotorModel& model, const sil::SilPlantConfig& plant, DrivenShaft& shaft)
         : model(model)
         , plant(plant)
+        , shaft(shaft)
     {}
 
     void PlantPowerStage::ModelInputs::SetLoadTorque(foc::NewtonMeter torque)
@@ -204,8 +215,8 @@ namespace virtual_motor
         });
     }
 
-    void PlantPowerStage::ModelInputs::SetShaftSpeed(std::optional<foc::RadiansPerSecond> speed)
+    void PlantPowerStage::ModelInputs::SetShaftDrive(const std::optional<ShaftDrive>& drive)
     {
-        model.Mechanics().Grip(speed);
+        shaft.Drive(drive);
     }
 }

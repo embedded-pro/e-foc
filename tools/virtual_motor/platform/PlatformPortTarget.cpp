@@ -65,9 +65,9 @@ namespace virtual_motor
         return platform.Disturbances().SetEncoderNoise(radians);
     }
 
-    std::optional<port::RefusalReason> PlatformPortTarget::SetShaftSpeed(std::optional<float> radiansPerSecond)
+    std::optional<port::RefusalReason> PlatformPortTarget::SetShaftSpeed(const std::optional<ShaftDrive>& drive)
     {
-        return platform.Disturbances().SetShaftSpeed(radiansPerSecond);
+        return platform.Disturbances().SetShaftSpeed(drive);
     }
 
     void PlatformPortTarget::ClearAll()

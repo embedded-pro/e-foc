@@ -26,6 +26,13 @@ namespace virtual_motor
         return sample;
     }
 
+    foc::NewtonMeter PlantSignals::ElectricalTorque() const
+    {
+        const auto dq = model.Electrical().LastDqCurrents();
+        const auto winding = model.Winding();
+        return foc::NewtonMeter{ torqueConstant * polePairs * (winding.fluxLinkage * dq.q + (winding.inductanceD - winding.inductanceQ) * dq.d * dq.q) };
+    }
+
     void PlantSignals::Started()
     {}
 
@@ -61,14 +68,13 @@ namespace virtual_motor
     void PlantSignals::SampleMechanical(SignalSample& sample, foc::NewtonMeter loadTorque)
     {
         const auto dq = model.Electrical().LastDqCurrents();
-        const auto winding = model.Winding();
         const auto& mechanics = model.Mechanics();
         Set(sample, Signal::currentD, dq.d);
         Set(sample, Signal::currentQ, dq.q);
         Set(sample, Signal::rotorAngle, mechanics.Angle().Value());
         Set(sample, Signal::encoderAngle, model.Encoder().Read().Value());
         Set(sample, Signal::rotorSpeed, mechanics.Speed().Value());
-        Set(sample, Signal::electricalTorque, torqueConstant * polePairs * (winding.fluxLinkage * dq.q + (winding.inductanceD - winding.inductanceQ) * dq.d * dq.q));
+        Set(sample, Signal::electricalTorque, ElectricalTorque().Value());
         Set(sample, Signal::loadTorque, loadTorque.Value());
         Set(sample, Signal::externalTorque, mechanics.ExternalTorque().Value());
         Set(sample, Signal::busVoltage, model.Supply().Voltage().Value());

@@ -45,6 +45,7 @@ namespace virtual_motor
         PlantSignals(foc::ThreePhaseMotorModel& model, uint8_t polePairs);
 
         SignalSample Sample(const foc::PhasePwmDutyCycles& appliedDuties, foc::NewtonMeter loadTorque);
+        foc::NewtonMeter ElectricalTorque() const;
 
         void Started() override;
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;

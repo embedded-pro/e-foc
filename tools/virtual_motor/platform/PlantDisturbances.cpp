@@ -80,14 +80,14 @@ namespace virtual_motor
         return std::nullopt;
     }
 
-    std::optional<port::RefusalReason> PlantDisturbances::SetShaftSpeed(std::optional<float> radiansPerSecond)
+    std::optional<port::RefusalReason> PlantDisturbances::SetShaftSpeed(const std::optional<ShaftDrive>& drive)
     {
-        if (radiansPerSecond && !math::IsFinite(*radiansPerSecond))
-            return port::RefusalReason::outOfRange;
+        if (auto refusal = Validate(drive))
+            return refusal;
 
-        inForce.shaftDriven = radiansPerSecond.has_value();
-        inForce.shaftSpeed = radiansPerSecond.value_or(0.0f);
-        inputs.SetShaftSpeed(radiansPerSecond ? std::optional{ foc::RadiansPerSecond{ *radiansPerSecond } } : std::nullopt);
+        inForce.shaftDriven = drive.has_value();
+        inForce.shaftSpeed = drive ? drive->speed.Value() : 0.0f;
+        inputs.SetShaftDrive(drive);
         return std::nullopt;
     }
 
@@ -184,6 +184,17 @@ namespace virtual_motor
             default:
                 return port::RefusalReason::unknownForm;
         }
+    }
+
+    std::optional<port::RefusalReason> PlantDisturbances::Validate(const std::optional<ShaftDrive>& drive)
+    {
+        if (!drive)
+            return std::nullopt;
+
+        const auto inertia = drive->inertia.Value();
+        if (!math::IsFinite(drive->speed.Value()) || !math::IsFinite(drive->torque.Value()) || !math::IsFinite(inertia) || inertia <= 0.0f)
+            return port::RefusalReason::outOfRange;
+        return std::nullopt;
     }
 
     float PlantDisturbances::ExternalTorqueAt(float seconds) const
