@@ -217,6 +217,10 @@ namespace virtual_motor
                 if (auto request = Read<port::EncoderNoise>(frame, valid))
                     Answer(port::MessageType::encoderNoise, target.SetEncoderNoise(request->radians), false);
                 break;
+            case port::MessageType::shaftSpeed:
+                if (auto request = Read<port::ShaftSpeed>(frame, valid))
+                    Answer(port::MessageType::shaftSpeed, target.SetShaftSpeed(request->drive ? std::optional{ request->radiansPerSecond } : std::nullopt), false);
+                break;
             case port::MessageType::clearAll:
                 target.ClearAll();
                 Answer(port::MessageType::clearAll, std::nullopt, false);

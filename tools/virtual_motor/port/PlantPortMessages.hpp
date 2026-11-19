@@ -9,7 +9,7 @@
 
 namespace virtual_motor::port
 {
-    constexpr uint16_t protocolVersion{ 2 };
+    constexpr uint16_t protocolVersion{ 3 };
     constexpr std::size_t signalCount{ 25 };
     constexpr uint16_t maxCapturePeriods{ 16384 };
     constexpr uint16_t captureChunkPeriods{ 512 };
@@ -36,6 +36,7 @@ namespace virtual_motor::port
         currentNoise = 0x86,
         encoderNoise = 0x87,
         clearAll = 0x88,
+        shaftSpeed = 0x89,
         stream = 0x90,
         capture = 0x91,
         cancelCapture = 0x92,
@@ -109,6 +110,7 @@ namespace virtual_motor::port
         constexpr uint8_t externalTorque{ 0b0010 };
         constexpr uint8_t currentNoise{ 0b0100 };
         constexpr uint8_t encoderNoise{ 0b1000 };
+        constexpr uint8_t shaftDriven{ 0b1'0000 };
     }
 
     struct ExternalTorque
@@ -158,6 +160,8 @@ namespace virtual_motor::port
         float currentNoise{ 0.0f };
         float encoderNoise{ 0.0f };
         uint8_t differs{ 0 };
+        bool shaftDriven{ false };
+        float shaftSpeed{ 0.0f };
 
         void WriteTo(PayloadWriter& writer) const;
         static Changes ReadFrom(PayloadReader& reader);
@@ -223,6 +227,17 @@ namespace virtual_motor::port
 
         void WriteTo(PayloadWriter& writer) const;
         static LoadTorque ReadFrom(PayloadReader& reader);
+    };
+
+    struct ShaftSpeed
+    {
+        static constexpr MessageType type{ MessageType::shaftSpeed };
+
+        bool drive{ false };
+        float radiansPerSecond{ 0.0f };
+
+        void WriteTo(PayloadWriter& writer) const;
+        static ShaftSpeed ReadFrom(PayloadReader& reader);
     };
 
     struct ExternalTorqueRequest

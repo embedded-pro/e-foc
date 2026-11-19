@@ -80,12 +80,24 @@ namespace virtual_motor
         return std::nullopt;
     }
 
+    std::optional<port::RefusalReason> PlantDisturbances::SetShaftSpeed(std::optional<float> radiansPerSecond)
+    {
+        if (radiansPerSecond && !math::IsFinite(*radiansPerSecond))
+            return port::RefusalReason::outOfRange;
+
+        inForce.shaftDriven = radiansPerSecond.has_value();
+        inForce.shaftSpeed = radiansPerSecond.value_or(0.0f);
+        inputs.SetShaftSpeed(radiansPerSecond ? std::optional{ foc::RadiansPerSecond{ *radiansPerSecond } } : std::nullopt);
+        return std::nullopt;
+    }
+
     void PlantDisturbances::ClearAll()
     {
         SetLoadTorque(baseline.loadTorque.Value());
         SetCurrentNoise(baseline.currentNoise.Value());
         SetEncoderNoise(baseline.encoderNoise.Value());
         SetExternalTorque(port::ExternalTorque{});
+        SetShaftSpeed(std::nullopt);
     }
 
     std::optional<port::RefusalReason> PlantDisturbances::Check(const port::ProfileStep& step) const
@@ -147,7 +159,8 @@ namespace virtual_motor
         changes.differs = static_cast<uint8_t>(Differs(inForce.loadTorque != baseline.loadTorque.Value(), port::differs::loadTorque) |
                                                Differs(inForce.externalTorque.form != port::TorqueForm::none, port::differs::externalTorque) |
                                                Differs(inForce.currentNoise != baseline.currentNoise.Value(), port::differs::currentNoise) |
-                                               Differs(inForce.encoderNoise != baseline.encoderNoise.Value(), port::differs::encoderNoise));
+                                               Differs(inForce.encoderNoise != baseline.encoderNoise.Value(), port::differs::encoderNoise) |
+                                               Differs(inForce.shaftDriven, port::differs::shaftDriven));
         return changes;
     }
 

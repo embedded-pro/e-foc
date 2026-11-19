@@ -4,6 +4,7 @@
 #include "tools/virtual_motor/platform/PlatformPortTarget.hpp"
 #include "gtest/gtest.h"
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -127,6 +128,31 @@ TEST_F(TestPlatformPortTarget, changes_reach_the_plant_and_are_listed_until_clea
 
     target->ClearAll();
     EXPECT_EQ(target->ChangesInForce().differs, 0);
+}
+
+TEST_F(TestPlatformPortTarget, a_driven_shaft_turns_at_the_speed_sent_from_the_next_control_period)
+{
+    Reports reports;
+    target->Attach(reports);
+    target->Pause();
+    EXPECT_FALSE(target->SetShaftSpeed(5.0f).has_value());
+    EXPECT_EQ(target->SetShaftSpeed(std::numeric_limits<float>::quiet_NaN()), RefusalReason::outOfRange);
+    EXPECT_TRUE(target->ChangesInForce().shaftDriven);
+
+    target->Stream(true);
+    target->Step(StepUnit::controlPeriod, 10);
+    target->Stream(false);
+    target->Detach();
+
+    ASSERT_EQ(reports.windows.size(), 1u);
+    const auto rotorSpeed = static_cast<std::size_t>(virtual_motor::Signal::rotorSpeed);
+    EXPECT_NEAR(reports.windows[0].minimum[rotorSpeed], 5.0f, 1e-4f);
+    EXPECT_NEAR(reports.windows[0].maximum[rotorSpeed], 5.0f, 1e-4f);
+
+    target->SetShaftSpeed(0.0f);
+    target->Step(StepUnit::controlPeriod, 1);
+    target->ClearAll();
+    EXPECT_FALSE(target->ChangesInForce().shaftDriven);
 }
 
 TEST_F(TestPlatformPortTarget, a_stream_closes_a_window_every_ten_control_periods)

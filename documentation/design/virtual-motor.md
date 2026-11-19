@@ -2,9 +2,9 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.11.0
+version: 0.12.0
 component: "virtual-motor"
-date: 2026-11-16
+date: 2026-11-19
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-16
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.11.0               |
+| Version   | 0.12.0               |
 | Component | virtual-motor        |
-| Date      | 2026-11-16           |
+| Date      | 2026-11-19           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -245,12 +245,13 @@ Moving the plant drive out of its two former copies left every metric of the hos
 ### Part E — Torque and noise while running
 
 While the motor runs, the plant port changes only what acts on the motor from outside: torque on the
-shaft and noise on the sensors. A change is queued and applied at the start of the next control period,
+shaft, the shaft's speed when something else drives it, and noise on the sensors. A change is queued and applied at the start of the next control period,
 never inside one; the pacer is the only writer of the plant's state.
 
 | Group         | Change                                                               | Plant part       |
 |---------------|----------------------------------------------------------------------|------------------|
 | Torque        | Load torque; external torque as a constant, a step, a ramp or a sine | Mechanical plant |
+| Shaft drive   | The shaft driven at a speed, or released                             | Mechanical plant |
 | Current noise | Noise standard deviation, the same on the three phases               | Current sensor   |
 | Encoder noise | Noise standard deviation                                             | Encoder          |
 
@@ -268,6 +269,15 @@ A change is refused, and the plant left as it was, when a value is not finite, a
 negative, a delay is negative, a duration is not positive, or a frequency is not between zero and a
 tenth of the control rate. While an external torque is in force it replaces the torque steps the plant
 description schedules.
+
+**Shaft drive.** A machine the motor is coupled to — the virtual arm, which integrates the dynamics of
+all its joints — can drive the shaft at a speed it sends. While driven, the shaft turns at the speed last
+sent and its angle advances from it; the plant's inertia, friction, load, external torque and cogging no
+longer move it. The motor still computes its electrical torque and streams it, which is what the driving
+machine reads back. A drive or release takes effect at the start of the next control period, as every
+change does; a release returns the shaft to the plant's own dynamics, starting from the speed it had. A
+speed that is not finite is refused. Clear all releases the shaft, and profiles do not carry the drive:
+it belongs to the machine that sends it, not to a bench disturbance.
 
 The motor's intrinsic parameters — resistance, inductances, flux linkage, pole pairs, inertia,
 friction, cogging — and its non-idealities and wiring faults (sensor bias, encoder resolution, a stuck
@@ -335,8 +345,9 @@ plant port connects to it before it joins the bus and introduces itself; one it 
 start. When the connection ends, the motor carries on without it, and a paused motor resumes, so a
 motor whose app has gone never hangs.
 
-**Version.** Hello names the protocol version: 2, since a window also carries its last control period,
-so a reader can pair signals sampled in the same period, such as the stator voltage α and β.
+**Version.** Hello names the protocol version: 3, since Changes also carries the shaft drive of Part E,
+appended after its other fields. Version 2 added a window's last control period, so a reader can pair
+signals sampled in the same period, such as the stator voltage α and β.
 
 **Frames.** Each message is one frame: its type in one byte, the length of its payload in two bytes, then
 the payload. Numbers are little-endian, reals are single-precision IEEE 754, and a text is its length in
@@ -350,7 +361,7 @@ Motor to app:
 |--------|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
 | `0x01` | Hello         | Protocol version (2 bytes), node, bus name, plant name, control rate in hertz (4 bytes)                                                                                                                                                                 | Once, first                                                                |
 | `0x02` | Status        | Control periods run (8 bytes), real-time factor, overruns (4 bytes), run state, LEDs, board protection state                                                                                                                                            | Every 100 ms of virtual time, and on every pause, resume and finished step |
-| `0x03` | Changes       | Load torque, external torque form and its four parameters, current noise, encoder noise, and which of them differ from the plant description                                                                                                            | Once after Hello, and after every accepted change                          |
+| `0x03` | Changes       | Load torque, external torque form and its four parameters, current noise, encoder noise, which of them differ from the plant description, whether the shaft is driven (driven differs from the description), and the speed it is driven at in rad/s     | Once after Hello, and after every accepted change                          |
 | `0x04` | Refused       | The type of the refused request, the reason                                                                                                                                                                                                             | For every refused request                                                  |
 | `0x05` | Log line      | The text of one debug log line                                                                                                                                                                                                                          | For every line the debug log writes                                        |
 | `0x10` | Window        | Sequence (4 bytes), the first control period of the window (8 bytes), the control periods in it, then the minimum and the maximum of every Data Model signal in its order, then every signal in the window's last control period                        | Every 10 control periods while the stream is on, unless dropped            |
@@ -369,7 +380,8 @@ App to motor:
 | `0x85` | External torque | Form (none, constant, step, ramp, sine) and four parameters in the order of Part E's table                                                                                           |
 | `0x86` | Current noise   | Standard deviation in A                                                                                                                                                              |
 | `0x87` | Encoder noise   | Standard deviation in rad                                                                                                                                                            |
-| `0x88` | Clear all       | None: the plant returns to its description                                                                                                                                           |
+| `0x88` | Clear all       | None: the plant returns to its description, the shaft released                                                                                                                       |
+| `0x89` | Shaft speed     | Drive: release (0) or drive (1), then the speed in rad/s, sent whatever the drive                                                                                                    |
 | `0x90` | Stream          | On (1) or off (0)                                                                                                                                                                    |
 | `0x91` | Capture         | Trigger, pre-trigger share in percent, length in control periods (2 bytes, 1 to 16,384)                                                                                              |
 | `0x92` | Cancel capture  | None                                                                                                                                                                                 |

@@ -203,4 +203,9 @@ namespace virtual_motor
             .biasRadians = plant.encoderBiasRadians,
         });
     }
+
+    void PlantPowerStage::ModelInputs::SetShaftSpeed(std::optional<foc::RadiansPerSecond> speed)
+    {
+        model.Mechanics().Grip(speed);
+    }
 }

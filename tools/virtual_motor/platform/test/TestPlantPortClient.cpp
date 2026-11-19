@@ -28,6 +28,7 @@ namespace
         MOCK_METHOD(std::optional<RefusalReason>, SetExternalTorque, (const ExternalTorque& torque), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetCurrentNoise, (float ampere), (override));
         MOCK_METHOD(std::optional<RefusalReason>, SetEncoderNoise, (float radians), (override));
+        MOCK_METHOD(std::optional<RefusalReason>, SetShaftSpeed, (std::optional<float> radiansPerSecond), (override));
         MOCK_METHOD(void, ClearAll, (), (override));
         MOCK_METHOD(void, Attach, (virtual_motor::InstrumentReports & reports), (override));
         MOCK_METHOD(void, Detach, (), (override));
@@ -171,6 +172,25 @@ TEST_F(TestPlantPortClient, an_accepted_change_answers_with_the_changes_in_force
     EXPECT_CALL(target, ClearAll());
     SendToMotor(Encode(ClearAll{}));
     EXPECT_TRUE(Decode<Changes>(Received(1).at(0)).has_value());
+}
+
+TEST_F(TestPlantPortClient, a_shaft_speed_drives_the_shaft_or_releases_it_and_answers_like_a_change)
+{
+    Attach();
+
+    EXPECT_CALL(target, SetShaftSpeed(std::optional<float>{ 4.0f })).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(ShaftSpeed{ true, 4.0f }));
+    EXPECT_TRUE(Decode<Changes>(Received(1).at(0)).has_value());
+
+    EXPECT_CALL(target, SetShaftSpeed(std::optional<float>{})).WillOnce(testing::Return(std::nullopt));
+    SendToMotor(Encode(ShaftSpeed{ false, 4.0f }));
+    EXPECT_TRUE(Decode<Changes>(Received(1).at(0)).has_value());
+
+    EXPECT_CALL(target, SetShaftSpeed(testing::_)).WillOnce(testing::Return(RefusalReason::outOfRange));
+    SendToMotor(Encode(ShaftSpeed{ true, 1.0f }));
+    const auto refused = Decode<Refused>(Received(1).at(0));
+    ASSERT_TRUE(refused.has_value());
+    EXPECT_EQ(refused->request, static_cast<uint8_t>(MessageType::shaftSpeed));
 }
 
 TEST_F(TestPlantPortClient, a_refused_change_answers_with_the_reason)

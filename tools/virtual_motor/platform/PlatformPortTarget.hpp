@@ -23,6 +23,7 @@ namespace virtual_motor
         std::optional<port::RefusalReason> SetExternalTorque(const port::ExternalTorque& torque) override;
         std::optional<port::RefusalReason> SetCurrentNoise(float ampere) override;
         std::optional<port::RefusalReason> SetEncoderNoise(float radians) override;
+        std::optional<port::RefusalReason> SetShaftSpeed(std::optional<float> radiansPerSecond) override;
         void ClearAll() override;
 
         void Attach(InstrumentReports& reports) override;

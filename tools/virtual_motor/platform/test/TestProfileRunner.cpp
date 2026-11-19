@@ -25,6 +25,7 @@ namespace
         MOCK_METHOD(void, SetExternalTorque, (foc::NewtonMeter torque), (override));
         MOCK_METHOD(void, SetCurrentNoise, (foc::Ampere sigma), (override));
         MOCK_METHOD(void, SetEncoderNoise, (foc::Radians sigma), (override));
+        MOCK_METHOD(void, SetShaftSpeed, (std::optional<foc::RadiansPerSecond> speed), (override));
     };
 
     ProfileStep Load(uint32_t at, float newtonMeter)
@@ -106,6 +107,7 @@ TEST_F(TestProfileRunner, stopping_returns_the_plant_to_its_description)
     EXPECT_CALL(inputs, SetLoadTorque(IsNear(0.0f)));
     EXPECT_CALL(inputs, SetCurrentNoise(testing::_));
     EXPECT_CALL(inputs, SetEncoderNoise(testing::_));
+    EXPECT_CALL(inputs, SetShaftSpeed(std::optional<foc::RadiansPerSecond>{}));
     EXPECT_CALL(reports, ReportProfileState(IsState(ProfileStateKind::stopped, 1, 2)));
     runner.Stop();
     Observe(3, 1000);
