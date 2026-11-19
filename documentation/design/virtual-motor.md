@@ -120,8 +120,8 @@ A virtual motor is started with:
 | Host the bus   | Open the hub for the named bus if no hub is listening yet                                                                       | off                       |
 | Plant port     | The loopback port the Virtual Motor app's plant port listens on (Part F)                                                        | none: no plant port       |
 
-A **text plant description** lets a tool that does not build e-foc describe a motor, such as a robot arm that
-gives each joint's motor the inertia of the links it drives. It is a text file of lines; the first reads
+A **text plant description** lets a tool that does not build e-foc describe a motor, including a load inertia on
+its shaft. It is a text file of lines; the first reads
 `e-foc plant description 1`, and every other line is a key and a value separated by spaces. Blank lines are
 ignored. It starts from a preset, `teknic` unless a `preset` line names another, and each key below replaces one
 value of it. Load inertia is added to the rotor inertia, whichever line comes first.
@@ -270,8 +270,8 @@ negative, a delay is negative, a duration is not positive, or a frequency is not
 tenth of the control rate. While an external torque is in force it replaces the torque steps the plant
 description schedules.
 
-**Shaft drive.** A machine the motor is coupled to — the virtual arm, which integrates the dynamics of
-all its joints — can drive the shaft at a speed it sends. While driven, the shaft's speed is set every
+**Shaft drive.** A machine the motor is coupled to, one that integrates its own dynamics, can drive the
+shaft at a speed it sends. While driven, the shaft's speed is set every
 control period and its angle advances from it; the plant's inertia, friction, load, external torque and
 cogging no longer move it. The motor still computes its electrical torque and streams it, which is what
 the driving machine reads back. A drive or release takes effect at the start of the next control period,
