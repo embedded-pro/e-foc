@@ -121,7 +121,7 @@ namespace tool
         EnablePrimary(!state.blocked);
         primaryButton->setToolTip(state.blocked ? "Disconnect from the CAN bus first — installing closes CAN Commander" : QString{});
         message->setText(state.blocked ? QString("%1 is downloaded and verified. Disconnect from the CAN bus to install it.").arg(version)
-                                            : QString("%1 is downloaded and verified.").arg(version));
+                                       : QString("%1 is downloaded and verified.").arg(version));
         ShowButtons(true, true, false, true, false);
     }
 
