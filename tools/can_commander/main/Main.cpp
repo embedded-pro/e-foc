@@ -1,7 +1,7 @@
 #include "hal/generic/TimerServiceGeneric.hpp"
 #include "tools/can_commander/gui/MainWindow.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
-#include "tools/can_commander/support/IssueLog.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include "tools/can_commander/support/QtEventDispatcher.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"

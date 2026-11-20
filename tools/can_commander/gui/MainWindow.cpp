@@ -1,8 +1,7 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
 #include "e-foc-protocol/contract/FocMotorWireContract.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
-#include "tools/can_commander/support/IssueReport.hpp"
-#include "tools/can_commander/support/UpdateInstallation.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
@@ -86,8 +85,8 @@ namespace tool
         , adapter(adapter)
         , issueLog(issueLog)
         , client(adapter)
-        , updateChecker(ReleaseVersion::Parse(application::version).value_or(ReleaseVersion{}), QUrl{ ToQt(application::latestReleaseApiUrl) })
-        , updateSession(UpdateDownloadDirectory(), UpdateCommandFor)
+        , updateChecker(ReleaseVersion::Parse(application::version).value_or(ReleaseVersion{}), QUrl{ ToQt(application::latestReleaseApiUrl) }, UserAgent())
+        , updateSession(UpdateDownloadDirectory(), UserAgent(), UpdateCommandFor)
     {
         CanCommandClientObserver::Attach(client);
         FirmwareTransferObserver::Attach(transfer);
@@ -721,7 +720,7 @@ namespace tool
         const bool wasConnected{ busConnected };
         busConnected = connected;
         connectionPanel->OnConnectionChanged(connected);
-        updateSession.SetBusConnected(connected);
+        updateSession.SetBlocked(connected);
 
         if (connected)
         {

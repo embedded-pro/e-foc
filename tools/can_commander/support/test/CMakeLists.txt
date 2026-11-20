@@ -8,14 +8,6 @@ target_link_libraries(e_foc.tool.can_commander.support_test PUBLIC
 )
 
 target_sources(e_foc.tool.can_commander.support_test PRIVATE
-    TestIssueLog.cpp
-    TestIssueReport.cpp
+    TestFirmwarePack.cpp
     TestQtEventDispatcher.cpp
-    TestReleaseFeed.cpp
-    TestReleaseVersion.cpp
-    TestUpdateChecker.cpp
-    TestUpdateDownloader.cpp
-    TestUpdateInstallation.cpp
-    TestUpdateInstaller.cpp
-    TestUpdateSession.cpp
 )

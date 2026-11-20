@@ -93,7 +93,7 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     FetchContent_Declare(
         ui
         GIT_REPOSITORY https://github.com/embedded-pro/ui-cpp.git
-        GIT_TAG        73b139fb65f92bad233ec354956d07d304f57274
+        GIT_TAG        946430d9904ab5a267548091997a543ba9973443
         SYSTEM
     )
     FetchContent_MakeAvailable(ui)
@@ -102,7 +102,7 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     # so they would otherwise inherit a policy that is ours and not a dependency's.
     foreach(fetched
         ui.core ui.theme ui.model ui.shell ui.charts ui.scope ui.scene ui.widgets
-        ui.terminal ui.backend.recording ui.backend.qt)
+        ui.terminal ui.backend.recording ui.backend.qt ui.backend.qt.update)
         if (TARGET ${fetched})
             set_target_properties(${fetched} PROPERTIES COMPILE_WARNING_AS_ERROR Off)
         endif()

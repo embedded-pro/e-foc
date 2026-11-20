@@ -118,9 +118,9 @@ namespace tool
     {
         primaryInstalls = true;
         primaryButton->setText("&Install and Restart");
-        EnablePrimary(!state.busConnected);
-        primaryButton->setToolTip(state.busConnected ? "Disconnect from the CAN bus first — installing closes CAN Commander" : QString{});
-        message->setText(state.busConnected ? QString("%1 is downloaded and verified. Disconnect from the CAN bus to install it.").arg(version)
+        EnablePrimary(!state.blocked);
+        primaryButton->setToolTip(state.blocked ? "Disconnect from the CAN bus first — installing closes CAN Commander" : QString{});
+        message->setText(state.blocked ? QString("%1 is downloaded and verified. Disconnect from the CAN bus to install it.").arg(version)
                                             : QString("%1 is downloaded and verified.").arg(version));
         ShowButtons(true, true, false, true, false);
     }
