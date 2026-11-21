@@ -93,7 +93,7 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     FetchContent_Declare(
         ui
         GIT_REPOSITORY https://github.com/embedded-pro/ui-cpp.git
-        GIT_TAG        b078cb39836874d505508937c4f476987115c9d9
+        GIT_TAG        05688798bb9624829e7ae78b2f2b2c7269110930
         SYSTEM
     )
     FetchContent_MakeAvailable(ui)
