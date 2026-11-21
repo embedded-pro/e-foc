@@ -10,4 +10,5 @@ target_link_libraries(e_foc.tool.can_commander.support_test PUBLIC
 target_sources(e_foc.tool.can_commander.support_test PRIVATE
     TestFirmwarePack.cpp
     TestQtEventDispatcher.cpp
+    TestUpdateProducts.cpp
 )

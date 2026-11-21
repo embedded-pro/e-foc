@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.24.0
+version: 0.25.0
 component: "tool-can-commander"
 date: 2026-11-10
 ---
@@ -12,7 +12,7 @@ date: 2026-11-10
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.24.0               |
+| Version   | 0.25.0               |
 | Component | tool-can-commander   |
 | Date      | 2026-11-10           |
 
@@ -63,8 +63,10 @@ The tool is split so that everything but widget layout can be tested without a d
   Closing the bus ends every pending command and reports every node offline at once. The client also reads
   each compatible node: its status every second and after every accepted command, because the controller
   sends its status only when asked, and its settings (Part J).
-- **Support** — application identity, the issue log, the bug-report builder, the release feed reader, the
-  update checker, and the bridge that runs the embedded-infrastructure event loop and timers on the GUI thread.
+- **Support** — application identity, the firmware-pack lookup, and the bridge that runs the
+  embedded-infrastructure event loop and timers on the GUI thread. The issue log, the bug-report builder, the
+  release feed reader, the update checker and installer, and the update banner with the flow behind it (Part G)
+  are ui-cpp's (`ui/backend/qt/update`), configured with the tool's name, version and pages.
 - **Presentation** — the window, one panel per motor, the overview row and the status bar. Widgets only
   display; they do not decide.
 

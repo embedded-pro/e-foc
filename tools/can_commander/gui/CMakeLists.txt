@@ -51,8 +51,6 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     SettingsPage.cpp
     TelemetryPanel.hpp
     TelemetryPanel.cpp
-    UpdateBanner.hpp
-    UpdateBanner.cpp
 )
 
 set_target_properties(e_foc.tool.can_commander.gui PROPERTIES

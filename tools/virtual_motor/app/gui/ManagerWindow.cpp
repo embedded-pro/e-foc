@@ -213,12 +213,7 @@ namespace virtual_motor::app
     void ManagerWindow::ReportIssue()
     {
         issueLog.Write(tool::IssueSeverity::info, "Opening a pre-filled issue report in the browser");
-        const auto environment = tool::CurrentIssueEnvironment(tool::IssueProduct{ displayName, "Virtual Motor" }, ToQt(tool::application::version), issueLog.FilePath());
-        const auto url = tool::BuildIssueUrl(QUrl{ ToQt(tool::application::newIssueUrl) }, environment, issueLog.RecentLines(60));
-        if (!QDesktopServices::openUrl(url))
-            QMessageBox::warning(this, "Report Issue",
-                QString("Could not open a web browser.\n\nPlease report the issue at %1 and attach the log file:\n%2")
-                    .arg(ToQt(tool::application::newIssueUrl), QDir::toNativeSeparators(issueLog.FilePath())));
+        tool::OpenIssueReport(tool::VirtualMotorProduct(), issueLog, this);
     }
 
     void ManagerWindow::OpenLogFolder()

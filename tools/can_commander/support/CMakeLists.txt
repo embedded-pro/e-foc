@@ -10,6 +10,7 @@ target_link_libraries(e_foc.tool.can_commander.support PUBLIC
     Qt6::Network
     infra.event
     ui.backend.qt.update
+    ui.backend.qt.update_widgets
 )
 
 target_compile_definitions(e_foc.tool.can_commander.support PUBLIC
