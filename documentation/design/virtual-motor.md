@@ -2,9 +2,9 @@
 title: "Virtual Motor Design"
 type: design
 status: draft
-version: 0.12.0
+version: 0.12.1
 component: "virtual-motor"
-date: 2026-11-19
+date: 2026-11-21
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-19
 | Title     | Virtual Motor Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.12.0               |
+| Version   | 0.12.1               |
 | Component | virtual-motor        |
-| Date      | 2026-11-19           |
+| Date      | 2026-11-21           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -285,15 +285,20 @@ was computed from. That lag sits inside the motor's own fast mechanical loop: wh
 the rotor on a stiff electrical spring, a torque that reaches the shaft's speed late acts as negative
 damping, so the rotor rings and the alignment can fail. The motor therefore closes the gap itself. With
 the speed, the machine sends the control period of the sample it used (a window's first period plus its
-periods minus one), the electrical torque it used, and the shaft's apparent inertia $J$. In every
-control period $n$ the shaft is driven, its speed is
+periods minus one), the shaft's apparent inertia $J$, and the load torque $\tau_{load}$ it found on the
+shaft at that sample: the electrical torque it used less what accelerated $J$ in its own solve, so the
+torque that would have left the shaft's speed unchanged. In every control period $n$ the shaft is driven,
+its speed is
 
 $$
-\omega(n) = \omega_{sent} + \frac{\Delta t}{J} \sum_{k_{used} < k < n} \left(\tau_e(k) - \tau_{used}\right)
+\omega(n) = \omega_{sent} + \frac{\Delta t}{J} \sum_{k_{used} < k < n} \left(\tau_e(k) - \tau_{load}\right)
 $$
 
 where $\tau_e(k)$ is the electrical torque of the Data Model in period $k$ and $\Delta t$ is one control
-period: the speed the machine would have reached had it seen every torque since its sample. The motor
+period: the speed the machine would have reached had it seen every torque since its sample while the load
+stayed as it was. A machine that sends the electrical torque it used in place of the load stops the
+shaft's acceleration at each speed it sends, and when its next speed comes late the gap reaches the
+alignment's spring as a kick. The motor
 keeps the electrical torque of its last 1,024 control periods, and older periods add nothing; a used
 period not yet reached adds nothing either. Between two requests the sum grows by one term each period.
 The speed listed in the changes in force is the speed sent. A drive whose speed or torque is not finite,
@@ -402,7 +407,7 @@ App to motor:
 | `0x86` | Current noise   | Standard deviation in A                                                                                                                                                              |
 | `0x87` | Encoder noise   | Standard deviation in rad                                                                                                                                                            |
 | `0x88` | Clear all       | None: the plant returns to its description, the shaft released                                                                                                                       |
-| `0x89` | Shaft speed     | Drive: release (0) or drive (1), speed in rad/s, the used control period (8 bytes), the used electrical torque in N·m, the inertia in kg·m²; all sent whatever the drive             |
+| `0x89` | Shaft speed     | Drive: release (0) or drive (1), speed in rad/s, the used control period (8 bytes), the load torque in N·m, the inertia in kg·m²; all sent whatever the drive                        |
 | `0x90` | Stream          | On (1) or off (0)                                                                                                                                                                    |
 | `0x91` | Capture         | Trigger, pre-trigger share in percent, length in control periods (2 bytes, 1 to 16,384)                                                                                              |
 | `0x92` | Cancel capture  | None                                                                                                                                                                                 |
