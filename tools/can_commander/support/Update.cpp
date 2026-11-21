@@ -12,8 +12,16 @@ namespace tool
     UpdateProduct CommanderProduct()
     {
         using ui::backend::qt::ToQt;
-        return UpdateProduct{ ToQt(application::displayName), ToQt(application::name), ToQt(application::version), QUrl{ ToQt(application::latestReleaseApiUrl) },
-            QUrl{ ToQt(application::releasesUrl) }, QUrl{ ToQt(application::newIssueUrl) }, UserAgent(), "Disconnect from the CAN bus" };
+        UpdateProduct product;
+        product.displayName = ToQt(application::displayName);
+        product.shortName = ToQt(application::name);
+        product.version = ToQt(application::version);
+        product.feedUrl = QUrl{ ToQt(application::latestReleaseApiUrl) };
+        product.releasesUrl = QUrl{ ToQt(application::releasesUrl) };
+        product.newIssueUrl = QUrl{ ToQt(application::newIssueUrl) };
+        product.userAgent = UserAgent();
+        product.blockedAction = "Disconnect from the CAN bus";
+        return product;
     }
 
     UpdateProduct VirtualMotorProduct()
