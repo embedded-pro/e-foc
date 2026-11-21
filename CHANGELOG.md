@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.0.0](https://github.com/embedded-pro/e-foc/compare/v3.0.0...v4.0.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **position:** a position setpoint is no longer taken modulo one turn unless positionCircular is set, and the reported position counts turns.
+
+### Features
+
+* **position:** Multi-turn position, linear by default, with a circular mode ([#718](https://github.com/embedded-pro/e-foc/issues/718)) ([401d0c7](https://github.com/embedded-pro/e-foc/commit/401d0c7b6c40396922948ffc894f35f9e8c8c4c3))
+* **virtual_motor:** A virtual motor reads a text plant description ([#723](https://github.com/embedded-pro/e-foc/issues/723)) ([e4b2d84](https://github.com/embedded-pro/e-foc/commit/e4b2d84529f6b52506823a90e077f215db86af93))
+* **virtual_motor:** Compensate the shaft drive for the sender's lag ([#725](https://github.com/embedded-pro/e-foc/issues/725)) ([586f7c9](https://github.com/embedded-pro/e-foc/commit/586f7c9dd29029c556d88fe8ae34b7467a9ea228))
+* **virtual_motor:** Drive the shaft at a speed sent over the plant port ([#724](https://github.com/embedded-pro/e-foc/issues/724)) ([d71ea8e](https://github.com/embedded-pro/e-foc/commit/d71ea8e75d40aa6a3ba56ee75e783fb13a9033ae))
+
+
+### Bug Fixes
+
+* **virtual_motor:** Can-lite with the virtual hub fixes ([#720](https://github.com/embedded-pro/e-foc/issues/720)) ([0984eec](https://github.com/embedded-pro/e-foc/commit/0984eec6d65c987242e9e3c2ce22051c265137d4))
+
+
+### Build System
+
+* **deps:** Bump infra/hal/st from `36ca0ac` to `079cb3b` ([#721](https://github.com/embedded-pro/e-foc/issues/721)) ([0948390](https://github.com/embedded-pro/e-foc/commit/09483908a0a1c335466fac2f812371bb10c0f002))
+* **deps:** Bump the patch-minor-action-updates group with 2 updates ([#722](https://github.com/embedded-pro/e-foc/issues/722)) ([279cd70](https://github.com/embedded-pro/e-foc/commit/279cd704746e36ab86712f85bc9a485510800f48))
+
 ## [3.0.0](https://github.com/embedded-pro/e-foc/compare/v2.0.1...v3.0.0) (2026-11-12)
 
 
