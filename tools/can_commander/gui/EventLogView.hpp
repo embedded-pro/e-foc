@@ -1,7 +1,7 @@
 #pragma once
 
 #include "can-lite/drivers/interface/CanBusAdapter.hpp"
-#include "tools/can_commander/support/IssueLog.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include <QCheckBox>
 #include <QPlainTextEdit>
 #include <QWidget>

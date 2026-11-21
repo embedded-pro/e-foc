@@ -7,7 +7,7 @@
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "tools/can_commander/logic/RecoveryAdvice.hpp"
-#include "tools/can_commander/support/IssueLog.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QLabel>
 #include <QMessageBox>

@@ -8,9 +8,7 @@
 #include "tools/can_commander/gui/UpdateBanner.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
-#include "tools/can_commander/support/IssueLog.hpp"
-#include "tools/can_commander/support/UpdateChecker.hpp"
-#include "tools/can_commander/support/UpdateSession.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include <QAction>
 #include <QLabel>
 #include <QMainWindow>

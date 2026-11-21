@@ -1,6 +1,6 @@
 #include "tools/virtual_motor/app/gui/ManagerWindow.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
-#include "tools/can_commander/support/IssueReport.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include "tools/virtual_motor/app/gui/AddMotorDialog.hpp"
 #include "tools/virtual_motor/app/gui/MotorWindow.hpp"
 #include "tools/virtual_motor/app/logic/MotorText.hpp"

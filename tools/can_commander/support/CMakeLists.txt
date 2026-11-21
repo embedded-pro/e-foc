@@ -9,6 +9,7 @@ target_link_libraries(e_foc.tool.can_commander.support PUBLIC
     Qt6::Core
     Qt6::Network
     infra.event
+    ui.backend.qt.update
 )
 
 target_compile_definitions(e_foc.tool.can_commander.support PUBLIC
@@ -17,26 +18,10 @@ target_compile_definitions(e_foc.tool.can_commander.support PUBLIC
 
 target_sources(e_foc.tool.can_commander.support PRIVATE
     ApplicationInfo.hpp
-    IssueLog.hpp
-    IssueLog.cpp
-    IssueReport.hpp
-    IssueReport.cpp
     QtEventDispatcher.hpp
     QtEventDispatcher.cpp
-    ReleaseFeed.hpp
-    ReleaseFeed.cpp
-    ReleaseVersion.hpp
-    ReleaseVersion.cpp
-    UpdateChecker.hpp
-    UpdateChecker.cpp
-    UpdateDownloader.hpp
-    UpdateDownloader.cpp
-    UpdateInstallation.hpp
-    UpdateInstallation.cpp
-    UpdateInstaller.hpp
-    UpdateInstaller.cpp
-    UpdateSession.hpp
-    UpdateSession.cpp
+    Update.hpp
+    Update.cpp
 )
 
 set_target_properties(e_foc.tool.can_commander.support PROPERTIES

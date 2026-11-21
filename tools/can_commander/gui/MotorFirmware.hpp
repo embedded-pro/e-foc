@@ -4,9 +4,7 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "tools/can_commander/logic/FirmwarePack.hpp"
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
-#include "tools/can_commander/support/IssueLog.hpp"
-#include "tools/can_commander/support/ReleaseFeed.hpp"
-#include "tools/can_commander/support/UpdateDownloader.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include <QElapsedTimer>
 #include <QObject>
 #include <QString>
@@ -90,7 +88,7 @@ namespace tool
         Reporter reporter;
         Reason commandsUnavailable;
         QWidget* dialogParent;
-        UpdateDownloader downloader;
+        UpdateDownloader downloader{ UserAgent() };
 
         std::optional<FirmwareIdentity> identity;
         std::optional<ReleaseInfo> latestRelease;

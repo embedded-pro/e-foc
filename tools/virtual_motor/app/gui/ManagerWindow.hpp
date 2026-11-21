@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/can_commander/support/IssueLog.hpp"
+#include "tools/can_commander/support/Update.hpp"
 #include "tools/virtual_motor/app/logic/Rig.hpp"
 #include <QMainWindow>
 #include <QPointer>
