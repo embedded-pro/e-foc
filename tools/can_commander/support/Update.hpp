@@ -9,6 +9,7 @@
 #include "ui/backend/qt/update/UpdateInstallation.hpp"
 #include "ui/backend/qt/update/UpdateInstaller.hpp"
 #include "ui/backend/qt/update/UpdateSession.hpp"
+#include "ui/backend/qt/update/widgets/UpdateAssistant.hpp"
 #include <QByteArray>
 
 namespace tool
@@ -27,18 +28,23 @@ namespace tool
     using ui::backend::qt::update::IssueLog;
     using ui::backend::qt::update::IssueProduct;
     using ui::backend::qt::update::IssueSeverity;
+    using ui::backend::qt::update::OpenIssueReport;
     using ui::backend::qt::update::ParseLatestRelease;
     using ui::backend::qt::update::ReleaseInfo;
     using ui::backend::qt::update::ReleaseVersion;
+    using ui::backend::qt::update::UpdateAssistant;
     using ui::backend::qt::update::UpdateChecker;
     using ui::backend::qt::update::UpdateDownloader;
     using ui::backend::qt::update::UpdateInstaller;
     using ui::backend::qt::update::UpdatePhase;
+    using ui::backend::qt::update::UpdateProduct;
     using ui::backend::qt::update::UpdateSession;
     using ui::backend::qt::update::UpdateState;
     using ui::backend::qt::update::UpdateStatus;
 
     QByteArray UserAgent();
+    UpdateProduct CommanderProduct();
+    UpdateProduct VirtualMotorProduct();
 
     std::optional<InstallerAsset> FirmwarePackFor(const ReleaseInfo& release, const QString& boardName);
 }

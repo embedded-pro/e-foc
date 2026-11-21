@@ -102,7 +102,7 @@ if (NOT E_FOC_EMBEDDED_BUILD)
     # so they would otherwise inherit a policy that is ours and not a dependency's.
     foreach(fetched
         ui.core ui.theme ui.model ui.shell ui.charts ui.scope ui.scene ui.widgets
-        ui.terminal ui.backend.recording ui.backend.qt ui.backend.qt.update)
+        ui.terminal ui.backend.recording ui.backend.qt ui.backend.qt.update ui.backend.qt.update_widgets)
         if (TARGET ${fetched})
             set_target_properties(${fetched} PROPERTIES COMPILE_WARNING_AS_ERROR Off)
         endif()

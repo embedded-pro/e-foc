@@ -5,7 +5,6 @@
 #include "tools/can_commander/gui/EventLogView.hpp"
 #include "tools/can_commander/gui/MotorOverview.hpp"
 #include "tools/can_commander/gui/MotorPanel.hpp"
-#include "tools/can_commander/gui/UpdateBanner.hpp"
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "tools/can_commander/logic/FirmwareTransfer.hpp"
 #include "tools/can_commander/support/Update.hpp"
@@ -82,11 +81,7 @@ namespace tool
         QWidget* BuildMotorArea();
         QWidget* BuildEmptyState();
         void ConnectSignals();
-        void ConnectUpdateChecker();
-        void ConnectUpdateSession();
-        void OnUpdateStateChanged(const UpdateState& state);
-        void RequestUpdateInstall();
-        void RestartForUpdate();
+        void ConnectUpdates();
         void RelaunchUpdatedVersion();
         void RestoreSettings();
         void SaveSettings() const;
@@ -104,7 +99,6 @@ namespace tool
         void UpdateSafetyControls();
         void UpdateStatusBar();
 
-        void CheckForUpdates(bool userInitiated);
         void ReportIssue();
         void OpenLogFolder();
         void ShowAbout();
@@ -116,10 +110,8 @@ namespace tool
         IssueLog& issueLog;
         CanCommandClient client;
         FirmwareTransfer transfer{ client };
-        UpdateChecker updateChecker;
-        UpdateSession updateSession;
+        UpdateAssistant updates;
 
-        UpdateBanner* updateBanner{ nullptr };
         ConnectionPanel* connectionPanel{ nullptr };
         QPushButton* emergencyStopButton{ nullptr };
         MotorOverview* overview{ nullptr };
@@ -138,13 +130,10 @@ namespace tool
         QAction* automaticUpdatesAction{ nullptr };
 
         QTimer rxPollTimer;
-        QTimer automaticUpdateTimer;
         QSocketNotifier* socketNotifier{ nullptr };
 
         std::map<uint16_t, MotorPanel*> motors;
         std::optional<ReleaseInfo> latestRelease;
         bool busConnected{ false };
-        bool userRequestedUpdateCheck{ false };
-        UpdatePhase updatePhase{ UpdatePhase::idle };
     };
 }
