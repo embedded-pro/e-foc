@@ -25,11 +25,6 @@ date: 2026-10-29
 - Specifying when and how `HasPendingAsyncWork()` must be extended to reflect all active async operations
 - Documenting the invariant that the `AccessedBySharedPtr` control block relies on, and how the codebase maintains it
 
-**Is NOT responsible for:**
-- Real-time ISR paths — this pattern applies only to work dispatched through the main event loop
-- General shared-ownership semantics unrelated to async scheduling
-- Heap-allocated object management (this pattern is exclusively for stack- and statically-allocated objects)
-
 ---
 
 ## Background: The Use-After-Free Risk

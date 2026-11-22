@@ -56,7 +56,7 @@ CAN bridge's `FirmwareUpgradeInterlock` implements `services::FirmwareUpgradeHol
   `Ready`, with nothing outstanding.
 - Erasing the whole staging slot before a download starts, then writing the received pack into it.
 - Checking the pack on Verify: its CRC-32 (the specification's section 4.3), and that its header names this
-  board and this microcontroller and an application image that fits the application slot.
+  board and an application image that fits the application slot.
 - Keeping a checked pack staged until Activate, Abort or the next Begin, and recording it in the status
   journal so a restart keeps it.
 - On Activate, recording *ready to deploy* in the status journal and restarting the controller.
@@ -64,15 +64,6 @@ CAN bridge's `FirmwareUpgradeInterlock` implements `services::FirmwareUpgradeHol
 - Ending a download in progress on the emergency stop.
 - Reporting the running firmware version, the board and the version of a staged pack over the FOC motor
   contract (2.6, Part H).
-
-**Is NOT responsible for:**
-- Verifying the pack's signature, decrypting it, or reading the microcontroller identity inside the image.
-  The bootloader does all three before it erases anything (`bootloader.md` Part I).
-- Choosing a firmware version, where it comes from, or when to download or apply it. The user does, through a
-  client.
-- Keeping the previous firmware. The bootloader overwrites it when it installs the new one.
-- Updating a board without a bootloader: the ST boards until they have one
-  (`bootloader.md` Part A, Part I below).
 
 ---
 
@@ -127,8 +118,8 @@ An accepted Begin erases the status journal, which discards a pack that was stag
 staging slot, one sector per event-loop turn, and only then answers. Each sector is read back after its erase,
 a chunk per turn, and a byte that does not read erased ends the download: the flash drivers report no error of
 their own, so the read-back is how the service sees a failed erase. The download therefore starts on a slot
-that is known to be erased: 16 sectors on the EK-TM4C1294XL, whatever the pack's size. The answer carries the
-page size, the number of bytes the service collects before it programs them: 128 on the TI board and 256 on
+that is known to be erased: 16 sectors on the reference board, whatever the pack's size. The answer carries the
+page size, the number of bytes the service collects before it programs them: 128 on the reference board and 256 on
 the emulated board (Part I).
 
 - An erase that fails, or a sector that does not read back erased, is answered `WriteError`, and the session
@@ -147,7 +138,7 @@ the emulated board (Part I).
   erased, and read back and compared with what was sent before its last block is acknowledged; nothing is
   erased while blocks arrive, so each block costs at most one page program and one read (Part G).
 - A page that does not read back as programmed is answered `WriteError` and the session goes to Error; the
-  client starts the download again with Begin. The page is not written a second time, because the ST internal
+  client starts the download again with Begin. The page is not written a second time, because some internal
   flash cannot program a unit twice without erasing it, and a second Begin erases the staging slot again.
 - A block that would take the download past the size given in Begin is answered `InvalidSize`.
 - A block that fills a page is acknowledged once the page is programmed. A command that arrives while a page
@@ -163,14 +154,14 @@ checks:
 1. the CRC-32 of exactly the Begin size, in the variant the `can-lite` specification fixes (section 4.3),
    against the value Verify carries; otherwise `CrcMismatch`;
 2. the pack header, as far as it can be read without the key: the magic, header version 1, a product name
-   equal to this firmware's own, which names the board and the microcontroller part (`bootloader.md` Part B),
+   equal to this firmware's own, which names the board and its processor part (`bootloader.md` Part B),
    a product version of three decimal numbers from 0 to 255, major, minor and patch, separated by dots
    (Part H), and one image whose target is the application, which ends the pack, and whose length, less its
    image header and its AES counter, fits the application slot less its descriptor; otherwise `NotReady`, the
    specification's answer for "no application". The image's destination and exact size are encrypted; the
    bootloader checks them before it erases anything (`bootloader.md` Parts C and I).
 
-A pack built for another microcontroller, an STM32 pack sent to a Tiva board for example, names another part
+A pack built for another board names another part
 and fails the second check; the bootloader would refuse it again (`bootloader.md` Part I). The signature is
 not checked here: the application holds no key and the bootloader checks it anyway.
 
@@ -224,10 +215,10 @@ them as the NVM design describes (`service-nvm.md`, version check).
   a download in progress (Part F).
 - **Non-volatile memory.** While a pack is received, and while Restarting, the CAN bridge answers `busy` to every
   command that writes
-  the configuration record: start-up settings, telemetry rate and fault supervision settings. On the
-  EK-TM4C1294XL the EEPROM and the flash share one controller, so a flash program and an EEPROM write must
-  never overlap; on the ST boards the rule costs nothing and keeps the behaviour the same.
-- **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes, on the TI
+  the configuration record: start-up settings, telemetry rate and fault supervision settings. Where the
+  EEPROM and the flash share one controller, as on the reference board, a flash program and an EEPROM write must
+  never overlap; elsewhere the rule costs nothing and keeps the behaviour the same.
+- **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes, on the reference
   board the instruction fetches and the watchdog's early-warning handler included, and the hardware resets
   25 ms after a warning its handler has not cleared. A 16 KB erase takes about 17 ms on the bench and up to
   40 ms with wear, so an erase in the half the application executes from cannot be made safe by splitting
@@ -235,7 +226,7 @@ them as the NVM design describes (`service-nvm.md`, version check).
   where their erases run while the core keeps executing. The service erases one sector per event-loop turn
   and programs one page at a time, so the watchdog's own 100 ms expiry is never approached. Those turns
   follow each other with nothing else scheduled between them, so from an accepted Begin to its answer the
-  node sends nothing, its heartbeat included: 0.68 s on the EK-TM4C1294XL for the 21 sectors with their
+  node sends nothing, its heartbeat included: 0.68 s on the reference board for the 21 sectors with their
   read-back. The design bounds that silence at 1 s, one heartbeat interval and a third of the 3 s after
   which a client reports the node offline, and the hardware apply scenario's `[METRIC]` line, Begin to
   answer, measures it.
@@ -251,22 +242,21 @@ application header (`bootloader.md` Part B), the project's release version; the 
 version in the staged pack's header, which Verify requires to read as three numbers from 0 to 255, the range
 the parameters carry (Part D). Every board reports its version and its kind, also one that cannot be updated.
 A board kind maps to the
-board and microcontroller its packs name (`bootloader.md` Part B), so a client picks the pack for the board it
+board its packs name (`bootloader.md` Part B), so a client picks the pack for the board it
 talks to and shows what waits to be applied.
 
 The firmware answers the running version and the board kind (`0xB1`–`0xB4`) from the version header EmIL
 generates from the CMake project version (`generated/Version.h`, target `e_foc.version_header`) and from `PlatformFactory::GetBoardKind()`, which returns the kind of the board the build is for, from the header the build generates from the board definitions (`bootloader.md` Part B); the staged-version
-parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board kinds: `EK-TM4C1294XL 1`, `NUCLEO-G474RE 2`,
-`NUCLEO-H563ZI 3`, emulated `5`, unknown `0`; `4` was the EK-TM4C123GXL, whose support was dropped, and is never reused.
+parameters (`0xB5`–`0xB7`) from the version the service holds staged. Board kinds are numbers: `1` is the reference board, `2` and `3` further boards, emulated `5`, unknown `0`; `4` was a
+board whose support was dropped, and is never reused.
 
 ### Part I — per board
 
-| Board         | Staging flash                                                     | Page  | Pack capacity |
-|---------------|-------------------------------------------------------------------|-------|---------------|
-| EK-TM4C1294XL | internal flash, staging region of `bootloader.md`                 | 128 B | 327 680 B     |
-| Emulated      | file `staging.bin` in the scenario directory                      | 256 B | 327 680 B     |
-| NUCLEO-H563ZI | none until it has a bootloader; then internal flash, bank 2       | —     | 0             |
-| NUCLEO-G474RE | none until it has a bootloader; then SPI NOR (`bootloader.md` Q1) | —     | 0             |
+| Board                        | Staging flash                                     | Page  | Pack capacity |
+|------------------------------|---------------------------------------------------|-------|---------------|
+| Reference board              | internal flash, staging region of `bootloader.md` | 128 B | 327 680 B     |
+| Emulated                     | file `staging.bin` in the scenario directory      | 256 B | 327 680 B     |
+| Board with no bootloader yet | none until it has a bootloader                    | —     | 0             |
 
 A board without a staging slot still answers the category: Begin with `InvalidSize`, Verify with
 `InvalidState`, Activate with `NotReady`.
@@ -287,7 +277,7 @@ beside the existing firmware archives (`.github/workflows/release-please.yml`):
 | Asset                                                    | Content                                                                                                 |
 |----------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
 | `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends                                                                |
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the application with its image descriptor, for a debugger; the name the reference board's image already had |
 | `e_foc-firmware-<board>-bootloader-<tag>.hex`            | the bootloader with the release key set, for a debugger, which programs it beside the application       |
 
 The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name,
@@ -302,10 +292,10 @@ continuous integration on every pull request, so the step a release takes is the
 | Level                | What it shows                                                                                                                                                                                                                                                                                                                                          | Requirements                                       |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
 | Unit tests           | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                                                                                  | REQ-FWU-002, REQ-FWU-003, REQ-FWU-004, REQ-FWU-005 |
-| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong microcontroller, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                      | supports REQ-FWU-001, REQ-FWU-002                  |
+| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong target, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                      | supports REQ-FWU-001, REQ-FWU-002                  |
 | Software in the loop | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader                                                             | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005              |
 | Software in the loop | The emulated bootloader's own scenarios: install, interrupted install repeated, a downloaded pack left alone, refusals for a bad signature, another product, another board and another destination, a damaged or empty slot halting it (`software-in-the-loop.md` Part P)                                                                              | REQ-FWU-001, REQ-FWU-002                           |
-| Hardware in the loop | Download, run, stop, apply and restart on the EK-TM4C1294XL, the version read back (`@hil_motor`)                                                                                                                                                                                                                                                      | REQ-FWU-002, REQ-FWU-003                           |
+| Hardware in the loop | Download, run, stop, apply and restart on the reference board, the version read back (`@hil_motor`)                                                                                                                                                                                                                                                      | REQ-FWU-002, REQ-FWU-003                           |
 | CAN Commander tests  | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a StrictMock bus; the tab's download and apply enabled only for a stopped motor with its identity read, no command pending and no other transfer on the bus, and sent only after the user's confirmation, against the tab's own buttons | REQ-FWU-004                                        |
 
 The hardware scenario downloads the application it runs, as a pack signed with the development key set,
@@ -363,7 +353,7 @@ stateDiagram-v2
     Receiving --> Error : flash write failed
     Receiving --> Idle : Abort, emergency stop or 30 s without a command
     Verifying --> Idle : Abort or emergency stop
-    Verifying --> Staged : CRC, board and microcontroller match
+    Verifying --> Staged : CRC and board match
     Verifying --> Error : CRC or header mismatch
     Staged --> Staged : drive runs, controller restarts
     Staged --> Restarting : Activate, drive stopped and idle
@@ -440,19 +430,9 @@ sequenceDiagram
 | Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                                       |
 | Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                                              |
 | Inactivity deadline | 30 s after the last accepted command while a pack is received, the service's own; none for a staged pack                                           |
-| Flash stall         | one sector erase or one page program per event-loop turn; from Begin to its answer the node is silent, 0.68 s on the EK-TM4C1294XL and at most 1 s |
+| Flash stall         | one sector erase or one page program per event-loop turn; from Begin to its answer the node is silent, 0.68 s on the reference board and at most 1 s |
 | Drive               | stopped while a pack is received; free to run while a pack is staged; the emergency stop always accepted, and it ends a download                   |
 | NVM writes          | refused with `busy` while a pack is received                                                                                                       |
 | One pack per node   | a second Begin while one is received is answered `Busy`; a Begin while one is staged replaces it                                                   |
-| Target              | a pack names one board and one microcontroller part; any other is refused at Verify                                                                |
-| Boards              | EK-TM4C1294XL and the emulated target; the ST boards once they have a bootloader                                                                   |
-
----
-
-## Open Questions
-
-| # | Question                                                                                       | Options                                                                    | Status                                                                                                                                                           |
-|---|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Should the transfer acknowledge a window of blocks at a time, as the specification suggests?   | `can-lite` extension (section 7.2) / one block in flight (current)         | open                                                                                                                                                             |
-| 2 | Which tool builds the packs in the release workflow? The library's pack builder needs mbedTLS. | The library's pack builder in a host build with mbedTLS / a script of ours | resolved: the library's pack builder, which now runs on tiny-AES and micro-ecc without mbedTLS (embedded-infra-lib#192), through the image tool's `pack` command |
-| 3 | Should the emergency stop also abort a download in progress?                                   | Abort on emergency stop / leave the download open                          | resolved: the emergency stop ends a download in progress (Part F)                                                                                                |
+| Target              | a pack names one board and one processor part; any other is refused at Verify                                                                |
+| Boards              | The reference board and the emulated target; other boards once they have a bootloader                                                                   |

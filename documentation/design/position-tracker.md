@@ -37,12 +37,6 @@ date: 2026-11-15
 - Starting the count again at turn 0 whenever the drive sets the position zero
 - Reporting the multi-turn position to the CAN telemetry
 
-**Is NOT responsible for:**
-- The angle within the turn and the position zero — the platform's encoder keeps both
-- Counting turns while the position cascade runs — the cascade counts them at its 1 kHz tick
-- Interpreting a position setpoint, linear or circular — the position cascade and the CAN bridge do that
-- Keeping the count across a power cycle — it starts at turn 0 at every power-up
-
 ---
 
 ## Component Details

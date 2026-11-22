@@ -35,15 +35,6 @@ date: 2026-11-10
   steps the user starts separately, download and apply, each only while that motor is stopped (Part M).
 - Shipping as a branded, installable product ("e-foc CAN Commander") for Windows and Debian-based Linux.
 
-**Is NOT responsible for:**
-- Deciding whether a command is safe. The firmware validates every setpoint and state transition; the tool
-  only keeps its input ranges inside what the firmware accepts.
-- Replacing the hardware emergency stop. The on-screen emergency stop is a CAN command and needs a working bus.
-- Coordinating motors with each other (synchronised moves, shared setpoints). Each motor is commanded on its own.
-- Sending anything to the network on its own other than the release check. Bug reports open in the
-  browser for the user to review and submit.
-- Checking a firmware pack's signature or decrypting it. The controller's bootloader does (`bootloader.md`).
-
 ---
 
 ## Component Details
@@ -503,18 +494,17 @@ nothing more.
   board, so the tab explains that and offers nothing. A node that reports its version but refuses the staged
   version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade service: the tab
   says that this firmware cannot be updated over CAN and offers no download. Only a board with a bootloader can
-  be updated, today the EK-TM4C1294XL and the emulated board; for any other the tab says that the board has no
+  be updated, today the reference board and the emulated board; for any other the tab says that the board has no
   bootloader to install a pack.
-- **The right board and microcontroller.** A release pack is downloaded with visible progress into the
+- **The right board.** A release pack is downloaded with visible progress into the
   per-user cache, in its `firmware` folder, and checked against the size and SHA-256 digest GitHub records for the asset, as
   the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
   opened, is read before it is offered: its magic, its header version, a size the staging slot holds (320 KB),
   a product name that is the board identification of the board the node reports (`bootloader.md` Part B),
-  which names that board and its microcontroller, a product version of three numbers from 0 to 255, and the one
+  which names that board, a product version of three numbers from 0 to 255, and the one
   application image that ends the pack, as the controller checks them (`service-firmware-upgrade.md` Part D).
   The tool knows every board's identification from the same header the firmware is built with. A pack for
-  another board or another microcontroller, an STM32 pack for a Tiva board for example, is not offered, and
-  the tab names both. The controller and its bootloader check again (`bootloader.md` Part I); the tool does not
+  another board is not offered, and the tab names both. The controller and its bootloader check again (`bootloader.md` Part I); the tool does not
   check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
   motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
@@ -547,7 +537,7 @@ nothing more.
   failed update that needs a debugger to recover.
 - **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
   wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
-  microcontroller, and nothing was staged; *Try Again*, offered after a failed or abandoned download only, asks
+  processor, and nothing was staged; *Try Again*, offered after a failed or abandoned download only, asks
   the download's confirmation again and restarts it from the beginning. A failed apply offers no *Try Again*:
   the node's state decides what the tab offers next. `NotReady` on Activate means no pack is staged on the
   controller. `InvalidState` on a block or Verify means the controller ended the download first, by an
@@ -567,7 +557,7 @@ nothing more.
 stateDiagram-v2
     [*] --> Current
     Current --> Available : newer release for the board, or a pack opened
-    Available --> Available : pack for another board or microcontroller, not offered
+    Available --> Available : pack for another board, not offered
     Available --> Downloading : Download to Controller… confirmed, motor stopped
     Downloading --> Downloading : block acknowledged, or resent after Query Progress
     Downloading --> Available : Cancel (Abort sent), or emergency stop sent
@@ -752,7 +742,7 @@ sequenceDiagram
     participant Node as Motor controller
     User->>Tool: Download to Controller… (motor stopped)
     Tool->>Feed: Download the board's pack (progress)
-    Tool->>Tool: Check size and SHA-256, board and microcontroller in the pack header
+    Tool->>Tool: Check size and SHA-256, board in the pack header
     Tool-->>User: Confirm: motor, version, motor stays stopped, nothing installed yet
     User->>Tool: Download
     Tool->>Node: Begin (size)
@@ -817,15 +807,5 @@ sequenceDiagram
 | Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                             |
 | Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB |
 | Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                |
-| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version; the EK-TM4C1294XL takes about 10 s (`bootloader.md` Constraints)               |
+| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version; the reference board takes about 10 s (`bootloader.md` Constraints)               |
 | Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                        |
-
----
-
-## Open Questions
-
-| # | Question                                                                                                                    | Options                                                  | Status |
-|---|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|--------|
-| 1 | Should the theme dim role-coloured buttons when disabled, so Start/Stop can carry their colours again?                      | Change the shared theme / keep default buttons           | open   |
-| 2 | Should the torque setpoint limit follow each board's maximum current from telemetry instead of the firmware command limit?  | Decode the maximum current field / keep the static limit | open   |
-| 3 | Should the emergency stop also go out as one broadcast frame, so motors without a tab are reached in a single transmission? | Broadcast plus per-node commands / per-node only         | open   |

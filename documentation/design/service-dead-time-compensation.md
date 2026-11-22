@@ -30,7 +30,7 @@ date: 2026-10-23
 
 A leg of the bridge does not deliver its duty. Between one switch turning off and the other turning
 on, the phase current alone decides where the switch node goes, and the leg loses voltage against
-the current's sign (`documentation/verification_and_validation/software-in-the-loop.md`, Part L). On E-FOC-HARDWARE the
+the current's sign (`documentation/verification_and_validation/software-in-the-loop.md`, Part L). On the reference board the
 loss is about 0.2 % of the period once the current passes about 0.2 A, and below that it shrinks in
 proportion to the current. At small currents the winding therefore sees about 0.17 Ω more than it
 has, which is why the online resistance estimate reads about 20 % high on the rig.
@@ -39,10 +39,6 @@ has, which is why the online resistance estimate reads about 20 % high on the ri
 - Correcting every duty the drive commands by the loss its leg's current will cause
 - Removing the sensors' offsets from every phase current on the way in (`service-current-offsets.md`)
 - Passing start, stop, the base frequency and the current limit through unchanged
-
-**Is NOT responsible for:**
-- Measuring the loss, which the board states (Part C)
-- Making a held duty follow the current, which is the procedure's job (Part D)
 
 ---
 
@@ -93,16 +89,16 @@ ones the offset correction needs anyway.
 
 ### Part C — The numbers
 
-| Board          | Dead band | Effective dead time  | Knee                 |
-|----------------|-----------|----------------------|----------------------|
-| E-FOC-HARDWARE | 500 ns    | 70 ns                | 0.2 A                |
-| E-FOC-HARDWARE | any other | none                 | none                 |
-| FRDM-MC-LVPMSM | any       | none                 | none                 |
-| Emulated       | any       | as the scenario says | as the scenario says |
+| Board           | Dead band | Effective dead time  | Knee                 |
+|-----------------|-----------|----------------------|----------------------|
+| Reference board | 500 ns    | 70 ns                | 0.2 A                |
+| Reference board | any other | none                 | none                 |
+| Other boards    | any       | none                 | none                 |
+| Emulated        | any       | as the scenario says | as the scenario says |
 
 A board with no figure for the dead band it runs reports none, and its duties pass unchanged.
 
-E-FOC-HARDWARE's figure comes from a sweep on the rig at 24 V. One leg was stepped from 50 % in
+The reference board's figure comes from a sweep on the rig at 24 V. One leg was stepped from 50 % in
 single PWM counts, from 1 to 150 of 1500, in both directions, with the other two legs at 50 %. Each
 point averaged 8000 offset-corrected samples, and the rotor did not move. Through the 500 ns band
 the winding read 1.02 to 1.06 Ω above 1 A. The saturated loss was 0.12 to 0.16 % of the period,

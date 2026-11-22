@@ -67,11 +67,6 @@ motor-controller scenario on hardware is tagged `@hil_motor`.
 - Encoding commands and decoding telemetry on the product's wire format
 - Describing the simulated world a software-in-the-loop target runs in
 
-**Is NOT responsible for:**
-- Control algorithm correctness in the small — that is what the unit tests under each library cover
-- CAN framing and payload layout — that is the wire contract tests' job
-- Substituting for hardware-in-the-loop, which alone exercises silicon, timing and analogue paths
-
 ---
 
 ## Component Details

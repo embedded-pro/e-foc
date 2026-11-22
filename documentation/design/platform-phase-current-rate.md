@@ -40,8 +40,6 @@ place that turns the platform's per-period samples into the rate a consumer asks
 - Passing the duty cycles, start, stop, the PWM frequency and the current limit through to the power
   stage unchanged.
 
-**Is NOT responsible for:**
-
 - The PWM frequency. The power stage keeps switching at the frequency it was configured with, whatever
   rate a consumer asks for.
 - Anything a platform does on every sample, such as the over-current check or the control-loop cycle
@@ -58,11 +56,11 @@ Before this component, each platform interpreted the requested rate itself, and 
 
 | Platform                   | What a slower rate did                           |
 |----------------------------|--------------------------------------------------|
-| TI                         | Re-clocked the PWM to that rate                  |
-| ST                         | Nothing; every sample was delivered              |
+| Hardware platform A        | Re-clocked the PWM to that rate                  |
+| Hardware platform B        | Nothing; every sample was delivered              |
 | Emulator and MIL simulator | Kept the PWM rate and delivered every Nth sample |
 
-On TI, alignment switched the bridge at 1 kHz and the inductance and pole-pair steps at 10 kHz, so
+On platform A, alignment switched the bridge at 1 kHz and the inductance and pole-pair steps at 10 kHz, so
 they characterised a different inverter from the one the current loop runs. The platforms are now split
 from the consumers by two interfaces:
 

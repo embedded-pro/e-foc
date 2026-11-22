@@ -36,13 +36,6 @@ date: 2026-11-06
   target, system clock, supply voltage, reset cause, and the fault record a crash left behind
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
 
-**Is NOT responsible for:**
-- Commanding the motor application. `sync_foc_sensored` has no command line: CAN is its only command
-  interface (`service-can.md`), and its serial port carries only the trace output, starting with the
-  startup banner (Part B)
-- Physical serial framing, character echo, or byte-level UART management — those are handled by the
-  `TerminalWithStorage` infrastructure component
-
 ---
 
 ## Component Details
@@ -158,7 +151,7 @@ The hardware-test application registers three additional terminal commands that 
 
 ### Asynchronous Completion
 
-All three commands are asynchronous. The terminal prompt (`>`) does not appear until the hardware operation completes and `ProcessResult` is called from the completion callback. This correctly models the interrupt-driven behaviour of the TM4C EEPROM peripheral.
+All three commands are asynchronous. The terminal prompt (`>`) does not appear until the hardware operation completes and `ProcessResult` is called from the completion callback. This correctly models the interrupt-driven behaviour of the platform's EEPROM peripheral.
 
 ### Argument Constraints
 

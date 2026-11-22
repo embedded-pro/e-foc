@@ -28,7 +28,7 @@ date: 2026-11-05
 
 ## Responsibilities
 
-A phase current sensor does not read zero at zero current. On E-FOC-HARDWARE the three phases read
+A phase current sensor does not read zero at zero current. On the reference board the three phases read
 +27, −18 and +54 mA with no current flowing. In the stationary frame that is a 42 mA error, which
 the rotation turns into a ripple at the electrical frequency, and it hides small torques such as the
 bench rotor's viscous friction (`documentation/verification_and_validation/software-in-the-loop.md`, Part M).
@@ -40,11 +40,6 @@ bench rotor's viscous friction (`documentation/verification_and_validation/softw
 - Handing the offsets in force to the inverter compensation stage, which removes them from every
   phase-current sample before any consumer receives it
 - Failing a measurement whose readings cannot be offsets
-
-**Is NOT responsible for:**
-- Deciding when to measure, which is the calibration sequence's job (`state-machine.md`)
-- Storing the offsets, which travel in the calibration record (`service-nvm.md`)
-- Board protection, which reads the raw samples in hardware
 
 ---
 

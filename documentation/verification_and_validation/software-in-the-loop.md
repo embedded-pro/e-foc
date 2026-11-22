@@ -66,11 +66,6 @@ graph LR
 - Simulating the board protection the hardware provides, and the wiring faults hardware can suffer
 - Isolating scenarios from one another so neither files nor sockets nor captured output leak across
 
-**Is NOT responsible for:**
-- Verifying control algorithm correctness in the small — that is what the unit tests are for
-- Testing CAN framing — that is covered by the wire contract tests
-- Standing in for hardware-in-the-loop, which alone exercises real silicon, timing and analogue paths
-
 ---
 
 ## Component Details

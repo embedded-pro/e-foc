@@ -36,12 +36,6 @@ date: 2026-11-08
 - Keeping an established rotor reference across a control-mode switch: a machine built by a switch out of an aligned `Ready` boots straight to `Ready` when the stored record is complete for its mode (see C4)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
-**Is NOT responsible for:**
-- Executing FOC calculations — those remain the responsibility of the control-mode implementation (Torque, Speed, Position)
-- Directly driving hardware peripherals — all hardware interaction is delegated to the calibration services and the FOC controller
-- Storing persistent calibration data itself — that is the responsibility of the Non-Volatile Memory service
-- Implementing the identification algorithms — those are encapsulated in the Electrical and Mechanical Parameters Identification services
-
 ---
 
 ## Component Details
@@ -642,8 +636,9 @@ The same reasoning applies one level down, inside `Runner`. The phase-current sl
 control loop to the bridge, so the runner holds it only while the bridge runs: `Enable()` clears the slot,
 enables the control law, starts the inverter and takes the slot last; `Disable()` releases the slot first,
 then stops the inverter and the control law. A conversion that lands while the slot is clear does nothing, so
-no per-sample flag is needed, and once `Disable()` has released the slot no sample can write a duty — on the
-TI PWM, a duty written to a stopped generator would restart it. The steps of `Enable()` are individually
+no per-sample flag is needed, and once `Disable()` has released the slot no sample can write a duty — on a
+PWM peripheral whose generator restarts on a duty write, a duty written to a stopped generator would restart
+it. The steps of `Enable()` are individually
 interruptible, and a `Stop()` from the faulting context between any two of them would be undone by the steps
 that follow it, re-arming the bridge on hardware that has just faulted. `Enable()` therefore clears a
 `stopRequested` flag that `Disable()` sets, re-checks it after every step, and unwinds through `Disable()`
@@ -687,11 +682,11 @@ momentary deassertion still cannot arm the bridge.
 blocks a clear nor satisfies the verification — such a platform behaves exactly as it did before the gate
 existed. Reporting `clear` instead would assert a verification the hardware never made, and a fault on those
 platforms comes from software (calibration failure, CAN bus-off, watchdog) rather than from a physical
-condition anything could hold. The TI protection comparators are ADC digital comparators on a
-PWM-triggered ADC, which stops converting once the bridge is stopped, so the comparators cannot be read while
-faulted. TI and the NUCLEO-G474RE therefore answer from their latched trips and a fresh bus-voltage reading
+condition anything could hold. On a platform whose protection comparators are ADC digital comparators on a
+PWM-triggered ADC, the ADC stops converting once the bridge is stopped, so the comparators cannot be read while
+faulted. Such platforms therefore answer from their latched trips and a fresh bus-voltage reading
 (`core/platform_abstraction/BoardProtection.hpp`, `documentation/design/error-handling.md`), QEMU from its
-simulated protection, and only the NUCLEO-H563ZI and a platform with no protection report
+simulated protection, and only a platform with no protection report
 `unknown`.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears

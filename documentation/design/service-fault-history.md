@@ -42,15 +42,6 @@ nothing to diagnose afterwards. The fault history keeps the last eight entries i
   configuration writes.
 - Answering a read of a record by its age (0 the newest) and clearing every record on an explicit command.
 
-**Is NOT responsible for:**
-- Recording a fault while the drive is already in `Fault`. The state machine keeps the first code of an episode
-  (`state-machine.md`, Fault Latching) and so does the history; a further fault of the same episode is traced only.
-- Recording a reset. A watchdog or hard fault resets the target before any write could start; the reset cause
-  is reported after the reboot instead (`watchdog.md`).
-- Keeping wall-clock time. The drive has none; the power-up count and the uptime order the records.
-- Clearing on a factory format. The calibration and configuration format leaves the history alone; only its own
-  clear empties it.
-
 ---
 
 ## Component Details
@@ -138,7 +129,7 @@ wait, and a fifth releases the oldest at once. The history is read and cleared o
 
 | Constraint         | Description                                                                                                   |
 |--------------------|---------------------------------------------------------------------------------------------------------------|
-| Eight records      | The 512-byte EEPROM of E-FOC-HARDWARE leaves 128 bytes after calibration and configuration; eight records fit |
+| Eight records      | The 512-byte EEPROM of the reference board leaves 128 bytes after calibration and configuration; eight records fit |
 | No wall clock      | Records are ordered by power-up and uptime; the power-up count saturates at 32767                             |
 | Torque current     | The peak is the largest one-millisecond torque current, not the largest phase-current sample                  |
 | One store a second | A fault storm keeps the newest records only; the in-memory history is complete until the next power loss      |

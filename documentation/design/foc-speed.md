@@ -37,12 +37,6 @@ date: 2026-11-08
 - Providing `OuterLoopFrequency()` so that the application can schedule the `LowPriorityInterrupt` at the correct rate
 - Arming and resetting all three PID controllers (speed, d-axis, q-axis) on Enable / Disable
 
-**Is NOT responsible for:**
-- Reading phase currents or encoder position directly from hardware — these are supplied by the Runner
-- Writing duty cycles to PWM hardware — duty cycles are returned to the Runner
-- Position control or any loop beyond the speed layer
-- Flux weakening (Id is always commanded to 0 A)
-
 ---
 
 ## Component Details
@@ -304,7 +298,7 @@ sequenceDiagram
 | Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).                  |
 | No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.              |
 | LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.                |
-| Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz). |
+| Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period). |
 | Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets.           |
 
 ---
