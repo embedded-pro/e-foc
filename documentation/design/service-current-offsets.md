@@ -31,7 +31,7 @@ date: 2026-11-05
 A phase current sensor does not read zero at zero current. On E-FOC-HARDWARE the three phases read
 +27, −18 and +54 mA with no current flowing. In the stationary frame that is a 42 mA error, which
 the rotation turns into a ripple at the electrical frequency, and it hides small torques such as the
-bench rotor's viscous friction (`documentation/design/software-in-the-loop.md`, Part M).
+bench rotor's viscous friction (`documentation/verification_and_validation/software-in-the-loop.md`, Part M).
 
 **Is responsible for:**
 - Measuring each phase sensor's zero-current reading at the start of the full calibration, and

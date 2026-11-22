@@ -241,17 +241,17 @@ The `defaults` test preset excludes the `hardware|integration` labels, so `ctest
 
 **Model-in-the-loop**: `integration_tests/model_in_the_loop` composes the control-mode state machine, the calibration services and the NVM stack as `Logic` does, minus CAN, against the same plant
 model, and steps them on the host at the control rate. Sweeps over laws, plants, torque signs and seeds belong there, with the scenarios' limits.
-Requirements are two tiers (`documentation/design/integration-testing.md`, *Feature-to-Requirements Mapping*): `documentation/requirements/*.yaml` holds the product requirements — solution-free promises
+Requirements are two tiers (`documentation/verification_and_validation/integration-testing.md`, *Feature-to-Requirements Mapping*): `documentation/verification_and_validation/requirements/*.yaml` holds the product requirements — solution-free promises
 observable at the drive's boundary, one per `shall`, no class or message names, no contract versions, no per-law limit tables — and the scenarios' `Examples:` tables hold the acceptance limits.
 A mechanism or design constraint goes in its design document, never in a requirement; a limit pinned from a `[METRIC]` line goes in the scenario only.
 Every requirement carries a `status` (`draft`, `implemented`, `verified`, `retired`) and a `verification` (`sil`, `hil`, `mil`, `unit`, `inspection`).
 A requirement is not required to have a scenario, but one marked `verified` must be cited by an `@REQ-...` tag. `documentation/tools/check-requirements-traceability.py` (run by `requirements-validation.yml`)
 fails on a missing status or verification, a `shall` over 90 words or naming another requirement, a `verified` requirement with no tag, a tag naming an unknown or retired ID, a duplicate ID, or a scenario kind the `verification` field omits.
-It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to how `Logic` wires a service is made in `ModelInTheLoop` too. See `documentation/design/software-in-the-loop.md` Part N.
+It is an ordinary gtest binary, so `ctest --preset host` runs it. A change to how `Logic` wires a service is made in `ModelInTheLoop` too. See `documentation/verification_and_validation/software-in-the-loop.md` Part N.
 
-Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
+Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/verification_and_validation/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
 
-**Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`.
+**Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/verification_and_validation/software-in-the-loop.md`.
 Every scenario boots through the emulated bootloader, which the harness loads with the public development key set; `staging.bin` and `journal.bin` in the scenario directory are its staging slot and status journal (Part P).
 `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
 

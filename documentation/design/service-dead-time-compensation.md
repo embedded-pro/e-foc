@@ -30,7 +30,7 @@ date: 2026-10-23
 
 A leg of the bridge does not deliver its duty. Between one switch turning off and the other turning
 on, the phase current alone decides where the switch node goes, and the leg loses voltage against
-the current's sign (`documentation/design/software-in-the-loop.md`, Part L). On E-FOC-HARDWARE the
+the current's sign (`documentation/verification_and_validation/software-in-the-loop.md`, Part L). On E-FOC-HARDWARE the
 loss is about 0.2 % of the period once the current passes about 0.2 A, and below that it shrinks in
 proportion to the current. At small currents the winding therefore sees about 0.17 Ω more than it
 has, which is why the online resistance estimate reads about 20 % high on the rig.

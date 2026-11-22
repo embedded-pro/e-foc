@@ -208,7 +208,7 @@ control law and PWM write — the work the cycle budget applies to. Hardware ISR
 is excluded; REQ-PLT-004 reserves 25% of the control period for that overhead. The measurement is
 taken in the platform layer so it is consistent across targets. The emulated target has no cycle
 counter and reads a free-running timer of its instruction-counted clock instead
-([software-in-the-loop.md](software-in-the-loop.md), Part B3).
+([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part B3).
 
 From it the platform maintains the last, minimum, maximum and a filtered average duration, the
 execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline

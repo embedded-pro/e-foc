@@ -11,5 +11,5 @@ toc-title: Table of Contents
 | Status    | Draft                    |
 | Generated | Auto-generated from YAML |
 
-> **Note:** Do not edit manually --- modify YAML files in `documentation/requirements/`
+> **Note:** Do not edit manually --- modify YAML files in `documentation/verification_and_validation/requirements/`
 

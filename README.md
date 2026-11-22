@@ -353,7 +353,7 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 | [Electrical Identification Service](documentation/design/service-electrical-ident.md)    | Resistance and inductance estimation service |
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
-| [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
+| [Integration Testing Design](documentation/verification_and_validation/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
 | [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
 | [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
 | [Virtual Motor](documentation/design/virtual-motor.md)                                   | Application on the host, on a virtual CAN    |
@@ -363,17 +363,17 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 | Document                                                                        | Description                                          |
 |---------------------------------------------------------------------------------|------------------------------------------------------|
-| [Lifecycle Requirements](documentation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
-| [Commissioning Requirements](documentation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
-| [Control Requirements](documentation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
-| [Protection Requirements](documentation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
-| [Platform Requirements](documentation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
-| [Communication Requirements](documentation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
-| [Firmware Update Requirements](documentation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
-| [Hardware Test Requirements](documentation/requirements/hardware-test.yaml)     | Board bring-up application                           |
-| [User Interface Requirements](documentation/requirements/user-interface.yaml)   | Status LEDs: running, commissioning, latched faults  |
+| [Lifecycle Requirements](documentation/verification_and_validation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
+| [Commissioning Requirements](documentation/verification_and_validation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
+| [Control Requirements](documentation/verification_and_validation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
+| [Protection Requirements](documentation/verification_and_validation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
+| [Platform Requirements](documentation/verification_and_validation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
+| [Communication Requirements](documentation/verification_and_validation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
+| [Firmware Update Requirements](documentation/verification_and_validation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
+| [Hardware Test Requirements](documentation/verification_and_validation/requirements/hardware-test.yaml)     | Board bring-up application                           |
+| [User Interface Requirements](documentation/verification_and_validation/requirements/user-interface.yaml)   | Status LEDs: running, commissioning, latched faults  |
 
-How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/design/integration-testing.md), *Feature-to-Requirements Mapping*.
+How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/verification_and_validation/integration-testing.md), *Feature-to-Requirements Mapping*.
 
 ### Theory
 

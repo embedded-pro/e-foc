@@ -40,7 +40,7 @@ winding:
 Figures are those of the E-FOC-HARDWARE board on the EK-TM4C1294XL. The board's own design files live in the
 `e-foc-hardware` submodule, which is not checked out with the firmware; the component figures here are those
 the software-in-the-loop characterisation took from the parts and the rig
-(`documentation/design/software-in-the-loop.md` Part L).
+(`documentation/verification_and_validation/software-in-the-loop.md` Part L).
 
 ---
 
@@ -172,7 +172,7 @@ $$
 
 the node is still swinging when the complement turns on, the loss is $i\,t_d^2/(2C_{node}T)$, proportional to the
 current, and the winding sees it as extra resistance; at zero current the leg delivers exactly $d\,V_{dc}$
-(`documentation/design/software-in-the-loop.md` Part L derives the three regimes). The transition between the
+(`documentation/verification_and_validation/software-in-the-loop.md` Part L derives the three regimes). The transition between the
 regimes is the **knee**. With the SIL's bench node of 600 pF and 100 ns at 24 V the formula gives 0.14 A; the
 rig measured 0.18–0.21 A.
 

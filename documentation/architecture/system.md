@@ -528,8 +528,8 @@ Two targets implement scenarios, selected by tag:
 2. **Hardware-in-the-loop** — the same firmware on a real board, reached through the hardware
    bridge over serial and CAN.
 
-Design detail: `documentation/design/integration-testing.md` for the shared structure, and
-`documentation/design/software-in-the-loop.md` for the simulated target.
+Design detail: `documentation/verification_and_validation/integration-testing.md` for the shared structure, and
+`documentation/verification_and_validation/software-in-the-loop.md` for the simulated target.
 
 ```mermaid
 graph TD

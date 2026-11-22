@@ -1038,7 +1038,7 @@ its noise and offset, rounds to a code and clips to the range, and the step aver
 drops the remainder, as the converter's averager does. The firmware's sample-and-hold request maps
 to 4, 16, 32, 64 or 256 clocks, as the TI platform maps it, and the emulated platform applies the
 readable-duty and maximum-duty limits, corrects each phase for its hold instant
-([sampling skew](platform-sampling-skew.md)) and rebuilds a hidden phase from the other two as the TI platform does.
+([sampling skew](../design/platform-sampling-skew.md)) and rebuilds a hidden phase from the other two as the TI platform does.
 
 On E-FOC-HARDWARE the converter is ADC0 of the TM4C1294 at 16 MHz, with 12 conversion clocks and
 two averaged conversions. The TLV9064 amplifiers at gain 10, behind 200 Ω and 150 pF, lag by about

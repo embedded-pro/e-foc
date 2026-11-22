@@ -175,7 +175,7 @@ def print_summary(by_id, tags):
 def main():
     root = pathlib.Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--requirements-dir", type=pathlib.Path, default=root / "documentation/requirements")
+    parser.add_argument("--requirements-dir", type=pathlib.Path, default=root / "documentation/verification_and_validation/requirements")
     parser.add_argument("--features-dir", type=pathlib.Path, default=root / "integration_tests/features")
     parser.add_argument("--quiet", action="store_true", help="print only the summary and the errors")
     args = parser.parse_args()

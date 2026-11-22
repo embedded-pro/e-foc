@@ -225,7 +225,7 @@ jobs:
           version: ${{ needs.release_please.outputs.version }}
           output-dir: docs-pdf
           artifact-name: documentation-pdfs
-          requirements-dir: documentation/requirements
+          requirements-dir: documentation/verification_and_validation/requirements
           features-dir: integration_tests/features
           matrix-output: docs-pdf/traceability-matrix.md
           matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.version }}.pdf

@@ -38,7 +38,7 @@ implements a scenario, and the runner is invoked with that tag.
 
 | Tag          | Target                                                               | Detailed in                                    |
 |--------------|----------------------------------------------------------------------|------------------------------------------------|
-| `@sil`       | Real firmware under an emulator, simulated motor                     | `documentation/design/software-in-the-loop.md` |
+| `@sil`       | Real firmware under an emulator, simulated motor                     | `documentation/verification_and_validation/software-in-the-loop.md` |
 | `@virtual`   | The application on the host as a virtual motor, simulated motor      | This document, *The virtual motor target*      |
 | `@hil_motor` | The motor-controller firmware on hardware, over the bridge, CAN only | This document                                  |
 | `@hil`       | The bring-up image on hardware, over the bridge, with its terminal   | This document                                  |
@@ -55,7 +55,7 @@ motor-controller scenario on hardware is tagged `@hil_motor`.
 > and memory stack against the plant model the emulated target carries, and carry the sweeps over
 > laws, plants and seeds that used to be emulated scenarios. They are ordinary unit-test binaries,
 > not a target of this suite, and every requirement they cover keeps at least one `@sil` scenario
-> here. See Part N of `documentation/design/software-in-the-loop.md`.
+> here. See Part N of `documentation/verification_and_validation/software-in-the-loop.md`.
 
 ---
 
@@ -236,14 +236,14 @@ retuned limit was edited twice, and a requirement turned "verified" by restating
 verified it. They are now kept apart.
 
 ```
-Tier 1  product requirement   documentation/requirements/*.yaml    what the drive promises
+Tier 1  product requirement   documentation/verification_and_validation/requirements/*.yaml    what the drive promises
           ^ @REQ tag
 Tier 2  acceptance criteria   integration_tests/features/*.feature  how much, on which plant, how checked
 ```
 
 | Content                                                                                 | Lives in                                      |
 |-----------------------------------------------------------------------------------------|-----------------------------------------------|
-| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/requirements/*.yaml`           |
+| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/verification_and_validation/requirements/*.yaml`           |
 | Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error  | The `Examples:` tables of the scenarios       |
 | Mechanisms and design constraints: storage, interrupt rules, ownership, class structure | The component's design document and AGENTS.md |
 | What each CAN contract version added                                                    | The contract changelog in `service-can.md`    |

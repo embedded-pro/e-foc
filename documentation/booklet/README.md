@@ -1,12 +1,13 @@
 # e-foc — Design Booklet
 
 The design reference for **e-foc**, a real-time Field-Oriented Control firmware for BLDC/PMSM motors on
-bare-metal embedded systems. The booklet has five parts. The theory foundations read in order, from the
+bare-metal embedded systems. The booklet has six parts. The theory foundations read in order, from the
 motor itself to the closed loops around it, the trade-offs between controllers, the numbers that matter
 and the disturbances the loops must live with. The practical part covers what the hardware and the
 firmware add: the power stage, the sensing chain and low-side shunts, the motor's imperfections and the
 implementation. The theory reference holds one chapter per controller algorithm and identification
-method. The architecture part structures the firmware, and the design part describes each component.
+method. The architecture part structures the firmware, the design part describes each component, and the
+verification and validation part describes how the drive is tested against its requirements.
 
 No source code appears here. Each chapter describes behaviour, structure, and responsibilities at the
 level a hardware or control engineer needs to understand the system without reading implementation
@@ -94,10 +95,16 @@ files. The builder numbers the chapters in the order the tables below list them.
 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry          |
 | [Bootloader](../design/bootloader.md)                                                  | Flash layout, pack verification and decryption, installation, the check at every reset |
 | [Fault Supervision](../design/fault-supervision.md)                                    | Encoder loss and stall detection from the event loop, drive-wide settings              |
-| [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                              |
 | [Tool: CAN Commander](../design/tool-can-commander.md)                                 | Desktop commander, issue log, update check, Windows and Debian installers              |
 | [Virtual Motor](../design/virtual-motor.md)                                            | Shipping application on the host against the plant, on a virtual CAN bus               |
 | [Tool: Virtual Motor](../design/tool-virtual-motor.md)                                 | Starting virtual motors, their plant views, disturbances and faults                    |
+
+## Verification and Validation
+
+| Chapter                                                                            | What it covers                                                                  |
+|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| [Integration Testing](../verification_and_validation/integration-testing.md)       | Test architecture, fixture composition, requirement tiers, coverage strategy    |
+| [Software in the Loop](../verification_and_validation/software-in-the-loop.md)     | The emulated target, the plant description, the scenario channels and metrics   |
 
 ## Building the booklet
 
@@ -127,7 +134,8 @@ GitHub Pages on `main`, and attaches the PDF to every published release.
 
 1. Check that the material does not belong to an existing document. Theory belongs in
    `documentation/theory/`, architecture decisions in `documentation/architecture/system.md`,
-   component design in `documentation/design/`. No source code in any chapter.
+   component design in `documentation/design/`, test plans and requirements in
+   `documentation/verification_and_validation/`. No source code in any chapter.
 2. Create the file from its template in `documentation/templates/`. Keep the template's `##` section
    headings exactly as written (the documentation validator looks for them); number the `###`
    subsections beneath them (`### 1.`, `### 2.`).
