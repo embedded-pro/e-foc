@@ -234,13 +234,12 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 
 | Asset                                                          | Content                                                                                                                                                                                             |
 |----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `e_foc-firmware-<board>-<tag>.tar.gz`                          | `.elf` and `.hex` of every application built for the board                                                                                                                                          |
-| `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex`         | ready-to-flash images for the EK-TM4C1294XL: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed |
+| `e_foc-firmware-<board>-<tag>.tar.gz`                          | `e_foc-firmware-<board>-<application>-<tag>.elf` and `.hex` of every application built for the board, and its `.upgrade` pack where the board has a bootloader. For the EK-TM4C1294XL the `.hex` images are ready to flash: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed|
 | `e_foc-source-<tag>.tar.gz`                                    | the complete source with every submodule (GitHub's own source archives omit them)                                                                                                                   |
 | `e_foc-can_commander-*`                                        | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
 | `eFocDesign.pdf`                                               | the complete design booklet                                                                                                                                                                         |
 | `e_foc-documentation-<tag>.zip`                                | the individual design, theory and requirements documents as PDFs                                                                                                                                    |
-| `e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-<tag>.upgrade` | the signed upgrade pack the CAN Commander sends to an EK-TM4C1294XL over CAN                                                                                                                        |
+| `e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-<tag>.upgrade` | the signed upgrade pack the CAN Commander sends to an EK-TM4C1294XL over CAN; also in the board archive, and published on its own because released CAN Commanders find it by this name              |
 
 Configuring a build from the source archive still downloads the dependencies CMake declares with
 `FetchContent` (such as `ui-cpp` and GoogleTest).
@@ -250,7 +249,7 @@ Configuring a build from the source archive still downloads the dependencies CMa
 Every release asset carries a build-provenance attestation, signed through [Sigstore](https://www.sigstore.dev/)
 by the workflow that built it (the release workflow, or the booklet workflow for `eFocDesign.pdf`), which proves
 the file was built from this repository by GitHub Actions. The release workflow verifies the attestation of the
-installers, the firmware images and the upgrade pack before it uploads them. Check one with the
+installers, the EK-TM4C1294XL firmware archive and the upgrade pack before it uploads them. Check one with the
 [GitHub CLI](https://cli.github.com/):
 
 ```bash

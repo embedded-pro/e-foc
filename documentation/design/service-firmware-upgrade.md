@@ -281,14 +281,18 @@ emulated bootloader reads (`software-in-the-loop.md` Part P).
 
 ### Part J — release assets
 
-The release workflow builds, signs and encrypts one pack per board that has a bootloader, and publishes it
-beside the existing firmware archives (`.github/workflows/release-please.yml`):
+The release workflow builds, signs and encrypts one pack per board that has a bootloader, and puts it in the
+board's firmware archive beside the images a debugger programs (`.github/workflows/release-please.yml`):
 
-| Asset                                                    | Content                                                                                                 |
-|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends                                                                |
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex`     | the application with its image descriptor, for a debugger; the name the EK-TM4C1294XL image already had |
-| `e_foc-firmware-<board>-bootloader-<tag>.hex`            | the bootloader with the release key set, for a debugger, which programs it beside the application       |
+| Asset                                                    | Content                                                                                                           |
+|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-<tag>.tar.gz`                    | every application's `e_foc-firmware-<board>-<application>-<tag>.elf` and `.hex`, and the pack below               |
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends; in the archive, and published on its own as well                        |
+
+In the archive, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex` is the application with its image
+descriptor and `e_foc-firmware-<board>-bootloader-<tag>.hex` the bootloader with the release key set, which a
+debugger programs together. The pack stays a standalone asset because released CAN Commanders download it by
+that name.
 
 The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name,
 the version and the target identity from the build of that board (`bootloader.md` Parts I and J), never from
