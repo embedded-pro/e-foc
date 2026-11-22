@@ -113,22 +113,32 @@ dependencies (mermaid-cli, Pandoc, and a XeLaTeX toolchain). Use that image, or 
 tools, then build both outputs:
 
 ```
-python documentation/tools/build-foc-booklet.py --format all
+python documentation/tools/build-foc-booklet.py --format all documents
 ```
 
 Outputs land in `build/booklet/`:
 
-| Path              | Content                                             |
-|-------------------|-----------------------------------------------------|
-| `eFocDesign.pdf`  | The complete booklet as a single PDF                |
-| `site/index.html` | Static site: landing page plus one page per chapter |
-| `book.md`         | Assembled Markdown the PDF is rendered from         |
+| Path              | Content                                                                                    |
+|-------------------|--------------------------------------------------------------------------------------------|
+| `eFocDesign.pdf`  | The complete booklet as a single PDF                                                       |
+| `documents/`      | One PDF per document, in `design/`, `theory/` and `verification_and_validation/`           |
+| `site/index.html` | Static site: landing page plus one page per chapter                                        |
+| `book.md`         | Assembled Markdown the PDF is rendered from                                                |
 
-`--format pdf` and `--format html` build one output; `--skip-diagrams` leaves Mermaid fences as
-code blocks when mmdc is unavailable; `--assemble-only` stops after writing `book.md`.
+`--format` takes one or more of `pdf`, `html`, `documents` and `all` (`pdf` and `html`); `--version` names and
+stamps the document PDFs with a release tag; `--traceability-matrix` adds the traceability matrix to them;
+`--skip-diagrams` leaves Mermaid fences as code blocks when mmdc is unavailable; `--assemble-only` stops after
+writing `book.md`.
 
-CI builds both outputs on every pull request that touches `documentation/`, publishes the site to
-GitHub Pages on `main`, and attaches the PDF to every published release.
+Every PDF opens with the standard two-sided front matter: a title page with the title, the author and the
+date, a blank page, the contents, a blank page, then the body on a right-hand page. A document's title page
+takes the title, version, status and date from its front matter; the metadata table and the template notes
+after it are left out of every PDF and of the site. The PDFs take each Mermaid diagram as a PDF that mermaid-cli
+renders through its browser, since flowchart and state labels are HTML that an SVG rasteriser drops; the site
+takes the SVG. Tables with long lines take column widths from their content, and their cells wrap and hyphenate.
+
+CI builds every output on every pull request that touches `documentation/` and publishes the site to GitHub
+Pages on `main`. The release puts the booklet and the document PDFs in one `e_foc-documentation-<tag>.zip`.
 
 ## Adding or changing a chapter
 

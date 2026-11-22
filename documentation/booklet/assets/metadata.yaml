@@ -1,13 +1,14 @@
 ---
 title: "e-foc — Design Booklet"
-subtitle: "Theory, Design, and Architecture"
+subtitle: "Theory, Architecture, Design, Verification and Validation"
 author:
   - "Gabriel Francisco dos Santos"
   - "gabriel.fra.santos@gmail.com"
 lang: en
 documentclass: book
 classoption:
-  - oneside
+  - twoside
+  - openright
 geometry:
   - margin=1in
 fontsize: 11pt
