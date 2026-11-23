@@ -101,10 +101,10 @@ files. The builder numbers the chapters in the order the tables below list them.
 
 ## Verification and Validation
 
-| Chapter                                                                            | What it covers                                                                  |
-|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| [Integration Testing](../verification_and_validation/integration-testing.md)       | Test architecture, fixture composition, requirement tiers, coverage strategy    |
-| [Software in the Loop](../verification_and_validation/software-in-the-loop.md)     | The emulated target, the plant description, the scenario channels and metrics   |
+| Chapter                                                                        | What it covers                                                                |
+|--------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| [Integration Testing](../verification_and_validation/integration-testing.md)   | Test architecture, fixture composition, requirement tiers, coverage strategy  |
+| [Software in the Loop](../verification_and_validation/software-in-the-loop.md) | The emulated target, the plant description, the scenario channels and metrics |
 
 ## Building the booklet
 
@@ -118,12 +118,12 @@ python documentation/tools/build-foc-booklet.py --format all documents
 
 Outputs land in `build/booklet/`:
 
-| Path              | Content                                                                                    |
-|-------------------|--------------------------------------------------------------------------------------------|
-| `eFocDesign.pdf`  | The complete booklet as a single PDF                                                       |
-| `documents/`      | One PDF per document, in `design/`, `theory/` and `verification_and_validation/`           |
-| `site/index.html` | Static site: landing page plus one page per chapter                                        |
-| `book.md`         | Assembled Markdown the PDF is rendered from                                                |
+| Path              | Content                                                                          |
+|-------------------|----------------------------------------------------------------------------------|
+| `eFocDesign.pdf`  | The complete booklet as a single PDF                                             |
+| `documents/`      | One PDF per document, in `design/`, `theory/` and `verification_and_validation/` |
+| `site/index.html` | Static site: landing page plus one page per chapter                              |
+| `book.md`         | Assembled Markdown the PDF is rendered from                                      |
 
 `--format` takes one or more of `pdf`, `html`, `documents` and `all` (`pdf` and `html`); `--version` names and
 stamps the document PDFs with a release tag; `--traceability-matrix` adds the traceability matrix to them;

@@ -170,8 +170,8 @@ interrupt is seen on a board.
 
 ### Provided
 
-| Interface                   | Purpose                                         | Contract                                                               |
-|-----------------------------|-------------------------------------------------|------------------------------------------------------------------------|
+| Interface                   | Purpose                                         | Contract                                                                    |
+|-----------------------------|-------------------------------------------------|-----------------------------------------------------------------------------|
 | Supervised event dispatcher | Run the application and prove it makes progress | Every hardware platform; supervision starts in the constructor, never stops |
 
 ### Required

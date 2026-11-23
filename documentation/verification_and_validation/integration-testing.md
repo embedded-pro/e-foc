@@ -36,12 +36,12 @@ types.
 Scenarios are authored in Gherkin and live in a single directory. A tag decides which target
 implements a scenario, and the runner is invoked with that tag.
 
-| Tag          | Target                                                               | Detailed in                                    |
-|--------------|----------------------------------------------------------------------|------------------------------------------------|
+| Tag          | Target                                                               | Detailed in                                                         |
+|--------------|----------------------------------------------------------------------|---------------------------------------------------------------------|
 | `@sil`       | Real firmware under an emulator, simulated motor                     | `documentation/verification_and_validation/software-in-the-loop.md` |
-| `@virtual`   | The application on the host as a virtual motor, simulated motor      | This document, *The virtual motor target*      |
-| `@hil_motor` | The motor-controller firmware on hardware, over the bridge, CAN only | This document                                  |
-| `@hil`       | The bring-up image on hardware, over the bridge, with its terminal   | This document                                  |
+| `@virtual`   | The application on the host as a virtual motor, simulated motor      | This document, *The virtual motor target*                           |
+| `@hil_motor` | The motor-controller firmware on hardware, over the bridge, CAN only | This document                                                       |
+| `@hil`       | The bring-up image on hardware, over the bridge, with its terminal   | This document                                                       |
 
 `@hil` is the only tag whose scenarios get the terminal (see *Out of scope: the bring-up image*); a
 motor-controller scenario on hardware is tagged `@hil_motor`.
@@ -236,14 +236,14 @@ Tier 1  product requirement   documentation/verification_and_validation/requirem
 Tier 2  acceptance criteria   integration_tests/features/*.feature  how much, on which plant, how checked
 ```
 
-| Content                                                                                 | Lives in                                      |
-|-----------------------------------------------------------------------------------------|-----------------------------------------------|
-| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/verification_and_validation/requirements/*.yaml`           |
-| Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error  | The `Examples:` tables of the scenarios       |
-| Mechanisms and design constraints: storage, interrupt rules, ownership, class structure | The component's design document and AGENTS.md |
-| What each CAN contract version added                                                    | The contract changelog in `service-can.md`    |
-| How the suite commands the target and decides a verdict                                 | This document and `software-in-the-loop.md`   |
-| A guard against a defect that was fixed                                                 | The regression test that reproduces it        |
+| Content                                                                                 | Lives in                                                        |
+|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| What the drive promises, observable at its boundary: CAN, shaft, power stage, NVM, boot | `documentation/verification_and_validation/requirements/*.yaml` |
+| Numeric limits per law, per plant and per step: settling, overshoot, rise, tail, error  | The `Examples:` tables of the scenarios                         |
+| Mechanisms and design constraints: storage, interrupt rules, ownership, class structure | The component's design document and AGENTS.md                   |
+| What each CAN contract version added                                                    | The contract changelog in `service-can.md`                      |
+| How the suite commands the target and decides a verdict                                 | This document and `software-in-the-loop.md`                     |
+| A guard against a defect that was fixed                                                 | The regression test that reproduces it                          |
 
 ### Writing a product requirement
 

@@ -290,16 +290,16 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint                     | Value / Description                                                                                                  |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                | 20 kHz — called from the FOC ISR once per PWM period.                                                                |
-| Outer loop rate                | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                                    |
-| Iq saturation                  | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                          |
-| Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).                  |
-| No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.              |
-| LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.                |
-| Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period). |
-| Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets.           |
+| Constraint                     | Value / Description                                                                                        |
+|--------------------------------|------------------------------------------------------------------------------------------------------------|
+| Inner loop rate                | 20 kHz — called from the FOC ISR once per PWM period.                                                      |
+| Outer loop rate                | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                          |
+| Iq saturation                  | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                |
+| Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).        |
+| No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.    |
+| LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.      |
+| Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period).           |
+| Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets. |
 
 ---
 

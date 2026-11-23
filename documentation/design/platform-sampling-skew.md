@@ -63,11 +63,11 @@ and a phase averaged over $n$ consecutive conversions behaves as if it were held
 instants. The platform derives one delay per phase from its converter settings when the converter is
 configured:
 
-| Platform                       | Phase A                    | Phase B | Phase C | Source                                                                             |
-|--------------------------------|----------------------------|---------|---------|------------------------------------------------------------------------------------|
-| Reference board                | 0.75 µs                    | 2.75 µs | 4.75 µs | 4-clock sample-and-hold, 12 conversion clocks, two averaged                     |
-| Emulator, MIL, virtual motor   | from the plant description |         |         | The converter fields of the current-sense chain (`software-in-the-loop.md` Part M) |
-| Other boards                   | 0                          | 0       | 0       | Not characterised; no correction                                                   |
+| Platform                     | Phase A                    | Phase B | Phase C | Source                                                                             |
+|------------------------------|----------------------------|---------|---------|------------------------------------------------------------------------------------|
+| Reference board              | 0.75 µs                    | 2.75 µs | 4.75 µs | 4-clock sample-and-hold, 12 conversion clocks, two averaged                        |
+| Emulator, MIL, virtual motor | from the plant description |         |         | The converter fields of the current-sense chain (`software-in-the-loop.md` Part M) |
+| Other boards                 | 0                          | 0       | 0       | Not characterised; no correction                                                   |
 
 The reference board's converter phase-delay setting shifts the trigger by a fraction of one converter clock, under 63 ns,
 and is left out.
@@ -174,7 +174,7 @@ sequenceDiagram
 
 | Constraint               | Value / Description                                                                             |
 |--------------------------|-------------------------------------------------------------------------------------------------|
-| Error removed            | On the reference board up to 0.40 A on the Teknic and 71 mA on the Anaheim at rated speed            |
+| Error removed            | On the reference board up to 0.40 A on the Teknic and 71 mA on the Anaheim at rated speed       |
 | Model                    | One inductance; a salient motor's phase inductance varies with the angle and is not followed    |
 | Model error              | A model inductance off by $k$ leaves $1 - 1/k$ of the skew until the online estimate settles    |
 | Rate age                 | Computed from the previous period's currents and turned one period ahead                        |

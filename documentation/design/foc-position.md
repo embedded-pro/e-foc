@@ -426,7 +426,7 @@ graph LR
 | Position error             | Plain in linear mode; folded into [−π, π] in circular mode without software position limits, so the move takes the short way.       |
 | LPI callback order         | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
 | No flux weakening          | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
-| Cycle budget (inner loop)  | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period).                           |
+| Cycle budget (inner loop)  | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period).                                               |
 | Controller state at Enable | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
 | Target reached             | Window and time from the configuration record, checked every 1 ms on the event loop and when asked.                                 |
 | Setpoint atomicity         | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |

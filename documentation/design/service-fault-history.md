@@ -127,9 +127,9 @@ wait, and a fifth releases the oldest at once. The history is read and cleared o
 
 ## Constraints & Limitations
 
-| Constraint         | Description                                                                                                   |
-|--------------------|---------------------------------------------------------------------------------------------------------------|
+| Constraint         | Description                                                                                                        |
+|--------------------|--------------------------------------------------------------------------------------------------------------------|
 | Eight records      | The 512-byte EEPROM of the reference board leaves 128 bytes after calibration and configuration; eight records fit |
-| No wall clock      | Records are ordered by power-up and uptime; the power-up count saturates at 32767                             |
-| Torque current     | The peak is the largest one-millisecond torque current, not the largest phase-current sample                  |
-| One store a second | A fault storm keeps the newest records only; the in-memory history is complete until the next power loss      |
+| No wall clock      | Records are ordered by power-up and uptime; the power-up count saturates at 32767                                  |
+| Torque current     | The peak is the largest one-millisecond torque current, not the largest phase-current sample                       |
+| One store a second | A fault storm keeps the newest records only; the in-memory history is complete until the next power loss           |

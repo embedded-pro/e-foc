@@ -338,30 +338,30 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Design
 
-| Document                                                                                 | Description                                  |
-|------------------------------------------------------------------------------------------|----------------------------------------------|
-| [FOC Transforms](documentation/design/foc-transforms.md)                                 | Clarke and Park transform design             |
-| [FOC Torque Control](documentation/design/foc-torque.md)                                 | Torque (current) control loop design         |
-| [FOC Speed Control](documentation/design/foc-speed.md)                                   | Speed control loop design                    |
-| [FOC Position Control](documentation/design/foc-position.md)                             | Position control loop design                 |
-| [Alignment Service](documentation/design/service-alignment.md)                           | Motor alignment and offset detection service |
-| [CLI Service](documentation/design/service-cli.md)                                       | Command-line interface service               |
-| [Current Offsets Service](documentation/design/service-current-offsets.md)               | Current sensor offset calibration service    |
-| [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md) | Duty correction for the bridge's dead time   |
-| [Cogging Compensation Service](documentation/design/service-cogging-compensation.md)     | Cogging torque map and current feed-forward  |
-| [Electrical Identification Service](documentation/design/service-electrical-ident.md)    | Resistance and inductance estimation service |
-| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
-| [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
-| [Integration Testing Design](documentation/verification_and_validation/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
-| [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
-| [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
-| [Virtual Motor](documentation/design/virtual-motor.md)                                   | Application on the host, on a virtual CAN    |
-| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                          | Plant views, disturbances and faults         |
+| Document                                                                                       | Description                                  |
+|------------------------------------------------------------------------------------------------|----------------------------------------------|
+| [FOC Transforms](documentation/design/foc-transforms.md)                                       | Clarke and Park transform design             |
+| [FOC Torque Control](documentation/design/foc-torque.md)                                       | Torque (current) control loop design         |
+| [FOC Speed Control](documentation/design/foc-speed.md)                                         | Speed control loop design                    |
+| [FOC Position Control](documentation/design/foc-position.md)                                   | Position control loop design                 |
+| [Alignment Service](documentation/design/service-alignment.md)                                 | Motor alignment and offset detection service |
+| [CLI Service](documentation/design/service-cli.md)                                             | Command-line interface service               |
+| [Current Offsets Service](documentation/design/service-current-offsets.md)                     | Current sensor offset calibration service    |
+| [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md)       | Duty correction for the bridge's dead time   |
+| [Cogging Compensation Service](documentation/design/service-cogging-compensation.md)           | Cogging torque map and current feed-forward  |
+| [Electrical Identification Service](documentation/design/service-electrical-ident.md)          | Resistance and inductance estimation service |
+| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)          | Friction and inertia estimation service      |
+| [NVM Service](documentation/design/service-nvm.md)                                             | Non-volatile memory persistence service      |
+| [Integration Testing Design](documentation/verification_and_validation/integration-testing.md) | Fixture design, calibration flow, CAN bridge |
+| [Status LEDs Service](documentation/design/service-leds.md)                                    | Status LED patterns and fault codes          |
+| [CAN Commander](documentation/design/tool-can-commander.md)                                    | Desktop commander, issue log, installers     |
+| [Virtual Motor](documentation/design/virtual-motor.md)                                         | Application on the host, on a virtual CAN    |
+| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                                | Plant views, disturbances and faults         |
 
 ### Requirements
 
-| Document                                                                        | Description                                          |
-|---------------------------------------------------------------------------------|------------------------------------------------------|
+| Document                                                                                                    | Description                                          |
+|-------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
 | [Lifecycle Requirements](documentation/verification_and_validation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
 | [Commissioning Requirements](documentation/verification_and_validation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
 | [Control Requirements](documentation/verification_and_validation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
