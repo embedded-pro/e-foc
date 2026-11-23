@@ -33,7 +33,7 @@ jobs:
       build: ${{ steps.release.outputs.release_created == 'true' || inputs.dry_run == true }}
       version: ${{ steps.release.outputs.tag_name || format('dry-run-{0}', github.run_number) }}
     steps:
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      - uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         if: ${{ !inputs.dry_run }}
         id: token
         with:
@@ -82,7 +82,7 @@ jobs:
         with:
           release: ${{ matrix.gcc }}
       - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc ccache
-      - uses: hendrikmuhs/ccache-action@dbeefd73e8e2ffc1bbc412570072735eb4db3607 # v1.2.25
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: release-${{ matrix.configuration }}-${{ matrix.target }}
           max-size: 2G
