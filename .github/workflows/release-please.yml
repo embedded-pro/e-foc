@@ -144,33 +144,30 @@ jobs:
           version="${{ needs.release_please.outputs.version }}"
           staging="staging/${{ matrix.target }}"
           mkdir -p "$staging"
-          find "build/${{ matrix.target }}" \( -name "*.elf" -o -name "*.hex" \) -path "*/${{ matrix.configuration }}/*" -type f | while read -r f; do
-            cp "$f" "$staging/"
+          find "build/${{ matrix.target }}" -name "e_foc.*.main.elf" -path "*/${{ matrix.configuration }}/*" -type f | while read -r elf; do
+            app="$(basename "$elf" .main.elf)"
+            app="${app#e_foc.}"
+            for image in "${elf%.elf}.elf" "${elf%.elf}.hex"; do
+              cp "$image" "$staging/e_foc-firmware-${{ matrix.target }}-${app}-${version}.${image##*.}"
+            done
           done
+          pack="e_foc-firmware-${{ matrix.target }}-sync_foc_sensored-${version}.upgrade"
+          if [ -f "$pack" ]; then
+            cp "$pack" "$staging/"
+          fi
+          ls -l "$staging"
           tar -czf "e_foc-firmware-${{ matrix.target }}-${version}.tar.gz" -C staging "${{ matrix.target }}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: firmware-${{ matrix.target }}
           path: e_foc-firmware-${{ matrix.target }}-*.tar.gz
           if-no-files-found: error
-      - name: Stage EK-TM4C1294XL hex images
-        if: matrix.target == 'EK-TM4C1294XL'
-        run: |
-          version="${{ needs.release_please.outputs.version }}"
-          for image in sync_foc_sensored:e_foc.sync_foc_sensored.main.hex bootloader:e_foc.bootloader.main.hex hardware_test:e_foc.hardware_test.main.hex; do
-            app="${image%%:*}"
-            hex="$(find "build/${{ matrix.target }}" -name "${image#*:}" -path "*/${{ matrix.configuration }}/*" -type f | head -n 1)"
-            test -s "$hex" || { echo "::error::no ${app} hex image for ${{ matrix.target }}"; exit 1; }
-            cp "$hex" "e_foc-firmware-${{ matrix.target }}-${app}-${version}.hex"
-          done
+      # Released CAN Commanders find a board's pack by this asset name, so the pack stays a standalone asset too.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: matrix.target == 'EK-TM4C1294XL'
         with:
-          name: firmware-hex-${{ matrix.target }}
-          path: |
-            e_foc-firmware-${{ matrix.target }}-*.hex
-            e_foc-firmware-${{ matrix.target }}-*.upgrade
-          if-no-files-found: error
+          name: firmware-pack-${{ matrix.target }}
+          path: e_foc-firmware-${{ matrix.target }}-sync_foc_sensored-*.upgrade
+          if-no-files-found: ignore
 
   package_source:
     name: Package Source
@@ -283,14 +280,19 @@ jobs:
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-G474RE-${v}.tar.gz" \
             "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
-            "e_foc-firmware-EK-TM4C1294XL-bootloader-${v}.hex" \
-            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.upgrade" \
-            "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
             "e_foc-source-${v}.tar.gz" \
             "e_foc-documentation-${v}.zip"; do
             test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
           done
+          for image in bootloader-${v}.hex sync_foc_sensored-${v}.hex hardware_test-${v}.hex sync_foc_sensored-${v}.upgrade; do
+            tar -tzf "release-assets/e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" | grep -qx "EK-TM4C1294XL/e_foc-firmware-EK-TM4C1294XL-${image}" \
+              || { echo "::error::e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz lacks e_foc-firmware-EK-TM4C1294XL-${image}"; exit 1; }
+          done
+          if compgen -G "release-assets/*.hex" > /dev/null; then
+            echo "::error::firmware images left outside the board archives"
+            exit 1
+          fi
           if compgen -G "release-assets/*.pdf" > /dev/null; then
             echo "::error::documentation PDFs left outside the zip"
             exit 1
@@ -307,8 +309,7 @@ jobs:
           for asset in \
             "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
             "e_foc-can_commander-${v}-linux-x86_64.deb" \
-            "e_foc-firmware-EK-TM4C1294XL-bootloader-${v}.hex" \
-            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.upgrade"; do
             gh attestation verify "release-assets/$asset" --repo "${{ github.repository }}"
           done
