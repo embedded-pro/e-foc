@@ -28,14 +28,11 @@ date: YYYY-MM-DD
 
 ## Responsibilities
 
-> State precisely what this component is responsible for and what it is explicitly NOT responsible for.
+> State precisely what this component is responsible for.
 > A well-scoped responsibility statement prevents scope creep and clarifies ownership boundaries.
-> Use a short bulleted list for each category.
+> List one bullet per responsibility.
 
 **Is responsible for:**
-- …
-
-**Is NOT responsible for:**
 - …
 
 ---
@@ -147,14 +144,3 @@ graph LR
 | Constraint | Value / Description |
 |------------|---------------------|
 | …          | …                   |
-
----
-
-## Open Questions
-
-> Track unresolved design questions. For each, state the question, the options being considered,
-> and any leaning or blockers.
-
-| # | Question | Options | Status |
-|---|----------|---------|--------|
-| 1 | …        | …       | open   |

@@ -45,11 +45,6 @@ between the neighbouring detents instead (`documentation/theory/position-loop-pi
 - Measuring the dry friction from the same two-direction run, and storing it with the calibration record
   for the speed and position cascades' friction feed-forward (Part F)
 
-**Is NOT responsible for:**
-- Measuring a map in torque mode, which runs no mechanical identification; it compensates with the map a
-  speed or position calibration stored in the shared record
-- A rotor angle reference across power cycles, which the alignment provides (Part E)
-
 ---
 
 ## Component Details

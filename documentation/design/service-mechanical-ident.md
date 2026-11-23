@@ -40,12 +40,6 @@ date: 2026-11-08
 - Enforcing a configurable one-shot estimation timeout, after which the latest RLS estimates are reported and the procedure stops
 - Delivering results through a single completion notification that reports friction and inertia using explicit physical units
 
-**Is NOT responsible for:**
-- Configuring the speed control loop — the loop's tunings and algorithm selection are established before the procedure begins, and the caller is responsible for the electrical model and provisional mechanics that make those loops able to move the rotor at all (see the State Machine design document)
-- Persisting the returned parameters — the caller decides what to do with them
-- Auto-tuning the speed controller — this service provides the plant parameters that a separate tuning step may consume
-- Measuring electrical parameters (R, L, pole pairs) — those are handled by the Electrical Parameters Identification service
-
 ---
 
 ## Component Details

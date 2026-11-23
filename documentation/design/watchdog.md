@@ -21,20 +21,11 @@ date: 2026-11-05
 ## Responsibilities
 
 **Is responsible for:**
-- Proving that the software is running. Every MCU platform supervises its event dispatcher with the MCU
+- Proving that the software is running. Every hardware platform supervises its event dispatcher with the
   watchdog peripheral from the moment the dispatcher is constructed until the next reset.
 - Bringing the power stage to a safe state from interrupt context when the dispatcher has stopped making
   progress, before the hardware resets the target.
 - Resetting the target from hardware, so that the next boot reports the reset cause as *watchdog*.
-
-**Is NOT responsible for:**
-- Proving that the control loops are running. A control interrupt that stops being raised while the
-  dispatcher keeps running is not a watchdog failure, and nothing else supervises it either: Part F records
-  why that is accepted.
-- Being switched on, off or reconfigured by the application. There is no watchdog port in the platform
-  factory. The platform owns the watchdog, and supervision is always on.
-- Detecting the reset cause after a watchdog reset. That is the error-handling component's work, reached
-  through the reset-cause port.
 
 ---
 
@@ -43,10 +34,10 @@ date: 2026-11-05
 ### Part A — supervision lives in the event dispatcher
 
 The mechanism is EMIL's, not e-foc's. EMIL provides:
-- a hardware watchdog interface, `hal::Watchdog`, implemented by the ST, TI and emulated-target drivers;
+- a hardware watchdog interface, `hal::Watchdog`, implemented by the hardware platforms' and the emulated target's drivers;
 - an event dispatcher worker that supervises it, `services::EventDispatcherWatchdogWorker`.
 
-Each MCU platform builds its dispatcher from that worker and hands it the platform's watchdog. The
+Each hardware platform builds its dispatcher from that worker and hands it the platform's watchdog. The
 dispatcher then does three things:
 
 - **Counts progress.** The worker counts one step when an action starts and one when it finishes, so an
@@ -69,12 +60,12 @@ The expiry handler runs inside the watchdog's early-warning interrupt. It runs t
 loop is stuck, so nothing can be scheduled and no application code can run.
 
 The handler does only what is safe in an interrupt and needs no driver state:
-1. It calls the direct power-stage cutoff, which the hard-fault handler also uses. On TI this clears the
+1. It calls the direct power-stage cutoff, which the hard-fault handler also uses. On the reference board this clears the
    PWM output enables, so every gate is driven inactive and the motor coasts.
 2. It returns.
 
 The handler does not reset by software. The watchdog is no longer refreshed, so the hardware resets the
-target one early-warning period later. That reset shows as *watchdog* in the MCU's own reset-cause
+target one early-warning period later. That reset shows as *watchdog* in the processor's own reset-cause
 register, with no record to write before the reset.
 
 This is the most graceful stop that is possible at this point. A torque ramp-down would need the event loop
@@ -87,7 +78,7 @@ Progress is counted only inside actions. A dispatcher that is idle, or frozen be
 interrupt never returns, looks like it is making progress. Because of that, the early-warning interrupt
 must not be able to preempt any interrupt that could hang:
 
-- The early-warning interrupt runs at the **lowest** priority the NVIC implements, no higher than the outer
+- The early-warning interrupt runs at the **lowest** priority the interrupt controller implements, no higher than the outer
   loop's PendSV.
 - A hung interrupt at any priority then starves the early warning, so the hardware resets the target
   without the handler running.
@@ -103,26 +94,26 @@ must not be able to preempt any interrupt that could hang:
 
 ### Part D — platforms
 
-| Platform         | Hardware                            | Early-warning period               | Expiration timeout           |
-|------------------|-------------------------------------|------------------------------------|------------------------------|
-| TI (TM4C129)     | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                       |
-| ST NUCLEO-G474RE | Window watchdog, prescaler 8        | Fixed by PCLK1 (≈12 ms at 170 MHz) | 100 ms (nine early warnings) |
-| ST NUCLEO-H563ZI | Window watchdog, prescaler 1        | Fixed by PCLK1                     | 100 ms                       |
-| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                              | 100 ms                       |
-| Host             | none                                | —                                  | —                            |
+| Platform                   | Hardware                          | Early-warning period            | Expiration timeout           |
+|----------------------------|-----------------------------------|---------------------------------|------------------------------|
+| Reference board            | Watchdog, reset on second timeout | 25 ms                           | 100 ms                       |
+| Window-watchdog platform A | Window watchdog, prescaler 8      | Fixed by its bus clock (≈12 ms) | 100 ms (nine early warnings) |
+| Window-watchdog platform B | Window watchdog, prescaler 1      | Fixed by its bus clock          | 100 ms                       |
+| Emulated target            | Watchdog of the emulated machine  | 25 ms                           | 100 ms                       |
+| Host                       | none                              | —                               | —                            |
 
-- **ST:** the vendor driver pins the window watchdog to the highest priority when it starts. The platform
-  lowers it to the lowest NVIC level straight after the dispatcher is constructed, for the reason given in
-  Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
-  bits and the STM32 parts implement four. On the NUCLEO-G474RE the cutoff disables TIM1's main output; on
-  the NUCLEO-H563ZI, which drives no bridge yet, it is empty.
+- **Window-watchdog platforms:** the vendor driver pins the window watchdog to the highest priority when it starts. The
+  platform lowers it to the lowest interrupt level straight after the dispatcher is constructed, for the reason given
+  in Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
+  bits and these processors implement four. On platform A the cutoff disables the bridge timer's main output; on
+  platform B, which drives no bridge yet, it is empty.
 
   The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1), so the
   early-warning handler must run within that tick. A small prescaler keeps the early-warning period short,
   and with it the rounding of the timeout; a larger one buys handler latency at the cost of a later expiry.
-  At 170 MHz prescaler 1 would leave 24 µs, less than the control-loop interrupt can hold off the handler, so
-  the NUCLEO-G474RE uses prescaler 8: 193 µs.
-- **Emulated target:** the MPS2 machine wires its watchdog to NMI, which cannot be lowered. So on the
+  On platform A prescaler 1 would leave 24 µs, less than the control-loop interrupt can hold off the handler, so
+  it uses prescaler 8: 193 µs.
+- **Emulated target:** the emulated machine wires its watchdog to NMI, which cannot be lowered. So on the
   emulated target a hung interrupt is caught only when the event loop is inside an action. That is
   acceptable for a target that drives a simulated plant.
 
@@ -163,7 +154,7 @@ PWM-to-ADC trigger and the conversion sequence are configured once at boot (`Con
 disable only start and stop the PWM that raises the trigger. The bring-up application (`hardware_test`)
 reconfigures them from its terminal, but it runs no control loop.
 
-The two causes differ on TI. The overcurrent, overvoltage and undervoltage comparators are steps of the same
+The two causes differ on the reference board. The overcurrent, overvoltage and undervoltage comparators are steps of the same
 PWM-triggered sequence and trip the PWM fault input in hardware. A masked interrupt leaves that path running,
 so the bridge stays protected. A lost trigger stops the comparators with the conversions, so nothing covers it.
 
@@ -179,9 +170,9 @@ interrupt is seen on a board.
 
 ### Provided
 
-| Interface                   | Purpose                                         | Contract                                                               |
-|-----------------------------|-------------------------------------------------|------------------------------------------------------------------------|
-| Supervised event dispatcher | Run the application and prove it makes progress | Every MCU platform; supervision starts in the constructor, never stops |
+| Interface                   | Purpose                                         | Contract                                                                    |
+|-----------------------------|-------------------------------------------------|-----------------------------------------------------------------------------|
+| Supervised event dispatcher | Run the application and prove it makes progress | Every hardware platform; supervision starts in the constructor, never stops |
 
 ### Required
 
@@ -262,7 +253,7 @@ sequenceDiagram
 ```mermaid
 graph LR
     EL[Event dispatcher worker] -->|steps| Sup[Supervision]
-    HW[MCU watchdog peripheral] -->|early warning| Sup
+    HW[Watchdog peripheral] -->|early warning| Sup
     Sup -->|refresh| HW
     Sup -->|expired| Cut[Direct power-stage cutoff]
     HW -->|missed refresh| Reset[Target reset]
@@ -278,12 +269,12 @@ With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
 - The first early warning after an action starts always counts as progress. A hung action is therefore
   detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
 - The hardware reset follows one period later, at most *(N+2)·P* after the action started.
-- With TI at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
-- With the NUCLEO-G474RE at *P* ≈ 12.1 ms (PCLK1 at 170 MHz, prescaler 8) and *N* = 9, that is about
+- With the reference board at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
+- With platform A at *P* ≈ 12.1 ms (prescaler 8) and *N* = 9, that is about
   109–121 ms to the cutoff and at most about 134 ms to the reset.
 
 A legitimate action must finish well inside *N·P*. Long work is already split across actions:
-- the TI EEPROM mass erase is polled from a timer rather than waited for;
+- the EEPROM mass erase is polled from a timer rather than waited for;
 - EEPROM writes wait only word by word;
 - identification sequences run from timers and phase-current callbacks;
 - the staging slot and the status journal lie in the flash half the application does not execute from
@@ -314,23 +305,12 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 | Constraint                      | Value / Description                                                                                             |
 |---------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | Scope                           | Proves the software is running; does not prove the control loops are running                                    |
-| Control interrupt               | Not supervised: a lost trigger leaves the last duty applied, unprotected on TI (Part F)                         |
+| Control interrupt               | Not supervised: a lost trigger leaves the last duty applied, unprotected on the reference board (Part F)        |
 | Always on                       | Starts with the dispatcher; there is no enable, disable or query                                                |
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
 | Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
-| Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                                 |
-| ST targets                      | Cutoff disables TIM1's main output on the NUCLEO-G474RE; empty on the NUCLEO-H563ZI, which drives no bridge     |
+| Early-warning priority          | Lowest on the hardware platforms, so a hung interrupt starves it; NMI on the emulated target                    |
+| Window-watchdog platforms       | Cutoff disables the bridge timer's main output on platform A; empty on platform B, which drives no bridge       |
 | Interrupt work                  | An interrupt that runs longer than the early-warning timeout resets the target, so interrupts only collect data |
 | Host build                      | No watchdog                                                                                                     |
-| Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead           |
-
----
-
-## Open Questions
-
-| # | Question                                                                        | Answer or options                                                                                                      | Status   |
-|---|---------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|----------|
-| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; a stopped control interrupt is an accepted residual risk (Part F)               | answered |
-| 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset                             | answered |
-| 3 | Should the ST window-watchdog driver take the early-warning priority as config? | Yes, as the Tiva driver does; today the platform overrides the driver after start, which depends on construction order | open     |
-| 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the SIL watchdog scenario stalls the event loop and asserts the *watchdog* reset cause after the reboot           | answered |
+| Reset cause                     | Read from the processor's reset-cause register; the emulated target reads a semihosting marker file instead     |

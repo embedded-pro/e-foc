@@ -38,14 +38,6 @@ date: 2026-11-08
 - Providing Enable and Disable transitions that safely reset internal PID state
 - Folding a torque current that would drive the rotor past the overspeed limit back to zero (REQ-PRO-004)
 
-**Is NOT responsible for:**
-- Reading phase current values from the ADC hardware — currents are passed in as arguments
-- Committing duty cycles to the PWM hardware — duty cycles are returned to the Runner
-- Measuring or tracking rotor position — the mechanical angle is passed in as an argument
-- Outer-loop speed or position control
-- Faulting an overspeed: the overspeed monitor of `fault-supervision.md` Part G does that from the event loop
-- Flux weakening (Id ≠ 0 operation is structurally possible but not yet supported)
-
 ---
 
 ## Component Details
@@ -281,7 +273,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Constraint                      | Value / Description                                                                                                   |
 |---------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                                         |
-| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz) for the full `Calculate()` execution.       |
+| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period) for the full `Calculate()` execution.                           |
 | No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                                          |
 | Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.                  |
 | Electrical angle wrapping       | Handled by the table index mask in `math::FastSine` — no explicit modulo operation required in loop.                  |

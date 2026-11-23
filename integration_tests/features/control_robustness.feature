@@ -20,7 +20,7 @@ Feature: Control Robustness Against Off-Nominal Plants
   The laws measured on the second motor carry a rise limit where they carried
   none. The harness had always measured their rise time and printed it, and no
   scenario asserted it, so a law that reached its setpoint by crawling there
-  passed. See documentation/design/software-in-the-loop.md.
+  passed. See documentation/verification_and_validation/software-in-the-loop.md.
 
   The hot, loaded and differently wound plants, and every law on the second
   motor, run in the host model-in-the-loop tests (integration_tests/

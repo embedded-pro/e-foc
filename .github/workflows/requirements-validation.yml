@@ -32,7 +32,7 @@ jobs:
           run-generate-requirements-pdf: 'true'
           upload-requirements-pdf: 'true'
           schema-path: documentation/tools/requirement.schema.json
-          requirements-dir: documentation/requirements
+          requirements-dir: documentation/verification_and_validation/requirements
           template-path: documentation/templates/requirements.md
           requirements-pdf-output: documentation/output/requirements.pdf
 

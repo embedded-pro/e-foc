@@ -68,7 +68,7 @@ Feature: FOC Control Performance
   rise and tail limits follow the same twice-the-worst rule as the outer loops;
   measured from rest the current rows repeat to the digit from run to run, so
   the figures they are twice of are exact. See
-  documentation/design/software-in-the-loop.md.
+  documentation/verification_and_validation/software-in-the-loop.md.
 
   The torque-accuracy outline holds the rotor 90 electrical degrees from its aligned position,
   where a phase-A sensor offset lands on the q axis, drifts that sensor 20 mA after the

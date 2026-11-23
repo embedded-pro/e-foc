@@ -33,19 +33,14 @@ date: 2026-11-08
   encoder index angle) and system
   configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
   settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
-  target window, travel limits, temperature, bus voltage and quick-stop deceleration) across power cycles using MCU
-  internal EEPROM
+  target window, travel limits, temperature, bus voltage and quick-stop deceleration) across power cycles using the
+  target's EEPROM
 - Persisting the fault history and the learned motor model, the inductance, inertia and friction online
   recalibration adopted (`online-recalibration.md`, Part F)
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Rejecting a record written with another layout version as invalid, so it is never misread
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
 - Providing non-blocking, callback-based operations — no operation may block the calling context
-
-**Is NOT responsible for:**
-- Raw EEPROM hardware access — all erase, read, and write operations are delegated to injected EmIL `services::NvmRegion` instances (`services/util/NvmRegion.hpp`); on the board each is an EmIL `services::NvmEepromRegion`
-- Computing the calibration or configuration values themselves — those are produced by the identification services and the application
-- Providing wear-levelling or journaling — a single record per region is maintained without historical versioning
 
 ---
 
@@ -212,7 +207,7 @@ an intact record survived the erase.
 
 ### EEPROM Address-Space Map
 
-The two NVM regions occupy fixed, non-overlapping address ranges within the MCU EEPROM. Addresses are byte offsets from the start of the EEPROM address space.
+The two NVM regions occupy fixed, non-overlapping address ranges within the EEPROM. Addresses are byte offsets from the start of the EEPROM address space.
 
 | Region        | Base address | Size      | Content                  |
 |---------------|--------------|-----------|--------------------------|
@@ -222,12 +217,12 @@ The two NVM regions occupy fixed, non-overlapping address ranges within the MCU 
 | Fault history | 384          | 128 B     | The fault history image  |
 | Reserved      | 512+         | remainder | Unused; not accessed     |
 
-The regions fit within the 2048-byte EEPROM available on the TM4C1294 target, and fill the 512-byte 24LC04 on
-E-FOC-HARDWARE, which backs the NUCLEO-G474RE (that MCU has no EEPROM); the fault history therefore holds eight
+The regions fit within the 2048-byte on-chip EEPROM of one target, and fill the 512-byte external EEPROM of the
+reference board, which backs a processor with no EEPROM of its own; the fault history therefore holds eight
 records, the number its 128 bytes take. The configuration region grew
-from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the 24LC04;
-the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
-193-byte record of layout 15 fits in the 224 that remain, and no stored record moves. The NUCLEO-H563ZI and host targets use an in-memory stub of
+from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the
+external EEPROM; the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
+193-byte record of layout 15 fits in the 224 that remain, and no stored record moves. Targets with no EEPROM and the host use an in-memory stub of
 identical layout for regression testing.
 
 ### Power-Loss Mitigation

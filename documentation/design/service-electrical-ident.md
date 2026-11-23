@@ -38,12 +38,6 @@ date: 2026-11-08
 - Delivering every completion from the event loop, never from the sampling interrupt that decides it
 - Rejecting calibration when `fitQuality < 0.5` (incoherent injection response)
 
-**Is NOT responsible for:**
-- Persisting identified parameters — the caller decides what to do with results
-- Encoder zero-offset calibration — that is the Motor Alignment service
-- Performing any closed-loop current control — all voltage application is open-loop
-- Running concurrently with the normal FOC loop — the FOC loop must be stopped before either procedure begins
-
 ---
 
 ## Architecture
@@ -211,7 +205,7 @@ zero with increasing noise or rotor motion.
 | sumSquared     | 1 float | Accumulates $\Sigma i^2$ for fitQuality |
 | sampleCount    | 1 int   | Warmup/measurement gate                 |
 
-**PWM bootstrap:** the ADC on TI targets is triggered by the PWM peripheral. Because the resistance
+**PWM bootstrap:** on some targets the ADC is triggered by the PWM peripheral. Because the resistance
 estimator stops PWM on completion, the inductance estimator writes a zero-voltage vector immediately
 after registering the ADC callback to restart the PWM-triggered ADC chain before the first sample
 is expected.
@@ -393,7 +387,7 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   $-K_p I_d$ into the output and pulled the resistance negative, by about $K_p$. Which command acted
   across a tick depends on when the bridge takes a new duty, and the platform states it as a number of
   periods. The emulated board applies a duty the moment it is written, so the previous tick's command
-  acted. E-FOC-HARDWARE loads its compare registers at the counter's zero, a period after the sample the
+  acted. The reference board loads its compare registers at the counter's zero, a period after the sample the
   duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
   rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
   much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother

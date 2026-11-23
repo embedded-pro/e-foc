@@ -143,7 +143,7 @@ $$
 f_{cog} = N_{cog}\, f_m = \frac{N_{cog}}{p}\, f_e
 $$
 
-The bench motor, 12 slots and 8 poles, has 24 detents 4 mN·m deep (`documentation/design/software-in-the-loop.md`
+The bench motor, 12 slots and 8 poles, has 24 detents 4 mN·m deep (`documentation/verification_and_validation/software-in-the-loop.md`
 Part K): $6 f_e$, the same frequency as dead time. At speed the speed loop and the inertia filter it; near
 standstill it decides where the rotor can rest, and a position setpoint between two detents is held only if
 the loop is stiffer than the cogging. *e-foc today:* compensated by a 48-bin map over one electrical period,
@@ -167,7 +167,7 @@ $$
 $$
 
 a loss for current out of the leg, a gain for current into it. At small current the node is still swinging when the complement turns on, the loss is
-proportional to the current and looks like extra resistance (`documentation/design/software-in-the-loop.md`
+proportional to the current and looks like extra resistance (`documentation/verification_and_validation/software-in-the-loop.md`
 Part L). Because the loss follows the sign of each phase current, it is a square wave in each phase: a
 fundamental component that reduces the voltage and odd harmonics, the 5th and 7th of which give a
 **$6 f_e$ ripple** in dq. Near each current zero crossing the current flattens ("zero-crossing distortion").
@@ -322,7 +322,7 @@ down.
 **Limit cycles.** Quantisation, a dead band or an unmodelled delay inside a high-gain loop can sustain an
 oscillation with no input. The deadbeat law, which assumed the duty acts at once, did so on the rig at
 3.4 kHz until it was made to predict the current for when its duty lands
-(`documentation/design/software-in-the-loop.md` Part K). Integral action around Coulomb friction is the
+(`documentation/verification_and_validation/software-in-the-loop.md` Part K). Integral action around Coulomb friction is the
 mechanical version: hunting.
 
 **Sine table.** 512 interpolated entries: an amplitude error of $1.9\times10^{-5}$, below every other item

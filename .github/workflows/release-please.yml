@@ -213,19 +213,37 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Generate documentation PDFs and traceability matrix
+      - name: Generate the traceability matrix
         uses: embedded-pro/project-documentation@e1b8b6866333964f2e02b29bba322cbee211819b # v0.3.0
         with:
           python-version: ''
-          run-build-documentation-pdfs: 'true'
           run-traceability-matrix: 'true'
-          version: ${{ needs.release_please.outputs.version }}
-          output-dir: docs-pdf
-          artifact-name: documentation-pdfs
-          requirements-dir: documentation/requirements
+          requirements-dir: documentation/verification_and_validation/requirements
           features-dir: integration_tests/features
           matrix-output: docs-pdf/traceability-matrix.md
-          matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.version }}.pdf
+      - name: Build the booklet and the document PDFs
+        run: |
+          python3 documentation/tools/build-foc-booklet.py --format pdf documents \
+            --version "${{ needs.release_please.outputs.version }}" \
+            --traceability-matrix docs-pdf/traceability-matrix.md
+      - name: Bundle the documentation
+        shell: bash
+        run: |
+          v="${{ needs.release_please.outputs.version }}"
+          docs="e_foc-documentation-${v}"
+          mkdir "$docs"
+          cp build/booklet/eFocDesign.pdf "$docs/"
+          cp -r build/booklet/documents/. "$docs/"
+          for folder in design theory verification_and_validation; do
+            compgen -G "$docs/$folder/*.pdf" > /dev/null || { echo "::error::no $folder PDFs"; exit 1; }
+          done
+          python3 -m zipfile -c "${docs}.zip" "$docs"
+          python3 -m zipfile -l "${docs}.zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: documentation
+          path: e_foc-documentation-*.zip
+          if-no-files-found: error
 
   publish_release_assets:
     name: Publish Release Assets
@@ -250,17 +268,6 @@ jobs:
           merge-multiple: true
       - name: Remove host install package
         run: rm -f release-assets/e_foc-0*.* release-assets/e_foc-*-Linux.*
-      - name: Bundle documentation PDFs
-        run: |
-          v="${{ needs.release_please.outputs.version }}"
-          docs="e_foc-documentation-${v}"
-          shopt -s nullglob
-          pdfs=(release-assets/*-"${v}".pdf)
-          [ "${#pdfs[@]}" -gt 0 ] || { echo "::error::no documentation PDFs"; exit 1; }
-          mkdir "$docs"
-          mv "${pdfs[@]}" "$docs/"
-          zip -q -r -X "release-assets/${docs}.zip" "$docs"
-          unzip -l "release-assets/${docs}.zip"
       - name: Check release assets
         run: |
           v="${{ needs.release_please.outputs.version }}"

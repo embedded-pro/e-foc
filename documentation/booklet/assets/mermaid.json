@@ -17,7 +17,7 @@
   "class": {
     "useMaxWidth": false
   },
-  "stateDiagram": {
+  "state": {
     "useMaxWidth": false
   }
 }

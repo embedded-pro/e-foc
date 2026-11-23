@@ -1,0 +1,17 @@
+% LaTeX preamble of the Design Booklet only, after preamble.tex (passed to pandoc via -H).
+
+% ── Chapter title styling ────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{RoyalBlue}}
+  {\chaptertitlename\ \thechapter}{20pt}{\Huge}
+
+% ── Cover page ───────────────────────────────────────────────────────────────
+\usepackage{titling}
+\pretitle{\begin{center}\vspace*{3cm}\Huge\bfseries\color{RoyalBlue}}
+\posttitle{\par\end{center}\vskip 0.8em}
+\preauthor{\begin{center}\large}
+\postauthor{\par\end{center}}
+\renewcommand{\and}{\\[0.4em]}
+\predate{\begin{center}\large}
+\postdate{\par\end{center}\vfill}

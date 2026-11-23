@@ -21,20 +21,12 @@ date: 2026-11-08
 ## Responsibilities
 
 **Is responsible for:**
-- Capturing Cortex-M CPU register state and a stack-address backtrace when a HardFault exception occurs, before the system resets.
+- Capturing the processor's register state and a stack-address backtrace when a HardFault exception occurs, before the system resets.
 - Cutting the power stage and resetting when an assertion fails.
 - Persisting that diagnostic snapshot in a memory region that is not cleared on reset, so it survives the subsequent boot.
 - Reporting the cause of the most recent reset (power-up, brown-out, software, hardware, or watchdog) to the application layer via `PlatformFactory`.
 - Reporting the formatted fault snapshot and the reset cause in the startup banner at boot.
 - Providing a platform-initiated software reset via `PlatformFactory::Reset()`.
-
-**Is NOT responsible for:**
-- Deciding what the application does after a fault (handled by the application layer).
-- Supervising the event dispatcher with the MCU watchdog — that is the watchdog component's work
-  ([Watchdog Design](watchdog.md)). This component only reports a watchdog reset once it has happened.
-- Correcting or masking the fault condition.
-- Logging to persistent storage beyond the single fault region.
-- CAN-bus boot notification or any network-layer diagnostics.
 
 ---
 
@@ -45,12 +37,12 @@ date: 2026-11-08
 A naked assembly trampoline runs in HardFault exception context before any C function prologue executes. It determines whether the exception was entered from thread mode (using PSP as the stack pointer) or from handler mode (using MSP), then passes the correct stack frame pointer to the C-level capture routine.
 
 `MemManage_Handler`, `BusFault_Handler` and `UsageFault_Handler` are aliases of the same trampoline, so a
-configurable fault is captured exactly like a HardFault, and CFSR tells them apart. Nothing enables them in
-`SCB->SHCSR`, so today each escalates to HardFault and the aliases never run. They exist for the ST vector table,
-which names all three. Without a strong definition there, the weak ones in EMIL's `FaultTracer` win, and they
-bring about 3 KB of fault-dump code and strings into the image. That code could only reach `abort()`, because
-nothing constructs a `FaultTracer`. The TI startup files point these vectors at `Default_Handler`, so on TI the
-aliases are only extra names for the HardFault trampoline and cost nothing.
+configurable fault is captured exactly like a HardFault, and the configurable-fault status register tells them
+apart. Nothing enables them, so today each escalates to HardFault and the aliases never run. They exist for a
+vector table that names all three. Without a strong definition there, the weak ones in EMIL's `FaultTracer` win, and
+they bring about 3 KB of fault-dump code and strings into the image. That code could only reach `abort()`, because
+nothing constructs a `FaultTracer`. A startup file that points these vectors at a default handler needs no alias,
+which then is only an extra name for the HardFault trampoline and costs nothing.
 
 The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register
 capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state
@@ -62,15 +54,15 @@ archive member carrying the real definition is never pulled in — nothing refer
 The result is a hook that is called on every fault and cuts nothing. Requiring the definition means a platform
 that forgets it fails to link.
 
-On TI, the definition clears `PWMENABLE` on each PWM module that `SYSCTL->PRPWM` reports as clocked, which
-drives every `pwmN` output low and so turns all six gate signals off. It is a handful of instructions with no
+On a platform with several PWM modules, the definition clears the output enable of each module whose clock is on, which
+drives every PWM output low and so turns all six gate signals off. It is a handful of instructions with no
 loop and no dependency on driver state, and it touches no unclocked peripheral — a write to one would fault
 again, and a nested fault here is the lockup this call exists to prevent.
 
-On the NUCLEO-G474RE the definition clears the main-output enable of TIM1, the advanced-control timer wired to
-the gate drivers, when its clock is on. With the off-state selections set, every gate input then sits at its idle
-low level, so all six FETs are off; like the TI definition it reads no driver state. On the NUCLEO-H563ZI the
-definition is empty, and says so: that target does not drive a bridge yet, so there is no timer to name.
+On a platform with one advanced-control timer wired to the gate drivers, the definition clears that timer's
+main-output enable when its clock is on. With the off-state selections set, every gate input then sits at its idle
+low level, so all six FETs are off; like the definition above it reads no driver state. On a platform that does not
+drive a bridge yet the definition is empty, and says so: there is no timer to name.
 
 ### Board protection state — `BoardProtectionStatus()`
 
@@ -89,22 +81,22 @@ The platforms answer as follows. The decision itself is one header, `core/platfo
 outside the board's overvoltage and undervoltage thresholds (a reading that is not a number counts as outside),
 `clear` otherwise. A latched trip answers without reading the bus.
 
-- **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
-  whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO; steps 3 to 5
-  are redirected to comparators 0, 1 and 2 through the SSOP register and never reach the FIFO, so the phase-current
+- **Comparator-based protection** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`,
+  steps 3 to 5) whose outputs drive the PWM fault inputs. Steps 0 to 2 convert the phase currents into the ADC FIFO;
+  steps 3 to 5 are redirected to comparators 0, 1 and 2 and never reach the FIFO, so the phase-current
   adapter still receives exactly three samples. The ADC driver empties the FIFO on every run and drops the first run
   after each arm, because arming can land while a run is half converted. Any later run with a different number of
-  samples fails an assertion (see Assertion failures below): it means a conversion was missed or overran. Comparator 0 watches the total current (PB4, AIN10), and 1 and 2 the
-  bus voltage (PB5, AIN11) against the overvoltage and the undervoltage threshold; their outputs feed bits 0, 1 and 2
-  of PWM fault source 1 (`FLTSRC1`), which tristates every motor PWM output the instant a threshold is crossed.
+  samples fails an assertion (see Assertion failures below): it means a conversion was missed or overran. Comparator 0 watches the total current, and 1 and 2 the
+  bus voltage against the overvoltage and the undervoltage threshold; their outputs feed bits 0, 1 and 2
+  of the PWM fault source, which tristates every motor PWM output the instant a threshold is crossed.
   Their counts come from the motor board's `BoardCharacteristics`; the
   total-current sense is biased to mid-rail, so `OvercurrentThresholdCounts` is an offset above half scale (6.6 A,
   80 % of the +8.25 A a 5 A/V sense spans on a 3.3 V ADC). The bus voltage is sampled twice, once against the
   overvoltage trip and once against an undervoltage trip at 18 V, because a sequencer step feeds one comparator.
-  The board runs its gate driver and the launchpad from the same bus, so a bus pulled down by the bridge would
+  The board runs its gate driver and the controller from the same bus, so a bus pulled down by the bridge would
   otherwise brown the controller out with nothing logged; at 18 V the gate-drive supply is still in regulation, the
   bridge is cut and the fault reaches the state machine. The overcurrent comparator cannot see the bus current
-  on E-FOC-HARDWARE: its shunt returns the low-side current of all three legs, and the sequence converts at the
+  on the reference board: its shunt returns the low-side current of all three legs, and the sequence converts at the
   counter's zero, where the low sides conduct and that current sums to zero. The phase currents are converted
   at that same instant, where each winding's current crosses its own shunt, so the conversion interrupt checks
   each of them against the same 6.6 A before handing them on. A sample beyond it cuts the outputs
@@ -118,41 +110,41 @@ outside the board's overvoltage and undervoltage thresholds (a reading that is n
   condition from an unevaluated one. `BoardProtectionStatus()` therefore does not read the comparators. It reports
   `asserted` while the over-current latch (`overCurrentTripped`, set by `TripOverCurrent`) or the PWM-fault latch
   (`pwmFaultAsserted`, set by `OnPwmFault` when the OV/UV comparators drive the fault input) is set, and otherwise
-  takes a fresh `PowerSupplyVoltage()` reading, on the separately triggered ADC1, and reports `asserted` when it is
+  takes a fresh `PowerSupplyVoltage()` reading, on a separately triggered ADC, and reports `asserted` when it is
   above 58 V or below 18 V and `clear` when it is between. The reading is blocking and takes about 134 µs, which is
   acceptable because the query runs on the event dispatcher at fault-clear time and never from an interrupt. Both
   latches hold until the bridge is stopped (`Stop()`), which the fault response does at once; after that the live
   bus reading is the evidence for an over- or undervoltage, and over-current is not observable while stopped
   because no current flows through a disabled bridge. Monitoring the bus while the stage is stopped, so a
   condition that appears with no fault pending is seen, is out of scope here and belongs to #466.
-- **NUCLEO-G474RE** — the same decision. Its checks run on the PWM-triggered samples, which stop with the bridge,
+- **Software-check protection** — the same decision. Its checks run on the PWM-triggered samples, which stop with the bridge,
   so the latch (`protectionTripped`, set by `TripProtection` and by the watchdog) covers the trip until `Stop()`
   and a fresh `PowerSupplyVoltage()` reading against the same thresholds covers the rest. The reading is on
-  ADC1 in the event loop, never in the interrupt.
+  ADC in the event loop, never in the interrupt.
 - **QEMU** — reports the simulated board protection's real status (`boardProtection.Status()`), driven by the
   plant's over-current, over- and undervoltage trip levels.
-- **NUCLEO-H563ZI** — does not wire board protection, so there is no condition to observe.
+- **No protection wired** — the platform does not wire board protection, so there is no condition to observe.
 - **host** — settable, so tests can hold the condition asserted across a re-arm attempt.
 
 **Verification.** The per-sample decision, `ExceedsOverCurrent` in `core/platform_abstraction/BoardProtection.hpp`,
 is shared by both platforms and unit-tested on the host, and `protection_faults.feature` covers the state machine's
 response to a board-protection fault through the QEMU board protection. The trip paths on the boards are verified
-by review only, and no automated test is planned for them (#487): the TI comparators driving the PWM fault inputs,
-the TI per-sample over-current cut and the NUCLEO-G474RE software checks. Exercising them takes a dedicated rig that
+by review only, and no automated test is planned for them (#487): the comparators driving the PWM fault inputs,
+the per-sample over-current cut and the software checks. Exercising them takes a dedicated rig that
 is out of scope here: a programmable supply driven above 58 V and below 18 V, a way to force a phase current above
 6.6 A, and a scope to bound the gate cut, none of which the CAN-only bench (`integration-testing.md`, *Commands and Verdicts over CAN Only*) has.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
-three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
+three processor fault status registers (configurable-fault status, memory-management address, bus-fault address) into the persistent region. It also scans the stack
 above the exception frame and records any word whose value falls within the `.text` section as a probable
 return address — this constitutes the backtrace. The scan is bounded to a fixed number of words, not run to
 `_estack`: on a bus or MPU fault the stack pointer itself may be the corrupt value, and dereferencing it can
 nest-fault into lockup, which leaves the motor energised indefinitely because the reset never happens. A
 validity sentinel is written last; this is the atomic
-commit point. If the MCU loses power or watchdog-resets mid-write, an incomplete capture is detected and
+commit point. If the processor loses power or watchdog-resets mid-write, an incomplete capture is detected and
 discarded on the next boot.
 
-After capture, the handler resets the MCU with `NVIC_SystemReset()`.
+After capture, the handler resets the processor with a system reset request.
 
 ### Assertion failures — `abort()`
 
@@ -161,13 +153,13 @@ attached and otherwise spins forever, with the gate drivers still switching at t
 not cut them when the failure happens in an interrupt. The hung interrupt starves the early warning, so nothing cuts
 the stage before the hardware reset 25 to 50 ms later ([Watchdog Design](watchdog.md), Part C).
 
-The fault handler's file therefore defines `abort()` on TI and ST, replacing the weak default. It calls
+The fault handler's file therefore defines `abort()` on the hardware platforms, replacing the weak default. It calls
 `CutPowerStage()` first, stops at a breakpoint when a debugger is attached, and otherwise resets with
-`NVIC_SystemReset()`. It writes no fault record, so the next boot reports a software reset.
+a system reset request. It writes no fault record, so the next boot reports a software reset.
 
 ### Persistent fault region
 
-The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
+The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts of the hardware targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
 
 The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-PLT-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
 
@@ -199,16 +191,16 @@ Alongside the post-mortem fault record, the platform keeps two live sets of coun
 statistics are read over CAN (`0xA0`–`0xA7`), and `ClearDiagnostics` resets both sets
 (`service-can.md`); no interface of the motor application reads the CAN error counters.
 
-**Control-interrupt execution.** The Cortex-M cycle counter (EmIL's
+**Control-interrupt execution.** The processor's cycle counter (EmIL's
 `hal::cortex::DataWatchpointAndTrace`, started once when the platform is built) is left free-running and read on entry
 to and exit from the application callback that executes inside the control interrupt; the difference
 is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
-own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
+own wrap. The measured window covers encoder read,
 control law and PWM write — the work the cycle budget applies to. Hardware ISR entry/exit overhead
 is excluded; REQ-PLT-004 reserves 25% of the control period for that overhead. The measurement is
 taken in the platform layer so it is consistent across targets. The emulated target has no cycle
 counter and reads a free-running timer of its instruction-counted clock instead
-([software-in-the-loop.md](software-in-the-loop.md), Part B3).
+([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part B3).
 
 From it the platform maintains the last, minimum, maximum and a filtered average duration, the
 execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline
@@ -216,11 +208,11 @@ still met), **deadline misses** (over the period itself), and **re-entries** (a 
 while the previous interrupt had not returned — the same failure observed as it happens rather than
 inferred afterwards).
 
-A Cortex-M exception cannot preempt itself, so a flag set on entry and tested on the next entry
-never sees a re-entry: the late conversion waits as pending and runs after the return. The TI and ST
+An exception cannot preempt itself, so a flag set on entry and tested on the next entry
+never sees a re-entry: the late conversion waits as pending and runs after the return. The hardware
 platforms instead check, as the callback ends, whether the interrupt now running is pending again
 (EmIL's `hal::cortex::InterruptPending(hal::cortex::ActiveInterrupt())`: the active exception
-number from `SCB->ICSR`, its bit in `NVIC->ISPR`). Both drivers clear their interrupt flag and
+number and its pending bit in the interrupt controller). Both drivers clear their interrupt flag and
 pending bit before calling back, so the bit is set only by a conversion or transfer that completed
 during the callback.
 
@@ -252,11 +244,11 @@ telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 
 ### Required
 
-| Interface                                           | Purpose                                               | Contract                                            |
-|-----------------------------------------------------|-------------------------------------------------------|-----------------------------------------------------|
-| Platform linker script                              | Provide `.error_handling` NOLOAD section in RAM       | Must be placed before `.bss` to avoid zero-fill     |
-| ARM Cortex-M NVIC                                   | Deliver HardFault exception to the handler trampoline | Always-enabled; not configurable via NVIC_EnableIRQ |
-| `SYSCTL->RESC` (TI) / `RCC->CSR` or `RCC->RSR` (ST) | Provide reset source bits at boot                     | Read once; cleared after read                       |
+| Interface                 | Purpose                                               | Contract                                        |
+|---------------------------|-------------------------------------------------------|-------------------------------------------------|
+| Platform linker script    | Provide `.error_handling` NOLOAD section in RAM       | Must be placed before `.bss` to avoid zero-fill |
+| Processor fault exception | Deliver HardFault exception to the handler trampoline | Always enabled; not configurable                |
+| Reset source register     | Provide reset source bits at boot                     | Read once; cleared after read                   |
 
 ---
 
@@ -266,14 +258,14 @@ telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 |---------------------|-------------------------|-----------------------|-------------------------------------------------|-----------------------------------------|
 | PersistentFaultData | magic                   | 32-bit unsigned       | 0 or 0xDEADBEEF                                 | Written last to commit capture          |
 | PersistentFaultData | r0–r3, r12, lr, pc, psr | 32-bit unsigned       | Any                                             | ARM exception stack frame words         |
-| PersistentFaultData | cfsr, mmfar, bfar       | 32-bit unsigned       | Any                                             | Cortex-M fault status registers         |
+| PersistentFaultData | cfsr, mmfar, bfar       | 32-bit unsigned       | Any                                             | Processor fault status registers        |
 | PersistentFaultData | stackTrace[16]          | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
 | PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–16                                            | Number of valid trace entries           |
-| ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
+| ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | Processor-agnostic                      |
 
 `ResetCause::watchdog` comes from the reset source bits alone. The watchdog never resets by software: on
 expiry it cuts the power stage and stops refreshing, and the peripheral's own reset sets the watchdog bit.
-No marker has to survive the reset on an MCU; the emulated target, which has no reset source bits, keeps a
+No marker has to survive the reset on a processor; the emulated target, which has no reset source bits, keeps a
 semihosting marker file instead. See [Watchdog Design](watchdog.md).
 
 ---
@@ -286,7 +278,7 @@ stateDiagram-v2
     [*] --> FaultDataAvailable : Boot — valid magic in persistent region
     FaultDataAvailable --> Idle : Formatted and validity sentinel cleared
     Idle --> Capturing : HardFault exception raised
-    Capturing --> [*] : magic written, NVIC_SystemReset called
+    Capturing --> [*] : magic written, system reset requested
 ```
 
 ---
@@ -318,7 +310,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant CPU as ARM Cortex-M
+    participant CPU as Processor
     participant Asm as HardFault_Handler (naked)
     participant C as HardFault_Handler_C
     participant PFD as PersistentFaultData (NOLOAD RAM)
@@ -329,8 +321,8 @@ sequenceDiagram
     C->>C: CutPowerStage() — PWM outputs off before anything else
     C->>PFD: magic = 0  (invalidate)
     C->>PFD: write r0–psr from exception frame
-    C->>PFD: write cfsr, mmfar, bfar from SCB
+    C->>PFD: write cfsr, mmfar, bfar from the fault status registers
     C->>PFD: scan stack for .text addresses → stackTrace
     C->>PFD: magic = 0xDEADBEEF  (commit)
-    C->>CPU: NVIC_SystemReset()
+    C->>CPU: system reset request
 ```

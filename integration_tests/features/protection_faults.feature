@@ -14,7 +14,7 @@ Feature: Board Protection Faults
   These rows were once held out of the default run because delivering a trip to
   a running drive locked the firmware up. The fault path defers its transition
   through the weak-pointer event dispatcher, which the emulated platform did not
-  register; see Part E of documentation/design/software-in-the-loop.md.
+  register; see Part E of documentation/verification_and_validation/software-in-the-loop.md.
 
   @sil @REQ-LCY-003
   Scenario Outline: A <fault> trip faults the running motor

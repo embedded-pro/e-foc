@@ -30,7 +30,7 @@ date: 2026-11-05
 
 The bootloader is a single, small program at the start of flash. It runs at every reset, before the motor
 controller application, and does two things only: it checks that the application is intact, and built for
-this microcontroller and board, before starting it; and it installs a new application that the running one
+this board, before starting it; and it installs a new application that the running one
 staged and that the user applied. Receiving the firmware is the application's job
 (`service-firmware-upgrade.md`); choosing it, and deciding when to download and when to apply it, is the user's,
 through the CAN Commander (`tool-can-commander.md` Part M).
@@ -39,25 +39,14 @@ through the CAN Commander (`tool-can-commander.md` Part M).
 - Checking, at every reset, the application in the application slot against its image descriptor (size and
   SHA-256) and starting it only when they match.
 - Installing an upgrade pack that the application staged and marked ready on the user's apply: checking that
-  the pack was built for this board and microcontroller, verifying its ECDSA-P256 signature over SHA-256 with
+  the pack was built for this board, verifying its ECDSA-P256 signature over SHA-256 with
   the public key built into the bootloader, decrypting the image with AES-128-CTR, writing it into the
   application slot and writing its image descriptor.
-- Refusing an image built for another microcontroller or board before anything is erased, by comparing the
+- Refusing an image built for another board before anything is erased, by comparing the
   target identity inside the image with the chip's own device identity (Part I).
 - Recording each step of an installation in the status journal, so that a reset or a power loss during an
   installation resumes it at the next reset, and a pack that failed a check is never tried again.
 - Starting the application: its vector table, its stack pointer and its reset handler.
-
-**Is NOT responsible for:**
-- Receiving firmware over CAN or any other channel. The bootloader has no CAN stack, no event loop and no
-  interrupts.
-- Updating itself. There is one stage only; the bootloader changes only with a debugger.
-- Keeping the previous application, or refusing an older version. Once an installation has started, the old
-  image is gone, and any validly signed pack for the board is accepted, newer or older.
-- Recovering a board whose application slot is broken and which holds no valid staged pack. It stays in the
-  bootloader, and a debugger restores it.
-- The non-volatile calibration and configuration records. They live outside the flash slots
-  (`service-nvm.md`), and an update leaves them untouched.
 
 ---
 
@@ -67,24 +56,25 @@ through the CAN Commander (`tool-can-commander.md` Part M).
 
 Flash is split into a bootloader region, an application slot and a staging slot. The application runs from
 its slot; the staging slot holds the pack the application received, in internal flash where two copies of the
-image fit and in external SPI NOR flash where they do not. The application and staging slots are 320 KB on every board, and no
+image fit and in external flash where they do not. The application and staging slots are 320 KB on every board, and no
 larger: the application erases all of it before a download starts (`service-firmware-upgrade.md` Part B), so
 its size bounds that erase. The status journal (Part D) is the erase unit after the staging slot; the last 64
 bytes of the application slot are the image descriptor (Part E).
 
-| Board         | Flash, erase unit       | Bootloader          | Application slot              | Staging slot                                 | Journal                 | Image today  |
-|---------------|-------------------------|---------------------|-------------------------------|----------------------------------------------|-------------------------|--------------|
-| EK-TM4C1294XL | 1 MB, 16 KB sectors     | `0x00000000`, 32 KB | `0x00008000`, 320 KB          | internal, `0x00080000`, 320 KB, upper half   | `0x000D0000`, 16 KB     | 246 KB       |
-| NUCLEO-H563ZI | 2 MB in two banks, 8 KB | `0x08000000`, 32 KB | `0x08008000`, 320 KB (bank 1) | internal, `0x08100000`, 320 KB (bank 2)      | `0x08150000`, 8 KB      | not measured |
-| NUCLEO-G474RE | 512 KB, 2 KB pages      | `0x08000000`, 32 KB | `0x08008000`, 320 KB          | external SPI NOR, from its address 0, 320 KB | the NOR sector after it | 259 KB       |
-| Emulated      | 4 MB of code RAM        | `0x00000000`, 32 KB | `0x00008000`, 320 KB          | semihosting file `staging.bin`, 320 KB       | file `journal.bin`      | 242 KB       |
+| Region           | Offset from the start of flash | Size           | Medium                                                                          |
+|------------------|--------------------------------|----------------|---------------------------------------------------------------------------------|
+| Bootloader       | `0x00000000`                   | 32 KB          | internal flash                                                                  |
+| Application slot | `0x00008000`                   | 320 KB         | internal flash; the last 64 bytes are the image descriptor                      |
+| Staging slot     | after the application slot     | 320 KB         | internal flash the application does not execute from, external flash, or a file |
+| Journal          | after the staging slot         | one erase unit | the medium of the staging slot                                                  |
 
-The EK-TM4C1294XL and the emulated board are built with this layout today. The NUCLEO-H563ZI and NUCLEO-G474RE
-rows are the layout those boards take once they get the bootloader (Open Question 6); until then each is linked
-standalone from the start of its flash, programmed with a debugger, carries no application header and has no
-staging slot (`service-firmware-upgrade.md` Part I).
+The reference board and the emulated board are built with this layout today; on the emulated board, which has 4 MB
+of code RAM, the staging slot is the semihosting file `staging.bin` and the journal the file `journal.bin`. The
+application image is 246 KB on the reference board and 242 KB on the emulated one. A board that does not yet have
+the bootloader is linked standalone from the start of its flash, programmed with a debugger, carries no application
+header and has no staging slot (`service-firmware-upgrade.md` Part I).
 
-On the EK-TM4C1294XL:
+On the reference board, whose staging slot is in internal flash:
 
 ```text
 0x00000000 +--------------------------+
@@ -95,7 +85,7 @@ On the EK-TM4C1294XL:
 0x00057FC0 |   image descriptor 64 B  |
 0x00058000 +--------------------------+
            | unused           160 KB  |
-0x00080000 +==========================+  half boundary: banks 0 and 1 below, banks 2 and 3 above
+0x00080000 +==========================+  half boundary: the application executes below, erases above
            | staging slot     320 KB  |  pack received over CAN, erased while the application runs
 0x000D0000 +--------------------------+
            | status journal    16 KB  |
@@ -104,10 +94,10 @@ On the EK-TM4C1294XL:
 0x00100000 +--------------------------+
 ```
 
-- The flash is two independent 512 KB halves, banks 0 and 1 below `0x00080000` and banks 2 and 3 above it.
+- The reference board's flash is two independent halves, below and above `0x00080000`.
   A sector erase stalls every read of its own half until it completes, instruction fetches and the
-  watchdog's early-warning handler included, while the other half reads normally (datasheet 8.2.3.3, flash
-  mirror mode: software runs from the lower banks while updating the upper). The application executes from
+  watchdog's early-warning handler included, while the other half reads normally (software runs from the
+  lower half while updating the upper). The application executes from
   the lower half and erases the staging slot and the journal while it runs, so both lie entirely in the upper
   half and no erase it performs can block the core or the watchdog; the linker script asserts it. A 16 KB
   erase takes about 17 ms on the bench and up to 40 ms with wear, against the 25 ms the watchdog hardware
@@ -115,20 +105,19 @@ On the EK-TM4C1294XL:
   board whenever an erase ran long. The bootloader's own erases of the application slot run with no watchdog.
 
 - The application is linked at the start of its slot. It moves the vector table to the slot before it enables
-  any interrupt, because neither the TI startup nor the ST system initialisation does: the TI startup leaves the
-  table at address 0 and the H5 system initialisation sets it to the start of flash.
-- On the NUCLEO-H563ZI the staging slot will be the second bank for the same reason, so the application
-  programs it while running from the first bank without stalling. Bank swapping stays off: the bootloader
+  any interrupt, because a platform's startup code leaves the table at its reset value, address 0 or the start
+  of flash.
+- On a board with two flash banks the staging slot is the bank the application does not execute from, for the
+  same reason, so the application programs it without stalling. Bank swapping stays off: the bootloader
   copies the image instead.
-- On the NUCLEO-G474RE the application slot will span both banks, and the staging slot an SPI NOR device on the
-  motor board (Open Question 1).
+- On a board whose staging slot is external flash, a serial NOR device holds it and the application slot spans
+  the internal flash.
 - A pack may be as large as the staging slot, 327 680 bytes, which is below the 393 216 bytes a `can-lite`
   firmware-upgrade transfer can address. The image it carries may fill the application slot less its
   descriptor, and the pack's header, signature and image framing less than that: an update installs only an
   image whose pack fits the staging slot.
-- The NUCLEO-G474RE image, 259 KB today, is larger than any pack the staging slot holds; that board gets updates
-  only once its image fits (Open Question 5).
-- `hardware_test` is linked standalone from the start of flash on every board, the EK-TM4C1294XL included:
+- A board whose image is larger than any pack the staging slot holds gets updates only once its image fits.
+- `hardware_test` is linked standalone from the start of flash on every board, the reference board included:
   programming its hex image replaces the bootloader, and the board gets the bootloader back only when the
   bootloader and `sync_foc_sensored` images are programmed again (Part J). It carries no application header and
   no image descriptor, so it never travels as a pack and the bootloader would never start it.
@@ -147,15 +136,14 @@ components, with exactly one image:
 | Image epilogue  | destination address (the start of the application slot) and image size                                   | yes    | yes       |
 | Image           | the application binary, as the debugger would program it into the slot                                   | yes    | yes       |
 
-- The **product name** field holds the **board identification**: `e-foc`, the board and the microcontroller
-  part, as in `e-foc EK-TM4C1294XL TM4C1294NCPDT`,
-  `e-foc NUCLEO-H563ZI STM32H563ZI`, `e-foc NUCLEO-G474RE STM32G474RE` and `e-foc emulated mps2-an386`. Every
+- The **product name** field holds the **board identification**: `e-foc`, the board and the processor
+  part, as in `e-foc emulated mps2-an386`. Every
   board has one, with a bootloader or not. It is defined once, in the board's definition in the build, beside
   the board kind, the board's name and whether it carries a bootloader; the build generates one header from
   those definitions, which the application, the
   bootloader, the software-in-the-loop harness and the CAN Commander read, and the packer takes it from the same
   definitions, never from a typed argument. The library names the field *product name*; the format does not
-  change. The bootloader compares it with its own, so a pack for another board or microcontroller is refused
+  change. The bootloader compares it with its own, so a pack for another board is refused
   before anything is written. The application checks the same identification when it verifies the pack, so the
   refusal comes before the user can apply it (`service-firmware-upgrade.md` Part D).
 - The **product version** is the build's project version, the release tag without its leading `v`: the version
@@ -199,8 +187,8 @@ flowchart TD
 ### Part D — status journal
 
 The embedded-infrastructure pack reader keeps an installation's progress in the pack's own status byte, which
-it clears bit by bit as the installation advances. The ST internal flash cannot do that: it programs 64-bit
-(G4) or 128-bit (H5) units with ECC, and a programmed unit cannot be programmed again until its page is
+it clears bit by bit as the installation advances. Some internal flash cannot do that: it programs 64-bit
+or 128-bit units with ECC, and a programmed unit cannot be programmed again until its page is
 erased. Progress therefore goes to a journal instead, the erase unit after the staging slot, on every board:
 
 - Each entry is one 16-byte unit: a marker, the status and the error code. A new status is written into the
@@ -240,15 +228,15 @@ The bootloader runs on the main stack alone, with 16 KB of RAM reserved for it a
 the decrypted first 2 KB of an image, the signature verification and the digest contexts live there, and the
 link fails if the bootloader's static data ever reaches into that reservation. The application reserves 1 KB
 the same way. The bootloader uses no interrupt, no timer and no peripheral but the flash controller and the clock
-tree. On the EK-TM4C1294XL it runs at the application's 120 MHz through the board's own clock bring-up, the
-`Clocks::Initialize` the application calls too (`targets/platform_implementations/ti/EK-TM4C1294XL/Clocks.hpp`), so
+tree. On the reference board it runs at the application's clock through the board's own clock bring-up, the
+`Clocks::Initialize` the application calls too, so
 its checks and an installation take the time they would in the application; the emulated board has no clock to set.
 The PLL stays running at the hand-over: the application's bring-up re-runs the same sequence, which first returns to
 the internal oscillator, so it starts from any clock state. Apart from these the processor is in its reset state; the
 flash controller is locked again. It points the vector table at the
 application slot, loads the stack pointer from the slot's first vector and branches to the reset handler in
-the second, through the embedded-infrastructure library's Cortex-M jump. The watchdog is not running at that point: the TI watchdog and the ST window watchdog both start
-only when software starts them, and the application does (`watchdog.md`).
+the second, through the embedded-infrastructure library's processor jump. The watchdog is not running at that point: the
+hardware watchdogs start only when software starts them, and the application does (`watchdog.md`).
 
 ### Part G — keys
 
@@ -275,17 +263,16 @@ only when software starts them, and the application does (`watchdog.md`).
   open-source product: anyone can build the plaintext image from the sources, and the release ships the
   bootloader with its key slot. The packs stay encrypted because the library's pack format carries the
   encryption. The signature is what keeps anyone without the release private key from installing an image on
-  a release board; production boards are also locked against debug access (TM4C debug lock, ST read-out
-  protection level 1).
+  a release board; production boards are also locked against debug access.
 
 ### Part H — per board
 
-| Board         | Application slot flash      | Staging flash                        | Bootloader                                                      |
-|---------------|-----------------------------|--------------------------------------|-----------------------------------------------------------------|
-| EK-TM4C1294XL | TI internal flash, blocking | TI internal flash, blocking          | yes                                                             |
-| NUCLEO-H563ZI | ST internal flash, bank 1   | ST internal flash, bank 2            | planned (Open Question 6)                                       |
-| NUCLEO-G474RE | ST internal flash           | SPI NOR on the motor board, blocking | planned, once the board has the device (Open Questions 1 and 6) |
-| Emulated      | code RAM, refilled at reset | file in the scenario directory       | yes                                                             |
+| Board                       | Application slot flash      | Staging flash                  | Bootloader |
+|-----------------------------|-----------------------------|--------------------------------|------------|
+| Reference board             | internal flash, blocking    | internal flash, blocking       | yes        |
+| Board with two flash banks  | internal flash, one bank    | internal flash, the other bank | planned    |
+| Board with external staging | internal flash              | external flash, blocking       | planned    |
+| Emulated                    | code RAM, refilled at reset | file in the scenario directory | yes        |
 
 The emulated target boots through the bootloader like a board with one: every software-in-the-loop scenario
 starts with the bootloader's check of the application slot, and the bootloader's own scenarios stage packs
@@ -294,31 +281,28 @@ at every reset, so an image the bootloader installs lasts until the next reset; 
 in the scenario directory and last across resets and restarts. The emulator has no device-identity register
 (Part I).
 
-### Part I — target identity: never the wrong microcontroller
+### Part I — target identity: never the wrong processor
 
-An image built for one microcontroller must never be written into another, an STM32 image into a Tiva board for
-example. The bootloader cannot trust the pack's labels alone, because a label is written by the packer and can
-be wrong; the image says itself what it was built for, and the chip says what it is.
+An image built for one processor must never be written into another. The bootloader cannot trust the pack's labels
+alone, because a label is written by the packer and can be wrong; the image says itself what it was built for, and
+the chip says what it is.
 
 **Application header.** Every application image built with the layout of Part A carries a 64-byte application
-header at offset 1 KB from the start of its slot, past the vector table of every supported microcontroller. It
+header at offset 1 KB from the start of its slot, past the vector table of every supported processor. It
 holds a magic value, the board kind (`service-can.md`, contract 2.6), the firmware version (the project version,
 from the version header embedded-infra-lib generates at build time) and the target identity: the device
-identity the image's microcontroller reports, as a family tag (TI Tiva or ST STM32) and the value its
+identity the image's processor reports, as a vendor-family tag and the value its
 device-identity register gives. The header is compiled from the board's definition, the one the rest of the image
-is compiled from, so it cannot disagree with the code beside it. On the TI part the class field tells TM4C129 from
-other Tiva classes but not one TM4C129 part from another; the board kind beside it does.
+is compiled from, so it cannot disagree with the code beside it. The device class the register reports tells one
+family of parts from another but not always one part from another; the board kind beside it does.
 
-| Microcontroller | Device identity the header carries                    | Where the chip reports it                   |
-|-----------------|-------------------------------------------------------|---------------------------------------------|
-| TM4C1294NCPDT   | device class `0x0A` (TM4C129), with the TI family tag | system control `DID0`, class field          |
-| STM32H563ZI     | device identifier `0x484`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
-| STM32G474RE     | device identifier `0x469`, with the ST family tag     | `DBGMCU` identity code, `DEV_ID`            |
-| Emulated        | the constant `0x00000386`, with the emulated tag      | none: the bootloader uses the same constant |
+| Target   | Device identity the header carries                       | Where the chip reports it                   |
+|----------|----------------------------------------------------------|---------------------------------------------|
+| Hardware | a device class or identifier, with the vendor family tag | the processor's device-identity register    |
+| Emulated | the constant `0x00000386`, with the emulated tag         | none: the bootloader uses the same constant |
 
-The TI and emulated identities are in those boards' definitions in the build today. The ST rows are the values
-the NUCLEO-H563ZI and NUCLEO-G474RE definitions take when those boards get the layout (Open Question 6); until
-then their definitions carry no identity and their images no application header.
+The identities are in the boards' definitions in the build. A board that does not yet have the layout has no
+identity in its definition and its images no application header.
 
 **Checks, in order.** A wrong pack is stopped at the first layer that can see the mistake; each later layer
 holds even if an earlier one was skipped or its label was wrong:
@@ -326,7 +310,7 @@ holds even if an earlier one was skipped or its label was wrong:
 | Layer                        | When                 | Checks                                                                                                                                  | A pack for another chip                    |
 |------------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
 | Release workflow             | when packs are built | the packer reads the application header from the built image; the product name and header must name the board the pack is published for | the release is not published               |
-| CAN Commander                | before the download  | the pack's product name names the node's board kind and its microcontroller                                                             | not offered; the reason is shown           |
+| CAN Commander                | before the download  | the pack's product name names the node's board kind                                                                                     | not offered; the reason is shown           |
 | Firmware, Verify             | end of the download  | the product name equals the running firmware's own (`service-firmware-upgrade.md` Part D)                                               | `NotReady`; nothing staged                 |
 | Bootloader, before any erase | at the apply         | product name, signature, then the decrypted vector table and application header against the chip                                        | marked invalid; the old application starts |
 | Bootloader, every reset      | before any start     | the application header against the chip and the board                                                                                   | not started                                |
@@ -335,7 +319,7 @@ Before erasing, the bootloader decrypts only the image's first 2 KB into RAM. AE
 the stream on its own, so this costs nothing in the copy that follows. It then checks that:
 
 1. the initial stack pointer lies in this chip's RAM and the reset handler in this board's application slot,
-   which a Tiva image (flash at `0x00000000`) fails on an STM32 (flash at `0x08000000`) and the other way round;
+   which an image linked for another processor's memory map fails;
 2. the application header's magic is valid, its board kind is this bootloader's board, and its target identity
    equals what this chip's device-identity register reports, read at that moment.
 
@@ -401,15 +385,15 @@ check writes no pack and fails the workflow.
 
 | Interface                | Purpose                                             | Contract                                                                                                                                                                                                                |
 |--------------------------|-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Blocking flash, internal | Read, erase and write the application slot          | TI and ST internal-flash drivers; erase per sector, write any byte range                                                                                                                                                |
-| Blocking flash, staging  | Read the pack, write the journal                    | Internal flash, or the SPI NOR driver on the NUCLEO-G474RE                                                                                                                                                              |
+| Blocking flash, internal | Read, erase and write the application slot          | the platform's internal-flash drivers; erase per sector, write any byte range                                                                                                                                           |
+| Blocking flash, staging  | Read the pack, write the journal                    | Internal flash, or the external-flash driver on a board with external staging                                                                                                                                           |
 | Upgrade pack components  | Pack reader, image installer                        | Embedded-infrastructure library; status kept through replaceable operations (Part D)                                                                                                                                    |
 | Bootloader components    | Journal, image checks, checked installer, boot flow | Embedded-infrastructure library's bootloader package (Parts C, D, E and I); this product supplies the flash, keys, layout, the target its application header names and the check of it (Part I), and the start (Part F) |
 | ECDSA-P256 verification  | Pack signature                                      | micro-ecc, over a SHA-256 computed in software without mbedTLS                                                                                                                                                          |
 | AES-128-CTR decryption   | Image confidentiality                               | tiny-aes, through the library's AES decryptor                                                                                                                                                                           |
 | SHA-256                  | Signature digest and the check at every reset       | The library's software SHA-256, fed in pieces read from flash                                                                                                                                                           |
-| Device identity register | What the chip is                                    | TI system control `DID0` and `DID1`; ST `DBGMCU` identity code (Part I)                                                                                                                                                 |
-| Cortex-M jump            | Start the application (Part F)                      | Embedded-infrastructure library; points the vector table at the slot, then loads the stack pointer and branches                                                                                                         |
+| Device identity register | What the chip is                                    | The processor's device-identity register (Part I)                                                                                                                                                                       |
+| Processor jump           | Start the application (Part F)                      | Embedded-infrastructure library; points the vector table at the slot, then loads the stack pointer and branches                                                                                                         |
 | Image tool               | Write the key slot into the bootloader (Part G)     | The embedded-infrastructure library's `application.bootloader_image inject-keys` (Part J)                                                                                                                               |
 
 ---
@@ -465,29 +449,16 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint           | Value / Description                                                                                                                                                                                                                                                                                                                                                                                                             |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Bootloader size      | a 32 KB region on every board; 17.1 KB on the EK-TM4C1294XL. 16 KB of RAM reserved for its stack, where the image's first 2 KB and the signature check live                                                                                                                                                                                                                                                                     |
-| Largest pack         | the staging slot, 320 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                                                                                                                                                                                                                                                                                               |
-| Largest image        | the application slot less its 64-byte descriptor                                                                                                                                                                                                                                                                                                                                                                                |
-| Check at every reset | one SHA-256 over the image at the application's clock (Part F); on the EK-TM4C1294XL, 0.74 s from reset to the application's banner, against about 5 s at the 16 MHz reset clock the bootloader ran at before                                                                                                                                                                                                                   |
-| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption. On the EK-TM4C1294XL, from Activate to the application's heartbeat for a 265 KB pack, the hardware apply scenario's `[METRIC]` line: 9.5 s, against 29.8 s at the 16 MHz reset clock the bootloader ran at before; programming the slot at the flash's own rate is most of it |
-| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                                                                                                                                                                                                                                                                                        |
-| Target               | an image runs only on the microcontroller and board its application header names; checked before any erase and at every reset                                                                                                                                                                                                                                                                                                   |
-| Vector table         | ends before offset 1 KB of the image on every supported microcontroller, where the application header starts                                                                                                                                                                                                                                                                                                                    |
-| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                                                                                                                                                                                                                                                                                                   |
-| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set                                                                                                                                                                                                                                                                      |
-| Boards               | EK-TM4C1294XL and the emulated board; NUCLEO-H563ZI and NUCLEO-G474RE planned (Open Questions 6 and 1)                                                                                                                                                                                                                                                                                                                          |
-
----
-
-## Open Questions
-
-| # | Question                                                                                       | Options                                                                                     | Status                                                                                                                                                                                    |
-|---|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Which SPI NOR device holds the NUCLEO-G474RE's staging slot, and on which SPI and chip-select? | A JEDEC serial NOR of 1 MB or more on the motor board / a flash board on the NUCLEO headers | open                                                                                                                                                                                      |
-| 2 | Should the bootloader refuse a pack older than the installed application?                      | Monotonic version counter in the journal / accept any signed pack (current)                 | open                                                                                                                                                                                      |
-| 3 | Should the software-in-the-loop runner also boot a staged pack under emulation?                | Bootloader and application as one emulated image / host tests of the install path only      | closed: every emulated scenario boots through the bootloader (`software-in-the-loop.md` Part P)                                                                                           |
-| 4 | Should the bootloader raise the clock to shorten the check at every reset?                     | Keep the reset clock / start the PLL in the bootloader (current)                            | closed: at the 16 MHz reset clock the EK-TM4C1294XL took about 5 s for the check and 29.8 s from Activate to the heartbeat; at the application's clock (Part F) it takes 0.74 s and 9.5 s |
-| 5 | How does the NUCLEO-G474RE image fit the slot a pack may hold?                                 | Trim the image / leave that board without updates (current)                                 | closed: the 320 KB slots hold its 259 KB image                                                                                                                                            |
-| 6 | When do the NUCLEO-H563ZI and NUCLEO-G474RE get the bootloader and the application layout?     | An ST bootloader platform over the ST flash drivers with Part A's layout / stay standalone  | open: both boards are linked standalone today                                                                                                                                             |
+| Constraint           | Value / Description                                                                                                                                                                                                                                                                                                                                                                                                        |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Bootloader size      | a 32 KB region on every board; 17.1 KB on the reference board. 16 KB of RAM reserved for its stack, where the image's first 2 KB and the signature check live                                                                                                                                                                                                                                                              |
+| Largest pack         | the staging slot, 320 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                                                                                                                                                                                                                                                                                          |
+| Largest image        | the application slot less its 64-byte descriptor                                                                                                                                                                                                                                                                                                                                                                           |
+| Check at every reset | one SHA-256 over the image at the application's clock (Part F); on the reference board, 0.74 s from reset to the application's banner, against about 5 s at the reset clock the bootloader ran at before                                                                                                                                                                                                                   |
+| Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption. On the reference board, from Activate to the application's heartbeat for a 265 KB pack, the hardware apply scenario's `[METRIC]` line: 9.5 s, against 29.8 s at the reset clock the bootloader ran at before; programming the slot at the flash's own rate is most of it |
+| Rollback             | none; any validly signed pack for the board installs, and the previous image is not kept                                                                                                                                                                                                                                                                                                                                   |
+| Target               | an image runs only on the processor and board its application header names; checked before any erase and at every reset                                                                                                                                                                                                                                                                                                    |
+| Vector table         | ends before offset 1 KB of the image on every supported processor, where the application header starts                                                                                                                                                                                                                                                                                                                     |
+| Recovery             | a broken application slot with no valid pack needs a debugger                                                                                                                                                                                                                                                                                                                                                              |
+| Keys                 | one ECDSA-P256 key pair and one AES-128 key for every board, written into the bootloader after the link; a public development set and a secret release set                                                                                                                                                                                                                                                                 |
+| Boards               | The reference board and the emulated board; a board with two flash banks and a board with external staging planned                                                                                                                                                                                                                                                                                                         |

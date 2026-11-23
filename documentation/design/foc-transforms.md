@@ -35,13 +35,6 @@ date: 2026-11-08
 - Converting a two-component voltage vector in the αβ frame to three-phase PWM duty cycles (Space Vector Modulation)
 - Supplying fast sine and cosine approximations via a pre-computed lookup table for use in the FOC hot path
 
-**Is NOT responsible for:**
-- Reading or writing hardware peripherals (ADC, PWM, encoder)
-- Managing PID controllers or setpoints
-- Determining rotor position — electrical angle must be supplied by the caller
-- Any control strategy decisions (torque, speed, or position setpoints)
-- Scaling voltage vectors to physical units — inputs and outputs are normalised fractions relative to the DC bus
-
 ---
 
 ## Component Details
@@ -190,7 +183,7 @@ a phase error of about Nε / (2 sin ω) over its N-sample block, which biases th
 These take the table entry just below the angle and rotate it by the remaining offset δ < 2π/512 with
 the series sin δ ≈ δ − δ³/6 and cos δ ≈ 1 − δ²/2 + δ⁴/24, whose truncation error is below 10⁻¹¹.
 The result is as accurate as the table entries themselves (within 1.3 × 10⁻⁶), uses the same ROM, and keeps
-the software `sinf`/`cosf` and their argument reduction — about 4 KB on a Cortex-M4 — out of the
+the software `sinf`/`cosf` and their argument reduction — about 4 KB of flash on the target — out of the
 firmware. It costs a handful of multiplies more than `Sine`, so the control loop keeps the interpolated
 form.
 

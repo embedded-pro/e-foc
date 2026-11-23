@@ -4,7 +4,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
   from the identified values of the real test rig, and it adds the dry friction, the encoder
   quantisation and the supply impedance real hardware has. Nothing here is a datasheet value
   except the power stage's switches and diodes and the current-sense chain's converter and
-  amplifiers; see Parts K, L and M of documentation/design/software-in-the-loop.md.
+  amplifiers; see Parts K, L and M of documentation/verification_and_validation/software-in-the-loop.md.
 
   The limits are pinned from measured runs with a margin.
 

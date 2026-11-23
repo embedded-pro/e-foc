@@ -41,14 +41,6 @@ date: 2026-11-11
 - Registering the `can-lite` firmware-upgrade category beside the FOC motor category, and answering `busy`
   to configuration writes while a firmware pack is received (Part K).
 
-**Is NOT responsible for:**
-- The FOC motor category's message format, its server and client categories and the client object — those
-  belong to the e-foc-protocol library (`infra/e-foc-protocol/documentation/design/wire-contract.md`).
-- The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
-- Receiving and checking firmware — that belongs to the firmware upgrade service (`service-firmware-upgrade.md`).
-- The FOC control algorithms, state machine transitions, or calibration — those belong to `core/foc/` and `core/state_machine/`.
-- Motor physics or hardware-specific logic.
-
 ---
 
 ## Component Details
@@ -231,13 +223,12 @@ flowchart LR
     V -- no --> D["node = 1 + board ID"]
 ```
 
-| Board                     | ID jumpers                                                                                          | Board ID |
-|---------------------------|-----------------------------------------------------------------------------------------------------|----------|
-| EK-TM4C1294XL             | PK0 (bit 0), PK1 (bit 1), PK2 (bit 2); a jumper to ground sets the bit                              | 0–7      |
-| NUCLEO-G474RE             | E-FOC-HARDWARE switch SW1 on PC10 (bit 0), PC11 (bit 1), PC12 (bit 2); a closed switch sets the bit | 0–7      |
-| NUCLEO-H563ZI, host, QEMU | none                                                                                                | 0        |
+| Platform                            | ID inputs                                                                 | Board ID |
+|-------------------------------------|---------------------------------------------------------------------------|----------|
+| Board with three ID inputs          | Three inputs, one per bit; a jumper or closed switch to ground sets a bit | 0–7      |
+| Board with no ID inputs, host, QEMU | none                                                                      | 0        |
 
-With the default base, eight EK-TM4C1294XL or NUCLEO-G474RE boards set to 0–7 answer as nodes 1–8, the
+With the default base, eight boards with ID inputs set to 0–7 answer as nodes 1–8, the
 most one bus carries (`can-lite` tracks eight servers).
 
 ### Part J — Current Stream
@@ -479,13 +470,3 @@ graph LR
 | Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)              |
 | Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                             |
 | Firmware download       | Configuration writes answered `busy`, the drive held stopped, while a pack is received (Part K)                                               |
-
----
-
-## Open Questions
-
-| # | Question                                                         | Resolution                                                                                                                       | Status   |
-|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | Status on demand via `OnRequestTelemetry`; currents and position pushed by the current stream (Part J)                           | resolved |
-| 2 | PID bandwidth commands                                           | Retired in 3.0: a loop's bandwidth is the parameter `currentBandwidth`, `speedBandwidth` or `positionBandwidth` (`SetParameter`) | resolved |
-| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                     | resolved |

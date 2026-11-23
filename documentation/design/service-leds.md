@@ -39,13 +39,6 @@ Requirements: REQ-UI-001, REQ-UI-002, REQ-UI-003.
 - Restarting a pattern from its first flash when the pattern changes, so that a new fault class is always read from
   the start
 
-**Is NOT responsible for:**
-- Detecting any fault: overcurrent, voltage, temperature and sensor faults are detected by the protection path
-  (`fault-supervision.md`) and enter Fault through the state machine
-- Latching a fault or clearing it (`state-machine.md`): the LEDs only follow what the state machine reports
-- Anything in the 20 kHz interrupt or the 1 kHz outer loop: the service runs on the event loop only
-- Reporting the fault over CAN (`service-can.md`) or storing it (`service-fault-history.md`)
-
 ---
 
 ## Component Details

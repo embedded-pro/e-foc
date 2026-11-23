@@ -48,30 +48,6 @@ date: 2026-11-06
 - Watching an enabled drive's filtered bus voltage against the operator's bus-voltage limits, and raising
   `overvoltage` or `undervoltage` when it leaves them (REQ-PRO-003, Part L).
 
-**Is NOT responsible for:**
-- Checking anything in the 20 kHz control interrupt. Per-sample plausibility checks are forbidden there
-  (REQ-PLT-004); sensor and power-stage failures that need a faster answer belong to board protection.
-- Telling a frozen encoder from a rotor locked before it moved. Both look the same from the drive — current
-  flows, the error does not close, the reading does not change — so both are reported as `encoderLoss`.
-- Storing or range-checking settings on the wire. The CAN settings bridge validates a write against the
-  wire contract and stores it in the configuration record; the supervisor only reads the record.
-- Detecting a single open phase while the motor runs. Two phases still carry current and turn the rotor, so
-  the shortfall Part E watches for does not appear; an open phase is caught at the next alignment
-  (`service-alignment.md`, phase continuity check), which runs at every power-up.
-- Catching an encoder that freezes while the rotor turns slowly and the drive demands no motion, as torque mode
-  at low speed. Part F needs a speed the rotor could not have shed, and Parts A to C need a demand; an encoder
-  that stops below that speed in torque mode is found at the next alignment (`service-alignment.md`, encoder
-  follow check).
-- Limiting the speed. The torque cascade folds its current against the overspeed limit (`foc-torque.md`) and
-  the control-mode state machine holds a speed setpoint at it; Part G only faults a rotor that passed both.
-- Measuring the winding temperature. Part I models the heat the current puts in from the ratings alone; a
-  winding that heats from outside, or a rating set too high, is not seen.
-- Protecting the board from its bus. The board's own over- and under-voltage comparators trip the power stage
-  whatever the operator set; Part L only adds tighter limits a motor or a supply may need, at the pace of the
-  bus-voltage service.
-- Protecting the motor from heat while a stall is not reported, unless the continuous rating of Part I is set. With stall reporting off, a held rotor can
-  carry up to the current limit; only the thermal protection of the board watches that.
-
 ---
 
 ## Component Details
