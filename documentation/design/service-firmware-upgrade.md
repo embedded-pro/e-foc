@@ -284,10 +284,10 @@ emulated bootloader reads (`software-in-the-loop.md` Part P).
 The release workflow builds, signs and encrypts one pack per board that has a bootloader, and puts it in the
 board's firmware archive beside the images a debugger programs (`.github/workflows/release-please.yml`):
 
-| Asset                                                    | Content                                                                                                           |
-|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
-| `e_foc-firmware-<board>-<tag>.tar.gz`                    | every application's `e_foc-firmware-<board>-<application>-<tag>.elf` and `.hex`, and the pack below               |
-| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends; in the archive, and published on its own as well                        |
+| Asset                                                    | Content                                                                                             |
+|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-<tag>.tar.gz`                    | every application's `e_foc-firmware-<board>-<application>-<tag>.elf` and `.hex`, and the pack below |
+| `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` | the upgrade pack the CAN Commander sends; in the archive, and published on its own as well          |
 
 In the archive, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.hex` is the application with its image
 descriptor and `e_foc-firmware-<board>-bootloader-<tag>.hex` the bootloader with the release key set, which a
