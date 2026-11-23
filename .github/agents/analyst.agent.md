@@ -18,4 +18,4 @@ Investigate and analyze. Do NOT write or edit code, and do NOT produce implement
 ## Output format
 
 Findings organized by topic or severity. Each finding: observation → evidence (file:line) → implication.
-End with a summary and optional recommendations for the planner or executor.
+End with a summary and, if asked, recommended next steps.
