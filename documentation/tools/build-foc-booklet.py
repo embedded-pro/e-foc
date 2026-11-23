@@ -223,7 +223,25 @@ def _has_tool(name):
     return shutil.which(name) is not None
 
 
-def _render_mermaid(code, skip_diagrams, output_format):
+_PRINT_FORMAT = []
+PNG_SCALE = 3
+
+
+def _print_format():
+    """How the PDFs take a diagram: a fitted PDF where mmdc offers one, else a PNG at three times the size."""
+    if not _PRINT_FORMAT:
+        result = subprocess.run(["mmdc", "--help"], capture_output=True, text=True)
+        options = result.stdout + result.stderr
+        if "--pdfFit" in options:
+            _PRINT_FORMAT.append(("pdf", ("--pdfFit",)))
+        elif "--scale" in options:
+            _PRINT_FORMAT.append(("png", ("--scale", str(PNG_SCALE))))
+        else:
+            _PRINT_FORMAT.append(("png", ()))
+    return _PRINT_FORMAT[0]
+
+
+def _render_mermaid(code, skip_diagrams, output_format, options=()):
     if skip_diagrams or not _has_tool("mmdc"):
         return None
 
@@ -242,7 +260,7 @@ def _render_mermaid(code, skip_diagrams, output_format):
             "--input", str(mmd_in),
             "--output", str(svg_out),
             "--outputFormat", output_format,
-            *(["--pdfFit"] if output_format == "pdf" else []),
+            *options,
             "--backgroundColor", "white",
             "--configFile", str(ASSETS / "mermaid.json"),
             "--puppeteerConfigFile", str(ASSETS / "puppeteer.json"),
@@ -451,12 +469,19 @@ def prerender_diagrams(sources, skip_diagrams, output_formats):
         for source in sources
         for code in MERMAID_RE.findall(source.read_text(encoding="utf-8"))
     }
-    jobs = [(code, output_format) for code in sorted(codes) for output_format in sorted(output_formats)]
+    formats = [("svg", ()) if output_format == "svg" else _print_format() for output_format in sorted(output_formats)]
+    jobs = [(code, output_format, options) for code in sorted(codes) for output_format, options in formats]
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1)) as pool:
-        list(pool.map(lambda job: _render_mermaid(job[0], skip_diagrams, job[1]), jobs))
+        list(pool.map(lambda job: _render_mermaid(job[0], skip_diagrams, job[1], job[2]), jobs))
 
 
 def _page_size(pdf):
+    if pdf.suffix == ".png":
+        header = pdf.read_bytes()[16:24]
+        scale = PNG_SCALE if "--scale" in _print_format()[1] else 1
+        width, height = int.from_bytes(header[:4], "big"), int.from_bytes(header[4:], "big")
+        # Browser pixels are 0.75 pt.
+        return width * 0.75 / scale, height * 0.75 / scale
     match = MEDIABOX_RE.search(pdf.read_bytes())
     if match is None:
         return None
@@ -484,12 +509,12 @@ def _print_diagram(pdf, caption):
 
 
 def _replace_diagrams(text, skip_diagrams, output):
-    output_format = "svg" if output == "html" else "pdf"
+    output_format, options = ("svg", ()) if output == "html" or skip_diagrams or not _has_tool("mmdc") else _print_format()
 
     def replace(match):
         code = match.group(1)
-        svg = _render_mermaid(code, skip_diagrams, output_format)
-        if svg and output_format == "pdf":
+        svg = _render_mermaid(code, skip_diagrams, output_format, options)
+        if svg and output_format != "svg":
             return _print_diagram(svg, _diagram_alt(code))
         return f"![{_diagram_alt(code)}]({svg})" if svg else match.group(0)
 

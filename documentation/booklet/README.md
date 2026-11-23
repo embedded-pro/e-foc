@@ -134,7 +134,7 @@ Every PDF opens with the standard two-sided front matter: a title page with the 
 date, a blank page, the contents, a blank page, then the body on a right-hand page. A document's title page
 takes the title, version, status and date from its front matter; the metadata table and the template notes
 after it are left out of every PDF and of the site. The PDFs take each Mermaid diagram as a PDF that mermaid-cli
-renders through its browser, since flowchart and state labels are HTML that an SVG rasteriser drops; the site
+renders through its browser (a PNG at three times the size where mermaid-cli has no `--pdfFit`), since flowchart and state labels are HTML that an SVG rasteriser drops; the site
 takes the SVG. Tables with long lines take column widths from their content, and their cells wrap and hyphenate.
 
 CI builds every output on every pull request that touches `documentation/` and publishes the site to GitHub
