@@ -28,10 +28,11 @@ date: 2026-11-09
 ## Assumptions & Constraints
 
 - **Constraint**: No dynamic memory allocation on the embedded target. All objects are stack- or statically-allocated for deterministic, bounded memory footprint.
-- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period (<= 4500 cycles at 120 MHz / 20 kHz) to guarantee real-time deadlines.
+- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period (<= 4500 cycles of the 6000-cycle control period) to guarantee real-time deadlines.
 - **Constraint**: No recursion in control-loop or ISR-reachable paths. Stack usage must be statically predictable.
 - **Constraint**: No C++ exceptions. Error signalling uses status return values, `std::optional`, or asynchronous callbacks.
-- **Constraint**: The system targets 32-bit ARM Cortex-M microcontrollers (STM32 and TI Tiva families). Host builds are supported for unit testing and simulation only.
+- **Constraint**: The system targets 32-bit ARM microcontrollers. Host builds are supported for unit testing and simulation only.
+- **Constraint**: Operation above base speed (field weakening) is not supported; it would need a flux-weakening setpoint on the torque interface.
 - **Assumption**: A single motor is controlled per instantiation. Multi-motor configurations require multiple independent instantiations.
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
 - **Assumption**: Rotor position is measured by a quadrature encoder.
@@ -49,15 +50,14 @@ The system is structured in four tiers:
 
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
 2. **Core / Library tier** — the FOC algorithm library (`core/foc/`), service library (`core/services/`), and the Platform Abstraction Layer interface (`core/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
-3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `PlatformFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
+3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (a concrete `PlatformFactory` for each hardware platform and for the host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
 4. **Tools tier** — host-only desktop tools (CAN commander, virtual motor) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
 graph TD
     subgraph TARGETS["Targets Tier"]
         INST["Application / Instantiation"]
-        PAL_TI["TI Target\nimplementation"]
-        PAL_ST["ST Target\nimplementation"]
+        PAL_HW["Hardware target\nimplementations"]
         PAL_HOST["Host and Virtual\nimplementations"]
     end
 
@@ -72,8 +72,7 @@ graph TD
         EMIL["embedded-infra-lib\n(containers · observer · function · timers)"]
         NT["numerical-toolbox\n(PID · filters · estimators)"]
         CAN["can-lite\n(CAN protocol)"]
-        HAL_TI["infra/hal/ti\n(TI vendor drivers)"]
-        HAL_ST["infra/hal/st\n(ST vendor drivers)"]
+        HAL["infra/hal\n(vendor drivers)"]
     end
 
     subgraph TOOLS["Tools Tier"]
@@ -85,8 +84,7 @@ graph TD
     INST --> SVC
     INST --> HF
     INST --> CAN_SVC
-    INST --> PAL_TI
-    INST --> PAL_ST
+    INST --> PAL_HW
     INST --> PAL_HOST
     FOC --> EMIL
     FOC --> NT
@@ -94,17 +92,15 @@ graph TD
     HF --> EMIL
     CAN_SVC --> CAN
     CAN_SVC --> FOC
-    PAL_TI --> HAL_TI
-    PAL_ST --> HAL_ST
+    PAL_HW --> HAL
     PAL_HOST --> EMIL
-    PAL_TI --> EMIL
-    PAL_ST --> EMIL
+    PAL_HW --> EMIL
     CAN --> EMIL
     TOOLS --> CAN_SVC
     TOOLS --> FOC
 ```
 
-The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a microcontroller or on the host, so the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
+The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a board or on the host, so the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
 
 ---
 
@@ -134,9 +130,9 @@ The three control modes are available in the same binary and are selected at run
 
 #### Interrupt Priority Plan
 
-On Cortex-M, equal priority means no preemption: a handler at the same level as the FOC ISR cannot be interrupted by it, so the FOC loop's worst-case latency is the duration of the longest other handler at or above its level. Leaving every source at the default therefore leaves the 20 kHz deadline hostage to a CAN receive or a UART DMA completion.
+On the target's processor, equal priority means no preemption: a handler at the same level as the FOC ISR cannot be interrupted by it, so the FOC loop's worst-case latency is the duration of the longest other handler at or above its level. Leaving every source at the default therefore leaves the 20 kHz deadline hostage to a CAN receive or a UART DMA completion.
 
-The TI target assigns priorities explicitly in `application::InterruptPriorities`:
+The hardware target assigns priorities explicitly in `application::InterruptPriorities`:
 
 | Source              | Priority  | Rationale                                                                                            |
 |---------------------|-----------|------------------------------------------------------------------------------------------------------|
@@ -166,15 +162,15 @@ and does nothing else.
 
 On a board that senses its phases with low-side shunts the duty also decides whether a phase can be read at
 all: a shunt carries its phase current only while that leg's low-side switch conducts around the PWM centre,
-where the converter samples. The TI platform passes every duty set through `foc::KeepLowSideShuntsReadable`
-with the motor board's limit (70 % on E-FOC-HARDWARE, none on FRDM-MC-LVPMSM). Above it all three duties move
+where the converter samples. The platform passes every duty set through `foc::KeepLowSideShuntsReadable`
+with the motor board's limit (70 % on the reference board, none on boards without the constraint). Above it all three duties move
 down together, which keeps the line-to-line voltages and so the vector the current loop asked for. Without the
 limit, a current loop that saturated drove a leg to the rail, read that phase near zero and held it there: on
 the bench the real current reached 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
 
 Only two phases need to be read, since the winding's three currents sum to zero. A vector wider than the limit
 takes the lowest duty to zero and keeps the middle one within the limit, and the highest may go up to the
-board's maximum duty, 95 % on E-FOC-HARDWARE, where the FAN7888's bootstrap capacitors still charge in every
+board's maximum duty, 95 % on the reference board, where the gate driver's bootstrap capacitors still charge in every
 period. `foc::LowSideShuntReadout` remembers the duties of the last two periods, because the samples at a PWM
 centre fall in the low-side pulse the period ending there shares with the one starting there, and gives a phase
 that had a duty above the limit in either the negative sum of the other two. Only a vector whose middle duty, or
@@ -185,7 +181,7 @@ where two phases share the highest duty are held to the limit. The bench motor i
 (REQ-CTL-001). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
 whatever its shunt shows outside the pulse.
 
-The window also has to hold every phase's conversion. The TI converter reads the three phases one after another in
+The window also has to hold every phase's conversion. The reference board's converter reads the three phases one after another in
 a single sequence triggered at the PWM centre, ahead of the three fault-comparator steps, and averages each step
 over two conversions, so a step lasts two sample-and-holds plus two 12-clock conversions and the last phase is
 read the longest after the centre. With a 16-clock sample-and-hold it finished about 10 µs late, after the
@@ -207,17 +203,17 @@ keep `-fno-finite-math-only`, but the check does not depend on it.
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service                          | Responsibility                                                                                                                                                                                                                                                                                                                              |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                                                                        |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                                           |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                                              |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                                             |
-| CLI                              | The bring-up command line of `hardware_test` and the startup banner; the motor application is commanded over CAN only.                                                                                                                                                                                                                      |
-| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                                  |
-| Fault History                    | Records every entry into `Fault` (code, power-up, uptime, control mode, filtered bus voltage, peak torque current of the last 10 ms) and keeps the eight newest across power cycles in a region of its own; read by age and cleared over CAN ([design](../design/service-fault-history.md)).                                                |
-| Status LEDs                      | Shows on three board LEDs whether the firmware runs, whether the motor is driven, commissioning activity and, in `Fault`, a flash code per fault class; event loop only ([design](../design/service-leds.md)).                                                                                                                              |
-| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC, board and microcontroller and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
+| Service                          | Responsibility                                                                                                                                                                                                                                                                                                             |
+|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                                                       |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                          |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                             |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                            |
+| CLI                              | The bring-up command line of `hardware_test` and the startup banner; the motor application is commanded over CAN only.                                                                                                                                                                                                     |
+| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine.                                                 |
+| Fault History                    | Records every entry into `Fault` (code, power-up, uptime, control mode, filtered bus voltage, peak torque current of the last 10 ms) and keeps the eight newest across power cycles in a region of its own; read by age and cleared over CAN ([design](../design/service-fault-history.md)).                               |
+| Status LEDs                      | Shows on three board LEDs whether the firmware runs, whether the motor is driven, commissioning activity and, in `Fault`, a flash code per fault class; event loop only ([design](../design/service-leds.md)).                                                                                                             |
+| Firmware Upgrade                 | Receives an upgrade pack over CAN into the staging slot, checks its CRC and board and keeps it staged; on the user's apply, marks it ready and restarts into the bootloader; holds the drive stopped while a pack is received, and the emergency stop ends the download ([design](../design/service-firmware-upgrade.md)). |
 
 ### 3. CAN Service
 
@@ -251,16 +247,15 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 | Serial terminal                             | Diagnostic trace and command-line interaction interface         |
 
 Concrete implementations exist for:
-- **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
-- **ST STM32 (NUCLEO-G474RE, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`. The NUCLEO-G474RE drives E-FOC-HARDWARE; the NUCLEO-H563ZI still runs on peripheral stubs.
+- **Hardware platforms**: platform-specific peripheral adapters under `targets/platform_implementations/`, one per supported board; a platform that does not drive a bridge yet runs on peripheral stubs.
 - **Host**: peripheral stubs that let the application build and link on a development machine, located under `targets/platform_implementations/host/`.
 - **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus; it runs the application as a virtual motor ([design](../design/virtual-motor.md)).
 
-On the Texas Instruments targets and the NUCLEO-G474RE the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
+On the hardware targets that support it the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
 A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
 RTT writes are non-blocking and drop when no probe is reading.
 
-The TI board sizes its console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
+The reference board sizes its console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
 application needs. Each size has a reason, and growing a feature past
 it should change the reason, not just the number:
 
@@ -276,11 +271,11 @@ it should change the reason, not just the number:
 | CAN receive buffer (`canReceiveBufferSize`)       | 16 frames | A client's transport queues at most 8 frames; an overflow is counted as `messageLost`, not lost silently.                                                                                                                                                                                 |
 | Fault status (`faultStatusSize`)                  | 448 B     | `PersistentFaultData::kMaxFormattedSize` (444), enforced by a `static_assert`, so the boot fault dump is never truncated.                                                                                                                                                                 |
 
-`sync_foc_sensored` has no command table: it registers no terminal commands. The TI linker script places `.bss`
+`sync_foc_sensored` has no command table: it registers no terminal commands. The linker script places `.bss`
 first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
-instead of forcing up to 1 KiB of padding after `.data`. The hal-ti `Gpio` driver keeps pin-interrupt handlers in a
-pool sized by the CMake cache variable `HAL_TI_GPIO_MAX_INTERRUPT_PINS` (default 8, 72 bytes each) and registers a
-port's interrupt only when a pin on it is enabled. A handler per pin would take 4.0 KiB more RAM on the TM4C129
+instead of forcing up to 1 KiB of padding after `.data`. The vendor `Gpio` driver keeps pin-interrupt handlers in a
+pool sized by a CMake cache variable (default 8, 72 bytes each) and registers a
+port's interrupt only when a pin on it is enabled. A handler per pin would take 4.0 KiB more RAM on the reference board
 (120 pins), and `sync_foc_sensored` enables no pin interrupt at all.
 
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
@@ -293,11 +288,9 @@ Each platform also states the electrical facts of its board, which the control l
 ```mermaid
 graph LR
     FOC_CORE["FOC Core\n+ Services"] -->|depends on| PAL_IF["PAL Interfaces\n(ThreePhaseInverter · Encoder\nLowPriorityInterrupt · …)"]
-    PAL_IF --> TI["TI Target\nimpl"]
-    PAL_IF --> ST["ST Target\nimpl"]
+    PAL_IF --> HW["Hardware target\nimpl"]
     PAL_IF --> HOST["Virtual board\nimpl"]
-    TI --> HAL_TI["infra/hal/ti"]
-    ST --> HAL_ST["infra/hal/st"]
+    HW --> HAL["infra/hal"]
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
 ```
 
@@ -352,21 +345,19 @@ condition for retiring it, so a workaround does not quietly become permanent.
 
 Vendor-provided hardware abstraction libraries consumed as Git submodules. They supply the low-level peripheral register access and interrupt management that the PAL concrete implementations use.
 
-| Directory      | Vendor / Board                      |
-|----------------|-------------------------------------|
-| `infra/hal/ti` | Texas Instruments Tiva (Cortex-M4F) |
-| `infra/hal/st` | STMicroelectronics STM32            |
+| Directory   | Content                                       |
+|-------------|-----------------------------------------------|
+| `infra/hal` | One vendor HAL per supported processor family |
 
 These are never used directly by the FOC core or services — only by the PAL concrete implementations.
 
 ### 8. Bootloader
 
-A single-stage bootloader sits at the start of flash, ahead of the application, on the EK-TM4C1294XL and the
-emulated board today; the ST boards with room for two images get it later ([design](../design/bootloader.md),
-Open Question 6). At every reset it checks the application slot against
+A single-stage bootloader sits at the start of flash, ahead of the application, on the reference board and the
+emulated board today; boards with room for two images get it later ([design](../design/bootloader.md)). At every reset it checks the application slot against
 its image descriptor and starts it; when the application has staged a firmware pack and the user has applied
-it, it first verifies the pack's ECDSA-P256 signature, board and microcontroller, decrypts it with AES-128-CTR
-and installs it. An image built for another microcontroller is refused before anything is erased: the image
+it, it first verifies the pack's ECDSA-P256 signature and board, decrypts it with AES-128-CTR
+and installs it. An image built for another board is refused before anything is erased: the image
 names its target and the bootloader compares it with the chip's own device identity. It has no CAN stack and no
 interrupts: the application receives the pack (Services, Firmware Upgrade) and the CAN Commander sends it. The
 user starts the download and, separately, the apply, each only while the motor is stopped.
@@ -380,12 +371,12 @@ flowchart LR
     Boot -- "starts" --> App
 ```
 
-| Board         | Staging slot               | Firmware update       |
-|---------------|----------------------------|-----------------------|
-| EK-TM4C1294XL | internal flash             | yes                   |
-| NUCLEO-H563ZI | internal flash, bank 2     | yes                   |
-| NUCLEO-G474RE | SPI NOR on the motor board | yes, once fitted      |
-| Emulated      | file in the scenario       | application side only |
+| Board                       | Staging slot          | Firmware update       |
+|-----------------------------|-----------------------|-----------------------|
+| Reference board             | internal flash        | yes                   |
+| Board with two flash banks  | the second flash bank | planned               |
+| Board with external staging | external flash        | planned               |
+| Emulated                    | file in the scenario  | application side only |
 
 ---
 
@@ -490,25 +481,15 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 ## Cross-Cutting Concerns
 
-| Concern               | Policy / Approach                                                                                                                                                                                                                                                                                 |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. Bounded containers from `embedded-infra-lib` replace STL heap-based containers. Host-side tools and tests may use the standard heap freely.                                                             |
-| Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio.                                                                                                    |
-| Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) from `embedded-infra-lib`. Raw floating-point with no unit context is not used for motor quantities.                                                                                         |
-| Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` on the host and `-O1` on embedded targets, where `-Og` overflows the TM4C129 application slot. |
-| Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                                                                                 |
-| Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                                                                                 |
-| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                                                                                 |
-
----
-
-## Open Questions & Decisions
-
-| # | Question / Decision                                    | Status   | Options Considered                                                                                        | Rationale                                                                                                                                                                                                                                                                                   |
-|---|--------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction                                                     | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
-| 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                                                                  |
-| 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                                                             |
+| Concern               | Policy / Approach                                                                                                                                                                                                                                                                         |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. Bounded containers from `embedded-infra-lib` replace STL heap-based containers. Host-side tools and tests may use the standard heap freely.                                                     |
+| Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio.                                                                                            |
+| Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) from `embedded-infra-lib`. Raw floating-point with no unit context is not used for motor quantities.                                                                                 |
+| Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` on the host and `-O1` on embedded targets, where `-Og` overflows the application slot. |
+| Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                                                                         |
+| Portability           | The control core has no knowledge of the underlying processor. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                                                                   |
+| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. Software-in-the-loop and model-in-the-loop provide closed-loop integration testing without hardware.                                                                         |
 
 ---
 
@@ -520,7 +501,7 @@ commands, and asserts on telemetry and traces.
 
 Two targets implement scenarios, selected by tag:
 
-1. **Software-in-the-loop** — the firmware built for an emulated Cortex-M4, running under an
+1. **Software-in-the-loop** — the firmware built for an emulated target processor, running under an
    emulator against a simulated three-phase motor the firmware itself owns. Only the motor, the
    power stage and the board protection are simulated, because there is no hardware. The motor is
    described per scenario and handed to the firmware at boot, and non-volatile memory is pre-seeded
@@ -528,8 +509,8 @@ Two targets implement scenarios, selected by tag:
 2. **Hardware-in-the-loop** — the same firmware on a real board, reached through the hardware
    bridge over serial and CAN.
 
-Design detail: `documentation/design/integration-testing.md` for the shared structure, and
-`documentation/design/software-in-the-loop.md` for the simulated target.
+Design detail: `documentation/verification_and_validation/integration-testing.md` for the shared structure, and
+`documentation/verification_and_validation/software-in-the-loop.md` for the simulated target.
 
 ```mermaid
 graph TD
@@ -575,4 +556,3 @@ that would drift away from them.
 
 Requirements with no scenario are verified by unit tests under the owning library, or are
 structural constraints discharged by design review; the generated matrix reports both.
-

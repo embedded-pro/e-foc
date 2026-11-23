@@ -113,7 +113,7 @@ $$
 
 The inner loop may use 4500 of them (75 %); the outer loop 20 000 per millisecond. The rest is for the outer
 loop, the communication interrupts and the event loop, which run only in the time the control interrupt leaves
-(REQ-PLT-004, `documentation/requirements/platform.yaml`).
+(REQ-PLT-004, `documentation/verification_and_validation/requirements/platform.yaml`).
 
 The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
 counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a
@@ -124,7 +124,7 @@ leaves out the hardware's interrupt entry and exit, for which the requirement re
 period (`documentation/design/error-handling.md`). Measured on silicon, the callback takes **1074–1353 cycles**
 (9–11 µs, 18–23 % of the period), of which the FOC calculation is 739–860. The emulator has no cycle counter; it reads
 an instruction-counted timer whose period is 1250 ticks, with the same three-quarter budget, 937 ticks
-(`documentation/performance-optimization/README.md`, `documentation/design/software-in-the-loop.md`).
+(`documentation/performance-optimization/README.md`, `documentation/verification_and_validation/software-in-the-loop.md`).
 
 ### 3. The One-Period Duty Delay
 
@@ -259,7 +259,7 @@ Each level catches what the one below it cannot:
 
 The plant grows from the rig: the one-period duty delay, found when the deadbeat law limit-cycled on hardware at
 3.4 kHz, is now a plant field, and a law that ignores it fails in simulation first
-(`documentation/design/software-in-the-loop.md` Part K, `documentation/design/integration-testing.md`).
+(`documentation/verification_and_validation/software-in-the-loop.md` Part K, `documentation/verification_and_validation/integration-testing.md`).
 
 ---
 

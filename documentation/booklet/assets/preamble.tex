@@ -1,8 +1,12 @@
-% LaTeX preamble for the e-foc Design Booklet (passed to pandoc via -H).
+% LaTeX preamble shared by the Design Booklet and every document PDF (passed to pandoc via -H).
 \usepackage{fancyhdr}
 \usepackage{emptypage}
 \usepackage{amssymb}
 \usepackage[dvipsnames]{xcolor}
+\usepackage{ragged2e}
+\usepackage{graphicx}
+\usepackage[figuresright]{rotating}
+\usepackage{xurl}
 
 % ── Unicode symbols that appear in the FOC docs ──────────────────────────────
 \usepackage{newunicodechar}
@@ -49,6 +53,19 @@
 \newunicodechar{𝜃}{\ensuremath{\theta}}
 \newunicodechar{𝜙}{\ensuremath{\phi}}
 \newunicodechar{𝛷}{\ensuremath{\Phi}}
+\newunicodechar{⁴}{\textsuperscript{4}}
+\newunicodechar{⁵}{\textsuperscript{5}}
+\newunicodechar{⁶}{\textsuperscript{6}}
+\newunicodechar{⁷}{\textsuperscript{7}}
+\newunicodechar{⁻}{\ensuremath{^{-}}}
+\newunicodechar{⌈}{\ensuremath{\lceil}}
+\newunicodechar{⌉}{\ensuremath{\rceil}}
+
+% ── Bold math ───────────────────────────────────────────────────────────────
+% Under unicode-math, \mathbf takes the bold text font, which has no Greek; \symbf takes the math font's.
+\ifdefined\symbf
+  \AtBeginDocument{\renewcommand{\mathbf}[1]{\symbf{#1}}}
+\fi
 
 % ── Running headers ──────────────────────────────────────────────────────────
 \pagestyle{fancy}
@@ -56,22 +73,6 @@
 \renewcommand{\headrulewidth}{0.4pt}
 \fancyhead[L]{\nouppercase{\leftmark}}
 \fancyhead[R]{\thepage}
-
-% ── Chapter title styling ────────────────────────────────────────────────────
-\usepackage{titlesec}
-\titleformat{\chapter}[display]
-  {\normalfont\huge\bfseries\color{RoyalBlue}}
-  {\chaptertitlename\ \thechapter}{20pt}{\Huge}
-
-% ── Cover page ───────────────────────────────────────────────────────────────
-\usepackage{titling}
-\pretitle{\begin{center}\vspace*{3cm}\Huge\bfseries\color{RoyalBlue}}
-\posttitle{\par\end{center}\vskip 0.8em}
-\preauthor{\begin{center}\large}
-\postauthor{\par\end{center}}
-\renewcommand{\and}{\\[0.4em]}
-\predate{\begin{center}\large}
-\postdate{\par\end{center}\vfill}
 
 % ── Boxed equations (used for key results) ──────────────────────────────────
 \usepackage{empheq}

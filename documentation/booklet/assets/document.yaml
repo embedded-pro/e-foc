@@ -1,0 +1,19 @@
+---
+author:
+  - "Gabriel Francisco dos Santos"
+  - "gabriel.fra.santos@gmail.com"
+lang: en
+documentclass: article
+classoption:
+  - twoside
+geometry:
+  - margin=1in
+fontsize: 11pt
+monofont: "DejaVu Sans Mono"
+monofontoptions:
+  - "Scale=0.85"
+linkcolor: RoyalBlue
+urlcolor: RoyalBlue
+toccolor: black
+colorlinks: true
+...

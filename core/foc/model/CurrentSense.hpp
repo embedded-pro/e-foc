@@ -30,6 +30,6 @@ namespace foc
     float ConversionHoldInstant(const CurrentSenseConfig& config, uint32_t conversion);
     float ShuntAmplifierOutput(const CurrentSenseConfig& config, ConductionWindow window, float current, float time);
 
-    // ADC reading of one sequence step; see Part M of documentation/design/software-in-the-loop.md.
+    // ADC reading of one sequence step; see Part M of documentation/verification_and_validation/software-in-the-loop.md.
     float ShuntReading(const CurrentSenseConfig& config, const ShuntSample& sample, uint32_t step, const infra::Function<float()>& conversionNoise);
 }

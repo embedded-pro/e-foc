@@ -125,7 +125,7 @@ $C_T = 1$ is best: the contributions are spread evenly and largely cancel.
 
 The bench motor shows 24 detents a revolution, six per electrical period, 4 mN·m deep. Its rest positions,
 scattered by torque pulses, cluster at 24 a revolution, which is what 12 slots and 8 poles give; the slot count is
-inferred from that, not read from a datasheet (`documentation/design/software-in-the-loop.md` Part K).
+inferred from that, not read from a datasheet (`documentation/verification_and_validation/software-in-the-loop.md` Part K).
 
 ### 2. What the Motor Designer Can Do
 

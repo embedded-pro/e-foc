@@ -46,15 +46,6 @@ and keeps the inductance, inertia and friction it learned across power cycles (R
 - Storing the recalibrated inductance, inertia and viscous friction, at most once every 15 minutes, restoring them at
   power-up while they belong to the commissioned model, and discarding them on the operator's command.
 
-**Is NOT responsible for:**
-- Changing a gain while the drive is `Enabled`. The current and speed loop designs are not interrupt-safe; the drive
-  waits for its next stop.
-- Changing the calibration record. It keeps the commissioned values; the learned ones are a record of their own.
-- Storing the resistance. It tracks the winding temperature, which is estimated from it against the commissioned
-  resistance (`fault-supervision.md`, Part K), so a hot resistance stored as the baseline would read as a cold winding
-  at the next power-up.
-- Torque mode, which runs no estimators.
-
 ---
 
 ## Component Details

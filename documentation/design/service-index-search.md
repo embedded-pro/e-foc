@@ -38,11 +38,6 @@ date: 2026-11-06
 - Failing safely: stopping the inverter on a run-out of travel, an over-current or a timeout, and dropping its
   completion on an abort
 
-**Is NOT responsible for:**
-- Deciding when to search, or storing the index angle — the calibration sequence and the state machine do that
-- Knowing whether the encoder has an index channel — the platform's encoder index port says so
-- Catching a rotor that is already turning (a flying start): the search always drives the rotor itself
-
 ---
 
 ## Component Details
@@ -124,9 +119,8 @@ The platform reports the index through a port beside the encoder:
 | Arm       | Forget any pulse seen so far                                                                    |
 | Seen      | Whether a pulse has been seen since the last arm; polled every control period during the search |
 
-The EK-TM4C1294XL latches the pulse in the quadrature encoder interface's raw interrupt status, so a pulse
-shorter than a control period is still seen. The NUCLEO-G474RE reads the index pin's level, which a pulse one
-count wide holds for 0.5 ms at the search speed of a 4000-count encoder — ten control periods. The emulated
+A platform whose encoder interface latches the pulse sees a pulse shorter than a control period. A platform that
+reads the index pin's level relies on the pulse lasting: one count wide it holds for 0.5 ms at the search speed of a 4000-count encoder — ten control periods. The emulated
 target reports the plant's index (`software-in-the-loop.md`, Part A), and the host has none.
 
 ---

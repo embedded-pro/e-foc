@@ -82,16 +82,6 @@ graph LR
   control-period boundary, while the motor runs
 - Running headless, so a script or a CI job can start virtual motors without a display
 
-**Is NOT responsible for:**
-- Verifying the firmware. Software-in-the-loop (the shipping binary under an emulator), the
-  model-in-the-loop sweeps and hardware-in-the-loop remain the verification tiers; a virtual motor
-  is a bench, not a test oracle (Part I)
-- Exposing the firmware's internal variables. The drive's own view leaves it over CAN, as a real
-  board's does; the plant port shows only what an instrument on the bench could measure
-- Firmware update. A virtual motor runs the application it was built with (Part B)
-- Changing the motor's intrinsic parameters while it runs (Part E)
-- Modelling CAN physical-layer faults beyond what Part G lists
-
 ---
 
 ## Component Details
@@ -565,14 +555,3 @@ Signals of the continuous stream and of a capture, per control period, in the or
 | Firmware update       | Not offered (Part B)                                                                       |
 | Changes while running | Torque and sensor noise only (Part E)                                                      |
 | Platforms             | Linux and Windows, the platforms the CAN Commander ships for                               |
-
----
-
-## Open Questions
-
-| # | Question                                     | Options                                                                                                     | Status                                                         |
-|---|----------------------------------------------|-------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| 1 | Where does the `virtual:` adapter live?      | In can-lite's host adapter composition; or in the CAN Commander only                                        | resolved: can-lite (Part G)                                    |
-| 2 | Does a virtual motor take a firmware update? | Refuse a download; or offer none                                                                            | resolved: none offered (Part B)                                |
-| 3 | What may change while the motor runs?        | Torque and noise only; or intrinsic parameters too                                                          | resolved: torque and noise (Part E)                            |
-| 4 | When can a virtual motor start calibrated?   | Once the calibration image builder leaves the test harness for a library the engine can link on Windows too | resolved: the builder is a library of the plant drive (Part B) |

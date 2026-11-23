@@ -37,13 +37,6 @@ date: 2026-11-10
   change visible and removable in one action
 - Shipping inside the e-foc CAN Commander installers, as "e-foc Virtual Motor"
 
-**Is NOT responsible for:**
-- Commanding the drive. Start, stop, modes, setpoints, calibration and settings are the CAN
-  Commander's, over the virtual bus, as for a real board; this app sends nothing on the bus
-- Showing the drive's internal state. What the drive reports (state, fault, its measured Id and Iq,
-  identified parameters) is read in the CAN Commander
-- Recording or reporting test verdicts
-
 ---
 
 ## Component Details
@@ -354,11 +347,3 @@ zero draws a vertical line and noise or a misalignment widens or tilts it.
 | Trace history | The last 10 s of stream windows per motor                             |
 | Capture       | One per motor, up to 16,384 control periods, kept until replaced      |
 | Bus commands  | None: the app never sends a CAN frame                                 |
-
----
-
-## Open Questions
-
-| # | Question                                                           | Options                                           | Status           |
-|---|--------------------------------------------------------------------|---------------------------------------------------|------------------|
-| 1 | Should the CAN Commander show a virtual node's plant views itself? | No, this app only; or a read-only plant tab later | open, leaning no |

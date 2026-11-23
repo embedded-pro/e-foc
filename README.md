@@ -238,8 +238,7 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 | `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex`         | ready-to-flash images for the EK-TM4C1294XL: `bootloader` and `sync_foc_sensored`, programmed together, and `hardware_test`, which is linked standalone and replaces the bootloader when programmed |
 | `e_foc-source-<tag>.tar.gz`                                    | the complete source with every submodule (GitHub's own source archives omit them)                                                                                                                   |
 | `e_foc-can_commander-*`                                        | desktop tools for Linux and Windows (see below)                                                                                                                                                     |
-| `eFocDesign.pdf`                                               | the complete design booklet                                                                                                                                                                         |
-| `e_foc-documentation-<tag>.zip`                                | the individual design, theory and requirements documents as PDFs                                                                                                                                    |
+| `e_foc-documentation-<tag>.zip`                                | `eFocDesign.pdf`, the complete design booklet, and every document as a PDF in `design/`, `theory/` and `verification_and_validation/`                                                               |
 | `e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-<tag>.upgrade` | the signed upgrade pack the CAN Commander sends to an EK-TM4C1294XL over CAN                                                                                                                        |
 
 Configuring a build from the source archive still downloads the dependencies CMake declares with
@@ -248,7 +247,7 @@ Configuring a build from the source archive still downloads the dependencies CMa
 ### Verifying a download
 
 Every release asset carries a build-provenance attestation, signed through [Sigstore](https://www.sigstore.dev/)
-by the workflow that built it (the release workflow, or the booklet workflow for `eFocDesign.pdf`), which proves
+by the release workflow that built it, which proves
 the file was built from this repository by GitHub Actions. The release workflow verifies the attestation of the
 installers, the firmware images and the upgrade pack before it uploads them. Check one with the
 [GitHub CLI](https://cli.github.com/):
@@ -339,41 +338,41 @@ Design: [documentation/design/tool-can-commander.md](documentation/design/tool-c
 
 ### Design
 
-| Document                                                                                 | Description                                  |
-|------------------------------------------------------------------------------------------|----------------------------------------------|
-| [FOC Transforms](documentation/design/foc-transforms.md)                                 | Clarke and Park transform design             |
-| [FOC Torque Control](documentation/design/foc-torque.md)                                 | Torque (current) control loop design         |
-| [FOC Speed Control](documentation/design/foc-speed.md)                                   | Speed control loop design                    |
-| [FOC Position Control](documentation/design/foc-position.md)                             | Position control loop design                 |
-| [Alignment Service](documentation/design/service-alignment.md)                           | Motor alignment and offset detection service |
-| [CLI Service](documentation/design/service-cli.md)                                       | Command-line interface service               |
-| [Current Offsets Service](documentation/design/service-current-offsets.md)               | Current sensor offset calibration service    |
-| [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md) | Duty correction for the bridge's dead time   |
-| [Cogging Compensation Service](documentation/design/service-cogging-compensation.md)     | Cogging torque map and current feed-forward  |
-| [Electrical Identification Service](documentation/design/service-electrical-ident.md)    | Resistance and inductance estimation service |
-| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
-| [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
-| [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
-| [Status LEDs Service](documentation/design/service-leds.md)                              | Status LED patterns and fault codes          |
-| [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
-| [Virtual Motor](documentation/design/virtual-motor.md)                                   | Application on the host, on a virtual CAN    |
-| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                          | Plant views, disturbances and faults         |
+| Document                                                                                       | Description                                  |
+|------------------------------------------------------------------------------------------------|----------------------------------------------|
+| [FOC Transforms](documentation/design/foc-transforms.md)                                       | Clarke and Park transform design             |
+| [FOC Torque Control](documentation/design/foc-torque.md)                                       | Torque (current) control loop design         |
+| [FOC Speed Control](documentation/design/foc-speed.md)                                         | Speed control loop design                    |
+| [FOC Position Control](documentation/design/foc-position.md)                                   | Position control loop design                 |
+| [Alignment Service](documentation/design/service-alignment.md)                                 | Motor alignment and offset detection service |
+| [CLI Service](documentation/design/service-cli.md)                                             | Command-line interface service               |
+| [Current Offsets Service](documentation/design/service-current-offsets.md)                     | Current sensor offset calibration service    |
+| [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md)       | Duty correction for the bridge's dead time   |
+| [Cogging Compensation Service](documentation/design/service-cogging-compensation.md)           | Cogging torque map and current feed-forward  |
+| [Electrical Identification Service](documentation/design/service-electrical-ident.md)          | Resistance and inductance estimation service |
+| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)          | Friction and inertia estimation service      |
+| [NVM Service](documentation/design/service-nvm.md)                                             | Non-volatile memory persistence service      |
+| [Integration Testing Design](documentation/verification_and_validation/integration-testing.md) | Fixture design, calibration flow, CAN bridge |
+| [Status LEDs Service](documentation/design/service-leds.md)                                    | Status LED patterns and fault codes          |
+| [CAN Commander](documentation/design/tool-can-commander.md)                                    | Desktop commander, issue log, installers     |
+| [Virtual Motor](documentation/design/virtual-motor.md)                                         | Application on the host, on a virtual CAN    |
+| [Virtual Motor App](documentation/design/tool-virtual-motor.md)                                | Plant views, disturbances and faults         |
 
 ### Requirements
 
-| Document                                                                        | Description                                          |
-|---------------------------------------------------------------------------------|------------------------------------------------------|
-| [Lifecycle Requirements](documentation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
-| [Commissioning Requirements](documentation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
-| [Control Requirements](documentation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
-| [Protection Requirements](documentation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
-| [Platform Requirements](documentation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
-| [Communication Requirements](documentation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
-| [Firmware Update Requirements](documentation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
-| [Hardware Test Requirements](documentation/requirements/hardware-test.yaml)     | Board bring-up application                           |
-| [User Interface Requirements](documentation/requirements/user-interface.yaml)   | Status LEDs: running, commissioning, latched faults  |
+| Document                                                                                                    | Description                                          |
+|-------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| [Lifecycle Requirements](documentation/verification_and_validation/requirements/lifecycle.yaml)             | States, emergency stop, faults, mode changes         |
+| [Commissioning Requirements](documentation/verification_and_validation/requirements/commissioning.yaml)     | Calibration, identification, online model            |
+| [Control Requirements](documentation/verification_and_validation/requirements/control.yaml)                 | Torque, speed and position performance, laws, tuning |
+| [Protection Requirements](documentation/verification_and_validation/requirements/protection.yaml)           | Current, thermal, supply, motion and sensor faults   |
+| [Platform Requirements](documentation/verification_and_validation/requirements/platform.yaml)               | Watchdog, processor faults, reset cause, timing      |
+| [Communication Requirements](documentation/verification_and_validation/requirements/communication.yaml)     | CAN contract, telemetry, node addressing             |
+| [Firmware Update Requirements](documentation/verification_and_validation/requirements/firmware-update.yaml) | Bootloader, download, apply, versions                |
+| [Hardware Test Requirements](documentation/verification_and_validation/requirements/hardware-test.yaml)     | Board bring-up application                           |
+| [User Interface Requirements](documentation/verification_and_validation/requirements/user-interface.yaml)   | Status LEDs: running, commissioning, latched faults  |
 
-How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/design/integration-testing.md), *Feature-to-Requirements Mapping*.
+How requirements, scenarios and design documents divide the work: [Integration Testing Design](documentation/verification_and_validation/integration-testing.md), *Feature-to-Requirements Mapping*.
 
 ### Theory
 

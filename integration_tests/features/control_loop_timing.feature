@@ -24,7 +24,7 @@ Feature: Control Loop Timing
   116 to 127 cycles for the current laws in torque mode, 160 in speed and
   position mode and 377 through a full calibration, the same to within a cycle
   from run to run. A change that makes the callback slower on purpose re-pins
-  by the same rule. See documentation/design/software-in-the-loop.md,
+  by the same rule. See documentation/verification_and_validation/software-in-the-loop.md,
   Part B3.
 
   @sil @REQ-PLT-004

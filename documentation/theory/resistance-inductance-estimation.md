@@ -247,7 +247,7 @@ case.
 On E-FOC-HARDWARE the gate driver's and the switches' delays take back most of the band: the node sees
 about 70 to 100 ns, an error near $0.07\,\text{V}$, and the drive corrects every duty for it
 (`documentation/design/service-dead-time-compensation.md`). The simulated plant reproduces the dead
-time and the switch node's partial swing at small currents (`documentation/design/software-in-the-loop.md`,
+time and the switch node's partial swing at small currents (`documentation/verification_and_validation/software-in-the-loop.md`,
 Part L).
 
 #### Signal Flow

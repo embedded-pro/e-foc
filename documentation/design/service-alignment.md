@@ -38,13 +38,6 @@ date: 2026-11-06
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
-**Is NOT responsible for:**
-- Persisting the returned encoder offset to NVM — that is the caller's decision
-- Finding the encoder's index — the index search does that once the alignment has set the frame (`service-index-search.md`)
-- Running during normal FOC operation — the FOC loop must be stopped by the caller before alignment begins
-- Measuring or interpreting motor electrical parameters (R, L, pole pairs)
-- Providing any feedback during the alignment beyond the single completion callback
-
 ---
 
 ## Component Details

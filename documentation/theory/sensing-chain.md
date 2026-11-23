@@ -67,7 +67,7 @@ not yet measure.
 E-FOC-HARDWARE has a shunt under each low-side switch, an amplifier per phase and one ADC that converts the
 three phases in sequence from a trigger at the PWM counter's zero, the centre of the low-side window, plus a
 fourth shunt on the common low-side return for the over-current comparator
-(`documentation/design/software-in-the-loop.md` Part M, `documentation/design/error-handling.md`).
+(`documentation/verification_and_validation/software-in-the-loop.md` Part M, `documentation/design/error-handling.md`).
 
 **The window.** In a centre-aligned period a leg at duty $d$ conducts on its low side for $(1-d)\,T$, centred on
 the counter's zero. A conversion that holds at $t_h$ after the trigger reads a valid current only if the window

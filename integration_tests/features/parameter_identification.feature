@@ -14,7 +14,7 @@ Feature: Parameter Identification Against a Known Plant
   waits on the plant's clock until the torque is on: the step that enables the
   motor waits in host time, so a slow host would otherwise start the rotor
   before the load arrives. See Part J of
-  documentation/design/software-in-the-loop.md.
+  documentation/verification_and_validation/software-in-the-loop.md.
 
   Each requirement keeps one scenario here for each path it constrains, on the
   bench motor, end to end through the emulated target. The sweeps over both

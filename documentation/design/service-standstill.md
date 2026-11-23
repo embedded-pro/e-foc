@@ -40,12 +40,6 @@ service holds the calibration back until the rotor is at rest (REQ-CMS-001).
 - Refusing a second request while one is outstanding, without disturbing the first
 - Cancelling an outstanding request without reporting it
 
-**Is NOT responsible for:**
-- Stopping the rotor: the drive is disabled when calibration starts, and the rotor coasts or is held
-  by its load
-- Failing the calibration, tracing the outcome, or deciding which step comes next — the calibration
-  orchestrator does that with the answer
-
 ---
 
 ## Component Details

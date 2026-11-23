@@ -27,8 +27,6 @@ date: 2026-10-19
 - Defining how the same scenario is compared between the emulated and the real target
 - Recording the targets the firmware does not meet yet, with the scenario that will hold each
 
-**Is NOT responsible for:**
-
 - Changing the estimators; each target below is fixed in its own change
 - Datasheet values: the rig's motor is generic and its published parameters are not trusted
 
@@ -157,7 +155,7 @@ light rotor then identifies within 2.2 %. The scenario is the teknic plant with
    reports the gap per quantity. That gap is the figure of merit for the plant: it falls as
    Parts B and C land, and a regression in it says the model has drifted from the rig.
 
-### Part F — Duty limits of the E-FOC-HARDWARE board
+### Part F — Duty limits of the reference board
 
 The board's `BoardCharacteristics` carries two duty limits: one measured on the rig and one set by the gate driver.
 
@@ -191,8 +189,4 @@ The current loop lost a phase above the readable limit, which is why `foc::KeepL
 
 - Nothing here runs until the board is powered from the stronger supply.
 - A noise record is only valid for the sensor chain it was taken on.
-
-## Open Questions
-
-- Is the shaft accessible for the added-disk inertia test, and is the disk's mass known?
-- Is a current probe available for the gain check, or only the AD3?
+- The added-disk inertia test needs access to the shaft and the disk's mass, and the gain check needs a current probe or the AD3.

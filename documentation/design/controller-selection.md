@@ -45,13 +45,6 @@ date: 2026-11-06
 - Holding the operator's tuning settings for every loop, validating them, applying them to the running
   controllers and persisting them
 
-**Is NOT responsible for:**
-- Implementing the control algorithms themselves — each concrete controller is self-contained
-- Executing FOC transforms (Clarke, Park, SVM) — these remain inline in the FOC loop
-- Estimating motor model parameters — that is the responsibility of the RLS identification services
-- Safety monitoring or fault detection — the FOC state machine owns these
-- Choosing the tuning settings — the operator supplies them; the defaults stand in until they do
-
 ---
 
 ## Component Details
@@ -662,12 +655,3 @@ graph TD
 | Parameter staleness            | Controllers are configured with the RLS snapshot at selection time. They are not automatically updated if RLS estimates change during operation.                                                                                  |
 | Mechanical parameters required | Speed and position algorithm configuration requires that the mechanical RLS identification has been completed. Attempting to select LQI or LQR before mechanical calibration is done produces an `InvalidParameters` result.      |
 | DARE numerical stability       | For extremely large inertia (Bd → 0) or zero viscous friction (Ad → 1), the DARE solution may be ill-conditioned. A controllability pre-check is performed before solving; an ill-conditioned system returns `InvalidParameters`. |
-
----
-
-## Open Questions
-
-| # | Question                                                                                                                                                                                             | Options                                                              | Status |
-|---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|--------|
-| 1 | Should the CAN `SetControllerAlgorithm` frame be acknowledged synchronously (blocking until NVM write completes) or asynchronously (NVM write deferred)?                                             | Acknowledged once stored (Part G), as every persisted CAN setting is | closed |
-| 2 | When the motor transitions from Speed mode to Position mode, should the position-loop LQR gains be recomputed from the speed-mode ADRC's parameter snapshot, or should they be stored independently? | Independent storage (current design) vs. shared parameter snapshot   | open   |

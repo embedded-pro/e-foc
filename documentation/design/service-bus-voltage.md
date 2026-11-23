@@ -39,20 +39,13 @@ scale its duties by the measured over the configured voltage (`foc-torque.md`, B
 - Handing every filtered value to the control mode, which passes it to the active cascade, and to the
   bus-voltage limit monitor (`fault-supervision.md` Part L)
 
-**Is NOT responsible for:**
-- Scaling the duties, which the cascade does
-- Bus over- and under-voltage protection: the board's comparators trip at the board's limits, and the
-  bus-voltage limit monitor faults an enabled drive at the operator's (`fault-supervision.md` Part L)
-- The bus voltage the resistance and inductance identification use, which they read from the platform
-  themselves at the start and the end of each measurement (`service-electrical-ident.md`)
-
 ---
 
 ## Component Details
 
 ### Part A — Reading the bus
 
-The platform's bus voltage read blocks for its conversion: about 134 µs on the EK-TM4C1294XL, whose
+The platform's bus voltage read blocks for its conversion: about 134 µs on the reference board, whose
 divider is sampled for 256 ADC clocks with eight-fold oversampling. The service therefore reads it from
 the event loop, never from an interrupt, once every 10 ms, which costs about 1.3 % of the event loop. The
 control interrupt preempts the read, so the 20 kHz loop is untouched.

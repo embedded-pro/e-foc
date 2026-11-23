@@ -125,14 +125,3 @@ sequenceDiagram
 | Error handling | …                 |
 | Timing budget  | …                 |
 | Safety         | …                 |
-
----
-
-## Open Questions & Decisions
-
-> Track unresolved design questions and key architectural decisions already made. For each decision,
-> record the options considered and the rationale for the chosen option.
-
-| # | Question / Decision | Status | Options Considered | Rationale |
-|---|---------------------|--------|--------------------|-----------|
-| 1 | …                   | open   | …                  | …         |

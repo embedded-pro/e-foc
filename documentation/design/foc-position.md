@@ -39,12 +39,6 @@ date: 2026-11-15
 - Reporting, through the drive, when the rotor has settled on its setpoint (Target Reached)
 - Keeping the reference, and the way the rotor takes to it, within the software position limits when they are set
 
-**Is NOT responsible for:**
-- Reading phase currents or encoder position directly from hardware — these are supplied by the Runner
-- Writing duty cycles to the PWM hardware — duty cycles are returned to the Runner
-- Counting turns while the cascade does not run — the position tracker does that on the event loop (Multi-Turn Position)
-- Flux weakening (Id is always commanded to 0 A)
-
 ---
 
 ## Component Details
@@ -432,7 +426,7 @@ graph LR
 | Position error             | Plain in linear mode; folded into [−π, π] in circular mode without software position limits, so the move takes the short way.       |
 | LPI callback order         | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
 | No flux weakening          | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
-| Cycle budget (inner loop)  | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |
+| Cycle budget (inner loop)  | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period).                                               |
 | Controller state at Enable | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
 | Target reached             | Window and time from the configuration record, checked every 1 ms on the event loop and when asked.                                 |
 | Setpoint atomicity         | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |

@@ -390,7 +390,7 @@ vmovgt.f32 s0, s1
 
 ## Measurement tiers
 
-Three complementary approaches verify cycle budgets. Tier 2 runs the software-in-the-loop firmware ([software-in-the-loop.md](../design/software-in-the-loop.md), Part B3). The emulator has no DWT, so the emulated platform times the control callback with a free-running timer of its instruction-counted clock: one cycle of that 25 MHz clock is five instructions retired, and a run reproduces its own figures to within a cycle. The control loop timing scenarios fail when an execution overruns the budget or the worst one passes a limit pinned at one and a half times what it measures.
+Three complementary approaches verify cycle budgets. Tier 2 runs the software-in-the-loop firmware ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part B3). The emulator has no DWT, so the emulated platform times the control callback with a free-running timer of its instruction-counted clock: one cycle of that 25 MHz clock is five instructions retired, and a run reproduces its own figures to within a cycle. The control loop timing scenarios fail when an execution overruns the budget or the worst one passes a limit pinned at one and a half times what it measures.
 
 | Tier                | Tool                                            | Purpose           | Authoritative for                            |
 |---------------------|-------------------------------------------------|-------------------|----------------------------------------------|
