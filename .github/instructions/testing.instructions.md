@@ -1,13 +1,11 @@
 ---
-description: "e-foc testing guidelines: prefer TEST_F for fixture-based tests, TYPED_TEST for multi-type tests, FOC transform correctness tests, PID anti-windup tests, SVM sector tests, host simulation for integration, Arrange-Act-Assert pattern. StrictMock required; NiceMock forbidden."
+description: "e-foc test specifics: fixture and typed-test patterns, FOC test cases."
 applyTo: "**/test/**,**/test_doubles/**"
 ---
 
-# e-foc Testing Guidelines
+# e-foc Test Specifics
 
-Follow AGENTS.md — see §Testing (TDD, GoogleTest macros, `StrictMock` only, `EXPECT_NEAR`, file names, host stubs, heap in tests) and §Async callback lifetime safety rule 6 (fixtures holding `WithSharedAccess` members). This file adds only the test specifics.
-
-## Fixture Test Pattern (single type — most FOC tests)
+## Fixture test (most FOC tests)
 
 ```cpp
 #include "core/foc/transforms/TransformsClarkePark.hpp"
@@ -30,12 +28,9 @@ TEST_F(TestClarkePark, forward_of_balanced_currents_at_zero_angle_gives_expected
 }
 ```
 
-## Typed Test Pattern (templated code instantiated for more than one type)
+## Typed test (template code instantiated for more than one type)
 
 ```cpp
-#include "core/foc/<area>/<Component>.hpp"
-#include <gtest/gtest.h>
-
 namespace
 {
     template<typename T>
@@ -53,16 +48,16 @@ TYPED_TEST(TestComponent, produces_correct_output)
 
 ## Rules
 
-- Include `<gtest/gtest.h>` (not `<gmock/gmock.h>`) unless gmock matchers are needed
-- Tests must not require hardware — use the stubs in `targets/platform_implementations/host/`
-- Descriptive test names that state the scenario and expected outcome; one behavior per test
-- Arrange-Act-Assert
+- Include `<gtest/gtest.h>`, not `<gmock/gmock.h>`, unless you need gmock matchers.
+- No hardware: use the stubs in `targets/platform_implementations/host/`.
+- The test name states the scenario and the expected outcome. One behaviour per test. Arrange-Act-Assert.
 
-## FOC-Specific Test Requirements
+## FOC test cases
 
-- **Clarke/Park transforms**: Verify against known analytical values (e.g., balanced symmetrical currents give known Iα, Iβ, Id, Iq)
-- **SVM**: Test duty cycles for all 6 sectors and sector boundaries
-- **PID anti-windup**: Verify that integrator is clamped and does not accumulate past output limits
-- **Electrical angle conversion**: Verify `θe = θm · pole_pairs` for multiple pole-pair counts
-- **Control loop integration**: model-in-the-loop (`integration_tests/model_in_the_loop`) for sweeps, `@sil` scenarios in `integration_tests/features/` for the firmware — see AGENTS.md §Build
-- Test edge cases: zero current, maximum current, zero speed, maximum speed, angle wraparound at ±π
+- Clarke/Park: check against analytical values (balanced currents give known Iα, Iβ, Id, Iq).
+- SVM: duty cycles in all 6 sectors and at the sector boundaries.
+- PID anti-windup: the integrator clamps and does not accumulate past the output limits.
+- Electrical angle: `θe = θm · pole_pairs` for more than one pole-pair count.
+- Control loop: model-in-the-loop (`integration_tests/model_in_the_loop`) for sweeps; `@sil` scenarios in
+  `integration_tests/features/` for the firmware.
+- Edge cases: zero and maximum current, zero and maximum speed, angle wrap at ±π.

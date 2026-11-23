@@ -23,6 +23,4 @@ Investigate and analyze. Do NOT write or edit code, and do NOT produce implement
 ## Output format
 
 Findings organized by topic or severity. Each finding: observation → evidence (file:line) → implication.
-End with a summary and one of:
-- **Actionable findings** → recommend planner (if design/planning needed) or executor (if fix is obvious and small)
-- **Informational only** → mark as terminal; no further agent needed
+End with a summary and, if asked, recommended next steps.

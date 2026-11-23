@@ -1,0 +1,5 @@
+name: Agent Rules
+on: [pull_request]
+jobs:
+  agents:
+    uses: embedded-pro/embedded-agent-kit/.github/workflows/verify-consumer.yml@main

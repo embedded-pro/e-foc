@@ -1,11 +1,9 @@
 ---
-description: "e-foc CMake rules: halst_target_bringup/hal_ti_target_bringup for embedded targets, add_subdirectory(test) for test targets, bounded-container and numerical-toolbox library targets, two-tier CI artifact model."
+description: "e-foc CMake specifics: host test target template and the library targets to link."
 applyTo: "**/CMakeLists.txt"
 ---
 
-# e-foc CMake Rules
-
-Follow AGENTS.md — see §Build (build commands and presets, CI artifact model, new files, embedded bringup, warnings and optimisation placement) and §Testing (`add_subdirectory(test)`). This file adds only the CMake specifics.
+# e-foc CMake Specifics
 
 ## Test targets
 
@@ -22,10 +20,12 @@ target_link_libraries(e_foc.foc.transforms_test PUBLIC
 )
 ```
 
-## Key library targets
+## Library targets
 
-Link against these rather than duplicating their logic:
-- `infra.util` — bounded containers (`infra::BoundedVector`, `BoundedString`, `BoundedDeque`, `BoundedList`), `WithSharedAccess`
+Link these. Do not copy their logic.
+
+- `infra.util` — bounded containers (`infra::BoundedVector`, `BoundedString`, `BoundedDeque`, `BoundedList`),
+  `WithSharedAccess`
 - `numerical.controllers.interfaces`, `numerical.controllers.implementations` — PID and other controllers
 - `numerical.filters.passive` — filters (`filters::passive::Fir`, …)
 - `numerical.math` — math helpers, `CompilerOptimizations.hpp`

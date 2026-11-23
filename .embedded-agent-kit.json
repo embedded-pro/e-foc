@@ -1,0 +1,5 @@
+{
+  "version": "0.3.0",
+  "bundles": ["core"],
+  "files": [".claude/agents/reviewer.md", ".github/agents/reviewer.agent.md"]
+}
