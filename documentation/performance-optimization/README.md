@@ -435,16 +435,16 @@ the *Analysis Notes* of each report list what is left open.
   loop its own in address order. Nested loops multiply: with a bound of 3 the body of a loop inside a loop is
   charged 9 times.
 
-| `loop_bounds` entry                                                       | Bound  | Why                                                     |
+| `loop_bounds` entry                                                       |  Bound | Why                                                     |
 |---------------------------------------------------------------------------|-------:|---------------------------------------------------------|
-| TI ADC interrupt lambda                                                   | 6      | Six channels in the sequence, drained from the FIFO     |
-| `PwmStmBase::StartImpl`                                                   | 3      | Three channels                                          |
-| `InverterCompensation::ThreePhasePwmOutput`                               | 1      | The loop walks nested compensation stages; there is one |
-| `SpeedDifferentiator::Measure`                                            | 2      | One retry when the control interrupt lands mid-read     |
-| `__ieee754_fmodf`                                                         | 3      | `remainder` of the difference of two single-turn angles |
-| `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     | 2      | Two directional fits                                    |
-| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` | list   | One bound per loop, below                               |
-| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  | 4      | Four elements of a 2×2 matrix                           |
+| TI ADC interrupt lambda                                                   |      6 | Six channels in the sequence, drained from the FIFO     |
+| `PwmStmBase::StartImpl`                                                   |      3 | Three channels                                          |
+| `InverterCompensation::ThreePhasePwmOutput`                               |      1 | The loop walks nested compensation stages; there is one |
+| `SpeedDifferentiator::Measure`                                            |      2 | One retry when the control interrupt lands mid-read     |
+| `__ieee754_fmodf`                                                         |      3 | `remainder` of the difference of two single-turn angles |
+| `RealTimeFrictionAndInertiaEstimator::SteadyFriction`                     |      2 | Two directional fits                                    |
+| Mechanical estimator `Update`, `RecursiveLeastSquares<float, 3u>::Update` |   list | One bound per loop, below                               |
+| Electrical `ComputeEstimate`, `RecursiveLeastSquares<float, 2u>::Update`  |      4 | Four elements of a 2×2 matrix                           |
 | `memmove`, `memset` (identification path)                                 | 12, 32 | Bytes: one `infra::Function`, one window record         |
 
 The mechanical estimator and its `RecursiveLeastSquares` walk a 3×3 matrix as a 3×3 nest, as a loop over its three
@@ -472,9 +472,9 @@ With the worst-path model the estimates at this revision are:
 
 | Path                | EK-TM4C1294XL | Budget | NUCLEO-G474RE | Budget |
 |---------------------|--------------:|-------:|--------------:|-------:|
-| Inner loop          | 3131          | 4500   | 2955          | 6375   |
-| Outer loop          | 6958          | 20000  | 6958          | 28333  |
-| Identification path | 4519          | 6000   | 4343          | 8500   |
+| Inner loop          |          3131 |   4500 |          2955 |   6375 |
+| Outer loop          |          6958 |  20000 |          6958 |  28333 |
+| Identification path |          4519 |   6000 |          4343 |   8500 |
 
 The analyser itself is installed with pip when the action runs, so the action's pin does not fix its version:
 `CYCLE_BUDGET_PACKAGE` in `ci.yml` does. The estimates above and the meaning of a loop bound are those of 1.1.0.
