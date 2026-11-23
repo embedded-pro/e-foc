@@ -1,6 +1,6 @@
 # e-foc — Agent Rules
 
-<!-- shared:begin 0.3.0 sha256:9aee198041110762 -->
+<!-- shared:begin 0.4.0 sha256:9aee198041110762 -->
 Canonical rules for Claude, Copilot and sub-agents. Sections marked *(shared)* come from embedded-pro/embedded-agent-kit:
 edit them there, not here. *(repo)* sections belong to this repository. *Exceptions* overrides a shared rule.
 
