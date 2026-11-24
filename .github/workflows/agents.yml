@@ -1,5 +1,11 @@
 name: Agent Rules
 on: [pull_request]
+permissions: {}
 jobs:
-  agents:
-    uses: embedded-pro/embedded-agent-kit/.github/workflows/verify-consumer.yml@main
+  agents-md:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: embedded-pro/embedded-agent-kit@2f4cee62a7a5d6f515d65ad302e6038c37c17f12 # v0.5.0
