@@ -1,6 +1,6 @@
 # e-foc — Agent Rules
 
-<!-- shared:begin 0.5.0 sha256:9aee198041110762 -->
+<!-- shared:begin 0.6.0 sha256:f57badde9903d1ff -->
 Canonical rules for Claude, Copilot and sub-agents. Sections marked *(shared)* come from embedded-pro/embedded-agent-kit:
 edit them there, not here. *(repo)* sections belong to this repository. *Exceptions* overrides a shared rule.
 
@@ -75,6 +75,22 @@ Scope: production code. Tests and host tools may use the heap.
 - Update docs before or with any behavioural change.
 - One fact, one place: link, never restate.
 - Visuals: Mermaid or ASCII.
+
+## Desktop tools *(shared)*
+
+Scope: host tools that people install and run, GUI or console.
+
+- Open the log file first in `main`, before the application object.
+  A GUI-subsystem build (`WIN32_EXECUTABLE`) has no stderr: the log file is its only output.
+- Write the log to a per-user writable folder (`AppLocalDataLocation`) and rotate it.
+  Capture the toolkit's messages (`qInstallMessageHandler`) from debug level.
+- Install a crash handler after the log. It writes a `FATAL` line on a crash signal, `std::terminate`
+  or an unhandled SEH exception, and a minidump on Windows. Qt tools use ui-cpp's `IssueLog` and `CrashReporter`.
+- Log each start-up step: version, OS, toolkit version, arguments, restored settings, first frame.
+- Provide `--safe-start`: it skips the saved state, so a bad saved state cannot block start-up.
+- Give the log folder a menu item (Help ▸ Open Log Folder).
+- Install test: start the tool, close it normally, then start it again with saved state.
+  Print the log. On a failure, upload the log folder and the dumps.
 <!-- shared:end -->
 
 ## Domain *(repo)*
