@@ -63,8 +63,8 @@ latest inner-loop sample. This never misses a turn below 500 turns per second. T
   crossing between that sample and the cascade's first tick is still counted. The cascade unwraps its first
   angle against the one it took.
 - **Publish.** Every tick the cascade publishes its count. The tracker reports the published count. When the
-  outer-loop interrupt pre-empts a reader on the event loop mid-read, the reader reads again. Thus it never sees the turns of one
-  tick with the angle of another.
+  outer-loop interrupt pre-empts a reader on the event loop mid-read, the reader reads again. Thus it
+  never sees the turns of one tick with the angle of another.
 - **Release.** When the cascade stops it hands back its last count and the tracker counts on from it.
 
 A cascade that started before the tracker took any sample starts at turn 0 from its own first angle.

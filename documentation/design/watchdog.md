@@ -82,8 +82,8 @@ must not be able to preempt any interrupt that could hang:
   loop's software interrupt.
 - A hung interrupt at any priority then starves the early warning, so the hardware resets the target
   without the handler running.
-- A hung action in the event loop leaves the early warning free to run, so the handler cuts the power stage
-  first and the hardware resets the target afterwards.
+- A hung action in the event loop leaves the early warning free to run. Thus the handler cuts the power stage
+  first, and the hardware resets the target afterwards.
 
 | Failure                                             | Early warning runs? | Outcome                                    |
 |-----------------------------------------------------|---------------------|--------------------------------------------|
@@ -269,8 +269,8 @@ With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
 - The first early warning after an action starts always counts as progress. A hung action is therefore
   detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
 - The hardware reset follows one period later, at most *(N+2)·P* after the action started.
-- With the reference board at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
-- With platform A at *P* ≈ 12.1 ms (divider 8) and *N* = 9, that is about
+- The reference board has *P* = 25 ms and *N* = 4. That gives 100–125 ms to the cutoff and at most 150 ms to the reset.
+- Platform A has *P* ≈ 12.1 ms (divider 8) and *N* = 9. That gives about
   109–121 ms to the cutoff and at most about 134 ms to the reset.
 
 A legitimate action must finish well inside *N·P*. Long work is already split across actions:

@@ -74,7 +74,7 @@ phase-current interrupt at the inverter's base frequency, so the index is polled
    of the resistive drop. The current therefore stays close to the sized one.
 4. **Index.** At the first control period that sees the index, the encoder is read and the vector stops
    turning. It keeps holding the rotor where it is. The reading is handed to the event loop.
-5. **Reference.** On the event loop, when the caller gave a stored index angle, the encoder is set so that the
+5. **Reference.** When the caller gave a stored index angle, the event loop sets the encoder so that the
    reading taken at the pulse becomes that angle. The current reading is shifted by the stored angle less the
    pulse reading. Only then is the inverter stopped and the completion delivered.
 

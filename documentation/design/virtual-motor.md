@@ -189,7 +189,7 @@ order a board sees:
    one period. Then the control interrupt runs with the measured currents and angle. Its duties
    are applied, one period late when the plant description says so.
 2. The low-priority interrupt runs right after the control interrupt that triggered it, as it would on
-   the board, where it pre-empts nothing but runs before the next control period.
+   the board. There it pre-empts nothing but runs before the next control period.
 3. The timers due in that millisecond fire.
 4. The event loop runs until it is idle.
 
@@ -423,10 +423,10 @@ rate.
   the order the hub put it on the bus. A sender never receives its own frame. A send completes when
   the frame has been put on the bus, which is the acknowledgement a controller would see.
 - **Timing.** The hub puts frames on a bus at that bus's bit rate, taking each frame's length with
-  stuffing into account, so bus load and latency are those of a real bus of that speed. Frames waiting
+  stuffing into account. Thus bus load and latency are those of a real bus of that speed. Frames waiting
   for the bus are put on it lowest identifier first, which is CAN arbitration.
 - **Bit rate.** A participant that joins at another bit rate than the bus's receives nothing and sees
-  its frames fail, as on a real bus with a mismatched node.
+  its frames fail. A real bus with a mismatched node behaves the same.
 - **Faults.** For each bus the app can set a frame drop probability and an added latency, and take one
   participant off the bus (bus-off) and back.
 - **Hosting.** The Virtual Motor app hosts the hub. A virtual motor started with *host the bus* hosts it

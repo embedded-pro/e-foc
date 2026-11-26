@@ -277,9 +277,9 @@ How the numbers were obtained:
   from. The values are chosen so that friction torque at rated speed is about 3 % of rated torque.
   This is 4.2 mN·m at 419 rad/s for the Anaheim and 9.4 mN·m at 628 rad/s for the Teknic. The
   identification scenarios treat them as plant truth, not as a claim about the real machines.
-- **Drive rating.** `maxSupportedCurrent` is the inverter's limit, not the motor's: 10 A and 20 A
-  are what a small drive for each class supports and what the injection-limit check in every
-  calibration procedure compares against. The 15 % DC resistance test draws about 5.5 A
+- **Drive rating.** `maxSupportedCurrent` is the inverter's limit, not the motor's. A small drive for
+  each class supports 10 A and 20 A. The injection-limit check in every calibration procedure
+  compares against these values. The 15 % DC resistance test draws about 5.5 A
   (Anaheim, 24 V) and 10 A (Teknic, 40 V), inside both ratings.
 
 The two motors bracket the plant in the directions that matter to the estimators. The Teknic has
@@ -292,7 +292,7 @@ Sources:
 
 - Anaheim Automation, *BLY17 Series Product Sheet* (L010228) and the
   [BLY172S-24V-4000 product page](https://anaheimautomation.com/bly172s-24v-4000.html):
-  24 V, 4000 rpm, 53 W, 18 oz·in, 1.20 mH line-to-line, 3.35 V/krpm, 0.00068 oz·in·s².
+  - 24 V, 4000 rpm, 53 W, 18 oz·in, 1.20 mH line-to-line, 3.35 V/krpm, 0.00068 oz·in·s².
 - Texas Instruments MotorWare `user.h`, motor `Anaheim_BLY172S`: $R_s = 0.4051$ Ω,
   $L_s = 0.6399$ mH, rated flux 0.03416 V/Hz, 4 pole pairs.
 - Teknic, *Industrial-Grade NEMA 23 Motors* datasheet
@@ -300,8 +300,8 @@ Sources:
   M-2310P-LN-04K, 40 V, 6000 rpm, 0.72 Ω and 0.40 mH line-to-line, 4.64 Vpk/krpm, 0.001 oz·in·s².
 - NXP, *MCUXpresso SDK FOC user guide*,
   [Teknic motor](https://docs.nxp.com/bundle/UG10297/page/HW/Motors/teknic_m2310p_motor.html),
-  which restates the same electrical values for the FRDM-MC kits, and the TI
-  [LVSERVOMTR](https://www.ti.com/tool/LVSERVOMTR) page for the 2MTR-DYNO.
+  and the TI [LVSERVOMTR](https://www.ti.com/tool/LVSERVOMTR) page. They restate the same electrical
+  values for the FRDM-MC kits and the 2MTR-DYNO, respectively.
 
 ---
 

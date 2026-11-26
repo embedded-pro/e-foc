@@ -276,7 +276,7 @@ that matter:
 
 - It is **armed with the inverter**, because comparators guard a stage that is switching. A
   standing condition does not fault a motor that was never enabled.
-- It is **evaluated every control tick**, against the live plant state, so a trip follows from the
+- It is **evaluated every control tick**, against the live plant state. A trip therefore follows from the
   physics of the scenario rather than being poked in by the test.
 - It is **delivered from the event loop**, not from the control interrupt. The handler stops the
   drive and walks the state machine, which is far more than belongs in a 20 kHz interrupt. On
@@ -492,7 +492,7 @@ every scenario in the suite now runs in the default set.
 
 - **Whole-percent duty resolution — fixed.** The duty cycles the modulator handed the inverter
   were `hal::Percent`, a whole-percent `uint8_t` from the infrastructure library's PWM
-  interfaces, and the conversion rounded to the nearest percent. On a 40 V bus into a 0.36 Ω,
+  interfaces. The conversion rounded to the nearest percent. On a 40 V bus into a 0.36 Ω,
   0.20 mH winding one step is 0.4 V. That is about a tenth of an ampere of ripple per control
   period.
   Thus the current loop held a half-ampere setpoint inside a band of about 30 % of it. It could
@@ -524,7 +524,7 @@ every scenario in the suite now runs in the default set.
   into its boundary layer, and the decoupled law 25 %. The zero output was the deadbeat and
   sliding designs computed for a winding of half a microhenry.
 - **The LQI position law is unstable — retracted.** Same cause. It settles into a 10 % band
-  within 30 ms with 27–40 % overshoot, and holds 1.5 rad against a torque step within 0.011 rad,
+  within 30 ms with 27–40 % overshoot. It holds 1.5 rad against a torque step within 0.011 rad,
   the tightest of the position laws.
 - **The LQI speed law was erratic — fixed.** From rest to 20 rad/s it overshot 121 % and never
   settled. Stepped to 40 rad/s while running, it overshot 66 % and kept swinging for the rest of
@@ -555,8 +555,8 @@ The same run, once a disturbance was made large enough to reach the current limi
 second thing:
 
 - **Two speed laws did not come back from a saturating disturbance — fixed.** A shaft torque of
-  half a newton-metre asks for about thirteen of the twenty amperes the drive allows, so the
-  current to reject it is there. ADRC and LQI were thrown 205 to 238 rad/s off a 20 rad/s
+  half a newton-metre asks for about thirteen of the twenty amperes the drive allows. The
+  current to reject it is therefore there. ADRC and LQI were thrown 205 to 238 rad/s off a 20 rad/s
   setpoint and returned. PI and two-DOF were thrown to about 317 and ended the window
   10.44 rad/s short. There was no windup — the velocity-form PI never reached its clamp. The PI
   placed its integral zero at a tenth of the speed bandwidth. That leaves a slow closed-loop
@@ -626,7 +626,7 @@ made on both reference motors so that a tolerance is not tuned to one winding.
 Three product channels carry what the firmware believes, all of them CAN messages of the product:
 
 - The **electrical parameters response** the CAN identification command broadcasts before it
-  acknowledges: resistance, inductance and pole pairs at the wire's resolution of 1 mΩ and 1 µH.
+  acknowledges. It holds resistance, inductance and pole pairs at the wire's resolution of 1 mΩ and 1 µH.
 - The **calibration record**, read with `QueryParameter` once `Calibrate` has acknowledged: the motor
   parameters (`0x40`–`0x45`), the current-sensor offsets and the cogging-map peak (`0x80`–`0x83`).
   This is the only way the mechanical identification's result is visible on this target. The CAN
@@ -640,8 +640,8 @@ The scenarios cover:
 
 - the offline procedures from a blank calibration and from one deliberately wrong by given factors
 - the online estimators from a wrong seed under a speed reference that alternates between two
-  levels (the same shape the identification service uses, because a constant speed excites
-  neither inertia nor friction)
+  levels. This is the same shape the identification service uses, because a constant speed excites
+  neither inertia nor friction
 - the same with a constant shaft torque applied while the estimators run
 - a winding that heats while running.
 
@@ -683,8 +683,8 @@ What the first characterisation found, in the order it was found:
   came in configured its current loop with an inductance a thousand times too small. Part I's
   numbers were measured that way and are re-measured below.
 - **The torque constant was a per-target constant of 0.1 N·m/A**, two and a half to three times
-  the true value of either reference motor, used by the mechanical identification, the online
-  inertia estimator and the speed-loop gain design alike. It is now derived from the calibration
+  the true value of either reference motor. The mechanical identification, the online inertia
+  estimator and the speed-loop gain design all used it. It is now derived from the calibration
   record.
 - **Small mechanical values did not survive the product's own outputs.** The mechanical
   parameters response on the wire carries inertia and friction as fixed-point with a resolution
@@ -749,7 +749,7 @@ What the first characterisation found, in the order it was found:
   speeds before publishing (`service-mechanical-ident.md` § *Persistence of Excitation*).
 
 - **The constant-torque scenario depended on the host's speed — fixed.** Its 0.01 N·m steps in
-  500 ms after enable on the plant's clock, but the excitation started after the enable step's
+  500 ms after enable on the plant's clock. The excitation, however, started after the enable step's
   half second of host time. A host can run the emulator slower than real time (230 to 350 ms of
   guest time to that half second here). Such a host turned the rotor first. The online estimator kept a
   stretch of unloaded motion at 52 rad/s in its two-second memory. The load is 20 to 40 times the
@@ -862,8 +862,8 @@ at rest.
 
 What the plant has shown so far:
 
-- **The inertia read about 10 % low on a 4000-count encoder, and the two runs agreed on it**, so
-  the agreement check could not see it. A simulation of the estimator alone traced it to the
+- **The inertia read about 10 % low on a 4000-count encoder, and the two runs agreed on it**.
+  The agreement check therefore could not see it. A simulation of the estimator alone traced it to the
   weighting of the torque against the acceleration, not to quantisation. It is fixed
   (`documentation/design/hardware-characterisation.md`, Part D).
 - **A residual low inertia of 1–4 % on quantised encoders varied from run to run**, so a limit
@@ -871,25 +871,25 @@ What the plant has shown so far:
   acceleration came from. Speeds now come from window-mean positions, and every quantised row
   reads within 0.3 % (Part D).
 - **Encoder noise of 0.2 mrad on the light reference rotor ended the calibration in Fault**, with
-  inertia estimates a hundred times too small, while the heavier bench rotor completed. The
+  inertia estimates a hundred times too small. The heavier bench rotor completed. The
   window was sized from the smallest position step, which a noisy continuous encoder drives to
   zero. It is now sized from the noise the encoder shows as well. The scenarios pin both
   reference rotors at 10 % (`documentation/design/hardware-characterisation.md`, Part D).
 - **Dry friction does not disturb the identification**; the estimator models it.
-- **The bench's cogging and dry friction made the PID and two-DOF position laws hunt**, ±0.17 rad
-  every 1.5 s at 1 rad on the rig and in the plant alike. Cascade P, LQR and LQI held
+- **The bench's cogging and dry friction made the PID and two-DOF position laws hunt**.
+  They hunted ±0.17 rad every 1.5 s at 1 rad, on the rig and in the plant alike. Cascade P, LQR and LQI held
   (`documentation/theory/position-loop-pid.md`, *A rotor that stands still*; REQ-CTL-003).
-- **The same cogging left the PID, two-DOF and Cascade P laws unable to hold a setpoint on a hill top**,
-  3.0 rad, where they stopped at 3.02 to 3.13 rad. The calibration's cogging map, which read the plant's
+- **The same cogging left the PID, two-DOF and Cascade P laws unable to hold a setpoint on a hill top**.
+  The setpoint was 3.0 rad. They stopped at 3.02 to 3.13 rad. The calibration's cogging map, which read the plant's
   4 mN·m within 4 %, lets every law hold it (`documentation/design/service-cogging-compensation.md`;
   REQ-CMS-001, REQ-CTL-003).
 - **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
-  inductance three times too high** while the estimator paired each current change with the previous
+  inductance three times too high**. The estimator paired each current change with the previous
   tick's command. The plant had applied every duty at once, so the simulation never showed the rig's
   2–6×. The platform now states the delay and the estimator pairs accordingly
   (`documentation/design/service-electrical-ident.md`; REQ-CMS-003).
-- **The same late duty put the deadbeat law into a 3.4 kHz limit cycle on the rig**, swinging to the
-  voltage limit with the rotor at rest. Inverting the plant on the measured current leaves the pole
+- **The same late duty put the deadbeat law into a 3.4 kHz limit cycle on the rig**.
+  It swung to the voltage limit with the rotor at rest. Inverting the plant on the measured current leaves the pole
   pair $z^2 - A_d z + A_d = 0$. With the duty a period late on the bench motor, the model showed this
   as a 102 % overshoot that took 12.8 ms to settle. The law now acts on the current it
   predicts for when its duty lands, which settles in 0.1 ms with 5 % overshoot
@@ -903,8 +903,8 @@ What the plant has shown so far:
   not model from what it mispredicts and subtracts it. That holds the setpoint within 0.5 mA
   (`documentation/theory/current-loop-deadbeat.md`; REQ-CTL-001).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
-  the identification is under half an amp, so a collapsing supply on the rig is not explained by
-  the motor's power alone.
+  the identification is under half an amp. The motor's power alone therefore does not explain a
+  collapsing supply on the rig.
 
 ### Part L — The power stage between the duty and the winding
 
@@ -942,7 +942,7 @@ which the plant puts on the winding in place of $d\,V_{bus}$. Three regimes foll
 
 - **Zero current:** the node stays wherever the last switch left it, and the leg delivers $d\,V_{bus}$.
 - **Small current**, $|i| < C V_{bus} / t_d$: on the edge that has to cross the bus the node swings
-  only part of the way, and the leg loses $i\,t_d^2 / (2C\,T)$ there, in proportion to the current.
+  only part of the way. The leg loses $i\,t_d^2 / (2C\,T)$ there, in proportion to the current.
   The winding sees it as extra resistance. The other edge only has to reach the body diode and
   clamps there, adding $\operatorname{sign}(i)\,V_f\,t_d / T$. Below $V_f C / t_d$ neither edge
   reaches a diode, and the whole loss is $i\,t_d^2 / (C\,T)$.
@@ -996,8 +996,8 @@ The chain had cost 1010 cycles on its own, 81 % of the period. With the drive's 
 the event loop starved and the watchdog reset the target. Most of it went on work whose result never
 changed:
 
-- an exponential for an amplifier that had settled long before the sample, which in float rounds
-  to exactly one past eighteen time constants and is no longer computed there
+- an exponential for an amplifier that had settled long before the sample. In float it rounds
+  to exactly one past eighteen time constants, and it is no longer computed there
 - the converter's code width and range rebuilt for every conversion
 - 64-bit sums for codes that fit in 32 bits.
 
@@ -1126,7 +1126,7 @@ the same plant model:
   It fires the scheduled torque step and encoder freeze. It records the trajectory with the same
   recorder.
 - The plant is configured from the same plant description by the same function the emulated
-  platform uses, so a field added to one cannot be missed by the other.
+  platform uses. A field added to one therefore cannot be missed by the other.
 - The outer loop runs after the control interrupt, as the low-priority interrupt does, and timers
   advance by one control period per step. The recorder is drained sixteen lines a millisecond, as
   the emulated platform drains it. A command waits a few milliseconds after completing, as a
@@ -1206,7 +1206,7 @@ Every control period runs the parts in one fixed order, and the order is part of
 3. The supply integrates the power the inverter drew, and the thermal model the copper loss of the
    new currents.
 4. The mechanical plant advances the rotor with the torque of the currents at the start of the
-   period, which keeps the position's second difference on the current reported with it.
+   period. This keeps the position's second difference on the current reported with it.
 5. The current sensor reads the new currents, then the encoder draws its noise for the period.
 
 The random draws come in that sequence, three for the current sensor and one for the encoder, so a

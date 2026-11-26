@@ -136,8 +136,8 @@ simulated target, the plant's own record:
   online estimates, the control-loop statistics and the reset cause (`QueryParameter`), and the electrical parameters an
   identification broadcasts.
 - **Plant trajectory**, on a simulated target only, carries what the motor actually did, sampled
-  on the control-tick time base, and the tick each command frame was delivered on, in a record file
-  the plant writes in the scenario directory. This is the channel the performance and disturbance
+  on the control-tick time base. It also carries the tick each command frame was delivered on. Both are
+  in a record file that the plant writes in the scenario directory. This is the channel the performance and disturbance
   scenarios measure; see the software-in-the-loop design.
 
 The identification scenarios compare the calibration record, the online estimates and the
@@ -345,7 +345,7 @@ a verdict.
 - **Traces are not a contract.** Their wording changes with any logging edit, nothing versions them,
   and a parser can match a stale line. The CAN contract is versioned and has its own wire tests.
 - **One step, two targets.** When both targets speak only CAN, a step reads the same on the emulator
-  and on hardware; today some steps take the terminal on one target and CAN on the other.
+  and on hardware. Today some steps take the terminal on one target and CAN on the other.
 - **Debug output is free to change.** Trace wording, verbosity and rate stop mattering to the suite,
   and a slow or chatty serial port can no longer delay or break a verdict.
 
@@ -417,8 +417,8 @@ board, and reaches it through the hardware bridge over CAN alone.
   a parameter over CAN first reads the value the drive holds. After a `@hil_motor` scenario, a hook
   writes every such value back, even when the scenario failed. A motor parameter that was never
   identified reads 0, which no write accepts, so the hook clears the calibration instead.
-- **Bench limits.** The rotor runs free with an inertia disk, so a motion scenario keeps to a few
-  tenths of an ampere for a bounded time, or to 0 A, and to at most 60 rad/s. A scenario that
+- **Bench limits.** The rotor runs free with an inertia disk. Thus a motion scenario keeps to a few
+  tenths of an ampere for a bounded time, or to 0 A. It also keeps to at most 60 rad/s. A scenario that
   accelerates the rotor in torque mode prints its peak speed as a `[METRIC]` line, and its limit is
   pinned from that line. Timing limits use speed polled over CAN, which resolves a few milliseconds.
 - **Not on the bench.** The bench encoder has no index channel (calibration reports none found), so
@@ -450,7 +450,7 @@ One follow-up change, in this order, each step leaving the suite green:
    and the serial output becomes the per-scenario debug log. Done.
 3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its
    stall in the world description. Done.
-4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use;
-   they remain only in the bring-up fixture, so a new step cannot bring them back. Done.
+4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use.
+   They remain only in the bring-up fixture, so a new step cannot bring them back. Done.
 5. **Documents.** Rewrite Observation and Interfaces here, and Parts B, D, G, I and J and the
    Interfaces of the software-in-the-loop design, for the new channels. Done.

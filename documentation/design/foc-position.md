@@ -336,8 +336,7 @@ Within a single low-priority interrupt call, the position and speed loops execut
 0. **Turns are counted first** (Multi-Turn Position): the count advances from the latest angle and is published to the position tracker.
 1. **Motion profile fires next** (Motion Profile): replans on a new setpoint. It samples the reference position, velocity and acceleration for this tick. With the profile off it passes the setpoint through.
 2. **Position law fires second**: reads θ and computes the position error to the reference (plain, or folded in circular mode without limits). It produces either a speed setpoint or an Iq setpoint.
-3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint. It computes speed error using Δθ/Δt, then produces and clamps the Iq setpoint.
- A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
+3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint. It computes speed error using Δθ/Δt, then produces and clamps the Iq setpoint. A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
 4. The low-priority interrupt returns. On the next 20 kHz ISR cycle, the inner loop picks up the updated Iq setpoint.
 
 This ordering guarantees that the Iq setpoint used by the inner loop is always the one derived in the most recent outer-loop tick.

@@ -260,9 +260,8 @@ hardware watchdogs start only when software starts them, and the application doe
   build without keys is safe, but cannot update a board.
 - Keys are not a build input: the build always produces a bootloader with an erased slot.
   Afterwards, the image tool's key injection writes the public key and the AES key from a set.
-  It writes them into the finished bootloader, its ELF file and its hex file. One build
- can therefore take the development
-  set or the release set, and the two differ only in those 80 bytes. Continuous integration injects the
+  It writes them into the finished bootloader, its ELF file and its hex file. One build can therefore take the
+  development set or the release set, and the two differ only in those 80 bytes. Continuous integration injects the
   development set into every build.
 - A release fails when the release set cannot be read, rather than publish a bootloader that could never
   update a board. A dry run injects the development set.
@@ -334,7 +333,6 @@ the stream on its own, so this costs nothing in the copy that follows. It then c
    An image linked for another processor's memory map fails this check;
 2. the application header's magic is valid and its board kind is this bootloader's board.
    Its target identity equals the device identity that this chip reports, read at that moment.
-
 
 A failure is recorded as *invalid* with the bootloader's own *wrong target* error code. This code is outside the range
 the library reserves for its loaders. The old application starts untouched.

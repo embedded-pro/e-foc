@@ -283,7 +283,7 @@ This is 97 %, at the edge, and matches the 4160 rpm limit of §4.
   indicative.
 - **Assumes**: steady state for the voltage budgets; transients need extra headroom.
 - **Derived, not measured**: the 0.81 modulation limit follows from the 70 % readable limit and common-mode
-  injection; the 95 % cap never binds below it, since the spread between highest and lowest duty is at most $m$.
+  injection. The 95 % cap never binds below it, since the spread between highest and lowest duty is at most $m$.
   The simulation results of `documentation/architecture/system.md` are consistent with it.
 - **Board-specific**: §1 and every figure derived from it hold for E-FOC-HARDWARE on the EK-TM4C1294XL;
   another board has its own `BoardCharacteristics`.

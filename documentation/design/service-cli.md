@@ -33,8 +33,8 @@ date: 2026-11-26
   and answering each with a status and a message
 - The hardware commands of the bring-up application (EEPROM, ADC, CAN, watchdog, reset cause) that
   the hardware-in-the-loop scenarios drive
-- The startup banner of both applications: firmware name, version and revision, build, compiler,
-  target, system clock, supply voltage, reset cause, and the fault record a crash left behind
+- The startup banner of both applications. It shows firmware name, version and revision, build, compiler, target
+  and system clock. It also shows supply voltage, reset cause, and the fault record a crash left behind
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
 
 ---

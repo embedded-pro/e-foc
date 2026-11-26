@@ -59,7 +59,7 @@ The sequence executed each cycle is:
 8. Speed limiter: fold the q-axis setpoint by the measured speed against the overspeed limit (Speed Limiter, below).
    Add the cogging current at θe ([service-cogging-compensation.md](service-cogging-compensation.md) Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
-10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The step rotates the sampled cos/sin pair through the delay angle ([foc-transforms.md](foc-transforms.md), *Delay compensation*). ωe is the filtered electrical speed of step 8's limiter. n is the platform's duty delay in periods.
+10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The step rotates the sampled cos/sin pair through the delay angle ([foc-transforms.md](foc-transforms.md), *Delay compensation*). The speed ωe is the filtered electrical speed of step 8's limiter. The delay n is the platform's duty delay in periods.
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
 12. Return the duty cycles to the control interrupt, which applies them to the power stage at once.
 13. Zero-vector rates: from Id, Iq and ωe, the rate of each phase current while all low sides conduct, turned

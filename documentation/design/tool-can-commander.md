@@ -21,18 +21,19 @@ date: 2026-11-26
 ## Responsibilities
 
 **Is responsible for:**
-- Letting a bench engineer open one CAN interface and command every e-foc motor controller on it, each
-  addressed by its CAN node ID (configured base plus the board's ID jumpers). The commands are start, stop,
+- Letting a bench engineer open one CAN interface and command every e-foc motor controller on it.
+  Each controller is addressed by its CAN node ID (configured base plus the board's ID jumpers). The commands are start, stop,
   clear fault, control mode, torque/speed/position setpoints, the controller of each loop and its settings.
   They also cover the motor parameters, the start-up settings, alignment and identification, plus one
   emergency stop that reaches all of them.
-- Showing each controller's state as that controller reports it: heartbeat, firmware contract
-  compatibility, motor state and fault, whether position mode reached its target, active control mode,
-  measurements, identified motor parameters and every setting it holds.
+- Showing each controller's state as that controller reports it:
+  - heartbeat and firmware contract compatibility
+  - motor state and fault, and whether position mode reached its target
+  - active control mode, measurements, identified motor parameters and every setting it holds.
 - Keeping a persistent issue log per user, and turning it into a pre-filled bug report on request.
 - Telling the user when a newer release exists, without ever blocking the tool.
-- Updating a motor controller's firmware over CAN, from the release for its board or from a pack file, in two
-  steps the user starts separately, download and apply, each only while that motor is stopped (Part M).
+- Updating a motor controller's firmware over CAN, from the release for its board or from a pack file (Part M).
+  The user starts the two steps separately: download and apply. Each step runs only while that motor is stopped.
 - Shipping as a branded, installable product ("e-foc CAN Commander") for Windows and Debian-based Linux.
 
 ---
@@ -86,7 +87,8 @@ graph TD
 ```
 
 - A tab appears automatically for every node whose frames are seen on the bus. The user can also add a tab
-  by node ID (Motor → Add Motor, or the "+ Add Motor" button) before that node comes online, and close tabs.
+  by node ID (Motor → Add Motor, or the "+ Add Motor" button) before that node comes online.
+  The user can close tabs.
   Closing a tab does not stop the motor.
 - The list of tabs is restored on the next start, so a known rig reopens with its motors in place.
 - At most eight motors are followed, the number of servers can-lite tracks liveness and sequence numbers
@@ -247,8 +249,8 @@ flowchart LR
     Edit --> Revert["Revert: values in force restored"]
 ```
 
-- **Controllers** shows the loops the active control mode runs: the current loop in torque mode, current and
-  speed in speed mode, all three in position mode. Each loop has its algorithm and the settings that
+- **Controllers** shows the loops the active control mode runs. These are the current loop in torque mode,
+  current and speed in speed mode, and all three in position mode. Each loop has its algorithm and the settings that
   algorithm uses; the other settings of the loop are hidden, not deleted. The current-loop bandwidth is
   shown for deadbeat too, which estimates its voltage error at that bandwidth. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
@@ -438,9 +440,9 @@ is deleted and never run. Downloading may happen while a bus is open, but instal
 tool. Installing therefore waits until the bus is disconnected. The banner says so, and installation
 continues on request once the bus is closed.
 
-- Windows: the tool hands over to a helper and closes. The helper waits until the tool has exited, then
-  starts the installer elevated, which shows the Windows permission prompt for the installer itself, silently
-  into the current installation folder. The installer starts the new version as the signed-in user when it
+- Windows: the tool hands over to a helper and closes. The helper waits until the tool has exited.
+  It then starts the installer elevated and silently into the current installation folder.
+  This shows the Windows permission prompt for the installer itself. The installer starts the new version as the signed-in user when it
   finishes. If the permission prompt is declined, the helper starts the old version again.
 - Linux: the tool asks for the administrator password through `pkexec` and installs the package with
   `apt-get`, keeping its window open meanwhile. On success it starts the new version and closes. A dismissed
@@ -504,12 +506,12 @@ The tool does not implement bus access itself. It uses the platform composition 
 and stays editable; with nothing to list it explains how to get an entry. The PCAN and Kvaser libraries are
 loaded when needed, so the tool installs and starts on a machine without them.
 
-- **Connect failure** — the adapter's own reason (port not found, in use, access denied, unsupported
-  bitrate, missing vendor library) goes to the log, followed by a next step chosen from the name's prefix.
-- **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
-  dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
+- **Connect failure** — the adapter's own reason goes to the log: port not found, in use, access denied,
+  unsupported bitrate, missing vendor library. A next step chosen from the name's prefix follows it.
+- **No usable adapter at startup** — no adapter has both its driver and at least one interface.
+  A dialog then lists every missing driver with what to install. While any adapter works, nothing is shown.
 - **Connecting** — an adapter that accepts the request but has not yet reported the connection shows
-  *Connecting…*: the fields and Connect are disabled and Disconnect cancels. The slcan adapter reports the
+  *Connecting…*. The fields and Connect are disabled and Disconnect cancels. The slcan adapter reports the
   connection once the device has acknowledged the bitrate and the open command. It also reports it after
   250 ms without a rejection, because CANable and CANtact firmware never acknowledge a command. A rejected bitrate or open command
   logs the adapter's reason, not a disconnect.
@@ -534,8 +536,9 @@ The tool never chains the two: a finished download ends with the pack staged and
 nothing more.
 
 - **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
-  release, by its asset name, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` with the board named as
-  the Diagnostics tab names it and the release's own tag ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part J). When that
+  release. It looks for the asset name `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade`
+  ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part J). The board is named as the Diagnostics
+  tab names it, and the tag is the release's own tag. When that
   release is newer than the version the motor reports, the Firmware tab says so. The motor's tab then carries
   a marker, an arrow after the motor's name, with the release in the tab's tooltip. *Open Pack File…* takes a
   local pack instead, for a development build. A node older than contract 2.6 cannot report its version or
@@ -555,9 +558,13 @@ nothing more.
   The tool knows every board's identification from the same header the firmware is built with. A pack for
   another board is not offered, and the tab names both. The controller and its bootloader check again ([bootloader.md](bootloader.md) Part I); the tool does not
   check the signature.
-- **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
-  motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
-  downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
+- **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only
+  while all of these hold:
+  - the motor's last status reads idle or ready
+  - it has no command pending
+  - no other motor on the bus is downloading.
+
+  Otherwise each says why. A motor in fault is cleared first. The controller enforces the same
   rule and answers *Busy* to a request that arrives while it runs.
 - **Download.** A confirmation names the motor and the version. It says that the motor stays stopped until
   the download ends, two to three minutes for 320 KB, and that nothing is installed yet. Then the tool sends
@@ -578,7 +585,7 @@ nothing more.
   ready", with *Apply Firmware…* and *Discard*, which sends Abort and forgets the staged pack. Verifying
   and, after Activate, the wait for the controller read the same way. The status line names the step over
   a busy bar, since a busy bar shows no text of its own.
-- **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
+- **Apply.** A confirmation names the motor, the running version and the staged one. It says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
   node to come back, then reads its version. The node is back when it reports nothing staged. The tool reads
   its firmware identity again when it comes back online. It also reads it every 5 s while the node has not
@@ -642,16 +649,16 @@ the Virtual Motor app ([tool-virtual-motor.md](tool-virtual-motor.md)).
   already runs at. The failure comes with the advice to check that a hub is running and that every node uses
   the same bitrate.
 - **Marking.** A node that reports the board kind *virtual* is marked **Virtual** on its tab, its overview
-  chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
-  motor.
-- **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else: no release,
-  no pack and no update steps, because a virtual motor runs the firmware it was built with. The Download
+  chip and its motor header. A virtual motor is therefore never mistaken for hardware, nor hardware for a
+  virtual motor.
+- **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else.
+  It shows no release, no pack and no update steps, because a virtual motor runs the firmware it was built with. The Download
   and Apply actions stay disabled and say so.
 - **Launching.** Motor → Launch Virtual Motor… starts the Virtual Motor app, which is installed with the
   tool ([tool-virtual-motor.md](tool-virtual-motor.md) Part I). Where the app is not installed next to the tool the action is
   disabled and says so.
 - **Going offline.** A paused, powered-off or crashed virtual motor goes silent and is reported offline
-  after the usual liveness timeout; closing the hub closes the bus as an unplugged adapter would.
+  after the usual liveness timeout. Closing the hub closes the bus as an unplugged adapter would.
 
 ## Interfaces
 

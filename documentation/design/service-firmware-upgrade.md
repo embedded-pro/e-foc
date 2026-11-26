@@ -48,14 +48,15 @@ a download through the session's download cancel. The pack header names its dest
 application target name, as [bootloader.md](bootloader.md) requires.
 
 **Is responsible for:**
-- Answering the can-lite firmware-upgrade category (`0x1`) on the drive's CAN node: Begin Upgrade, Data
-  Block, Verify, Activate, Abort and Query Progress, as the can-lite firmware-upgrade specification defines
+- Answering the can-lite firmware-upgrade category (`0x1`) on the drive's CAN node. Its commands are Begin
+  Upgrade, Data Block, Verify, Activate, Abort and Query Progress, as the can-lite firmware-upgrade specification defines
   them.
 - Accepting Begin Upgrade (download) and Activate (apply) only while the drive is stopped, in Idle or
   Ready, with nothing outstanding.
 - Erasing the whole staging slot before a download starts, then writing the received pack into it.
-- Checking the pack on Verify: its CRC-32 (the specification's section 4.3), and that its header names this
-  board and an application image that fits the application slot.
+- Checking the pack on Verify:
+  - its CRC-32 (the specification's section 4.3)
+  - that its header names this board and an application image that fits the application slot.
 - Keeping a checked pack staged until Activate, Abort or the next Begin, and recording it in the status
   journal so a restart keeps it.
 - On Activate, recording *ready to deploy* in the status journal and restarting the controller.
@@ -136,7 +137,7 @@ and 256 on the emulated board (Part I).
 - The bytes are collected into one page. A full page is programmed into the staging slot, which Begin
   erased. It is then read back and compared with what was sent before its last block is acknowledged. Nothing is
   erased while blocks arrive, so each block costs at most one page program and one read (Part G).
-- A page that does not read back as programmed is answered *WriteError* and the session goes to Error; the
+- A page that does not read back as programmed is answered *WriteError*, and the session goes to Error. The
   client starts the download again with Begin. The page is not written a second time, because some internal
   flash cannot program a unit twice without erasing it. A second Begin erases the staging slot again.
 - A block that would take the download past the size given in Begin is answered *InvalidSize*.
@@ -158,7 +159,7 @@ checks:
    - a product name equal to this firmware's own, which names the board and its processor part
      ([bootloader.md](bootloader.md) Part B)
    - a product version of three decimal numbers from 0 to 255, major, minor and patch, separated by dots (Part H)
-   - one image whose target is the application, which ends the pack, and whose length, less its image header and
+   - one image whose target is the application and which ends the pack. Its length, less its image header and
      its AES counter, fits the application slot less its descriptor
 
 The image's destination and exact size are encrypted. The bootloader checks them before it erases anything
@@ -195,11 +196,11 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
 
 ### Part F — Abort and the inactivity deadline
 
-- Abort while a pack is being received, or the inactivity deadline, ends the download: the session returns to
+- Abort while a pack is being received, or the inactivity deadline, ends the download. The session returns to
   Idle, the interlock is released and the journal stays empty, so nothing is staged. A Begin or Verify still
   unanswered is answered *InvalidState* first.
 - The emergency stop ends a download in progress, from an accepted Begin until Verify is answered, as Abort
-  does, without an Abort answer: the client sees its pending Begin or Verify answered *InvalidState*, or its
+  does, without an Abort answer. The client sees its pending Begin or Verify answered *InvalidState*, or its
   next block answered *InvalidState*. A staged pack stays staged, and an accepted Activate still restarts.
 - Abort in Staged or Error discards the staged pack and the service returns to Idle. The pack is unavailable at
   once: Activate is answered *NotReady* and the staged version reads zero. Erasing the journal stalls flash, so
@@ -210,16 +211,16 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
 
 ### Part G — interlocks
 
-- **Drive.** While a pack is received (Erasing, Receiving and Verifying), and after an accepted Activate
-  (Restarting), the service counts as asynchronous work of the control-mode state machine. Thus the state
+- **Drive.** While a pack is received (Erasing, Receiving and Verifying), the service counts as asynchronous
+  work of the control-mode state machine. The same holds after an accepted Activate (Restarting). Thus the state
   machine refuses enable, calibration, re-alignment, calibration clear, a motor parameter change and a
   control-mode or algorithm selection. It refuses them as it does while an NVM write is outstanding
   ([state-machine.md](state-machine.md)). A staged pack holds nothing. The drive runs normally until the user applies
   it, and Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted, and ends
   a download in progress (Part F).
 - **Non-volatile memory.** While a pack is received, and while Restarting, the CAN bridge answers *busy* to every
-  command that writes
-  the configuration record: start-up settings, telemetry rate and fault supervision settings. Where the
+  command that writes the configuration record. Such a command writes the start-up settings, the telemetry rate
+  or the fault supervision settings. Where the
   EEPROM and the flash share one controller, as on the reference board, a flash program and an EEPROM write must
   never overlap. Elsewhere the rule costs nothing and keeps the behaviour the same.
 - **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes. On the reference

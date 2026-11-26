@@ -34,8 +34,8 @@ into a ripple at the electrical frequency. It hides small torques such as the be
 ([software-in-the-loop](../verification_and_validation/software-in-the-loop.md), Part M).
 
 **Is responsible for:**
-- Measuring each phase sensor's zero-current reading at the start of the full calibration, and
-  again at the first Enable after power-up, a control-mode switch or a Fault
+- Measuring each phase sensor's zero-current reading at the start of the full calibration. The
+  measurement repeats at the first Enable after power-up, a control-mode switch or a Fault
 - Confirming each measurement with a second one, so a single disturbed window is never stored
 - Handing the offsets in force to the inverter compensation stage, which removes them from every
   phase-current sample before any consumer receives it

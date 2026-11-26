@@ -34,8 +34,13 @@ deceleration, an over-current burst and a command timeout. The fault history kee
 (REQ-PRO-006).
 
 **Is responsible for:**
-- Recording every entry into Fault: the fault code, the power-up it happened in, the time since that power-up,
-  the control mode, the filtered bus voltage and the peak torque current of the last 10 ms.
+- Recording every entry into Fault:
+  - the fault code
+  - the power-up it happened in
+  - the time since that power-up
+  - the control mode
+  - the filtered bus voltage
+  - the peak torque current of the last 10 ms.
 - Keeping the eight newest records in the non-volatile memory, the oldest overwritten first.
 - Counting the power-ups, so that records of different power-ups can be ordered although the uptime restarts.
 - Writing from the event loop only, at most once a second, without colliding with the calibration and

@@ -42,12 +42,13 @@ estimates, safely (REQ-CMS-003), and keeps the inductance, inertia and friction 
   - once its estimator reports it settled
   - once it has differed from that model by more than a threshold for a dwell time of running
   - and only inside a plausibility band around the commissioned value.
-- Applying the new model only while the drive is stopped, redesigning the current and speed loops from it with the
-  loop bandwidths the operator or the calibration chose.
+- Applying the new model only while the drive is stopped, and redesigning the current and speed loops from it. The
+  redesign uses the loop bandwidths the operator or the calibration chose.
 - The operator's choice of when: never, on command, or on every stop.
 - Counting each recalibration applied and each estimate rejected, and showing the model in use.
-- Storing the recalibrated inductance, inertia and viscous friction, at most once every 15 minutes, restoring them at
-  power-up while they belong to the commissioned model, and discarding them on the operator's command.
+- Storing the recalibrated inductance, inertia and viscous friction, at most once every 15 minutes.
+- Restoring them at power-up while they belong to the commissioned model, and discarding them on the operator's
+  command.
 
 ---
 
@@ -142,12 +143,12 @@ learned from. The resistance is never stored.
   again 10 ms later; one that fails waits for the next window.
 - **Mode off** never stores, and runs the commissioned model; the stored values are kept for when the mode is turned
   on again.
-- **Power-up.** While the mode is on command or automatic, and the record's commissioned inductance, inertia and
-  friction still match the check, the stored values are in use from the first Ready, each only inside its
-  plausibility band (Part B). A new calibration or a changed motor parameter changes the check, so the stored values
+- **Power-up.** The stored values are in use from the first Ready, each only inside its plausibility band
+  (Part B). This holds while the mode is on command or automatic, and while the record's commissioned inductance,
+  inertia and friction still match the check. A new calibration or a changed motor parameter changes the check, so the stored values
   are no longer used, and the next store replaces them.
 - **Reset Model.** A CAN command, accepted only while stopped, stores an empty learned model at once, outside the
-  15-minute rate, and returns the model in use to the commissioned one, the resistance included. It is acknowledged
+  15-minute rate. It also returns the model in use to the commissioned one, the resistance included. It is acknowledged
   once the record is stored.
 - **Count.** The stores since power-up are a read-only parameter over CAN, so a test can bound the writes.
 

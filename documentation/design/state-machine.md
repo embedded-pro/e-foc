@@ -47,7 +47,6 @@ date: 2026-11-26
 - On a boot with valid NVM data, loading the electrical parameters (R, L, pole pairs) and staying in Idle.
   It stays there until a live alignment re-establishes the rotor reference. The motor cannot be enabled until a Re-align or a Calibrate succeeds. A record that carries an encoder index angle, on a drive with an index channel, boots to Ready instead. The first Enable then restores the reference from the index (see Referencing the Rotor from the Encoder Index)
 - Keeping an established rotor reference across a control-mode switch. A machine built by a switch out of an aligned Ready boots straight to Ready. It does so when the stored record is complete for its mode (see C4)
-
 - Intercepting hardware fault notifications from the fault notifier:
   - stopping the inverter in the delivering context
   - then transitioning to Fault on the event dispatcher (see Fault Safety)
@@ -1228,8 +1227,7 @@ completes, the mode selection therefore decides:
    default). Report *busy* for a transient failure, or *NVM failed* otherwise. The active mode was never touched.
 2. **Write succeeded and the guard still holds**: activate the pending mode and report *ok*.
 3. **Write succeeded but the guard no longer holds**: keep the active mode. Restore the default control mode in
-   the configuration record and write it back, so that NVM agrees with the running mode.
- Report *busy* when that write
+   the configuration record and write it back, so that NVM agrees with the running mode. Report *busy* when that write
    completes, whatever its status. The pending callback stays set during the rollback write, so a Select in that
    window is refused with *busy* (C2).
 

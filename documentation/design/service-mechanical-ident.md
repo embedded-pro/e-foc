@@ -33,7 +33,7 @@ date: 2026-11-26
 - Starting and stopping the drive for the duration of the procedure, and driving the two-level speed trajectory that provides the excitation
 - Refusing a request whose configuration does not describe a bounded trajectory, and ending a run that leaves the current or speed envelope it was given
 - Reporting an estimate only when it is converged and physically plausible, and reporting absent values otherwise
-- Releasing the drive and discarding the pending completion when the caller aborts, so that a fault is not overwritten by the result of the procedure it interrupted
+- Releasing the drive and discarding the pending completion when the caller aborts. Thus the result of the procedure it interrupted does not overwrite a fault
 - Computing instantaneous electromagnetic torque from the q-axis current and the caller-supplied torque constant
 - Estimating angular acceleration by finite-differencing successive speed measurements obtained from the encoder
 - Maintaining a real-time Recursive Least Squares (RLS) estimator that continuously refines the parameter vector [J, B, τ_friction] using each new observation
@@ -378,7 +378,7 @@ The interrupt reads two things the event loop writes: whether a run is active an
 
 A single-shot timer starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:
 
-- **τ_friction** (the constant term) is the first element of θ. It is τ_c plus any constant shaft load, because the one-shot run turns one way only and cannot separate dry friction from a load, so it is not reported. The Coulomb friction comes from the cogging-map step, which turns both ways (`service-cogging-compensation.md`).
+- **τ_friction** (the constant term) is the first element of θ. It is τ_c plus any constant shaft load, because the one-shot run turns one way only. The run cannot separate dry friction from a load, so τ_friction is not reported. The Coulomb friction comes from the cogging-map step, which turns both ways (`service-cogging-compensation.md`).
 - **J** (inertia) is the second element of θ; reported in kg·m² (N·m·s²).
 - **B** (viscous friction) is the third element of θ; reported in N·m·s/rad.
 

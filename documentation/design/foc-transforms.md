@@ -105,7 +105,7 @@ The electrical angle θe is obtained by multiplying the mechanical rotor angle �
 The caller is responsible for supplying the correct θe.
 
 **Invariants:**
-- The forward Park in the current-sensing path uses the sampled θe. The inverse Park of the closed-loop current paths uses that angle advanced by the delay between the sample and the instant the voltage is applied, θe + (n + ½)·ωe·Ts, where n is the number of periods the bridge takes to load a new duty and ωe is the electrical speed the cascade already holds. The open-loop drives (alignment, pole-pair sweep, inductance injection, resistance hold) and the cogging feed-forward keep the sampled angle.
+- The forward Park in the current-sensing path uses the sampled θe. The inverse Park of the closed-loop current paths advances that angle by the delay between the sample and the instant the voltage is applied. The advanced angle is θe + (n + ½)·ωe·Ts. Here n is the number of periods the bridge takes to load a new duty. The speed ωe is the electrical speed the cascade already holds. The open-loop drives (alignment, pole-pair sweep, inductance injection, resistance hold) and the cogging feed-forward keep the sampled angle.
 - The transform is stateless — no memory of previous cycles.
 
 ### Composite Clarke–Park — Chained Transform with Single Trigonometric Evaluation

@@ -81,7 +81,7 @@ outside the board's overvoltage and undervoltage thresholds. A reading that is n
 Otherwise the answer is *clear*. A latched trip answers without reading the bus.
 
 - **Comparator-based protection** — hardware comparators on the phase-current sampling chain watch the
-  currents and the bus voltage, and their outputs drive the power stage's fault input. The comparator samples
+  currents and the bus voltage. Their outputs drive the power stage's fault input. The comparator samples
   never reach the phase-current samples, so the phase-current sampling still delivers exactly three samples.
   The sampling driver empties its sample queue on every conversion run. It drops the first run after each arm,
   because the arm can land while a run is half converted. Any later run with a different number of samples fails an

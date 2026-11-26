@@ -192,7 +192,7 @@ restores the aligned frame exactly: $c$ cancels, and so does the absolute positi
 Two properties make this better than aligning again:
 
 - **The reading is taken at the pulse, not at the field.** A rotor dragged by a turning field lags it
-  by the load angle that balances friction, cogging and load (§2), but the encoder reading at the
+  by the load angle that balances friction, cogging and load (§2). But the encoder reading at the
   pulse is the same however far it lags. The alignment's settled position, by contrast, carries that
   balance as an error.
 - **The pulse has a width.** It spans one count or one line, and a pulse met from the other side is
@@ -257,10 +257,10 @@ stateDiagram-v2
 - **Assumes**: Negligible cogging torque relative to $K_{mag} \cdot I_{align}$. High cogging torque
   motors may require a higher alignment current.
 - **Assumes** (§7): The index mark does not move relative to the rotor between commissioning and
-  power-up; an encoder that is remounted needs a new alignment, which measures the index again.
+  power-up. An encoder that is remounted needs a new alignment, which measures the index again.
 - **Does not handle**: Repeated alignment without re-energising (thermal state must be considered).
-- **Does not handle**: Distribution of alignment offset across multiple electrical periods for motors
-  where $p > 1$ and the mechanical step may span more than one electrical revolution.
+- **Does not handle**: Distribution of alignment offset over several electrical periods, for motors
+  with $p > 1$ whose mechanical step may span more than one electrical revolution.
 
 ## References
 

@@ -28,7 +28,7 @@ date: 2026-11-09
 ## Assumptions & Constraints
 
 - **Constraint**: No dynamic memory allocation on the embedded target. All objects are stack- or statically-allocated for deterministic, bounded memory footprint.
-- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period (<= 4500 cycles of the 6000-cycle control period) to guarantee real-time deadlines.
+- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period. That is <= 4500 cycles of the 6000-cycle control period. This limit guarantees real-time deadlines.
 - **Constraint**: No recursion in control-loop or ISR-reachable paths. Stack usage must be statically predictable.
 - **Constraint**: No C++ exceptions. Error signalling uses status return values, `std::optional`, or asynchronous callbacks.
 - **Constraint**: The system targets 32-bit ARM microcontrollers. Host builds are supported for unit testing and simulation only.
@@ -50,7 +50,7 @@ The system is structured in four tiers:
 
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
 2. **Core / Library tier** — the FOC algorithm library (`core/foc/`), service library (`core/services/`), and the Platform Abstraction Layer interface (`core/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
-3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (a concrete `PlatformFactory` for each hardware platform and for the host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
+3. **Targets tier** — target-specific code that is NOT reusable across all environments. It holds platform implementations (a concrete `PlatformFactory` for each hardware platform and for the host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
 4. **Tools tier** — host-only desktop tools (CAN commander, virtual motor) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
@@ -221,7 +221,7 @@ The FOC motor CAN category — its wire contract, the server/client pair and `Fo
 
 **Server half** (runs on the embedded target):
 - `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire encoding (`float32` and the stream's `int16` scaling ↔ physical unit) is contained entirely here.
-- The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node; its observer is the firmware upgrade service, and while a pack is received the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
+- The `can-lite` firmware-upgrade category (`0x1`) — registered on the same protocol server and node. Its observer is the firmware upgrade service. While a pack is received, the bridge refuses configuration writes ([design](../design/service-can.md), Part K).
 - `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, the torque, speed and position setpoints, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls.
   It also implements the identification, telemetry and settings commands (`OnIdentifyElectrical`, `OnRequestTelemetry`, `OnSetParameter`, `OnQueryParameter`), each reporting success or a specific `FocMotorCategoryError` on the response frame.
 
@@ -249,7 +249,7 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 Concrete implementations exist for:
 - **Hardware platforms**: platform-specific peripheral adapters under `targets/platform_implementations/`, one per supported board; a platform that does not drive a bridge yet runs on peripheral stubs.
 - **Host**: peripheral stubs that let the application build and link on a development machine, located under `targets/platform_implementations/host/`.
-- **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus; it runs the application as a virtual motor ([design](../design/virtual-motor.md)).
+- **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus. It runs the application as a virtual motor ([design](../design/virtual-motor.md)).
 
 On the hardware targets that support it, the command console and the trace output are also mirrored on SEGGER RTT (channel 0). This applies whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
 A debug probe can then read and drive the console with the USB-serial link down. That is the situation in which a hardware failure most needs diagnosing.

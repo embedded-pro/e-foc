@@ -168,15 +168,15 @@ Source: `documentation/performance-optimization/README.md`. Further choices:
   reassociation and contraction into fused multiply-adds are allowed. Infinities and NaNs keep their meaning, so a check
   for them still works where one is made. Hot functions defined in headers are forced inline; nothing
   uses per-function optimisation pragmas, which would block inlining.
-- **Per-unit scaling.** Voltages are carried as fractions of $V_{dc}/\sqrt3$, so the modulator's limit is the unit
-  circle and gains are dimensionless where they meet it ([current-loop-pi.md](current-loop-pi.md), *Gain
+- **Per-unit scaling.** Voltages are carried as fractions of $V_{dc}/\sqrt3$. Thus the modulator's limit is the unit
+  circle, and gains are dimensionless where they meet it ([current-loop-pi.md](current-loop-pi.md), *Gain
   Normalisation*).
-- **Incremental controllers.** The PI laws compute a change from the last applied output, which avoids a large
+- **Incremental controllers.** The PI laws compute a change from the last applied output. This avoids a large
   integrator state, starts bumplessly, and makes anti-windup a matter of committing the applied value.
 - **Angles** are wrapped to $[-\pi, \pi)$, where `float` resolves $2.4\times10^{-7}$ rad; nothing accumulates an
   unbounded angle or time in a `float`.
-- **No validation per sample.** Checking every intermediate for NaN would cost the budget; validation happens where
-  data enters (a parameter set, an identification result), with a check of the exponent bits that survives
+- **No validation per sample.** Checking every intermediate for NaN would cost the budget. Validation happens where
+  data enters (a parameter set, an identification result). It uses a check of the exponent bits that survives
   `-ffast-math` (`documentation/architecture/system.md`).
 
 ### 5. Determinism Rules and Why
@@ -198,18 +198,18 @@ The code base forbids, in the control and platform layers (`AGENTS.md`):
 Each context writes what another reads, without locks (a lock in an interrupt can deadlock):
 
 - **Control interrupt ↔ outer loop**: single-writer, single-reader **triple buffers**. The writer always has a free
-  slot that the reader does not hold, so neither side waits and the reader always gets a complete, consistent
+  slot that the reader does not hold. Thus neither side waits, and the reader always gets a complete, consistent
   value (EmIL's `infra/util/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
   loop this way. The torque-mode set point crosses from the event loop to the control interrupt this way. A single
   32-bit value
   needs no buffer: the speed loop's current reference is one `volatile float`, which the Cortex-M writes and reads in
   one access (`core/foc/cascade/CascadeWithSpeedLoop.hpp`).
-- **Interrupts → event loop**: the interrupt latches a flag or a result and posts a closure to the event dispatcher;
-  the service that owns the result handles it in thread context. A closure that may outlive its owner holds a weak
+- **Interrupts → event loop**: the interrupt latches a flag or a result and posts a closure to the event dispatcher.
+  The service that owns the result handles it in thread context. A closure that may outlive its owner holds a weak
   reference (`documentation/design/async-callback-lifetime.md`).
-- **Event loop → control**: new parameters (gains, a motor model, a cogging map) are prepared in the event loop,
-  with the divisions and table expansions done there, and written into the controllers when the drive reaches
-  `Ready` or while it is stopped (`documentation/design/controller-selection.md`).
+- **Event loop → control**: new parameters (gains, a motor model, a cogging map) are prepared in the event loop.
+  The event loop also does the divisions and table expansions. The parameters are written into the controllers
+  when the drive reaches `Ready` or while it is stopped (`documentation/design/controller-selection.md`).
 
 ### 7. Bring-Up: the Calibration Sequence
 
@@ -318,7 +318,7 @@ CPU, is the binding constraint.
 - **Platform-specific**: priorities, the ADC trigger and the duty delay are those of the TI platform; another MCU
   states its own through the platform interface.
 - **Not verifiable here**: the TI driver code (dead-time cycle calculation, QEI filter, ADC clock setup) lives in a
-  submodule not checked out with the firmware; its behaviour is taken from the platform code and the design
+  submodule not checked out with the firmware. Its behaviour is taken from the platform code and the design
   documents.
 - **Does not cover**: the build system, the bootloader and firmware update (`design/bootloader.md`,
   `design/service-firmware-upgrade.md`), and the desktop tools.

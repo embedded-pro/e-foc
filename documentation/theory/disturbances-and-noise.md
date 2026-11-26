@@ -36,7 +36,7 @@ Two facts organise the whole chapter:
    §2). A disturbance below the bandwidth is largely removed. A sensor error below the bandwidth is faithfully
    reproduced as a real error, because the loop believes its sensor.
 2. **The dq frame moves frequencies.** A phase-current component at $h$ times the electrical frequency
-   appears in dq at $(h - 1) f_e$ if it rotates with the fundamental and at $(h + 1) f_e$ if it rotates
+   appears in dq at $(h - 1) f_e$ if it rotates with the fundamental. It appears at $(h + 1) f_e$ if it rotates
    against it. That is why an offset shows up at $1\times f_e$, a gain mismatch at $2\times$, and dead time
    and back-EMF harmonics at $6\times$. A ripple's frequency names its cause (§7).
 
@@ -146,8 +146,8 @@ $$
 The bench motor, 12 slots and 8 poles, has 24 detents 4 mN·m deep (`documentation/verification_and_validation/software-in-the-loop.md`
 Part K): $6 f_e$, the same frequency as dead time. At speed the speed loop and the inertia filter it. Near standstill it
 decides where the rotor can rest. A position setpoint between two detents is held only if
-the loop is stiffer than the cogging. *e-foc today:* compensated by a 48-bin map over one electrical period,
-fed forward as current (`documentation/design/service-cogging-compensation.md`).
+the loop is stiffer than the cogging. *e-foc today:* a 48-bin map compensates it.
+The map covers one electrical period and is fed forward as current (`documentation/design/service-cogging-compensation.md`).
 
 **Inertia change.** A load coupled to the shaft adds inertia. A speed loop tuned for $\hat{J}$ on a shaft with
 inertia $J$ has its bandwidth scaled by $\hat{J}/J$, but not its load dip. The loop's stiffness $K_t K_p$ sets the
@@ -173,7 +173,8 @@ Part L). Because the loss follows the sign of each phase current, it is a square
 fundamental component that reduces the voltage, and odd harmonics. The 5th and 7th give a
 **$6 f_e$ ripple** in dq. Near each current zero crossing the current flattens ("zero-crossing distortion").
 On E-FOC-HARDWARE the effective loss is 70 ns against a 500 ns commanded band. That is 34 mV at 24 V, 56 mV at 40 V
-per leg. *e-foc today:* every duty is corrected for the board's loss, with a ramp through the 0.2 A knee
+per leg. *e-foc today:* every duty is corrected for the board's loss.
+The correction ramps through the 0.2 A knee
 (`documentation/design/service-dead-time-compensation.md`). The switch-level picture is in
 [the power stage](power-stage.md) §4.
 
@@ -201,7 +202,7 @@ gain, the bandwidth and every voltage feed-forward fall by $V_{actual}/V_{assume
 Scaling the modulator by $V_{assumed}/V_{actual}$ restores the applied voltage without
 touching the gains or the feed-forwards. The largest voltage the law may ask for becomes $V_{actual}/V_{assumed}$
 of the configured circle. *e-foc today:* $V_{dc}$ is read once at boot
-(`targets/sync_foc_sensored/main/instantiations/Logic.cpp`) and used for the normalisation and the
+(`targets/sync_foc_sensored/main/instantiations/Logic.cpp`). It is used for the normalisation and the
 identification. While the drive runs, the event loop reads the bus every 10 ms and filters it with a 50 ms time constant
 (`documentation/design/service-bus-voltage.md`). The cascades follow it that way (`documentation/design/foc-torque.md`,
 Bus Voltage Tracking). The sliding-mode law has no integrator to hide the gain error. With this law, a supply that sags
@@ -238,7 +239,7 @@ $$
 a ripple at **$1 f_e$** of amplitude $|\mathbf{o}|$. Inside the current-loop bandwidth the loop makes the
 measured current follow the reference. Thus the real current carries the opposite ripple, and the torque ripples
 by $K_t |\mathbf{o}|$ at $f_e$. The bench board's raw offsets were +27, −18 and +54 mA. That is a 42 mA vector after the
-Clarke transform and 1.6 mN·m of ripple on the Teknic. *e-foc today:* the calibration measures them with the rotor at
+Clarke transform. It gives 1.6 mN·m of ripple on the Teknic. *e-foc today:* the calibration measures them with the rotor at
 rest. It takes the mean of two 2000-sample windows that agree within 10 mA (noise below 1 mA). It subtracts the result
 from every sample (`documentation/design/service-current-offsets.md`). Where
 the offsets come from, and how they drift, is in [the sensing chain](sensing-chain.md) §3.
@@ -254,7 +255,7 @@ $$
 $$
 
 a constant error of $\varepsilon I/3$ and, from the backwards-rotating part, a ripple of the same amplitude at
-**$2 f_e$**. *e-foc today:* not calibrated; the hardware-characterisation plan includes a per-phase gain check
+**$2 f_e$**. *e-foc today:* not calibrated. The hardware-characterisation plan includes a per-phase gain check
 (`documentation/design/hardware-characterisation.md` Part B).
 
 **Current noise and quantisation.** The sense chain carries 31–39 mA RMS per averaged sample, against a 4 mA
@@ -278,9 +279,9 @@ $$
 $$
 
 The speed loop multiplies it by $K_p$. On the Teknic at 100 rad/s ($K_p$ = 0.037 A per rad/s) that is 24 mA RMS of
-$i_q^*$ and 0.9 mN·m of torque noise. At 300 rad/s it is three times more. Longer windows trade this noise for delay;
-more counts per revolution or an observer (a tracking PLL, a Kalman filter) reduce it without the delay.
-*e-foc today:* the window difference is used unfiltered (`core/foc/cascade/SpeedDifferentiator.cpp`); the
+$i_q^*$ and 0.9 mN·m of torque noise. At 300 rad/s it is three times more. Longer windows trade this noise for delay.
+More counts per revolution or an observer (a tracking PLL, a Kalman filter) reduce it without delay.
+*e-foc today:* the window difference is unfiltered (`core/foc/cascade/SpeedDifferentiator.cpp`). The
 identification estimators avoid end-sample speeds by using window-mean positions
 (`documentation/theory/friction-inertia-estimation.md` §4.1).
 
@@ -307,8 +308,8 @@ by it. The remedy rotates the inverse Park by an advanced angle $\theta_e + (n +
 $n$ is the number of periods the bridge takes to load a
 new duty (1 on the TI board, 0 on the emulated plant). The vector is fixed in the stator while it is held. The advance
 centres it on the rotor over the hold.
-*e-foc today:* the inverse Park of the torque, speed and position cascades uses the advanced angle, with the filtered
-electrical speed the cascade already holds. The forward Park, the cogging feed-forward and the
+*e-foc today:* the torque, speed and position cascades advance the inverse Park angle. They use the filtered
+electrical speed that each cascade already holds. The forward Park, the cogging feed-forward and the
 open-loop drives keep the sampled angle. The residual is second order. The held vector sweeps
 $\pm\tfrac12\omega_e T_s^i$ about the rotor. Thus its mean in the rotor frame is the commanded vector scaled by
 $\mathrm{sinc}(\tfrac12\omega_e T_s^i)$. There is no cross term between the axes (0.07 % short at 6000 rpm on the

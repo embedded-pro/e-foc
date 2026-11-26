@@ -277,6 +277,5 @@ sequenceDiagram
     It read 14.5 % high, the noise adding to a small map's peak.
     With the dry friction and no cogging no map is stored (REQ-CMS-001);
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
-    within 4 s. It holds it for 2 s, and then 1.0 rad (REQ-CTL-003).
- Without the map the PID,
+    within 4 s. It holds it for 2 s, and then 1.0 rad (REQ-CTL-003). Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.

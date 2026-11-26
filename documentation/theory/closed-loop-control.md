@@ -154,8 +154,8 @@ The cascade exists for four reasons:
    fraction of a millisecond, the speed loop sees an almost ideal torque source: $\tau_e \approx K_t i_q^*$.
    Its plant shrinks from the fourth-order model to $K_t / (J s + B_f)$.
 2. **Limits sit where the quantity is controlled.** Clamping $i_q^*$ is a torque limit and a current
-   limit, applied where current is regulated, so neither the motor nor the inverter sees more than
-   $I_{max}$ whatever the outer loops ask for.
+   limit, applied where current is regulated. Thus neither the motor nor the inverter sees more than
+   $I_{max}$, whatever the outer loops ask for.
 3. **Each loop has a simple plant** and is designed alone: an RL circuit, an inertia, an integrator.
 4. **Each loop runs at its own rate.** The current loop needs 20 kHz; the mechanics do not, and the outer
    loops run at 1 kHz in a lower-priority interrupt.
@@ -185,7 +185,7 @@ the same rule (`documentation/theory/speed-loop-pi.md`).
 
 A loop is only as good as what it measures.
 
-- **Phase currents.** Shunts in the low-side legs are sampled once per PWM period, at the centre of the
+- **Phase currents.** Shunts in the low-side legs are sampled once per PWM period. The sample is at the centre of the
   low-side conduction window, where the switching ripple crosses its average. All three phases are
   converted. Above 70 % duty a phase's shunt does not conduct long enough to read. Then the drive rebuilds that
   phase from the other two through $i_a + i_b + i_c = 0$ (`core/platform_abstraction/LowSideShuntWindow.hpp`).
@@ -236,7 +236,7 @@ error finally reverses, the integrator holds the output at the limit until it ha
 overshoots. This is **windup**. Every PI in e-foc is protected against it:
 
 - the **current loop** commits the voltage actually applied after the circle limit back into its
-  incremental form (back-calculation), so the integrator never leaves what the modulator can produce
+  incremental form (back-calculation). Thus the integrator never leaves what the modulator can produce
   (`current-loop-pi.md`, *Anti-Windup*). A per-axis clamp would not do: $v_d' = v_q' = 0.8$ passes it and
   still has length 1.13;
 - the **speed loop** clamps the incremental update to $\pm I_{max}$, which gives the same effect
