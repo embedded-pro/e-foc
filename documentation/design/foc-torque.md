@@ -54,16 +54,16 @@ The sequence executed each cycle is:
 4. Evaluate cos(θe) and sin(θe) via the fast trigonometric LUT — one evaluation, results reused.
 5. Clarke forward: (Ia, Ib) → (Iα, Iβ); Ic is derived from the balanced-phase constraint.
 6. Park forward: (Iα, Iβ, θe) → (Id, Iq).
-7. Current stream: add Id and Iq to the stream window; on the window's last sample, store the two means and θm
+7. Current stream: add Id and Iq to the stream window. On the window's last sample, store the two means and θm
    for the event loop ([service-can.md](service-can.md) Part J). Skipped while the stream is stopped.
-8. Speed limiter: fold the q-axis setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
-   add the cogging current at θe ([service-cogging-compensation.md](service-cogging-compensation.md) Part D) and clamp to the current limit.
+8. Speed limiter: fold the q-axis setpoint by the measured speed against the overspeed limit (Speed Limiter, below).
+   Add the cogging current at θe ([service-cogging-compensation.md](service-cogging-compensation.md) Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
-10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The sampled cos/sin pair is rotated through the delay angle ([foc-transforms.md](foc-transforms.md), *Delay compensation*), with ωe the filtered electrical speed of step 8's limiter and n the platform's duty delay in periods.
+10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The step rotates the sampled cos/sin pair through the delay angle ([foc-transforms.md](foc-transforms.md), *Delay compensation*). ωe is the filtered electrical speed of step 8's limiter. n is the platform's duty delay in periods.
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
 12. Return the duty cycles to the control interrupt, which applies them to the power stage at once.
 13. Zero-vector rates: from Id, Iq and ωe, the rate of each phase current while all low sides conduct, turned
-    one period ahead, handed to the slope sink the platform provides
+    one period ahead. The step hands these rates to the slope sink the platform provides
     ([platform-sampling-skew.md](platform-sampling-skew.md) Part B). Zero until the model has an inductance.
 
 ```mermaid
@@ -86,9 +86,9 @@ flowchart LR
 
 Two independent incremental PID controllers regulate the direct (d) and quadrature (q) current components independently. Both PIDs share the same structural properties:
 
-- **Output clamping**: the output magnitude is limited to the modulation circle, 1 at the configured DC bus voltage and r at a measured one (Bus Voltage Tracking).
-- **Anti-windup**: back-calculation. Each axis is the incremental PI controller of the numerical toolbox. It first proposes the unlimited demand. The modulation-circle limit is then applied to the d/q vector, and the controller takes the realised voltage back, so the next increment starts from what was applied and the integrator cannot wind up.
-- **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth, normalised by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
+- **Output clamping**: the output magnitude is limited to the modulation circle. The limit is 1 at the configured DC bus voltage and r at a measured one (Bus Voltage Tracking).
+- **Anti-windup**: back-calculation. Each axis is the incremental PI controller of the numerical toolbox. It first proposes the unlimited demand. The modulation-circle limit is then applied to the d/q vector. The controller takes the realised voltage back. Thus the next increment starts from what was applied and the integrator cannot wind up.
+- **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth. It normalises the gains by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
 - **Incrementalism**: the PID uses the incremental (velocity) form, accumulating output from step to step, which naturally limits abrupt changes at Enable transitions.
 
 The d-axis setpoint is normally 0 A for a surface PMSM (Id = 0 gives maximum torque per ampere). Setting the d-axis setpoint to a non-zero negative value for flux weakening is structurally possible. The operational consequences are outside the scope of this document.

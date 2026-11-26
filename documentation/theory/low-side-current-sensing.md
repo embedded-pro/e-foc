@@ -34,8 +34,8 @@ wrong, it reads zeros at high duty, or reads at the wrong instant.
 This chapter explains:
 
 - what the shunt sees in each state of its leg;
-- why **centre-aligned PWM** with the trigger at the **counter's zero** gives a window in which all three shunts
-  read at once, with no switching edge inside it;
+- why **centre-aligned PWM** triggered at the **counter's zero** gives a window where all three shunts read at
+  once, with no switching edge inside;
 - how long that window must be, and what happens when it is too short at high modulation;
 - why shifting all three duties down is free, and how far it extends the readable range
   (modulation 0.4 → 0.7 for all three phases);
@@ -82,8 +82,8 @@ is on.**
 ### 2. Centre-Aligned PWM and the Common Window
 
 With a centre-aligned (up-down) counter, each leg's high side is on while the counter is above that leg's compare
-level, around the counter's top, and its low side is on while the counter is below it, around the counter's zero.
-All three legs are therefore low together around the zero: the inverter applies the zero vector **000**, every
+level, around the counter's top. Its low side is on while the counter is below it, around the counter's zero.
+All three legs are therefore low together around the zero. The inverter applies the zero vector **000**, every
 low side conducts, and **all three shunts read at the same time**. This common window is
 
 $$
@@ -94,20 +94,20 @@ $$
 
 Three properties make this the right place to sample:
 
-- **No edge happens inside it.** Every leg's falling edge comes before the window opens and every rising edge
-  after it closes, so neither the switching noise of another leg nor a node transition lands in a conversion.
-- **The ripple is symmetric about it.** In centre-aligned PWM the switching ripple of each phase current is
-  symmetric about the window's centre, so a sample there equals the current's average over the period
+- **No edge happens inside it.** Every leg's falling edge comes before the window opens, and every rising edge
+  after it closes. So neither the switching noise of another leg nor a node transition lands in a conversion.
+- **The ripple is symmetric about it.** In centre-aligned PWM, the switching ripple of each phase current is
+  symmetric about the window's centre. So a sample there equals the current's average over the period
   ([disturbances and noise](disturbances-and-noise.md) §3). No filter, no delay, no aliasing of the ripple.
 - **It is at a fixed instant.** The counter's zero is a hardware event the ADC can be triggered from, with no
   software jitter.
 
 **Polarity matters.** If the outputs were configured the other way round, high side on around the counter's
-zero, the common interval at zero would be **111**: every high side on, every shunt reading zero. The trigger
+zero, the common interval at zero would be **111**. Every high side is then on, and every shunt reads zero. The trigger
 must land in the 000 interval, whatever the timer calls it.
 
-Edge-aligned PWM is worse on every count: all legs switch together at the period start, the low intervals end at
-different times, and the common low interval sits right after other legs' edges.
+Edge-aligned PWM is worse on every count. All legs switch together at the period start, and the low intervals end
+at different times. The common low interval sits right after other legs' edges.
 
 ### 3. How Long the Window Must Be
 
@@ -128,36 +128,36 @@ t_{hold,k} \le \frac{(1 - d_k)\,T}{2}, \qquad
 t_{db} + t_{settle} \le \frac{(1 - d_k)\,T}{2} + t_{start,k}
 $$
 
-The first keeps the last conversion inside the window; the second gives the amplifier time to settle after the
-low side turned on (the dead band delays that turn-on for a current flowing into the leg). Solving for the duty,
+The first keeps the last conversion inside the window. The second gives the amplifier time to settle after the
+low side turned on. The dead band delays that turn-on for a current flowing into the leg. Solving for the duty,
 
 $$
 d_k \le 1 - \frac{2\,\max\left(t_{hold,k},\ t_{db} + t_{settle} - t_{start,k}\right)}{T}
 $$
 
-On E-FOC-HARDWARE the last phase holds 5.25 µs after the trigger, the dead band is 0.5 µs and the amplifier settles
-in about 1.7 µs ([sensing chain](sensing-chain.md) §5): the first condition binds, at $d \le 79\,\%$. The board's
+On E-FOC-HARDWARE, the last phase holds 5.25 µs after the trigger, and the dead band is 0.5 µs. The amplifier
+settles in about 1.7 µs ([sensing chain](sensing-chain.md) §5), so the first condition binds, at $d \le 79\,\%$. The board's
 limit is set from measurement at $d_{read} = 70\,\%$, which also covers ringing and the amplifier's recovery
 (`documentation/design/hardware-characterisation.md` Part F).
 
 ### 4. When the Window Is Too Short
 
 **One phase hidden.** In a wye winding $i_a + i_b + i_c = 0$, so two shunts are enough. The phase with the
-highest duty has the shortest window, so it is the one to give up, and it is rebuilt from the other two:
+highest duty has the shortest window, so it is the one to give up. The firmware rebuilds it from the other two:
 
 $$
 i_{hidden} = -\left(i_{other,1} + i_{other,2}\right)
 $$
 
-The rebuilt phase carries the noise of two samples ($\sqrt2$ times one) and their gain errors, and which phase is
+The rebuilt phase carries the noise of two samples ($\sqrt2$ times one) and their gain errors. Which phase is
 hidden changes every 60° of the reference, so the error signature shifts with it. It is a good fallback, not free.
 
 **Offsets and the rebuild.** The order of the two corrections matters. If the hidden phase is rebuilt from samples
-whose offsets are already removed, its offset is the negated sum of the other two's residuals, below a milliampere
-after calibration. In *e-foc* the platform rebuilds from the raw samples (`LowSideShuntReadout`) and
+whose offsets are already removed, its offset is the negated sum of the other two's residuals. This is below a
+milliampere after calibration. In *e-foc* the platform rebuilds from the raw samples (`LowSideShuntReadout`) and
 `InverterCompensation` subtracts the calibrated offsets afterwards, one per phase. Rebuilt as plain
 $-(m_{other,1} + m_{other,2})$, the hidden phase would come out biased by the sum of all three offsets,
-$-(o_a + o_b + o_c)$: with the bench's +27, −18 and +54 mA, −63 mA on whichever phase is hidden. So
+$-(o_a + o_b + o_c)$. With the bench's +27, −18 and +54 mA, this is −63 mA on whichever phase is hidden. So
 `InverterCompensation` hands the offsets it applies down to the platform (`CurrentOffsets`), and the readout adds
 their sum back when it rebuilds:
 
@@ -169,7 +169,7 @@ Subtracting $o_{hidden}$ from that leaves $-(i_{other,1} + i_{other,2})$, the sa
 offsets are already removed. It costs one addition, and only on a period that rebuilds.
 
 **Two phases hidden.** In the directions where two phases share the highest duty ($\theta = 60^\circ, 180^\circ,
-300^\circ$ for common-mode injection), both windows shrink together and only one phase remains: nothing can be
+300^\circ$ for common-mode injection), both windows shrink together. Only one phase remains: nothing can be
 rebuilt. The only remedy is less voltage. There, the two high duties sit $0.866\,m$ above the lowest, so keeping
 the middle one readable requires
 
@@ -184,7 +184,7 @@ A vector that turns at constant length stays undistorted only up to $0.81\,V_{dc
 
 A wye motor without a neutral connection responds only to the **line-to-line** voltages. Adding the same amount to
 all three duties moves the neutral point's voltage and changes no current. The modulator may therefore move the
-three duties down until the lowest reaches zero, and every low-side window grows by the same amount, at no cost in
+three duties down until the lowest reaches zero. Every low-side window then grows by the same amount, at no cost in
 voltage.
 
 e-foc applies this only when needed (`core/platform_abstraction/LowSideShuntWindow.hpp`,
@@ -192,8 +192,8 @@ e-foc applies this only when needed (`core/platform_abstraction/LowSideShuntWind
 
 1. If the highest duty is at most 70 %, write the duties unchanged.
 2. Otherwise shift all three down by $\min(d_{max} - 70\,\%,\ d_{min})$.
-3. If the middle duty is still above 70 %, or the highest above 95 % (the bootstrap limit,
-   [power stage](power-stage.md) §3), scale the three about the lowest so the binding one meets its limit. This keeps
+3. If the middle duty is still above 70 %, or the highest above 95 %, scale the three about the lowest. The
+   bootstrap limit is 95 % ([power stage](power-stage.md) §3). The scale makes the binding one meet its limit. This keeps
    the vector's direction and shortens it.
 
 How far each strategy reads, computed over a full electrical turn:
@@ -224,9 +224,9 @@ And it moves the neutral point's voltage, which a motor does not feel but its be
 ### 6. The Window Straddles Two Periods
 
 The compare registers load at the counter's zero, the same instant the ADC is triggered
-([firmware implementation](firmware-implementation.md) §3). The low-side pulse around that instant is formed by
-two different duties: its first half by the falling edge of the period that is ending, its second half by the
-rising edge of the period that is starting.
+([firmware implementation](firmware-implementation.md) §3). Two different duties form the low-side pulse
+around that instant. The falling edge of the period that is ending forms its first half. The rising edge of the
+period that is starting forms its second half.
 
 ```text
           period k-1 (duty d_old)        |         period k (duty d_new)
@@ -236,25 +236,25 @@ rising edge of the period that is starting.
                                          ^ trigger, compares load
 ```
 
-A phase is safely readable only if **both** duties leave it a window: the new one for the conversions after the
-trigger, the old one for the settling before it. e-foc's `LowSideShuntReadout` therefore keeps the duties of the
-last two periods, and treats a phase as hidden if either was above the limit
+A phase is safely readable only if **both** duties leave it a window. The new duty serves the conversions after
+the trigger, and the old duty the settling before it. Therefore e-foc's `LowSideShuntReadout` keeps the duties of
+the last two periods. It treats a phase as hidden if either was above the limit
 (`documentation/architecture/system.md`).
 
 ### 7. The Total-Current Shunt Reads Zero at the Zero Vector
 
 A shunt in the common return of the three low sides carries their sum. During 000 that sum is
 $i_a + i_b + i_c = 0$: sampled at the counter's zero it reads nothing, whatever the motor draws. It reads a phase
-current only during an active vector, which is how single-shunt drives work: two samples per period, at instants
-placed inside the active vectors, give two phase currents. On E-FOC-HARDWARE the total-current shunt feeds an
-over-current comparator that is evaluated at the counter's zero, so it cannot see a bus over-current; the
+current only during an active vector, which is how single-shunt drives work. Two samples per period, at instants
+placed inside the active vectors, give two phase currents. On E-FOC-HARDWARE, the total-current shunt feeds an
+over-current comparator that is evaluated at the counter's zero. So it cannot see a bus over-current; the
 per-phase software check is the protection that works ([power stage](power-stage.md) §7).
 
 ### 8. Sampling Skew and Simultaneous Sampling
 
 One ADC converts the three phases one after another; on E-FOC-HARDWARE the last holds 5.25 µs after the first is
-triggered. During 000 each current moves at $-(e_k + R_s i_k)/L_s$, so a phase read late is off its period mean by
-that slope times the delay: up to 71 mA on the Anaheim and 0.40 A on the Teknic at rated speed
+triggered. During 000, each current moves at $-(e_k + R_s i_k)/L_s$. So a phase read late is off its period mean by
+that slope times the delay. At rated speed, this is up to 71 mA on the Anaheim and 0.40 A on the Teknic
 ([sensing chain](sensing-chain.md) §6). Remedies:
 
 - **Sample two phases at once** on two converters (the TM4C1294 has ADC0 and ADC1; e-foc uses ADC1 for the bus
@@ -326,8 +326,8 @@ graph LR
 **How much speed does the shift buy the Anaheim at 24 V?** With plain SVM and the same 70 % limit, two phases
 hide once $m > 0.2/0.433 = 0.46$, so an undistorted vector is limited to $0.46 \times 13.86 = 6.4$ V. With the shift
 the limit is $m = 0.81$, 11.2 V ([numbers that matter](numbers-to-know.md) §4). At 3 A, solving the steady-state
-voltage equation of [the motor model](motor-model.md) §9 with each limit gives a top speed of about 2170 rpm
-without the shift and 4160 rpm with it: the shift nearly doubles the usable speed. In simulation the bench motor
+voltage equation of [the motor model](motor-model.md) §9 with each limit gives the top speed. It is about
+2170 rpm without the shift and 4160 rpm with it: the shift nearly doubles the usable speed. In simulation the bench motor
 went from stopping near 356 rad/s to holding 460 rad/s once the shift and the rebuild were in place
 (`documentation/architecture/system.md`).
 
@@ -339,8 +339,8 @@ went from stopping near 356 rad/s to holding 460 rad/s once the shift and the re
   currents must be measured.
 - **Assumes**: three low-side shunts. Two-shunt and single-shunt drives follow the same timing rules with fewer
   options.
-- **Derived**: the readable ranges per strategy are computed from the duty laws, the 70 % limit and the 95 % cap;
-  the speeds in the worked example are steady-state estimates.
+- **Derived**: the readable ranges per strategy are computed from the duty laws, the 70 % limit and the 95 % cap.
+  The speeds in the worked example are steady-state estimates.
 - **Not implemented**: simultaneous sampling and a centred conversion burst. Skew is corrected from the motor
   model instead ([sampling skew](../design/platform-sampling-skew.md)).
 

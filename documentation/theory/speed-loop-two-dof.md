@@ -25,8 +25,8 @@ date: 2026-08-31
 
 ## Overview
 
-S3 (Two-DOF speed control) resolves a fundamental limitation of single-DOF speed controllers:
-tightening the feedback loop for faster setpoint following degrades load stiffness and vice versa.
+S3 (Two-DOF speed control) resolves a fundamental limitation of single-DOF speed controllers.
+Tightening the feedback loop for faster setpoint following degrades load stiffness, and vice versa.
 A reference pre-filter $F(z)$ in the forward path shapes command tracking independently from the
 feedback loop designed for disturbance rejection. This is particularly valuable for servo speed
 control where both fast tracking and high stiffness are required simultaneously.

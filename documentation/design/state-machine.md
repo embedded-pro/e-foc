@@ -35,10 +35,22 @@ date: 2026-11-26
 **Is responsible for:**
 - Owning the complete motor lifecycle: Idle → Calibrating → Ready ⇄ Enabled, and Fault as an escape state reachable from any active state
 - Enforcing all transition guards: the FOC controller is enabled only after a successful calibration, and calibration starts only from Idle or Ready
-- Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → index search when the encoder has an index → (mechanical parameter identification for speed/position modes) → NVM persistence
-- On a boot with valid NVM data, loading the electrical parameters (R, L, pole pairs) and staying in Idle until a live alignment re-establishes the rotor reference. The motor cannot be enabled until a Re-align or a Calibrate succeeds. A record that carries an encoder index angle, on a drive with an index channel, boots to Ready instead, and the first Enable restores the reference from the index (see Referencing the Rotor from the Encoder Index)
-- Keeping an established rotor reference across a control-mode switch: a machine built by a switch out of an aligned Ready boots straight to Ready when the stored record is complete for its mode (see C4)
-- Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to Fault on the event dispatcher (see Fault Safety)
+- Orchestrating the sequential calibration chain:
+  1. waiting for the rotor to come to rest
+  2. current sensor offsets
+  3. pole-pair identification
+  4. resistance and inductance estimation
+  5. alignment
+  6. index search when the encoder has an index
+  7. (mechanical parameter identification for speed/position modes)
+  8. NVM persistence
+- On a boot with valid NVM data, loading the electrical parameters (R, L, pole pairs) and staying in Idle.
+  It stays there until a live alignment re-establishes the rotor reference. The motor cannot be enabled until a Re-align or a Calibrate succeeds. A record that carries an encoder index angle, on a drive with an index channel, boots to Ready instead. The first Enable then restores the reference from the index (see Referencing the Rotor from the Encoder Index)
+- Keeping an established rotor reference across a control-mode switch. A machine built by a switch out of an aligned Ready boots straight to Ready. It does so when the stored record is complete for its mode (see C4)
+
+- Intercepting hardware fault notifications from the fault notifier:
+  - stopping the inverter in the delivering context
+  - then transitioning to Fault on the event dispatcher (see Fault Safety)
 
 ---
 
@@ -123,8 +135,8 @@ of a RAM budget that the linker now guards.
 
 The table is the single source of truth for what the machine accepts:
 
-- An event that arrives in a state with no row for it is **forbidden**: nothing changes, the
-  command reports *rejected*, and the trace shows which event was refused in which state.
+- An event that arrives in a state with no row for it is **forbidden**: nothing changes and the
+  command reports *rejected*. The trace shows which event was refused in which state.
 - An event whose rows exist but whose guards all refuse it is **rejected** in the same way.
   The guard holds conditions such as "asynchronous work is outstanding" or "the rotor
   reference is not established".
@@ -250,13 +262,13 @@ deceleration of the configuration record.
 |-------------------------|-------------------|--------------------|-------------------------------------------------|
 | Quick-stop deceleration | 0 (current limit) | 0 – 100 000 rad/s² | Rate at which a quick stop slows the rotor down |
 
-- Speed and position mode ramp the speed reference from the measured speed to zero at the deceleration, and the
-  speed loop follows it within the current limit. A deceleration of zero steps the reference to zero, so the
+- Speed and position mode ramp the speed reference from the measured speed to zero at the deceleration.
+  The speed loop follows it within the current limit. A deceleration of zero steps the reference to zero, so the
   loop brakes at the current limit. The position law and the speed ramp of the setpoint are suspended
   ([FOC Speed Control](foc-speed.md) and [FOC Position Control](foc-position.md), Quick Stop).
 - Torque mode has no speed loop. The cascade brakes with a q-axis current against the measured speed. The current
-  is capped at the value that decelerates the calibrated inertia at the deceleration, or at the current limit for
-  zero ([FOC Torque Control](foc-torque.md), Quick Stop). Without a calibrated inertia it cannot size the braking
+  is capped at the value that decelerates the calibrated inertia at the deceleration.
+  For a deceleration of zero it is capped at the current limit ([FOC Torque Control](foc-torque.md), Quick Stop). Without a calibrated inertia it cannot size the braking
   current. Quick Stop is then rejected and the drive stays Enabled; the client falls back to the emergency stop.
 
 The event loop checks the measured speed every 10 ms. Once its magnitude is below 2 rad/s, or once the deadline
@@ -486,8 +498,8 @@ on demand.
 
 Before identification starts, the state machine therefore applies to the live controller:
 
-1. the **electrical model it has just measured** in this run — the pending resistance, inductance, pole-pair
-   count and effective flux linkage, with the current-loop tunings that follow from them;
+1. the **electrical model it has just measured** in this run: the pending resistance, inductance, pole-pair
+   count and effective flux linkage. The current-loop tunings that follow from them come with it;
 2. a **bounded provisional mechanical model** — a small placeholder inertia, zero viscous friction and a
    deliberately low speed-loop bandwidth. It is a stand-in that lets the speed loop act within its current
    envelope, not a measurement. It is never persisted or reported as calibration.
@@ -849,9 +861,9 @@ its result if the state machine is still in the state that issued the service ca
 Each callback no longer re-implements this invariant as a convention. Each callback translates its result into an
 event and dispatches it. The transition table decides whether the result is applied:
 
-- The results of the calibration steps (pole pairs, resistance and inductance, alignment, friction and inertia)
-  become the events *calibration step changed*, *alignment succeeded*, *mechanical parameters identified* and
-  *calibration step failed*. These events have rows only in Calibrating. The mechanical result also carries a guard
+- The calibration steps give results: pole pairs, resistance and inductance, alignment, friction and inertia.
+  These results become the events *calibration step changed*, *alignment succeeded*, *mechanical parameters
+  identified* and *calibration step failed*. These events have rows only in Calibrating. The mechanical result also carries a guard
   on the active sub-step. The calibration orchestrator also drops the results of a run that was aborted.
 - The completion of the calibration save becomes *calibration saved*, which has rows only in Calibrating. It never
   carries a *busy* status, because the calibration flow retries a *busy* answer internally (see C2c) and does not
@@ -865,8 +877,8 @@ event and dispatches it. The transition table decides whether the result is appl
   outstanding invalidation.
 - The completion of the motor-parameter save becomes *motor parameter saved*. It is handled in Idle and Ready and
   completes the pending command without a transition.
-- Both NVM completions also have rows in Fault, because a fault or an emergency stop while the operation is in
-  flight aborts the command but not the erase or the write. The RAM record follows the NVM outcome, whatever
+- Both NVM completions also have rows in Fault. A fault or an emergency stop while the operation is in
+  flight aborts the command, but not the erase or the write. The RAM record follows the NVM outcome, whatever
   happened to the command. A successful invalidation drops the record. A later Clear Fault then returns to Idle and
   does not restore a calibration that no longer exists in NVM. A stored motor parameter is adopted. An invalidation
   that fails while the machine is already in Fault is ignored, because the fault is already latched.
@@ -1051,8 +1063,8 @@ to run again after an alignment-only recovery.
 For the speed and position control modes, the state machine creates and manages two online parameter estimators
 alongside the main control loop:
 
-- **Online Mechanical Estimator** — continuously refines rotor inertia (J) and viscous friction (B) with a Recursive
-  Least Squares estimator that runs at the outer-loop rate (1 kHz).
+- **Online Mechanical Estimator** — continuously refines rotor inertia (J) and viscous friction (B).
+  It uses a Recursive Least Squares estimator that runs at the outer-loop rate (1 kHz).
 - **Online Electrical Estimator** — continuously refines phase resistance (R) and d-axis inductance (Ld) with a
   d-axis voltage-model RLS estimator that runs at the same rate.
 
@@ -1215,8 +1227,9 @@ completes, the mode selection therefore decides:
 1. **Write failed**: restore the default control mode in the configuration record (NVM still holds the previous
    default). Report *busy* for a transient failure, or *NVM failed* otherwise. The active mode was never touched.
 2. **Write succeeded and the guard still holds**: activate the pending mode and report *ok*.
-3. **Write succeeded but the guard no longer holds**: keep the active mode, restore the default control mode in the
-   configuration record and write it back, so that NVM agrees with the running mode. Report *busy* when that write
+3. **Write succeeded but the guard no longer holds**: keep the active mode. Restore the default control mode in
+   the configuration record and write it back, so that NVM agrees with the running mode.
+ Report *busy* when that write
    completes, whatever its status. The pending callback stays set during the rollback write, so a Select in that
    window is refused with *busy* (C2).
 

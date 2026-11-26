@@ -26,8 +26,8 @@ date: 2026-10-30
 ## Overview
 
 The baseline current controller is a discrete incremental PI regulator applied independently to the
-d- and q-axis current errors in the rotating dq frame. It is always available — no RLS convergence
-is required — and its pole-zero cancellation design places the closed-loop bandwidth precisely at the
+d- and q-axis current errors in the rotating dq frame. It is always available: no RLS convergence
+is required. Its pole-zero cancellation design places the closed-loop bandwidth precisely at the
 specified value $\omega_{bw}^i$. All advanced current controllers (A1–A3) supplement or replace this
 baseline while preserving the same output interface.
 
@@ -89,8 +89,8 @@ K_p = L_s\, \omega_{bw}, \qquad K_i = R_s\, \omega_{bw}
 $$
 
 **Practical limit**: the loop delay of about $1.5\,T_s^i$ costs $\omega_{bw} \cdot 1.5\,T_s^i$ of phase at
-crossover, which leaves 45° of margin at roughly $\omega_{bw} \approx 10000$ rad/s at 20 kHz
-(`documentation/theory/closed-loop-control.md` §7); conservative designs use $2000$–$5000$ rad/s.
+crossover. This leaves 45° of margin at roughly $\omega_{bw} \approx 10000$ rad/s at 20 kHz
+(`documentation/theory/closed-loop-control.md` §7). Conservative designs use $2000$–$5000$ rad/s.
 
 ### Gain Normalisation
 
@@ -122,13 +122,13 @@ value this axis proposed.
 ### Anti-Windup
 
 The actuator constraint here is the modulation circle (see *Output Voltage Limit* below). It couples
-$d$ and $q$, so it cannot be expressed as the independent per-axis clamp a stock PID carries: a
-per-axis clamp to $[-1,1]$ never fires for a demand such as $v_d' = v_q' = 0.8$, yet that vector has
-magnitude $1.13$ and the circle limiter scales it down. Both integrators would then accumulate
+$d$ and $q$, so it cannot be expressed as the independent per-axis clamp a stock PID carries. A
+per-axis clamp to $[-1,1]$ never fires for a demand such as $v_d' = v_q' = 0.8$. Yet that vector has
+magnitude $1.13$, and the circle limiter scales it down. Both integrators would then accumulate
 against a limit they cannot see.
 
-The loop therefore uses back-calculation against the realised output. Both axes propose, the circle
-limit is applied once to the resulting vector, and the applied components are committed back as
+The loop therefore uses back-calculation against the realised output. Both axes propose. The circle
+limit is applied once to the resulting vector. The applied components are committed back as
 $v'[k-1]$ for the next sample:
 
 $$

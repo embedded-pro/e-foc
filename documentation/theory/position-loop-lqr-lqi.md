@@ -91,8 +91,8 @@ The section above is the textbook formulation. The implemented LQI departs from 
 reading `LqiPositionController::Solve` against the formulation above will not work without them.
 
 **Time-scaled coordinates.** The state is
-$x = \bigl(x_I,\; e_\theta,\; \omega_m T_s^o\bigr)^{\!T}$ — speed is carried as *radians per
-sample*, not radians per second, and the integral accumulates the raw per-sample deviation. Scaling
+$x = \bigl(x_I,\; e_\theta,\; \omega_m T_s^o\bigr)^{\!T}$. Speed is carried as *radians per
+sample*, not radians per second. The integral accumulates the raw per-sample deviation. Scaling
 every state by $T_s^o$ this way removes $T_s^o$ from the plant matrices entirely:
 
 $$
@@ -101,13 +101,13 @@ A = \begin{pmatrix} 1 & 1 & 0 \\ 0 & 1 & 1 \\ 0 & 0 & A_d^o \end{pmatrix},
 B = \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix}
 $$
 
-$B$ is unity, not $B_d^o$: the input is normalised, and the plant's actual input gain is carried
-outside the Riccati solve as `currentPerNormalizedInput`, which converts the optimal command back
+$B$ is unity, not $B_d^o$: the input is normalised. The plant's actual input gain is carried
+outside the Riccati solve as `currentPerNormalizedInput`. This gain converts the optimal command back
 into Amperes. This is what keeps the solve numerically well conditioned across the range of
 inertias the mechanical identification returns.
 
 **The integral state is first, not last.** The order is $[x_I,\; e_\theta,\; \omega_m T_s^o]$, so
-the gain vector reads $[K_I,\; K_\theta,\; K_\omega]$ — the reverse of the
+the gain vector reads $[K_I,\; K_\theta,\; K_\omega]$. This is the reverse of the
 $[K_\theta, K_\omega, K_I]$ ordering the augmentation above suggests.
 
 **The error sign.** $e_\theta = \theta_m - \theta_m^*$, the wrapped error negated, and the solver
@@ -116,7 +116,7 @@ one alone inverts the feedback. Inside software position limits the error is the
 instead of the wrapped one (`position-loop-pid.md`, Angle-Error Wrapping).
 
 **Q is normalised, and R comes from the bandwidth.** The weights are ratios against the
-position-error weight rather than absolute penalties, and the input penalty is set from the desired
+position-error weight rather than absolute penalties. The input penalty is set from the desired
 bandwidth rather than from the current envelope:
 
 $$
@@ -141,8 +141,8 @@ inside the unit circle. Guaranteed by the DARE solution when the plant is contro
 time via `DiscreteAlgebraicRiccatiEquation`. `IntegralStateFeedbackLqi` provides the LQI variant.
 
 **Moving reference**: the designs regulate to a fixed reference, whose speed is zero. While a motion profile
-is active (`position-motion-profile.md`) the speed that belongs to zero error is $\dot r$, so the speed state
-is $(\omega - \dot r)\,T_o$ in both laws, and the acceleration feed-forward $J\ddot r / K_t$ is added to the
+is active (`position-motion-profile.md`) the speed that belongs to zero error is $\dot r$. Thus the speed state
+is $(\omega - \dot r)\,T_o$ in both laws. The acceleration feed-forward $J\ddot r / K_t$ is added to the
 q-axis current. The LQI integral state accumulates the deviation as before. Without a profile $\dot r = 0$.
 
 ```mermaid

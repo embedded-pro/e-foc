@@ -143,9 +143,9 @@ v'[k] = \Pi\bigl(\tilde{v}'_{PI}[k] + v'_{ff}[k]\bigr)
 $$
 
 Limiting the PI output on its own first and the sum again afterwards reserves no headroom for the
-feedforward, so decoupling degrades exactly at the high speeds where the cross-coupling and back-EMF
+feedforward. Then decoupling degrades exactly at the high speeds where the cross-coupling and back-EMF
 terms it cancels are largest. The share committed back to the PI's integrator is the applied vector
-minus the feedforward, so the feedforward is never integrated as if the loop had asked for it.
+minus the feedforward. Thus the feedforward is never integrated as if the loop had asked for it.
 
 ---
 

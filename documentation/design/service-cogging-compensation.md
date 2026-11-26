@@ -42,8 +42,9 @@ step between the neighbouring detents instead ([position loop PID](../theory/pos
 - Adding the measured torque, as current, to what the torque, speed and position cascades ask of
   the winding at every control interrupt
 - Keeping that addition out of the torque the online mechanical estimator regresses
-- Measuring the dry friction from the same two-direction run, and storing it with the calibration record
-  for the speed and position cascades' friction feed-forward (Part F)
+- Measuring the dry friction from the same two-direction run
+- Storing the dry friction with the calibration record for the speed and position cascades' friction
+  feed-forward (Part F)
 
 ---
 
@@ -73,10 +74,10 @@ At 10 rad/s the cogging repeats at 240 rad/s, well above the speed loop's 100 ra
 therefore goes into speeding and slowing the rotor rather than into current. The torque a bin holds
 is therefore the winding's less the rotor's:
 
-- a bin's speed is the rotation the encoder reported in it over the time spent there, so a bin
-  one encoder count wider than its neighbour does not read as faster;
-- its acceleration is its speed times the slope of speed with angle, taken over two bins on either
-  side so that eight bins a cogging cycle lose about 1 % of it;
+- a bin's speed is the rotation the encoder reported in it over the time spent there.
+  A bin one encoder count wider than its neighbour therefore does not read as faster;
+- its acceleration is its speed times the slope of speed with angle, taken over two bins on either side.
+  Eight bins a cogging cycle therefore lose about 1 % of it;
 - its torque is the torque constant times its mean current, less the identified inertia times its
   acceleration.
 
@@ -153,12 +154,12 @@ the map missed ([service-mechanical-ident.md](service-mechanical-ident.md)).
 ### Part E — Where it does not reach
 
 - **Alignment repeatability.** The alignment pulls the rotor to the electrical zero against the
-  cogging and the dry friction, so it can settle a little to either side of where it settled when
-  the map was measured. A map applied after a later alignment is shifted by that much, and the
+  cogging and the dry friction. It can therefore settle a little to either side of where it settled
+  when the map was measured. A map applied after a later alignment is shifted by that much, and the
   compensation leaves a residual that grows with the shift. Within the power cycle that measured
   the map there is no shift.
 - **Torque mode without a stored map.** It runs no mechanical identification and measures no map of its
-  own; until a speed or position calibration has stored one, its setpoint is passed through uncompensated.
+  own. Until a speed or position calibration has stored one, its setpoint is passed through uncompensated.
 - **Differences between pole pairs.** One electrical period holds the average of the four.
 
 ### Part F — The dry friction and its feed-forward
@@ -248,32 +249,34 @@ sequenceDiagram
 
 - **Unit tests.**
   - The builder recovers a 4 mN·m, 24-detent cogging from a simulated rotor under a 50 rad/s speed
-    loop, read through a 4000-count encoder, within 4 % in every bin and its peak within 5 %, and
-    without the inertia term refuses it.
+    loop, read through a 4000-count encoder. It recovers it within 4 % in every bin and its peak within
+    5 %. Without the inertia term it refuses it.
   - It refuses a run that left a bin empty or turned the wrong way.
-  - It refuses noise alone in both directions, and a profile only one direction shows, and keeps
+  - It refuses noise alone in both directions, and a profile only one direction shows. It keeps
     a cogging smaller than the noise when both directions share it.
-  - The mapping service turns both ways and reports the map, stops the bridge past the current
-    envelope, times out with no map when the rotor does not turn, and stays silent once aborted.
-  - The builder recovers the bench's 3.7 mN·m of dry friction from a simulated rotor with and without a constant
-    shaft load, refuses an incomplete run and a negative estimate.
-  - The friction feed-forward gives the sign of the speed reference, ramps through zero, refuses an implausible
-    friction, and is clamped by the current limit in the speed and position cascades; the torque cascade has none.
+  - The mapping service turns both ways and reports the map, and stops the bridge past the current
+    envelope. It times out with no map when the rotor does not turn, and stays silent once aborted.
+  - The builder recovers the bench's 3.7 mN·m of dry friction from a simulated rotor with and without a
+    constant shaft load. It refuses an incomplete run and a negative estimate.
+  - The friction feed-forward gives the sign of the speed reference, ramps through zero and refuses an
+    implausible friction. It is clamped by the current limit in the speed and position cascades. The torque
+    cascade has none.
   - The feed-forward reproduces a cogging sampled eight times a cycle within 3 %, wraps in either
     direction and scales with the torque constant.
   - The cascade asks for the cogging current at standstill once a map is loaded and stops when it
-    is cleared, and the mechanical estimator's window leaves the compensation out.
+    is cleared. The mechanical estimator's window leaves the compensation out.
   - The torque cascade adds the cogging current to the operator's setpoint, within the current
-    limit, not to a calibration's current command, and reports the operator's demand.
+    limit, not to a calibration's current command. It reports the operator's demand.
 - **MIL and SIL.** On the bench plant, with the map a speed-mode calibration measured, a 0.12 A
-  torque command turns the rotor; without a map it stays in a detent (REQ-CTL-001). The SIL
+  torque command turns the rotor. Without a map it stays in a detent (REQ-CTL-001). The SIL
   scenario read 61.8 rad of travel in 2 s with the map and 0.010 rad without.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
   - the full calibration measures the cogging's peak within 10 % (REQ-CMS-001); it read 3.83 to
     3.90 mN·m against 4.0 across runs;
-  - a cogging a quarter as deep, with the dry friction, is mapped within 30 % (it read 14.5 % high,
-    the noise adding to a small map's peak), and with the dry friction and no cogging no map is
-    stored (REQ-CMS-001);
+  - a cogging a quarter as deep, with the dry friction, is mapped within 30 % (REQ-CMS-001).
+    It read 14.5 % high, the noise adding to a small map's peak.
+    With the dry friction and no cogging no map is stored (REQ-CMS-001);
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
-    within 4 s and holds it for 2 s, and then 1.0 rad (REQ-CTL-003). Without the map the PID,
+    within 4 s. It holds it for 2 s, and then 1.0 rad (REQ-CTL-003).
+ Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.

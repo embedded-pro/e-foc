@@ -18,10 +18,10 @@ date: 2026-11-08
 
 ## Overview
 
-Field-Oriented Control (FOC) — also called vector control — is the standard high-performance control strategy for
-Permanent Magnet Synchronous Motors (PMSM) and Brushless DC motors (BLDC). Its central insight is that a
-three-phase AC motor can be controlled as simply as a DC motor if all quantities are expressed in a reference frame
-that rotates synchronously with the rotor flux.
+Field-Oriented Control (FOC), also called vector control, is the standard high-performance control strategy.
+It applies to Permanent Magnet Synchronous Motors (PMSM) and Brushless DC motors (BLDC). Its central insight is
+that a three-phase AC motor can be controlled as simply as a DC motor. For this, all quantities are expressed in a
+reference frame that rotates synchronously with the rotor flux.
 
 In the rotating (dq) reference frame the three-phase stator currents reduce to two DC components:
 - $i_d$ — the flux-producing (direct) component, nominally zero for maximum torque per ampere (MTPA).
@@ -31,8 +31,8 @@ Current controllers in the rotating frame regulate these DC quantities without p
 inverse transforms and Space Vector Modulation (SVM) reconstruct the three-phase PWM duty cycles that drive the
 inverter.
 
-The transforms and the dq model are derived in [the motor model](motor-model.md); the physics behind them is in
-[the physical picture](motor-physics.md), and the reasons for the cascade of loops in
+The transforms and the dq model are derived in [the motor model](motor-model.md). The physics behind them is in
+[the physical picture](motor-physics.md). The reasons for the cascade of loops are in
 [closed-loop control](closed-loop-control.md). This chapter gives the forms the firmware evaluates every control
 period, the modulator that turns a voltage vector into duty cycles, and the complete loop.
 
@@ -130,9 +130,9 @@ $$
 This confirms: when the current vector is aligned with the d-axis (rotor flux axis), $i_q = 0$ (zero torque).
 When the current vector is 90° ahead of the rotor (MTPA), $i_d = 0$ and $i_q = I$ (maximum torque).
 
-**Inverse Park Transform** (dq → αβ, for voltage reconstruction). e-foc evaluates it at the advanced angle
-$\theta_e + (n + \tfrac12)\,\omega_e T_s$, not at the sampled $\theta_e$: the duty computed now acts $n$ periods
-after the next counter zero and is then held for a period, so the rotor has turned by that much when the vector
+**Inverse Park Transform** (dq → αβ, for voltage reconstruction). The firmware evaluates it at the advanced angle
+$\theta_e + (n + \tfrac12)\,\omega_e T_s$, not at the sampled $\theta_e$. The duty computed now acts $n$ periods
+after the next counter zero and is then held for a period. Thus the rotor has turned by that much when the vector
 is applied ([disturbances and noise](disturbances-and-noise.md) §5). The forward Park keeps the sampled angle:
 the current was measured at it.
 
@@ -174,8 +174,8 @@ $$
 \boxed{\tau_e = \frac{3}{2}\, p\, \psi_f\, i_q}
 $$
 
-Setting the $i_q$ reference from an outer speed or position loop gives a torque-current-mode inner loop, the
-fundamental advantage of FOC over scalar control, and $i_d^* = 0$ gives the most torque per ampere.
+Setting the $i_q$ reference from an outer speed or position loop gives a torque-current-mode inner loop. This is the
+fundamental advantage of FOC over scalar control. The setting $i_d^* = 0$ gives the most torque per ampere.
 
 The dq-axis current regulators are interchangeable at runtime. Gain design and normalisation depend on
 the active algorithm — see the current loop controller chapters in `documentation/theory/`.
@@ -197,15 +197,15 @@ the eight inverter states. The three-phase half-bridge inverter produces 8 switc
 | $V_7$  | (1,1,1)          | 0                       | 0                      |
 
 The six active vectors ($V_1$–$V_6$) form a regular hexagon of circumradius $\tfrac{2}{3}$ in these
-normalised units — that is the length of each vertex vector in the table above. The inscribed circle
+normalised units. That is the length of each vertex vector in the table above. The inscribed circle
 (maximum linear SVM range) is the hexagon's apothem, $\tfrac{2}{3}\cos 30^\circ = \tfrac{1}{\sqrt3}
 \approx 0.577$, corresponding to $V_{dc}/\sqrt{3}$ in physical volts. The two agree: it is the
 circumradius that is $\tfrac{2}{3}$, and reading that as the linear range overstates it by 15%.
 
 ![A reference vector sweeping the SVM hexagon, the active sector shaded, and the three duty cycles of common-mode injection](../animations/svm-hexagon.svg)
 
-The animation runs the common-mode injection below at a modulation of 0.9: the reference vector stays inside
-the dashed linear-limit circle, the sector it crosses is shaded, and the three duty cycles take the
+The animation runs the common-mode injection below at a modulation of 0.9. The reference vector stays inside
+the dashed linear-limit circle. The sector it crosses is shaded. The three duty cycles take the
 characteristic saddle shape.
 
 #### Common-Mode Injection Method
@@ -235,9 +235,9 @@ $$
 d_k = \mathrm{clamp}\!\left(\frac{v_k + v_{common}}{\sqrt{3}} + 0.5,\ 0,\ 1\right), \quad k \in \{A, B, C\}
 $$
 
-The factor $1/\sqrt{3}$ in the duty cycle formula arises from the normalisation: at the hexagon boundary,
-the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ in per-unit, $V_{dc}/2$ in volts, and
-the factor maps this to the [0, 1] duty cycle range centred at 0.5.
+The factor $1/\sqrt{3}$ in the duty cycle formula arises from the normalisation. At the hexagon boundary,
+the maximum phase voltage (after common-mode injection) is $\sqrt{3}/2$ in per-unit, $V_{dc}/2$ in volts. The
+factor maps this to the [0, 1] duty cycle range centred at 0.5.
 
 **Advantages over sector-based SVM**:
 - No angle or sector lookup required.
@@ -267,10 +267,10 @@ To avoid calling `sinf/cosf` in the ISR:
 - Angular range: angle is normalised to $[0, 1)$ representing $[0, 2\pi)$.
 
 The fixed-step table introduces a bounded angle-quantisation error of at most $\pi/512 \approx 0.35°$ when
-truncating to the nearest entry. The implementation interpolates linearly between adjacent entries, which
+truncating to the nearest entry. The implementation interpolates linearly between adjacent entries. This
 bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. At the Teknic's rated 6000 rpm
-($p = 4$) the electrical angle advances $\omega_e/20000 = 0.126\ \text{rad} \approx 7.2°$ per step, roughly
-10 table entries, so it is the interpolation rather than the table density that bounds the error.
+($p = 4$) the electrical angle advances $\omega_e/20000 = 0.126\ \text{rad} \approx 7.2°$ per step. This is roughly
+10 table entries. Thus it is the interpolation rather than the table density that bounds the error.
 
 ---
 
@@ -326,8 +326,8 @@ bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. A
 
 ### Sensitivity Analysis
 
-How errors in $R_s$, $L_s$, $\theta_e$, $V_{dc}$ and the current-sensor offsets affect control quality, and
-the other disturbances the loops see, are in [disturbances and noise](disturbances-and-noise.md).
+[Disturbances and noise](disturbances-and-noise.md) gives the other disturbances the loops see. It also gives how
+errors in $R_s$, $L_s$, $\theta_e$, $V_{dc}$ and the current-sensor offsets affect control quality.
 
 ---
 

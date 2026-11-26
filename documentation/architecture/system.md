@@ -44,7 +44,7 @@ date: 2026-11-09
 
 ## System Overview
 
-e-foc is a Field-Oriented Control (FOC) firmware for BLDC and PMSM motors. Its purpose is to transform three-phase stator currents into a rotating reference frame so that torque and flux can be regulated independently with standard linear PIDs, then synthesise the three-phase PWM voltages via Space Vector Modulation.
+e-foc is a Field-Oriented Control (FOC) firmware for BLDC and PMSM motors. It transforms three-phase stator currents into a rotating reference frame, so that standard linear PIDs can regulate torque and flux independently. It then synthesises the three-phase PWM voltages via Space Vector Modulation.
 
 The system is structured in four tiers:
 
@@ -100,7 +100,7 @@ graph TD
     TOOLS --> FOC
 ```
 
-The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a board or on the host, so the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
+The virtual board implements the same PAL contracts as real hardware, with the simulation plant behind them. The application never needs to distinguish between running on a board or on the host. Thus the shipping application runs on a development machine as a virtual motor that the CAN Commander commands like a board ([design](../design/virtual-motor.md)).
 
 ---
 
@@ -120,9 +120,9 @@ The heart of the system. Decomposed into sub-layers following a strict separatio
 | Cascade         | Orchestration of the control cascade — the per-mode control loops that combine the current, speed and position algorithms.                                                                                                                                                   |
 | Instantiations  | Wiring that combines a control-mode cascade with the execution runner to produce a ready-to-use FOC controller.                                                                                                                                                              |
 
-Because Interfaces, Math, and Transforms carry no dependency on the control cascade, the identification, alignment, and simulation components consume them directly without pulling in the control loops.
+Interfaces, Math, and Transforms carry no dependency on the control cascade. Thus the identification, alignment, and simulation components consume them directly without pulling in the control loops.
 
-The three control modes are available in the same binary and are selected at runtime through `ControlModeStateMachine`. Only one mode is active at a time; switching is only permitted from `Idle` or `Ready` state and persists the new choice to NVM via `defaultControlMode`:
+The three control modes are available in the same binary and are selected at runtime through `ControlModeStateMachine`. Only one mode is active at a time. Switching is only permitted from `Idle` or `Ready` state and persists the new choice to NVM via `defaultControlMode`:
 
 - **Torque control** — innermost loop: regulates phase currents to produce a commanded torque (specified as Id/Iq current setpoints).
 - **Speed control** — outer loop on top of torque control: a PID regulates rotor angular velocity by commanding Id/Iq setpoints to the inner loop. The outer loop runs at a lower priority interrupt (typically 1 kHz) while the inner loop still runs at 20 kHz.
@@ -130,7 +130,7 @@ The three control modes are available in the same binary and are selected at run
 
 #### Interrupt Priority Plan
 
-On the target's processor, equal priority means no preemption: a handler at the same level as the FOC ISR cannot be interrupted by it, so the FOC loop's worst-case latency is the duration of the longest other handler at or above its level. Leaving every source at the default therefore leaves the 20 kHz deadline hostage to a CAN receive or a UART DMA completion.
+On the target's processor, equal priority means no preemption: a handler at the same level as the FOC ISR cannot be interrupted by it. Thus the FOC loop's worst-case latency is the duration of the longest other handler at or above its level. Leaving every source at the default therefore leaves the 20 kHz deadline hostage to a CAN receive or a UART DMA completion.
 
 The hardware target assigns priorities explicitly in `application::InterruptPriorities`:
 
@@ -142,7 +142,7 @@ The hardware target assigns priorities explicitly in `application::InterruptPrio
 | UART                | `low`     | Terminal and tracing; the least time-critical source on the board                                    |
 | PendSV (outer loop) | `lowest`  | Set by `hal::cortex::LowPriorityInterrupt`; the 1 kHz outer loop must never preempt the current loop |
 
-The outer loop runs on PendSV at the lowest configurable priority. It carries a 20 000-cycle budget against the inner loop's 4 500, so running it above the current loop would insert up to a full outer-loop execution of duty-update jitter once per millisecond.
+The outer loop runs on PendSV at the lowest configurable priority. It carries a 20 000-cycle budget against the inner loop's 4 500. Running it above the current loop would thus insert up to a full outer-loop execution of duty-update jitter once per millisecond.
 
 ```mermaid
 graph LR
@@ -155,48 +155,48 @@ graph LR
 The `Runner` is the only component that interacts with the PAL inverter and encoder at interrupt time. It registers the ADC-sampling callback and drives the `Calculate()` dispatch into the active control-mode implementation.
 
 The dispatch carries no validation of the sample. Nothing in the 20 kHz path inspects the phase currents for
-plausibility or for finiteness: at 4500 cycles a frame the budget is spent on the control law, and a failed
-shunt or ADC channel is the hardware's fault detection to catch, not the control loop's.
-`foc::SpaceVectorModulation` clamps each phase into [0, 1] once, as it converts its output to duty cycles,
+plausibility or for finiteness. At 4500 cycles a frame the budget is spent on the control law. The hardware's fault
+detection catches a failed shunt or ADC channel, not the control loop. Space-vector modulation
+(`foc::SpaceVectorModulation`) clamps each phase into [0, 1] once, as it converts its output to duty cycles,
 and does nothing else.
 
-On a board that senses its phases with low-side shunts the duty also decides whether a phase can be read at
-all: a shunt carries its phase current only while that leg's low-side switch conducts around the PWM centre,
+On a board that senses its phases with low-side shunts the duty also decides whether a phase can be read at all. A shunt
+carries its phase current only while that leg's low-side switch conducts around the PWM centre,
 where the converter samples. The platform passes every duty set through `foc::KeepLowSideShuntsReadable`
 with the motor board's limit (70 % on the reference board, none on boards without the constraint). Above it all three duties move
 down together, which keeps the line-to-line voltages and so the vector the current loop asked for. Without the
-limit, a current loop that saturated drove a leg to the rail, read that phase near zero and held it there: on
-the bench the real current reached 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
+limit, a current loop that saturated drove a leg to the rail, read that phase near zero and held it there. On the bench
+the real current reached 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
 
 Only two phases need to be read, since the winding's three currents sum to zero. A vector wider than the limit
-takes the lowest duty to zero and keeps the middle one within the limit, and the highest may go up to the
-board's maximum duty, 95 % on the reference board, where the gate driver's bootstrap capacitors still charge in every
-period. `foc::LowSideShuntReadout` remembers the duties of the last two periods, because the samples at a PWM
-centre fall in the low-side pulse the period ending there shares with the one starting there, and gives a phase
-that had a duty above the limit in either the negative sum of the other two. Only a vector whose middle duty, or
-whose highest, is still above its limit is scaled down, along its own direction. With all three phases kept
-readable the circle the modulator can trace shrank to 70 % of the hexagon's inner circle; now only the directions
-where two phases share the highest duty are held to the limit. The bench motor in simulation, which stopped near
-356 rad/s, reaches 420 rad/s with the same current ripple as at 340 rad/s and holds 460 rad/s within 1 rad/s
+takes the lowest duty to zero and keeps the middle one within the limit. The highest may go up to the board's maximum
+duty, 95 % on the reference board. At that duty the gate driver's bootstrap capacitors still charge in every period. The
+readout (`foc::LowSideShuntReadout`) remembers the duties of the last two periods. It needs them because the samples at
+a PWM centre fall in the low-side pulse the period ending there shares with the one starting there. For a phase that had
+a duty above the limit in either period, the readout gives the negative sum of the other two. Only a vector whose middle
+duty, or whose highest, is still above its limit is scaled down, along its own direction. With all three phases kept
+readable the circle the modulator can trace shrank to 70 % of the hexagon's inner circle. Now only the directions
+where two phases share the highest duty are held to the limit. In simulation the bench motor stopped near 356 rad/s. Now
+it reaches 420 rad/s with the same current ripple as at 340 rad/s. It holds 460 rad/s within 1 rad/s
 (REQ-CTL-001). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
 whatever its shunt shows outside the pulse.
 
-The window also has to hold every phase's conversion. The reference board's converter reads the three phases one after another in
-a single sequence triggered at the PWM centre, ahead of the three fault-comparator steps, and averages each step
-over two conversions, so a step lasts two sample-and-holds plus two 12-clock conversions and the last phase is
-read the longest after the centre. With a 16-clock sample-and-hold it finished about 10 µs late, after the
-low-side window of a leg above about 50 to 60 % duty had closed: on the bench the last phase in the sequence read
-10 to 15 % low near the 50 % duty every leg holds in closed loop, and up to 34 % low at 65 %, and reversing the
-sequence moved the error to whichever phase came last. The application asks for the shortest sample-and-hold, 4
-clocks, which by the same count brings the last phase in at 5.25 µs, and keeps the averaging. All three phases
-then read within 2.5 % up to 69 % duty, and the standard deviation of a zero-current sample fell from 60 to 79 mA
+The window also has to hold every phase's conversion. The reference board's converter reads the three phases one after
+another in a single sequence. The PWM centre triggers it, and the three fault-comparator steps follow. It averages each
+step over two conversions. Thus a step lasts two sample-and-holds plus two 12-clock conversions, and the last phase is
+read the longest after the centre. With a 16-clock sample-and-hold it finished about 10 µs late. The low-side window of
+a leg above about 50 to 60 % duty had then closed. On the bench the last phase in the sequence read 10 to 15 % low near
+50 % duty. Every leg holds that duty in closed loop. It read up to 34 % low at 65 %. Reversing the sequence
+moved the error to whichever phase came last. The application asks for the shortest sample-and-hold, 4 clocks, and keeps
+the averaging. By the same count this brings the last phase in at 5.25 µs. All three phases
+then read within 2.5 % up to 69 % duty. The standard deviation of a zero-current sample fell from 60 to 79 mA
 per phase to 31 to 39 mA. Dropping the averaging instead read the phases as cleanly but raised that noise by 15 to
 25 %.
 
-`math::IsFinite` from the numerical toolbox survives for the places where validation is affordable and worth having —
-`CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
+`math::IsFinite` from the numerical toolbox survives for the places where validation is affordable and worth having.
+These are `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
 applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
-calling `std::isnan`, which `-ffinite-math-only` licenses the compiler to fold to a constant; the embedded builds
+calling `std::isnan`, which `-ffinite-math-only` licenses the compiler to fold to a constant. The embedded builds
 keep `-fno-finite-math-only`, but the check does not depend on it.
 
 ### 2. Services
@@ -217,7 +217,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 
 ### 3. CAN Service
 
-The FOC motor CAN category — its wire contract, the server/client pair and `FocMotorCanClient` — comes from the e-foc-protocol library (`infra/e-foc-protocol/`), which every client of the drive shares. The CAN service layer (`core/can/`) adds the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
+The FOC motor CAN category — its wire contract, the server/client pair and `FocMotorCanClient` — comes from the e-foc-protocol library (`infra/e-foc-protocol/`). Every client of the drive shares this library. The CAN service layer (`core/can/`) adds the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
 
 **Server half** (runs on the embedded target):
 - `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire encoding (`float32` and the stream's `int16` scaling ↔ physical unit) is contained entirely here.
@@ -251,8 +251,8 @@ Concrete implementations exist for:
 - **Host**: peripheral stubs that let the application build and link on a development machine, located under `targets/platform_implementations/host/`.
 - **Virtual**: the virtual board, whose power stage, encoder, supply and protection are the simulation plant, joined to a virtual CAN bus; it runs the application as a virtual motor ([design](../design/virtual-motor.md)).
 
-On the hardware targets that support it the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
-A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
+On the hardware targets that support it, the command console and the trace output are also mirrored on SEGGER RTT (channel 0). This applies whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). EmIL's `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
+A debug probe can then read and drive the console with the USB-serial link down. That is the situation in which a hardware failure most needs diagnosing.
 RTT writes are non-blocking and drop when no probe is reading.
 
 The reference board sizes its console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
@@ -272,10 +272,10 @@ it should change the reason, not just the number:
 | Fault status (`faultStatusSize`)                  | 448 B     | `PersistentFaultData::kMaxFormattedSize` (444), enforced by a `static_assert`, so the boot fault dump is never truncated.                                                                                                                                                                 |
 
 `sync_foc_sensored` has no command table: it registers no terminal commands. The linker script places `.bss`
-first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
-instead of forcing up to 1 KiB of padding after `.data`. The vendor `Gpio` driver keeps pin-interrupt handlers in a
-pool sized by a CMake cache variable (default 8, 72 bytes each) and registers a
-port's interrupt only when a pin on it is enabled. A handler per pin would take 4.0 KiB more RAM on the reference board
+first, sorted by alignment. Thus the uDMA control table, which must be 1 KiB-aligned, starts at the beginning of RAM.
+This avoids up to 1 KiB of padding after `.data`. The vendor `Gpio` driver keeps pin-interrupt handlers in a
+pool sized by a CMake cache variable (default 8, 72 bytes each). It registers a port's interrupt only when a pin on it
+is enabled. A handler per pin would take 4.0 KiB more RAM on the reference board
 (120 pins), and `sync_foc_sensored` enables no pin interrupt at all.
 
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
@@ -298,10 +298,10 @@ graph LR
 
 The wiring layer. Assembles the concrete PAL implementation, the selected FOC mode(s), and the services into a runnable system. This is the only layer that is aware of the specific combination in use — all other layers depend only on abstractions.
 
-The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation
-lifecycle: it enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`),
-orchestrates the sequential calibration chain (electrical identification, alignment, and mechanical
-identification for speed/position modes), and responds to hardware fault notifications by immediately stopping
+The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation lifecycle.
+It enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`). It orchestrates the sequential
+calibration chain (electrical identification, alignment, and mechanical
+identification for speed/position modes). It responds to hardware fault notifications by immediately stopping
 the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be
 enabled.
 
@@ -338,8 +338,8 @@ workaround until the fix lands. Two such defects shaped the position loop and ar
 | PR **#288** / **#289** — scale-invariant DARE convergence tolerance               | Without it the position LQR and LQI designs do not converge at all. The submodule must stay at or past this commit.                                                     |
 | Issue **#291** — `IntegralStateFeedbackLqi` had no non-aborting construction path | Its constructor called `really_assert(converged)`, so a non-convergent solve aborted the firmware. `TryCreate` now exists and every state feedback design here uses it. |
 
-Should a comparable defect appear again, record it in this table with the workaround and the
-condition for retiring it, so a workaround does not quietly become permanent.
+Should a comparable defect appear again, record it in this table with the workaround and the condition for retiring it.
+Thus a workaround does not quietly become permanent.
 
 ### 7. Vendor HAL (was §6)
 
@@ -353,12 +353,11 @@ These are never used directly by the FOC core or services — only by the PAL co
 
 ### 8. Bootloader
 
-A single-stage bootloader sits at the start of flash, ahead of the application, on the reference board and the
-emulated board today; boards with room for two images get it later ([design](../design/bootloader.md)). At every reset it checks the application slot against
-its image descriptor and starts it; when the application has staged a firmware pack and the user has applied
-it, it first verifies the pack's ECDSA-P256 signature and board, decrypts it with AES-128-CTR
-and installs it. An image built for another board is refused before anything is erased: the image
-names its target and the bootloader compares it with the chip's own device identity. It has no CAN stack and no
+A single-stage bootloader sits at the start of flash, ahead of the application, on the reference board and the emulated board today. Boards with room for two images get it later ([design](../design/bootloader.md)). At every reset it checks the application slot against
+its image descriptor and starts it. When the application has staged a firmware pack and the user has applied it, the
+bootloader first verifies the pack's ECDSA-P256 signature and board. It then decrypts the pack with AES-128-CTR and
+installs it. An image built for another board is refused before anything is erased. The image names its target, and the
+bootloader compares it with the chip's own device identity. It has no CAN stack and no
 interrupts: the application receives the pack (Services, Firmware Upgrade) and the CAN Commander sends it. The
 user starts the download and, separately, the apply, each only while the motor is stopped.
 
@@ -504,7 +503,7 @@ Two targets implement scenarios, selected by tag:
 1. **Software-in-the-loop** — the firmware built for an emulated target processor, running under an
    emulator against a simulated three-phase motor the firmware itself owns. Only the motor, the
    power stage and the board protection are simulated, because there is no hardware. The motor is
-   described per scenario and handed to the firmware at boot, and non-volatile memory is pre-seeded
+   described per scenario and handed to the firmware at boot. Non-volatile memory is pre-seeded
    so a scenario starts from a chosen calibration and configuration.
 2. **Hardware-in-the-loop** — the same firmware on a real board, reached through the hardware
    bridge over serial and CAN.
@@ -550,9 +549,9 @@ graph TD
 ### Requirements Traceability
 
 Each scenario carries the requirement identifiers it verifies as tags, alongside the tag naming the
-target that implements it. The traceability matrix is generated from those tags at release time by
-reading the feature directory, so the mapping lives with the scenarios rather than in a table here
+target that implements it. The traceability matrix is generated from those tags at release time by reading the feature
+directory. Thus the mapping lives with the scenarios rather than in a table here
 that would drift away from them.
 
 Requirements with no scenario are verified by unit tests under the owning library, or are
-structural constraints discharged by design review; the generated matrix reports both.
+structural constraints discharged by design review. The generated matrix reports both.

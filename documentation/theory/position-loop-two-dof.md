@@ -64,9 +64,9 @@ $$
 e_{fb}[k] = F(z)\,\theta_m^*[k] - \theta_m[k]
 $$
 
-**Wrapping constraint**: $\theta_m$ lives on the circle, not on the line, so $F(z)$ must not be run
-directly on the wrapped angle: filtering from $+3.0$ rad towards $-3.0$ rad would interpolate through
-$0$ and execute a $344^\circ$ rotation instead of the $16^\circ$ move across the seam. The
+**Wrapping constraint**: $\theta_m$ lives on the circle, not on the line. Thus $F(z)$ must not be run
+directly on the wrapped angle. Filtering from $+3.0$ rad towards $-3.0$ rad would interpolate through
+$0$. It would execute a $344^\circ$ rotation instead of the $16^\circ$ move across the seam. The
 first-order prefilter is therefore realised on the wrapped error:
 
 $$
@@ -74,16 +74,16 @@ $$
 $$
 
 with $\alpha = 1 - e^{-T_o/\tau_{ff}}$ and $\mathrm{wrap}(\cdot)$ folding onto $(-\pi, \pi]$. The state
-$\theta_f$ is seeded from the measured angle on reset and on the first sample; seeding it at zero
+$\theta_f$ is seeded from the measured angle on reset and on the first sample. Seeding it at zero
 would ramp the reference in from absolute zero on every enable. For $\tau_{ff} \le 0$ the prefilter
 is transparent and the raw setpoint passes through. Inside software position limits both wraps are
-dropped and the prefilter runs on the line: the setpoint and the filter state stay between the
+dropped, and the prefilter runs on the line. The setpoint and the filter state stay between the
 limits, which never contain the seam (`position-loop-pid.md`, Angle-Error Wrapping).
 
-**Motion profile**: a motion profile (`position-motion-profile.md`) already shapes the reference, so while
-it is active the pre-filter is bypassed and the feedback controller works on the profiled reference with its
-velocity feed-forward; the pre-filter state is dropped and reseeded from the measured angle when the profile
-ends. Without a profile the pre-filter is unchanged.
+**Motion profile**: a motion profile (`position-motion-profile.md`) already shapes the reference. Thus while
+it is active the pre-filter is bypassed. The feedback controller works on the profiled reference with its
+velocity feed-forward. When the profile ends, the pre-filter state is dropped and reseeded from the measured
+angle. Without a profile the pre-filter is unchanged.
 
 **Relation to P2**: When $F(z) = 1$ and the feedback controller is a proportional P, the structure
 collapses to Cascade P→PI. Two-DOF position control is the generalisation — $F(z)$ independently

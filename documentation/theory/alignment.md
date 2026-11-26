@@ -22,8 +22,8 @@ Motor alignment establishes the correspondence between the incremental encoder p
 electrical rotor angle $\theta_e$. An incremental encoder measures mechanical shaft rotation from a
 relative zero point that is arbitrary at power-on. FOC requires the absolute electrical angle to compute
 the Clarke–Park transform correctly. Without calibration, the angle error $\Delta\theta$ between the
-assumed and actual rotor position causes cross-coupling between the d and q axes, degrading torque
-production and potentially causing instability.
+assumed and actual rotor position causes cross-coupling between the d and q axes. This cross-coupling degrades
+torque production and can cause instability.
 
 The alignment procedure forces the rotor to a known electrical position by applying a stator field at
 a fixed electrical angle (typically $\theta_e = 0$). The encoder reading at the settled position becomes
@@ -66,10 +66,10 @@ $$
 $$
 
 where $\delta = \theta_e^{field} - \theta_r$ is the angle between the stator field and the rotor d-axis
-(the north pole of the permanent magnet), and $K_{mag} > 0$ is a motor-dependent constant.
+(the north pole of the permanent magnet). The constant $K_{mag} > 0$ depends on the motor.
 
-This is the classical synchronising torque of a synchronous machine: $\tau = K_{mag}\sin(\delta)$, positive
-while the field leads the rotor, so it always pulls the rotor towards the field.
+This is the classical synchronising torque of a synchronous machine: $\tau = K_{mag}\sin(\delta)$. It is
+positive while the field leads the rotor, so it always pulls the rotor towards the field.
 
 **Equilibrium**: $\tau_{sync} = 0$ when $\delta = 0$ or $\delta = \pi$. The stable equilibrium is $\delta = 0$,
 i.e. the rotor d-axis aligns with the applied stator field. The $\delta = \pi$ equilibrium is unstable.
@@ -110,10 +110,10 @@ The settling curve is drawn in *Block Diagrams* below (alignment settling).
 The implementation applies a single fixed stator field at $\theta_e^{field} = 0$. The rotor d-axis is
 attracted to this angle and settles there from any starting position that is not at the unstable
 equilibrium ($\delta = \pi$). In practice, static friction and motor winding asymmetry prevent the
-rotor from remaining at the unstable equilibrium, so the procedure reliably converges for
-surface-mounted PMSM and BLDC motors. For interior PMSM motors with significant magnetic saliency,
-a rotor that is already near the unstable equilibrium and is held by static friction may require the
-`settledThreshold` to be tightened and the `testVoltage` to be increased to ensure movement.
+rotor from remaining at the unstable equilibrium. Thus the procedure reliably converges for
+surface-mounted PMSM and BLDC motors. Interior PMSM motors can have significant magnetic saliency. On such a
+motor, static friction can hold a rotor that is already near the unstable equilibrium. This rotor may need a
+tighter `settledThreshold` and a higher `testVoltage` to ensure movement.
 
 The field is maintained continuously at a constant duty cycle until the rotor is detected as settled.
 No stepping or sweeping is performed.
@@ -170,7 +170,7 @@ potentially demagnetising the permanent magnets under sustained high current.
 ### 7. Index Reference — Keeping the Offset Across a Reset
 
 $\theta_{offset}$ is a reading of a counter that starts from an arbitrary value at every power-up, so
-it cannot be stored. An encoder with an index channel also carries a fixed mark: one pulse per
+it cannot be stored. An encoder with an index channel also carries a fixed mark. This mark is one pulse per
 revolution at a mechanical angle $\theta_m^{idx}$ that does not change with the power-up. Read in the
 aligned frame, the pulse sits at
 
@@ -197,10 +197,10 @@ Two properties make this better than aligning again:
   balance as an error.
 - **The pulse has a width.** It spans one count or one line, and a pulse met from the other side is
   read one width away. Both the commissioning and the power-up search therefore turn the rotor
-  forward and are armed only after the rotor has snapped to the first field, so both meet the same edge.
+  forward. Both are armed only after the rotor has snapped to the first field, so both meet the same edge.
 
-The precision is the encoder count plus the motion within one control period at the search speed:
-at half a revolution per second and 20 kHz that is 0.16 mrad, far below one count of a 4000-count
+The precision is the encoder count plus the motion within one control period at the search speed.
+At half a revolution per second and 20 kHz, that motion is 0.16 mrad. This is far below one count of a 4000-count
 encoder (1.57 mrad). The search moves the rotor by at most 1.25 revolutions; one always passes the index.
 
 The theory says nothing about the field the search uses: any field the rotor follows forward will do.

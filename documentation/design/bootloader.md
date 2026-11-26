@@ -45,10 +45,11 @@ it, and deciding when to download and when to apply it, is the user's, through t
   - verifying its ECDSA-P256 signature over SHA-256 with the public key built into the bootloader
   - decrypting the image with AES-128-CTR
   - writing it into the application slot and writing its image descriptor.
-- Refusing an image built for another board before anything is erased, by comparing the
-  target identity inside the image with the chip's own device identity (Part I).
-- Recording each step of an installation in the status journal, so that a reset or a power loss during an
-  installation resumes it at the next reset, and a pack that failed a check is never tried again.
+- Refusing an image built for another board before anything is erased.
+  It compares the target identity inside the image with the chip's own device identity (Part I).
+- Recording each step of an installation in the status journal.
+  A reset or a power loss during an installation then resumes it at the next reset.
+  A pack that failed a check is never tried again.
 - Starting the application: its vector table, its stack pointer and its reset handler.
 
 ---
@@ -108,15 +109,14 @@ On the reference board, whose staging slot is in internal flash:
   that crossed the boundary therefore reset the board whenever an erase ran long. The bootloader's own erases of the application slot run with no watchdog.
 
 - The application is linked at the start of its slot. It moves the vector table to the slot before it enables
-  any interrupt, because a platform's startup code leaves the table at its reset value, address 0 or the start
-  of flash.
-- On a board with two flash banks the staging slot is the bank the application does not execute from, for the
-  same reason, so the application programs it without stalling. Bank swapping stays off: the bootloader
+  any interrupt. A platform's startup code leaves the table at its reset value, address 0 or the start of flash.
+- On a board with two flash banks the staging slot is the bank the application does not execute from.
+  For the same reason, the application programs it without stalling. Bank swapping stays off: the bootloader
   copies the image instead.
 - On a board whose staging slot is external flash, a serial NOR device holds it and the application slot spans
   the internal flash.
-- A pack may be as large as the staging slot, 327 680 bytes, which is below the 393 216 bytes a can-lite
-  firmware-upgrade transfer can address. The image it carries may fill the application slot less its
+- A pack may be as large as the staging slot, 327 680 bytes.
+  This is below the 393 216 bytes a can-lite firmware-upgrade transfer can address. The image it carries may fill the application slot less its
   descriptor, and the pack's header, signature and image framing less than that. An update installs only an
   image whose pack fits the staging slot.
 - A board whose image is larger than any pack the staging slot holds gets updates only once its image fits.
@@ -149,8 +149,8 @@ components, with exactly one image:
   change. The bootloader compares it with its own, so a pack for another board is refused
   before anything is written. The application checks the same identification when it verifies the pack, so the
   refusal comes before the user can apply it ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part D).
-- The **product version** is the build's project version, the release tag without its leading `v`: the version
-  the application reports as running once the pack is installed. The component is the motor-controller
+- The **product version** is the build's project version, the release tag without its leading `v`.
+  The application reports this version as running once the pack is installed. The component is the motor-controller
   application, named `sync_foc_sensored` in the pack.
 - The prologue's status byte and error code are outside the signature and are not used: progress is kept in
   the status journal (Part D).
@@ -197,14 +197,15 @@ erased. Progress therefore goes to a journal instead, the erase unit after the s
 
 - Each entry is one 16-byte unit: a marker, the status and the error code. A new status is written into the
   next erased unit; the current status is the last entry written, and an erased journal reads *empty*.
-- The application erases the journal when it accepts a new download, writes *downloaded* when the pack passed
-  its checks, and writes *ready to deploy* when the user applies it. The bootloader ignores *downloaded*, so a
+- The application erases the journal when it accepts a new download.
+  It writes *downloaded* when the pack passed its checks.
+  It writes *ready to deploy* when the user applies it. The bootloader ignores *downloaded*, so a
   staged pack waits through any number of restarts; it writes *deploy started*, *deployed*, or *invalid* with
   the error code.
 - The pack reader and the image installer of the library read and write the status through replaceable
-  operations; the bootloader supplies ones that use the journal.
-- An entry that a reset cut short is not valid and is skipped; the next status goes into the following erased
-  unit, so no unit is ever programmed twice.
+  operations. The bootloader supplies ones that use the journal.
+- An entry that a reset cut short is not valid and is skipped.
+  The next status goes into the following erased unit, so no unit is ever programmed twice.
 - A status equal to the current one is not written again, so an installation interrupted any number of times
   adds no entries. With the application erasing the journal at every download, one download and installation
   write at most five entries and the journal never fills. A full journal would be erased and restarted with the
@@ -245,11 +246,11 @@ hardware watchdogs start only when software starts them, and the application doe
 
 ### Part G — keys
 
-- A key set is one file holding the AES-128 image key, the ECDSA-P256 public key and its private key; the
-  firmware image tool (Part J) generates one from the host's random source.
+- A key set is one file holding the AES-128 image key, the ECDSA-P256 public key and its private key.
+  The firmware image tool (Part J) generates one from the host's random source.
 - Two key sets exist. The development set is public: e-foc is open source, so it lives in the repository
-  beside the bootloader, and continuous integration, pull requests from forks, the
-  release workflow's dry runs and local builds all use it. Anyone can sign a pack that a board with the
+  beside the bootloader. Continuous integration, pull requests from forks, the release workflow's dry runs
+  and local builds all use it. Anyone can sign a pack that a board with the
   development key accepts, so that key is for development boards only. The release set is the only secret, a
   repository secret that only the release workflow reads. A pack signed with the development key never
   installs on a board whose bootloader carries the release key.
@@ -257,15 +258,16 @@ hardware watchdogs start only when software starts them, and the application doe
   left erased. An erased slot holds no valid public key, and the library's verifier refuses a key that is not
   on the curve. Every pack therefore fails its signature check, and only the installed application ever starts. A
   build without keys is safe, but cannot update a board.
-- Keys are not a build input: the build always produces a bootloader with an erased slot, and the image tool's
-  key injection writes the public key and the AES key from a set into the finished bootloader, its ELF file
-  and its hex file, afterwards. One build can therefore take the development
+- Keys are not a build input: the build always produces a bootloader with an erased slot.
+  Afterwards, the image tool's key injection writes the public key and the AES key from a set.
+  It writes them into the finished bootloader, its ELF file and its hex file. One build
+ can therefore take the development
   set or the release set, and the two differ only in those 80 bytes. Continuous integration injects the
   development set into every build.
 - A release fails when the release set cannot be read, rather than publish a bootloader that could never
-  update a board; a dry run injects the development set.
+  update a board. A dry run injects the development set.
 - The public key only verifies, so reading it from a board gains nothing. The AES key hides nothing in an
-  open-source product: anyone can build the plaintext image from the sources, and the release ships the
+  open-source product. Anyone can build the plaintext image from the sources, and the release ships the
   bootloader with its key slot. The packs stay encrypted because the library's pack format carries the
   encryption. The signature is what keeps anyone without the release private key from installing an image on
   a release board. Production boards are also locked against debug access.
@@ -328,10 +330,11 @@ holds even if an earlier one was skipped or its label was wrong:
 Before erasing, the bootloader decrypts only the image's first 2 KB into RAM. AES-128-CTR decrypts any part of
 the stream on its own, so this costs nothing in the copy that follows. It then checks that:
 
-1. the initial stack pointer lies in this chip's RAM and the reset handler in this board's application slot,
-   which an image linked for another processor's memory map fails;
-2. the application header's magic is valid, its board kind is this bootloader's board, and its target identity
-   equals the device identity that this chip reports, read at that moment.
+1. the initial stack pointer lies in this chip's RAM and the reset handler in this board's application slot.
+   An image linked for another processor's memory map fails this check;
+2. the application header's magic is valid and its board kind is this bootloader's board.
+   Its target identity equals the device identity that this chip reports, read at that moment.
+
 
 A failure is recorded as *invalid* with the bootloader's own *wrong target* error code. This code is outside the range
 the library reserves for its loaders. The old application starts untouched.

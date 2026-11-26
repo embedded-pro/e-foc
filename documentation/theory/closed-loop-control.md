@@ -72,10 +72,9 @@ first course in control.
 ### 1. Why Open Loop Is Not Enough
 
 An open-loop drive computes the voltage from the model and applies it. At standstill, a q current $I$ needs
-$v_q = R_s I$. If the winding's resistance is 30 % above the value the drive was given, which a rise of about
-75 K does to copper, the current and the torque are 23 % low. At speed the error is worse: the voltage is
-dominated by the back-EMF $\omega_e \psi_f$, and a small error in $\psi_f$ or in the measured speed becomes a
-large error in the much smaller difference that drives the current. A load torque the drive did not expect
+$v_q = R_s I$. A rise of about 75 K puts the winding's copper resistance 30 % above the value the drive was
+given. Then the current and the torque are 23 % low. At speed the error is worse: the back-EMF
+$\omega_e \psi_f$ dominates the voltage. A small error in $\psi_f$ or in the measured speed becomes a large error in the much smaller difference that drives the current. A load torque the drive did not expect
 changes the speed, the back-EMF with it, and the current again.
 
 Feedback replaces the requirement "know the motor exactly" by "measure the output". The controller compares
@@ -124,13 +123,13 @@ Read the equations term by term:
 margin $\varphi_m$. Margins of 45–70° give a well-damped response. Below about 30° the loop rings, and at
 zero it oscillates. Delay (§7) eats phase margin first.
 
-**The waterbed.** For a stable loop whose gain falls at least as $1/s^2$ at high frequency, which every
-physical loop does, pushing $|S|$ down over one band of frequencies pushes it up over another (Bode's
-sensitivity integral); delay and right-half-plane zeros make the trade worse. A loop cannot be made faster for free:
-past a point, more gain only moves the error to another frequency, where it appears as overshoot and noise.
+**The waterbed.** Take a stable loop whose gain falls at least as $1/s^2$ at high frequency, as every
+physical loop does. Pushing $|S|$ down over one band of frequencies pushes it up over another (Bode's
+sensitivity integral). Delay and right-half-plane zeros make the trade worse. A loop cannot be made faster for
+free. Past a point, more gain only moves the error to another frequency, where it appears as overshoot and noise.
 
-**Integral action.** A controller with a pole at $s = 0$ makes $|L| \to \infty$ at DC, so $S(0) = 0$: no
-steady-state error for a constant reference or a constant input disturbance. That is why every current and
+**Integral action.** A controller with a pole at $s = 0$ makes $|L| \to \infty$ at DC, so $S(0) = 0$. Thus a
+constant reference or a constant input disturbance leaves no steady-state error. That is why every current and
 speed controller in e-foc integrates, and why each needs anti-windup (§6).
 
 ### 3. The Cascade
@@ -179,7 +178,7 @@ outer crossover $\omega_{c,o}$:
 | 20                                   | 2.9°                         |
 
 A ratio of 5–10 is the usual compromise. e-foc keeps the current loop at least ten times the default speed
-loop (`documentation/design/controller-selection.md`, automatic bandwidth), and the speed loop chapter uses
+loop (`documentation/design/controller-selection.md`, automatic bandwidth). The speed loop chapter uses
 the same rule (`documentation/theory/speed-loop-pi.md`).
 
 ### 4. Feedback Signals
@@ -188,8 +187,8 @@ A loop is only as good as what it measures.
 
 - **Phase currents.** Shunts in the low-side legs are sampled once per PWM period, at the centre of the
   low-side conduction window, where the switching ripple crosses its average. All three phases are
-  converted; above 70 % duty a phase's shunt is not conducting long enough to read, and that phase is rebuilt
-  from the other two through $i_a + i_b + i_c = 0$ (`core/platform_abstraction/LowSideShuntWindow.hpp`).
+  converted. Above 70 % duty a phase's shunt does not conduct long enough to read. Then the drive rebuilds that
+  phase from the other two through $i_a + i_b + i_c = 0$ (`core/platform_abstraction/LowSideShuntWindow.hpp`).
   Offsets are measured at calibration (`documentation/design/service-current-offsets.md`).
 - **Rotor angle.** A quadrature encoder, 4000 counts per mechanical revolution by default, gives
   $\theta_m$; the alignment offset turns it into $\theta_e = p\,(\theta_m - \theta_0)$
@@ -217,9 +216,9 @@ It cannot destabilise the loop when it is computed from references, and barely c
 measured signal such as speed. Speed voltages computed from measured speed are, strictly, inside the loop;
 at the speed loop's time scale they are a slowly varying correction.
 
-The same idea generalises to the **two-degree-of-freedom** structure: one part shapes the response to the
-reference (a pre-filter $F$), another the response to disturbances (the feedback $C$), and they are tuned
-separately instead of trading against each other in one gain
+The same idea generalises to the **two-degree-of-freedom** structure. One part shapes the response to the
+reference (a pre-filter $F$). Another part shapes the response to disturbances (the feedback $C$). The two are
+tuned separately instead of trading against each other in one gain
 (`speed-loop-two-dof.md`, `position-loop-two-dof.md`).
 
 ### 6. Saturation and Anti-Windup
@@ -244,10 +243,10 @@ overshoots. This is **windup**. Every PI in e-foc is protected against it:
   (`speed-loop-pi.md`).
 
 When the voltage vector is too long, e-foc scales both components by the same factor, which keeps the
-*voltage* angle. Near standstill that keeps the current on its axis too. At speed it does not: with the
-back-EMF and the speed voltages in the balance, a voltage scaled by $k < 1$ settles with
-$i_d = -(1 - k)\,\omega_e^2 L_s \psi_f / (R_s^2 + \omega_e^2 L_s^2)$, negative, so the current turns off the q-axis
-and torque per ampere falls while the loop stays saturated.
+*voltage* angle. Near standstill that keeps the current on its axis too. At speed it does not. The
+back-EMF and the speed voltages are in the balance. A voltage scaled by $k < 1$ then settles with a negative
+$i_d = -(1 - k)\,\omega_e^2 L_s \psi_f / (R_s^2 + \omega_e^2 L_s^2)$. So the current turns off the q-axis, and
+torque per ampere falls while the loop stays saturated.
 
 ### 7. Digital Control: Sampling and Delay
 
@@ -260,11 +259,11 @@ applies the voltage computed from it, time passes:
 | Zero-order hold                            | A duty held for a whole period acts on average half a period late                                                                                      | $T_s^i/2$ = 25 µs                |
 | **Total**                                  |                                                                                                                                                        | $T_d \approx 1.5\,T_s^i$ = 75 µs |
 
-The same delay lets the rotor turn $\omega_e T_d$ before the voltage lands. e-foc rotates the inverse Park by
-that angle, $(n + \tfrac12)\,\omega_e T_s^i$ with $n$ the platform's duty delay in periods, so the vector is
-aligned with the rotor over the hold and the voltage acts on the axis the controller meant
-([disturbances and noise](disturbances-and-noise.md) §5). That removes the speed-proportional angle error, not the
-phase the delay costs at crossover, which the table below still counts.
+The same delay lets the rotor turn $\omega_e T_d$ before the voltage lands. Therefore e-foc rotates the inverse Park by
+that angle, $(n + \tfrac12)\,\omega_e T_s^i$, with $n$ the platform's duty delay in periods. Thus the vector stays
+aligned with the rotor over the hold. The voltage acts on the axis the controller meant
+([disturbances and noise](disturbances-and-noise.md) §5). That removes the speed-proportional angle error. It does
+not remove the phase the delay costs at crossover, which the table below still counts.
 
 A pure delay has unit gain and a phase of $-\omega T_d$. For a PI current controller that cancels the
 plant pole ([current-loop-pi.md](current-loop-pi.md)), the loop gain is
@@ -286,19 +285,19 @@ The delay alone caps the current loop near $10^4$ rad/s at 20 kHz, the same figu
 models the delay explicitly (the two-step deadbeat of `current-loop-deadbeat.md`).
 
 The **speed loop** has its own delay. The 1 ms window difference is the average speed over the last
-millisecond, half a window old. The speed controller runs as soon as the window closes, and the current
-reference it produces is picked up by the next 20 kHz period and held for the next millisecond, half a window
+millisecond, half a window old. The speed controller runs as soon as the window closes. The next 20 kHz period
+picks up the current reference it produces. That reference is held for the next millisecond, half a window
 late on average. With $T_d \approx 1$ ms, a 100 rad/s speed loop loses 5.7°, a 300 rad/s loop 17°.
 
-**Sampling the right instant.** Sampling the phase currents at the centre of the PWM period, where the
-symmetric ripple crosses its mean, takes the average current without filtering it, so the current loop
+**Sampling the right instant.** The symmetric ripple crosses its mean at the centre of the PWM period.
+Sampling the phase currents there takes the average current without filtering it. Thus the current loop
 carries no filter delay and no aliased ripple.
 
 ### 8. Choosing Bandwidths
 
-**What the number is.** Each loop has one tuning knob, its closed-loop bandwidth $\omega_{bw}$: the
+**What the number is.** Each loop has one tuning knob, its closed-loop bandwidth $\omega_{bw}$. This is the
 frequency up to which the loop's output follows its reference, close to the crossover of §2. It states how
-fast the loop should be, so it belongs to the controller, not to the motor: the same motor runs at any
+fast the loop should be, so it belongs to the controller, not to the motor. The same motor runs at any
 bandwidth inside the limits below.
 
 The current and position designs close to a first-order loop, $T(s) = \omega_{bw}/(s + \omega_{bw})$, so the
@@ -323,12 +322,12 @@ law derives its gains from the bandwidth and the identified model, so no gain is
 | Speed    | $K_p = 2J\,\omega_{bw}/K_t$, integral zero at $\max(B_f/J,\ \omega_{bw}/4)$ | $J$, $B_f$, $K_t$              | [speed-loop-pi.md](speed-loop-pi.md)         |
 | Position | $K_p = \omega_{bw}$                                                         | None: the speed loop inside it | [position-loop-pid.md](position-loop-pid.md) |
 
-A model error scales the bandwidth the loop reaches: a speed loop designed with $\hat{J}$ for a rotor of
-inertia $J$ closes at $\omega_{bw}\hat{J}/J$, and a current loop at $\omega_{bw}\hat{L}_s/L_s$
+A model error scales the bandwidth the loop reaches. A speed loop designed with $\hat{J}$ for a rotor of
+inertia $J$ closes at $\omega_{bw}\hat{J}/J$. A current loop closes at $\omega_{bw}\hat{L}_s/L_s$
 ([disturbances and noise](disturbances-and-noise.md)).
 
-**What bounds it.** The motor, the sensors and the control rate bound each loop's bandwidth from above,
-and the loop around it and the load bound it from below:
+**What bounds it.** The motor, the sensors and the control rate bound each loop's bandwidth from above.
+The loop around it and the load bound it from below:
 
 | Loop     | Rate   | Typical $\omega_{bw}$                   | Bounded above by                                                          | Bounded below by        |
 |----------|--------|-----------------------------------------|---------------------------------------------------------------------------|-------------------------|
@@ -347,12 +346,12 @@ and the loop around it and the load bound it from below:
 $\sigma_i$ is the RMS current-sensor noise the calibration measured: the second term keeps the noise
 $L_s\,\omega_{bw}$ puts on the voltage command under 0.08 V RMS. At 20 kHz the first term is 8378 rad/s.
 
-None of these is identified from the motor; the identified inductance and the measured noise only cap the
-current loop. The calibration record has a current-loop and a speed-loop bandwidth field, and a value in
-range there replaces the automatic one, but calibration measures neither: it carries the current-loop
-field over from the record it replaces, zero on a first calibration, and writes a fixed 100 rad/s into the
+None of these is identified from the motor. The identified inductance and the measured noise only cap the
+current loop. The calibration record has a current-loop and a speed-loop bandwidth field. A value in
+range there replaces the automatic one, but calibration measures neither. It carries the current-loop
+field over from the record it replaces, zero on a first calibration. It writes a fixed 100 rad/s into the
 speed-loop field. A loop is made faster or slower by setting its bandwidth over CAN, inside the
-bounds above; 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
+bounds above. A value of 0 returns it to automatic. The trade-offs between controller algorithms within these bounds
 are the subject of the [controller chapter](advanced-controllers.md).
 
 ---

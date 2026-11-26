@@ -24,7 +24,7 @@ date: 2026-11-05
 
 ## Overview
 
-A loop believes its sensors ([closed-loop control](closed-loop-control.md) §2): every error in a measured
+A loop believes its sensors ([closed-loop control](closed-loop-control.md) §2). Every error in a measured
 current or angle below the bandwidth becomes a real error in the motor. This chapter follows each signal from
 the physical quantity to the number the controller uses, and lists what each stage adds:
 
@@ -64,9 +64,9 @@ not yet measure.
 | In-line, per phase   | The phase current at all times              | Always readable, no window       | Amplifier must reject the full switching common mode                          |
 | Single DC-link shunt | Bus-current pulses                          | One sensor                       | Phases rebuilt from two samples per period; needs minimum active-vector times |
 
-E-FOC-HARDWARE has a shunt under each low-side switch, an amplifier per phase and one ADC that converts the
-three phases in sequence from a trigger at the PWM counter's zero, the centre of the low-side window, plus a
-fourth shunt on the common low-side return for the over-current comparator
+E-FOC-HARDWARE has a shunt under each low-side switch and an amplifier per phase. One ADC converts the three
+phases in sequence from a trigger at the PWM counter's zero, the centre of the low-side window. A fourth shunt on
+the common low-side return feeds the over-current comparator
 (`documentation/verification_and_validation/software-in-the-loop.md` Part M, `documentation/design/error-handling.md`).
 
 **The window.** In a centre-aligned period a leg at duty $d$ conducts on its low side for $(1-d)\,T$, centred on
@@ -77,13 +77,13 @@ $$
 d \le 1 - \frac{2\,\max\left(t_h,\ t_{db} + t_{settle} - t_{start}\right)}{T}
 $$
 
-where the first term keeps the hold inside the closing edge and the second gives the amplifier time to settle after
+where the first term keeps the hold inside the closing edge. The second term gives the amplifier time to settle after
 the opening edge ([low-side shunt current sensing](low-side-current-sensing.md) §3).
 
-The last phase holds 5.25 µs after the trigger with the shortest sample-and-hold, which allows $d \le 79\,\%$; with
-a 16-clock sample-and-hold it held at 9.75 µs, 61 %. The board's limit is set below both,
-from measurement, at 70 % (a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %,
-`documentation/design/hardware-characterisation.md` Part F). Above it the firmware lowers all three duties
+The last phase holds 5.25 µs after the trigger with the shortest sample-and-hold, which allows $d \le 79\,\%$. With
+a 16-clock sample-and-hold, it held at 9.75 µs, 61 %. Measurement sets the board's limit below both, at 70 %.
+A phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %
+(`documentation/design/hardware-characterisation.md` Part F). Above it the firmware lowers all three duties
 together and rebuilds the hidden phase from $i_a + i_b + i_c = 0$
 (`core/platform_abstraction/LowSideShuntWindow.hpp`). The timing, the problems of low-side sensing and the PWM
 configuration it needs are treated in [low-side shunt current sensing](low-side-current-sensing.md).
@@ -98,19 +98,19 @@ V_{ADC} = V_{mid} + G\,R_{sh}\, i + G\,V_{os} + \dots, \qquad
 i_{meas} = k_{ADC}\left(V_{ADC} - \tfrac{1}{2}V_{ref}\right)
 $$
 
-E-FOC-HARDWARE: TLV9064 amplifiers at gain 10 behind 200 Ω and 150 pF, a conversion slope of 5 A/V around the
-3.3 V reference's mid-point, so ±8.25 A in 4096 codes of 4.03 mA (`BoardCharacteristics.hpp`,
+E-FOC-HARDWARE: TLV9064 amplifiers at gain 10 behind 200 Ω and 150 pF. The conversion slope is 5 A/V around
+the 3.3 V reference's mid-point. This gives ±8.25 A in 4096 codes of 4.03 mA (`BoardCharacteristics.hpp`,
 `core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp`). The shunt value is not in the firmware tree; 5 A/V
 at gain 10 implies $R_{sh} = 1/(5 \times 10) = 20$ mΩ if nothing else divides the signal.
 
-**The shunt trade.** A larger shunt gives more signal against the amplifier's offset and noise, and more loss:
-at 3 A peak and about half the time conducting, 20 mΩ dissipates 45 mW and warms, and a shunt's temperature
+**The shunt trade.** A larger shunt gives more signal against the amplifier's offset and noise, and more loss.
+At 3 A peak and about half the time conducting, 20 mΩ dissipates 45 mW and warms. A shunt's temperature
 coefficient (typically 50–100 ppm/K for a metal element) turns that warming into gain drift.
 
 ### 3. Amplifier Offset and Drift
 
 Every error voltage at the amplifier's input appears at the ADC multiplied by the amplifier's noise gain,
-$\approx G$, and in the measured current multiplied again by $k_{ADC}$:
+$\approx G$. The conversion to current multiplies it again by $k_{ADC}$:
 
 $$
 \Delta i = k_{ADC}\, G\, V_{os} = 5 \times 10 \times V_{os} = 50\ \text{A/V} \times V_{os}
@@ -126,41 +126,46 @@ $$
 | ADC offset                                           | a few LSB                  | ≈ 10 mA              | Yes                            |
 | **Measured raw offsets on the bench**                |                            | **+27, −18, +54 mA** | Yes                            |
 
-The measured offsets sit where this budget puts them: tens of milliamperes, dominated by the static terms that the
-calibration removes (a later calibration stored +25, −17, +45 mA, `documentation/design/state-machine.md`).
-What remains after calibration is drift: the amplifier's own, small, and the bias network's, which can be larger
-than the amplifier's and depends on a board design not visible from the firmware. Making the bias ratiometric to
+The measured offsets sit where this budget puts them: tens of milliamperes. The static terms that the
+calibration removes dominate them (a later calibration stored +25, −17, +45 mA, `documentation/design/state-machine.md`).
+What remains after calibration is drift: the amplifier's own, small, and the bias network's. The bias network's
+drift can be larger than the amplifier's and depends on a board design not visible from the firmware. Making the bias ratiometric to
 the ADC reference, so that both move together, cancels the supply's part of it.
 
 A residual offset rotates in dq at the electrical frequency and makes a torque ripple $K_t|\mathbf{o}|$ at $f_e$
-([disturbances and noise](disturbances-and-noise.md) §4). *e-foc today:* offsets are measured with the rotor at
-rest, all legs at 50 %, at every calibration and before an electrical identification over CAN, and restored from
-the calibration record at boot. Each window discards 200 samples and averages 2000 (110 ms, noise below 1 mA); a
-measurement keeps the mean of two windows whose offsets agree within 10 mA on every phase, takes a third when they
-do not, and fails without an agreeing pair, so a single disturbed window is never stored. On the bench a
+([disturbances and noise](disturbances-and-noise.md) §4).
+
+*e-foc today:* the firmware measures offsets with the
+rotor at rest, all legs at 50 %. It measures them at every calibration and before an electrical identification
+over CAN. It restores them from the calibration record at boot. Each window discards 200 samples and averages
+2000 (110 ms, noise below 1 mA). A measurement keeps the mean of two windows whose offsets agree within 10 mA on
+every phase. It takes a third window when they do not, and fails without an agreeing pair. So the firmware never
+stores a single disturbed window. On the bench a
 back-to-back calibration once read one phase 52 mA low in one window, which the second window now catches
 (`documentation/design/service-current-offsets.md`). The first Enable after power-up, a control-mode switch or a
-Fault measures them again at rest and uses the new values when each phase is within 50 mA of the stored one, which
-holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-CTL-001); drift that
-builds up while the drive runs is not tracked. The hardware-characterisation plan measures each
+Fault measures them again at rest. It uses the new values when each phase is within 50 mA of the stored one. This
+holds the mean torque current within 1 % plus 5 mA of its command after a 20 mA drift (REQ-CTL-001). Nothing tracks
+drift that builds up while the drive runs. The hardware-characterisation plan measures each
 condition cold and after ten minutes of PWM to separate it from noise.
 
 ### 4. Gain Errors and Phase Mismatch
 
 The current's scale depends on the shunt's value and the amplifier's gain-setting resistors. With 1 % parts, a
-channel's gain can be off by up to about 3 % (1 % shunt, two 1 % resistors), and two channels can differ by
+channel's gain can be off by up to about 3 % (1 % shunt, two 1 % resistors). Two channels can differ by
 about twice that in the worst case. A gain error common to all phases scales the current loop's gain and the
-torque; a **mismatch** between phases leaves a ripple at $2 f_e$ in dq of $\varepsilon I/3$ per unit mismatch
-$\varepsilon$ on one phase ([disturbances and noise](disturbances-and-noise.md) §4). *e-foc today:* gains are
+torque. A **mismatch** between phases leaves a ripple at $2 f_e$ in dq of $\varepsilon I/3$ per unit mismatch
+$\varepsilon$ on one phase ([disturbances and noise](disturbances-and-noise.md) §4).
+
+*e-foc today:* gains are
 not calibrated; a per-phase check against a bench meter is planned
 (`documentation/design/hardware-characterisation.md` Part B).
 
 ### 5. Bandwidth, Settling and Filtering
 
 After each switching edge the amplifier's input steps, and its output must settle before the conversion holds.
-A gain-10 stage on a 10 MHz gain-bandwidth amplifier closes at about 1 MHz, a time constant of 160 ns; the 200 Ω,
+A gain-10 stage on a 10 MHz gain-bandwidth amplifier closes at about 1 MHz, a time constant of 160 ns. The 200 Ω,
 150 pF filter adds 30 ns. The SIL models the chain as one 200 ns first-order lag, consistent with these. Settling
-to 12 bits takes $\ln 4096 \approx 8.3$ time constants, about 1.7 µs: small against the window, which is why the
+to 12 bits takes $\ln 4096 \approx 8.3$ time constants, about 1.7 µs: small against the window. That is why the
 readable limit comes from the window's closing, not its opening.
 
 The filter is not an anti-alias filter for the control loop: at 5 MHz it passes the switching ripple. Aliasing is
@@ -182,11 +187,11 @@ the last holds at $(5 \times 16 + 4)/16$ MHz = 5.25 µs. Three consequences:
 
 - **Sample-and-hold length is a trade.** A longer one lets the sampling capacitor charge through the source
   impedance; a shorter one keeps the last phase inside the window. On the bench, 16 clocks read the last phase
-  10–34 % low at 50–65 % duty; 4 clocks read all three within 2.5 % up to 69 % duty (`documentation/architecture/system.md`).
+  10–34 % low at 50–65 % duty. With 4 clocks, all three read within 2.5 % up to 69 % duty (`documentation/architecture/system.md`).
 - **The phases are not sampled at one instant.** While all legs are low, the zero vector, each phase current
   moves at $-(e_k + R_s i_k)/L_s$. A phase read $\Delta t$ after the centre is off its period mean by about that
-  slope times $\Delta t$. At rated speed and 5 µs that is 71 mA on the Anaheim (9.1 V back-EMF over 0.64 mH) and
-  0.40 A on the low-inductance Teknic (16 V over 0.2 mH): a speed-dependent error that grows for exactly the
+  slope times $\Delta t$. At rated speed and 5 µs, that is 71 mA on the Anaheim (9.1 V back-EMF over 0.64 mH).
+  On the low-inductance Teknic (16 V over 0.2 mH), it is 0.40 A. This speed-dependent error grows for exactly the
   motors with the largest PWM ripple. The platform subtracts it: the cascade supplies each phase's
   zero-vector slope from the motor model, and the platform knows each phase's delay
   ([sampling skew](../design/platform-sampling-skew.md)).
@@ -195,20 +200,20 @@ the last holds at $(5 \times 16 + 4)/16$ MHz = 5.25 µs. Three consequences:
   Hardware averaging over two conversions is worth having (dropping it raised the noise by 15–25 %); a wider
   converter would not be.
 
-The calibration stores the measured noise RMS, and the automatic current-loop bandwidth is held where the
+The calibration stores the measured noise RMS. The automatic current-loop bandwidth stays where the
 proportional gain keeps that noise under 0.08 V of voltage command
 (`documentation/design/controller-selection.md`).
 
 ### 7. The Encoder
 
 A quadrature encoder gives two square waves, A and B, a quarter cycle apart; their order tells the direction.
-Counting both edges of both channels (×4 decoding) gives four counts per line: the default 4000 counts per
-revolution of e-foc is a 1000-line encoder read this way. The QEI counter is converted to an angle as
-$2\pi\,n/N_{enc}$ and wrapped to $[-\pi, \pi)$ (`core/platform_abstraction/QuadratureEncoderDecorator.hpp`); the
-platform then subtracts the alignment offset and wraps the difference to $[-\pi, \pi)$ again
+Counting both edges of both channels (×4 decoding) gives four counts per line. So the default 4000 counts per
+revolution of e-foc is a 1000-line encoder read this way. The platform converts the QEI counter to an angle as
+$2\pi\,n/N_{enc}$ and wraps it to $[-\pi, \pi)$ (`core/platform_abstraction/QuadratureEncoderDecorator.hpp`). It
+then subtracts the alignment offset and wraps the difference to $[-\pi, \pi)$ again
 (`core/platform_abstraction/EncoderZero.hpp`). Every target therefore reads half a turn either side of the
-alignment zero, as the simulated encoder does; without the second wrap the reading would sit in a window
-shifted by the offset, and the same rotor position could read a full turn apart from its setpoint.
+alignment zero, as the simulated encoder does. Without the second wrap, the reading would sit in a window
+shifted by the offset. The same rotor position could then read a full turn apart from its setpoint.
 
 | Property         | E-FOC-HARDWARE / e-foc                                                                                                                                    | Consequence                                                                                            |
 |------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
@@ -219,17 +224,24 @@ shifted by the offset, and the same rotor position could read a full turn apart 
 | Plausibility     | Fault if, for 100 ms, the drive pushes ≥ 5 % of its current limit and asks for motion while the angle stays within 0.01 rad (defaults, settable over CAN) | Detects a disconnected or stuck encoder; a rotor pushed against the drive and held is a stall instead  |
 | Standstill       | Within 2 mrad for 100 ms                                                                                                                                  | Gates the offset measurement                                                                           |
 
-Practical errors that the counter cannot see: a code wheel mounted off-centre or with uneven slots (a periodic
-angle error, once per revolution, whose speed error grows with speed); count dither at rest, flipping between two
-neighbours; electrical noise on long encoder cables, which a digital glitch filter in the counter suppresses; and
-mechanical compliance between the encoder and the rotor. Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `documentation/design/fault-supervision.md`,
+Practical errors that the counter cannot see:
+
+- a code wheel mounted off-centre or with uneven slots (a periodic angle error, once per revolution, whose speed
+  error grows with speed);
+- count dither at rest, flipping between two neighbours;
+- electrical noise on long encoder cables, which a digital glitch filter in the counter suppresses;
+- mechanical compliance between the encoder and the rotor.
+
+Sources: `core/supervision/EncoderPlausibilityMonitor.hpp`, `documentation/design/fault-supervision.md`,
 `core/services/standstill/RotorStandstillImpl.hpp`.
 
 ### 8. Bus Voltage and Temperature
 
-The bus is divided by 21.25 into the ADC: a 70 V full scale, 17 mV per LSB, read through a long sample-and-hold
-with eightfold oversampling. *e-foc today:* the control reads it once, at boot, and uses that value for the
-modulator's normalisation and the identification; the same pin is converted twice per PWM period, but only for
+A divider of 21.25 feeds the bus into the ADC: a 70 V full scale, 17 mV per LSB. The ADC reads it through a long
+sample-and-hold with eightfold oversampling.
+
+*e-foc today:* the control reads it once, at boot, and uses that value
+for the modulator's normalisation and the identification. The same pin is converted twice per PWM period, but only for
 the over- and under-voltage comparators ([power stage](power-stage.md) §7). The consequences of a bus that moves
 afterwards are in [disturbances and noise](disturbances-and-noise.md) §3.
 
@@ -299,12 +311,12 @@ graph LR
 
 ## Worked Example
 
-**How much offset drift is too much?** On the Teknic ($K_t$ = 38.4 mN·m/A), a residual offset vector of
-$|\mathbf{o}|$ makes a torque ripple $K_t|\mathbf{o}|$ at $f_e$. Against the speed quantum's 0.9 mN·m of torque
+**How much offset drift is too much?** On the Teknic ($K_t$ = 38.4 mN·m/A), a residual offset vector
+$|\mathbf{o}|$ gives torque ripple $K_t|\mathbf{o}|$ at $f_e$. Against the speed quantum's 0.9 mN·m of torque
 noise ([disturbances and noise](disturbances-and-noise.md), *Worked Example*), an offset matters once
 $K_t|\mathbf{o}| \gtrsim 0.9$ mN·m, that is $|\mathbf{o}| \gtrsim 23$ mA. The amplifier's own drift (1.5 mA over
-50 K) never gets there. A drift shared by the three channels, a common bias network for example, is common mode:
-the three-sensor Clarke transform removes it entirely while all three phases are measured, and an offset on a single
+50 K) never gets there. A drift shared by the three channels, a common bias network for example, is common mode.
+The three-sensor Clarke transform removes it entirely while all three phases are measured. An offset on a single
 phase enters the vector at only two-thirds of its size, so the thresholds here are conservative. A rebuilt phase
 breaks that: built from two channels, it carries twice their common drift with the opposite sign. The raw offsets
 (tens of mA) are past the threshold from the start, which is why the calibration is not optional.
@@ -313,8 +325,8 @@ breaks that: built from two channels, it carries twice their common drift with t
 
 ## Limitations & Assumptions
 
-- **Assumes**: the TLV906x datasheet's typical and maximum figures, and 1 % passive parts, for the error budget;
-  the board's actual bias network and shunt part are not in the firmware tree.
+- **Assumes**: the TLV906x datasheet's typical and maximum figures, and 1 % passive parts, for the error budget.
+  The board's actual bias network and shunt part are not in the firmware tree.
 - **Derived**: the 20 mΩ shunt, the settling time and the sampling-skew error are computed from stated figures, not
   measured.
 - **Does not cover**: isolated or Hall-effect current sensors, sin/cos or absolute encoders, sensorless angle

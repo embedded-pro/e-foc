@@ -28,7 +28,7 @@ date: 2026-08-31
 P2 (Cascade P→PI) is the industry-standard servo position architecture used by SERCOS, EtherCAT,
 and most industrial servo drives. A proportional position controller outputs a speed reference which
 is tracked by the inner speed loop. The single parameter $K_v$ (velocity loop gain) directly sets
-the position-loop bandwidth in a physically transparent way — the baseline architecture servo
+the position-loop bandwidth in a physically transparent way. This is the baseline architecture servo
 engineers expect to configure. No parameter identification is required.
 
 Operates exclusively in the **1 kHz outer handler**.
@@ -102,8 +102,8 @@ With $K_{ff} = 1$, steady-state velocity tracking error is theoretically zero. U
 when the velocity reference signal carries noise.
 
 **Motion profile**: while a profile is active (`position-motion-profile.md`) the firmware sets
-$K_{ff} = 1$ and takes the profile velocity $\dot r$ as the velocity reference, so the output is
-$\omega_m^* = K_v\,(r - \theta_m) + \dot r$, and the acceleration feed-forward $J\ddot r / K_t$ is added to the
+$K_{ff} = 1$. It takes the profile velocity $\dot r$ as the velocity reference. Thus the output is
+$\omega_m^* = K_v\,(r - \theta_m) + \dot r$. The acceleration feed-forward $J\ddot r / K_t$ is added to the
 q-axis current. Without a profile the term is zero.
 
 **Tuning**:

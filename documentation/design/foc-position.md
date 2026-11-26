@@ -29,10 +29,18 @@ date: 2026-11-26
 ## Responsibilities
 
 **Is responsible for:**
-- Executing the FOC cascade: an outermost position loop and a middle speed loop (both at 1 kHz within the same low-priority interrupt call), and the innermost current control loop (20 kHz)
-- Regulating rotor mechanical position to a commanded setpoint in radians, a multi-turn angle from the position zero in linear mode and an angle within the turn in circular mode
-- Counting turns while it drives the rotor, taking the count from the position tracker when it starts and handing it back when it stops (Multi-Turn Position)
-- Dispatching to the selected position algorithm and routing its output to either the speed loop or, for the state feedback laws, straight to the current loop
+- Executing the FOC cascade:
+  - an outermost position loop and a middle speed loop, both at 1 kHz within the same low-priority interrupt call
+  - the innermost current control loop (20 kHz)
+- Regulating rotor mechanical position to a commanded setpoint in radians:
+  - in linear mode, a multi-turn angle from the position zero
+  - in circular mode, an angle within the turn
+- Counting turns while it drives the rotor (Multi-Turn Position):
+  - taking the count from the position tracker when it starts
+  - handing it back when it stops
+- Dispatching to the selected position algorithm and routing its output:
+  - to the speed loop
+  - for the state feedback laws, straight to the current loop
 - Estimating rotor angular velocity from consecutive mechanical angle samples (same wrap-around compensation as speed control) for the middle loop
 - Resetting the position, speed and current controller state on Enable / Disable
 - Accepting a position setpoint in mechanical radians and propagating all derived setpoints through the cascade
@@ -76,8 +84,8 @@ The position error is the difference between the reference and the measured posi
 
 The position controller selection holds every position algorithm without heap allocation. It dispatches to the active one without an indirect call, exactly as the current and speed loops do. Each algorithm declares the kind of output it produces:
 
-- **Speed reference** (PID, Cascade P, Two-DOF): the value is written as the speed setpoint and the speed loop runs immediately afterwards in the same callback, as it always has.
-- **Current reference** (LQR, LQI): the speed loop is skipped entirely and the value becomes the q-axis current setpoint directly. These laws carry ω in their own state vector and already regulate it, so running them on top of a speed loop would stack two regulators on the same state.
+- **Speed reference** (PID, Cascade P, Two-DOF): the value is written as the speed setpoint. The speed loop runs immediately afterwards in the same callback, as it always has.
+- **Current reference** (LQR, LQI): the speed loop is skipped entirely and the value becomes the q-axis current setpoint directly. These laws carry ω in their own state vector and already regulate it. Running them on top of a speed loop would stack two regulators on the same state.
 
 The speed-reference laws saturate at one loop bandwidth of speed per π radians of error. The current-reference laws clamp to ± I_max, and LQI stops accumulating its integral state whenever that clamp is active.
 
@@ -164,7 +172,7 @@ and drive-wide limits ([service-can.md](service-can.md), [service-nvm.md](servic
 - **On and off.** The profile is on only while the velocity and the acceleration are both above zero. Off, the
   setpoint reaches the position law exactly as without the feature, and so do every output and every
   observation.
-- **Replan.** A new setpoint is noticed at the next 1 kHz tick and the plan restarts from the reference's own
+- **Replan.** A new setpoint is noticed at the next 1 kHz tick. The plan restarts from the reference's own
   position and velocity (and acceleration when jerk is set), so they stay continuous. A reversal brakes at the
   deceleration, then turns round; the speed and rates stay within the limits throughout.
 - **Seed.** On Enable, after a speed or current command, and when the profile is switched on, the reference
@@ -202,11 +210,14 @@ commissioned one and
 calls it *homed* (REQ-CMS-006):
 
 - Homed after a successful calibration in this power-up, because that calibration's alignment defines the frame.
-- Homed after the first Start restored the rotor reference from the encoder index, because the index angle stored
-  with the calibration puts the encoder back in the frame of that calibration ([state-machine.md](state-machine.md), Referencing the
-  Rotor from the Encoder Index).
-- Not homed at every power-up, after Clear Calibration, after an alignment, an identification of the electrical
-  parameters or a pole-pair change, and whenever the rotor reference is lost.
+- Homed after the first Start restored the rotor reference from the encoder index.
+  The index angle stored with the calibration puts the encoder back in the frame of that calibration
+  ([state-machine.md](state-machine.md), Referencing the Rotor from the Encoder Index).
+- Not homed:
+  - at every power-up
+  - after Clear Calibration, after an alignment, an identification of the electrical parameters or a pole-pair
+    change
+  - whenever the rotor reference is lost.
 
 A control-mode switch that keeps the rotor reference keeps the homed state with it. The state is the read-only
 parameter *homed* of contract 2.19 ([service-can.md](service-can.md)).
@@ -247,8 +258,8 @@ Two counters keep n, and exactly one of them counts at any time:
 - **The position tracker** at all other times, on the event loop, from an encoder reading every 1 ms. An event
   loop held up for longer than half a turn of the rotor loses a turn. That is 7.5 ms at the 4000 rpm of the
   faster reference motor.
-- **Handover.** When the cascade starts it takes the tracker's count together with the angle it was counted at,
-  so a seam crossing in between is still counted; when it stops it hands its count back. While the cascade
+- **Handover.** When the cascade starts it takes the tracker's count together with the angle it was counted at.
+  A seam crossing in between is therefore still counted. When the cascade stops it hands its count back. While the cascade
   counts, the tracker reports the count the cascade published.
 
 The count starts at turn 0 at power-up and whenever the drive sets the position zero. An alignment or an index restore sets
@@ -289,9 +300,9 @@ the drive is homed (Homing and the Position Reference) the same limits are absol
 With the limits on:
 
 - A position setpoint outside them is refused and the previous one stays in force ([service-can.md](service-can.md), contract
-  4.0); in circular mode the setpoint is taken modulo 2π into [−π, π) before the check.
-- The cascade holds its reference within them, so a setpoint accepted before the limits were narrowed takes
-  the rotor to the nearer limit, never beyond it.
+  4.0). In circular mode the setpoint is taken modulo 2π into [−π, π) before the check.
+- The cascade holds its reference within them. A setpoint accepted before the limits were narrowed therefore
+  takes the rotor to the nearer limit, never beyond it.
 - The position law takes the plain difference between the reference and θ, as it always does in linear
   mode. In circular mode it no longer folds the difference into [−π, π]. The interval between the limits
   never contains the encoder seam, so the plain difference is the way that stays inside. From 2.9 rad to
@@ -323,9 +334,10 @@ flowchart LR
 Within a single low-priority interrupt call, the position and speed loops execute in strict order:
 
 0. **Turns are counted first** (Multi-Turn Position): the count advances from the latest angle and is published to the position tracker.
-1. **Motion profile fires next** (Motion Profile): replans on a new setpoint and samples the reference position, velocity and acceleration for this tick; with the profile off it passes the setpoint through.
-2. **Position law fires second**: reads θ, computes the position error to the reference (plain, or folded in circular mode without limits), produces either a speed setpoint or an Iq setpoint.
-3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint, computes speed error using Δθ/Δt, produces and clamps the Iq setpoint. A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
+1. **Motion profile fires next** (Motion Profile): replans on a new setpoint. It samples the reference position, velocity and acceleration for this tick. With the profile off it passes the setpoint through.
+2. **Position law fires second**: reads θ and computes the position error to the reference (plain, or folded in circular mode without limits). It produces either a speed setpoint or an Iq setpoint.
+3. **Speed PID fires third, if the position law produced a speed setpoint**: reads the freshly updated setpoint. It computes speed error using Δθ/Δt, then produces and clamps the Iq setpoint.
+ A current-reference law writes the Iq setpoint itself and this step is skipped. The acceleration feed-forward and the friction feed-forward are stored beside the result.
 4. The low-priority interrupt returns. On the next 20 kHz ISR cycle, the inner loop picks up the updated Iq setpoint.
 
 This ordering guarantees that the Iq setpoint used by the inner loop is always the one derived in the most recent outer-loop tick.

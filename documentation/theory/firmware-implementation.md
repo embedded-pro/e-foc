@@ -25,7 +25,7 @@ date: 2026-11-08
 ## Overview
 
 The theory chapters describe continuous signals and exact arithmetic. The firmware has 50 µs, 6000 clock cycles,
-a single-precision floating-point unit and a stack of fixed size, and it must give the same answer, in the same
+a single-precision floating-point unit and a stack of fixed size. It must give the same answer, in the same
 time, every period, for as long as the motor runs. This chapter explains the practical choices that bridge the
 two:
 
@@ -84,9 +84,9 @@ Sources: `targets/platform_implementations/ti/implementation/PlatformFactoryImpl
 7. Correct each duty for dead time; keep the low-side shunts readable; write the duties.
 8. Record the cycle count.
 
-Nothing in it waits or allocates. During calibration the active service's sample callback also runs in it (the
-offset measurement, for example, accumulates there), but everything that can wait is posted to the event loop: a
-fault detected in the interrupt is latched and the bridge stopped there, but reported from the event loop.
+Nothing in it waits or allocates. During calibration the active service's sample callback also runs in it (the offset
+measurement, for example, accumulates there). Everything that can wait is posted to the event loop. The interrupt
+latches a fault it detects and stops the bridge, but the event loop reports the fault.
 
 ```mermaid
 sequenceDiagram
@@ -112,15 +112,15 @@ N_{cyc} = \frac{f_{cpu}}{f_s} = \frac{120\ \text{MHz}}{20\ \text{kHz}} = 6000\ \
 $$
 
 The inner loop may use 4500 of them (75 %); the outer loop 20 000 per millisecond. The rest is for the outer
-loop, the communication interrupts and the event loop, which run only in the time the control interrupt leaves
+loop, the communication interrupts and the event loop. They run only in the time the control interrupt leaves
 (REQ-PLT-004, `documentation/verification_and_validation/requirements/platform.yaml`).
 
-The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform
-counts three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a
-re-entry, an interrupt requested again before the previous one finished, seen as its own pending bit set when the
-callback ends; a GPIO pin can also be toggled for a scope.
-The measurement covers the application callback inside the interrupt (encoder read, control law, PWM write) and
-leaves out the hardware's interrupt entry and exit, for which the requirement reserves the remaining quarter of the
+The cycle counter of the Cortex-M debug unit (DWT `CYCCNT`) timestamps every control interrupt. The platform counts
+three events: an interrupt over its budget, one that missed its deadline (longer than a period), and a re-entry. A
+re-entry is an interrupt requested again before the previous one finished. The platform detects it from its own pending
+bit, set when the callback ends. A GPIO pin can also be toggled for a scope.
+The measurement covers the application callback inside the interrupt (encoder read, control law, PWM write). It leaves
+out the hardware's interrupt entry and exit, for which the requirement reserves the remaining quarter of the
 period (`documentation/design/error-handling.md`). Measured on silicon, the callback takes **1074–1353 cycles**
 (9–11 µs, 18–23 % of the period), of which the FOC calculation is 739–860. The emulator has no cycle counter; it reads
 an instruction-counted timer whose period is 1250 ticks, with the same three-quarter budget, 937 ticks
@@ -128,8 +128,8 @@ an instruction-counted timer whose period is 1250 ticks, with the same three-qua
 
 ### 3. The One-Period Duty Delay
 
-The PWM's compare registers are double-buffered and load at the counter's zero, all three legs together (global
-update), so a duty never changes in the middle of a period and the legs stay synchronised. The cost is a period of
+The PWM's compare registers are double-buffered and load at the counter's zero, all three legs together (global update).
+Thus a duty never changes in the middle of a period and the legs stay synchronised. The cost is a period of
 delay:
 
 ```text
@@ -141,13 +141,13 @@ delay:
      |<----------- 1 period ---------->|<-- held for a period: ½ period more on average -->|
 ```
 
-The platform states the delay (`DutyUpdateDelayPeriods() = 1` on TI) so that code which models the plant can
-account for it: the deadbeat current law predicts the current at the instant its duty lands, and the estimators
-pair each current change with the voltage that caused it (`documentation/theory/current-loop-deadbeat.md`,
+The platform states the delay (`DutyUpdateDelayPeriods() = 1` on TI) so that code which models the plant can account for
+it. The deadbeat current law predicts the current at the instant its duty lands. The estimators pair each current change
+with the voltage that caused it (`documentation/theory/current-loop-deadbeat.md`,
 `documentation/design/service-electrical-ident.md`). Together with the hold it gives the 1.5-period loop delay of
-[closed-loop control](closed-loop-control.md) §7. The inverse Park does not use the sampled angle: the rotor turns
-during those $n + \tfrac12$ periods, so the angle is advanced by $(n + \tfrac12)\,\omega_e T_s$, with $n$ the
-platform's delay, by rotating the sampled $(\cos\theta_e, \sin\theta_e)$ through that small angle
+[closed-loop control](closed-loop-control.md) §7. The inverse Park does not use the sampled angle, because the rotor
+turns during those $n + \tfrac12$ periods. It advances the angle by $(n + \tfrac12)\,\omega_e T_s$, with $n$ the
+platform's delay. It does this by rotating the sampled $(\cos\theta_e, \sin\theta_e)$ through that small angle
 ([disturbances and noise](disturbances-and-noise.md) §5, [FOC transforms](../design/foc-transforms.md)).
 
 ### 4. Numerics on a Cortex-M4F
@@ -165,8 +165,8 @@ The EK-TM4C1294XL's Cortex-M4F has a single-precision floating-point unit. That 
 Source: `documentation/performance-optimization/README.md`. Further choices:
 
 - **Compiler flags.** Embedded builds use `-ffast-math -fno-finite-math-only` (`numerical_toolbox_enable_embedded_optimizations()`):
-  reassociation and contraction into fused multiply-adds are allowed, but infinities and NaNs keep their meaning,
-  so a check for them still works where one is made. Hot functions defined in headers are forced inline; nothing
+  reassociation and contraction into fused multiply-adds are allowed. Infinities and NaNs keep their meaning, so a check
+  for them still works where one is made. Hot functions defined in headers are forced inline; nothing
   uses per-function optimisation pragmas, which would block inlining.
 - **Per-unit scaling.** Voltages are carried as fractions of $V_{dc}/\sqrt3$, so the modulator's limit is the unit
   circle and gains are dimensionless where they meet it ([current-loop-pi.md](current-loop-pi.md), *Gain
@@ -200,7 +200,8 @@ Each context writes what another reads, without locks (a lock in an interrupt ca
 - **Control interrupt ↔ outer loop**: single-writer, single-reader **triple buffers**. The writer always has a free
   slot that the reader does not hold, so neither side waits and the reader always gets a complete, consistent
   value (EmIL's `infra/util/TripleBuffer.hpp`). The estimator snapshots cross from the control interrupt to the outer
-  loop this way, and the torque-mode set point from the event loop to the control interrupt. A single 32-bit value
+  loop this way. The torque-mode set point crosses from the event loop to the control interrupt this way. A single
+  32-bit value
   needs no buffer: the speed loop's current reference is one `volatile float`, which the Cortex-M writes and reads in
   one access (`core/foc/cascade/CascadeWithSpeedLoop.hpp`).
 - **Interrupts → event loop**: the interrupt latches a flag or a result and posts a closure to the event dispatcher;
@@ -229,8 +230,8 @@ produced (`documentation/design/state-machine.md`, *Calibration Sequence*):
 | 8. Cogging map (speed and position modes) | 10 rad/s both ways; 48-bin map                                                                                      | $J$ for the inertia correction, the tuned speed loop                     |
 | 9. Store                                  | Calibration record with magic, layout version and CRC-32; read back and verified                                    | All of the above                                                         |
 
-Any failed step ends in `Fault`; a missing cogging map does not. A layout change of the record (version 3 to 4 when
-the map was added) makes every stored calibration invalid and forces a new one (`documentation/design/service-nvm.md`).
+Any failed step ends in `Fault`; a missing cogging map does not. A layout change of the record (version 3 to 4 when the
+map was added) makes every stored calibration invalid. It forces a new one (`documentation/design/service-nvm.md`).
 
 ### 8. Supervision in Software
 
@@ -257,8 +258,8 @@ Each level catches what the one below it cannot:
 | Software in the loop     | The target binary in an emulator, against a plant with dead time, switch-node physics, sense-chain timing, duty delay, cogging, friction, encoder counts and a sagging supply | Timing, integer and float effects, non-idealities |
 | Hardware in the loop     | The EK-TM4C1294XL with E-FOC-HARDWARE on the rig                                                                                                                              | Everything the plant does not model               |
 
-The plant grows from the rig: the one-period duty delay, found when the deadbeat law limit-cycled on hardware at
-3.4 kHz, is now a plant field, and a law that ignores it fails in simulation first
+The plant grows from the rig. The one-period duty delay was found when the deadbeat law limit-cycled on hardware at 3.4
+kHz. It is now a plant field, and a law that ignores it fails in simulation first
 (`documentation/verification_and_validation/software-in-the-loop.md` Part K, `documentation/verification_and_validation/integration-testing.md`).
 
 ---
@@ -302,13 +303,13 @@ graph LR
 
 **Could e-foc run its PWM at 40 kHz?** The period halves to 25 µs and $N_{cyc}$ to 3000; the 75 % budget is 2250
 cycles. The measured 1353 cycles of the callback fit, at 45 % of the period, with the interrupt entry and exit on
-top of that. The loop delay halves to 37.5 µs, which doubles the
-current-loop bandwidth the delay allows ([closed-loop control](closed-loop-control.md) §7) to about
-$2\times10^4$ rad/s, and halves the PWM current ripple. Against that: switching losses double
-([power stage](power-stage.md) §5), the fixed effective dead time becomes 0.28 % of the period instead of 0.14 %,
-the low-side window shrinks with the period while the ADC sequence does not, so the readable duty falls (the last
-phase holding at 5.25 µs allows $1 - 2 \times 5.25/25 = 58\,\%$ before settling), and the outer-loop prescaler
-becomes 40. The window, not the CPU, is the binding constraint.
+top of that. The loop delay halves to 37.5 µs. This doubles the current-loop bandwidth the delay allows ([closed-loop
+control](closed-loop-control.md) §7) to about
+$2\times10^4$ rad/s and halves the PWM current ripple. Against that, switching losses double ([power
+stage](power-stage.md) §5). The fixed effective dead time becomes 0.28 % of the period instead of 0.14 %. The low-side
+window shrinks with the period while the ADC sequence does not, so the readable duty falls. The last phase holding at
+5.25 µs allows $1 - 2 \times 5.25/25 = 58\,\%$ before settling. The outer-loop prescaler becomes 40. The window, not the
+CPU, is the binding constraint.
 
 ---
 
