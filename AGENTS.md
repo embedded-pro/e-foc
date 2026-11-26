@@ -238,8 +238,9 @@ Static objects (application composites never destroyed while the event loop runs
 - A design document opens with `## Responsibilities`: one list. No "Is NOT responsible for" list.
 - No "Open Questions" section: an undecided item is a GitHub issue; a known limitation goes in
   *Constraints & Limitations*.
-- Design and architecture documents describe the component, not its hardware: no MCU or board names, vendor
-  peripherals, registers or clock frequencies. Say "the target"; "on the reference board" for a measured figure.
+- Design documents describe the component, not its code or hardware: no class, function or file names, no MCU or
+  board names, vendor peripherals, registers or clock frequencies. Say "the target"; "on the reference board" for a
+  measured figure. Only `architecture/system.md` names the target family (deployment view).
 - PDFs: `documentation/tools/build-foc-booklet.py` builds the booklet and one PDF per document
   (`--format pdf documents`). Each opens with title page (title, author, date), blank page, contents, blank page,
   body. A new folder gets an entry in `DOCUMENT_FOLDERS`; a new chapter its line in

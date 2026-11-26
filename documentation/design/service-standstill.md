@@ -2,9 +2,9 @@
 title: "Service: Rotor Standstill"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-standstill
-date: 2026-10-27
+date: 2026-11-26
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | Service: Rotor Standstill |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.1.0                     |
+| Version   | 0.1.1                     |
 | Component | service-standstill        |
-| Date      | 2026-10-27                |
+| Date      | 2026-11-26                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,11 +29,11 @@ date: 2026-10-27
 ## Responsibilities
 
 The full calibration starts by measuring the current sensors' offsets with all three legs at 50 % duty
-(`service-current-offsets.md`). That shorts the windings, so a rotor still turning from an earlier run
-drives its back-EMF current through the sensors, and the offset step would store that current as sensor
-bias. In simulation, a calibration started 25 ms after disabling the bench motor at 500 rpm stored
-offsets 5 to 15 mA off in five runs out of five (`state-machine.md`, Calibration Sequence). This
-service holds the calibration back until the rotor is at rest (REQ-CMS-001).
+([service-current-offsets.md](service-current-offsets.md)). That shorts the windings, so a rotor still turning
+from an earlier run drives its back-EMF current through the sensors. The offset step would store that current
+as sensor bias. In simulation, the bench motor was disabled at 500 rpm and a calibration started 25 ms later.
+In five runs out of five, it stored offsets 5 to 15 mA off ([state-machine.md](state-machine.md), Calibration
+Sequence). This service holds the calibration back until the rotor is at rest (REQ-CMS-001).
 
 **Is responsible for:**
 - Reporting, once, whether the encoder came to rest within the allotted time
@@ -48,30 +48,30 @@ service holds the calibration back until the rotor is at rest (REQ-CMS-001).
 
 The service samples the encoder every 10 ms. The first sample of a request anchors a window. Each
 later sample that lies within 2 mrad of the anchor, measured with angle wrap-around, extends the
-window; a sample outside that band moves the anchor to where the rotor now is and starts the window
+window. A sample outside that band moves the anchor to where the rotor now is and starts the window
 again. Ten samples in a row inside the band, 100 ms, mean the rotor is at rest. That bounds its speed
 to 0.02 rad/s.
 
 The band is measured from where the window began rather than from one sample to the next. A rotor
-creeping by less than 2 mrad every 10 ms would pass a sample-to-sample test forever while turning
-at up to 0.2 rad/s; against a fixed anchor it leaves the band within a few samples and the window
-restarts. Encoder jitter inside the band, by contrast, never restarts it, and a rotor resting on the
-0 / 2π boundary is at rest like any other.
+creeping by less than 2 mrad every 10 ms would pass a sample-to-sample test forever while turning at
+up to 0.2 rad/s. Against a fixed anchor, it leaves the band within a few samples and the window
+restarts. Encoder jitter inside the band, by contrast, never restarts it. A rotor resting on the 0 /
+2π boundary is at rest like any other.
 
 A rotor already at rest therefore costs the calibration the 100 ms window and nothing else.
 
 ### Part B — Timeout
 
 A rotor that has not been at rest for a whole window 10 s after the request is reported as not at
-rest, and the calibration fails with `[SM] The rotor did not come to rest`. A spinning flywheel or a
-rotor driven by its load would otherwise hold the calibration indefinitely.
+rest. The calibration then fails with `[SM] The rotor did not come to rest`. A spinning flywheel or
+a rotor driven by its load would otherwise hold the calibration indefinitely.
 
 ### Part C — Lifetime of a request
 
 A request ends exactly once: at rest, at the timeout, or cancelled. Both timers stop when it ends.
 A cancelled request reports nothing; the orchestrator cancels it when the calibration is aborted, for
 example by an emergency stop. A request made while another is outstanding is answered "not at rest"
-at once and leaves the outstanding one running, so a duplicate request cannot restart or hide it.
+at once. It leaves the outstanding one running, so a duplicate request cannot restart or hide it.
 After a request ends the service accepts a new one.
 
 ---

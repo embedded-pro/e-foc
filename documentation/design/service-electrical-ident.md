@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.8.1
+version: 0.8.2
 component: service-electrical-ident
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.8.1                                         |
+| Version   | 0.8.2                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-11-08                                    |
+| Date      | 2026-11-26                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,14 +29,14 @@ date: 2026-11-08
 ## Responsibilities
 
 **Is responsible for:**
-- Measuring phase resistance ($R_s$) via DC voltage step using `ResistanceEstimator`
-- Measuring d-axis inductance ($L_s$) via HF sinusoidal injection using `SinusoidalInductanceEstimator`
+- Measuring phase resistance ($R_s$) via DC voltage step using the resistance estimator
+- Measuring d-axis inductance ($L_s$) via HF sinusoidal injection using the inductance estimator
 - Estimating the number of pole pairs by rotating an open-loop voltage vector and comparing electrical angle to mechanical encoder angle
-- Delivering a combined `ResistanceInductanceResult` — resistance, inductance, and fit quality — via a single completion callback once both sub-estimators finish
+- Delivering a combined result — resistance, inductance, and fit quality — via a single completion once both sub-estimators finish
 - Enforcing that R/L identification and pole-pairs estimation cannot run concurrently
-- Stopping the inverter cleanly before invoking any completion callback
+- Stopping the inverter cleanly before invoking any completion
 - Delivering every completion from the event loop, never from the sampling interrupt that decides it
-- Rejecting calibration when `fitQuality < 0.5` (incoherent injection response)
+- Rejecting calibration when the fit quality is below 0.5 (incoherent injection response)
 
 ---
 
@@ -46,14 +46,14 @@ The R/L estimation is split across three cooperating components:
 
 ```mermaid
 graph TD
-    A[ElectricalParametersIdentification interface] --> B[ElectricalParametersIdentificationImpl\norchestrator]
-    B --> C[ResistanceEstimator\nDC step → R]
-    B --> D[SinusoidalInductanceEstimator\nGoertzel injection → L]
-    B --> E[Pole-pairs sweep logic\nencoder-based]
+    A["Electrical identification interface"] --> B["Orchestrator"]
+    B --> C["Resistance estimator\nDC step → R"]
+    B --> D["Inductance estimator\nGoertzel injection → L"]
+    B --> E["Pole-pairs sweep logic\nencoder-based"]
 ```
 
-`ResistanceEstimator` and `SinusoidalInductanceEstimator` are standalone components; the orchestrator
-calls them sequentially and assembles their results into a single `ResistanceInductanceResult`.
+The resistance estimator and the inductance estimator are standalone components; the orchestrator
+calls them sequentially and assembles their results into a single result.
 Application code (hardware test terminal, etc.) may also call these components directly.
 
 ---
@@ -64,109 +64,119 @@ Application code (hardware test terminal, etc.) may also call these components d
 
 Every procedure in this service drives the bridge open-loop: a fixed duty is applied and held, with no
 current regulator in the path. The resulting current is set entirely by the applied voltage and the
-winding impedance, and a low-resistance motor reaches a large current within the settle time. The
+winding impedance. A low-resistance motor reaches a large current within the settle time. The
 resistance test in particular holds a DC duty for seconds.
 
-Each procedure therefore registers a phase-current callback that checks every sample against
-`ThreePhaseInverter::MaxCurrentSupported()` and aborts immediately if any phase exceeds it — stopping
-the inverter, cancelling the step timer, and reporting failure through the procedure's normal failure
-path. Previously the pole-pairs and resistance procedures registered an
-empty callback and discarded the samples, leaving hardware comparators (present on some boards, absent
-on others) as the only backstop. `MotorAlignment` applies the same check.
+Each procedure therefore registers a phase-current handler that checks every sample against
+the inverter's maximum supported current. If any phase exceeds it, the handler aborts immediately. It stops
+the inverter, cancels the step timer, and reports failure through the procedure's normal failure
+path. Previously the pole-pairs and resistance procedures registered an empty handler and discarded the
+samples. This left hardware comparators (present on some targets, absent on others) as the only backstop.
+The motor alignment (`service-alignment.md`) applies the same check.
 
 The limit is a per-sample abort, not regulation: it stops a runaway, it does not hold a setpoint.
 
 ### Ending a procedure
 
-A procedure that has finished, failed or been aborted does **not** reclaim the inverter's phase-current
-callback slot. Reassigning that slot from inside its own invocation destroys the closure being executed, and
-every one of these procedures fails from inside that callback. Instead each procedure is gated on its own
+A procedure that has finished, failed or been aborted does **not** release the inverter's phase-current
+handler. Releasing that handler from inside its own run destroys the handler that runs, and
+every one of these procedures fails from inside that handler. Instead each procedure is gated on its own
 pending completion, and a sample that arrives after the procedure ended is discarded before it reaches
-anything. This matters most for the inductance injection, whose callback writes duty cycles on every sample:
-ungated, it would re-arm the peripheral that the abort had just stopped.
+anything. This matters most for the inductance injection, whose handler writes duty cycles on every sample.
+Ungated, it would re-arm the power stage that the abort had just stopped.
 
-`Abort()` is the caller-facing form of the same shutdown. It stops injection, cancels all timers (including
-the no-sample watchdog), and drops the pending completion **without invoking it** — the caller that aborted
-owns the outcome, so a fault raised by the state machine cannot be overwritten by the result of the
-procedure it interrupted. It covers whichever stage is live: resistance, inductance injection, or the
+The abort is the caller-facing form of the same shutdown. It stops injection, cancels all timers (including
+the no-sample watchdog), and drops the pending completion **without invoking it**. The caller that aborted
+owns the outcome. Thus the result of the procedure that the abort interrupted cannot overwrite a fault raised
+by the state machine. It covers whichever stage is live: resistance, inductance injection, or the
 pole-pairs sweep.
 
-The decisions that end a procedure on a sample — the resistance buffer filling, the inductance block
-completing, a phase current over the limit — are taken in the sampling interrupt, and so is the one thing that
-must happen at that instant: the injection is stopped there. The completion is not. Computing the result,
-starting the inductance stage once the resistance is known, and whatever the caller does next — answering over
-CAN, tracing, starting the next calibration step — is event-loop work. Run from the interrupt, it started the
-inductance stage from inside the resistance stage's own sample callback, started and cancelled timers there,
-and in a full calibration took one execution of 6709 cycles, more than five control periods
-(`software-in-the-loop.md`, Part I). So the outcome is queued and delivered from the event loop. Until then the
-run is still in progress: samples are discarded, the settle and step timers and the no-sample watchdog do
-nothing, and `Abort()` drops the queued outcome. The outcome carries the run it belongs to, so one that an
-abort overtook cannot complete a run started after it. Outcomes decided on the event loop already — the
-pole-pair count, which the sweep computes on its step timer, and a no-sample failure — complete directly,
-unless an over-current outcome is already queued, which they then leave to be delivered. The interrupt can
-also trip while the event loop is between its check and a write to the bridge — the sweep's next step, or the
-first duty a procedure applies — and that write would re-arm the bridge the interrupt had just stopped, so each
-such write is followed by a second check that stops the bridge again. The reverse holds for a procedure whose
-sample callback writes the bridge, the resistance step and the inductance injection: when the event loop ends it,
-by an abort, a no-sample failure or its destruction, it marks the run ended before it stops the bridge, so a
-sample taken between the two is discarded instead of writing a duty that would re-arm it.
+Some decisions end a procedure on a sample:
 
-Every estimator is also RAII-safe: if destroyed while active, the destructor cancels all timers and stops
-the driver without invoking the completion callback.
+- the resistance buffer filling;
+- the inductance block completing;
+- a phase current over the limit.
 
-### ResistanceEstimator
+The sampling interrupt takes these decisions. It also does the one thing that must happen at that instant:
+it stops the injection there. The completion is not delivered there. The following is event-loop work:
+computing the result, starting the inductance stage once the resistance is known, and whatever the caller does
+next. What the caller does next includes answering over CAN, tracing and starting the next calibration step.
+When this work ran from the interrupt, it started the inductance stage from inside the resistance stage's own
+sample handler. It also started and cancelled timers there. In a full calibration, one execution took more
+than five control periods (`software-in-the-loop.md`, Part I). So the outcome is queued and delivered from the
+event loop. Until then the run is still in progress:
 
-Applies a DC differential voltage across phase A versus phases B and C, held around mid-rail: A
-above the middle by two thirds of the test duty, B and C below it by one third. Every leg switches
-near the middle of the period, and the duties are written again on every sample, settling and
-measuring alike, sampled at the PWM's own rate, so the dead-time correction below the estimator follows the current as it rises
-and the winding receives the test voltage (`service-dead-time-compensation.md`). On the rig the
-loss is small at the step's current: held this way the step read 1.083 Ω, and held once from legs
-at 1 % it read 1.082 Ω. A
-`TimerSingleShot` fires after the configured settle time to allow the current to reach steady state.
-A 5-sample moving-average filter (using a bounded deque of capacity 5) is applied in-flight to each
-ADC sample before it is pushed to the measurement buffer (bounded vector, capacity 123).
+- samples are discarded;
+- the settle and step timers and the no-sample watchdog do nothing;
+- an abort drops the queued outcome.
+
+The outcome carries the run it belongs to, so one that an abort overtook cannot complete a run started after
+it. Some outcomes are already decided on the event loop: the pole-pair count, which the sweep computes on its
+step timer, and a no-sample failure. These outcomes complete directly. If an over-current outcome is already
+queued, they leave it to be delivered. The interrupt can also trip while the event loop is between its check
+and a write to the bridge. Such a write is the sweep's next step, or the first duty a procedure applies. That
+write would re-arm the bridge the interrupt had just stopped. So each such write is followed by a second check
+that stops the bridge again. The reverse holds for a procedure whose sample handler writes the bridge: the
+resistance step and the inductance injection. The event loop can end such a procedure by an abort, a no-sample
+failure or its destruction. It then marks the run ended before it stops the bridge. So a sample taken between
+the two is discarded instead of writing a duty that would re-arm the bridge.
+
+Every estimator is also safe on destruction: if destroyed while active, it cancels all timers and stops
+the inverter without invoking the completion.
+
+### Resistance Estimator
+
+Applies a DC differential voltage across phase A versus phases B and C, held around mid-rail. A is
+above the middle by two thirds of the test duty, and B and C are below it by one third. Every leg switches
+near the middle of the period. The duties are written again on every sample, settling and
+measuring alike, sampled at the switching rate. So the dead-time correction below the estimator follows the
+current as it rises, and the winding receives the test voltage (`service-dead-time-compensation.md`). On the
+rig the loss is small at the step's current. Held this way, the step read 1.083 Ω. Held once from legs
+at 1 %, it read 1.082 Ω. A
+single-shot timer fires after the configured settle time to allow the current to reach steady state.
+A 5-sample moving-average filter is applied in-flight to each
+phase-current sample before it is pushed to the measurement buffer (capacity 123).
 
 When the buffer is full, the steady-state current is read from the mean of the last 10 % of the
-buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor, where $V_{step}$
-is the test duty times the mean of the bus voltage read as the measurement starts and as it ends, so a bus
+buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor. Here $V_{step}$
+is the test duty times the mean of the bus voltage read as the measurement starts and as it ends. So a bus
 that moves during the procedure is not taken for a change of resistance. If $I_{ss} \leq 0$, the result is
 absent.
 
-**No-sample watchdog:** a second `TimerSingleShot` is armed immediately after the DC duty is applied
-and resets on every ADC callback (during both settle and measurement phases). Default bound: 100 ms
-(`Config::noSampleTimeout`). If the ADC produces no callback within that window — whether at startup
-or after samples stop mid-measurement — the watchdog fires `FailMeasurement()`, stopping the driver
-and delivering an absent result. This ensures ADC loss does not leave the motor energised
+**No-sample watchdog:** a second single-shot timer is armed immediately after the DC duty is applied.
+It resets on every phase-current sample, during both settle and measurement phases. Default bound: 100 ms
+(the configured no-sample timeout). If no sample arrives within that window, the watchdog fails the
+measurement. This applies at startup and after samples stop mid-measurement. The watchdog then stops the
+inverter and delivers an absent result. This ensures a loss of sampling does not leave the motor energised
 indefinitely regardless of the configured settle time.
 
-**RAII cleanup:** the destructor cancels all timers and stops the driver if the estimator is
-destroyed while a measurement is active, so callers do not need to call `Abort()` explicitly before
-releasing the object.
+**Cleanup on destruction:** the estimator cancels all timers and stops the inverter if it is
+destroyed while a measurement is active. So callers do not need to abort it explicitly before
+releasing it.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Settling : Start(config, onDone)
+    Idle --> Settling : start
     Settling --> Measuring : settle timer fires
-    Settling --> Fault : no-sample watchdog fires (no ADC in 100 ms)
+    Settling --> Fault : no-sample watchdog fires (no sample in 100 ms)
     Measuring --> Done : buffer full, I_ss > 0
     Measuring --> Fault : I_ss ≤ 0
     Measuring --> Fault : no-sample watchdog fires
-    Done --> Idle : onDone({resistance}) fired
-    Fault --> Idle : onDone({nullopt}) fired
+    Done --> Idle : completes with the resistance
+    Fault --> Idle : completes with no resistance
 ```
 
 **Internal buffers:**
 
 | Buffer            | Capacity    | Purpose                                      |
 |-------------------|-------------|----------------------------------------------|
-| Moving-avg window | 5 samples   | In-flight noise reduction on ADC input       |
+| Moving-avg window | 5 samples   | In-flight noise reduction on the samples     |
 | Measurement store | 123 samples | Filtered step-response for steady-state read |
 
 ---
 
-### SinusoidalInductanceEstimator
+### Inductance Estimator
 
 Injects a sinusoidal voltage on the alpha axis only (beta = 0), keeping net electromagnetic torque
 at zero so the rotor remains stationary. The injection frequency is snapped to the nearest
@@ -176,89 +186,89 @@ leakage.
 Two phases run consecutively:
 
 1. **Warmup** — voltage is injected but the Goertzel is not fed. Allows the current transient to
-   decay and the steady-state sinusoidal response to establish. Duration: `warmupPeriods` full
+   decay and the steady-state sinusoidal response to establish. Duration: the configured warm-up periods, in full
    injection cycles.
 
-2. **Measurement** — the Goertzel accumulates `measurementPeriods` full cycles of current samples
-   (block size $N = N_{periods} \times N_{spp}$, bin $k = N_{periods}$). When `Ready()`, the
-   complex result is delay-corrected (rotation by $e^{+j\omega d T_s}$ to cancel the $d$-sample
-   ADC pipeline lag), then converted to $\text{Im}(Z)$ and finally to per-phase inductance. The injected
+2. **Measurement** — the Goertzel accumulates the configured measurement periods, in full cycles of current samples
+   (block size $N = N_{periods} \times N_{spp}$, bin $k = N_{periods}$). When the Goertzel is ready, the
+   complex result is delay-corrected: a rotation by $e^{+j\omega d T_s}$ cancels the $d$-sample
+   sampling pipeline lag. The result is then converted to $\text{Im}(Z)$ and finally to per-phase inductance. The injected
    amplitude in volts is the injection duty times the mean of the bus voltage read as the injection starts
    and as it ends.
 
 The injected sine uses the interpolated sine table. The Goertzel bin phasor $e^{j\omega}$ and the
 delay rotation use the table's accurate form (within $1.3 \times 10^{-6}$, see
-[FOC transforms](foc-transforms.md)): an error $\varepsilon$ in $\cos\omega$ detunes the resonator and
-rotates the result by about $N\varepsilon / (2\sin\omega)$, which at the default 700 Hz and
-$N = 580$ is $1.8 \times 10^{-3}$ rad, against $2.6 \times 10^{-2}$ rad for the interpolated table.
-None of these calls the software `sinf`/`cosf`, so their argument reduction is not linked.
+[FOC transforms](foc-transforms.md)). An error $\varepsilon$ in $\cos\omega$ detunes the resonator and
+rotates the result by about $N\varepsilon / (2\sin\omega)$. At the default 700 Hz and
+$N = 580$, this rotation is $1.8 \times 10^{-3}$ rad, against $2.6 \times 10^{-2}$ rad for the interpolated table.
+None of these calls the standard library's software sine or cosine, so their argument reduction is not linked.
 
-The coherence metric `fitQuality = 2|I_{Goertzel}|² / (N · \Sigma i²)` is computed simultaneously
+The coherence metric, the fit quality $Q = 2|I_{Goertzel}|^2 / (N \cdot \Sigma i^2)$, is computed simultaneously
 from the accumulated current power. It equals 1.0 for a pure sinusoid at $f_{inj}$ and falls toward
 zero with increasing noise or rotor motion.
 
 **Working memory (streaming — no sample buffer required):**
 
-| Variable       | Size    | Purpose                                 |
-|----------------|---------|-----------------------------------------|
-| Goertzel state | 3 float | $s_1$, $s_2$, sample count              |
-| sumSquared     | 1 float | Accumulates $\Sigma i^2$ for fitQuality |
-| sampleCount    | 1 int   | Warmup/measurement gate                 |
+| Variable       | Size    | Purpose                                      |
+|----------------|---------|----------------------------------------------|
+| Goertzel state | 3 float | $s_1$, $s_2$, sample count                   |
+| Sum of squares | 1 float | Accumulates $\Sigma i^2$ for the fit quality |
+| Sample count   | 1 int   | Warmup/measurement gate                      |
 
-**PWM bootstrap:** on some targets the ADC is triggered by the PWM peripheral. Because the resistance
-estimator stops PWM on completion, the inductance estimator writes a zero-voltage vector immediately
-after registering the ADC callback to restart the PWM-triggered ADC chain before the first sample
-is expected.
+**Sampling bootstrap:** on some targets the power stage's switching triggers the phase-current sampling.
+Because the resistance estimator stops the power stage on completion, the inductance estimator applies a
+zero-voltage vector immediately after it registers its sample handler. This restarts the sampling before
+the first sample is expected.
 
-**No-sample watchdog:** a `TimerSingleShot` is armed when injection begins and resets on every ADC
-callback. Default bound: 100 ms (`Config::noSampleTimeout`). Loss of ADC samples — whether the
-bootstrap never triggers or samples stop mid-measurement — causes the watchdog to fire
-`FailMeasurement()`, stopping the driver and delivering an absent result within the documented bound.
+**No-sample watchdog:** a single-shot timer is armed when injection begins and resets on every
+phase-current sample. Default bound: 100 ms (the configured no-sample timeout). A loss of samples causes the
+watchdog to fail the measurement, whether the bootstrap never triggers or samples stop mid-measurement. The
+watchdog then stops the inverter and delivers an absent result within the documented bound.
 
-**RAII cleanup:** the destructor cancels the watchdog timer and stops the driver if the estimator is
+**Cleanup on destruction:** the estimator cancels the watchdog timer and stops the inverter if it is
 destroyed while a measurement is active.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Warmup : Start(config, onDone)\nPWM bootstrap written
-    Warmup --> Measuring : warmupPeriods complete
-    Warmup --> Fault : phase current exceeds MaxCurrentSupported()
-    Warmup --> Fault : no-sample watchdog fires (no ADC in 100 ms)
+    Idle --> Warmup : start\nsampling bootstrap applied
+    Warmup --> Measuring : warm-up periods complete
+    Warmup --> Fault : phase current exceeds the maximum supported
+    Warmup --> Fault : no-sample watchdog fires (no sample in 100 ms)
     Measuring --> Done : Goertzel ready, L > 0
     Measuring --> Fault : L ≤ 0 or noise floor
-    Measuring --> Fault : phase current exceeds MaxCurrentSupported()
+    Measuring --> Fault : phase current exceeds the maximum supported
     Measuring --> Fault : no-sample watchdog fires
-    Done --> Idle : onDone({inductance, fitQuality}) fired
-    Fault --> Idle : driver.Stop(), onDone({nullopt, 0}) fired
+    Done --> Idle : completes with the inductance and the fit quality
+    Fault --> Idle : inverter stopped, completes with no inductance and fit quality 0
 ```
 
 ---
 
-### ElectricalParametersIdentificationImpl (orchestrator)
+### Orchestrator
 
-Sequences `ResistanceEstimator` then `SinusoidalInductanceEstimator` and assembles their results
-into a single `ResistanceInductanceResult`. If resistance estimation fails (absent result), the L
-stage is skipped and the combined callback fires immediately with an absent result. If the L stage
-yields `fitQuality < 0.5`, the orchestrator treats this as a fault and includes the low-quality
+Sequences the resistance estimator, then the inductance estimator, and assembles their results
+into a single result. If resistance estimation fails (absent result), the L
+stage is skipped and the combined completion fires immediately with an absent result. If the L stage
+yields a fit quality below 0.5, the orchestrator treats this as a fault. It includes the low-quality
 result so the caller can make its own policy decision.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> DCSettle : EstimateResistanceAndInductance called
+    Idle --> DCSettle : resistance and inductance requested
     DCSettle --> DCMeasure : settle timer fires
     DCMeasure --> SinWarmup : R computed, I_ss > 0
     DCMeasure --> Fault : I_ss = 0
-    SinWarmup --> SinMeasure : warmupPeriods complete
+    SinWarmup --> SinMeasure : warm-up periods complete
     SinMeasure --> Done : Goertzel ready
-    Done --> Idle : onDone(ResistanceInductanceResult) fired
-    Fault --> Idle : onDone(ResistanceInductanceResult{absent}) fired
+    Done --> Idle : completes with the result
+    Fault --> Idle : completes with an absent result
 ```
 
-**Concurrent-call invariant:** a second call to `EstimateResistanceAndInductance` while any of the
-five states above is active causes the new request to be rejected immediately (callback fires with an
-absent result). The pole-pairs procedure shares this guard: neither procedure may start while the
+**Concurrent-call invariant:** a second resistance and inductance request while any of the
+five states above is active is rejected immediately. The completion then fires with an
+absent result. The pole-pairs procedure shares this guard: neither procedure may start while the
 other is active.
 
 ---
@@ -267,11 +277,11 @@ other is active.
 
 The service applies an open-loop voltage vector at electrical angle 0° and advances it by a fixed
 increment each settle-timer tick. The rotor starts anywhere, so the first vector can pull it up to
-half an electrical revolution either way, and a rotor resting on that vector's torque null, 180°
+half an electrical revolution either way. A rotor resting on that vector's torque null, 180°
 from it, does not move at all until a later vector pulls it. The first electrical revolution is
-therefore a lead-in that is not counted: by its end the rotor follows the field one step behind,
+therefore a lead-in that is not counted. By its end the rotor follows the field one step behind,
 and the encoder reading there is the reference. The vector then turns through exactly $N_{rev}$
-more electrical revolutions, ending on the angle the reference was read at, and the mechanical
+more electrical revolutions, ending on the angle the reference was read at. The mechanical
 displacement is accumulated after every step. Both the reference and the end are read one step
 behind the field, so the lag cancels:
 
@@ -279,30 +289,32 @@ $$
 x = 2\pi N_{rev} / \Delta\theta_{mech,total}, \qquad p = \text{round}(x)
 $$
 
-The result is absent if the rotation is below $\pi/2$ (rotor not following the field), or if $x$ is
-more than a quarter from the nearest integer: a rotor that skipped or slipped part of a revolution
-must fail the calibration, not hand the loops a wrong pole-pair count. Counting the first snap, as
-an earlier version did, measured anything from 1590° to 1950° electrical for 1800° of field travel;
-on the bench motor (four pole pairs) a rotor that had to snap back more than about 170° read five,
-and the calibration that followed drove the rotor with an angle error that grew with every
-radian it turned, until the current loop saturated and pulled the supply down. Taking the
-reference right after the first vector instead failed four bench sweeps in seventeen: the rotor rested on
-that vector's null, moved only at the next step, and the sweep measured 1620° for 1800°, a ratio
-of 4.44.
+The result is absent in two cases:
+
+- the rotation is below $\pi/2$ (rotor not following the field);
+- $x$ is more than a quarter from the nearest integer.
+
+A rotor that skipped or slipped part of a revolution must fail the calibration, not hand the loops a wrong
+pole-pair count. An earlier version counted the first snap. It measured anything from 1590° to 1950°
+electrical for 1800° of field travel. On the bench motor (four pole pairs), a rotor that had to snap back
+more than about 170° read five. The calibration that followed drove the rotor with an angle error that grew
+with every radian it turned. This went on until the current loop saturated and pulled the supply down. Taking
+the reference right after the first vector instead failed four bench sweeps in seventeen. The rotor rested on
+that vector's null and moved only at the next step. The sweep measured 1620° for 1800°, a ratio of 4.44.
 
 ```mermaid
 flowchart TD
     START["θe = 0°, apply vector"] --> LEAD["Advance θe one electrical\nrevolution, uncounted"]
-    LEAD --> REF["Wait settle_time\nread encoder → reference"]
+    LEAD --> REF["Wait settle time\nread encoder → reference"]
     REF --> STEP["Advance θe by Δθe\napply open-loop voltage"]
-    STEP --> SETTLE["Wait settle_time\n(TimerSingleShot)"]
+    STEP --> SETTLE["Wait settle time\n(single-shot timer)"]
     SETTLE --> READ["Read encoder\naccumulate Δθm"]
     READ --> CHECK{"N full electrical\nrevolutions done?"}
     CHECK -->|No| STEP
     CHECK -->|Yes| CALC["x = 2πN / Δθm"]
     CALC --> VALID{"Δθm > π/2 and\nx within ¼ of an integer?"}
-    VALID -->|Yes| CB_OK["onDone(round(x))"]
-    VALID -->|No| CB_FAIL["onDone(nullopt)"]
+    VALID -->|Yes| CB_OK["Complete with round(x)"]
+    VALID -->|No| CB_FAIL["Complete with no count"]
 ```
 
 ---
@@ -311,35 +323,37 @@ flowchart TD
 
 ### Provided
 
-| Interface                                         | Purpose                                                                                                                                | Contract                                                                                                                                                        |
-|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateResistanceAndInductance(config, onDone)` | Sequences DC-step R estimation then sinusoidal L estimation; delivers `ResistanceInductanceResult{resistance, inductance, fitQuality}` | Rejected (immediate empty callback) if pole-pairs procedure is already running; inverter stopped before callback fires; fires exactly once, from the event loop |
-| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                                         | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once, from the event loop                                   |
+| Interface                      | Purpose                                                                       | Contract                                                               |
+|--------------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| Estimate resistance/inductance | DC-step R estimation, then sinusoidal L estimation; delivers the result below | Rejected at once with an empty result if the pole-pairs procedure runs |
+| Estimate pole pairs            | Sweeps an open-loop rotating vector; delivers an optional pole-pair count     | Rejected if the R/L procedure is already running                       |
+
+Each procedure stops the inverter before its completion fires. Each completion fires exactly once, from the event loop.
 
 ### Result Type
 
-`ResistanceInductanceResult` carries:
+The resistance and inductance result carries:
 
-| Field        | Type                   | Absent when                  |
-|--------------|------------------------|------------------------------|
-| `resistance` | `optional<Ohm>`        | DC step finds $I_{ss} = 0$   |
-| `inductance` | `optional<MilliHenry>` | Goertzel yields $L \leq 0$   |
-| `fitQuality` | `float` in $[0, 1]$    | Always present; 0 on failure |
+| Field       | Type               | Absent when                  |
+|-------------|--------------------|------------------------------|
+| Resistance  | optional, in Ω     | DC step finds $I_{ss} = 0$   |
+| Inductance  | optional, in mH    | Goertzel yields $L \leq 0$   |
+| Fit quality | number in $[0, 1]$ | Always present; 0 on failure |
 
 ### Required
 
-| Interface            | Purpose                                                        | Contract                                                                                                                |
-|----------------------|----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| `ThreePhaseInverter` | Voltage application and ADC sampling callbacks for both stages | Must not be concurrently claimed by any other controller                                                                |
-| `Encoder`            | Reads mechanical angle during pole-pairs sweep                 | Must be initialised before pole-pairs estimation begins                                                                 |
-| DC bus voltage       | Converts the applied duty to volts                             | Read from the event loop at the start and the end of a measurement; a fixed value for a target that has no live reading |
+| Interface            | Purpose                                                       | Contract                                                                                                                |
+|----------------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Three-phase inverter | Voltage application and phase-current samples for both stages | Must not be concurrently claimed by any other controller                                                                |
+| Encoder              | Reads mechanical angle during pole-pairs sweep                | Must be initialised before pole-pairs estimation begins                                                                 |
+| DC bus voltage       | Converts the applied duty to volts                            | Read from the event loop at the start and the end of a measurement; a fixed value for a target that has no live reading |
 
 ---
 
 ## Online Resistance and Inductance Estimation
 
 In addition to the one-shot calibration procedures above, a continuous online estimator
-(`RealTimeResistanceAndInductanceEstimator`) runs alongside the closed-loop speed/position
+runs alongside the closed-loop speed/position
 controller to track slow parameter drift. See the state machine design document for when online
 estimates are applied.
 
@@ -356,18 +370,19 @@ $$\overline{V_d} = R\,\overline{I_d} + L\left(\frac{I_{d,end} - I_{d,start}}{T} 
 The regressor vector is $\phi = [\overline{I_d},\ (\Delta I_d / T - \overline{\omega_e I_q})]^T$ in amperes and
 amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. A recursive
 instrumental-variable estimator with forgetting factor 0.9995 updates $\theta$ once per outer-loop period (1 kHz),
-which gives it a memory of about 2 s. With half that memory the estimate wandered within a run: through the bench's
-current-sense chain the inductance moved by 5 % (one standard deviation) about the winding's, and the bench read
-0.93 to 1.12 times the calibration. Doubling the memory halves that wander, and a warming winding, whose resistance
-changes over minutes, is still tracked. How many steps of the excitation the memory holds sets the rest (Excitation).
+which gives it a memory of about 2 s. With half that memory, the estimate wandered within a run. Through the
+bench's current-sense chain, the inductance moved by 5 % (one standard deviation) about the winding's. The bench
+read 0.93 to 1.12 times the calibration. Doubling the memory halves that wander, and a warming winding, whose
+resistance changes over minutes, is still tracked. How many steps of the excitation the memory holds sets the
+rest (Excitation).
 
 ### Instrumental Variables
 
 The inductance column takes its current change from two single samples: the last of this window and the last
 of the one before. Each carries the current sensor's noise in full, and least squares reads noise in a regressor
-as a weaker dependence on it. On the bench motor the recursive least-squares estimate read the inductance 55 %
-low with the ±75 mA excitation below, and still 33 % low with ±0.3 A; in simulation, with 10 mA of noise, 9 to
-11 % low, where the estimate below reads it within 5 %.
+as a weaker dependence on it. On the bench motor, the recursive least-squares estimate read the inductance 55 %
+low with the ±75 mA excitation below. It still read 33 % low with ±0.3 A. In simulation, with 10 mA of noise, it
+read 9 to 11 % low, where the estimate below reads it within 5 %.
 
 The recursion therefore takes its gain along an instrument $z$ rather than along the regressor:
 
@@ -376,9 +391,9 @@ $$K = \frac{P z}{\lambda + \phi^T P z}, \qquad \theta \leftarrow \theta + K\,(\o
 with $z = [I_d^*,\ \Delta I_d^* / T]^T$: the d-axis reference the window ran with, and its change from the
 previous window's. The reference is the excitation itself. It moves with the true current and not with the
 sensor's noise, so the estimate converges on the winding however noisy the samples are. The constant part of
-$\overline{V_d}$ that no column explains, such as a small error in the rotor angle, which leaks back-EMF into
-the d axis, also averages out against a reference that alternates in sign. With $z = \phi$ the recursion is
-the ordinary RLS one.
+$\overline{V_d}$ that no column explains also averages out against a reference that alternates in sign. A
+small error in the rotor angle, which leaks back-EMF into the d axis, is one such part. With $z = \phi$ the
+recursion is the ordinary RLS one.
 
 The averages are accumulated by the control interrupt, tick by tick, and published with each window:
 
@@ -386,72 +401,78 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   not the command just computed from that same sample. Regressing the same-tick command put the PI's own
   $-K_p I_d$ into the output and pulled the resistance negative, by about $K_p$. Which command acted
   across a tick depends on when the bridge takes a new duty, and the platform states it as a number of
-  periods. The emulated board applies a duty the moment it is written, so the previous tick's command
-  acted. The reference board loads its compare registers at the counter's zero, a period after the sample the
-  duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
-  rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
-  much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
-  laws. The emulated board applying each duty a period late reproduces it (REQ-CMS-003).
+  periods. The emulated target applies a duty the moment it is written, so the previous tick's command
+  acted. The reference board applies a new duty at the start of the next switching period. This is a period
+  after the sample the duty came from, so the command from two ticks back acted. Paired with the previous
+  tick's command, the rig read the online inductance 2 to 6 times too high under the deadbeat law. The
+  command of the deadbeat law swings by as much as the $L\,\Delta I_d / T$ term it is regressed against.
+  Under the smoother laws, the rig read it 1 to 15 % high. The emulated target applying each duty a period
+  late reproduces it (REQ-CMS-003).
 - $V_d$ is the d component the command has *in the rotor frame* while it acts, and the cascades rotate the
   command by the delay angle $(n + \tfrac12)\,\omega_e T_s$ before they apply it (`foc-transforms.md`, *Delay
-  compensation*). The vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$,
-  so its angle to the rotor runs from $-\tfrac12\Delta\theta_e$ to $+\tfrac12\Delta\theta_e$ about zero and
-  the tick's mean d component is $v_d\,\mathrm{sinc}(\tfrac12\Delta\theta_e) - 0\cdot v_q$: the term in $v_q$
-  is odd about the centre and averages out, the shortfall in $v_d$ is second order (0.07 % at 6000 rpm). The
-  window therefore takes $v_d$ as paired, with no cross-axis term. Before the advance the vector was
-  stationary relative to the sample instant: the rotor ran from $0$ to $\Delta\theta_e$ ahead of it, and the
+  compensation*). The vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$.
+  So its angle to the rotor runs from $-\tfrac12\Delta\theta_e$ to $+\tfrac12\Delta\theta_e$ about zero. The
+  tick's mean d component is $v_d\,\mathrm{sinc}(\tfrac12\Delta\theta_e) - 0\cdot v_q$. The term in $v_q$
+  is odd about the centre and averages out. The shortfall in $v_d$ is second order (0.07 % at 6000 rpm). The
+  window therefore takes $v_d$ as paired, with no cross-axis term. Before the advance, the vector was
+  stationary relative to the sample instant. The rotor ran from $0$ to $\Delta\theta_e$ ahead of it. The
   mean of $v_d\cos x + v_q\sin x$ over that span is $v_d + \tfrac12\Delta\theta_e v_q$, which is the
   correction the window used to add. Half was the right figure for a duty applied at once. For a duty applied a
-  period late the vector is a further $\Delta\theta_e$ behind when it lands, so the correct term was
-  $\tfrac32\Delta\theta_e v_q$ and the half left $\Delta\theta_e v_q$ uncorrected; the advance removes
+  period late, the vector is a further $\Delta\theta_e$ behind when it lands. So the correct term was
+  $\tfrac32\Delta\theta_e v_q$, and the half left $\Delta\theta_e v_q$ uncorrected. The advance removes
   the whole $(n + \tfrac12)\,\Delta\theta_e$ at the source, for both values of $n$. The estimate depends on the
-  advance only through the speed it is computed with: an error $\Delta\omega_e$ in that speed leaves
+  advance only through the speed it is computed with. An error $\Delta\omega_e$ in that speed leaves
   $(n + \tfrac12)\,\Delta\omega_e T_s\,v_q$, second order in the small figures.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,
   rather than the outer loop's last speed, which lags an accelerating rotor.
 
 ### Excitation
 
-The product regulates $I_d$ to zero, so the resistance column is never excited on its own: the recursion
+The product regulates $I_d$ to zero, so the resistance column is never excited on its own. The recursion
 drifted, read $-0.68\ \Omega$ for a $0.36\ \Omega$ winding, and could not by construction track a warming
 one. The speed and position cascades therefore add a d-axis square wave to the current reference while the
-estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 50 Hz. It produces no torque on a
-non-salient machine and a copper loss proportional to its square. An update is taken only while the
+estimator is attached. The square wave is $\pm 2.5\,\%$ of the drive's current limit at 50 Hz. It produces no
+torque on a non-salient machine and a copper loss proportional to its square. An update is taken only while the
 reference exceeds 50 mA, so an amplitude of zero switches both the injection and resistance tracking off.
 
 An update is also skipped while the current does not follow the reference: when the window's mean current has not
 reached half of it. An open phase, or a loop held at its voltage limit, leaves the current behind while the loop
 applies its full voltage. Such a window has a regressor near zero, and the recursion has no information to take
-from it: without this check its gain grows by the forgetting factor at every window, and a current held at 1 mA
-against a ±0.5 A reference drove the resistance to 26 MΩ within 3000 windows. In the motor-disconnected scenario
-the winding temperature read from such a resistance tripped the drive with an over-temperature, on slower runners,
-before the phase-loss monitor could report the missing phase (`fault-supervision.md`, Part E).
+from it. Without this check, its gain grows by the forgetting factor at every window. A current held at 1 mA
+against a ±0.5 A reference drove the resistance to 26 MΩ within 3000 windows. In the motor-disconnected scenario,
+the winding temperature read from such a resistance tripped the drive with an over-temperature. On slower runners,
+this happened before the phase-loss monitor could report the missing phase (`fault-supervision.md`, Part E).
 
-A step of the square wave lies inside one window, whose mean current is then near zero whether the current follows
-or not, and these are the windows that tell the inductance. A step window therefore keeps the decision of the window
-before it. The decision rests on the mean of a window's twenty samples rather than on any one of them: through the
-bench's current-sense chain a single sample carries about 35 mA of noise against a ±71 mA reference, and a check on
-it skipped windows by their noise and read the resistance 5.6 % low; the mean carries about 8 mA.
+A step of the square wave lies inside one window. The mean current of that window is then near zero whether the
+current follows or not. These are the windows that tell the inductance. A step window therefore keeps the decision
+of the window before it. The decision rests on the mean of a window's twenty samples rather than on any one of them.
+Through the bench's current-sense chain, a single sample carries about 35 mA of noise against a ±71 mA reference. A
+check on one sample skipped windows by their noise and read the resistance 5.6 % low. The mean carries about 8 mA.
 
-Only the steps of the square wave tell the inductance: between them the current is held, and its change over a
+Only the steps of the square wave tell the inductance. Between them the current is held, and its change over a
 window is the sensor's noise alone. Each step is read through two single samples, so the estimate's scatter falls
 with the number of steps its memory holds. Through the bench's current-sense chain, with 50 mA of noise in each
-phase, readings at 10 Hz scattered by 3.6 % (one standard deviation) from one run to the next and reached 8 % low,
-at 20 Hz by 1.9 %, and at 50 Hz by 1.1 %. With the noise removed, the same chain read within 0.2 % from run to run.
+phase, readings scattered from one run to the next:
+
+- at 10 Hz by 3.6 % (one standard deviation), and reached 8 % low;
+- at 20 Hz by 1.9 %;
+- at 50 Hz by 1.1 %.
+
+With the noise removed, the same chain read within 0.2 % from run to run.
 The 10 ms half-period is still six or more times the L/R of the reference motors and the bench motor, 0.6 to 1.6 ms.
 
 The square wave is audible. On the bench it is a ±71 mA d-axis current with harmonics at 150, 250, 350 Hz and
-up, as large as the torque current at light load. The cascades therefore run it in bursts: the first 4 s after
-each enable, then the first 4 s of every 60 s, with the reference at zero in between. The 50 mA threshold above
-makes the estimator skip every window of a pause, so it neither updates nor forgets, and its estimates hold
-until the next burst. A burst holds two memories of the estimator, which converges within it from the wrong
-seeds of REQ-CMS-003; a winding that warms over minutes is still followed, a minute at a time. In simulation
-the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA RMS in the pause after it,
-while the speed reference steps between 30 and 50 rad/s (REQ-CMS-003).
+up. This current is as large as the torque current at light load. The cascades therefore run it in bursts. A
+burst runs for the first 4 s after each enable, then for the first 4 s of every 60 s. The reference is at zero
+in between. The 50 mA threshold above makes the estimator skip every window of a pause. So it neither updates
+nor forgets, and its estimates hold until the next burst. A burst holds two memories of the estimator, which
+converges within it from the wrong seeds of REQ-CMS-003. A winding that warms over minutes is still followed, a
+minute at a time. In simulation the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA
+RMS in the pause after it. The speed reference meanwhile steps between 30 and 50 rad/s (REQ-CMS-003).
 
 The estimator reports itself settled once it has published, after the 200 updates it needs from its seed. Online
 recalibration (`online-recalibration.md`) adopts an estimate only once it has settled, and only while the drive is
-stopped; nothing else changes the current loop's design from it.
+stopped. Nothing else changes the current loop's design from it.
 
 ### Publication
 
@@ -459,6 +480,6 @@ Estimates are published after 200 updates since the last seed, and only when bot
 
 ### Seeding
 
-When calibration data is loaded (from NVM or after fresh calibration), the online estimator is
-seeded with the identified values, avoiding a cold-start transient where estimates are physically
+When calibration data is loaded (from the non-volatile memory or after fresh calibration), the online estimator is
+seeded with the identified values. This avoids a cold-start transient where estimates are physically
 meaningless.

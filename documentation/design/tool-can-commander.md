@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.25.0
+version: 0.25.1
 component: "tool-can-commander"
-date: 2026-11-10
+date: 2026-11-26
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.25.0               |
+| Version   | 0.25.1               |
 | Component | tool-can-commander   |
-| Date      | 2026-11-10           |
+| Date      | 2026-11-26           |
 
 ---
 
@@ -22,10 +22,10 @@ date: 2026-11-10
 
 **Is responsible for:**
 - Letting a bench engineer open one CAN interface and command every e-foc motor controller on it, each
-  addressed by its CAN node ID (configured base plus the board's ID jumpers): start, stop, clear fault,
-  control mode, torque/speed/position setpoints, the controller of each loop and its settings, the motor
-  parameters, the start-up settings, alignment and identification, plus one emergency stop that reaches all
-  of them.
+  addressed by its CAN node ID (configured base plus the board's ID jumpers). The commands are start, stop,
+  clear fault, control mode, torque/speed/position setpoints, the controller of each loop and its settings.
+  They also cover the motor parameters, the start-up settings, alignment and identification, plus one
+  emergency stop that reaches all of them.
 - Showing each controller's state as that controller reports it: heartbeat, firmware contract
   compatibility, motor state and fault, whether position mode reached its target, active control mode,
   measurements, identified motor parameters and every setting it holds.
@@ -46,18 +46,20 @@ The tool is split so that everything but widget layout can be tested without a d
 - **Adapter** — the CAN bus, provided by can-lite's host drivers (Part I). It shows every received frame to its
   observers before handing it to the protocol client.
 - **Logic** — the command client, one for the whole bus. Every command names its node and every report says
-  which node sent it. Per node it tracks: online (a frame was seen; offline after the protocol's 3 s server
-  timeout or when the bus closes), firmware compatibility, and the last command sent until that command is
-  acknowledged, rejected or times out after 2 s (12 s for Start, whose first acknowledgement waits for the rotor to rest and the current offsets to be measured; two minutes for alignment, identification and calibration). A newer
-  command — typically the emergency stop — takes over the slot and restarts the timeout; an acknowledgement
-  of an older command no longer ends it. A command the client refuses locally leaves the slot untouched.
-  Closing the bus ends every pending command and reports every node offline at once. The client also reads
-  each compatible node: its status every second and after every accepted command, because the controller
-  sends its status only when asked, and its settings (Part J).
+  which node sent it. Per node it tracks whether it is online, its firmware compatibility, and the last
+  command sent. A node is online once a frame was seen, and offline after the protocol's 3 s server timeout
+  or when the bus closes. The last command stays tracked until it is acknowledged, rejected or times out
+  after 2 s. Start times out after 12 s, because its first acknowledgement waits for the rotor to rest and
+  the current offsets to be measured. Alignment, identification and calibration time out after two
+  minutes. A newer command — typically the emergency stop — takes over the slot and restarts the timeout.
+  An acknowledgement of an older command no longer ends it. A command the client refuses locally leaves
+  the slot untouched. Closing the bus ends every pending command and reports every node offline at once.
+  The client also reads each compatible node: its status and its settings (Part J). It reads the status
+  every second and after every accepted command, because the controller sends its status only when asked.
 - **Support** — application identity, the firmware-pack lookup, and the bridge that runs the
   embedded-infrastructure event loop and timers on the GUI thread. The issue log, the bug-report builder, the
-  release feed reader, the update checker and installer, and the update banner with the flow behind it (Part G)
-  are ui-cpp's (`ui/backend/qt/update`), configured with the tool's name, version and pages.
+  release feed reader, and the update checker and installer are ui-cpp's. So is the update banner with the
+  flow behind it (Part G). Each is configured with the tool's name, version and pages.
 - **Presentation** — the window, one panel per motor, the overview row and the status bar. Widgets only
   display; they do not decide.
 
@@ -87,7 +89,7 @@ graph TD
   by node ID (Motor → Add Motor, or the "+ Add Motor" button) before that node comes online, and close tabs.
   Closing a tab does not stop the motor.
 - The list of tabs is restored on the next start, so a known rig reopens with its motors in place.
-- At most eight motors are followed, the number of servers `can-lite` tracks liveness and sequence numbers
+- At most eight motors are followed, the number of servers can-lite tracks liveness and sequence numbers
   for. A further node is logged and left without a tab.
 - With no motors, the motor area explains how motors appear and offers Add Motor.
 
@@ -103,85 +105,94 @@ graph TD
 | Setpoint                                          | the value last accepted, and what Apply would send while the knob shows another value                     | that node's setpoint acknowledgement    |
 | Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted                            | that node's parameter responses         |
 | Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                                                 | that node's status (read every second)  |
-| Target reached                                    | *Yes* once position mode reports its target reached, *No* otherwise; "—" before 2.10                      | `targetReached`, read with each status  |
-| Winding temperature                               | °C from the online resistance; "—" in torque mode, uncalibrated or before 2.13                            | `windingTemperature`, with each status  |
-| Homed                                             | *Yes* once the position zero is the commissioned one, *No* otherwise; "—" before 2.19                     | `homed`, read with each status          |
+| Target reached                                    | *Yes* once position mode reports its target reached, *No* otherwise; "—" before 2.10                      | *targetReached*, read with each status  |
+| Winding temperature                               | °C from the online resistance; "—" in torque mode, uncalibrated or before 2.13                            | *windingTemperature*, with each status  |
+| Homed                                             | *Yes* once the position zero is the commissioned one, *No* otherwise; "—" before 2.19                     | *homed*, read with each status          |
 | Id, Iq and position                               | the latest current-stream sample, repainted at most 25 times a second                                     | that node's current stream              |
 | Status bar                                        | motors online out of motors shown, and how many are in fault                                              | all nodes                               |
 | Firmware                                          | running version and board, a pack staged on it, a newer release for the board, the progress of a download | that node's 2.6 parameters, the release |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
-that node goes offline, so stale numbers never read as live. The current stream (`service-can.md` Part J)
-delivers up to 1000 samples a second from each node; the panel keeps only each node's latest sample and
-paints it on a 40 ms timer, so nine streaming nodes cost the event loop at most 225 repaints a second, and
-stream frames stay out of the raw frame log. A fault on one motor stays visible in the
+that node goes offline, so stale numbers never read as live. The current stream ([service-can.md](service-can.md) Part J)
+delivers up to 1000 samples a second from each node. The panel keeps only each node's latest sample and
+paints it on a 40 ms timer. Thus nine streaming nodes cost the event loop at most 225 repaints a second.
+Stream frames stay out of the raw frame log. A fault on one motor stays visible in the
 overview row and on its tab while another motor is being commanded.
 
-The target-reached and winding-temperature rows sit in the Motor Status group under the state and fault, and are
-read with every status rather than on Refresh, so a flag from the previous move is replaced within a second and right
-after the next setpoint is accepted.
+The target-reached and winding-temperature rows sit in the Motor Status group under the state and fault. The tool
+reads them with every status rather than on Refresh. Thus a flag from the previous move is replaced within a second
+and right after the next setpoint is accepted.
 
 ### Part D — commands and the emergency stop
 
-A motor's commands are enabled only when the bus is open, the node is online, its firmware contract is
-compatible and it has no command pending. When disabled, every command explains why (tooltip); the
-persistent reasons — not connected, node not on the bus, incompatible firmware, waiting for the firmware
-version — also appear as an inline hint in that motor's panel.
+A motor's commands are enabled only when:
 
-The emergency stop is outside that rule. One large button (and Esc, also in the Motor menu) sends an
-emergency stop to every motor that has a tab and every node currently online, whether or not a command is
-pending on it. It is enabled while the bus is open and at least one of those motors can receive it. The log
-names the motors it reached and, separately, those it could not reach (incompatible firmware or a refused
-frame) with the advice to use the hardware stop.
+- the bus is open;
+- the node is online;
+- its firmware contract is compatible;
+- it has no command pending.
 
-Beside Stop Motor each motor has **Quick Stop** (contract 3.2, `state-machine.md` Quick Stop), an ordinary motor
-command: it decelerates that motor at its quick-stop deceleration and leaves it Ready, where Stop Motor cuts the
+When disabled, every command explains why (tooltip). The persistent reasons also appear as an inline hint in
+that motor's panel. These reasons are not connected, node not on the bus, incompatible firmware, and waiting
+for the firmware version.
+
+The emergency stop is outside that rule. One large button sends an emergency stop to every motor that has
+a tab and every node currently online. Esc and an entry in the Motor menu do the same. The stop goes out
+whether or not a command is pending on the motor. It is enabled while the bus is open and at least one of
+those motors can receive it. The log names the motors it reached. Separately, it names those it could not
+reach (incompatible firmware or a refused frame), with the advice to use the hardware stop.
+
+Beside Stop Motor each motor has **Quick Stop** (contract 3.2, [state-machine.md](state-machine.md) Quick Stop), an ordinary motor
+command. It decelerates that motor at its quick-stop deceleration and leaves it Ready. Stop Motor instead cuts the
 power stage and lets it coast. The status shows *Stopping*, as a warning, until it is Ready. It is
-enabled under the rule above, also while the last status says the motor is stopped,
-since a stale status must not hold back a stop; otherwise its tooltip says why. The emergency stop stays the stop
+enabled under the rule above, also while the last status says the motor is stopped.
+A stale status must not hold back a stop. Otherwise its tooltip says why. The emergency stop stays the stop
 of every motor at once and of a motor that calibrates.
 
-Input ranges and decimal places follow the wire contract: the limit is the smaller of the firmware's
-command limit and what the 16-bit wire field can carry, and the decimals match the wire resolution, so the
-tool never offers precision that the frame drops. Position offers the firmware's whole range since contract
-4.0, ±1000 turns (±360 000°) from the position zero (`documentation/design/foc-position.md`, Multi-Turn
-Position), the range the measured position is reported in too. With circular positioning on, the drive takes
+Input ranges and decimal places follow the wire contract. The limit is the smaller of the firmware's
+command limit and what the 16-bit wire field can carry. The decimals match the wire resolution, so the
+tool never offers precision that the frame drops. Since contract 4.0, position offers the firmware's whole
+range: ±1000 turns (±360 000°) from the position zero ([foc-position.md](foc-position.md), Multi-Turn
+Position). The measured position is reported in this range too. With circular positioning on, the drive takes
 the setpoint modulo one turn, so the operator stays within ±180° to name each target once. The measured position
-reads the multi-turn position of the motion telemetry only: the current stream's position is the angle within
-the turn, which places the waveforms, and painting it in the same read-out would make the reading jump by whole
+reads the multi-turn position of the motion telemetry only. The current stream's position is the angle within
+the turn, which places the waveforms. Painting it in the same read-out would make the reading jump by whole
 turns.
 
 The setpoint of the active control mode is chosen with a knob and the number box beside it, which follow
-each other: torque in amperes, speed in revolutions per minute, position in degrees. The wire still carries
-amperes, radians per second and radians as floats; the tool converts at its edge, and one knob step is
-0.001 A, 0.01 rad/s (about 0.095 rpm) or 0.001 rad (about 0.057°), so a typed value snaps to the nearest
+each other. Torque is in amperes, speed in revolutions per minute, position in degrees. The wire still carries
+amperes, radians per second and radians as floats, and the tool converts at its edge. One knob step is
+0.001 A, 0.01 rad/s (about 0.095 rpm) or 0.001 rad (about 0.057°). A typed value snaps to the nearest
 step. Turning the knob or typing never sends anything: Apply, or Enter in the box or on the
 focused knob, sends the value shown. Beside the knob the panel shows the value the controller last
-accepted, also marked on the knob's scale; while the knob shows another value it says what Apply would
+accepted, also marked on the knob's scale. While the knob shows another value, the panel says what Apply would
 send. An acknowledged mode change or the node leaving the bus forgets the accepted value, because the new
 mode starts from its own setpoint. The measured speed and position read in rpm and degrees as well, to two
-decimals; loop bandwidths stay in rad/s, since they are frequencies, not speeds.
+decimals. Loop bandwidths stay in rad/s, since they are frequencies, not speeds.
 
 The measured speed and position come from the motion telemetry that answers each status request
-(`service-can.md`, contract 3.1). The panel offers no torque in newton-metres; the tool's client can send it,
+([service-can.md](service-can.md), contract 3.1). The panel offers no torque in newton-metres; the tool's client can send it,
 and the controller converts it with the calibrated torque constant.
 
-Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
-for a rejection (for example "not valid in the active control mode"), a command that was refused locally
-and never sent, or a command that received no answer in time.
+Each command outcome is logged in words and prefixed with its motor:
+
+- accepted;
+- the plain-language reason for a rejection (for example "not valid in the active control mode");
+- a command that was refused locally and never sent;
+- a command that received no answer in time.
 
 Align, Identify Electrical and Calibrate move the rotor and answer only when they
-finish, so the tool waits up to two minutes for them instead of two seconds; the panel says the rotor will
+finish. Thus the tool waits up to two minutes for them instead of two seconds. The panel says the rotor will
 move before the button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
 in progress (Part J).
 
 ### Part L — refused commands
 
-When a controller refuses an operating command — start, stop, clear fault, a setpoint or Align — because of
-its state ("not allowed in the motor's current state") or because the command does not fit (an alignment
-without a calibration for the active mode, a setpoint for another mode), the panel opens a non-modal dialog
-that names the motor and the refused command and says what makes the motor operational again, judged from
-the last status the controller reported:
+A controller can refuse an operating command: start, stop, clear fault, a setpoint or Align. It refuses it
+because of its state ("not allowed in the motor's current state"), or because the command does not fit. A
+command that does not fit is an alignment without a calibration for the active mode, or a setpoint for
+another mode. In both cases the panel opens a non-modal dialog that names the motor and the refused command.
+The dialog says what makes the motor operational again, judged from the last status the controller reported:
 
 | Last reported state           | Refused                                            | Advice                                                                                     | Button                |
 |-------------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------|-----------------------|
@@ -197,25 +208,32 @@ the last status the controller reported:
 
 Stop Motor refused while stopped, Clear Fault refused without a fault and Start Motor refused while running
 get no dialog; the log line says enough. The button sends the same command as its counterpart in the panel,
-only while that motor accepts commands, and brings its tab to the front. A motor has at most one dialog: the
-same advice raises the open one, other advice replaces it, and a change of the reported state closes it,
+only while that motor accepts commands, and brings its tab to the front. A motor has at most one dialog. The
+same advice raises the open one, and other advice replaces it. A change of the reported state closes it,
 since what it says no longer applies. The refusal is logged as before.
 
 A 2.8 controller reports Ready as *Ready* and an uncalibrated or unaligned Idle as *Idle*; an older one reports
-both as idle. The advice for a motor that is not running covers both: aligning is what makes an idle motor Ready,
-and the text names the other reason Start Motor is refused in Ready (the board protection). A control-mode switch out of an aligned Ready keeps the rotor reference (state-machine
-design, C4), so switching modes no longer needs Align Rotor; a switch into speed or position mode without
-inertia and friction does, after they are set.
+both as idle. The advice for a motor that is not running covers both. Aligning is what makes an idle motor Ready.
+The text also names the other reason Start Motor is refused in Ready (the board protection). A control-mode
+switch out of an aligned Ready keeps the rotor reference (state-machine design, C4). Thus switching modes no
+longer needs Align Rotor. A switch into speed or position mode without inertia and friction does need it,
+after they are set.
 
 ### Part J — controllers, motor parameters and configuration
 
-The settings tabs show what the node holds, not what was last typed. A node is read completely when it is
-found compatible, and again after a mode change (accepted or
-refused), a controller change, an identification, an alignment, applied motor parameters, a refused
-setting or a Revert: the active mode and the algorithm of every loop, then every numbered parameter the
-operator can set — the read-only values of contract 2.2 are readings, not settings, and are not read here. Reads
-go one at a time, because the CAN send queue holds six frames; they do not make the node busy and are not
-logged one by one. A read that is not answered leaves "—".
+The settings tabs show what the node holds, not what was last typed. The tool reads a node completely when
+it finds it compatible. It reads it again after any of these:
+
+- a mode change (accepted or refused);
+- a controller change;
+- an identification or an alignment;
+- applied motor parameters;
+- a refused setting or a Revert.
+
+A complete read covers the active mode and the algorithm of every loop, then every numbered parameter the
+operator can set. The read-only values of contract 2.2 are readings, not settings, and are not read here.
+Reads go one at a time, because the CAN send queue holds six frames. They do not make the node busy and are
+not logged one by one. A read that is not answered leaves "—".
 
 ```mermaid
 flowchart LR
@@ -234,114 +252,128 @@ flowchart LR
   algorithm uses; the other settings of the loop are hidden, not deleted. The current-loop bandwidth is
   shown for deadbeat too, which estimates its voltage error at that bandwidth. A bandwidth can be left
   *Automatic*, in which case the field shows the bandwidth the firmware derived.
-- **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (measured by Calibrate, or the
-  platform default), inertia, viscous friction and Coulomb friction (the dry friction the calibration measures in
-  speed and position mode and the controller feeds forward, contract 2.20), and the commissioning actions Align, Identify Electrical
-  and Calibrate, the whole sequence of the firmware's calibration, which includes the mechanical
-  identification in speed and position mode. Changing the pole pairs
-  says that the rotor has to be aligned again before it can start. Clear Calibration forgets the stored record
-  after the user confirms it in a dialog, since the motor cannot start again until it is calibrated; a
-  successful Calibrate or Clear Calibration reads the motor parameters and the diagnostics again.
+- **Motor Parameters** holds resistance, inductance, pole pairs and flux linkage (measured by Calibrate, or
+  the platform default). It also holds inertia, viscous friction and Coulomb friction. Coulomb friction is
+  the dry friction the calibration measures in speed and position mode and the controller feeds forward
+  (contract 2.20). It also holds the commissioning actions Align, Identify Electrical and Calibrate.
+  Calibrate is the whole sequence of the firmware's calibration, which includes the mechanical
+  identification in speed and position mode. Changing the pole pairs says that the rotor has to be aligned
+  again before it can start. Clear Calibration forgets the stored record after the user confirms it in a
+  dialog, since the motor cannot start again until it is calibrated. A successful Calibrate or Clear
+  Calibration reads the motor parameters and the diagnostics again.
 - **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.
-  They are stored at once and take effect when the controller restarts; a new node ID or bitrate means the
-  motor appears under another tab, or only after reconnecting at the new bitrate, and the tab says so.
-  Beside them, *Current stream rate* (Hz, 0–1000, 0 stops the stream) sets how often the controller sends the
-  Id, Iq and position samples the Telemetry panel plots (`service-can.md` Part J); it is stored at once and in
-  force within a millisecond, in any state. The field says that every node's stream shares the bus, so the
+  They are stored at once and take effect when the controller restarts. A new node ID means the motor
+  appears under another tab; a new bitrate means it appears only after reconnecting at the new bitrate. The
+  tab says so. Beside them, *Current stream rate* (Hz, 0–1000, 0 stops the stream) sets how often the
+  controller sends samples. These are the Id, Iq and position samples the Telemetry panel plots
+  ([service-can.md](service-can.md) Part J). The rate is stored at once and in force within a millisecond,
+  in any state. The field says that every node's stream shares the bus, so the
   rates of all nodes together have to fit its bitrate.
   Its **Fault Supervision** group holds the drive-wide settings of the fault supervisor
-  (`fault-supervision.md`): the window, current fraction, demanded speed, position error and still excursion
-  that decide when a rotor is not following the drive, and *Report stalls*. They are stored at once and in
-  force within 10 ms, in any state. While *Report stalls* is off — stored, or only edited — the group warns,
-  in the warning colour and in words, that a rotor held against the drive can carry up to the current limit
-  with no fault and only the board's thermal protection watches it; encoder loss is reported either way.
-  Its **Limits** group holds the drive-wide limits of contract 2.9 (`service-can.md`): the overspeed limit
-  that torque mode folds its current against, speed mode holds a setpoint at and every mode faults beyond
-  (`fault-supervision.md` Part G), the following-error window and time of position mode (Part H) and the
-  speed acceleration and deceleration of speed mode (`foc-speed.md`, Speed Ramp), the command timeout
-  (`service-can.md` Part F) and the motor's continuous and peak current ratings with the peak time
-  (`fault-supervision.md` Part I); a following-error window, a rate, a timeout or a continuous rating of zero
-  turns that limit off, a peak rating of zero means the board's limit, and each field's tooltip says so. The command timeout's tooltip also warns that the commander sends a setpoint
-  only when it changes, so with a timeout set a motor it starts faults once the timeout runs out without a new
-  setpoint. They are stored at once and in force from the next control period, in any
-  state; the group says that a drive beyond 110 % of the limit faults and coasts.
+  ([fault-supervision.md](fault-supervision.md)). The window, current fraction, demanded speed, position
+  error and still excursion decide when a rotor is not following the drive. The group also holds *Report
+  stalls*. They are stored at once and in force within 10 ms, in any state. While *Report stalls* is off —
+  stored, or only edited — the group shows a warning in the warning colour and in words. The warning says
+  that a rotor held against the drive can carry up to the current limit with no fault. It also says that
+  only the board's thermal protection watches it. Encoder loss is reported either way.
+  Its **Limits** group holds the drive-wide limits of contract 2.9 ([service-can.md](service-can.md)). It
+  holds the overspeed limit ([fault-supervision.md](fault-supervision.md) Part G). Torque mode folds its
+  current against it, speed mode holds a setpoint at it, and every mode faults beyond it. The group also
+  holds the following-error window and time of position mode (Part H). It holds the speed acceleration and
+  deceleration of speed mode ([foc-speed.md](foc-speed.md), Speed Ramp) and the command timeout
+  ([service-can.md](service-can.md) Part F). It also holds the motor's continuous and peak current ratings
+  with the peak time ([fault-supervision.md](fault-supervision.md) Part I). A following-error window, a
+  rate, a timeout or a continuous rating of zero turns that limit off. A peak rating of zero means the
+  board's limit. Each field's tooltip says so. The command timeout's tooltip also warns that the commander
+  sends a setpoint only when it changes. Thus, with a timeout set, a motor it starts faults once the timeout
+  runs out without a new setpoint. They are stored at once and in force from the next control period, in
+  any state. The group says that a drive beyond 110 % of the limit faults and coasts.
   Its **Motion Profile** group holds the profile velocity, acceleration, deceleration and jerk of contract 3.1
-  (`foc-position.md`, Motion Profile): position mode plans a trapezoidal path to each setpoint within them, the
-  profile is off while the velocity or the acceleration is zero, a deceleration of zero uses the acceleration,
-  and the jerk is reserved for a later S-curve and has no effect yet, as the group says. They are stored at once
-  and in force from the next control period, in any state.
-  Its **Target Window** group holds the position window and its time of contract 2.10 (`foc-position.md`,
-  Target Reached): position mode reports the target reached once its error has stayed within the window for
-  the time, and a window of zero keeps the report off, as the group says. They are stored at once and in force
+  ([foc-position.md](foc-position.md), Motion Profile). Position mode plans a trapezoidal path to each
+  setpoint within them. The profile is off while the velocity or the acceleration is zero, and a
+  deceleration of zero uses the acceleration. The jerk is reserved for a later S-curve and has no effect
+  yet, as the group says. They are stored at once and in force from the next control period, in any state.
+  Its **Target Window** group holds the position window and its time of contract 2.10 ([foc-position.md](foc-position.md),
+  Target Reached). Position mode reports the target reached once its error has stayed within the window for
+  the time. A window of zero keeps the report off, as the group says. They are stored at once and in force
   within 1 ms, in any state.
   Its **Travel Limits** group holds the position minimum and maximum of contract 2.11, ±1000 turns since
-  contract 4.0 (`foc-position.md`, Software Position Limits). The group says they are measured from the position
-  zero, counting whole turns unless circular positioning is on, and are off while the minimum is not below the
-  maximum, and that when on, position mode refuses a setpoint outside them and moves the direct way between them. They are stored at once and in force from the next control period. The same group
-  holds the **Require homing** toggle of contract 2.19 (`foc-position.md`, Homing and the Position Reference)
-  with a note: position mode then starts only once a calibration or the encoder index has set the commissioned
-  zero in this power-up, and speed and torque mode are not held back. It also holds the **Circular positioning**
-  toggle of contract 4.0 (`foc-position.md`, Multi-Turn Position), off by default, with a note: on, a setpoint is
-  an angle within one turn and the rotor takes the shorter way round, from the next Start. The Motor Status group
-  shows the *Homed* reading next to *Target reached*.
-  Its **Thermal** group holds the calibration temperature of contract 2.13 (`fault-supervision.md` Part K): the
-  winding's temperature when the calibration measured its resistance, which the winding-temperature estimate starts
-  from; and the temperature limit and margin of contract 2.14, over which speed and position mode derate the current
-  and at which they fault. They are stored at once and in force within 100 ms.
-  Its **Supply Limits** group holds the bus-voltage minimum and maximum of contract 2.15 (`fault-supervision.md`
-  Part L). The group says each is off at 0, that a running drive faults with undervoltage or overvoltage when the
-  bus leaves them while a stopped one is not watched, and that the board's own trips stay in force. They are
-  stored at once and in force within 10 ms.
-Its **Quick Stop** group holds the quick-stop deceleration of contract 3.2 (`state-machine.md`, Quick Stop): the
-  rate at which Quick Stop slows the motor down, zero braking at the current limit. It is stored at once and used
-  by the next quick stop.
- Its **Online Recalibration** group holds the recalibration mode of contract 2.17 (`online-recalibration.md`), chosen
-  by name: *Off*, *On command* or *Automatic*. The group says that speed and position mode re-estimate the motor while
-  it runs, that *On command* redesigns the loops when Recalibrate is pressed on the Diagnostics tab and *Automatic* at
-  every stop, and that the loops never change while the motor runs. It is stored at once.
-Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
-the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
+  contract 4.0 ([foc-position.md](foc-position.md), Software Position Limits). The group says they are
+  measured from the position zero, counting whole turns unless circular positioning is on. It says they are
+  off while the minimum is not below the maximum. It also says that when on, position mode refuses a
+  setpoint outside them and moves the direct way between them. They are stored at once and in force from
+  the next control period. The same group holds the **Require homing** toggle of contract 2.19
+  ([foc-position.md](foc-position.md), Homing and the Position Reference). Its note says that position mode
+  then starts only once a calibration or the encoder index has set the commissioned zero in this power-up.
+  The note adds that speed and torque mode are not held back. It also holds the **Circular positioning**
+  toggle of contract 4.0 ([foc-position.md](foc-position.md), Multi-Turn Position), off by default. Its note
+  says that, from the next Start with the toggle on, a setpoint is an angle within one turn. The rotor then
+  takes the shorter way round. The Motor Status group shows the *Homed* reading next to *Target reached*.
+  Its **Thermal** group holds the calibration temperature of contract 2.13 ([fault-supervision.md](fault-supervision.md)
+  Part K). This is the winding's temperature when the calibration measured its resistance, which the
+  winding-temperature estimate starts from. It holds the temperature limit and margin of contract 2.14, over
+  which speed and position mode derate the current and at which they fault. They are stored at once and in
+  force within 100 ms.
+  Its **Supply Limits** group holds the bus-voltage minimum and maximum of contract 2.15 ([fault-supervision.md](fault-supervision.md)
+  Part L). The group says each is off at 0. It says that a running drive faults with undervoltage or
+  overvoltage when the bus leaves them, while a stopped one is not watched. It also says that the board's
+  own trips stay in force. They are stored at once and in force within 10 ms.
+  Its **Quick Stop** group holds the quick-stop deceleration of contract 3.2 ([state-machine.md](state-machine.md),
+  Quick Stop). This is the rate at which Quick Stop slows the motor down; a value of zero brakes at the
+  current limit. It is stored at once and used by the next quick stop.
+  Its **Online Recalibration** group holds the recalibration mode of contract 2.17 ([online-recalibration.md](online-recalibration.md)), chosen
+  by name: *Off*, *On command* or *Automatic*. The group says that speed and position mode re-estimate the
+  motor while it runs. It says that *On command* redesigns the loops when Recalibrate is pressed on the
+  Diagnostics tab, and *Automatic* at every stop. It also says that the loops never change while the motor
+  runs. It is stored at once.
+Apply sends only the changed values, one at a time, each after the previous one was accepted. It stops at
+the first refusal or missing answer. The log names the refused value and why, and the values not sent stay
 marked. Within a loop the settings go before the algorithm, so a law is designed with the settings it was
-chosen with — unless the new law is one that never refuses a setting (all but speed LQI and position LQR and
-LQI), which then goes first, so the law it replaces does not judge settings it will no longer run. Of the
-sliding-mode pair the one that keeps the switching gain below the boundary layer goes first, and a pair that
+chosen with. The exception is a new law that never refuses a setting (all but speed LQI and position LQR and
+LQI). Such a law goes first, so the law it replaces does not judge settings it will no longer run. Of the
+sliding-mode pair, the one that keeps the switching gain below the boundary layer goes first. A pair that
 would end with the switching gain at or above the boundary layer is refused before anything is sent. Revert
 drops the edits and reads the values in force again.
 
-Controllers and motor parameters change only while the motor is stopped: their Apply is disabled, with the
+Controllers and motor parameters change only while the motor is stopped. Their Apply is disabled, with the
 reason, while the last status says the motor runs or calibrates. Start-up settings can be stored at any time.
 
- node is compatible only when its contract version equals the tool's (`wire-contract.md` of e-foc-protocol Part A), so every
-setting, reading and command in this part is offered on every compatible node; the tool keeps no path for older
-firmware. A node on another version is marked incompatible and sent no motor commands. It is still read for its
-firmware identity, and its Firmware tab offers the update of Part M without waiting for a motor state the tool cannot
-read from it: the controller's own interlock refuses the transfer while its motor runs.
+A node is compatible only when its contract version equals the tool's (the e-foc-protocol wire contract, Part
+A). Thus every setting, reading and command in this part is offered on every compatible node. The tool keeps
+no path for older firmware. A node on another version is marked incompatible and sent no motor commands. It
+is still read for its firmware identity. Its Firmware tab offers the update of Part M without waiting for a
+motor state the tool cannot read from it. The controller's own interlock refuses the transfer while its
+motor runs.
 
 ### Part K — diagnostics
 
-The **Diagnostics** tab shows what the controller measured or derived and cannot be edited: the calibration
-record's current-sensor offsets and cogging peak, the online estimates (zero in torque mode, which runs no
-estimator), the control-loop statistics and the cause of the last reset, named. They are the read-only
-parameters of contract 2.2, read one at a time like the settings when the node is found compatible, after a
-calibration and on Refresh; each shows "—" until it is read, and the values are dropped when the node leaves
-the bus. Clear Statistics sends `ClearDiagnostics`, which restarts the control-loop and CAN error statistics,
+The **Diagnostics** tab shows what the controller measured or derived and cannot be edited:
+
+- the calibration record's current-sensor offsets and cogging peak;
+- the online estimates (zero in torque mode, which runs no estimator);
+- the control-loop statistics;
+- the cause of the last reset, named.
+
+They are the read-only parameters of contract 2.2. The tool reads them one at a time like the settings: when
+the node is found compatible, after a calibration and on Refresh. Each shows "—" until it is read, and the
+values are dropped when the node leaves the bus. Clear Statistics sends ClearDiagnostics, which restarts the control-loop and CAN error statistics,
 and reads them again once the controller accepts it.
 
-Its **Online Recalibration** group shows the model the loops are designed from — resistance, inductance, inertia and
-viscous friction in use — and the recalibrations applied, rejected and stored since power-up (contracts 2.17 and 2.18),
-read with the other diagnostics and again after a Recalibrate or Reset Model is accepted. Recalibrate sends
-`Recalibrate`; it is disabled, with the reason shown in the group and on the button, while the mode is *Off*, in torque
-mode (which runs no estimators) and while the motor runs or calibrates, since the firmware refuses it then.
-Reset Model asks for confirmation, sends `ResetModel`, which forgets the learned inductance, inertia and friction,
-and is disabled with the reason while the motor runs or calibrates.
+Its **Online Recalibration** group shows the model the loops are designed from: resistance, inductance, inertia
+and viscous friction in use. It also shows the recalibrations applied, rejected and stored since power-up
+(contracts 2.17 and 2.18). The group is read with the other diagnostics, and again after a Recalibrate or Reset
+Model is accepted. Recalibrate sends Recalibrate. It is disabled while the mode is *Off*, in torque mode (which
+runs no estimators) and while the motor runs or calibrates. The firmware refuses it then, and the reason shows in
+the group and on the button. Reset Model asks for confirmation and sends ResetModel, which forgets the learned
+inductance, inertia and friction. It is disabled with the reason while the motor runs or calibrates.
 
-Its **Fault History** group lists the controller's last eight faults, newest first (`service-fault-history.md`):
-the fault, the control mode, the power-up it happened in, the time from that power-up, the bus voltage and the
-peak torque current. The commander asks for every age (contract 2.16) when the node is found compatible, on
-Refresh, when the motor reports a fault and after a clear, and pairs each age's two responses into one row. The
-group shows "—" until the newest age is answered, "No faults recorded." when the controller holds none, and
-forgets the rows when the node leaves the bus. Clear Fault History asks for confirmation, sends
-`ClearFaultHistory` and reads the history again once the controller has stored it.
+Its **Fault History** group lists the controller's last eight faults, newest first ([service-fault-history.md](service-fault-history.md)).
+Each row holds the fault, the control mode and the power-up it happened in. It also holds the time from that
+power-up, the bus voltage and the peak torque current. The commander asks for every age (contract 2.16) when
+the node is found compatible and on Refresh. It also asks when the motor reports a fault and after a clear. It pairs each age's two responses into
+one row. The group shows "—" until the newest age is answered. It shows "No faults recorded." when the
+controller holds none. It forgets the rows when the node leaves the bus. Clear Fault History asks for confirmation, sends
+ClearFaultHistory and reads the history again once the controller has stored it.
 
 ### Part E — issue log
 
@@ -349,25 +381,37 @@ forgets the rows when the node leaves the bus. Clear Fault History asks for conf
 - Every line is one entry: UTC timestamp, severity (INFO, WARN, ERROR), message.
 - The current file rotates at 1 MiB; three files are kept. A log folder that disappears while the tool runs
   stops file output; the tool keeps running and keeps the newest entries in memory.
-- Recorded: session start with version, operating system and Qt version; connect and disconnect; motor
-  discovery; per motor, online and offline, command outcomes, firmware contract result, changes of motor
-  state and fault (not every frame); emergency stops; release check results; warnings Qt itself raises.
+- Recorded:
+  - session start with version, operating system and Qt version;
+  - connect and disconnect;
+  - motor discovery;
+  - per motor, online and offline, command outcomes, firmware contract result, changes of motor state and
+    fault (not every frame);
+  - emergency stops;
+  - release check results;
+  - warnings Qt itself raises.
 - Raw CAN frames are not recorded; they are shown, on request, in the bounded on-screen event log only.
 - The newest entries are also kept in memory for the bug report.
 
 ### Part F — reporting an issue
 
-Help → Report Issue opens the project's new-issue page with the title prefixed "[CAN Commander]" and a body
-holding: a prompt for what happened, the version, operating system, architecture and Qt version, the
-newest log entries, and where the full log file lives (with the home folder shown as "~"). Older entries
+Help → Report Issue opens the project's new-issue page with the title prefixed "[CAN Commander]". The body
+holds:
+
+- a prompt for what happened;
+- the version, operating system, architecture and Qt version;
+- the newest log entries;
+- where the full log file lives (with the home folder shown as "~").
+
+Older entries
 are dropped until the address fits the length the issue tracker accepts. Nothing is sent until the user
 submits the page. Help → Open Log Folder shows the files.
 
 ### Part G — update check and self-upgrade
 
-At startup and every 24 hours while running (unless automatic checks are switched off in the Help menu or by
-the no-update-check option), and on Help → Check for Updates, the tool reads the project's latest-release
-document over HTTPS, honouring the system proxy. The release tag is compared with the tool's own version as
+The tool reads the project's latest-release document over HTTPS, honouring the system proxy. It does so at
+startup and every 24 hours while running, and on Help → Check for Updates. Automatic checks can be switched off
+in the Help menu or by the no-update-check option. The release tag is compared with the tool's own version as
 three numbers.
 
 - Newer release: a dismissible banner names the version and offers to install it, plus the release notes.
@@ -378,17 +422,21 @@ three numbers.
   and links to the releases page.
 
 The installer is the release asset whose name ends in the platform's installer suffix (Part H). Installing
-it from inside the tool needs the tool to run from an installed package (not a portable archive), the
-asset to carry the SHA-256 digest GitHub records for every uploaded release asset (the release workflow
-publishes no checksum file of its own) and, on Linux, `pkexec` and `apt-get` to be present.
+it from inside the tool needs:
+
+- the tool to run from an installed package (not a portable archive);
+- the asset to carry the SHA-256 digest GitHub records for every uploaded release asset (the release
+  workflow publishes no checksum file of its own);
+- on Linux, `pkexec` and `apt-get` to be present.
+
 When any of them is missing, the banner offers the installer download, or the release page, instead.
 
 Installing always starts with the user: *Install Update…* asks for confirmation and says what happens next.
-The tool then downloads the installer with visible progress, which the user can cancel, and checks the
+The tool then downloads the installer with visible progress, which the user can cancel. It checks the
 received file's size and SHA-256 against the size and digest GitHub records for the asset. A file that does not match
 is deleted and never run. Downloading may happen while a bus is open, but installing closes or restarts the
-tool, so it waits until the bus is disconnected: the banner says so, and installation continues on request
-once the bus is closed.
+tool. Installing therefore waits until the bus is disconnected. The banner says so, and installation
+continues on request once the bus is closed.
 
 - Windows: the tool hands over to a helper and closes. The helper waits until the tool has exited, then
   starts the installer elevated, which shows the Windows permission prompt for the installer itself, silently
@@ -425,13 +473,13 @@ stateDiagram-v2
 | Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | the `e-foc-can-commander` command, a desktop entry and icons                                                  | Qt libraries and platform plugins declared as package dependencies; built on Ubuntu 24.04, so it needs a distribution of that generation or newer |
 
 The portable archives (Windows zip, Linux tar.gz) stay alongside the installers. The release workflow
-installs each package on a clean runner, checks the reported version against the project version, launches
-the tool, and uninstalls it before the release is published.
+installs each package on a clean runner and checks the reported version against the project version. It then
+launches the tool and uninstalls it before the release is published.
 
 Every release asset carries a build-provenance attestation, signed through Sigstore by the release
-workflow, so anyone can check that a file was built from this repository by its release workflow. Once the
-project's code signing is configured, the Windows executable is Authenticode-signed before packaging, so the
-portable archive and the installer carry the same signed binary, and the installer itself is signed too; the
+workflow. Thus anyone can check that a file was built from this repository by its release workflow. Once the
+project's code signing is configured, the Windows executable is Authenticode-signed before packaging. Thus the
+portable archive and the installer carry the same signed binary. The installer itself is signed too, and the
 release check then requires both signatures to be valid. Until then the signing steps are skipped and releases
 are published unsigned.
 
@@ -461,9 +509,9 @@ loaded when needed, so the tool installs and starts on a machine without them.
 - **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
   dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
 - **Connecting** — an adapter that accepts the request but has not yet reported the connection shows
-  *Connecting…*: the fields and Connect are disabled and Disconnect cancels. slcan reports the connection
-  once the device has acknowledged the bitrate and the open command, or after 250 ms without a rejection,
-  because CANable and CANtact firmware never acknowledge a command. A rejected bitrate or open command
+  *Connecting…*: the fields and Connect are disabled and Disconnect cancels. The slcan adapter reports the
+  connection once the device has acknowledged the bitrate and the open command. It also reports it after
+  250 ms without a rejection, because CANable and CANtact firmware never acknowledge a command. A rejected bitrate or open command
   logs the adapter's reason, not a disconnect.
 - **Polling** — on Linux the tool waits on the adapter's descriptor; on Windows it polls the adapter every
   millisecond. Reading starts as soon as the adapter accepts the request, so the slcan handshake replies
@@ -473,82 +521,89 @@ loaded when needed, so the tool installs and starts on a machine without them.
 
 ### Part M — firmware update
 
-Each motor's **Firmware** tab shows the firmware the controller reports: its release version, its board and a
-pack staged on it, if any (contract 2.6, `service-can.md`). An update has two steps, and the user starts each
+Each motor's **Firmware** tab shows the firmware the controller reports (contract 2.6,
+[service-can.md](service-can.md)). This is its release version, its board and a pack staged on it, if any. An update has two steps, and the user starts each
 one, separately, while that motor is stopped:
 
 1. **Download to Controller** sends a pack to the controller, which checks it and keeps it staged
-   (`service-firmware-upgrade.md`). The motor can run again afterwards; the staged pack waits.
+   ([service-firmware-upgrade.md](service-firmware-upgrade.md)). The motor can run again afterwards; the staged pack waits.
 2. **Apply Firmware** tells the controller to install the staged pack. It restarts, and its bootloader
-   installs the pack (`bootloader.md`).
+   installs the pack ([bootloader.md](bootloader.md)).
 
 The tool never chains the two: a finished download ends with the pack staged and the Apply button offered,
 nothing more.
 
 - **Sources.** The release check of Part G also looks for the firmware pack of the motor's board in the latest
   release, by its asset name, `e_foc-firmware-<board>-sync_foc_sensored-<tag>.upgrade` with the board named as
-  the Diagnostics tab names it and the release's own tag (`service-firmware-upgrade.md` Part J). When that
-  release is newer than the version the motor reports, the Firmware tab says so and the motor's tab carries a
-  marker, an arrow after the motor's name, with the release in the tab's tooltip. *Open Pack File…* takes a
+  the Diagnostics tab names it and the release's own tag ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part J). When that
+  release is newer than the version the motor reports, the Firmware tab says so. The motor's tab then carries
+  a marker, an arrow after the motor's name, with the release in the tab's tooltip. *Open Pack File…* takes a
   local pack instead, for a development build. A node older than contract 2.6 cannot report its version or
   board, so the tab explains that and offers nothing. A node that reports its version but refuses the staged
-  version (`0xB5`–`0xB7` answered `invalidPayload`) runs firmware without the firmware-upgrade service: the tab
+  version (`0xB5`–`0xB7` answered *invalidPayload*) runs firmware without the firmware-upgrade service. The tab
   says that this firmware cannot be updated over CAN and offers no download. Only a board with a bootloader can
-  be updated, today the reference board and the emulated board; for any other the tab says that the board has no
-  bootloader to install a pack.
+  be updated: today the reference board and the emulated board. For any other board, the tab says that the board
+  has no bootloader to install a pack.
 - **The right board.** A release pack is downloaded with visible progress into the
-  per-user cache, in its `firmware` folder, and checked against the size and SHA-256 digest GitHub records for the asset, as
-  the self-upgrade checks its installer; a file that does not match is deleted. Every pack, downloaded or
-  opened, is read before it is offered: its magic, its header version, a size the staging slot holds (320 KB),
-  a product name that is the board identification of the board the node reports (`bootloader.md` Part B),
-  which names that board, a product version of three numbers from 0 to 255, and the one
-  application image that ends the pack, as the controller checks them (`service-firmware-upgrade.md` Part D).
+  per-user cache, in its firmware folder. The tool checks it against the size and SHA-256 digest GitHub
+  records for the asset, as the self-upgrade checks its installer. A file that does not match is deleted.
+  Every pack, downloaded or opened, is read before it is offered, as the controller checks it
+  ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part D). The tool checks its magic, its header
+  version, and a size the staging slot holds (320 KB). The product name must be the board identification of
+  the board the node reports, which names that board ([bootloader.md](bootloader.md) Part B). The product
+  version must be three numbers from 0 to 255. One application image must end the pack.
   The tool knows every board's identification from the same header the firmware is built with. A pack for
-  another board is not offered, and the tab names both. The controller and its bootloader check again (`bootloader.md` Part I); the tool does not
+  another board is not offered, and the tab names both. The controller and its bootloader check again ([bootloader.md](bootloader.md) Part I); the tool does not
   check the signature.
 - **Stopped means Idle or Ready.** *Download to Controller…*, *Apply Firmware…* and *Discard* are enabled only while the
   motor's last status reads idle or ready, it has no command pending and no other motor on the bus is
   downloading; otherwise each says why. A motor in fault is cleared first. The controller enforces the same
-  rule and answers `Busy` to a request that arrives while it runs.
-- **Download.** A confirmation names the motor and the version, and says that the motor stays stopped until
-  the download ends, two to three minutes for 320 KB, and that nothing is installed yet. Then Begin, which the
-  controller answers once it has erased its whole staging slot, the status line reading "Erasing the
-  controller's staging slot…" over a busy bar until then; then the blocks one at a time, each after the previous one was acknowledged, and Verify with the
-  pack's CRC-32. A block not answered within 1 s is followed by a Query Progress and sent again from where the controller stands, at most
-  three times in a row before the download is given up. A block or Verify answered `Busy`, which the controller
-  gives while it programs a page, counts as unanswered: the block is sent again from where the controller
-  stands, and Verify is sent again. A progress bar shows the bytes sent out of the total
-  and the time left; *Cancel* sends Abort. While the download runs, that motor's other commands are disabled
-  with the reason "Firmware transfer in progress: the other commands wait until it ends. The emergency stop
-  stays available."; every other motor stays commandable. An emergency stop sent to the motor ends its download on both sides: the controller drops the
-  pack (`service-firmware-upgrade.md` Part F) and the tool sends nothing more and says the stop ended the
-  download and nothing was staged. A staged pack and an apply under way are not affected, as on the
-  controller. A verified download leaves the tab reading "1.7.0 downloaded, apply when ready", with *Apply
-  Firmware…* and *Discard*, which sends Abort and forgets the staged pack. Verifying and, after Activate, the
-  wait for the controller read the same way: the status line names the step over a busy bar, since a busy bar
-  shows no text of its own.
+  rule and answers *Busy* to a request that arrives while it runs.
+- **Download.** A confirmation names the motor and the version. It says that the motor stays stopped until
+  the download ends, two to three minutes for 320 KB, and that nothing is installed yet. Then the tool sends
+  Begin, which the controller answers once it has erased its whole staging slot. Until then the status line
+  reads "Erasing the controller's staging slot…" over a busy bar. Then the tool sends the blocks one at a
+  time, each after the previous one was acknowledged, and Verify with the pack's CRC-32. A block not
+  answered within 1 s is followed by a Query Progress. The block is then sent again from where the
+  controller stands, at most three times in a row before the download is given up. A block or Verify
+  answered *Busy* counts as unanswered; the controller gives *Busy* while it programs a page. The block is
+  then sent again from where the controller stands, and Verify is sent again. A progress bar shows the
+  bytes sent out of the total and the time left; *Cancel* sends Abort. While the download runs, that
+  motor's other commands are disabled with the reason "Firmware transfer in progress: the other commands
+  wait until it ends. The emergency stop stays available." Every other motor stays commandable. An
+  emergency stop sent to the motor ends its download on both sides. The controller drops the pack
+  ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part F). The tool sends nothing more and says
+  the stop ended the download and nothing was staged. A staged pack and an apply under way are not
+  affected, as on the controller. A verified download leaves the tab reading "1.7.0 downloaded, apply when
+  ready", with *Apply Firmware…* and *Discard*, which sends Abort and forgets the staged pack. Verifying
+  and, after Activate, the wait for the controller read the same way. The status line names the step over
+  a busy bar, since a busy bar shows no text of its own.
 - **Apply.** A confirmation names the motor, the running version and the staged one, and says that the
   controller restarts and that the old firmware is not kept. Then Activate. The tool waits up to 30 s for the
-  node to come back, then reads its version. The node is back when it reports nothing staged: the tool reads
-  its firmware identity again when it comes back online, and every 5 s while it has not dropped off the bus,
-  which a restart faster than the 3 s offline timeout does not. The update succeeded when the node reports the
-  staged version. A node that comes back with the old version had its pack refused by the bootloader, which
-  kept the old application: the tool says so and logs it. A node that does not come back is reported as a
+  node to come back, then reads its version. The node is back when it reports nothing staged. The tool reads
+  its firmware identity again when it comes back online. It also reads it every 5 s while the node has not
+  dropped off the bus. A restart faster than the 3 s offline timeout does not drop it off. The update
+  succeeded when the node reports the staged version. A node that comes back with the old version had its
+  pack refused by the bootloader, which kept the old application. The tool says so and logs it. A node that does not come back is reported as a
   failed update that needs a debugger to recover.
-- **Refusals.** `Busy` means the motor was not stopped or had work outstanding; the tab says to stop it and
-  wait. `CrcMismatch` and `NotReady` on Verify mean the pack did not arrive intact or is not for this board and
-  processor, and nothing was staged; *Try Again*, offered after a failed or abandoned download only, asks
-  the download's confirmation again and restarts it from the beginning. A failed apply offers no *Try Again*:
-  the node's state decides what the tab offers next. `NotReady` on Activate means no pack is staged on the
-  controller. `InvalidState` on a block or Verify means the controller ended the download first, by an
-  emergency stop, an abort or its 30 s inactivity deadline, and `SessionTimeout` that it ended it after 30 s
-  without a block; nothing was staged either way. Every text names the step it answers, so the same answer
-  reads differently for a download and for an apply.
+- **Refusals.** Every text names the step it answers, so the same answer reads differently for a download
+  and for an apply.
+  - *Busy* means the motor was not stopped or had work outstanding; the tab says to stop it and wait.
+  - *CrcMismatch* and *NotReady* on Verify mean the pack did not arrive intact or is not for this board and
+    processor. Nothing was staged.
+  - *Try Again*, offered after a failed or abandoned download only, asks the download's confirmation again
+    and restarts it from the beginning. A failed apply offers no *Try Again*: the node's state decides what
+    the tab offers next.
+  - *NotReady* on Activate means no pack is staged on the controller.
+  - *InvalidState* on a block or Verify means the controller ended the download first. It ended it by an
+    emergency stop, an abort or its 30 s inactivity deadline. Nothing was staged.
+  - *SessionTimeout* on a block or Verify means the controller ended the download after 30 s without a block.
+    Nothing was staged.
 - **Bus.** Disconnecting or closing the tool during a transfer asks first, and the question says what goes on
   without the tool. During a download, doing it anyway abandons the download, which the controller drops after
   30 s without a command, and nothing is installed. During an apply, once Activate was sent, the controller
-  restarts and its bootloader installs the staged pack whether the tool watches or not: the tab says so and
-  asks to reconnect and read the version. During a discard, whether the controller took the Abort is unknown,
+  restarts and its bootloader installs the staged pack. This happens whether the tool watches or not. The tab
+  says so and asks to reconnect and read the version. During a discard, whether the controller took the Abort is unknown,
   and the pack may still be staged. A staged pack is not affected by the bus closing; it is still there, and
   still offered for apply, at the next connection.
 - Every step, refusal and failure goes to the issue log, with the motor and the versions.
@@ -577,22 +632,23 @@ stateDiagram-v2
 
 ### Part N — virtual motors
 
-A virtual motor (`virtual-motor.md`) is the shipping application running on the development machine
+A virtual motor ([virtual-motor.md](virtual-motor.md)) is the shipping application running on the development machine
 against the simulation plant. The tool reaches it on a virtual CAN bus, named `virtual:<bus>` in the
-Interface box, and commands it like any board; it learns nothing about the plant, whose views belong to
-the Virtual Motor app (`tool-virtual-motor.md`).
+Interface box, and commands it like any board. It learns nothing about the plant, whose views belong to
+the Virtual Motor app ([tool-virtual-motor.md](tool-virtual-motor.md)).
 
 - **Listing.** The Interface box lists `virtual:default` while a virtual CAN hub runs on the machine; any
-  other bus name can be typed. Connecting while no hub runs, or at another bitrate than the bus already
-  runs at, fails with the advice to check that a hub is running and that every node uses the same bitrate.
+  other bus name can be typed. Connecting fails while no hub runs, or at another bitrate than the bus
+  already runs at. The failure comes with the advice to check that a hub is running and that every node uses
+  the same bitrate.
 - **Marking.** A node that reports the board kind *virtual* is marked **Virtual** on its tab, its overview
   chip and its motor header, so a virtual motor is never mistaken for hardware, nor hardware for a virtual
   motor.
 - **Firmware.** The Firmware tab shows a virtual motor's version and board kind and nothing else: no release,
-  no pack and no update steps, because a virtual motor runs the firmware it was built with; the Download
+  no pack and no update steps, because a virtual motor runs the firmware it was built with. The Download
   and Apply actions stay disabled and say so.
 - **Launching.** Motor → Launch Virtual Motor… starts the Virtual Motor app, which is installed with the
-  tool (`tool-virtual-motor.md` Part I). Where the app is not installed next to the tool the action is
+  tool ([tool-virtual-motor.md](tool-virtual-motor.md) Part I). Where the app is not installed next to the tool the action is
   disabled and says so.
 - **Going offline.** A paused, powered-off or crashed virtual motor goes silent and is reported offline
   after the usual liveness timeout; closing the hub closes the bus as an unplugged adapter would.
@@ -609,16 +665,16 @@ the Virtual Motor app (`tool-virtual-motor.md`).
 
 ### Required
 
-| Interface                 | Purpose                                                      | Contract                                                                                             |
-|---------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| CAN adapter driver        | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)             |
-| Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-COM-001, per server) |
-| CAN service client        | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
-| Release feed              | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
-| Firmware packs            | Firmware update                                              | Release assets named as in `service-firmware-upgrade.md` Part J, each with the digest GitHub records |
-| Firmware-upgrade category | Firmware update                                              | `can-lite` firmware-upgrade specification; the controller answers as `service-firmware-upgrade.md`   |
-| Elevation                 | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                          |
-| Web browser               | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
+| Interface                 | Purpose                                                      | Contract                                                                                                                          |
+|---------------------------|--------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| CAN adapter driver        | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)                                          |
+| Firmware wire contract    | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-COM-001, per server)                              |
+| CAN service client        | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                                                            |
+| Release feed              | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H                                |
+| Firmware packs            | Firmware update                                              | Release assets named as in [service-firmware-upgrade.md](service-firmware-upgrade.md) Part J, each with the digest GitHub records |
+| Firmware-upgrade category | Firmware update                                              | can-lite firmware-upgrade specification; the controller answers as [service-firmware-upgrade.md](service-firmware-upgrade.md)     |
+| Elevation                 | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                                                       |
+| Web browser               | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                                                      |
 
 ---
 
@@ -791,21 +847,21 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint             | Value / Description                                                                                                                                      |
-|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                                                                        |
-| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase          |
-| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                          |
-| Status reads           | each compatible node every 1 s and after every accepted command: state and fault, motion, target reached, winding temperature and homed                  |
-| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                                                                          |
-| On-screen event log    | newest 5000 lines                                                                                                                                        |
-| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                                  |
-| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                                                                                   |
-| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                     |
-| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                                 |
-| Automatic checks       | at startup and every 24 h while running                                                                                                                  |
-| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                             |
-| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB |
-| Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                |
-| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version; the reference board takes about 10 s (`bootloader.md` Constraints)             |
-| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                        |
+| Constraint             | Value / Description                                                                                                                                         |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Motors per bus         | 8 (the servers can-lite tracks)                                                                                                                             |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate; 10 s for Begin, answered after the staging erase             |
+| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                                                                             |
+| Status reads           | each compatible node every 1 s and after every accepted command: state and fault, motion, target reached, winding temperature and homed                     |
+| Node offline after     | 3 s without a frame (can-lite server timeout)                                                                                                               |
+| On-screen event log    | newest 5000 lines                                                                                                                                           |
+| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                                                                                     |
+| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                                                                                      |
+| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address)                                                        |
+| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                                                                                    |
+| Automatic checks       | at startup and every 24 h while running                                                                                                                     |
+| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match GitHub's record of the asset                                                |
+| Firmware update        | download and apply each started by the user, each only while the motor is idle or ready; one download at a time per bus; two to three minutes for 320 KB    |
+| Firmware block answer  | 1 s, then Query Progress and resend; three tries in a row                                                                                                   |
+| Firmware restart       | after Apply, the node is back within 30 s and reports the staged version; the reference board takes about 10 s ([bootloader.md](bootloader.md) Constraints) |
+| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                                                                           |

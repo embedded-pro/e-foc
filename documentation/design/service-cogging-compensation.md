@@ -2,9 +2,9 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: service-cogging-compensation
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Cogging Compensation |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.4.0                         |
+| Version   | 0.4.1                         |
 | Component | service-cogging-compensation  |
-| Date      | 2026-11-08                    |
+| Date      | 2026-11-26                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,12 +29,12 @@ date: 2026-11-08
 ## Responsibilities
 
 A permanent-magnet rotor prefers some angles to others even with no current in the winding: its
-magnets pull towards the stator teeth. On the bench motor, a 12-slot, 8-pole machine, that cogging
-torque repeats 24 times a revolution and is about 4 mN·m deep, as large as the shaft's 3.7 mN·m of
-dry friction (`software-in-the-loop.md`, Part K). A position setpoint between two detents sits
-where the cogging pushes the rotor away. A loop holds it there only if its stiffness exceeds the
-cogging's, and at the default tunings it does not: the PID, two-DOF and Cascade P laws step
-between the neighbouring detents instead (`documentation/theory/position-loop-pid.md`).
+magnets pull towards the stator teeth. On the bench motor, a 12-slot, 8-pole machine, that cogging torque
+repeats 24 times a revolution. It is about 4 mN·m deep, as large as the shaft's 3.7 mN·m of dry friction
+([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part K). A position
+setpoint between two detents sits where the cogging pushes the rotor away. A loop holds it there only if its
+stiffness exceeds the cogging's. At the default tunings it does not: the PID, two-DOF and Cascade P laws
+step between the neighbouring detents instead ([position loop PID](../theory/position-loop-pid.md)).
 
 **Is responsible for:**
 - Measuring the cogging torque over one electrical period during the full calibration, in speed
@@ -51,27 +51,27 @@ between the neighbouring detents instead (`documentation/theory/position-loop-pi
 
 ### Part A — Why one electrical period
 
-The encoder has no index, so after a power cycle the firmware knows the rotor's angle only from the
-alignment, which pulls the rotor to the electrical zero. That fixes the electrical angle, and the
-mechanical angle only up to a whole electrical period. A map over one electrical period is therefore
-the longest one that means the same after every alignment.
+The encoder has no index. After a power cycle the firmware therefore knows the rotor's angle only
+from the alignment, which pulls the rotor to the electrical zero. That fixes the electrical angle,
+and the mechanical angle only up to a whole electrical period. A map over one electrical period is
+therefore the longest one that means the same after every alignment.
 
-It also holds the cogging. Its fundamental repeats at the least common multiple of the slot and
-pole counts a revolution, 24 on the bench motor, which is a whole number of times per electrical
-period: six. What the map loses is any difference between the pole pairs, which a map over a
-revolution would keep.
+It also holds the cogging. Its fundamental repeats at the least common multiple of the slot and pole
+counts a revolution: 24 on the bench motor. This is a whole number of times per electrical period:
+six. What the map loses is any difference between the pole pairs, which a map over a revolution
+would keep.
 
 ### Part B — The measurement
 
 The step runs once the mechanical parameters are agreed, with the speed loop configured from them.
-It turns the rotor under speed control at 10 rad/s, half a revolution to settle and then two
-revolutions measured, in one direction and then in the other. Each control interrupt adds the
-quadrature current and the encoder's rotation since the last interrupt to the bin of the electrical
-period the rotor is in, 48 bins, kept per direction.
+It turns the rotor under speed control at 10 rad/s, in one direction and then in the other. In each
+direction it turns half a revolution to settle and then two revolutions measured. Each control
+interrupt adds the quadrature current and the encoder's rotation since the last interrupt to the bin
+the rotor is in. The electrical period has 48 bins, kept per direction.
 
-At 10 rad/s the cogging repeats at 240 rad/s, well above the speed loop's 100 rad/s, so most of it
-goes into speeding and slowing the rotor rather than into current. The torque a bin holds is
-therefore the winding's less the rotor's:
+At 10 rad/s the cogging repeats at 240 rad/s, well above the speed loop's 100 rad/s. Most of it
+therefore goes into speeding and slowing the rotor rather than into current. The torque a bin holds
+is therefore the winding's less the rotor's:
 
 - a bin's speed is the rotation the encoder reported in it over the time spent there, so a bin
   one encoder count wider than its neighbour does not read as faster;
@@ -80,33 +80,33 @@ therefore the winding's less the rotor's:
 - its torque is the torque constant times its mean current, less the identified inertia times its
   acceleration.
 
-Without the inertia term the map missed most of the cogging. The two directions are then averaged:
-the cogging follows the angle and stays, the friction follows the motion and cancels, and so does
-the viscous term at equal speeds. The mean is taken out. The same two profiles carry the dry friction
-(Part F). A direction that left a bin with fewer
-than 16 samples, or turned the wrong way, yields no map.
+Without the inertia term the map missed most of the cogging. The two directions are then averaged.
+The cogging follows the angle and stays. The friction follows the motion and cancels, and so does the
+viscous term at equal speeds. The mean is taken out. The same two profiles carry the dry friction
+(Part F). A direction that left a bin with fewer than 16 samples, or turned the wrong way, yields no
+map.
 
-A motor without cogging still gave a map: noise alone, 0.13 to 0.26 mN·m on the bench plant, which
-the feed-forward then applied as a torque ripple of its own. The two directions tell the cogging
-from the noise. The cogging is the same in both, while the noise in one is independent of the noise
-in the other. So the builder compares the two profiles, each with its mean removed: the root mean
-square of their sum against that of their difference, which it calls the agreement. Noise alone
-agrees to about 1, and the builder keeps a map only from an agreement of 3. In simulation, through
-full calibrations:
+A motor without cogging still gave a map: noise alone, 0.13 to 0.26 mN·m on the bench plant. The
+feed-forward then applied it as a torque ripple of its own. The two directions tell the cogging from
+the noise. The cogging is the same in both, while the noise in one is independent of the noise in
+the other. So the builder compares the two profiles, each with its mean removed. It compares the
+root mean square of their sum against that of their difference, and calls this the agreement. Noise
+alone agrees to about 1, and the builder keeps a map only from an agreement of 3. In simulation,
+through full calibrations:
 
 | Plant                                    | Agreement   | Map            |
 |------------------------------------------|-------------|----------------|
 | Bench, no cogging, four noise seeds      | 0.99 – 1.20 | none           |
 | Bench, 3.7 mN·m dry friction, no cogging | 0.85        | none           |
-| Teknic and anaheim reference motors      | 0.76 – 0.78 | none           |
+| Teknic and Anaheim reference motors      | 0.76 – 0.78 | none           |
 | Bench, 0.5 mN·m cogging                  | 6.6         | 0.60 mN·m peak |
 | Bench, 1 mN·m cogging                    | 9.1         | 1.08 mN·m peak |
 | Bench, the bench's 4 mN·m cogging        | 26          | 3.87 mN·m peak |
 
-The agreement also refuses a map built with the wrong inertia: without the inertia term, the
-simulated rotor's two directions agree to 0.14, against 52 with it, because the current the speed
-loop gives each detent leads the rotor in one direction and lags it in the other. The calibration
-traces the agreement with the map's peak.
+The agreement also refuses a map built with the wrong inertia. Without the inertia term, the
+simulated rotor's two directions agree to 0.14, against 52 with it. The reason is that the current
+the speed loop gives each detent leads the rotor in one direction and lags it in the other. The
+calibration traces the agreement with the map's peak.
 
 The run stops the bridge if any phase current passes the identification envelope, and gives up
 after 10 s. Neither ends the calibration: a calibration without a map completes and is stored
@@ -115,20 +115,20 @@ without one.
 ### Part C — The record
 
 The map is stored as 48 signed bytes and one scale: the largest bin is ±127. It adds 52 bytes, so
-the calibration record grows from 56 to 108 bytes inside its 128-byte region, and the layout
-version goes from 3 to 4. A board flashed with this version therefore boots with no calibration and
-has to be calibrated again (`service-nvm.md`).
+the calibration record grows from 56 to 108 bytes inside its 128-byte region. The layout version
+goes from 3 to 4. A board flashed with this version therefore boots with no calibration and has to
+be calibrated again ([service-nvm.md](service-nvm.md)).
 
 An external electrical identification over CAN keeps the stored map, as it keeps the current
 offsets: it measures neither.
 
 ### Part D — The feed-forward
 
-When a calibration with a map is applied, at boot or when one completes, the cascade expands the 48
-bins into 256 points over the electrical period, by a periodic Catmull-Rom curve through the bin
-centres, and divides by the torque constant. At every control interrupt it looks up the current at
-the rotor's electrical angle, interpolating linearly between points, and adds it to the speed
-loop's output, or to the current an LQR or LQI position law asks for directly. The sum is held
+A calibration with a map is applied at boot or when one completes. The cascade then expands the 48
+bins into 256 points over the electrical period. It uses a periodic Catmull-Rom curve through the
+bin centres and divides by the torque constant. At every control interrupt it looks up the current
+at the rotor's electrical angle, interpolating linearly between points. It adds this current to the
+speed loop's output, or to the current an LQR or LQI position law asks for directly. The sum is held
 within the drive's current limit. The lookup costs about as much as one sine from the table the
 transforms use.
 
@@ -139,16 +139,16 @@ The map is cleared before the mechanical identification runs, so a calibration m
 without the compensation from an earlier one.
 
 Torque mode compensates with the same map once a speed or position calibration has stored one, since the
-calibration record is shared by the modes. Its cascade adds the current to the operator's q-axis setpoint
-after the speed limiter (`foc-torque.md`), so the limiter folds the operator's torque and not the cogging's,
-and holds the sum within the current limit. The compensation is added, not part of the command: the demand the
-cascade reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step,
-such as the flux-linkage identification's, is not compensated, and a new calibration clears the map before it
-identifies the motor, as in the other modes (REQ-CTL-001).
+calibration record is shared by the modes. Its cascade adds the current to the operator's q-axis setpoint after the speed
+limiter ([foc-torque.md](foc-torque.md)). The limiter therefore folds the operator's torque and not the cogging's. The
+cascade holds the sum within the current limit. The compensation is added, not part of the command: the demand the cascade
+reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step, such as the
+flux-linkage identification's, is not compensated. A new calibration clears the map before it identifies the motor, as in
+the other modes (REQ-CTL-001).
 
-The online mechanical estimator regresses the current without the compensation's share. The
-compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
-the inertia, the friction, and only what the map missed (`service-mechanical-ident.md`).
+The online mechanical estimator regresses the current without the compensation's share. The compensation and the
+plant's cogging cancel in the torque balance. The estimator therefore sees the inertia, the friction, and only what
+the map missed ([service-mechanical-ident.md](service-mechanical-ident.md)).
 
 ### Part E — Where it does not reach
 
@@ -166,25 +166,26 @@ the inertia, the friction, and only what the map missed (`service-mechanical-ide
 (REQ-CMS-008 and REQ-CTL-008)
 
 The two directions' mean torques differ by the friction that turns with the rotor. Forward, the winding carries
-the cogging, any constant shaft load, the dry friction $\tau_c$ and the viscous term $B\omega$; backward, the
-same cogging and load, less $\tau_c$ and $B|\omega|$. So $\tau_c$ is half the difference of the two directions'
-mean torques, less $B$ times the mean speed, and a constant load cancels. The one-way mechanical
+the cogging, any constant shaft load, the dry friction $\tau_c$ and the viscous term $B\omega$. Backward, it
+carries the same cogging and load, less $\tau_c$ and $B|\omega|$. So $\tau_c$ is half the difference of the two
+directions' mean torques, less $B$ times the mean speed, and a constant load cancels. The one-way mechanical
 identification cannot say this: its constant term is $\tau_c$ plus the load. The identified viscous friction and
 inertia are inputs.
 
-The estimate is kept apart from the map. A motor without cogging stores no map but still has dry friction, so
-a run that covered every bin in both directions yields the friction even when the map is refused. A run that
-left a bin empty, or whose estimate is negative or not finite, yields none and the record keeps 0, which the
-cascades read as no feed-forward; the calibration traces the value, or that there is none.
+The estimate is kept apart from the map. A motor without cogging stores no map but still has dry friction. A
+run that covered every bin in both directions therefore yields the friction even when the map is refused. A
+run that left a bin empty, or whose estimate is negative or not finite, yields none. The record then keeps 0,
+which the cascades read as no feed-forward. The calibration traces the value, or that there is none.
 
-The speed and position cascades, when a calibration with a friction is applied, divide it by the torque
-constant once, and at every outer-loop period add that current, signed by the speed reference and ramped
-linearly through zero over $\pm$2 rad/s, to the speed loop's demand (`documentation/theory/disturbances-and-noise.md`,
-*Friction*). The current is held below the drive's current limit at load time; a friction that would need the
-whole limit is refused. The addition sits before the current limit, so the sum is held within it, and outside the
-torque the online mechanical estimator regresses. Torque mode has no speed reference and applies none. Like the
-map, the feed-forward is cleared before the mechanical identification runs, and while the cogging map is measured,
-so neither measurement sees the compensation of an earlier calibration.
+When a calibration with a friction is applied, the speed and position cascades divide it by the torque
+constant once. At every outer-loop period they add that current to the speed loop's demand ([disturbances and
+noise](../theory/disturbances-and-noise.md), *Friction*). The current is signed by the speed reference and
+ramped linearly through zero over $\pm$2 rad/s. The current is held below the drive's current limit at load
+time; a friction that would need the whole limit is refused. The addition sits before the current limit, so
+the sum is held within it, and outside the torque the online mechanical estimator regresses. Torque mode has
+no speed reference and applies none. Like the map, the feed-forward is cleared before the mechanical
+identification runs, and while the cogging map is measured. Neither measurement therefore sees the
+compensation of an earlier calibration.
 
 ---
 

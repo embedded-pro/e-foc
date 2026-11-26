@@ -21,6 +21,10 @@ date: YYYY-MM-DD
 > Python, CMake, shell, etc.) are allowed.** Use Mermaid diagrams to express behavior instead.
 > Prose descriptions of algorithms are encouraged; source-level details are not.
 >
+> **Component, not code or hardware**: No class, type, function, file or folder names. No MCU, board,
+> vendor peripheral, register or clock frequency. Say "the target"; "on the reference board" for a
+> measured figure.
+>
 > **Diagrams**: All visuals must be Mermaid (` ```mermaid `), TikZ via ` ```{=latex} ` raw blocks (source in
 > `documentation/tikz/`), or ASCII art. External image references (`![alt](path)`) are **not allowed**.
 
@@ -30,7 +34,8 @@ date: YYYY-MM-DD
 
 > State precisely what this component is responsible for.
 > A well-scoped responsibility statement prevents scope creep and clarifies ownership boundaries.
-> List one bullet per responsibility.
+> List one bullet per responsibility. Do not add a "not responsible for" list: state boundaries in
+> *Interfaces* (Required).
 
 **Is responsible for:**
 - …
