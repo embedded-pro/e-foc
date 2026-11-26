@@ -81,7 +81,7 @@ Speed and acceleration come from differences of encoder positions, and an encode
 count of $q$ radians, a window of $T_w$ seconds quantises the speed at $q/T_w$ and the acceleration at $q/T_w^2$. Read
 at 20 kHz, a 1000-line encoder (4000 counts per revolution, $q$ = 1.6 mrad) moves in steps of about 31 rad/s. Its
 second difference is quantised at over 600 000 rad/s². The acceleration is the harder quantity, because its
-quantisation falls with the _square_ of the window.
+quantisation falls with the *square* of the window.
 
 The procedure therefore sizes its **observation window** from the encoder it is given. It tracks the smallest non-zero
 position step it sees, which is one count. Once it has seen enough steps, it chooses the window that holds the
