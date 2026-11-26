@@ -25,10 +25,10 @@ date: 2026-10-30
 
 ## Overview
 
-A3 (Sliding-Mode) is robust to model uncertainty — the most critical early in operation before
-RLS has converged and during thermal transients that shift $R_s$. The SMC drives the current error
+A3 (Sliding-Mode) is robust to model uncertainty. This uncertainty is most critical early in operation,
+before RLS has converged, and during thermal transients that shift $R_s$. The SMC drives the current error
 onto a stable sliding surface regardless of parameter mismatch, within a defined gain margin.
-Unlike A1 and A2, A3 deliberately omits the A1 feedforward and treats residual coupling and noise
+Unlike A1 and A2, A3 deliberately omits the A1 feedforward. It treats residual coupling and noise
 as a bounded disturbance covered by the switching gain $K_{sw}$.
 
 Operates exclusively in the **20 kHz FOC ISR**. Partial RLS dependency — $A_d^i$, $B_d^i$ are
@@ -58,7 +58,7 @@ i[k+1] = A_d^i \cdot i[k] + B_d^i \cdot v'[k]
 $$
 
 A3 deliberately omits the A1 feedforward and treats the residual coupling and noise as a bounded
-disturbance covered by the switching gain $K_{sw}$; that robustness is the reason to select it
+disturbance covered by the switching gain $K_{sw}$. That robustness is the reason to select it
 before RLS has converged.
 
 ---
@@ -91,17 +91,17 @@ $$
 
 where $\mathrm{sat}(x) = \mathrm{clamp}(x,-1,1)$. Because $B_d^i = (1 - A_d^i)/R_s$, the last term is
 exactly $R_s i^*[k]$ — the resistive drop the reference current requires. All terms carry a leading
-minus sign on the error because it is measured as $i - i^*$: a current below its reference gives
+minus sign on the error because it is measured as $i - i^*$. A current below its reference gives
 $e < 0$ and must command a *positive* voltage. The boundary layer $\phi > 0$ replaces the
 discontinuous sign function with saturation to prevent chattering.
 
-The toolbox's `SlidingModeControl` computes its equivalent term as $-(S B)^{-1} S A\, e$, i.e. it
+The toolbox's `SlidingModeControl` computes its equivalent term as $-(S B)^{-1} S A\, e$. Thus it
 cancels whatever the state matrix it is given predicts. It is handed $A_d^i - \lambda$, not
-$A_d^i$. Handing it $A_d^i$ — the form this law shipped with — makes the equivalent term deadbeat:
-it drives the next error to zero on its own, and the switching term then pushes the error
+$A_d^i$. This law shipped with $A_d^i$. That form makes the equivalent term deadbeat:
+it drives the next error to zero on its own. The switching term then pushes the error
 $K_{sw}$ past zero every time it leaves the boundary layer. From rest a step of $\phi$ overshot by
-$K_{sw}/\phi$, 40 % with the shipped defaults, and oscillated with ratio $-K_{sw}/\phi$ after that;
-the SIL measured 46–50 % on a 0.5 A step.
+$K_{sw}/\phi$, 40 % with the shipped defaults. After that it oscillated with ratio $-K_{sw}/\phi$.
+The SIL measured 46–50 % on a 0.5 A step.
 
 **Parameter choices**:
 - $\lambda$ follows the current-loop bandwidth, so large steps approach the surface at the loop's

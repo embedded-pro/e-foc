@@ -68,8 +68,8 @@ shift out.
 
 ### Part B — The rate of each phase during the zero vector
 
-While all three low sides conduct, every terminal is at the negative rail and the star point at zero,
-so each winding sees no applied voltage:
+While all three low sides conduct, every terminal is at the negative rail and the star point at zero.
+Thus each winding sees no applied voltage:
 
 $$L\,\frac{di_k}{dt} = -R\,i_k - e_k$$
 

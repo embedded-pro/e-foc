@@ -108,27 +108,27 @@ $$
 $\omega_{bw}$ exactly. It is an empirical margin carried by the implementation; this chapter
 records it rather than justifying it, because no derivation here yields it.
 
-**The integral zero is floored** at $\omega_{bw}/4$, so the pole-zero cancellation this section is
+**The integral zero is floored** at $\omega_{bw}/4$. Thus the pole-zero cancellation this section is
 named after happens only when $B_f/J$ is already the larger of the two. For the identified
-parameters of a small PMSM it is not — $B_f/J$ is typically well under $\omega_{bw}/4$ — so in
-practice the floor sets the zero and the plant pole is *not* cancelled. The floor exists so that
-$K_i$ stays non-zero when the mechanical identification returns $B_f = 0$, which would otherwise
+parameters of a small PMSM it is not: $B_f/J$ is typically well under $\omega_{bw}/4$. So in
+practice the floor sets the zero, and the plant pole is *not* cancelled. The floor exists so that
+$K_i$ stays non-zero when the mechanical identification returns $B_f = 0$. Without the floor, that case would
 leave a pure proportional law with a standing error.
 
 **Where the floor sits decides load rejection.** With the factor 2 on $K_p$ the loop closes as
 $s^2 + 2\omega_{bw}s + 2\omega_{bw} z$, where $z$ is the integral zero. Its slow root sits near $z$
-and is what works a load torque off: the speed error after a torque step $\tau$ decays as
+and is what works a load torque off. After a torque step $\tau$, the speed error decays as
 $\frac{\tau}{J\,(p_2 - p_1)}\left(e^{p_1 t} - e^{p_2 t}\right)$. A floor of $\omega_{bw}/10$ put that
-root near $\omega_{bw}/10$ — about 10 rad/s at a 100 rad/s bandwidth, a time constant near 100 ms —
-so a 0.5 N·m step on the reference rotor (7.06 µkg·m²) was still 10.4 rad/s off a 20 rad/s setpoint
-0.4 s later and needed nearly half a second to return inside 3 rad/s. At $\omega_{bw}/4$ the slow
+root near $\omega_{bw}/10$. This is about 10 rad/s at a 100 rad/s bandwidth, a time constant near 100 ms.
+Then a 0.5 N·m step on the reference rotor (7.06 µkg·m²) was still 10.4 rad/s off a 20 rad/s setpoint
+0.4 s later. It needed nearly half a second to return inside 3 rad/s. At $\omega_{bw}/4$ the slow
 root moves to about $0.29\,\omega_{bw}$ and the same recovery takes under 200 ms. The zero also
-enters the reference path, so it trades against step overshoot: at $\omega_{bw}/4$ it nearly cancels
-the slow root and a step from rest overshoots by under 10 % on the same rotor; at $\omega_{bw}/2$ the
+enters the reference path, so it trades against step overshoot. At $\omega_{bw}/4$ it nearly cancels
+the slow root. Then a step from rest overshoots by under 10 % on the same rotor. At $\omega_{bw}/2$ the
 overshoot passes 15 %.
 
-Both gains are then divided by $I_{q,max}$ before they reach the PID, and its output is multiplied
-by $I_{q,max}$ again, so the controller works in normalised units and the scaling cancels.
+Both gains are then divided by $I_{q,max}$ before they reach the PID. Its output is multiplied
+by $I_{q,max}$ again. Thus the controller works in normalised units, and the scaling cancels.
 
 **Practical limit**: speed bandwidth must satisfy the cascade separation principle:
 $\omega_{bw}^s \leq \omega_{bw}^i / 10$, where $\omega_{bw}^i$ is the current-loop bandwidth.
@@ -142,7 +142,7 @@ $$
 \Delta u[k] = K_p\,\bigl(e[k] - e[k-1]\bigr) + K_i\, T_s^o\, e[k]
 $$
 
-The $T_s^o$ factor is folded into the gain the implementation stores, so the `ki` in the code is the
+The $T_s^o$ factor is folded into the gain the implementation stores. Thus the `ki` in the code is the
 $K_i T_s^o$ of this expression, not the $K_i$ of the continuous design above.
 $$
 u[k] = \mathrm{clamp}\bigl(u[k-1] + \Delta u[k],\ -I_{q,max},\ I_{q,max}\bigr)

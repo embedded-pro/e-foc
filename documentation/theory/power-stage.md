@@ -25,8 +25,8 @@ date: 2026-11-05
 
 ## Overview
 
-Everything the controllers compute ends as six gate signals. The power stage turns them into phase voltages,
-and on the way it adds delay, voltage error, losses and failure modes that the model of
+Everything the controllers compute ends as six gate signals. The power stage turns them into phase voltages.
+On the way, it adds delay, voltage error, losses and failure modes that the model of
 [the physical picture](motor-physics.md) §9 leaves out. This chapter follows the path from the gate to the
 winding:
 
@@ -38,7 +38,7 @@ winding:
 - the **losses**, the **DC link** and regeneration, and the **protection** paths.
 
 Figures are those of the E-FOC-HARDWARE board on the EK-TM4C1294XL. The board's own design files live in the
-`e-foc-hardware` submodule, which is not checked out with the firmware; the component figures here are those
+`e-foc-hardware` submodule, which is not checked out with the firmware. The component figures here are those
 the software-in-the-loop characterisation took from the parts and the rig
 (`documentation/verification_and_validation/software-in-the-loop.md` Part L).
 
@@ -98,30 +98,31 @@ A power MOSFET between drain and source behaves, to first order, as a resistor t
 $R_{ds(on)}$ and open:
 
 - **On** (gate driven above threshold, usually 10–15 V for a standard part): the channel conducts **in both
-  directions** with resistance $R_{ds(on)}$. Current flowing from source to drain through an on channel,
-  instead of through the diode beside it, is *synchronous rectification*: the drop is $i\,R_{ds(on)}$ rather
+  directions** with resistance $R_{ds(on)}$. Current that flows from source to drain through an on channel,
+  not through the diode beside it, is *synchronous rectification*. The drop is then $i\,R_{ds(on)}$ rather
   than $V_f$.
-- **Off**: the channel blocks the bus voltage, but the **body diode** that the device's structure forms between
+- **Off**: the channel blocks the bus voltage. But the **body diode** that the device's structure forms between
   source and drain still conducts from source to drain, at $V_f \approx 0.8$ V.
 - **In between**: the gate charge must move the gate-source and the Miller (gate-drain) capacitances, and the
   drain voltage swings across the output capacitance $C_{oss}$. A transition takes tens of nanoseconds; during it
   the device carries current and voltage at once and dissipates.
 
-The body diode also stores charge while it conducts. When the opposite switch then turns on, that charge is
-swept out as a brief reverse-recovery current spike through both devices, one of the sources of the ringing at
-each edge.
+The body diode also stores charge while it conducts. When the opposite switch then turns on, a brief
+reverse-recovery current spike through both devices sweeps that charge out. This spike is one of the sources of
+the ringing at each edge.
 
-For a 24–48 V drive the MOSFET wins over the IGBT on every count that matters here: no fixed collector-emitter
-drop, fast switching, a body diode for free. $R_{ds(on)}$ rises with die temperature, typically by half to
-double between 25 and 125 °C, so conduction loss grows as the board warms.
+For a 24–48 V drive, the MOSFET wins over the IGBT on every count that matters here. It has no fixed
+collector-emitter drop, it switches fast, and its body diode comes for free. The channel resistance $R_{ds(on)}$
+rises with die temperature, typically by half to double between 25 and 125 °C. So conduction loss grows as the
+board warms.
 
 ### 3. Gate Drive and the Bootstrap
 
 The low-side switch's source is at ground, so its gate is driven from a ground-referred supply. The high-side
 switch's source is the **switch node**, which moves between 0 and $V_{dc}$; its gate must be driven relative to
-that node. The FAN7888 does it with a **bootstrap**: a capacitor per leg, charged through a diode from the
-driver's 15 V rail whenever the node is low (the low side conducting), and floating up with the node when the
-high side turns on.
+that node. The FAN7888 does it with a **bootstrap**: one capacitor per leg. A diode charges the capacitor from
+the driver's 15 V rail whenever the node is low (the low side conducting). When the high side turns on, the
+capacitor floats up with the node.
 
 Two practical limits follow:
 
@@ -132,17 +133,17 @@ Two practical limits follow:
 - **The driver's supply must stay in regulation.** Its 15 V rail is fed from the bus, which is why the board's
   under-voltage trip sits at 18 V.
 
-The duty cap does not limit the undistorted voltage circle: at modulation $m$ the highest duty sits at most $m$
-above the lowest, so the shift that keeps the shunts readable stays inside 95 % up to $m = 0.95$. The shunts' 70 %
+The duty cap does not limit the undistorted voltage circle. At modulation $m$, the highest duty sits at most $m$
+above the lowest. So the shift that keeps the shunts readable stays inside 95 % up to $m = 0.95$. The shunts' 70 %
 readable window binds first and holds the circle to $0.81\,V_{dc}/\sqrt3$ ([numbers that matter](numbers-to-know.md)
 §4).
 
 ### 4. Shoot-Through and Dead Time
 
-If both switches of a leg conduct at the same time, the bus is shorted through them. The current is limited
-only by two channel resistances and the loop's stray inductance, reaches tens of amperes in nanoseconds, and
-destroys the devices or the bus. Turning one switch off and the other on at the same instant is not safe:
-turn-off is slower than turn-on, and delays differ between devices and drivers. Every leg therefore waits a
+If both switches of a leg conduct at the same time, the bus is shorted through them. Only two channel
+resistances and the loop's stray inductance limit the current. It reaches tens of amperes in nanoseconds and
+destroys the devices or the bus. Turning one switch off and the other on at the same instant is not safe.
+Turn-off is slower than turn-on, and delays differ between devices and drivers. Every leg therefore waits a
 **dead time** with both switches off between the two.
 
 ![One half-bridge leg through a PWM period, dead time exaggerated: the conducting device and current path for a positive phase current, the two gate signals, and the switch-node voltage against its ideal, with the volt-seconds the dead time loses](../animations/half-bridge-dead-time.svg)
@@ -150,9 +151,9 @@ turn-off is slower than turn-on, and delays differ between devices and drivers. 
 During the dead time nothing drives the node; the **phase current** does. A winding's inductance keeps its
 current flowing, so the current finds a path through a body diode:
 
-- **Current out of the leg** ($i > 0$): it flows up through the low-side diode, the node sits at $-V_f$. When the
-  high side was the one that turned off, the node falls at once, as the ideal waveform does; when the high side
-  is the one about to turn on, the node stays low for the whole dead time. The leg loses the volt-seconds of one
+- **Current out of the leg** ($i > 0$): it flows up through the low-side diode, the node sits at $-V_f$. If the
+  high side turned off, the node falls at once, as the ideal waveform does. If the high side is about to turn
+  on, the node stays low for the whole dead time. The leg loses the volt-seconds of one
   dead time per period.
 - **Current into the leg** ($i < 0$): the mirror image, through the high-side diode; the leg gains one dead
   time of volt-seconds.
@@ -170,20 +171,20 @@ $$
 |i| < \frac{C_{node}\,V_{dc}}{t_d}
 $$
 
-the node is still swinging when the complement turns on, the loss is $i\,t_d^2/(2C_{node}T)$, proportional to the
-current, and the winding sees it as extra resistance; at zero current the leg delivers exactly $d\,V_{dc}$
+the node is still swinging when the complement turns on. The loss is then $i\,t_d^2/(2C_{node}T)$, proportional to
+the current, and the winding sees it as extra resistance. At zero current, the leg delivers exactly $d\,V_{dc}$
 (`documentation/verification_and_validation/software-in-the-loop.md` Part L derives the three regimes). The transition between the
 regimes is the **knee**. With the SIL's bench node of 600 pF and 100 ns at 24 V the formula gives 0.14 A; the
 rig measured 0.18–0.21 A.
 
 **What the node actually sees.** The MCU commands a 500 ns band. The node's dead time is that band plus the
-driver's turn-on delay minus its turn-off delay, and the transitions themselves take part of it. The rig sweep
-is the authority: stepping one leg in single PWM counts at 24 V, the loss the winding saw saturated at 0.12–0.16 %
-of the period, an **effective 70 ns** at the 500 ns band, with the knee at 0.2 A. Widening the band to 1000, 1500
-and 2000 ns moved the loss up in 500 ns steps, each staying about 420 ns short of the band: the driver's and the
-switches' delays take that much of every band back (`documentation/design/service-dead-time-compensation.md`). That is also why the band must not be narrowed
-without measuring the node on a scope: the margin it leaves against shoot-through is not visible from the
-firmware.
+driver's turn-on delay minus its turn-off delay. The transitions themselves take part of it. The rig sweep
+is the authority. It stepped one leg in single PWM counts at 24 V. The loss the winding saw saturated at
+0.12–0.16 % of the period, an **effective 70 ns** at the 500 ns band. The knee was at 0.2 A. Widening the band
+to 1000, 1500 and 2000 ns moved the loss up in 500 ns steps. Each step stayed about 420 ns short of the band:
+the driver's and the switches' delays take that much of every band back
+(`documentation/design/service-dead-time-compensation.md`). For the same reason, do not narrow the band without
+measuring the node on a scope. The firmware cannot see the margin the band leaves against shoot-through.
 
 **Consequences.** On E-FOC-HARDWARE the error is 0.14 % of $V_{dc}$ per leg: 34 mV at 24 V. Against the large
 voltages of a running motor it is nothing. Against the small voltages of identification it is everything: with
@@ -198,30 +199,32 @@ $$
 d_k \leftarrow d_k + \frac{t_{eff}}{T}\cdot \operatorname{clamp}\!\left(\frac{i_k}{i_{knee}},\ -1,\ 1\right)
 $$
 
-The ramp is a straight-line stand-in for the small-current regime: the physical loss grows as
+The ramp is a straight-line stand-in for the small-current regime. The physical loss grows as
 $i\,t_d^2/(2C_{node}T)$ and only approaches its saturated value above the knee (at $i = C_{node}V_{dc}/t_d$ it is
-half of it), while the ramp reaches full correction at the measured knee. Its purpose is to avoid chattering between
+half of it). The ramp, in contrast, reaches full correction at the measured knee. Its purpose is to avoid chattering between
 $\pm t_{eff}/T$ when the current is near zero and its sign uncertain
 (`core/services/inverter_compensation/InverterCompensation.hpp`).
 
 **Minimum pulse.** A commanded conduction shorter than the dead band and the switching transitions does not
-happen as commanded. The firmware has no minimum-pulse handling, by decision. The top is guarded by the 95 % bootstrap
-cap; the bottom is not: shifting the duties down for the shunts ([low-side shunt current sensing](low-side-current-sensing.md)
-§5) drives the lowest duty continuously to exactly 0 %, so it passes through high-side pulses shorter than the
-500 ns band (15 PWM counts, 1 % duty at 20 kHz) on the way.
+happen as commanded. The firmware has no minimum-pulse handling, by decision. The 95 % bootstrap cap
+guards the top. Nothing guards the bottom. Shifting the duties down for the shunts
+([low-side shunt current sensing](low-side-current-sensing.md) §5) drives the lowest duty continuously to exactly
+0 %. On the way, it passes through high-side pulses shorter than the 500 ns band (15 PWM counts, 1 % duty at
+20 kHz).
 
-With the 0.7 readable limit and min-max centring the shifted lowest duty is $1.7 - 2\,d_{max}$, so it lands between
-0 and 1 % only while the highest duty $d_{max}$ is between 84.5 % and 85 %: a brief crossing at high modulation, about
-2 % of the periods of the bench motor held at 400 rad/s in the model-in-the-loop plant. In such a period that leg's high
-side does not turn on, so the voltage applied differs from the command by at most 1 % duty for that period. It cannot
-cause shoot-through, since the dead band is inserted by the PWM hardware whatever the duty.
+With the 0.7 readable limit and min-max centring, the shifted lowest duty is $1.7 - 2\,d_{max}$. So it lands
+between 0 and 1 % only while the highest duty $d_{max}$ is between 84.5 % and 85 %. This is a brief crossing at high
+modulation. It occurs in about 2 % of the periods of the bench motor held at 400 rad/s in the model-in-the-loop
+plant. In such a period, that leg's high side does not turn on. The applied voltage then differs from the command
+by at most 1 % duty for that period. It cannot cause shoot-through, since the PWM hardware inserts the dead band
+whatever the duty.
 
-Handling it (extending the shift until the lowest duty is exactly 0, and rounding a second short leg to 0 or the minimum
-pulse) was implemented and rejected (issue #463, closed as not planned). It cost about 55 cycles in the control
-interrupt on both Cortex-M4 boards, 4043 to 4098 of the 4500 on EK-TM4C1294XL, about an eighth of the inner loop's
-remaining headroom, and its tests showed only that the short pulses were gone, not a control metric it improved.
-Revisit it if a power stage with a longer dead band, or a gate driver that misbehaves on runt pulses, makes the error
-or the pulses matter.
+Handling it was implemented and rejected (issue #463, closed as not planned). The handling extended the shift
+until the lowest duty was exactly 0. It rounded a second short leg to 0 or the minimum pulse. It cost about 55
+cycles in the control interrupt on both Cortex-M4 boards: 4043 to 4098 of the 4500 on EK-TM4C1294XL. That is about
+an eighth of the inner loop's remaining headroom. Its tests showed only that the short pulses were gone, not a
+control metric it improved. Revisit it if a power stage with a longer dead band makes the error or the pulses
+matter. A gate driver that misbehaves on runt pulses is a reason too.
 
 ### 5. Losses
 
@@ -236,9 +239,9 @@ bridge, with phase-current peak $I$ (mean $\lvert i\rvert = 2I/\pi$, RMS $I/\sqr
 | Voltage-current overlap | $3\cdot\tfrac{1}{2}V_{dc}\tfrac{2I}{\pi}(t_r + t_f) f_s$ | 55 mW for an assumed 20 ns per edge      |
 | Gate drive              | $6\cdot Q_g V_{gs} f_s$                                  | not computable: $Q_g$ is not in the repo |
 
-Under 0.3 W for the semiconductors, against $\tfrac{3}{2} R_s I^2$ = 14.9 W in the bench motor's 1.10 Ω winding at
-the same current: at this power level the motor, not the board, is what heats. Switching loss scales with $f_s$,
-conduction loss does not, which is half of the trade in choosing the PWM frequency; the other half is the current
+The semiconductors lose under 0.3 W, against $\tfrac{3}{2} R_s I^2$ = 14.9 W in the bench motor's 1.10 Ω winding
+at the same current. At this power level, the motor heats, not the board. Switching loss scales with $f_s$;
+conduction loss does not. This is half of the trade in choosing the PWM frequency. The other half is the current
 ripple ([disturbances and noise](disturbances-and-noise.md) §3), which falls as $1/f_s$.
 
 ### 6. The DC Link
@@ -253,8 +256,8 @@ common-mode-injection SVM, as a fraction of the phase RMS current:
 | 0.6        | 0.64          | 0.60           |
 | 0.9        | 0.47          | 0.48           |
 
-At 3 A peak (2.1 A RMS) the capacitor carries up to 1.4 A RMS, which sets its rating; the bulk capacitance is
-not in the repo, so the voltage ripple it leaves is not computed here.
+At 3 A peak (2.1 A RMS), the capacitor carries up to 1.4 A RMS, which sets its rating. The bulk capacitance is
+not in the repo, so this chapter does not compute the voltage ripple it leaves.
 
 **Supply impedance.** A bench supply with source resistance or a current limit lets the bus sag under load. The
 bench's 4 A supply collapsed during calibration (`documentation/design/hardware-characterisation.md`), and the
@@ -264,12 +267,12 @@ under-voltage trip is what catches it.
 **Regeneration.** A motor that brakes is a generator: the power $\tau\,\omega$ flows back through the bridge into
 the bus. A supply cannot absorb it, so the capacitor charges. The Teknic's rotor alone at 6000 rpm stores
 $\tfrac{1}{2}J\omega^2 = 1.39$ J. Returned whole into a 470 µF bus at 24 V it would raise the bus to about
-81 V; into 1000 µF, to 58 V. The winding and switch losses absorb part of it, a load's inertia adds more. e-foc
-has no brake chopper and no regeneration limit; the 58 V over-voltage comparator is the guard.
+81 V; into 1000 µF, to 58 V. The winding and switch losses absorb part of it; a load's inertia adds more. In
+e-foc, there is no brake chopper and no regeneration limit. The 58 V over-voltage comparator is the guard.
 
 **Coasting with the gates off.** With all six gates off the body diodes form a three-phase rectifier. While the
-motor's line-to-line back-EMF peak stays below $V_{dc}$ they block and the rotor coasts freely. Above it they
-conduct and brake the motor into the bus: the Teknic at 6000 rpm makes 27.8 V line-to-line, more than a 24 V bus
+motor's line-to-line back-EMF peak stays below $V_{dc}$ they block and the rotor coasts freely. Above it, they
+conduct and brake the motor into the bus. The Teknic at 6000 rpm makes 27.8 V line-to-line: more than a 24 V bus
 but less than its rated 40 V.
 
 ### 7. Protection
@@ -286,18 +289,18 @@ Sources: `BoardCharacteristics.hpp`, `targets/platform_implementations/ti/implem
 
 Three properties of this scheme matter in practice:
 
-- **Detection is once per PWM period.** The comparators sit on ADC steps triggered by the PWM, and the software
+- **Detection is once per PWM period.** The comparators sit on ADC steps triggered by the PWM. The software
   check runs in the current interrupt: up to 50 µs pass between a fault and its detection. A wye winding sees at
-  most $\tfrac{2}{3}V_{dc}$ across one phase (one leg high, two low), so in that time its current rises by up to
-  $\tfrac{2}{3}V_{dc}\,T/L_s$: 0.75 A on the bench motor, 1.25 A on the Anaheim, **6.7 A on the low-inductance
-  Teknic at 40 V**. The sense range has to cover the trip level plus that rise, or the fault
+  most $\tfrac{2}{3}V_{dc}$ across one phase (one leg high, two low). In that time, its current rises by up to
+  $\tfrac{2}{3}V_{dc}\,T/L_s$. It is 0.75 A on the bench motor, 1.25 A on the Anaheim and **6.7 A on the
+  low-inductance Teknic at 40 V**. The sense range has to cover the trip level plus that rise, or the fault
   current saturates the ADC before it is seen.
 - **The CUR_TOTAL comparator cannot see bus current on this board.** Its shunt carries the three low-side
-  returns, sampled at the PWM counter's zero where they sum to zero; over-current protection rests on the
+  returns, sampled at the PWM counter's zero where they sum to zero. Over-current protection rests on the
   per-phase software check (`documentation/design/error-handling.md`).
 - **A fault leaves the motor coasting**, not braked: every gate off, the bridge latched until the fault is
-  cleared: at most three clears, the budget restored after 10 s of clean running. A 250 ms dwell before a clear
-  applies on platforms that report their protection status; the TI platform reports it as unknown, so there only
+  cleared. The clear budget is three, restored after 10 s of clean running. A 250 ms dwell before a clear
+  applies on platforms that report their protection status. The TI platform reports it as unknown, so there only
   the budget applies (`documentation/design/error-handling.md`).
 
 On the FRDM-MC-LVPMSM board there are no comparators; the shared software check is the only
@@ -307,10 +310,10 @@ over-current protection.
 
 Much of what makes a power stage work never appears in its equations:
 
-- **Commutation loop.** The loop from the bulk capacitor through both switches of a leg has stray inductance; each
+- **Commutation loop.** The loop from the bulk capacitor through both switches of a leg has stray inductance. Each
   edge rings in it, and the overshoot adds to the device's voltage stress. Keeping it small (a ceramic capacitor
   at each leg) matters more than the switch choice.
-- **Kelvin sensing.** The shunt's sense traces must leave its pads separately from the power path, or the power
+- **Kelvin sensing.** The shunt's sense traces must leave its pads separately from the power path. Otherwise the power
   trace's own resistance and inductance add to the measured voltage.
 - **Sample away from edges.** Every switching edge couples into the amplifiers and the ground. Sampling at the
   centre of the low-side window, where no edge occurs, is the timing half of the cure
@@ -384,8 +387,8 @@ braking that is slow enough for the losses to absorb the energy, or a brake resi
 
 ## Limitations & Assumptions
 
-- **Source of figures**: component values come from the SIL characterisation of the rig, not from schematics,
-  which are in a submodule not checked out with the firmware.
+- **Source of figures**: component values come from the SIL characterisation of the rig, not from schematics.
+  The schematics are in a submodule not checked out with the firmware.
 - **Illustrative**: the 20 ns transition time and the bus capacitances in the regeneration example are assumed,
   to show orders of magnitude.
 - **Simplifies**: diode reverse recovery and ringing are described, not modelled.

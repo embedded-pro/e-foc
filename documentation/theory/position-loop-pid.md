@@ -31,11 +31,10 @@ bandwidth — the closed-loop position bandwidth equals $K_p$ directly. No param
 required.
 
 The law is a **PI**, not the pure P this chapter derives. The derivation below is the P design the
-cascade shipped with and still the way to read the proportional path; the integral term removes the
-standing error a speed disturbance leaves while the rotor moves. Its zero and the weight the
-proportional term gives the reference are fixed by the design in *Integral zero and reference
-weighting* below, not by the loop tunings, and a rotor that stands still is treated as *A rotor that
-stands still* describes.
+cascade shipped with. It is still the way to read the proportional path. The integral term removes the
+standing error a speed disturbance leaves while the rotor moves. The design in *Integral zero and
+reference weighting* below fixes the integral's zero and the reference weight, not the loop tunings.
+*A rotor that stands still* describes how the law treats a rotor that stands still.
 
 Operates exclusively in the **1 kHz outer handler**.
 
@@ -113,29 +112,29 @@ $$
 $$
 
 Without wrapping, a $+3.1$ rad reference reached from $-3.1$ rad would command a $6.2$ rad
-(354°) rotation through the long arc instead of the $0.08$ rad short arc.
+(354°) rotation through the long arc. The short arc is only $0.08$ rad.
 
 **Inside software position limits.** With a position minimum and maximum set (`foc-position.md`,
-Software Position Limits), the short arc can leave the travel: from $2.9$ rad to $-2.9$ rad within
-limits of $\pm 3$ rad it crosses the seam, outside the limits. The reference is then held in
-$[\theta_{min}, \theta_{max}]$ and every difference, the error and both steps of the velocity form,
-is the plain difference: $\mathrm{wrap}(x)$ is replaced by $x$. The interval never contains the seam,
-so neither the reference nor the measured angle crosses it, and the plain difference is the way that
+Software Position Limits), the short arc can leave the travel. From $2.9$ rad to $-2.9$ rad within
+limits of $\pm 3$ rad, it crosses the seam, outside the limits. The reference is then held in
+$[\theta_{min}, \theta_{max}]$. Every difference, the error and both steps of the velocity form,
+is the plain difference: $x$ replaces $\mathrm{wrap}(x)$. The interval never contains the seam,
+so neither the reference nor the measured angle crosses it. The plain difference is the way that
 stays inside, $-5.8$ rad back through zero.
 
 A step longer than $\pi / b$, about $4.2$ rad, saturates the velocity form on its first sample, which
 only the limits make possible. A velocity form that simply clamps would drop the part of
-$K_p\,b\,\Delta\theta^*$ beyond the speed envelope and leave the integral alone to close it, a tail of
-more than a second on a $5$ rad move. The law instead holds that part back, $h[k]$ below, and applies it
+$K_p\,b\,\Delta\theta^*$ beyond the speed envelope. It would leave the integral alone to close it, a tail of
+more than a second on a $5$ rad move. The law instead holds that part back, $h[k]$ below. It applies it
 as the rotor's own steps bring the output inside the clamp, which is what a positional
-$K_p\,(b\,\theta^* - \theta)$ would do: in the software-in-the-loop run a $5$ rad move between limits of
-$\pm 3$ rad reaches the $6.28$ mrad target window in about $0.5$ s instead of $1.4$ s. Only the reference's share is held back: what the clamp takes from
-the integral or the measured steps is dropped as before, so the anti-windup is unchanged, and a law that
-never saturates on a reference step behaves exactly as without it.
+$K_p\,(b\,\theta^* - \theta)$ would do. In the software-in-the-loop run, a $5$ rad move between
+$\pm 3$ rad limits reaches the $6.28$ mrad target window in about $0.5$ s, not $1.4$ s. Only the reference's
+share is held back. What the clamp takes from the integral or the measured steps is dropped as before, so the
+anti-windup is unchanged. A law that never saturates on a reference step behaves exactly as without it.
 
 ### Integral zero and reference weighting
 
-The integral zero sits at a fifth of the position bandwidth, $K_i = 0.2\,\omega_{bw}^p K_p$, and the
+The integral zero sits at a fifth of the position bandwidth, $K_i = 0.2\,\omega_{bw}^p K_p$. The
 proportional term acts on $b\,\theta^* - \theta$ with $b = 0.75$ rather than on the error:
 
 $$
@@ -144,33 +143,34 @@ $$
 
 in the velocity form the implementation uses, with every difference wrapped as the error is. With the
 output normalised to the speed envelope and clamped to $[-1, 1]$, the reference's share
-$r[k] = h[k-1] + K_p\,b\,\Delta\theta^*[k]$ enters the sum, and the part of what the clamp removes that has
+$r[k] = h[k-1] + K_p\,b\,\Delta\theta^*[k]$ enters the sum. The part of what the clamp removes that has
 the sign of $r[k]$, at most $|r[k]|$, is held back as $h[k]$ for the next sample.
 
 The zero used to sit at the integral weight times the bandwidth, a twentieth of it with the default
-weight. That places a slow closed-loop pole just beside the zero, and the pair leaves a tail whose
-size is the residue of that pole: under an ideal speed loop at $\omega_{bw}^p = 18.85$ rad/s the
-poles fall at $-0.995$ and $-17.9$ rad/s against a zero at $-0.94$, and a 1.5 rad step keeps some
+weight. That places a slow closed-loop pole just beside the zero. The pair leaves a tail whose
+size is the residue of that pole. Under an ideal speed loop at $\omega_{bw}^p = 18.85$ rad/s, the
+poles fall at $-0.995$ and $-17.9$ rad/s against a zero at $-0.94$. A 1.5 rad step keeps some
 0.089 rad of overshoot that decays over a second — 0.055 rad is still there half a second later. A
 torque step pushing the same way as that tail starts its excursion already most of the way across a
 0.08 rad recovery band.
 
 Moving the zero up to $\omega_{bw}^p/5$ alone shortens the tail but makes it larger, because the zero
 also lies in the reference path. Weighting the reference in the proportional term takes the zero out
-of the reference path without touching disturbance rejection, which sees the full $K_p$ through
-$\Delta\theta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
+of the reference path without touching disturbance rejection. Disturbance rejection sees the full
+$K_p$ through $\Delta\theta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
 of the setpoint 450 ms after the step.
 
 The weight has a price under a moving setpoint. A constant velocity reference $\dot{\theta}^*$ leaves
-the proportional term $(1 - b)\,K_p\,\dot{\theta}^* T_s^o$ short every period, and the integral can
+the proportional term $(1 - b)\,K_p\,\dot{\theta}^* T_s^o$ short every period. The integral can
 only make that up from a standing error, $e_\theta = (1 - b)\,\dot{\theta}^* / (0.2\,\omega_{bw}^p)$:
-0.13 rad at 2 rad/s, a quarter more than the P design's $\dot{\theta}^* / \omega_{bw}^p$.
+0.13 rad at 2 rad/s. That is a quarter more than the P design's $\dot{\theta}^* / \omega_{bw}^p$.
 
 ### A rotor that stands still
 
-While the measured speed is under 2 % of the speed envelope, about 1.2 rad/s at the default bandwidth
-and less than one count per period on a 4000-count encoder, the integral step is replaced by a
-relaxation of the command towards the speed the error alone calls for, at the integral's own rate:
+While the measured speed is under 2 % of the speed envelope, a relaxation of the command replaces the
+integral step. That speed is about 1.2 rad/s at the default bandwidth, less than one count per period on a
+4000-count encoder. The command relaxes towards the speed the error alone calls for, at the integral's own
+rate:
 
 $$
 \omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta\theta^*[k] - \Delta\theta_m[k]\right) + \alpha\left(K_p\, e_\theta[k] - \omega_m^*[k-1]\right), \qquad \alpha = 0.2\,\omega_{bw}^p T_s^o
@@ -178,26 +178,26 @@ $$
 
 From a zero command the relaxation is exactly the integral step, so a step from rest starts as before.
 What it removes is the integral's memory while nothing moves. The weighted proportional term leaves
-$(1 - b)\,K_p$ of every setpoint change for the integral to supply, and on a smooth shaft the
+$(1 - b)\,K_p$ of every setpoint change for the integral to supply. On a smooth shaft, the
 integral finishes that while the rotor approaches. A detent or dry friction that stops the rotor near
-the setpoint used to leave it unfinished, or winding: the command grew while the rotor stood still,
-the speed loop's integral raised the torque until the rotor broke away, the excess carried it past the
+the setpoint used to leave it unfinished, or winding. The command grew while the rotor stood still. The
+speed loop's integral raised the torque until the rotor broke away. The excess carried it past the
 setpoint, and the cycle repeated. On the bench, 24 detents a revolution about 4 mN·m deep and
-3.7 mN·m of dry friction made it a limit cycle of ±0.17 rad every 1.5 s at 1 rad.
+3.7 mN·m of dry friction made it a limit cycle. The cycle was ±0.17 rad every 1.5 s at 1 rad.
 
-Relaxed, the command settles at $K_p e_\theta$, the speed loop's integral supplies whatever torque
-holds the rotor, and the rotor creeps onto the setpoint as it does under Cascade P. Nothing is lost at
-rest: every speed law rejects a constant torque with no speed error, so no disturbance needs the
+Relaxed, the command settles at $K_p e_\theta$, and the speed loop's integral supplies whatever
+torque holds the rotor. The rotor creeps onto the setpoint as it does under Cascade P. Nothing is lost at
+rest: every speed law rejects a constant torque with no speed error. So no disturbance needs the
 position integral to hold a stationary rotor.
 
 ### Profile velocity feed-forward
 
 While a motion profile is active (`position-motion-profile.md`) the reference is $r$ with velocity $\dot r$.
-The velocity-form PI keeps its state on the normalised error and its clamp as before; $\dot r$ is added to the
-speed reference after the clamped state, so the feed-forward cannot wind the integral up, and the acceleration
-feed-forward $J\ddot r / K_t$ joins the q-axis current. The reference weight $b = 0.75$ shapes the response to a step the
-loop is given whole; a profiled reference is already shaped and its velocity is fed forward, so $b = 1$ while
-a profile is active, which makes the output $K_p\,e$ plus the integral plus $\dot r$ and leaves no part of the
+The velocity-form PI keeps its state on the normalised error and its clamp as before. The law adds $\dot r$ to
+the speed reference after the clamped state, so the feed-forward cannot wind the integral up. The acceleration
+feed-forward $J\ddot r / K_t$ joins the q-axis current. The reference weight $b = 0.75$ shapes the response to a
+step the loop is given whole. A profiled reference is already shaped and its velocity is fed forward, so $b = 1$
+while a profile is active. This makes the output $K_p\,e$ plus the integral plus $\dot r$ and leaves no part of the
 reference for the integral to supply. Without a profile $\dot r = 0$, $b = 0.75$ and the output is unchanged.
 
 ### Output Limiting
@@ -232,7 +232,7 @@ $$
 - A setpoint between two cogging detents sits where the cogging torque pushes the rotor away from it.
   The loop holds there only while its stiffness, $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, exceeds the
   cogging's, the detent count times its depth. On the bench at the default bandwidths (100 rad/s
-  speed, 18.8 rad/s position) the loop's 0.046 N·m/rad is half the cogging's 0.096, and the
+  speed, 18.8 rad/s position), the loop's 0.046 N·m/rad is half the cogging's 0.096. The
   rotor steps between the neighbouring detents instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
   map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
   with it every position law holds 3.0 rad (REQ-CTL-003).

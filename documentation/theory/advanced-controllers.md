@@ -20,13 +20,13 @@ date: 2026-11-08
 
 ## Overview
 
-This chapter covers the controller algorithms available for the three nested FOC loops: what each one
-assumes, what it gains, what it costs, and what happens when its assumptions fail. Each loop exposes a
+This chapter covers the controller algorithms available for the three nested FOC loops. For each one it
+gives what it assumes, what it gains and what it costs. It also gives what happens when its assumptions fail. Each loop exposes a
 runtime-selectable controller slot configured over CAN without a firmware rebuild. Per-algorithm
 chapters contain the full mathematical foundation and design equations.
 
 The loop structure, the $S + T = 1$ trade, the bandwidth limits that delay and sampling impose, and
-anti-windup are in [closed-loop control](closed-loop-control.md); every algorithm below lives inside those
+anti-windup are in [closed-loop control](closed-loop-control.md). Every algorithm below lives inside those
 limits. The shared plant models (dq current, mechanical speed, position) and discretisation are in
 `documentation/theory/foc-plant-models.md`.
 
@@ -88,19 +88,19 @@ $$
 $$
 
 e-foc bounds this at 0.08 V RMS when it chooses the bandwidth itself
-(`documentation/design/controller-selection.md`): on the bench board and motor, not one of the reference motors,
-38.5 mA of sensor noise at the PWM-derived 8378 rad/s gave 0.40 V and an audible hiss. A deadbeat law has the largest gain of all,
-$1/B_d^i \approx L_s/T_s^i$: 4 V/A for the Teknic, 12.8 V/A for the Anaheim, against 1 V/A for a 5000 rad/s
-PI on the Teknic. In the speed loop the speed quantum (1.57 rad/s per count per window) plays the role of
-the noise, and $K_p = 2J\omega_{bw}/K_t$ turns it into current-reference steps.
+(`documentation/design/controller-selection.md`). The bench board and motor are not one of the reference motors.
+On them, 38.5 mA of sensor noise at the PWM-derived 8378 rad/s gave 0.40 V and an audible hiss. A deadbeat law has
+the largest gain of all, $1/B_d^i \approx L_s/T_s^i$. It is 4 V/A for the Teknic and 12.8 V/A for the Anaheim. A
+5000 rad/s PI on the Teknic has 1 V/A. In the speed loop the speed quantum (1.57 rad/s per count per window) plays
+the role of the noise. The gain $K_p = 2J\omega_{bw}/K_t$ turns it into current-reference steps.
 
 ### 2. Stiffness versus Robustness
 
-Model-based laws invert the plant: deadbeat computes the exact voltage that reaches the reference in one
-step, LQR the optimal gains for the identified $J$ and $B_f$. With the right model they reject disturbances
+Model-based laws invert the plant. Deadbeat computes the exact voltage that reaches the reference in one
+step. LQR computes the optimal gains for the identified $J$ and $B_f$. With the right model they reject disturbances
 faster than anything else. With the wrong one they lose that performance first and, if the error is large,
 stability. Model-free laws (PI, sliding mode, the baseline position law) give up some speed and gain
-tolerance: an integral removes any constant error whatever the parameters, a sliding-mode switching gain
+tolerance. An integral removes any constant error whatever the parameters. A sliding-mode switching gain
 covers any disturbance up to its size. The sensitivity peak $M_s = \max_\omega \lvert S(j\omega)\rvert$ measures
 the margin: $M_s \le 1.3$ guarantees at least 45° of phase margin, $M_s \le 2$ at least 29° and a gain margin
 of 2. A loop that relies on cancellation has its $M_s$ set by how good the cancellation is.
@@ -109,9 +109,9 @@ of 2. A loop that relies on cancellation has its $M_s$ set by how good the cance
 
 In a single-degree-of-freedom loop the same gains decide how the output follows the reference and how it
 rejects load. A stiff loop overshoots reference steps; a gentle one sags under load. The speed PI shows it
-directly: the integral zero that sets load recovery also enters the reference path and sets the step
+directly. The integral zero that sets load recovery also enters the reference path and sets the step
 overshoot (`documentation/theory/speed-loop-pi.md`, *What the implementation uses*). Two-DOF laws (S3, P3)
-add a reference pre-filter so the feedback can be tuned for rejection alone; feedforward (velocity in P2,
+add a reference pre-filter so the feedback can be tuned for rejection alone. Feedforward (velocity in P2,
 decoupling in A1) removes the predictable part of the tracking error before feedback sees it.
 
 ### 4. Model-Based versus Model-Free
@@ -130,8 +130,8 @@ motor is running on a mismatched model once the motor is warm, unless an online 
 
 Every current-loop algorithm runs inside the 20 kHz interrupt, whose inner-loop budget is 4500 cycles
 (37.5 µs at 120 MHz). The measured inner loop takes 1074–1353 cycles on the TM4C1294
-(`documentation/performance-optimization/README.md`), so none of the algorithms below is limited by
-computation; the limit on all of them is the 1.5-period loop delay of
+(`documentation/performance-optimization/README.md`). Computation thus limits none of the algorithms below.
+The limit on all of them is the 1.5-period loop delay of
 [closed-loop control](closed-loop-control.md) §7. The outer loops run at 1 kHz with a 20 000-cycle budget,
 which none of the speed or position laws comes near either.
 
@@ -198,7 +198,7 @@ graph TD
 ```
 
 The baselines (PI current, PI speed, P position) are what a drive runs before any identification and what
-every other algorithm is measured against. Change one loop at a time, from the inside out: a speed
+every other algorithm is measured against. Change one loop at a time, from the inside out. A speed
 controller tuned against a current loop that later changes is tuned against the wrong plant.
 
 ---
@@ -220,8 +220,8 @@ controller tuned against a current loop that later changes is tuned against the 
 | Position | P2 | Cascade P→PI                | [position-loop-cascade-p.md](position-loop-cascade-p.md)       |
 | Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
 
-Friction is compensated in the speed and position cascades by a Coulomb feed-forward on the quadrature-current
-reference, with the dry friction measured by the cogging-map step (`documentation/theory/disturbances-and-noise.md`,
+A Coulomb feed-forward on the quadrature-current reference compensates friction in the speed and position
+cascades. The cogging-map step measures the dry friction (`documentation/theory/disturbances-and-noise.md`,
 *Friction*). Cogging, the other low-speed torque disturbance, is compensated too
 (`documentation/design/service-cogging-compensation.md`).
 

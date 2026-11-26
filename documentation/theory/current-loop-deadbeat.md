@@ -26,9 +26,9 @@ date: 2026-08-31
 ## Overview
 
 A2 (Deadbeat) inverts the discrete current plant model to compute the exact voltage that drives
-the current to its reference in one sampling step — the minimum physically achievable settling
+the current to its reference in one sampling step. This is the minimum physically achievable settling
 time (50 µs at 20 kHz). This maximises servo stiffness: the torque response is instantaneous
-relative to any outer loop, so load disturbances are rejected before position error can accumulate.
+relative to any outer loop. Thus load disturbances are rejected before position error can accumulate.
 A two-step variant reduces noise amplification at the cost of geometric (non-deadbeat) settling.
 
 Operates exclusively in the **20 kHz FOC ISR**. Requires tight electrical RLS convergence ($L_s$,
@@ -60,7 +60,7 @@ i[k+1] = A_d^i \cdot i[k] + B_d^i \cdot v'[k]
 $$
 
 A2 inverts this plant model directly and therefore applies the **same A1 feedforward** to its
-inversion result — an exact plant inversion is only exact once the coupling it does not model
+inversion result. An exact plant inversion is only exact once the coupling it does not model
 has been cancelled.
 
 ---
@@ -78,8 +78,8 @@ settling takes more than one sample but remains optimal for the available headro
 
 **Two-step variant** (noise robustness): The one-step law amplifies measurement noise by
 $1/B_d^i = L_s/T_s^i$, which is large for small inductances. The two-step law solves for the
-**minimum-norm input sequence** over a two-sample horizon and applies its first element, with the
-reference gain corrected so that the closed loop retains unity DC gain:
+**minimum-norm input sequence** over a two-sample horizon and applies its first element. It
+corrects the reference gain so that the closed loop retains unity DC gain:
 
 $$
 v'[k] = \frac{\left((A_d^i)^2 - A_d^i + 1\right) i^* - (A_d^i)^3\, i[k]}{B_d^i\left((A_d^i)^2 + 1\right)}
@@ -87,8 +87,8 @@ $$
 
 This reduces the state gain — and hence noise amplification — by roughly half.
 
-**Receding-horizon behaviour**: because only the first element of the sequence is applied and the
-solution is recomputed every sample, the two-step law does *not* settle in exactly two samples. The
+**Receding-horizon behaviour**: the law applies only the first element of the sequence. It
+recomputes the solution every sample. Thus the two-step law does *not* settle in exactly two samples. The
 closed-loop pole is $A_d^i/\left((A_d^i)^2+1\right)$, giving a geometric rather than deadbeat
 response. Tracking is nonetheless exact in steady state: the reference gain is obtained by solving
 
@@ -97,8 +97,8 @@ B_d^i\, g_{ref} = 1 - A_d^i + B_d^i\, g_{state}
 $$
 
 which forces unity DC gain. Taking the raw minimum-norm reference gain instead leaves a static error
-of $A_d^i/\left((A_d^i)^2 - A_d^i + 1\right)$ — around 1% at $A_d^i = 0.90$ and 20% at $0.61$ —
-which is worst in the small-$L_s$ regime the variant targets.
+of $A_d^i/\left((A_d^i)^2 - A_d^i + 1\right)$: around 1% at $A_d^i = 0.90$ and 20% at $0.61$.
+This error is worst in the small-$L_s$ regime the variant targets.
 
 The one-step law is unaffected — it places the closed-loop pole at the origin and tracks exactly.
 
@@ -109,20 +109,20 @@ Deadbeat is the natural progression after Decoupled PID has validated RLS conver
 added to $v'$ before the modulation-circle limit. Without them $\omega_e L_s i_q$ enters as an
 unmodelled disturbance and the one-step settling property is lost at speed.
 
-**A duty that acts a period late**: on a board whose PWM loads the new compare values at the next
-period boundary (E-FOC-HARDWARE), the voltage computed from $i[k]$ is applied from $k+1$, and
-$v'[k-1]$ is what drives the plant meanwhile:
+**A duty that acts a period late**: on some boards the PWM loads the new compare values at the next
+period boundary (E-FOC-HARDWARE). There the voltage computed from $i[k]$ is applied from $k+1$.
+Meanwhile $v'[k-1]$ drives the plant:
 
 $$
 i[k+1] = A_d^i\, i[k] + B_d^i\, v'[k-1]
 $$
 
-The law above, applied unchanged, gives the closed loop $z^2 - A_d^i z + A_d^i = 0$: a pole pair of
-radius $\sqrt{A_d^i}$ at angle $\arccos\!\left(\sqrt{A_d^i}/2\right)$. On the bench motor
-($A_d^i \approx 0.95$ at 20 kHz) that is $|z| = 0.974$ at about 3.4 kHz, which the rig showed as a
-3.4–3.7 kHz limit cycle swinging to the voltage limit. When the platform states the delay
-(`DutyUpdateDelayPeriods() = 1`), the law acts on the current it predicts for the moment its own
-duty lands, from the measurement and the voltage still in flight:
+The law above, applied unchanged, gives the closed loop $z^2 - A_d^i z + A_d^i = 0$. This is a pole
+pair of radius $\sqrt{A_d^i}$ at angle $\arccos\!\left(\sqrt{A_d^i}/2\right)$. On the bench motor
+($A_d^i \approx 0.95$ at 20 kHz) that is $|z| = 0.974$ at about 3.4 kHz. The rig showed it as a
+3.4–3.7 kHz limit cycle swinging to the voltage limit. The platform can state the delay
+(`DutyUpdateDelayPeriods() = 1`). Then the law acts on the current it predicts for the moment its own
+duty lands. It predicts it from the measurement and the voltage still in flight:
 
 $$
 \hat{i}[k+1] = A_d^i\, i[k] + B_d^i\, v'[k-1], \qquad
@@ -130,18 +130,22 @@ v'[k] = \frac{i^* - A_d^i\, \hat{i}[k+1]}{B_d^i}
 $$
 
 With an exact model the one-step law then reaches the reference one period later than without the
-delay, and the two-step law keeps its pole. The voltage in flight is the one the plant receives: the
-decoupled output after the modulation-circle limit, less the decoupling terms, so a saturated step
-is predicted as applied rather than as requested.
+delay. The two-step law keeps its pole. The voltage in flight is the one the plant receives. It is the
+decoupled output after the modulation-circle limit, less the decoupling terms. Thus the law predicts a
+saturated step as applied rather than as requested.
 
-**A voltage the model does not account for**: back-EMF fed forward from a flux linkage that is not
-the motor's, what is left of the dead time, or a resistance error each add a voltage $d$ the law does
-not see. With no integral action the law settles with an offset of $B_d^i\, d$, or
-$B_d^i (1 + A_d^i)\, d$ with a late duty, since the prediction runs the error through the plant a
-second time. On the bench motor a stored flux linkage of 7.0 mWb against the motor's 4.6 mWb left
-+0.23 A at a 0 A setpoint by 275 rad/s, which kept the rotor accelerating. The law therefore
-estimates $d$ from how far each measured current lands from the current it predicted for that
-sample, and subtracts the estimate from its command:
+**A voltage the model does not account for**: each of these adds a voltage $d$ the law does not see:
+
+- back-EMF fed forward from a flux linkage that is not the motor's;
+- what is left of the dead time;
+- a resistance error.
+
+With no integral action the law settles with an offset of $B_d^i\, d$. With a late duty the offset is
+$B_d^i (1 + A_d^i)\, d$, since the prediction runs the error through the plant a second time. On the
+bench motor, the stored flux linkage was 7.0 mWb against the motor's 4.6 mWb. By 275 rad/s this left
++0.23 A at a 0 A setpoint and kept the rotor accelerating. The law therefore estimates $d$ from how far each
+measured current lands from the current it predicted for that sample. It subtracts the estimate from
+its command:
 
 $$
 \hat{d}[k] = \hat{d}[k-1] + \frac{g}{B_d^i}\left(i[k] - \hat{i}[k]\right), \qquad
@@ -153,19 +157,21 @@ $$
 v'[k] = \frac{i^* - A_d^i\, \hat{i}[k+1]}{B_d^i} - \hat{d}[k]
 $$
 
-where $v'_{\text{acting}}$ is the voltage that drives the plant from $k$ to $k+1$: $v'[k-1]$ with a
-late duty and $v'[k]$ without one, in which case the law itself acts on $i[k]$ as before. $\omega_c$
-is the current loop's bandwidth setting. With an exact model each prediction comes true, so the
-estimate leaves the response to the reference untouched; a constant $d$ is removed at a first-order
-rate $\omega_c$, the rate at which a PI loop of that bandwidth rejects it. The estimate is driven by
-the voltage the plant receives after the modulation limit, so it does not wind up. The first sample
+where $v'_{\text{acting}}$ is the voltage that drives the plant from $k$ to $k+1$. This is $v'[k-1]$ with a
+late duty. Without one it is $v'[k]$, and the law itself acts on $i[k]$ as before. The term $\omega_c$
+is the current loop's bandwidth setting. With an exact model each prediction comes true. Thus the
+estimate leaves the response to the reference untouched. A constant $d$ is removed at a first-order
+rate $\omega_c$, the rate at which a PI loop of that bandwidth rejects it. The voltage the plant receives
+after the modulation limit drives the estimate, so it does not wind up. The first sample
 after a reset only seeds the prediction, since what acted before it is unknown.
 
 The cost is noise: the estimate turns the noise of the measured current into voltage. On the bench
-motor's model a simulation with 38.5 mA of sensor noise puts about a fifth more noise on the command
-at $\omega_c$ = 1885 rad/s and about 85 % more at 8378 rad/s. The same simulation, with a late duty,
-stays stable for inductance errors from half to one and a half times the motor's up to 8378 rad/s,
-and from 0.7 to 1.3 times at the 20000 rad/s limit.
+motor's model, a simulation with 38.5 mA of sensor noise puts more noise on the command. It is about a
+fifth more at $\omega_c$ = 1885 rad/s and about 85 % more at 8378 rad/s. The same simulation, with a late
+duty, stays stable for these inductance errors:
+
+- up to 8378 rad/s, from half to one and a half times the motor's;
+- at the 20000 rad/s limit, from 0.7 to 1.3 times.
 
 **Normalisation**: $v'[k]$ (physical volts) normalised identically to the PI output:
 $v'_{norm}[k] = v'[k] \cdot \sqrt{3}/V_{dc}$.
@@ -184,8 +190,8 @@ $$
 $$
 
 See `documentation/theory/current-loop-pi.md` — *Output Voltage Limit* — for the full derivation.
-Deadbeat has no integral action, and its voltage estimate is driven by the voltage the plant
-receives after the limit, so it is unaffected by windup at the voltage limit.
+Deadbeat has no integral action. The voltage the plant receives after the limit drives its voltage
+estimate. Thus windup at the voltage limit does not affect it.
 
 ---
 

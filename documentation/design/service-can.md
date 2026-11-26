@@ -35,9 +35,12 @@ date: 2026-11-26
 - Broadcasting the on-demand status and motion telemetry frames in response to RequestTelemetry.
 - Streaming the measured d- and q-axis currents and the rotor position at the configured telemetry rate (Part J).
 - Selecting the control algorithm of each loop and reporting the algorithms in force.
-- Writing and reading the numbered parameters of the contract: every loop's tuning settings, the motor
-  parameters of the calibration record, the start-up settings, the current stream's rate and the drive-wide
-  supervision settings.
+- Writing and reading the numbered parameters of the contract:
+  - every loop's tuning settings
+  - the motor parameters of the calibration record
+  - the start-up settings
+  - the current stream's rate
+  - the drive-wide supervision settings.
 - Registering the can-lite firmware-upgrade category beside the FOC motor category, and answering *busy*
   to configuration writes while a firmware pack is received (Part K).
 
@@ -64,10 +67,10 @@ The client category is part of e-foc-protocol (wire contract, Part C).
 The CAN bridge observes the FOC motor category server and uses the control-mode state machine. It
 translates each command the server decodes into the matching state machine call:
 
-- Start → asynchronous enable. The bridge sends the acknowledgement when the enable is decided: at once,
-  or after the offset refresh of the first enable after power-up, a mode switch or a Fault
-  ([state-machine.md](state-machine.md), Refreshing the current offsets at enable). Success acknowledges;
-  a refusal sends the matching error.
+- Start → asynchronous enable. The bridge sends the acknowledgement when the enable is decided. The decision
+  comes at once, or after an offset refresh. The offset refresh runs at the first enable after power-up, a mode
+  switch or a Fault ([state-machine.md](state-machine.md), Refreshing the current offsets at enable).
+  Success acknowledges; a refusal sends the matching error.
 - Stop → disable.
 - ClearFault → clear fault.
 - EmergencyStop → emergency stop.
@@ -90,7 +93,8 @@ translates each command the server decodes into the matching state machine call:
   never drives the mechanical estimator, so speed and position end in Idle reporting *partialCalibration*,
   while torque reaches Ready.
 - RequestTelemetry → the bridge broadcasts the current state and fault code in the telemetry status
-  response, then the measured speed and measured position in the motion telemetry frame; always succeeds.
+  response. Then it broadcasts the measured speed and measured position in the motion telemetry frame. The
+  command always succeeds.
   The reported state maps Stopping to *stopping* and Ready to *ready*. It maps Idle to
   *partialCalibration* instead of *idle* when the non-volatile record is not empty but incomplete (old
   schema or interrupted external calibration).
@@ -102,10 +106,10 @@ translates each command the server decodes into the matching state machine call:
     record to the control mode. The control mode validates it (ranges, switching gain below boundary
     layer, position design feasibility). It applies the record to the running controller when stopped and
     stores it;
-  - a motor parameter: the control mode sends the motor parameter change to the lifecycle, which stores the
-    edited calibration record and re-applies the model ([state-machine.md](state-machine.md)); the operator's
+  - a motor parameter: the control mode sends the motor parameter change to the lifecycle. The lifecycle stores the
+    edited calibration record and re-applies the model ([state-machine.md](state-machine.md)). The operator's
     tuning settings are re-applied on top, because applying a model re-derives the loop tunings;
-  - a start-up setting or the telemetry rate: changed in the configuration record and stored; a start-up
+  - a start-up setting or the telemetry rate: changed in the configuration record and stored. A start-up
     setting takes effect at the next start, the telemetry rate at the current stream's next tick (Part J).
     A setting that cannot be stored is taken back, and the record's next write leaves it out. The
     configuration record has one owner, the control-mode state machine. The bridge changes the field in that
@@ -115,7 +119,7 @@ translates each command the server decodes into the matching state machine call:
   flight, answers *busy*.
 - QueryParameter → the value in force:
   - a loop setting's effective value: an automatic bandwidth reports the bandwidth the firmware derived,
-    flagged automatic, or 0 flagged automatic when the active mode does not run that loop;
+    flagged automatic. When the active mode does not run that loop, it reports 0 flagged automatic;
   - a motor parameter from the calibration record in RAM: 0 while unknown; an unset flux linkage reports
     the platform's default, flagged automatic;
   - a start-up setting or the telemetry rate from the stored configuration.
@@ -124,10 +128,10 @@ translates each command the server decodes into the matching state machine call:
   - the active mode's online estimates (0 in torque mode, which runs none);
   - the control-loop statistics of the platform diagnostics;
   - the reset cause the platform reported at start-up.
-- Calibrate → calibration on the active mode's state machine, answered when the sequence ends: success,
-  *invalidState* when the drive is not stopped, the category error the sequence ended with otherwise.
+- Calibrate → calibration on the active mode's state machine, answered when the sequence ends. The answer is
+  success, *invalidState* when the drive is not stopped, or otherwise the category error the sequence ended with.
 - ClearCalibration → calibration clear, answered once the record is invalidated and the drive is back in
-  Idle; a record that cannot be invalidated faults the drive and answers *persistenceFailed*.
+  Idle. A record that cannot be invalidated faults the drive and answers *persistenceFailed*.
   Either command arriving while the other one, another non-volatile write, a mode selection or a setting is
   outstanding is answered *busy*.
 - ClearDiagnostics → the platform diagnostics reset, which restarts the control-loop and CAN statistics;

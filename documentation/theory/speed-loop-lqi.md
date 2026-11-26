@@ -103,26 +103,26 @@ explicit performance cost.
 - $R$: input penalty — directly caps the $i_q^*$ command.
 - Starting point: $q_\omega = 1$, $q_I = 0.1$.
 - $R$ must scale with the plant's own normalized input gain squared, $b^2 = (K_t T_s^o I_{q,max} / J)^2$,
-  not a flat constant: a fixed $R$ is only the right order of magnitude when $b$ is $O(1)$, but $b$
+  not a flat constant. A fixed $R$ is only the right order of magnitude when $b$ is $O(1)$. But $b$
   varies by orders of magnitude across motors (small-inertia, high-torque-constant motors give a
   large $b$). `LqiSpeedController` derives it as
-  `R = NormalizedEffortWeight(bandwidth, samplingFrequency) * b^2`, reusing the same bandwidth-to-effort
+  `R = NormalizedEffortWeight(bandwidth, samplingFrequency) * b^2`. This reuses the same bandwidth-to-effort
   mapping the position-loop LQI/LQR controllers use (`core/foc/speed_loop/SpeedPlantModel.hpp`). Leaving
   $R$ unscaled by $b^2$ produced an effectively deadbeat gain with no margin against the always-present
-  loop delay of a real (non-ideal) current loop — the root cause of the LQI speed law's former
+  loop delay of a real (non-ideal) current loop. This was the root cause of the LQI speed law's former
   overshoot and poor disturbance rejection (`documentation/verification_and_validation/software-in-the-loop.md` Part I).
 
 **Gain computation** runs once at configuration time off the hot path using the `DARE` solver from
 the numerical toolbox. The 1 kHz handler executes only the dot product.
 
 **Numerical conditioning**: the DARE is solved with the control input expressed per-unit of
-$I_{q,max}$ and with the integral state accumulating the raw error sum rather than $e \cdot T_s^o$.
-Both substitutions leave $\mathbf{K}$ unchanged — only the ratio $Q/R$ and the state scaling matter —
-but they keep the entries of $P$ of order unity, which the single-precision fixed-point iteration
-needs in order to reach its absolute convergence threshold.
+$I_{q,max}$. The integral state accumulates the raw error sum rather than $e \cdot T_s^o$.
+Both substitutions leave $\mathbf{K}$ unchanged: only the ratio $Q/R$ and the state scaling matter.
+But they keep the entries of $P$ of order unity. The single-precision fixed-point iteration
+needs this to reach its absolute convergence threshold.
 
 **Anti-windup**: the integral state is frozen (conditional integration) on any sample where the
-unsaturated command falls outside $\pm I_{q,max}$, and resumes as soon as the command re-enters the
+unsaturated command falls outside $\pm I_{q,max}$. It resumes as soon as the command re-enters the
 envelope. The controller does this by running a second time on that sample with the negated error, which winds
 the integral state back.
 

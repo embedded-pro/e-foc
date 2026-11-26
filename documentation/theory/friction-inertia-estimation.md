@@ -18,13 +18,14 @@ date: 2026-11-08
 
 ## Overview
 
-Accurate knowledge of the mechanical plant parameters — rotor moment of inertia $J$, viscous friction
-coefficient $B$, and Coulomb (static) friction torque $\tau_0$ — is required to design an optimal speed
-or position loop, to implement feed-forward compensation, and to estimate system health over time.
+The mechanical plant parameters are the rotor moment of inertia $J$, the viscous friction coefficient $B$
+and the Coulomb (static) friction torque $\tau_0$. Accurate knowledge of them is required to design an
+optimal speed or position loop. It is also required to implement feed-forward compensation and to estimate
+system health over time.
 
 This identification procedure uses **Recursive Least Squares (RLS)** to fit the parameters of Newton's
-rotational equation of motion to real-time measurements of torque (estimated from $i_q$) and speed/
-acceleration (derived from the encoder). RLS operates online in every control cycle, converging to the
+rotational equation of motion to real-time measurements of torque and speed/acceleration. The torque is
+estimated from $i_q$; the speed and acceleration are derived from the encoder. RLS operates online in every control cycle, converging to the
 true parameters as the motor is excited with varying speed profiles.
 
 ---
@@ -138,15 +139,15 @@ $$
 
 With $\lambda = 0.9995$ — the value `RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor`
 carries — $N_{eff} = 2000$ samples, two seconds at the 1 kHz outer-loop rate. The memory has to span
-more than one level of the excitation: within a single plateau the intercept and the speed column
-are collinear, so a memory shorter than a plateau (the 200 ms that $\lambda = 0.995$ gave against a
-250 ms dwell) can never separate $B$ from $\tau_0$, and the online friction estimate wandered around
-zero.
+more than one level of the excitation. Within a single plateau, the intercept and the speed column
+are collinear. So a memory shorter than a plateau (the 200 ms that $\lambda = 0.995$ gave against a
+250 ms dwell) can never separate $B$ from $\tau_0$. With such a memory, the online friction estimate
+wandered around zero.
 
 A forgetting factor also inflates the covariance in any direction the regressor does not excite, by
-$\lambda^{-1}$ per update. A plateau still informs $B$ and $\tau_0$ but not $J$, so the online
-estimator takes plateau samples only while the covariance trace stays under a ceiling, and
-accelerating samples always; see `documentation/design/service-mechanical-ident.md`
+$\lambda^{-1}$ per update. A plateau still informs $B$ and $\tau_0$ but not $J$. So the online
+estimator takes plateau samples only while the covariance trace stays under a ceiling. It always takes
+accelerating samples; see `documentation/design/service-mechanical-ident.md`
 § *Persistence of Excitation*.
 
 ### 4. Torque and Kinematics Estimation
@@ -179,28 +180,33 @@ $\omega$ before differentiation reduces this effect at the cost of bandwidth.
 
 At the 20 kHz control rate a single sample of $i_q$ and a second difference of the encoder describe
 the same instant closely enough. At the 1 kHz outer-loop rate they do not. The speed difference
-$\omega[n] - \omega[n-1]$ of two window-mean speeds is a triangular average of the acceleration
-centred one outer sample *earlier* than the instantaneous current $i_q[n]$ it used to be regressed
-against. With the speed loop's transients decaying at $\sigma \approx 400$ rad/s that misalignment
-scales the identified inertia by about $e^{-\sigma T} \approx 0.67$ — the 26–33 % low reading the SIL
+$\omega[n] - \omega[n-1]$ of two window-mean speeds is a triangular average of the acceleration.
+It is centred one outer sample *earlier* than the instantaneous current $i_q[n]$ it used to be regressed
+against. With the speed loop's transients decaying at $\sigma \approx 400$ rad/s, that misalignment
+scales the identified inertia by about $e^{-\sigma T} \approx 0.67$. That is the 26–33 % low reading the SIL
 first measured.
 
 The online estimator therefore regresses quantities the control interrupt integrates over each outer
-period $T$, and it takes them the way the one-shot procedure does (see
+period $T$. It takes them the way the one-shot procedure does (see
 `documentation/design/service-mechanical-ident.md`, Speed and Acceleration Estimation). An earlier
 form regressed $K_T(\bar i_{q,k} + \bar i_{q,k-1})/2$ on $(\bar\omega_k - \bar\omega_{k-1})/T$, with
 $\bar\omega_k = (\theta_k - \theta_{k-1})/T$ the speed between the angles latched at the window
 boundaries. Those are two single readings, so on a 4000-count encoder the acceleration carried
 about 1600 rad/s² of quantisation per count at $T$ = 1 ms. Noise in a regressor biases its
-coefficient toward zero: $J$ read about 4 % low in simulation, and on the bench motor's plant the
+coefficient toward zero: $J$ read about 4 % low in simulation. On the bench motor's plant, the
 fit never explained the torque well enough to publish.
 
-The interrupt now accumulates, over each outer period, the mean of the positions it sampled relative to
-the window's start, the window's rotation, the smallest non-zero encoder step, and the moments
-$\overline{i_q}$, $\overline{i_q u}$ and $\overline{i_q u^2}$ of the current, with $u$ a sample's place
-in the window. The estimator merges $M$ outer windows into an observation window of $T_w = M T$, $M$ sized
-from the encoder count and at least 4, and from three consecutive observation windows with mean positions
-$\bar\theta_{k-2}, \bar\theta_{k-1}, \bar\theta_k$ it regresses
+The interrupt now accumulates four quantities over each outer period:
+
+- the mean of the positions it sampled relative to the window's start;
+- the window's rotation;
+- the smallest non-zero encoder step;
+- the moments $\overline{i_q}$, $\overline{i_q u}$ and $\overline{i_q u^2}$ of the current, with $u$ a
+  sample's place in the window.
+
+The estimator merges $M$ outer windows into an observation window of $T_w = M T$. It sizes $M$ from the
+encoder count, at least 4. From three consecutive observation windows with mean positions
+$\bar\theta_{k-2}, \bar\theta_{k-1}, \bar\theta_k$, it regresses
 
 $$
 \boxed{K_T\,\tilde i_q = J\,\frac{\bar\theta_k - 2\bar\theta_{k-1} + \bar\theta_{k-2}}{T_w^2}
@@ -208,25 +214,26 @@ $$
 $$
 
 where $\tilde i_q$ is the current weighted by the quadratic B-spline that the second difference of three
-window means puts on the acceleration: $u^2/2$ over the first window, $1/2 + u(1-u)$ over the second and
-$(1-u)^2/2$ over the third. The moments are what make that weighting exact when windows are merged:
-$u$ in the merged window is $(j + u_j)/M$ for outer window $j$, and its square expands into the three
+window means puts on the acceleration. The weights are $u^2/2$ over the first window, $1/2 + u(1-u)$ over
+the second and $(1-u)^2/2$ over the third. The moments are what make that weighting exact when windows are
+merged. In the merged window, $u$ is $(j + u_j)/M$ for outer window $j$, and its square expands into the three
 moments of each outer window. Both sides then describe the same instant, the middle of the middle
-window, and a window mean carries little of the quantisation of any one reading. The regression runs
+window. A window mean carries little of the quantisation of any one reading. The regression runs
 in milli-newton-metres against micro-unit $J$ and $B$, so its three columns are of order one on these
 rotors.
 
 #### 4.2 Viscous friction from constant-speed runs
 
-The viscous term of the full regression also takes the torque of every transient and every ripple, which on the rig
+The viscous term of the full regression also takes the torque of every transient and every ripple. On the rig, this
 outweighed the small difference friction makes between two constant speeds. The online estimator therefore takes $B$
-from a second fit: each run of observations whose speed stays within a band of the run's mean contributes one point,
-its mean speed against its mean torque less $J$ times the run's mean acceleration, and $B$ is the slope of the line
-through those points, weighted by run length. Within a run the speed loop answers every dip with torque, and a loop
-that ripples there swings the torque against the acceleration, so either would decide a slope fitted to the
+from a second fit. Each run of observations whose speed stays within a band of the run's mean contributes one point.
+The point is its mean speed against its mean torque less $J$ times the run's mean acceleration. The slope of the line
+through those points, weighted by run length, is $B$. Within a run, the speed loop answers every dip with torque. A
+loop that ripples there swings the torque against the acceleration. Either would decide a slope fitted to the
 observations themselves; the means carry neither. The moments decay with the regression's forgetting factor, so a
-long run at one speed narrows the spread rather than inflating a covariance. $B$ is the same in both directions of
-rotation while the intercepts are not, so the slope is pooled over the runs of both, each about its own means; see
+long run at one speed narrows the spread rather than inflating a covariance. The coefficient $B$ is the same in both
+directions of rotation while the intercepts are not. So the slope is pooled over the runs of both, each about its own
+means; see
 `documentation/design/service-mechanical-ident.md`, *Online Inertia and Friction Estimation*.
 
 ### 5. Convergence Criteria
@@ -247,20 +254,23 @@ The two thresholds in use: $\epsilon_e = 10^{-4}$ and $\epsilon_K = 10^{-2}$.
 The gain trace criterion is a proxy for $\mathrm{tr}(\mathbf{P}[n])$ shrinking, which proves that
 $\hat{\mathbf{\theta}}[n]$ has converged to a minimum-variance estimate given the data.
 
-Both procedures also require the observations to have included enough accelerating samples and to
-span more than one speed (a quarter of the fastest seen), which is what identifies $J$ and separates
-$B$ from $\tau_0$ respectively.
+Both procedures also require the observations to have included enough accelerating samples, which
+identifies $J$. They also require the observations to span more than one speed (a quarter of the fastest
+seen), which separates $B$ from $\tau_0$.
 
-The online estimator does not use the instantaneous innovation: 0.1 mN·m sits under the torque ripple
-any real drive has, so it was met by chance. It publishes once it has observed a thousand outer-loop
-periods (one second) since its seed and its exponentially averaged residual is under a quarter of the
-averaged output in RMS terms — the fit explains the torque it sees, apart from the ripple a real drive has and
-no term of the model carries.
+The online estimator does not use the instantaneous innovation. The 0.1 mN·m threshold sits under the
+torque ripple any real drive has, so it was met by chance. It publishes once both conditions hold:
+
+- it has observed a thousand outer-loop periods (one second) since its seed;
+- its exponentially averaged residual is under a quarter of the averaged output in RMS terms.
+
+The fit then explains the torque it sees, apart from the ripple a real drive has and no term of the model
+carries.
 
 ### 6. Observability Requirement
 
 RLS identifies $J$, $B$, and $\tau_0$ simultaneously only if the regressor matrix $\mathbf{\Phi}$
-is **persistently exciting** of order 3 — i.e. the columns $[1, \dot\omega, \omega]$ are linearly
+is **persistently exciting** of order 3. That is, the columns $[1, \dot\omega, \omega]$ are linearly
 independent over the observation window. In practice this requires:
 
 - $\dot\omega \neq 0$: the motor must accelerate and decelerate (constant-speed operation cannot
@@ -359,8 +369,8 @@ $$
 = 0.01 + 0.01 + 0.05 = 0.07\ \text{N·m}
 $$
 
-The difference 0.6 − 0.07 = 0.53 N·m is the load torque $\tau_{load}$, which becomes the innovation
-residual from the estimator perspective — it will be treated as noise and averaged out over
+The difference 0.6 − 0.07 = 0.53 N·m is the load torque $\tau_{load}$. From the estimator perspective,
+it becomes the innovation residual. The estimator treats it as noise and averages it out over
 $N_{eff}$ samples.
 
 ---

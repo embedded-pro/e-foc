@@ -29,9 +29,9 @@ Two complementary offline identification methods are used, one for each paramete
 - **Resistance** — DC voltage step: steady-state V/I gives $R_s$ directly. Accurate for any motor.
 - **Inductance** — HF sinusoidal injection: synchronous demodulation of the current response at the injection frequency extracts Im(Z) and thus $L_s$. Suitable for low-resistance motors where the time-constant method fails.
 
-The reason two separate methods are needed is a fundamental signal-conditioning problem. At the 700 Hz injection frequency the ratio $\omega L_s / R_s$ is 7 for the Anaheim BLY172S-24V-4000 ($R_s = 0.405\,\Omega$, $L_s = 0.64\,\text{mH}$) and 2.4 for the Teknic M-2310P-LN-04K ($R_s = 0.36\,\Omega$, $L_s = 0.20\,\text{mH}$), so resistance is 14 % and 38 % of the impedance.
+The reason two separate methods are needed is a fundamental signal-conditioning problem. At the 700 Hz injection frequency the ratio $\omega L_s / R_s$ is 7 for the Anaheim BLY172S-24V-4000 ($R_s = 0.405\,\Omega$, $L_s = 0.64\,\text{mH}$). It is 2.4 for the Teknic M-2310P-LN-04K ($R_s = 0.36\,\Omega$, $L_s = 0.20\,\text{mH}$). Resistance is thus 14 % and 38 % of the impedance.
 
-For lower-resistance windings that share falls below 5 %, and any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because $\tau = L_s/R_s$ is 1.6 ms for the Anaheim and 0.56 ms for the Teknic, 16 and 5.6 samples at 10 kHz — too few for threshold-based detection through a filter of comparable length.
+For lower-resistance windings that share falls below 5 %, and any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails. The time constant $\tau = L_s/R_s$ is 1.6 ms for the Anaheim and 0.56 ms for the Teknic: 16 and 5.6 samples at 10 kHz. These are too few for threshold-based detection through a filter of comparable length.
 
 Each parameter is therefore extracted using the technique that makes it the dominant signal.
 
@@ -76,7 +76,7 @@ The same topology factor applies to both parameters. The applied voltage is the 
 $D_{test} \cdot V_{dc}$ for the DC step, held around mid-rail: terminal A at
 $\tfrac{1}{2} + \tfrac{2}{3} D_{test}$ and B and C at $\tfrac{1}{2} - \tfrac{1}{3} D_{test}$. For the sinusoidal injection the
 Clarke inverse of $\{v, 0\}$ maps to three-phase duties $\{v, -v/2, -v/2\}$ (phases relative to
-midpoint), which produces a terminal A-to-BC amplitude of $v \cdot 0.75 \cdot V_{dc}$.
+midpoint). This produces a terminal A-to-BC amplitude of $v \cdot 0.75 \cdot V_{dc}$.
 
 ---
 
@@ -91,14 +91,14 @@ $$
 where $F_{terminal}$ is the winding topology factor above and $I_{ss}$ is the mean of the last 10 %
 of the sample buffer.
 
-A single step measures whatever voltage the bridge loses along with the winding, so the step is
+A single step measures whatever voltage the bridge loses along with the winding. Thus the step is
 built for the dead-time correction (`documentation/design/service-dead-time-compensation.md`) to
 remove that loss. Every leg switches near the middle of the period, never a pulse as short as the
-dead band, and the duties are written again on every sample at the PWM's own rate, so the
+dead band. The duties are written again on every sample at the PWM's own rate, so the
 correction follows the current as it rises. At the step's 2 A the board's loss is worth at most
-about 0.03 Ω, and on the rig the step read 1.083 Ω this way against 1.082 Ω from 1 % legs written
-once, within the 0.005 Ω between runs. The dead-time sweep's 1.02 to 1.06 Ω is a slope through a
-bus reading that fell with the current, not a measure of the step's bias.
+about 0.03 Ω. On the rig the step read 1.083 Ω this way against 1.082 Ω from 1 % legs written
+once. This is within the 0.005 Ω between runs. The dead-time sweep's 1.02 to 1.06 Ω is a slope through a
+bus reading that fell with the current. It is not a measure of the step's bias.
 
 **Why this fails for L:** the DC step reveals only the time constant $\tau = L_s/R_s$. For the
 Anaheim BLY172S ($L_s = 0.64\,\text{mH}$, $R_s = 0.405\,\Omega$) $\tau = 1.58\,\text{ms}$, which
@@ -142,7 +142,7 @@ time), needs no stored reference, and delivers an exact complex result when `Rea
 samples at 700 Hz, it uses 12 bytes of working state versus 1.1 kB for an I/Q reference buffer.
 
 **Exact bin alignment:** the block size is chosen as $N = N_{periods} \times N_{spp}$ and the
-Goertzel bin as $k = N_{periods}$, so exactly $N_{periods}$ complete injection cycles fit in the
+Goertzel bin as $k = N_{periods}$. Thus exactly $N_{periods}$ complete injection cycles fit in the
 window. Any mismatch between injection frequency and analysis bin causes spectral leakage that biases
 $\text{Im}(Z)$. The implementation snaps the injection to $f_{inj}^{exact} = f_s / N_{spp}$
 (nearest integer-sample-per-period frequency) to eliminate leakage entirely.
@@ -203,8 +203,8 @@ $R_s T_s / L_s$:
 | Teknic M-2310P-LN-04K (terminal)     | 0.18            | ≈ 9 %                        | −15.5 %         |
 
 The terminal factor cancels in the ratio, so it is the per-phase $R_s / L_s$ that sets the bias. The
-measured column is the software-in-the-loop identification against the exact plant, whose
-whole-percent duty quantises the 15 % injection and adds to the ZOH term; the estimate reads low in
+measured column is the software-in-the-loop identification against the exact plant. Its
+whole-percent duty quantises the 15 % injection and adds to the ZOH term. The estimate reads low in
 both cases. For the Anaheim motor the error is within calibration tolerance; for the Teknic it is not
 negligible. A correction using the already-measured $R_s$ and $b_d$ can be applied post-hoc; it is
 not implemented today.
@@ -238,14 +238,14 @@ fitQuality falls below 0.5.
 
 Inverter dead-time introduces a voltage error at the switching frequency that corrupts the injection
 signal. For a dead time $t_{dt}$ at the switch node and 20 kHz PWM the error voltage is approximately
-$2 \cdot t_{dt} \cdot f_{sw} \cdot V_{dc}$, which would be $0.48\,\text{V}$ at $V_{dc} = 24\,\text{V}$ if
+$2 \cdot t_{dt} \cdot f_{sw} \cdot V_{dc}$. This would be $0.48\,\text{V}$ at $V_{dc} = 24\,\text{V}$ if
 the node saw the whole 500 ns band. At 10 % injection ($V_{inj} = 2.4\,\text{V}$) that would be 20 %
 distortion; at 15 % ($V_{inj} = 3.6\,\text{V}$) it falls to 13 %. The minimum recommended injection
 voltage is **15 % of bus** to keep dead-time distortion below 15 % of the injected signal in that worst
 case.
 
-On E-FOC-HARDWARE the gate driver's and the switches' delays take back most of the band: the node sees
-about 70 to 100 ns, an error near $0.07\,\text{V}$, and the drive corrects every duty for it
+On E-FOC-HARDWARE the gate driver's and the switches' delays take back most of the band. The node sees
+about 70 to 100 ns, an error near $0.07\,\text{V}$. The drive corrects every duty for it
 (`documentation/design/service-dead-time-compensation.md`). The simulated plant reproduces the dead
 time and the switch node's partial swing at small currents (`documentation/verification_and_validation/software-in-the-loop.md`,
 Part L).

@@ -27,8 +27,9 @@ date: 2026-11-26
 ## Responsibilities
 
 **Is responsible for:**
-- Starting, pausing, power-cycling and powering off virtual motors ([virtual-motor.md](virtual-motor.md)), each a CAN
-  node on a virtual bus, and restoring the set of motors on the next start
+- Starting, pausing, power-cycling and powering off virtual motors ([virtual-motor.md](virtual-motor.md)).
+  Each is a CAN node on a virtual bus.
+- Restoring the set of motors on the next start
 - Hosting the virtual CAN hub, and showing which buses exist and who is on them
 - Showing, per motor, what bench instruments would show:
   - phase currents, leg voltages and the modulation hexagon
@@ -91,9 +92,8 @@ without a display:
   - *Crashed* when its process ends unasked. A crashed motor keeps its row with its last log lines one
     click away; the row explains that the CAN Commander will report it offline.
 - A motor that introduces itself with another plant port protocol version ([virtual-motor.md](virtual-motor.md) Part F)
-  is powered off, and its log names both versions: the app and the virtual motor program it starts
-  ship together.
-- **Real time** shows the real-time factor; below 0.98 it is a warning with the overrun count in the
+  is powered off. Its log names both versions: the app and the virtual motor program it starts ship together.
+- **Real time** shows the real-time factor. Below 0.98 it is a warning with the overrun count in the
   tooltip, because the drive is then running late.
 - **Open CAN Commander** starts the CAN Commander installed next to the app; its Interface box lists
   `virtual:default` while the hub runs ([tool-can-commander.md](tool-can-commander.md) Part N).
@@ -106,8 +106,8 @@ without a display:
 - **Eight motors.** A bus carries at most eight, the number of motors the CAN Commander follows. With
   eight in the list, Add Motor is disabled and its tooltip says why. A restored list longer than that
   starts its first eight and reports the rest.
-- **Issue log.** Every motor added, removed, reset or crashed, every refusal, and every start-up
-  failure (virtual motor program missing, plant port unavailable) goes to a persistent issue log. The log is a
+- **Issue log.** A persistent issue log gets every motor added, removed, reset or crashed, and every refusal.
+  It also gets every start-up failure (virtual motor program missing, plant port unavailable). The log is a
   rotating file in the per-user data folder, in the CAN Commander's format, with timestamps in UTC.
 - **Help.**
   - *Report Issue…* opens a pre-filled issue in the browser, with the app's version, the operating
@@ -172,9 +172,9 @@ without a full rate stream.
 | Mechanics | Rotor speed (rad/s); true and encoder angle (rad); electrical, load and external torque (N·m) |
 | Supply    | Bus voltage (V); bus current (A); winding temperature (°C)                                    |
 
-- **Stream on demand.** A motor's window asks for the stream while it is open and shows a trace view,
-  and turns it off when it is closed, minimised or shows the log, so a motor nobody watches samples
-  nothing. After a motor restarts the window asks again.
+- **Stream on demand.** A motor's window asks for the stream while it is open and shows a trace view.
+  It turns the stream off when it is closed, minimised or shows the log. A motor nobody watches therefore
+  samples nothing. After a motor restarts the window asks again.
 - **History.** The app keeps the last 10 s of windows per motor. The time axis shows the chosen span,
   10 ms to 10 s, ending at the newest window and labelled in time before it. A window the motor dropped
   breaks the trace instead of joining across the gap. The toolbar counts the windows dropped since
@@ -223,8 +223,9 @@ stateDiagram-v2
 
 A cross-section of the motor, drawn at the true mechanical angle:
 
-- The stator with its three phase axes, each winding shaded by the sign and size of its current: warm for
-  a current into the winding, cool for one out of it, stronger as it nears the largest current shown.
+- The stator with its three phase axes, each winding shaded by the sign and size of its current:
+  - warm for a current into the winding, cool for one out of it
+  - stronger as it nears the largest current shown.
 - The rotor with the pole pairs of its plant description, alternating north and south, the d axis marked.
 - The current space vector (the amplitude-invariant Clarke of the true phase currents) and the stator
   voltage vector, drawn from the centre in the stationary frame. Each is scaled to its own largest
@@ -248,9 +249,10 @@ capture:
   half turn, over time.
 - A histogram of the difference, with its mean (bias) and standard deviation (noise).
 - The encoder's counts per revolution and its resolution in electrical degrees from the plant
-  description, or that it is ideal when the description gives no counts.
-- A *stuck* indicator when the reported angle has not changed over the last 10 ms while the true angle
-  moved by more than one count, or by a thousandth of a radian for an ideal encoder.
+  description. When the description gives no counts, the view shows that the encoder is ideal.
+- A *stuck* indicator. It shows when both of these hold:
+  - the reported angle has not changed over the last 10 ms
+  - the true angle moved by more than one count, or by a thousandth of a radian for an ideal encoder.
 
 The index pulse is not in the Data Model, so the monitor does not show it.
 
@@ -313,8 +315,8 @@ their own start-menu entry and icon. The installers' asset names stay unchanged,
 finds them as before.
 
 - **Debian package.** `e-foc-virtual-motor-app` and `e-foc-virtual-motor` install beside
-  `e-foc-can-commander`, so the app finds the virtual motor program and the CAN Commander's Launch
-  Virtual Motor… finds the app. The menu entry *e-foc Virtual Motor* carries its own icon: the CAN
+  `e-foc-can-commander`. The app therefore finds the virtual motor program, and the CAN Commander's
+  Launch Virtual Motor… finds the app. The menu entry *e-foc Virtual Motor* carries its own icon: the CAN
   Commander's motor inside a dashed ring, which also marks the app's windows. The release's install test
   installs the package, checks both entries and icons, and asks the virtual motor program for its usage.
   It then runs the app and removes the package.

@@ -126,7 +126,7 @@ The common part of all control-mode state machines covers:
 - Every NVM operation from the call until its callback, the boot-time check and load included
 - The Calibrating state
 - The calibration orchestrator, from the moment a run starts until it succeeds, fails or is
-  aborted, and for as long as the electrical identification reports itself running. The run
+  aborted. It is also covered for as long as the electrical identification reports itself running. The run
   covers the alignment step as well, which the electrical identification alone does not see
 
 The outer-loop state machines (speed and position) also cover:

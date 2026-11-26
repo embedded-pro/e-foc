@@ -26,9 +26,8 @@ date: 2026-10-29
 ## Overview
 
 This chapter is the start of the theory part. It explains what is inside a permanent-magnet synchronous
-motor (PMSM) and why it turns, using only the physics a motor-control engineer needs: a coil carrying
-current makes a magnetic field, a magnet in a field feels a torque, and a moving magnet induces a voltage
-in a coil.
+motor (PMSM) and why it turns, using only the physics a motor-control engineer needs. A coil carrying current makes a
+magnetic field. A magnet in a field feels a torque. A moving magnet induces a voltage in a coil.
 
 Two results carry through every later chapter:
 
@@ -86,8 +85,8 @@ graph LR
 that guide magnetic flux across the air gap and *slots* that hold the copper. The stack is laminated
 because steel conducts: a solid core would carry eddy currents induced by the changing flux and heat up.
 
-**Windings.** Three identical windings, the phases A, B and C, are placed so that their magnetic axes are
-$120^\circ$ apart (in electrical degrees, see Section 3). Both reference motors in
+**Windings.** Three identical windings make the phases A, B and C. Their magnetic axes are $120^\circ$ apart (in
+electrical degrees, see Section 3). Both reference motors in
 `documentation/theory/foc-plant-models.md` are **wye** (star) connected: one end of each phase is joined at
 a neutral point that is not brought out. Kirchhoff's current law at that point gives
 
@@ -96,9 +95,9 @@ i_a + i_b + i_c = 0
 $$
 
 which is why two current sensors are enough to know all three currents. In a **delta** connection the
-phases form a triangle; it is converted to an equivalent wye for analysis. Windings are either
-*concentrated* (each coil wound around one tooth: short end turns, cheap, rich in harmonics) or
-*distributed* (each coil spans several slots: closer to sinusoidal). The model in this booklet assumes the
+phases form a triangle; it is converted to an equivalent wye for analysis. Windings are either *concentrated* or
+*distributed*. In a concentrated winding each coil is wound around one tooth: short end turns, cheap, rich in harmonics.
+In a distributed winding each coil spans several slots: closer to sinusoidal. The model in this booklet assumes the
 result is sinusoidal (Section 6).
 
 **Rotor.** A steel shaft and back iron carrying permanent magnets, usually sintered NdFeB (ferrite in cheap
@@ -112,10 +111,10 @@ repeats that pattern $p$ times around its circumference, and spreads each phase 
 
 ### 2. The Magnetism You Need
 
-**A coil makes a field.** A current $i$ through a coil of $N$ turns produces a magnetomotive force
-$\mathcal{F} = N i$ that drives flux along the coil's axis. Its direction follows the right-hand rule: curl
+**A coil makes a field.** A current $i$ through a coil of $N$ turns produces a magnetomotive force $\mathcal{F} = N i$.
+It drives flux along the coil's axis. Its direction follows the right-hand rule: curl
 the fingers of the right hand along the current and the thumb points along the field. In the figures, a dot
-($\odot$) is current coming out of the page and a cross ($\otimes$) is current going in; a coil with its
+($\odot$) is current coming out of the page and a cross ($\otimes$) is current going in. A coil with its
 dot at $90^\circ$ above its axis and its cross at $90^\circ$ below pushes flux along the axis.
 
 In the linear range of the iron, the flux density in the air gap is proportional to the current. Doubling
@@ -271,7 +270,7 @@ that makes it.
 
 It is called *back*-EMF because, in a motor, it opposes the supply. To push current into a phase the
 inverter must apply more than the back-EMF. Once the back-EMF approaches the voltage the inverter can make,
-no more current can be pushed in at all; that sets the top speed (Section 10).
+no more current can be pushed in at all. That sets the top speed (Section 10).
 
 **Torque constant from back-EMF.** Feed the phases with currents in phase with their back-EMFs, which is
 the $\delta = 90^\circ$ condition of Section 5:
@@ -301,16 +300,16 @@ conversion to $\psi_f$.
 
 **Sinusoidal or trapezoidal.** The shape of $\psi_a(\theta_e)$ is set by the magnet shape and the winding
 layout. A motor built for a flat-topped (trapezoidal) back-EMF is traditionally called a *BLDC* motor and is
-driven six-step. One built for a sinusoidal back-EMF is a *PMSM* and is driven with sinusoidal currents. The
-names are used loosely: both reference motors are sold as BLDC motors and are run with sinusoidal FOC on
+driven six-step. One built for a sinusoidal back-EMF is a *PMSM* and is driven with sinusoidal currents. The names are
+used loosely. Both reference motors are sold as BLDC motors and are run with sinusoidal FOC on
 the TI and NXP evaluation kits they come with.
 
 ### 7. Six-Step versus Sinusoidal Commutation
 
-The simplest drive switches the current between pairs of phases according to three Hall sensors: two phases
-conduct at a time, giving six states per electrical cycle. The stator field can then only point in six
+The simplest drive switches the current between pairs of phases according to three Hall sensors. Two phases conduct at a
+time, giving six states per electrical cycle. The stator field can then only point in six
 directions and **jumps $60^\circ$** at each commutation. Commutating when $\delta$ falls to $60^\circ$ and
-jumping it back to $120^\circ$ keeps $\delta$ between those limits, so with a sinusoidal back-EMF the torque
+jumping it back to $120^\circ$ keeps $\delta$ between those limits. With a sinusoidal back-EMF the torque thus
 swings between $\sin 60^\circ$ and $\sin 90^\circ$ of its maximum:
 
 $$
@@ -318,8 +317,8 @@ $$
 $$
 
 at six times the electrical frequency. A motor with an ideal trapezoidal back-EMF and instant current
-commutation would produce flat torque, but real current cannot change instantly in an inductive winding, and
-the commutation ripple remains.
+commutation would produce flat torque. But real current cannot change instantly in an inductive winding, so the
+commutation ripple remains.
 
 Sinusoidal commutation needs the rotor angle continuously, from an encoder or an observer, and three
 independently controlled currents. In return the field turns smoothly at $90^\circ$ ahead of the rotor and
@@ -335,8 +334,8 @@ $\operatorname{lcm}(N_s, 2p)$ times per mechanical revolution for $N_s$ slots. I
 current cannot see, treated in [disturbances and noise](disturbances-and-noise.md) and compensated by the
 cogging map in `documentation/design/service-cogging-compensation.md`.
 
-**Saliency.** In a surface-mounted rotor the magnets behave magnetically almost like air, so the stator sees
-the same air gap whichever way the rotor points: $L_d = L_q$. In an interior rotor the iron between buried
+**Saliency.** In a surface-mounted rotor the magnets behave magnetically almost like air. The stator sees the same air
+gap whichever way the rotor points: $L_d = L_q$. In an interior rotor the iron between buried
 magnets makes the path along the q-axis easier than along the d-axis: $L_d < L_q$. The rotor then also
 feels a *reluctance torque*, the pull of plain iron towards the field, which adds to the magnet torque. Both
 reference motors are surface-mounted; the [motor model](motor-model.md) carries the general $L_d \ne L_q$
@@ -345,14 +344,14 @@ form for completeness.
 ### 9. From DC Bus to Phase Voltage
 
 The motor is fed by an inverter: three half-bridges, one per phase, each made of two transistors in series
-across the DC bus. In each leg exactly one transistor conducts (both at once would short the bus, so a short
-*dead time* separates them), and the phase terminal sits at either $V_{dc}$ or $0$.
+across the DC bus. In each leg exactly one transistor conducts. Both at once would short the bus, so a short *dead time*
+separates them. The phase terminal sits at either $V_{dc}$ or $0$.
 
 Switching each leg fast, at 20 kHz in e-foc, with a duty cycle $d_k$ makes its *average* terminal voltage
 $d_k V_{dc}$. The winding inductance filters the switching: the current follows the average voltage, with a
 small ripple at the PWM frequency. The three legs give $2^3 = 8$ switch states: six that apply a voltage
 vector to the motor and two (all low, all high) that apply none. Averaging the six active vectors over a PWM
-period can make any voltage inside a hexagon; the largest circle inside it, a sinusoidal phase voltage of
+period can make any voltage inside a hexagon. The largest circle inside it, a sinusoidal phase voltage of
 amplitude $V_{dc}/\sqrt{3}$, is the linear limit. The [FOC chapter](foc.md) derives this
 space-vector modulation and animates it; [the power stage](power-stage.md) covers the switches, the gate drive and
 the dead time.
@@ -421,7 +420,7 @@ The reference motors (values from `documentation/theory/foc-plant-models.md` "Re
 | No-load speed estimate at rated bus      | $V_{dc}/(\sqrt3 p \psi_f)$        | 637 rad/s (6080 rpm)     | 902 rad/s (8610 rpm)  |
 
 The line-to-line figure reproduces the Teknic datasheet's 4.64 V/krpm. The Anaheim's 3.95 V follows from
-TI's identified flux, which the model uses; the Anaheim sheet itself quotes 3.35 V/krpm, which would mean 15 % less
+TI's identified flux, which the model uses. The Anaheim sheet itself quotes 3.35 V/krpm, which would mean 15 % less
 flux ([plant models](foc-plant-models.md), *Reference Motors*). Both no-load speeds
 sit above the rated speeds (4000 and 6000 rpm), leaving voltage for the resistive and inductive drops under
 load.

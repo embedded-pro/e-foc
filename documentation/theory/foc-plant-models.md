@@ -70,9 +70,9 @@ $$
 \frac{di_q}{dt} = -\frac{R_s}{L_s} i_q - \omega_e i_d - \frac{\psi_f \omega_e}{L_s} + \frac{1}{L_s} v_q
 $$
 
-The cross-coupling terms $+\omega_e i_q$ (on d) and $-\omega_e i_d$ (on q), and the back-EMF
-disturbance $-\psi_f \omega_e / L_s$ (on q), prevent the two axes from being treated as independent
-RL plants. Advanced current controllers either cancel these terms via feedforward or treat them as
+Three terms prevent the two axes from being treated as independent RL plants. They are the
+cross-coupling terms $+\omega_e i_q$ (on d) and $-\omega_e i_d$ (on q), and the back-EMF
+disturbance $-\psi_f \omega_e / L_s$ (on q). Advanced current controllers either cancel these terms via feedforward or treat them as
 bounded disturbances.
 
 #### Decoupled Per-Axis Plant
@@ -125,7 +125,8 @@ $$
 
 The simulated plant splits $T_L$ into two terms. A *load* opposes motion whatever its direction, so it
 changes sign with $\omega_m$ and vanishes at rest, like friction. An *external torque* keeps its sign
-whatever the rotor does, like gravity on an arm or a step applied by a test to disturb the loop, and it
+whatever the rotor does. Examples are gravity on an arm and a step that a test applies to disturb the
+loop. It
 is the term a position controller has to hold against. Both are additive on the right-hand side:
 
 $$
@@ -152,10 +153,10 @@ $$
 \boxed{A_d^o = 1 - \frac{B_f T_s^o}{J}, \qquad B_d^o = \frac{K_t T_s^o}{J}}
 $$
 
-Both matrices come from the same approximation, which is the part that matters: the exact $A_d^o$
+Both matrices come from the same approximation, which is the part that matters. The exact $A_d^o$
 paired with the Euler $B_d^o$ would be a model of no system at all. The Euler pair is valid while
-$B_f T_s^o / J \ll 1$, which holds comfortably at 1 kHz for the inertias and frictions the
-mechanical identification returns, and unlike the exact pair it stays defined for a frictionless
+$B_f T_s^o / J \ll 1$. This holds comfortably at 1 kHz for the inertias and frictions the
+mechanical identification returns. Unlike the exact pair, it stays defined for a frictionless
 load, where $K_t (1 - A_d^o) / B_f$ is $0/0$.
 
 $$
@@ -235,9 +236,8 @@ graph LR
 
 ## Reference Motors
 
-The plant model is exercised, in the unit tests, the model-in-the-loop tests and the software-in-the-loop suite,
-with two motors whose parameters are published by their vendors and by the evaluation kits built
-around them. The values below are per phase for a wye winding, which is what the model and the
+The unit tests, the model-in-the-loop tests and the software-in-the-loop suite exercise the plant model with
+two motors. Their vendors, and the evaluation kits built around them, publish their parameters. The values below are per phase for a wye winding, which is what the model and the
 identification services use. The headers under `motor_parameters/` carry exactly these numbers.
 
 | Parameter                         | Symbol                        | Anaheim Automation BLY172S-24V-4000 | Teknic M-2310P-LN-04K      |
@@ -259,8 +259,8 @@ How the numbers were obtained:
 
 - **Line-to-line to per-phase.** Datasheets quote terminal values; for a wye winding
   $R_s = R_{LL}/2$ and $L_s = L_{LL}/2$. The Teknic sheet gives 0.72 Ω and 0.40 mH line-to-line.
-  The Anaheim sheet gives 1.20 mH line-to-line (0.60 mH per phase); the 0.64 mH and 0.405 Ω in the
-  header are TI's InstaSPIN identification of the same motor, which agrees with the sheet to within
+  The Anaheim sheet gives 1.20 mH line-to-line (0.60 mH per phase). The 0.64 mH and 0.405 Ω in the
+  header are TI's InstaSPIN identification of the same motor. This agrees with the sheet to within
   the spread expected between a six-step datasheet rating and a sinusoidal measurement.
 - **Flux linkage from back-EMF.** With a line-to-line peak constant $K_{e}$ per 1000 rpm
   ($\omega_m = 104.7$ rad/s, $\omega_e = p\,\omega_m$):
@@ -268,31 +268,31 @@ How the numbers were obtained:
   TI reports the Anaheim flux as $0.03416$ V/Hz, a peak phase voltage per electrical hertz, so
   $\psi_f = 0.03416 / 2\pi = 5.44$ mWb. The Anaheim sheet's 3.35 V/krpm, read the same way as the
   Teknic's, gives $3.35 / (\sqrt{3} \cdot 418.9) = 4.62$ mWb, 15 % less. The model keeps TI's
-  identified value; with the sheet's, $K_t$ would be 27.7 mN·m/A instead of 32.6, the rated current
-  4.6 A instead of 3.9 A and the no-load speed at 24 V 750 rad/s instead of 637. The Anaheim figures
+  identified value. With the sheet's, $K_t$ would be 27.7 mN·m/A instead of 32.6. The rated current
+  would be 4.6 A instead of 3.9 A, and the no-load speed at 24 V 750 rad/s instead of 637. The Anaheim figures
   derived in these chapters carry that uncertainty.
 - **Inertia.** $1\ \text{oz·in·s}^2 = 7.0616 \times 10^{-3}\ \text{kg·m}^2$: 0.00068 oz·in·s²
   (Anaheim) and 0.001 oz·in·s² (Teknic).
 - **Viscous friction.** Neither vendor publishes a viscous term or a no-load current to derive one
-  from. The values are chosen so that friction torque at rated speed is about 3 % of rated torque
-  (4.2 mN·m at 419 rad/s for the Anaheim, 9.4 mN·m at 628 rad/s for the Teknic), and the
+  from. The values are chosen so that friction torque at rated speed is about 3 % of rated torque.
+  This is 4.2 mN·m at 419 rad/s for the Anaheim and 9.4 mN·m at 628 rad/s for the Teknic. The
   identification scenarios treat them as plant truth, not as a claim about the real machines.
-- **Drive rating.** `maxSupportedCurrent` is the inverter's limit, not the motor's: 10 A and 20 A
-  are what a small drive for each class supports and what the injection-limit check in every
-  calibration procedure compares against. The 15 % DC resistance test draws about 5.5 A
+- **Drive rating.** `maxSupportedCurrent` is the inverter's limit, not the motor's. A small drive for
+  each class supports 10 A and 20 A. The injection-limit check in every calibration procedure
+  compares against these values. The 15 % DC resistance test draws about 5.5 A
   (Anaheim, 24 V) and 10 A (Teknic, 40 V), inside both ratings.
 
-The two motors bracket the plant in the directions that matter to the estimators: the Teknic has
-the shorter electrical time constant (11 control ticks at 20 kHz, still well inside the Euler
-stability region), and its $R_s T_s / L_s$ of 0.18 at the 10 kHz identification rate makes the ZOH
-bias of the inductance estimator visible (see `resistance-inductance-estimation.md`), where the
+The two motors bracket the plant in the directions that matter to the estimators. The Teknic has
+the shorter electrical time constant: 11 control ticks at 20 kHz, still well inside the Euler
+stability region. Its $R_s T_s / L_s$ of 0.18 at the 10 kHz identification rate makes the ZOH
+bias of the inductance estimator visible (see `resistance-inductance-estimation.md`). The
 Anaheim's 0.063 keeps it small.
 
 Sources:
 
 - Anaheim Automation, *BLY17 Series Product Sheet* (L010228) and the
   [BLY172S-24V-4000 product page](https://anaheimautomation.com/bly172s-24v-4000.html):
-  24 V, 4000 rpm, 53 W, 18 oz·in, 1.20 mH line-to-line, 3.35 V/krpm, 0.00068 oz·in·s².
+  - 24 V, 4000 rpm, 53 W, 18 oz·in, 1.20 mH line-to-line, 3.35 V/krpm, 0.00068 oz·in·s².
 - Texas Instruments MotorWare `user.h`, motor `Anaheim_BLY172S`: $R_s = 0.4051$ Ω,
   $L_s = 0.6399$ mH, rated flux 0.03416 V/Hz, 4 pole pairs.
 - Teknic, *Industrial-Grade NEMA 23 Motors* datasheet
@@ -300,8 +300,8 @@ Sources:
   M-2310P-LN-04K, 40 V, 6000 rpm, 0.72 Ω and 0.40 mH line-to-line, 4.64 Vpk/krpm, 0.001 oz·in·s².
 - NXP, *MCUXpresso SDK FOC user guide*,
   [Teknic motor](https://docs.nxp.com/bundle/UG10297/page/HW/Motors/teknic_m2310p_motor.html),
-  which restates the same electrical values for the FRDM-MC kits, and the TI
-  [LVSERVOMTR](https://www.ti.com/tool/LVSERVOMTR) page for the 2MTR-DYNO.
+  and the TI [LVSERVOMTR](https://www.ti.com/tool/LVSERVOMTR) page. They restate the same electrical
+  values for the FRDM-MC kits and the 2MTR-DYNO, respectively.
 
 ---
 

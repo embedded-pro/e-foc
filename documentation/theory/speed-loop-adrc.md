@@ -25,9 +25,9 @@ date: 2026-08-31
 
 ## Overview
 
-S2 (Active Disturbance Rejection Control) makes the load torque disturbance explicit: an Extended
-State Observer (ESO) estimates the total disturbance (load torque + model error) in real time and
-the control law cancels it. This gives dramatically faster load-step rejection than integral action
+S2 (Active Disturbance Rejection Control) makes the load torque disturbance explicit. An Extended
+State Observer (ESO) estimates the total disturbance (load torque + model error) in real time.
+The control law cancels it. This gives dramatically faster load-step rejection than integral action
 alone, with only two tuning parameters ($\omega_c$, $\omega_o$). LQI handles the disturbance only
 implicitly through its integral state; ADRC cancels it before the control law sees it.
 
@@ -104,10 +104,10 @@ $$
 - $b_0 = K_t/J$ from RLS. Tolerates ±50% error without stability loss.
 
 **Performance**: Under a step load torque, the ADRC suppresses the speed dip in approximately
-$1/\omega_o$ seconds — typically an order of magnitude faster than integral action alone.
+$1/\omega_o$ seconds. This is typically an order of magnitude faster than integral action alone.
 
 **Relation to toolbox**: `ActiveDisturbanceRejectionControl<float,1>` implements this ESO and
-control law — the template parameter is the plant order, and the extended state carrying $\hat{f}$ is
+control law. The template parameter is the plant order. The extended state carrying $\hat{f}$ is
 added on top of it. `Compute(ω_ref, ω_meas)` is called once per 1 kHz handler cycle.
 
 ```mermaid
@@ -145,8 +145,8 @@ graph LR
 - High $\omega_o$ amplifies speed measurement noise. Use a velocity smoother upstream if needed.
 - The ESO is discretized with forward Euler, whose poles leave the unit circle for
   $\omega_o T_s^o > 0.83$. The toolbox enforces the conservative precondition
-  $\omega_o T_s^o < 0.5/n$; the configured observer bandwidth is clamped to $\omega_o \leq 0.4 / T_s^o$
-  to stay inside it, which caps the usable $\omega_o/\omega_c$ ratio at 1 kHz.
+  $\omega_o T_s^o < 0.5/n$. The configured observer bandwidth is clamped to $\omega_o \leq 0.4 / T_s^o$
+  to stay inside it. This caps the usable $\omega_o/\omega_c$ ratio at 1 kHz.
 - The clipped $i_q^*$ is fed back into the ESO each cycle, so a sustained current clip does not
   bias $\hat{f}$.
 - Speed estimate must be smooth. A noisy encoder derivative degrades all speed controllers equally.

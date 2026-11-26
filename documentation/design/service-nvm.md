@@ -34,8 +34,10 @@ date: 2026-11-26
     index angle)
   - system configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections,
     fault-supervision settings)
-  - the drive-wide limits of the system configuration: overspeed, following error, speed ramps, command timeout,
-    motor current ratings, target window, travel limits, temperature, bus voltage and quick-stop deceleration
+  - the drive-wide limits of the system configuration:
+    - overspeed, following error, speed ramps and command timeout
+    - motor current ratings, target window and travel limits
+    - temperature, bus voltage and quick-stop deceleration
 - Persisting the fault history and the learned motor model, the inductance, inertia and friction online
   recalibration adopted (`online-recalibration.md`, Part F)
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
@@ -363,10 +365,10 @@ The limits, with their ranges and defaults, are:
 - the following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H)
 - the speed acceleration and deceleration, 0–100 000 rad/s², 0 (no limit) by default (`foc-speed.md`)
 - the profile velocity, 0–5000 rad/s, the profile acceleration and deceleration, 0–100 000 rad/s², and the profile
-  jerk, 0–10 000 000 rad/s³ (0 selects the trapezoidal plan), all 0 by default, which turns the profile off
+  jerk, 0–10 000 000 rad/s³. A jerk of 0 selects the trapezoidal plan. All are 0 by default, which turns the profile off
   (`foc-position.md`, Motion Profile)
 - the command timeout, 0–60 s, 0 (off) by default (`service-can.md` Part F)
-- the continuous and peak current, 0–100 A, 0 by default (off, and the board's current limit), with the peak time,
+- the continuous and peak current, 0–100 A, 0 by default (off, and the board's current limit). The peak time is
   0.1–60 s, default 1 (`fault-supervision.md` Part I)
 - the position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000-count encoder), with its time,
   0–10 s, default 0.02 (`foc-position.md` Target Reached)

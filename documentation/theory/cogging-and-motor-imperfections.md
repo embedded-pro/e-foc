@@ -26,19 +26,19 @@ date: 2026-11-09
 ## Overview
 
 A real motor is not the sinusoidal machine of [the motor model](motor-model.md). Its magnets are pulled
-towards the stator teeth even with no current (**cogging**), its back-EMF carries harmonics, its iron
+towards the stator teeth even with no current (**cogging**), and its back-EMF carries harmonics. Its iron
 saturates, its resistance and magnets drift with temperature, and its bearings rub. The firmware cannot change
 any of this; it can only measure it and compensate for what it measures.
 
-This chapter treats cogging in depth, because it is the imperfection a position drive feels most and the one
-e-foc measures and cancels, and then the other motor imperfections at the level a drive engineer needs. The
-main results:
+This chapter treats cogging in depth. It is the imperfection a position drive feels most, and the one e-foc
+measures and cancels. The chapter then treats the other motor imperfections at the level a drive engineer
+needs. The main results:
 
 - Cogging repeats $N_{cog} = \operatorname{lcm}(N_s, 2p)$ times per revolution, and always an **even whole
-  number of times per electrical period**, which is why a map over one electrical period holds it.
-- At low speed it shows as velocity ripple, at rest as detents, and against a position loop as a stiffness of
-  $N_{cog} T_{cog}$ that the loop must exceed.
-- It can be measured by turning the rotor slowly in both directions: the cogging follows the angle, the
+  number of times per electrical period**. That is why a map over one electrical period holds it.
+- At low speed it shows as velocity ripple, and at rest as detents. Against a position loop, it acts as a
+  stiffness of $N_{cog} T_{cog}$ that the loop must exceed.
+- It can be measured by turning the rotor slowly in both directions. The cogging follows the angle, the
   friction follows the motion, and their average and difference separate them.
 
 ---
@@ -81,7 +81,7 @@ rotor by hand, these are the notches you feel: the **detents**.
 ![Cogging of a 12-slot, 8-pole motor: the rotor turns slowly through a quarter revolution; the cogging torque repeats every 15° and crosses zero at the detents](../animations/cogging-torque.svg)
 
 **Periodicity.** The stator's pattern repeats every slot pitch, $2\pi/N_s$. The rotor's pattern, as far as the
-air-gap energy is concerned, repeats every pole pitch, $2\pi/2p$: a north pole and a south pole store the same
+air-gap energy is concerned, repeats every pole pitch, $2\pi/2p$. A north pole and a south pole store the same
 energy. The combined pattern repeats at the smallest angle that is a whole number of both:
 
 $$
@@ -102,7 +102,7 @@ $$
 $$
 
 is always an even integer. Whatever the slot and pole counts, cogging repeats exactly within every electrical
-period, so a map indexed by the electrical angle represents its fundamental and all its harmonics, provided the
+period. So a map indexed by the electrical angle represents its fundamental and all its harmonics, provided the
 pole pairs are identical. Differences between pole pairs (magnet tolerances) repeat once per revolution and
 are what such a map cannot hold.
 
@@ -124,7 +124,7 @@ $C_T = 1$ is best: the contributions are spread evenly and largely cancel.
 | 24 / 4        | 24        | 4     | 12                    | High unless skewed     |
 
 The bench motor shows 24 detents a revolution, six per electrical period, 4 mN·m deep. Its rest positions,
-scattered by torque pulses, cluster at 24 a revolution, which is what 12 slots and 8 poles give; the slot count is
+scattered by torque pulses, cluster at 24 a revolution, which is what 12 slots and 8 poles give. The slot count is
 inferred from that, not read from a datasheet (`documentation/verification_and_validation/software-in-the-loop.md` Part K).
 
 ### 2. What the Motor Designer Can Do
@@ -148,10 +148,10 @@ $$
 $$
 
 which **grows as the speed falls**. The bench rotor ($J \approx 12.4\ \mu$kg·m², $T_{cog}$ = 4 mN·m,
-$N_{cog}$ = 24) at 10 rad/s ripples by about 1.3 rad/s, 13 % of its speed; at 100 rad/s by 0.13 rad/s.
+$N_{cog}$ = 24) at 10 rad/s ripples by about 1.3 rad/s, 13 % of its speed. At 100 rad/s, it ripples by 0.13 rad/s.
 
 **At low speed**, inside the speed bandwidth, the loop fights it with current: a ripple of $T_{cog}/K_t$ in
-$i_q$ at $N_{cog} f_m$, which the speed quantum and the loop's own lag make imperfect.
+$i_q$ at $N_{cog} f_m$. The speed quantum and the loop's own lag make this imperfect.
 
 **At rest**, the rotor settles in a detent. Near a detent the cogging acts like a torsional spring of stiffness
 
@@ -160,34 +160,34 @@ k_{cog} = \left|\frac{d\tau_{cog}}{d\theta_m}\right|_{max} = N_{cog}\, T_{cog}
 $$
 
 24 × 4 mN·m = 0.096 N·m/rad on the bench. A position setpoint between two detents sits on a slope that pushes the
-rotor away; the loop holds it only if its own stiffness is larger. For the cascade it is
+rotor away. The loop holds it only if its own stiffness is larger. For the cascade, the stiffness is
 $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, 0.046 N·m/rad at the default 100 rad/s speed and 18.8 rad/s position
-bandwidths: half the cogging's, and the rotor steps between detents instead
+bandwidths. That is half the cogging's, and the rotor steps between detents instead
 (`documentation/theory/position-loop-pid.md`, *Limitations & Assumptions*). Holding without the map would take a
 speed bandwidth above about 210 rad/s.
 
 **Breakaway.** To start the rotor, the drive must exceed cogging and dry friction together: 0.135–0.23 A of q
-current on the bench. That is 5.7–9.7 mN·m with the configured 7 mWb flux linkage, or 3.7–6.3 mN·m with the
-4.6 mWb the flux-linkage identification measured on the same motor (`documentation/design/state-machine.md`). The
-second range sits below the plant's 4 mN·m of cogging plus 3.7 mN·m of dry friction, so the bench's torque figures
-appear to rest on the configured 7 mWb; the currents are what was measured, and the torques scale with whichever
+current on the bench. That is 5.7–9.7 mN·m with the configured 7 mWb flux linkage. With the 4.6 mWb the
+flux-linkage identification measured on the same motor, it is 3.7–6.3 mN·m (`documentation/design/state-machine.md`).
+The second range sits below the plant's 4 mN·m of cogging plus 3.7 mN·m of dry friction. So the bench's torque
+figures appear to rest on the configured 7 mWb. The currents are what was measured, and the torques scale with whichever
 flux linkage converts them.
 
 **Alignment.** The alignment pulls the rotor to the electrical zero against the cogging, so it can settle a
-little to either side, which limits the repeatability of everything referenced to it, a cogging map included
+little to either side. This limits the repeatability of everything referenced to it, a cogging map included
 (`documentation/theory/alignment.md`).
 
 ### 4. Measuring Cogging
 
-Turn the rotor under speed control at a constant low speed $\omega_0$, once in each direction, and record, for
-each bin of electrical angle, the torque the winding supplied. In steady motion the torque balance in a bin is
+Turn the rotor under speed control at a constant low speed $\omega_0$, once in each direction. For
+each bin of electrical angle, record the torque the winding supplied. In steady motion the torque balance in a bin is
 
 $$
 K_t\, \bar{i}_q - J\,\bar\alpha = -\tau_{cog}(\theta) + T_f \operatorname{sgn}(\omega) + B_f\,\omega
 $$
 
-where the inertia term removes what went into accelerating the rotor (at 10 rad/s the bench cogging repeats at
-240 rad/s, far above a 100 rad/s speed loop, so most of it shows as acceleration, not current). Write the left
+where the inertia term removes what went into accelerating the rotor. At 10 rad/s, the bench cogging repeats at
+240 rad/s, far above a 100 rad/s speed loop. So most of it shows as acceleration, not current. Write the left
 side as $\tau_+(\theta)$ for the forward run and $\tau_-(\theta)$ for the reverse run at the same speed. Then
 
 $$
@@ -198,13 +198,13 @@ $$
 Friction and viscous torque follow the motion and cancel in the average; cogging follows the angle and stays.
 
 **Telling cogging from noise.** Each run's noise is independent of the other's, while the cogging is common to
-both. With their means removed, the RMS of the sum against the RMS of the difference, the *agreement*, is about 1
-for noise alone and grows with the cogging. e-foc keeps a map only above 3; the bench's 4 mN·m gives 26
+both. With their means removed, the RMS of the sum against the RMS of the difference is the *agreement*. It is about 1
+for noise alone and grows with the cogging. Only above 3 does e-foc keep a map; the bench's 4 mN·m gives 26
 (`documentation/design/service-cogging-compensation.md` Part B).
 
 **Bin width.** Averaging over a bin of width $\Delta$ multiplies a harmonic of period $P$ by
 $\operatorname{sinc}(\pi\Delta/P)$. With 48 bins per electrical period and six cogging periods in it, a bin is an
-eighth of a cogging period: $\operatorname{sinc}(\pi/8) = 0.975$, the 2.5 % the design records.
+eighth of a cogging period. This gives $\operatorname{sinc}(\pi/8) = 0.975$, the 2.5 % the design records.
 
 ### 5. Compensating Cogging
 
@@ -215,20 +215,22 @@ $$
 i_q^* \leftarrow i_q^* + \frac{\hat\tau_{map}(\theta_e)}{K_t}
 $$
 
-It is a feed-forward: it acts before any error appears, so it works at every speed, including the low speeds
+It is a feed-forward: it acts before any error appears. So it works at every speed, including the low speeds
 the speed loop cannot reach and the rest positions a position loop has to hold. Its error is the map's error
-plus the angle error since the map was measured. e-foc stores 48 bins, expands them to 256 points with a
-periodic Catmull-Rom curve, interpolates linearly at run time (about the cost of one sine from the table), and
-keeps the sum inside the current limit. With it, every position law holds a setpoint between detents on the
+plus the angle error since the map was measured. In e-foc, the compensation stores 48 bins and expands them to
+256 points with a periodic Catmull-Rom curve. It interpolates linearly at run time (about the cost of one sine
+from the table). It keeps the sum inside the current limit. With it, every position law holds a setpoint between detents on the
 bench (`documentation/design/service-cogging-compensation.md` Part D).
 
-Torque mode measures no map of its own, but compensates with the one a speed or position calibration stored,
-adding it to the operator's torque command, so a small torque turns the rotor through the detents instead of
+Torque mode measures no map of its own. It compensates with the one a speed or position calibration stored,
+adding it to the operator's torque command. So a small torque turns the rotor through the detents instead of
 stopping in one.
 
-What it does not reach: a map shifted by a later alignment that settled to a different side of a detent;
-torque mode before any speed or position calibration has stored a map; and the differences between pole pairs
-that a single electrical period averages out.
+What it does not reach:
+
+- a map shifted by a later alignment that settled to a different side of a detent;
+- torque mode before any speed or position calibration has stored a map;
+- the differences between pole pairs that a single electrical period averages out.
 
 ### 6. Other Motor Imperfections
 
@@ -307,7 +309,7 @@ The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles),
 4. **Detent stiffness.** $24 \times 0.004 = 0.096$ N·m/rad against the position cascade's
    $2 \times 12.4\times10^{-6} \times 50 \times 18.8 = 0.023$ N·m/rad: a setpoint between detents is lost without
    the map and held with it.
-5. **Map fidelity.** Eight bins per cogging period lose 2.5 % of the fundamental; the residual after
+5. **Map fidelity.** Eight bins per cogging period lose 2.5 % of the fundamental. The residual after
    compensation is a few per cent of 4 mN·m, about 0.1 mN·m, at the level of the map's noise floor.
 
 ---
@@ -317,7 +319,7 @@ The bench motor, 24 detents a revolution (consistent with 12 slots and 8 poles),
 - **Assumes**: identical pole pairs for the electrical-period map; their differences repeat per revolution.
 - **Assumes**: the speed during the measurement is steady enough for the inertia correction to hold.
 - **Simplifies**: the speed-ripple estimate keeps the fundamental only and ignores the loop's partial rejection.
-- **Board-specific**: the bench figures are those of the motor on the E-FOC-HARDWARE rig; the reference motors
+- **Board-specific**: the bench figures are those of the motor on the E-FOC-HARDWARE rig. The reference motors
   in the simulation plant have no cogging unless a scenario adds it.
 
 ## References

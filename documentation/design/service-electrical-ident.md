@@ -408,7 +408,7 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   command of the deadbeat law swings by as much as the $L\,\Delta I_d / T$ term it is regressed against.
   Under the smoother laws, the rig read it 1 to 15 % high. The emulated target applying each duty a period
   late reproduces it (REQ-CMS-003).
-- $V_d$ is the d component the command has *in the rotor frame* while it acts, and the cascades rotate the
+- $V_d$ is the d component the command has *in the rotor frame* while it acts. The cascades rotate the
   command by the delay angle $(n + \tfrac12)\,\omega_e T_s$ before they apply it (`foc-transforms.md`, *Delay
   compensation*). The vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$.
   So its angle to the rotor runs from $-\tfrac12\Delta\theta_e$ to $+\tfrac12\Delta\theta_e$ about zero. The

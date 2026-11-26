@@ -30,10 +30,11 @@ date: 2026-11-26
 
 **Is responsible for:**
 - Turning the rotor slowly, with an open-loop voltage vector sized for a bounded current, until the encoder's
-  index pulse passes, and reporting the encoder reading at that pulse
-- At commissioning, measuring that reading in the frame the alignment has just set: the **index angle**, the
-  mechanical angle of the index from the electrical zero
-- At power-up, re-referencing the encoder so that it reads the stored index angle at the pulse, which restores
+  index pulse passes
+- Reporting the encoder reading at that pulse
+- At commissioning, measuring the **index angle**: that reading in the frame the alignment has just set. It is
+  the mechanical angle of the index from the electrical zero
+- At power-up, re-referencing the encoder so that it reads the stored index angle at the pulse. This restores
   the frame the alignment set without aligning again (REQ-CMS-005)
 - Failing safely: stopping the inverter on a run-out of travel, an over-current or a timeout, and dropping its
   completion on an abort
@@ -62,7 +63,7 @@ The search drives the inverter directly, as the alignment does, with no current 
 phase-current interrupt at the inverter's base frequency, so the index is polled every control period.
 
 1. **Sizing.** The vector's amplitude is the voltage that drives the search current through the calibrated
-   phase resistance from the measured bus: a vector of duty fraction `d` drives `d·Vdc/(2R)` into phase a,
+   phase resistance from the measured bus. A vector of duty fraction `d` drives `d·Vdc/(2R)` into phase a,
    so `d = 2·I·R/Vdc`. The search current is 0.6 A, or a quarter of the inverter's maximum if that is less.
    Without a positive resistance and bus voltage the amplitude is unknown and the search refuses to start.
 2. **Hold.** The vector is held at electrical angle zero for 200 ms. A rotor anywhere else snaps to it, turning
@@ -72,9 +73,9 @@ phase-current interrupt at the inverter's base frequency, so the index is polled
    The rotor follows it like a stepper. At that speed the back-EMF and the winding's reactance are a small part
    of the resistive drop. The current therefore stays close to the sized one.
 4. **Index.** At the first control period that sees the index, the encoder is read and the vector stops
-   turning; it keeps holding the rotor where it is. The reading is handed to the event loop.
-5. **Reference.** On the event loop, when the caller gave a stored index angle, the encoder is set so that the
-   reading taken at the pulse becomes that angle: the current reading is shifted by the stored angle less the
+   turning. It keeps holding the rotor where it is. The reading is handed to the event loop.
+5. **Reference.** When the caller gave a stored index angle, the event loop sets the encoder so that the
+   reading taken at the pulse becomes that angle. The current reading is shifted by the stored angle less the
    pulse reading. Only then is the inverter stopped and the completion delivered.
 
 The search always turns forward, at commissioning and at power-up alike. It therefore always meets the same edge

@@ -21,30 +21,31 @@ date: 2026-11-26
 ## Responsibilities
 
 **Is responsible for:**
-- Watching an enabled drive from the event loop for effort without motion: torque current that asks the
-  rotor to move while the encoder reading stays put (REQ-PRO-005).
-- Telling the two causes it can tell apart: a rotor an outside force pushed against the drive and then
-  held (*stall*), and everything else — an encoder that stopped reporting, or a rotor locked before it
-  ever moved (*encoder loss*).
+- Watching an enabled drive from the event loop for effort without motion (REQ-PRO-005). That is torque
+  current that asks the rotor to move while the encoder reading stays put.
+- Telling the two causes it can tell apart:
+  - *stall*: a rotor an outside force pushed against the drive and then held.
+  - *encoder loss*: everything else — an encoder that stopped reporting, or a rotor locked before it ever
+    moved.
 - Raising the fault through the platform fault notifier, as a hardware protection trip is raised.
 - Using the drive-wide supervision settings of the configuration record from its next evaluation, and
   leaving stall reporting off when the operator turned it off (REQ-PRO-005).
-- Watching an enabled drive for a current it demands but cannot make flow, and raising *phase missing* when the
-  motor is disconnected while it runs (REQ-PRO-005, Part E).
+- Watching an enabled drive for a current it demands but cannot make flow (REQ-PRO-005, Part E). It raises
+  *phase missing* when the motor is disconnected while it runs.
 - Watching an enabled drive, in every control mode, for an encoder reading that stops dead faster than the rotor
-  could physically stop, and raising *encoder loss* (REQ-PRO-005, Part F). This is the watch that covers torque
+  could physically stop. It raises *encoder loss* (REQ-PRO-005, Part F). This is the watch that covers torque
   mode, where the drive demands no motion for Parts A to C to judge.
 - Watching an enabled drive, in every control mode, for a rotor that turns faster than the overspeed limit allows,
   and raising *overspeed* (REQ-PRO-004, Part G).
 - Watching an enabled position drive for a position error that stays beyond the operator's following-error
-  window for the following-error time, and raising *following error* (REQ-PRO-004, Part H).
-- Keeping a thermal model of the motor's winding from its current and folding the drive's current limit back
-  from the peak to the continuous rating when the motor is overloaded (REQ-PRO-001, Part I).
+  window for the following-error time. It raises *following error* (REQ-PRO-004, Part H).
+- Keeping a thermal model of the motor's winding from its current (REQ-PRO-001, Part I). When the motor is
+  overloaded, it folds the drive's current limit back from the peak to the continuous rating.
 - Watching an enabled position drive for a rotor carried more than four encoder counts past the software
-  position limits, and raising *position limit* (REQ-CTL-007, Part J).
+  position limits. It raises *position limit* (REQ-CTL-007, Part J).
 - Inferring the winding's temperature from the online resistance estimate in speed and position mode
-  (REQ-PRO-002), derating the current limit as it nears the temperature limit and raising *overtemperature*
-  at the limit (REQ-PRO-002, Part K).
+  (REQ-PRO-002). It derates the current limit as the temperature nears the temperature limit. At the limit, it
+  raises *overtemperature* (REQ-PRO-002, Part K).
 - Watching an enabled drive's filtered bus voltage against the operator's bus-voltage limits, and raising
   *overvoltage* or *undervoltage* when it leaves them (REQ-PRO-003, Part L).
 

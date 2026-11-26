@@ -29,12 +29,13 @@ date: 2026-11-26
 ## Responsibilities
 
 **Is responsible for:**
-- Calibrating the encoder zero-offset so that the encoder frame and the motor's electrical rotor frame are aligned (position = 0 in the encoder corresponds to electrical angle = 0° in the rotor)
+- Calibrating the encoder zero-offset so that the encoder frame and the motor's electrical rotor frame are aligned. Position = 0 in the encoder then corresponds to electrical angle = 0° in the rotor
 - Applying an open-loop DC voltage vector at electrical angle 0° via the three-phase inverter to force the rotor to a known magnetic position
 - Detecting rotor settlement by monitoring encoder position change over consecutive samples
-- Reporting the calibrated encoder offset (in radians) via a single completion on success, or reporting failure if the rotor does not settle within the allowed time
-- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-PRO-005): a disconnected motor or an open phase leaves the rotor where it is, which the settlement check alone takes for an aligned rotor
-- Refusing to align when the encoder does not follow the field (REQ-CMS-001): the vector is held a quarter electrical turn ahead first, and the encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
+- Reporting the calibrated encoder offset (in radians) via a single completion on success
+- Reporting failure if the rotor does not settle within the allowed time
+- Refusing to align a motor whose phases do not carry the current the alignment vector drives, and saying so (REQ-PRO-005). A disconnected motor or an open phase leaves the rotor where it is. The settlement check alone takes that for an aligned rotor
+- Refusing to align when the encoder does not follow the field (REQ-CMS-001). The vector is held a quarter electrical turn ahead first. The encoder must travel the matching mechanical angle when the vector moves to the alignment angle. An encoder stuck from boot reads as settled at once, which the settlement check alone takes for an aligned rotor
 - Stopping the inverter cleanly after the procedure completes, whether successfully or not
 - Enforcing mutual exclusion: silently ignoring re-entry while an alignment is already in progress
 
@@ -50,22 +51,22 @@ Before invoking alignment, the caller must have:
 2. Provided the number of pole pairs for the motor under test.
 3. Given an alignment configuration that holds:
    - **test voltage percent** — fraction of DC bus voltage (0–100 %) applied to the d-axis during the procedure
-   - **sampling frequency** — the rate at which encoder samples are taken and settlement is checked (Hz); a
-     divisor of the switching frequency, since the shared [decimating inverter](platform-phase-current-rate.md) hands
-     on every Nth sample while the power stage keeps switching at its own frequency
+   - **sampling frequency** — the rate at which encoder samples are taken and settlement is checked (Hz). It is a
+     divisor of the switching frequency, because the shared [decimating inverter](platform-phase-current-rate.md) hands
+     on every Nth sample. Meanwhile, the power stage keeps switching at its own frequency
    - **max samples** — the total number of sampling ticks before the procedure times out
    - **settled threshold** — the maximum absolute encoder position change (radians) that qualifies as "not moving"
    - **settled count** — the number of consecutive below-threshold samples required to declare settlement
-   - **phase resistance** and **bus voltage** — the calibrated winding resistance and the measured supply, from
-     which the phase-continuity check derives the current the vector should drive; either left at zero skips the
+   - **phase resistance** and **bus voltage** — the calibrated winding resistance and the measured supply. From
+     them, the phase-continuity check derives the current the vector should drive. Either left at zero skips the
      part of the check that needs them
    - **phase inductance** — the calibrated winding inductance; with the resistance it sets how far the current
      can have risen by the settled samples. Left at zero, the current is taken as settled
-   - **follow step** — the electrical angle ahead of the alignment angle at which the vector is held first, so
-     the encoder can be seen to follow the field; zero skips the first hold and the follow check. The calibration
+   - **follow step** — the electrical angle ahead of the alignment angle at which the vector is held first. With
+     it, the encoder can be seen to follow the field. Zero skips the first hold and the follow check. The calibration
      flow passes a quarter turn
-   - **follow dwell** — the samples of the second hold during which settlement is not yet counted, so the rotor
-     has started to move before it can be declared settled; 100 by default
+   - **follow dwell** — the samples of the second hold during which settlement is not yet counted. Thus the rotor
+     has started to move before it can be declared settled. The default is 100
 
 These parameters are tuned by the application engineer for the specific motor and mechanical load. A typical configuration applies 10–20 % of bus voltage and requires 20 consecutive samples within 0.001 rad of one another before declaring settlement.
 
@@ -149,7 +150,7 @@ samples it already takes at the sampling frequency, never the 20 kHz ones. It de
 - **phase a** carries less than a quarter of the expected `|ia|`. Phase a is the only one driven against the
   other two together, so this also catches a fully disconnected motor, where nothing flows;
 - **phase b or c** carries less than a quarter of half of the expected `|ia|`. An open b or c leaves a and the
-  other one in series, so the open phase reads zero while a still carries most of its current.
+  other one in series. Thus the open phase reads zero while a still carries most of its current.
 
 A quarter leaves room for what the model ignores. Dead time and switch drop take a few percent of the
 alignment voltage, and the calibrated resistance can be off by more than that. A missing phase reads a few

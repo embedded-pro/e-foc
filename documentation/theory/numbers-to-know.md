@@ -25,10 +25,14 @@ date: 2026-10-29
 ## Overview
 
 The earlier chapters derive relationships. This one puts numbers in them, for the two reference motors and
-for the firmware and board e-foc runs on, so that a reader can tell at a glance whether a loop is fast
-enough, whether a speed is reachable, or whether an error is above the noise. Every motor figure is derived
-from `documentation/theory/foc-plant-models.md` "Reference Motors" (which also shows how the datasheet values
-were converted); every firmware or board figure names the file it comes from.
+for the firmware and board e-foc runs on. With them a reader can tell at a glance:
+
+- whether a loop is fast enough;
+- whether a speed is reachable;
+- whether an error is above the noise.
+
+Every motor figure is derived from `documentation/theory/foc-plant-models.md` "Reference Motors". That section
+also shows how the datasheet values were converted. Every firmware or board figure names the file it comes from.
 
 The headline numbers:
 
@@ -107,8 +111,8 @@ graph LR
     ACC --> TM["Mechanical τ<br/>≈ 0.5 s"]
 ```
 
-The separation the cascade relies on is visible directly: the current settles in a few electrical time
-constants, the speed loop sees a new value every millisecond, and the rotor needs tens of milliseconds to
+The separation the cascade relies on is visible directly. The current settles in a few electrical time
+constants. The speed loop sees a new value every millisecond. The rotor needs tens of milliseconds to
 change speed appreciably.
 
 ### 3. Motor Constants and Conversions
@@ -151,18 +155,18 @@ At the rated point, steady state, $i_d = 0$ ([motor model](motor-model.md) §8):
 | Mechanical power         | $\tau\,\omega_m$            | 53.2 W                    | 172 W                    |
 
 **The board's own voltage limit.** The low-side shunts need the readable window of §1. When a voltage vector
-would need more, all three duties move down together, which keeps the line-to-line voltages; only a vector
-whose middle duty would still exceed 70 % (or whose highest would exceed 95 %) is scaled back along its own
-direction (`documentation/architecture/system.md`). In the three directions where two phases share the highest
-duty, $\theta = 60^\circ, 180^\circ, 300^\circ$, common-mode injection gives those two phases a duty
-$0.866\,m$ above the lowest at modulation $m$, so
+would need more, all three duties move down together, which keeps the line-to-line voltages. Only some
+vectors are scaled back along their own direction (`documentation/architecture/system.md`). These are the
+vectors whose middle duty would still exceed 70 % (or whose highest would exceed 95 %). In three directions,
+$\theta = 60^\circ, 180^\circ, 300^\circ$, two phases share the highest duty. There, common-mode injection gives
+those two phases a duty $0.866\,m$ above the lowest at modulation $m$, so
 
 $$
 0.866\, m \le 0.70 \quad\Rightarrow\quad m \le 0.808
 $$
 
 A vector that turns at constant length therefore stays undistorted only up to about $0.81\,V_{max}$ on
-E-FOC-HARDWARE; beyond it the vector is flattened in those three directions. The timing behind both limits is in
+E-FOC-HARDWARE. Beyond it the vector is flattened in those three directions. The timing behind both limits is in
 [low-side shunt current sensing](low-side-current-sensing.md). The speed limits change
 accordingly, computed at $m = 0.808$:
 
@@ -191,8 +195,8 @@ accordingly, computed at $m = 0.808$:
 | `float` resolution                | $2^{-23}$ relative                        | $1.2 \times 10^{-7}$; one ulp at $\pm\pi$ is $2.4 \times 10^{-7}$ rad |
 
 Two comparisons from this table carry through the design. The dead-time loss (34–56 mV) is comparable to the
-resistive drop of a small current, $R_s \times 0.2\ \text{A} = 72$–$81$ mV: it is negligible at load and
-dominant near zero current, which is why it is compensated and why identification avoids small currents
+resistive drop of a small current, $R_s \times 0.2\ \text{A} = 72$–$81$ mV. It is negligible at load and
+dominant near zero current. That is why it is compensated and why identification avoids small currents
 (`documentation/design/service-dead-time-compensation.md`). And the current noise is ten times the current
 LSB: a wider ADC would not help, a quieter sense chain would.
 
@@ -268,8 +272,8 @@ Which input moves which result:
    each control period sees 7.2° of rotation, and the voltage it computes is applied about 10.8° late.
 
 **The Anaheim at 24 V, 4000 rpm, 3 A** gives $V_q = 0.405 \times 3 + 1675.5 \times 0.00544 = 10.33$ V,
-$V_d = -1675.5 \times 0.00064 \times 3 = -3.22$ V, $|V| = 10.8$ V against $0.808 \times 13.86 = 11.2$ V: 97 %, at
-the edge, matching the 4160 rpm limit of §4.
+$V_d = -1675.5 \times 0.00064 \times 3 = -3.22$ V. Then $|V| = 10.8$ V against $0.808 \times 13.86 = 11.2$ V.
+This is 97 %, at the edge, and matches the 4160 rpm limit of §4.
 
 ---
 
@@ -279,7 +283,7 @@ the edge, matching the 4160 rpm limit of §4.
   indicative.
 - **Assumes**: steady state for the voltage budgets; transients need extra headroom.
 - **Derived, not measured**: the 0.81 modulation limit follows from the 70 % readable limit and common-mode
-  injection; the 95 % cap never binds below it, since the spread between highest and lowest duty is at most $m$.
+  injection. The 95 % cap never binds below it, since the spread between highest and lowest duty is at most $m$.
   The simulation results of `documentation/architecture/system.md` are consistent with it.
 - **Board-specific**: §1 and every figure derived from it hold for E-FOC-HARDWARE on the EK-TM4C1294XL;
   another board has its own `BoardCharacteristics`.

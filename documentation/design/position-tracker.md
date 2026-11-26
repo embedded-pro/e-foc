@@ -30,10 +30,10 @@ date: 2026-11-26
 
 **Is responsible for:**
 - Keeping the multi-turn position θ = 2π·n + θm of the rotor from the position zero in every control mode and
-  state, by counting the turns n of the encoder angle θm ([foc-position.md](foc-position.md), Multi-Turn Position)
+  state. It counts the turns n of the encoder angle θm ([foc-position.md](foc-position.md), Multi-Turn Position)
 - Counting the turns on the event loop, from an encoder reading every 1 ms, while the position cascade does not
-- Handing the count to the position cascade when it starts and taking it back when it stops, and reporting the
-  count the cascade publishes in between
+- Handing the count to the position cascade when it starts, and taking it back when it stops
+- Reporting the count the cascade publishes in between
 - Starting the count again at turn 0 whenever the drive sets the position zero
 - Reporting the multi-turn position to the CAN telemetry
 
@@ -58,13 +58,13 @@ faster reference motor's rated speed.
 Only one counter counts at a time. While the cascade runs, it counts every 1 kHz tick from the angle of the
 latest inner-loop sample. This never misses a turn below 500 turns per second. The tracker then stops counting:
 
-- **Hold.** When the cascade starts (an Enable, a speed command or a current command in position mode) it takes
-  the tracker's count together with the angle that count was taken at, and the tracker stops sampling. A seam
+- **Hold.** When the cascade starts (an Enable, a speed command or a current command in position mode), it takes
+  the tracker's count. It also takes the angle that count was taken at, and the tracker stops sampling. A seam
   crossing between that sample and the cascade's first tick is still counted. The cascade unwraps its first
   angle against the one it took.
-- **Publish.** Every tick the cascade publishes its count. The tracker reports the published count; a reader on
-  the event loop that the outer-loop interrupt pre-empts mid-read reads again, so it never sees the turns of one
-  tick with the angle of another.
+- **Publish.** Every tick the cascade publishes its count. The tracker reports the published count. When the
+  outer-loop interrupt pre-empts a reader on the event loop mid-read, the reader reads again. Thus it
+  never sees the turns of one tick with the angle of another.
 - **Release.** When the cascade stops it hands back its last count and the tracker counts on from it.
 
 A cascade that started before the tracker took any sample starts at turn 0 from its own first angle.

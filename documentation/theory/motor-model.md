@@ -86,15 +86,15 @@ $$
 v_k = R_s i_k + \frac{d\psi_k}{dt}, \qquad k \in \{a, b, c\}
 $$
 
-The linkage of phase a has four contributions: its own current, the currents of the two other phases
-through their mutual inductance, and the rotor magnet:
+The linkage of phase a has four contributions. They are its own current, the currents of the two other
+phases through their mutual inductance, and the rotor magnet:
 
 $$
 \psi_a = L_{aa}\, i_a + M\, i_b + M\, i_c + \psi_f \cos\theta_e
 $$
 
 For three identical windings whose axes are $120^\circ$ apart, the self inductance is a leakage part plus a
-magnetising part, $L_{aa} = L_\sigma + L_m$, and the mutual inductance is the magnetising part projected
+magnetising part, $L_{aa} = L_\sigma + L_m$. The mutual inductance is the magnetising part projected
 through $\cos 120^\circ$: $M = -\tfrac{1}{2} L_m$. In a wye winding $i_b + i_c = -i_a$, so
 
 $$
@@ -120,7 +120,7 @@ v_c = R_s i_c + L_s \frac{di_c}{dt} + e_c, \qquad e_c = -\omega_e \psi_f \sin\!\
 $$
 
 Three equations, but only two independent currents, and back-EMFs that depend on the rotor angle. To keep
-the torque steady the currents must be sinusoids that track $\theta_e$: a regulator would have to follow a
+the torque steady the currents must be sinusoids that track $\theta_e$. A regulator would have to follow a
 moving target at up to hundreds of hertz. The next three steps remove that.
 
 ### 2. Space Vectors
@@ -296,9 +296,9 @@ J \frac{d\omega_m}{dt} = \tau_e - B_f\, \omega_m - T_L, \qquad
 \frac{d\theta_m}{dt} = \omega_m, \qquad \theta_e = p\,\theta_m
 $$
 
-$B_f\,\omega_m$ is viscous friction. $T_L$ collects everything else the shaft sees: a load that opposes motion
-and an external torque with a fixed sign, split in `documentation/theory/foc-plant-models.md` §2, plus
-Coulomb friction and cogging (see [disturbances and noise](disturbances-and-noise.md)).
+$B_f\,\omega_m$ is viscous friction. $T_L$ collects everything else the shaft sees. This is a load that opposes motion
+and an external torque with a fixed sign, split in `documentation/theory/foc-plant-models.md` §2. It also
+collects Coulomb friction and cogging (see [disturbances and noise](disturbances-and-noise.md)).
 
 ### 7. The Complete Model in State-Space Form
 
@@ -323,7 +323,7 @@ Two properties of this model shape the whole control structure:
   parameter and the electrical part is linear.
 - **It has two time scales.** The electrical time constant $L_s/R_s$ is 0.56 ms (Teknic) to 1.58 ms
   (Anaheim); the mechanical time constant $J/B_f$ is about half a second for both. The currents settle long
-  before the speed moves, which is what justifies controlling current in an inner loop and speed in an outer
+  before the speed moves. This justifies controlling current in an inner loop and speed in an outer
   one ([closed-loop control](closed-loop-control.md)).
 
 The linear per-loop plants and their discrete-time versions are derived in
@@ -353,9 +353,9 @@ $$
          Vd = −ωe·Ls·Iq                    (not to scale)
 ```
 
-The applied voltage leads the current and grows with speed through two terms: the back-EMF $\omega_e\psi_f$,
-which dominates, and the inductive drop $\omega_e L_s I_q$, which tilts the vector towards $-d$. A current
-controller has to produce this voltage; the voltage it cannot produce is the limit of the next section.
+The applied voltage leads the current and grows with speed through two terms. The back-EMF $\omega_e\psi_f$
+dominates. The inductive drop $\omega_e L_s I_q$ tilts the vector towards $-d$. A current
+controller has to produce this voltage. The voltage it cannot produce is the limit of the next section.
 
 ### 9. Operating Envelope
 
@@ -390,8 +390,8 @@ graph LR
   $i_{q,max}(\omega_e) = \sqrt{(V_{max}/\omega_e)^2 - \psi_f^2}\,/\,L_s$ and falls to zero at
   $\omega_e = V_{max}/\psi_f$.
 - **Field weakening** would go further by injecting negative $i_d$, moving the current towards the centre of
-  the voltage circle. e-foc does not implement it; its cascades keep $i_d^* = 0$, apart from a ±2.5 % of
-  $I_{max}$, 50 Hz square wave they inject for 4 s in every 60 s while the online electrical estimator runs
+  the voltage circle. e-foc does not implement it. Its cascades keep $i_d^* = 0$, apart from a 50 Hz square wave
+  of ±2.5 % of $I_{max}$. They inject it for 4 s in every 60 s while the online electrical estimator runs
   (`core/foc/cascade/CascadeWithSpeedLoop.cpp`).
 
 Keeping $R_s$, the exact speed limit at a q current $I$ solves

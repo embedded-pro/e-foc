@@ -27,9 +27,8 @@ date: 2026-11-10
 
 ## Overview
 
-The suite is a **black-box driver**. It starts a target running the real firmware, speaks to it
-over the product's own CAN command set, and asserts on the frames that come back and, on an
-emulated target, on the plant's own record. It
+The suite is a **black-box driver**. It starts a target running the real firmware and speaks to it over the product's
+own CAN command set. It asserts on the frames that come back and, on an emulated target, on the plant's own record. It
 does not reach into the firmware, does not mock its components, and knows nothing of its internal
 types.
 
@@ -73,8 +72,8 @@ motor-controller scenario on hardware is tagged `@hil_motor`.
 
 ### The interactor seam
 
-Everything a scenario needs from a target sits behind one interface: lifecycle, command and
-telemetry transport, and — for a simulated target only — the world the firmware runs in.
+Everything a scenario needs from a target sits behind one interface: lifecycle, command and telemetry transport. For a
+simulated target, it also holds the world the firmware runs in.
 
 ```mermaid
 graph TD
@@ -92,8 +91,8 @@ graph TD
     BRIDGE --> BOARD["Motor board"]
 ```
 
-The terminal is not part of that seam. It has an interactor of its own, which only the hardware
-interactor implements, and a fixture of its own, which exists only in a scenario tagged `@hil` (see
+The terminal is not part of that seam. It has an interactor of its own, which only the hardware interactor implements.
+It also has a fixture of its own, which exists only in a scenario tagged `@hil` (see
 *Out of scope: the bring-up image*). A motor-controller step has no terminal to write to and no trace
 to read, and on the emulator there is no terminal interactor at all.
 
@@ -105,8 +104,8 @@ motor target*).
 
 ### Scenario lifecycle
 
-Each scenario gets a fresh target. Setup accumulates in the scenario's own state and is applied in
-a single restart, so a scenario that describes a plant, a calibration and a set of algorithms still
+Each scenario gets a fresh target. Setup accumulates in the scenario's own state and is applied in a single restart.
+Thus a scenario that describes a plant, a calibration and a set of algorithms still
 starts the target once rather than once per description.
 
 ```mermaid
@@ -133,12 +132,12 @@ simulated target, the plant's own record:
 - **Telemetry** carries the lifecycle state, the fault code, and the measured speed and position.
 - **Command acknowledgements** carry acceptance or the reason for refusal.
 - **Responses** carry what the firmware decided and measured: the algorithm each loop ended up
-  running (`QueryAlgorithms`), which can differ from what was asked for; the calibration record, the
-  online estimates, the control-loop statistics and the reset cause (`QueryParameter`); and the
-  electrical parameters an identification broadcasts.
+  running (`QueryAlgorithms`), which can differ from what was asked for. They also carry the calibration record, the
+  online estimates, the control-loop statistics and the reset cause (`QueryParameter`), and the electrical parameters an
+  identification broadcasts.
 - **Plant trajectory**, on a simulated target only, carries what the motor actually did, sampled
-  on the control-tick time base, and the tick each command frame was delivered on, in a record file
-  the plant writes in the scenario directory. This is the channel the performance and disturbance
+  on the control-tick time base. It also carries the tick each command frame was delivered on. Both are
+  in a record file that the plant writes in the scenario directory. This is the channel the performance and disturbance
   scenarios measure; see the software-in-the-loop design.
 
 The identification scenarios compare the calibration record, the online estimates and the
@@ -152,25 +151,25 @@ and per restart, so an assertion cannot match a line from an earlier boot.
 
 ### The virtual motor target
 
-A scenario tagged `@virtual` runs against the virtual motor program (`virtual-motor.md`): the same
-application, compiled for the host, on the same plant model, so the virtual board cannot drift from
-the emulated one unnoticed. The interactor starts one program per scenario in the scenario's own
-directory, hosting its own virtual CAN bus on a free loopback port, and joins that bus at the
+A scenario tagged `@virtual` runs against the virtual motor program (`virtual-motor.md`). This is the same application,
+compiled for the host, on the same plant model. Thus the virtual board cannot drift from
+the emulated one unnoticed. The interactor starts one program per scenario in the scenario's own directory. Each program
+hosts its own virtual CAN bus on a free loopback port. The interactor joins that bus at the
 application's default bit rate as the scenario's CAN client. The plant description and the memory
-image the scenario describes are the files the emulated target reads, under the names the program is
-given; a restart stops the program and starts it again on them. Whatever the program prints is the
+image the scenario describes are the files the emulated target reads, under the names the program is given. A restart
+stops the program and starts it again on them. Whatever the program prints is the
 scenario's debug log.
 
 The set is small and functional: a calibration over CAN, a calibration restored from memory, mode
-switches and the start-up check of the current sensors. A virtual motor keeps wall-clock time and
-writes no plant record, so the performance and disturbance scenarios, which measure the plant's
-trajectory on the emulator's instruction-counted time, stay `@sil` only, as do the bootloader and
-upgrade scenarios, which need an image to boot. A `@virtual` scenario keeps its `@sil` tag: the
+switches and the start-up check of the current sensors. A virtual motor keeps wall-clock time and writes no plant
+record. The performance and disturbance scenarios measure the plant's trajectory on the emulator's instruction-counted
+time, so they stay `@sil` only. The bootloader and upgrade scenarios need an image to boot, so they also stay `@sil`
+only. A `@virtual` scenario keeps its `@sil` tag: the
 requirement it verifies is verified on the emulator, and the virtual run guards the virtual board.
 
 ### Isolation
 
-Scenarios ran into each other through three shared resources, all now per session: the working
+Scenarios ran into each other through three shared resources. All are now per session: the working
 directory holding the target's files, the sockets behind the target's serial ports, and the
 captured output.
 
@@ -191,16 +190,16 @@ captured output.
 | Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
 The command transport heartbeats while it awaits an acknowledgement, as a CAN client does. An
-identification acknowledges only when it ends, and the target emergency-stops an identification or an
+identification acknowledges only when it ends. The target emergency-stops an identification or an
 enabled drive whose client falls silent (see the CAN service design).
 
 The transport addresses the node whose heartbeat it waits for at the start of a scenario. A board
-answers as its configured base plus the board ID read from its jumpers, so the suite takes the node
-ID from the first server heartbeat it sees rather than assuming node 1; the emulated target, with
-no jumpers, is node 1. While it waits it broadcasts a status request, which a server answers with a
-heartbeat at once, so a target is found as soon as its CAN server is up rather than a heartbeat period
-later. It sends one at most once a second: a request a silent target cannot acknowledge stays in the
-bus adapter and is delivered in a burst when the target comes back, and a burst of them filled the
+answers as its configured base plus the board ID read from its jumpers. Thus the suite takes the node ID from the first
+server heartbeat it sees rather than assuming node 1. The emulated target, with
+no jumpers, is node 1. While it waits it broadcasts a status request, which a server answers with a heartbeat at once.
+Thus the suite finds a target as soon as its CAN server is up rather than a heartbeat period
+later. It sends one at most once a second. A request a silent target cannot acknowledge stays in the bus adapter. The
+adapter delivers such requests in a burst when the target comes back. A burst of them filled the
 target's send queue ahead of the first command's acknowledgement.
 
 ### Required from the system under test
@@ -218,16 +217,16 @@ No test-only command is added to the product to make the suite work.
 
 ## Feature-to-Requirements Mapping
 
-Each scenario carries the requirement identifiers it verifies as tags alongside its runner tag.
+Each scenario carries the requirement identifiers it verifies as tags alongside its runner tag. The checker
 `documentation/tools/check-requirements-traceability.py`, which `requirements-validation.yml` runs on
-every pull request, reads the tags straight from the feature directory, so the mapping lives with the
+every pull request, reads the tags straight from the feature directory. Thus the mapping lives with the
 scenarios rather than in this document where it would rot.
 
 ### Two tiers
 
 A requirement states what the drive promises; a scenario states how much and how it is checked. The
-two used to be one layer: requirements carried the scenarios' limit tables word for word, so every
-retuned limit was edited twice, and a requirement turned "verified" by restating the test that
+two used to be one layer. Requirements carried the scenarios' limit tables word for word, so every retuned limit was
+edited twice. A requirement turned "verified" by restating the test that
 verified it. They are now kept apart.
 
 ```
@@ -263,8 +262,8 @@ Tier 2  acceptance criteria   integration_tests/features/*.feature  how much, on
 - **Status and verification are mandatory.** `verified` needs at least one citing scenario;
   `implemented` is met by code checked through unit tests or inspection only.
 
-A broad requirement cited by many scenarios is verified only as far as its scenarios reach: the
-checker's listing prints the number of scenarios per requirement, and a review of a new requirement
+A broad requirement cited by many scenarios is verified only as far as its scenarios reach. The checker's listing prints
+the number of scenarios per requirement. A review of a new requirement
 asks which scenario covers each promise it makes.
 
 ### Former requirement identifiers
@@ -312,11 +311,15 @@ or issue maps as follows; the checker refuses any of them as a tag.
 | REQ-HWT-001           | REQ-HIL-001, 004, 005, 006                                                                                                                                                                                                                                                                                  |
 | moved out (see below) | REQ-TRQ-001, 004; REQ-SPD-001, 004, 005, 007; REQ-POS-001, 002, 004, 006, 008; REQ-SPD-002; REQ-CAL-002 to 004, 006 to 008, 011; REQ-SM-019, 022, 027, 030; REQ-CTRL-007, 011; REQ-INT-008 to 012, 015 to 017; REQ-CAN-004, 005; REQ-EH-013, 014; REQ-PERF-007; REQ-UPD-008, 015; REQ-BOOT-006; REQ-POS-013 |
 
-The former requirements moved out were design constraints (fixed-size law storage, cascade rates,
-callback ownership, the torque-constant derivation, NVM writer ordering, the CAN client API and its
-tracing), rules of this test suite (CAN-only commands and verdicts, no test-only messages), wire
-contract test rules, and guards against fixed defects; each is stated in the design document of its
-component.
+The former requirements moved out were of four kinds:
+
+- design constraints (fixed-size law storage, cascade rates, callback ownership, the torque-constant derivation, NVM
+  writer ordering, the CAN client API and its tracing);
+- rules of this test suite (CAN-only commands and verdicts, no test-only messages);
+- wire contract test rules;
+- guards against fixed defects.
+
+Each is stated in the design document of its component.
 
 ---
 
@@ -329,11 +332,12 @@ component.
 
 ### The rule
 
-Every scenario of the motor controller application, on the emulator and on hardware alike, sends
-every command as a CAN frame and decides pass or fail only from the CAN frames the target sends and,
-on the emulator, from what the simulated plant records about itself. The serial port is a debug
-channel: the suite records everything the target prints and attaches it to a failed scenario, but
-never writes to it and never parses it for a verdict.
+Every scenario of the motor controller application, on the emulator and on hardware alike, sends every command as a CAN
+frame. It decides pass or fail only from the CAN frames the target sends and,
+on the emulator, from what the simulated plant records about itself. The serial port is a debug channel. The suite
+records everything the target prints and attaches it to a failed scenario. It never writes to the port and never parses
+it for
+a verdict.
 
 - **CAN is the product's control surface.** A deployed controller is commanded over the bus, by the
   CAN Commander or a host. A scenario that goes through the terminal proves a path no deployed system
@@ -341,7 +345,7 @@ never writes to it and never parses it for a verdict.
 - **Traces are not a contract.** Their wording changes with any logging edit, nothing versions them,
   and a parser can match a stale line. The CAN contract is versioned and has its own wire tests.
 - **One step, two targets.** When both targets speak only CAN, a step reads the same on the emulator
-  and on hardware; today some steps take the terminal on one target and CAN on the other.
+  and on hardware. Today some steps take the terminal on one target and CAN on the other.
 - **Debug output is free to change.** Trace wording, verbosity and rate stop mattering to the suite,
   and a slow or chatty serial port can no longer delay or break a verdict.
 
@@ -362,9 +366,9 @@ graph LR
     LOG -.->|"attached on failure"| REPORT["Test report"]
 ```
 
-On the emulator, CAN frames have a second emulated serial port to themselves, in the same text
-encoding in both directions, and the plant's samples and command-delivery ticks are in a file the
-plant writes in the scenario directory through semihosting, which the host reads back. On hardware,
+On the emulator, CAN frames have a second emulated serial port to themselves, in the same text encoding in both
+directions. The plant's samples and command-delivery ticks are in a file the plant writes in the scenario directory
+through semihosting. The host reads this file back. On hardware,
 CAN goes through the bridge's own bus.
 
 ### What has to move
@@ -384,14 +388,14 @@ Each row was a dependence on the terminal or on a trace, and what replaced it.
 | `PLANT` and `CAN_RX_AT` lines                                 | step-response, disturbance and estimator scenarios            | the plant record file                                                                                                                                   | transport |
 
 Algorithm selection on the hardware motor scenarios already goes over CAN (`SelectAlgorithm`, contract
-2.1): reading the terminal's reply raced the trace output, so a heartbeat trace line could be taken for it.
+2.1). Reading the terminal's reply raced the trace output, so a heartbeat trace line could be taken for it.
 
 The runner's own `[METRIC]` lines are its report on standard error, not target output, and stay.
 
-Every new message is a product diagnostic that the CAN Commander shows as well: a commissioning
-engineer needs the estimates, the loop statistics and the reset cause as much as a test does, so no
-message exists only for testing. Stalling the event loop is the one injected fault, and
-it is not a command: it is part of the simulated world and exists only on the emulator.
+Every new message is a product diagnostic that the CAN Commander shows as well. A commissioning engineer needs the
+estimates, the loop statistics and the reset cause as much as a test does. Thus no message exists only for testing.
+Stalling the event loop is the one injected fault. It is not a command: it is part of the simulated world and exists
+only on the emulator.
 
 ### The hardware motor target
 
@@ -400,8 +404,8 @@ board, and reaches it through the hardware bridge over CAN alone.
 
 - **Programming.** The runner loads the application ELF through the debugger and then writes the
   application's `.image.bin` over the application slot. The probe keeps whatever a programmed sector
-  held outside the ELF's sections, such as the gap between the vector table and the application
-  header, while the bootloader hashes the whole image. Without the second write, a slot that last held
+  held outside the ELF's sections, such as the gap between the vector table and the application header. The bootloader,
+  however, hashes the whole image. Without the second write, a slot that last held
   the bring-up image fails that hash, and the bootloader never starts the application. The bring-up
   image replaces the bootloader too, so `--bootloader-elf` names a bootloader ELF, its keys injected,
   that the runner programs first. With both, a `@hil` run and a `@hil_motor` run follow each other on
@@ -413,8 +417,8 @@ board, and reaches it through the hardware bridge over CAN alone.
   a parameter over CAN first reads the value the drive holds. After a `@hil_motor` scenario, a hook
   writes every such value back, even when the scenario failed. A motor parameter that was never
   identified reads 0, which no write accepts, so the hook clears the calibration instead.
-- **Bench limits.** The rotor runs free with an inertia disk, so a motion scenario keeps to a few
-  tenths of an ampere for a bounded time, or to 0 A, and to at most 60 rad/s. A scenario that
+- **Bench limits.** The rotor runs free with an inertia disk. Thus a motion scenario keeps to a few
+  tenths of an ampere for a bounded time, or to 0 A. It also keeps to at most 60 rad/s. A scenario that
   accelerates the rotor in torque mode prints its peak speed as a `[METRIC]` line, and its limit is
   pinned from that line. Timing limits use speed polled over CAN, which resolves a few milliseconds.
 - **Not on the bench.** The bench encoder has no index channel (calibration reports none found), so
@@ -424,13 +428,13 @@ board, and reaches it through the hardware bridge over CAN alone.
 ### Out of scope: the bring-up image
 
 The hardware-test image (scenarios tagged `@hil`: ADC, PWM, encoder, EEPROM, CAN peripheral, UART,
-hard fault, reset cause, watchdog) brings up a board; it is not the motor controller. Its terminal is
+hard fault, reset cause, watchdog) brings up a board. It is not the motor controller. Its terminal is
 its interface, the UART scenario tests that terminal itself, and the CAN scenario checks the
 peripheral before any CAN command server runs. It keeps using the terminal, through a fixture that
 a hook creates only for a scenario tagged `@hil`.
 
-The scenarios that reset the board (the reset command, the watchdog stall and the hard fault) wait for
-the restart before they talk to the terminal again. The boot banner's reset-cause line marks it, and so
+Three scenarios reset the board: the reset command, the watchdog stall and the hard fault. They wait for the restart
+before they talk to the terminal again. The boot banner's reset-cause line marks it, and so
 does the bridge dropping the serial link, which a reset can do. A probe sent earlier would reach the
 image that is about to reset. The session reconnects to the bridge whenever a link has dropped, so one
 dropped link fails no later scenario.
@@ -446,7 +450,7 @@ One follow-up change, in this order, each step leaving the suite green:
    and the serial output becomes the per-scenario debug log. Done.
 3. **Steps.** Port the rows above one feature at a time; the emulator watchdog scenario schedules its
    stall in the world description. Done.
-4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use;
-   they remain only in the bring-up fixture, so a new step cannot bring them back. Done.
+4. **Guard.** Remove terminal writes and trace reads from the fixture the application scenarios use.
+   They remain only in the bring-up fixture, so a new step cannot bring them back. Done.
 5. **Documents.** Rewrite Observation and Interfaces here, and Parts B, D, G, I and J and the
    Interfaces of the software-in-the-loop design, for the new channels. Done.

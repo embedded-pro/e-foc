@@ -30,12 +30,12 @@ date: 2026-11-26
 
 **Is responsible for:**
 - Maintaining a collection of concrete controller instances for each of the three FOC loops
-  (current, speed, position), all stored in fixed-size, statically-allocated storage without heap use
+  (current, speed, position). All are stored in fixed-size, statically-allocated storage without heap use
 - Activating one controller per loop at runtime by constructing it in place from the available set
 - Routing each loop's per-sample computation to the active controller with zero virtual-dispatch
   overhead through type-aware dispatch (variant visit)
 - Enforcing that algorithm selection is only permitted while the active mode is stopped (Idle or
-  Ready) and has no NVM work outstanding — not only while the motor is disabled
+  Ready) and has no NVM work outstanding. Disabling the motor alone is not enough
 - Propagating motor model parameters from the online RLS estimators to the newly selected controller
   immediately after selection
 - Persisting the active algorithm identifier for each loop to non-volatile memory upon each selection
