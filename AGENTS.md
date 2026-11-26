@@ -1,6 +1,6 @@
 # e-foc — Agent Rules
 
-<!-- shared:begin 0.6.0 sha256:f57badde9903d1ff -->
+<!-- shared:begin 0.7.0 sha256:000f44de0ff3a5bd -->
 Canonical rules for Claude, Copilot and sub-agents. Sections marked *(shared)* come from embedded-pro/embedded-agent-kit:
 edit them there, not here. *(repo)* sections belong to this repository. *Exceptions* overrides a shared rule.
 
@@ -75,6 +75,21 @@ Scope: production code. Tests and host tools may use the heap.
 - Update docs before or with any behavioural change.
 - One fact, one place: link, never restate.
 - Visuals: Mermaid or ASCII.
+- Put each document in the folder for its kind: `theory/` (physics, mathematics, algorithms),
+  `architecture/` (structure and deployment), `design/` (one component each),
+  `verification_and_validation/` (test plans, test design, requirements).
+- A test strategy or test plan is never a design document.
+- Every document starts with front matter: `title`, `type`, `status`, `version`, `date`.
+- A design document describes the component: responsibilities, behaviour, interfaces, states, limits.
+  It names no MCU, board, vendor peripheral, register, clock frequency, class, function or file.
+  Say "the target". Say "on the reference board" for a measured figure.
+- Only an architecture document names the deployment target.
+- A design document opens with `## Responsibilities`: one list of what the component does.
+  No "not responsible for" list. Put boundaries in *Interfaces* (Required).
+- No "Open Questions" section. Open an issue and link it. Put a known limitation in *Constraints & Limitations*.
+- After a documentation change, build the rendered output if the repository has a build for it.
+  Check that each diagram renders and that no table column runs into the next.
+- Skill `doc-writer`, when installed: load it before you create or change a document.
 
 ## Desktop tools *(shared)*
 
