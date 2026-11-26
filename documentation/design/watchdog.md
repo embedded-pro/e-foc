@@ -2,9 +2,9 @@
 title: "Watchdog Design"
 type: design
 status: draft
-version: 0.4.4
+version: 0.4.5
 component: "watchdog"
-date: 2026-11-05
+date: 2026-11-26
 ---
 
 | Field     | Value           |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Watchdog Design |
 | Type      | design          |
 | Status    | draft           |
-| Version   | 0.4.2           |
+| Version   | 0.4.5           |
 | Component | watchdog        |
-| Date      | 2026-11-05      |
+| Date      | 2026-11-26      |
 
 ---
 
@@ -22,7 +22,7 @@ date: 2026-11-05
 
 **Is responsible for:**
 - Proving that the software is running. Every hardware platform supervises its event dispatcher with the
-  watchdog peripheral from the moment the dispatcher is constructed until the next reset.
+  hardware watchdog from the moment the dispatcher is constructed until the next reset.
 - Bringing the power stage to a safe state from interrupt context when the dispatcher has stopped making
   progress, before the hardware resets the target.
 - Resetting the target from hardware, so that the next boot reports the reset cause as *watchdog*.
@@ -33,9 +33,9 @@ date: 2026-11-05
 
 ### Part A — supervision lives in the event dispatcher
 
-The mechanism is EMIL's, not e-foc's. EMIL provides:
-- a hardware watchdog interface, `hal::Watchdog`, implemented by the hardware platforms' and the emulated target's drivers;
-- an event dispatcher worker that supervises it, `services::EventDispatcherWatchdogWorker`.
+The mechanism is EmIL's, not e-foc's. EmIL provides:
+- a hardware watchdog interface, implemented by the drivers of the hardware platforms and of the emulated target;
+- an event dispatcher worker that supervises it.
 
 Each hardware platform builds its dispatcher from that worker and hands it the platform's watchdog. The
 dispatcher then does three things:
@@ -60,13 +60,13 @@ The expiry handler runs inside the watchdog's early-warning interrupt. It runs t
 loop is stuck, so nothing can be scheduled and no application code can run.
 
 The handler does only what is safe in an interrupt and needs no driver state:
-1. It calls the direct power-stage cutoff, which the hard-fault handler also uses. On the reference board this clears the
-   PWM output enables, so every gate is driven inactive and the motor coasts.
+1. It calls the direct power-stage cutoff, which the hard-fault handler also uses. On the reference board this disables the
+   PWM outputs, so every gate is driven inactive and the motor coasts.
 2. It returns.
 
 The handler does not reset by software. The watchdog is no longer refreshed, so the hardware resets the
-target one early-warning period later. That reset shows as *watchdog* in the processor's own reset-cause
-register, with no record to write before the reset.
+target one early-warning period later. That reset shows as *watchdog* in the processor's own reset cause,
+with no record to write before the reset.
 
 This is the most graceful stop that is possible at this point. A torque ramp-down would need the event loop
 that has just been proven stuck, and the time left before the hardware reset is only one early-warning
@@ -79,7 +79,7 @@ interrupt never returns, looks like it is making progress. Because of that, the 
 must not be able to preempt any interrupt that could hang:
 
 - The early-warning interrupt runs at the **lowest** priority the interrupt controller implements, no higher than the outer
-  loop's PendSV.
+  loop's software interrupt.
 - A hung interrupt at any priority then starves the early warning, so the hardware resets the target
   without the handler running.
 - A hung action in the event loop leaves the early warning free to run, so the handler cuts the power stage
@@ -97,27 +97,27 @@ must not be able to preempt any interrupt that could hang:
 | Platform                   | Hardware                          | Early-warning period            | Expiration timeout           |
 |----------------------------|-----------------------------------|---------------------------------|------------------------------|
 | Reference board            | Watchdog, reset on second timeout | 25 ms                           | 100 ms                       |
-| Window-watchdog platform A | Window watchdog, prescaler 8      | Fixed by its bus clock (≈12 ms) | 100 ms (nine early warnings) |
-| Window-watchdog platform B | Window watchdog, prescaler 1      | Fixed by its bus clock          | 100 ms                       |
+| Window-watchdog platform A | Window watchdog, divider 8        | Fixed by its bus clock (≈12 ms) | 100 ms (nine early warnings) |
+| Window-watchdog platform B | Window watchdog, divider 1        | Fixed by its bus clock          | 100 ms                       |
 | Emulated target            | Watchdog of the emulated machine  | 25 ms                           | 100 ms                       |
 | Host                       | none                              | —                               | —                            |
 
-- **Window-watchdog platforms:** the vendor driver pins the window watchdog to the highest priority when it starts. The
+- **Window-watchdog platforms:** the low-level driver pins the window watchdog to the highest priority when it starts. The
   platform lowers it to the lowest interrupt level straight after the dispatcher is constructed, for the reason given
-  in Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
-  bits and these processors implement four. On platform A the cutoff disables the bridge timer's main output; on
-  platform B, which drives no bridge yet, it is empty.
+  in Part C. The platform sets that level in the interrupt controller's own encoding. EmIL's priority levels assume
+  three priority bits, and these processors implement four. On platform A, the cutoff disables the main output of the
+  PWM generator that drives the bridge. On platform B, which drives no bridge yet, it is empty.
 
-  The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1), so the
-  early-warning handler must run within that tick. A small prescaler keeps the early-warning period short,
-  and with it the rounding of the timeout; a larger one buys handler latency at the cost of a later expiry.
-  On platform A prescaler 1 would leave 24 µs, less than the control-loop interrupt can hold off the handler, so
-  it uses prescaler 8: 193 µs.
+  The window watchdog resets one counter tick after its early warning (4096 · divider periods of its bus clock). Thus the
+  early-warning handler must run within that tick. A small divider keeps the early-warning period short,
+  and with it the rounding of the timeout. A larger one buys handler latency at the cost of a later expiry.
+  On platform A, divider 1 would leave 24 µs, less than the control-loop interrupt can hold off the handler. Thus
+  it uses divider 8: 193 µs.
 - **Emulated target:** the emulated machine wires its watchdog to NMI, which cannot be lowered. So on the
   emulated target a hung interrupt is caught only when the event loop is inside an action. That is
   acceptable for a target that drives a simulated plant.
 
-  The machine has no reset-cause register, and its reset reloads RAM. So the expiry handler writes a marker
+  The machine has no reset cause, and its reset reloads RAM. So the expiry handler writes a marker
   file through semihosting before the reset, and the next boot reads the marker, clears it and reports
   *watchdog*. The simulated bridge has no gate to cut.
 - **Host:** the host build keeps a plain dispatcher. It is not a target that can be reset.
@@ -132,7 +132,7 @@ The bring-up application keeps one command:
 The emulated target has no stall command. A SIL scenario describes the stall in the plant description,
 as it describes any other fault of the simulated world: the platform schedules the never-returning action
 the given time after boot, unless that boot followed a watchdog reset. The scenario then reads the reset
-cause over CAN (`resetCause`, contract 2.2) once the target answers again and expects *watchdog*. That
+cause over CAN (resetCause, contract 2.2) once the target answers again and expects *watchdog*. That
 runs the whole expiry path in continuous integration: the stalled action, the NMI early warning, the
 semihosting marker, the machine reset and the reset-cause report. The production firmware carries no
 stall command either way.
@@ -146,12 +146,12 @@ Nothing supervises the 20 kHz control interrupt itself. What catches each way it
 | Case                                                                                                  | Caught by                                                                  |
 |-------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
 | The interrupt never returns                                                                           | This watchdog: it starves the early warning (Part C) and the target resets |
-| The interrupt faults                                                                                  | The HardFault handler, which cuts the power stage                          |
+| The interrupt faults                                                                                  | The hard fault handler, which cuts the power stage                         |
 | The interrupt stops being raised while the event loop runs: lost PWM-to-ADC trigger, masked interrupt | Nothing. The PWM keeps its last duty until a disable, a fault or a reset   |
 
-The last case needs a peripheral fault. In the motor-controller application (`sync_foc_sensored`) the
-PWM-to-ADC trigger and the conversion sequence are configured once at boot (`ConfigureAdcAndPwm`); enable and
-disable only start and stop the PWM that raises the trigger. The bring-up application (`hardware_test`)
+The last case needs a peripheral fault. In the motor-controller application, the
+PWM-to-ADC trigger and the conversion sequence are configured once at boot. Enable and
+disable only start and stop the PWM that raises the trigger. The bring-up application
 reconfigures them from its terminal, but it runs no control loop.
 
 The two causes differ on the reference board. The overcurrent, overvoltage and undervoltage comparators are steps of the same
@@ -178,9 +178,9 @@ interrupt is seen on a board.
 
 | Interface                 | Purpose                                                     | Contract                                                                                             |
 |---------------------------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| `hal::Watchdog`           | Early-warning interrupt, refresh, reset on a missed refresh | Constructed before the dispatcher; early warning at the lowest priority where the hardware allows it |
+| Hardware watchdog         | Early-warning interrupt, refresh, reset on a missed refresh | Constructed before the dispatcher; early warning at the lowest priority where the hardware allows it |
 | Direct power-stage cutoff | Safe state from the early-warning interrupt                 | Interrupt-safe, depends on no driver state; shared with the fault handler                            |
-| Reset-cause register      | Report the watchdog reset on the next boot                  | Read and cleared once at boot by the error-handling component                                        |
+| Reset cause               | Report the watchdog reset on the next boot                  | Read and cleared once at boot by the error-handling component                                        |
 
 ---
 
@@ -219,7 +219,7 @@ sequenceDiagram
     participant EL as Event dispatcher
     participant WD as Watchdog early warning
     participant Inv as Power stage
-    participant HW as Watchdog peripheral
+    participant HW as Hardware watchdog
 
     EL->>EL: action starts (steps odd)
     Note over EL: action hangs
@@ -227,7 +227,7 @@ sequenceDiagram
     loop N times
         WD->>HW: refresh, missed++
     end
-    WD->>Inv: CutPowerStage()
+    WD->>Inv: cut power stage
     Note over WD: expired — no more refreshes
     HW->>HW: timeout — reset
     Note over HW: next boot reports reset cause Watchdog
@@ -239,7 +239,7 @@ sequenceDiagram
 sequenceDiagram
     participant ISR as Hung interrupt
     participant WD as Watchdog early warning (lowest priority)
-    participant HW as Watchdog peripheral
+    participant HW as Hardware watchdog
 
     Note over ISR: never returns
     HW-->>WD: early warning pending, starved
@@ -253,7 +253,7 @@ sequenceDiagram
 ```mermaid
 graph LR
     EL[Event dispatcher worker] -->|steps| Sup[Supervision]
-    HW[Watchdog peripheral] -->|early warning| Sup
+    HW[Hardware watchdog] -->|early warning| Sup
     Sup -->|refresh| HW
     Sup -->|expired| Cut[Direct power-stage cutoff]
     HW -->|missed refresh| Reset[Target reset]
@@ -270,18 +270,18 @@ With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
   detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
 - The hardware reset follows one period later, at most *(N+2)·P* after the action started.
 - With the reference board at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
-- With platform A at *P* ≈ 12.1 ms (prescaler 8) and *N* = 9, that is about
+- With platform A at *P* ≈ 12.1 ms (divider 8) and *N* = 9, that is about
   109–121 ms to the cutoff and at most about 134 ms to the reset.
 
 A legitimate action must finish well inside *N·P*. Long work is already split across actions:
-- the EEPROM mass erase is polled from a timer rather than waited for;
-- EEPROM writes wait only word by word;
+- the NVM mass erase is polled from a timer rather than waited for;
+- NVM writes wait only word by word;
 - identification sequences run from timers and phase-current callbacks;
 - the staging slot and the status journal lie in the flash half the application does not execute from
-  (`bootloader.md` Part A), so their sector erases, about 17 ms each and up to 40 ms with wear, never
+  ([bootloader.md](bootloader.md) Part A), so their sector erases, about 17 ms each and up to 40 ms with wear, never
   hold the early-warning handler. Each erase with its read-back is one action of about 30 ms, and the
   21 of a Begin Upgrade run back to back with nothing else between them, so the loop serves nothing
-  else for about 0.7 s, bounded at 1 s (`service-firmware-upgrade.md`). An erase in the
+  else for about 0.7 s, bounded at 1 s ([service-firmware-upgrade.md](service-firmware-upgrade.md)). An erase in the
   application's own half would hold the handler itself and reset the target at the next period,
   whatever the action split.
 
@@ -293,7 +293,7 @@ New work that could block for longer than the expiration timeout has to be split
 
 A handler that is merely slow starves the early warning exactly as a hung one does, so the hardware resets the
 target even though the handler would have returned. The phase-current interrupt of the hardware test terminal
-formatted a 100-line table while the ADC interrupt was active; that took about as long as the hardware timeout
+formatted a 100-line table while the phase-current interrupt was active; that took about as long as the hardware timeout
 and reset the target on `pwm` followed by `duty`. The rule that follows:
 
 - Interrupt handlers collect data and schedule work; they never format, trace or wait.
@@ -310,7 +310,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
 | Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
 | Early-warning priority          | Lowest on the hardware platforms, so a hung interrupt starves it; NMI on the emulated target                    |
-| Window-watchdog platforms       | Cutoff disables the bridge timer's main output on platform A; empty on platform B, which drives no bridge       |
+| Window-watchdog platforms       | Cutoff disables the bridge PWM main output on platform A; empty on platform B, which drives no bridge           |
 | Interrupt work                  | An interrupt that runs longer than the early-warning timeout resets the target, so interrupts only collect data |
 | Host build                      | No watchdog                                                                                                     |
-| Reset cause                     | Read from the processor's reset-cause register; the emulated target reads a semihosting marker file instead     |
+| Reset cause                     | Read from the processor's reset cause; the emulated target reads a semihosting marker file instead              |

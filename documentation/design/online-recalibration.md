@@ -2,9 +2,9 @@
 title: "Online Recalibration"
 type: design
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: online-recalibration
-date: 2026-11-06
+date: 2026-11-26
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Online Recalibration |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.1                |
+| Version   | 0.2.2                |
 | Component | online-recalibration |
-| Date      | 2026-11-06           |
+| Date      | 2026-11-26           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,8 +29,8 @@ date: 2026-11-06
 ## Responsibilities
 
 In speed and position mode the drive re-estimates its motor while it runs: the resistance and inductance from a
-small d-axis injection (`service-electrical-ident.md`, Excitation), the inertia and viscous friction from the speed
-and torque current (`service-mechanical-ident.md`). The loop gains are designed from the calibration record, so a
+small d-axis injection ([service-electrical-ident.md](service-electrical-ident.md), Excitation), the inertia and viscous friction from the speed
+and torque current ([service-mechanical-ident.md](service-mechanical-ident.md)). The loop gains are designed from the calibration record, so a
 load whose inertia differs from the commissioned one, or a winding whose resistance has risen, runs on a model that
 no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CMS-003),
 and keeps the inductance, inertia and friction it learned across power cycles (REQ-CMS-003).
@@ -61,10 +61,10 @@ designed from it once its machine is ready.
 
 ### Part B — When an estimate is used
 
-The event loop reads the estimates every 100 ms while the drive is `Enabled`. A quantity is a candidate when:
+The event loop reads the estimates every 100 ms while the drive is Enabled. A quantity is a candidate when:
 
 1. **Its estimator has settled.** The electrical estimator once it has taken the 200 updates it needs before it
-   publishes; the mechanical estimator once a direction's fit has settled (`service-mechanical-ident.md`). An
+   publishes; the mechanical estimator once a direction's fit has settled ([service-mechanical-ident.md](service-mechanical-ident.md)). An
    estimator that has not settled since it was seeded publishes its seed.
 2. **It differs from the model in use by more than 10 %,** and has done so for **5 s of running**. Time spent
    stopped does not count; a reading within 10 % starts the count again.
@@ -93,9 +93,9 @@ correction follows a settled electrical estimate inside them while the drive run
 | On command | A Recalibrate command while stopped adopts every settled estimate more than 10 % off, inside its band, no dwell |
 | Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                    |
 
-The mode is a drive-wide setting of the configuration record (`service-nvm.md`), read and written over CAN
-(`service-can.md`, contract 2.17). The CAN Commander chooses it on its Configuration tab and shows the model in
-use, the counters and the Recalibrate and Reset Model commands on its Diagnostics tab (`tool-can-commander.md`).
+The mode is a drive-wide setting of the configuration record ([service-nvm.md](service-nvm.md)), read and written over CAN
+([service-can.md](service-can.md), contract 2.17). The CAN Commander chooses it on its Configuration tab and shows the model in
+use, the counters and the Recalibrate and Reset Model commands on its Diagnostics tab ([tool-can-commander.md](tool-can-commander.md)).
 
 ```mermaid
 stateDiagram-v2
@@ -114,7 +114,7 @@ stateDiagram-v2
 Applying a model redesigns the current loop from the resistance and inductance in use and the speed loop, and in
 position mode the position loop, from the inertia and friction in use, with the record's flux linkage and pole
 pairs. The operator's loop settings are then applied again, so the bandwidths do not change. It happens only while
-the drive is stopped, so neither control interrupt runs a loop half-redesigned; the next `Enable` resets the loops
+the drive is stopped, so neither control interrupt runs a loop half-redesigned; the next Enable resets the loops
 as it always does. The estimators are not seeded again: they keep tracking from where they are, and the model in use
 now agrees with them.
 
@@ -129,7 +129,7 @@ parameters over CAN; the motor parameters keep reading the calibration record. T
 ### Part F — Storing the model
 
 A recalibration that changes the inductance, inertia or viscous friction in use stores the three of them in the
-learned-model record (`service-nvm.md`), with a check of the commissioned values they were learned from. The
+learned-model record ([service-nvm.md](service-nvm.md)), with a check of the commissioned values they were learned from. The
 resistance is never stored.
 
 - **Rate.** At most one store every 15 minutes of uptime. The first change after power-up is stored at the stop that
@@ -139,7 +139,7 @@ resistance is never stored.
 - **Mode off** never stores, and runs the commissioned model; the stored values are kept for when the mode is turned
   on again.
 - **Power-up.** While the mode is on command or automatic, and the record's commissioned inductance, inertia and
-  friction still match the check, the stored values are in use from the first `Ready`, each only inside its
+  friction still match the check, the stored values are in use from the first Ready, each only inside its
   plausibility band (Part B). A new calibration or a changed motor parameter changes the check, so the stored values
   are no longer used, and the next store replaces them.
 - **Reset Model.** A CAN command, accepted only while stopped, stores an empty learned model at once, outside the
@@ -180,7 +180,7 @@ stateDiagram-v2
 | Online estimators    | Current estimates and whether they settled  | Written by the low-priority interrupt; read on the event loop |
 | Calibration record   | The commissioned model and the loop design  | Flux linkage, pole pairs, bandwidths                          |
 | Learned-model record | The stored inductance, inertia and friction | Loaded once at power-up; written whole and read back          |
-| Lifecycle            | Entering `Ready` from `Enabled`             | Announced on the event loop                                   |
+| Lifecycle            | Entering Ready from Enabled                 | Announced on the event loop                                   |
 | Timer                | The 100 ms observation                      | Runs on the event loop                                        |
 
 ---

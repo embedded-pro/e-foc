@@ -2,9 +2,9 @@
 title: "Platform: Phase-Current Sample Rate"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: platform-phase-current-rate
-date: 2026-10-29
+date: 2026-11-26
 ---
 
 | Field     | Value                               |
@@ -12,9 +12,9 @@ date: 2026-10-29
 | Title     | Platform: Phase-Current Sample Rate |
 | Type      | design                              |
 | Status    | draft                               |
-| Version   | 0.1.0                               |
+| Version   | 0.1.1                               |
 | Component | platform-phase-current-rate         |
-| Date      | 2026-10-29                          |
+| Date      | 2026-11-26                          |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -39,12 +39,6 @@ place that turns the platform's per-period samples into the rate a consumer asks
 - Adding no work to the control loop's interrupt when the consumer asks for every sample.
 - Passing the duty cycles, start, stop, the PWM frequency and the current limit through to the power
   stage unchanged.
-
-- The PWM frequency. The power stage keeps switching at the frequency it was configured with, whatever
-  rate a consumer asks for.
-- Anything a platform does on every sample, such as the over-current check or the control-loop cycle
-  metrics. That runs in the platform's interrupt before a sample reaches this component.
-- Filtering. Samples that are not delivered are dropped, not averaged.
 
 ---
 
@@ -89,7 +83,7 @@ called.
 
 A request is made from the main context while the power stage's interrupt may be running. Both the
 power stage's callback and the consumer callback the counter hands samples to are swapped as a whole:
-the interrupt runs either the previous callable or the new one, never a mix. The ratio and the count
+the interrupt runs either the previous callback or the new one, never a mix. The ratio and the count
 are single words, so a request that lands between two samples changes the delivery from the next
 sample on.
 
@@ -179,6 +173,9 @@ graph LR
 | Cost at the PWM rate         | None in the interrupt; the consumer is the power stage's callback            |
 | Cost below the PWM rate      | One count and compare per PWM period, outside the control loop               |
 | First sample after a request | The Nth power-stage sample after it                                          |
+| PWM frequency                | Unchanged; the power stage switches at its configured frequency for any rate |
+| Per-sample platform work     | The over-current check and cycle metrics run in the platform's interrupt first |
+| No filtering                 | Samples that are not delivered are dropped, not averaged                     |
 
 ---
 

@@ -2,9 +2,9 @@
 title: "Platform: Phase-Current Sampling Skew"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: platform-sampling-skew
-date: 2026-11-09
+date: 2026-11-26
 ---
 
 | Field     | Value                                 |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Platform: Phase-Current Sampling Skew |
 | Type      | design                                |
 | Status    | draft                                 |
-| Version   | 0.1.0                                 |
+| Version   | 0.1.1                                 |
 | Component | platform-sampling-skew                |
-| Date      | 2026-11-09                            |
+| Date      | 2026-11-26                            |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -42,12 +42,6 @@ back to the window centre before the controller sees it.
 - Leaving the samples unchanged while no controller supplies the rates, and on a platform that reads
   all phases at once.
 
-- Estimating the rates. The FOC cascade owns the motor model and computes them.
-- The offsets and the dead-time loss: the stage above removes the offsets and corrects the duties
-  ([dead-time compensation](service-dead-time-compensation.md)).
-- The current ripple of the active vectors. The correction only moves the sample along the zero
-  vector, where all low sides conduct.
-
 ---
 
 ## Component Details
@@ -65,12 +59,12 @@ configured:
 
 | Platform                     | Phase A                    | Phase B | Phase C | Source                                                                             |
 |------------------------------|----------------------------|---------|---------|------------------------------------------------------------------------------------|
-| Reference board              | 0.75 µs                    | 2.75 µs | 4.75 µs | 4-clock sample-and-hold, 12 conversion clocks, two averaged                        |
-| Emulator, MIL, virtual motor | from the plant description |         |         | The converter fields of the current-sense chain (`software-in-the-loop.md` Part M) |
+| Reference board              | 0.75 µs                    | 2.75 µs | 4.75 µs | The converter's hold and conversion times, two conversions averaged                |
+| Emulator, MIL, virtual motor | from the plant description |         |         | The converter fields of the current-sense chain ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part M) |
 | Other boards                 | 0                          | 0       | 0       | Not characterised; no correction                                                   |
 
-The reference board's converter phase-delay setting shifts the trigger by a fraction of one converter clock, under 63 ns,
-and is left out.
+The reference board's converter can shift the trigger by less than 63 ns. The correction leaves this
+shift out.
 
 ### Part B — The rate of each phase during the zero vector
 
@@ -87,7 +81,7 @@ $$\dot{i}_d = -\frac{R}{L}\,i_d, \qquad \dot{i}_q = -\frac{R}{L}\,i_q - \omega_e
 which the inverse Park and Clarke transforms turn into one rate per phase. The FOC cascade computes it
 every period from the currents it has just measured, the electrical speed it already tracks and the
 motor model it was configured with, and hands it straight to the platform's shunt readout, past the
-dead-time compensation and the decimating inverter, which have no use for it: one indirect call a
+dead-time compensation and the decimating inverter, which have no use for it: one call a
 period. The rate is used at the next sample, one period later, so the cascade turns it by the angle
 $\delta = \omega_e T_s$ the rotor covers in one period first, in rotor coordinates and to second order
 ($\cos\delta \approx 1 - \delta^2/2$, $\sin\delta \approx \delta$); at speed that is the larger part of its
@@ -180,6 +174,9 @@ sequenceDiagram
 | Rate age                 | Computed from the previous period's currents and turned one period ahead                        |
 | Cost                     | Three multiply-subtracts in the platform; the rates cost the cascade one transform and one call |
 | Platforms without timing | Delays of zero: the samples pass unchanged                                                      |
+| Rates                    | The FOC cascade estimates the rates from its motor model; the correction only applies them      |
+| Offsets and dead time    | The stage above removes the offsets and corrects the duties ([dead-time compensation](service-dead-time-compensation.md)) |
+| Active-vector ripple     | Not corrected; the correction only moves the sample along the zero vector                       |
 
 ---
 

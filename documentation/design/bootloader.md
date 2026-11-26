@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.6
+version: 0.6.7
 component: "bootloader"
-date: 2026-11-05
+date: 2026-11-26
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.3      |
+| Version   | 0.6.7      |
 | Component | bootloader |
-| Date      | 2026-11-05 |
+| Date      | 2026-11-26 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -32,8 +32,8 @@ The bootloader is a single, small program at the start of flash. It runs at ever
 controller application, and does two things only: it checks that the application is intact, and built for
 this board, before starting it; and it installs a new application that the running one
 staged and that the user applied. Receiving the firmware is the application's job
-(`service-firmware-upgrade.md`); choosing it, and deciding when to download and when to apply it, is the user's,
-through the CAN Commander (`tool-can-commander.md` Part M).
+([service-firmware-upgrade.md](service-firmware-upgrade.md)); choosing it, and deciding when to download and when to apply it, is the user's,
+through the CAN Commander ([tool-can-commander.md](tool-can-commander.md) Part M).
 
 **Is responsible for:**
 - Checking, at every reset, the application in the application slot against its image descriptor (size and
@@ -57,7 +57,7 @@ through the CAN Commander (`tool-can-commander.md` Part M).
 Flash is split into a bootloader region, an application slot and a staging slot. The application runs from
 its slot; the staging slot holds the pack the application received, in internal flash where two copies of the
 image fit and in external flash where they do not. The application and staging slots are 320 KB on every board, and no
-larger: the application erases all of it before a download starts (`service-firmware-upgrade.md` Part B), so
+larger: the application erases all of it before a download starts ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part B), so
 its size bounds that erase. The status journal (Part D) is the erase unit after the staging slot; the last 64
 bytes of the application slot are the image descriptor (Part E).
 
@@ -69,10 +69,10 @@ bytes of the application slot are the image descriptor (Part E).
 | Journal          | after the staging slot         | one erase unit | the medium of the staging slot                                                  |
 
 The reference board and the emulated board are built with this layout today; on the emulated board, which has 4 MB
-of code RAM, the staging slot is the semihosting file `staging.bin` and the journal the file `journal.bin`. The
+of code RAM, the staging slot is a semihosting staging file and the journal a semihosting journal file. The
 application image is 246 KB on the reference board and 242 KB on the emulated one. A board that does not yet have
 the bootloader is linked standalone from the start of its flash, programmed with a debugger, carries no application
-header and has no staging slot (`service-firmware-upgrade.md` Part I).
+header and has no staging slot ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part I).
 
 On the reference board, whose staging slot is in internal flash:
 
@@ -99,9 +99,9 @@ On the reference board, whose staging slot is in internal flash:
   watchdog's early-warning handler included, while the other half reads normally (software runs from the
   lower half while updating the upper). The application executes from
   the lower half and erases the staging slot and the journal while it runs, so both lie entirely in the upper
-  half and no erase it performs can block the core or the watchdog; the linker script asserts it. A 16 KB
+  half and no erase it performs can block the core or the watchdog; the build asserts it. A 16 KB
   erase takes about 17 ms on the bench and up to 40 ms with wear, against the 25 ms the watchdog hardware
-  allows an unserviced early warning (`watchdog.md`), so a staging slot that crossed the boundary reset the
+  allows an unserviced early warning ([watchdog.md](watchdog.md)), so a staging slot that crossed the boundary reset the
   board whenever an erase ran long. The bootloader's own erases of the application slot run with no watchdog.
 
 - The application is linked at the start of its slot. It moves the vector table to the slot before it enables
@@ -112,14 +112,14 @@ On the reference board, whose staging slot is in internal flash:
   copies the image instead.
 - On a board whose staging slot is external flash, a serial NOR device holds it and the application slot spans
   the internal flash.
-- A pack may be as large as the staging slot, 327 680 bytes, which is below the 393 216 bytes a `can-lite`
+- A pack may be as large as the staging slot, 327 680 bytes, which is below the 393 216 bytes a can-lite
   firmware-upgrade transfer can address. The image it carries may fill the application slot less its
   descriptor, and the pack's header, signature and image framing less than that: an update installs only an
   image whose pack fits the staging slot.
 - A board whose image is larger than any pack the staging slot holds gets updates only once its image fits.
-- `hardware_test` is linked standalone from the start of flash on every board, the reference board included:
-  programming its hex image replaces the bootloader, and the board gets the bootloader back only when the
-  bootloader and `sync_foc_sensored` images are programmed again (Part J). It carries no application header and
+- The bring-up application is linked standalone from the start of flash on every board, the reference board included.
+  Programming its hex image replaces the bootloader. The board gets the bootloader back only when the
+  bootloader and motor-controller application images are programmed again (Part J). It carries no application header and
   no image descriptor, so it never travels as a pack and the bootloader would never start it.
 
 ### Part B — upgrade pack
@@ -137,7 +137,7 @@ components, with exactly one image:
 | Image           | the application binary, as the debugger would program it into the slot                                   | yes    | yes       |
 
 - The **product name** field holds the **board identification**: `e-foc`, the board and the processor
-  part, as in `e-foc emulated mps2-an386`. Every
+  part, in the form `e-foc <board> <processor>`. Every
   board has one, with a bootloader or not. It is defined once, in the board's definition in the build, beside
   the board kind, the board's name and whether it carries a bootloader; the build generates one header from
   those definitions, which the application, the
@@ -145,9 +145,10 @@ components, with exactly one image:
   definitions, never from a typed argument. The library names the field *product name*; the format does not
   change. The bootloader compares it with its own, so a pack for another board is refused
   before anything is written. The application checks the same identification when it verifies the pack, so the
-  refusal comes before the user can apply it (`service-firmware-upgrade.md` Part D).
+  refusal comes before the user can apply it ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part D).
 - The **product version** is the build's project version, the release tag without its leading `v`: the version
-  the application reports as running once the pack is installed. The component is `sync_foc_sensored`.
+  the application reports as running once the pack is installed. The component is the motor-controller
+  application, named `sync_foc_sensored` in the pack.
 - The prologue's status byte and error code are outside the signature and are not used: progress is kept in
   the status journal (Part D).
 - An image whose destination is not the start of the application slot, or whose size exceeds the slot less
@@ -228,22 +229,22 @@ The bootloader runs on the main stack alone, with 16 KB of RAM reserved for it a
 the decrypted first 2 KB of an image, the signature verification and the digest contexts live there, and the
 link fails if the bootloader's static data ever reaches into that reservation. The application reserves 1 KB
 the same way. The bootloader uses no interrupt, no timer and no peripheral but the flash controller and the clock
-tree. On the reference board it runs at the application's clock through the board's own clock bring-up, the
-`Clocks::Initialize` the application calls too, so
+tree. On the reference board, it runs at the application's clock through the board's own clock bring-up, the
+same one that the application calls. Thus
 its checks and an installation take the time they would in the application; the emulated board has no clock to set.
-The PLL stays running at the hand-over: the application's bring-up re-runs the same sequence, which first returns to
+The clock stays as set at the hand-over: the application's bring-up re-runs the same sequence, which first returns to
 the internal oscillator, so it starts from any clock state. Apart from these the processor is in its reset state; the
 flash controller is locked again. It points the vector table at the
 application slot, loads the stack pointer from the slot's first vector and branches to the reset handler in
 the second, through the embedded-infrastructure library's processor jump. The watchdog is not running at that point: the
-hardware watchdogs start only when software starts them, and the application does (`watchdog.md`).
+hardware watchdogs start only when software starts them, and the application does ([watchdog.md](watchdog.md)).
 
 ### Part G — keys
 
 - A key set is one file holding the AES-128 image key, the ECDSA-P256 public key and its private key; the
   firmware image tool (Part J) generates one from the host's random source.
 - Two key sets exist. The development set is public: e-foc is open source, so it lives in the repository
-  (`targets/bootloader/keys/development.keys`), and continuous integration, pull requests from forks, the
+  beside the bootloader, and continuous integration, pull requests from forks, the
   release workflow's dry runs and local builds all use it. Anyone can sign a pack that a board with the
   development key accepts, so that key is for development boards only. The release set is the only secret, a
   repository secret that only the release workflow reads. A pack signed with the development key never
@@ -276,9 +277,9 @@ hardware watchdogs start only when software starts them, and the application doe
 
 The emulated target boots through the bootloader like a board with one: every software-in-the-loop scenario
 starts with the bootloader's check of the application slot, and the bootloader's own scenarios stage packs
-and read the journal (`software-in-the-loop.md` Part P). Its code memory is RAM that the emulator fills again
+and read the journal ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P). Its code memory is RAM that the emulator fills again
 at every reset, so an image the bootloader installs lasts until the next reset; staging and journal are files
-in the scenario directory and last across resets and restarts. The emulator has no device-identity register
+in the scenario directory and last across resets and restarts. The emulator has no device identity
 (Part I).
 
 ### Part I — target identity: never the wrong processor
@@ -289,16 +290,16 @@ the chip says what it is.
 
 **Application header.** Every application image built with the layout of Part A carries a 64-byte application
 header at offset 1 KB from the start of its slot, past the vector table of every supported processor. It
-holds a magic value, the board kind (`service-can.md`, contract 2.6), the firmware version (the project version,
+holds a magic value, the board kind ([service-can.md](service-can.md), contract 2.6), the firmware version (the project version,
 from the version header embedded-infra-lib generates at build time) and the target identity: the device
-identity the image's processor reports, as a vendor-family tag and the value its
-device-identity register gives. The header is compiled from the board's definition, the one the rest of the image
-is compiled from, so it cannot disagree with the code beside it. The device class the register reports tells one
+identity the image's processor reports, as a vendor-family tag and the value
+that the processor reports as its device identity. The header is compiled from the board's definition, the one the rest of the image
+is compiled from, so it cannot disagree with the code beside it. The device class that the processor reports tells one
 family of parts from another but not always one part from another; the board kind beside it does.
 
 | Target   | Device identity the header carries                       | Where the chip reports it                   |
 |----------|----------------------------------------------------------|---------------------------------------------|
-| Hardware | a device class or identifier, with the vendor family tag | the processor's device-identity register    |
+| Hardware | a device class or identifier, with the vendor family tag | the processor's device identity             |
 | Emulated | the constant `0x00000386`, with the emulated tag         | none: the bootloader uses the same constant |
 
 The identities are in the boards' definitions in the build. A board that does not yet have the layout has no
@@ -311,7 +312,7 @@ holds even if an earlier one was skipped or its label was wrong:
 |------------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
 | Release workflow             | when packs are built | the packer reads the application header from the built image; the product name and header must name the board the pack is published for | the release is not published               |
 | CAN Commander                | before the download  | the pack's product name names the node's board kind                                                                                     | not offered; the reason is shown           |
-| Firmware, Verify             | end of the download  | the product name equals the running firmware's own (`service-firmware-upgrade.md` Part D)                                               | `NotReady`; nothing staged                 |
+| Firmware, Verify             | end of the download  | the product name equals the running firmware's own ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part D)                  | *NotReady*; nothing staged                 |
 | Bootloader, before any erase | at the apply         | product name, signature, then the decrypted vector table and application header against the chip                                        | marked invalid; the old application starts |
 | Bootloader, every reset      | before any start     | the application header against the chip and the board                                                                                   | not started                                |
 
@@ -321,17 +322,17 @@ the stream on its own, so this costs nothing in the copy that follows. It then c
 1. the initial stack pointer lies in this chip's RAM and the reset handler in this board's application slot,
    which an image linked for another processor's memory map fails;
 2. the application header's magic is valid, its board kind is this bootloader's board, and its target identity
-   equals what this chip's device-identity register reports, read at that moment.
+   equals the device identity that this chip reports, read at that moment.
 
 A failure is recorded as *invalid* with the bootloader's own *wrong target* error code, outside the range the
 library reserves for its loaders, and the old application starts untouched.
 
 ### Part J — firmware image tool
 
-The embedded-infrastructure library's `application.bootloader_image`, a host program built with its
-bootloader package, so the firmware build needs no interpreter and e-foc keeps no tool of its own. The
-library's tests cover it. The host build has it as a target, and an embedded build builds it first with the
-host compiler, in the build directory's `_native_bootloader_image/bin`, where the workflows run it.
+The firmware image tool is the embedded-infrastructure library's bootloader image tool, a host program built
+with its bootloader package. Thus the firmware build needs no interpreter, and e-foc keeps no tool of its own. The
+library's tests cover it. The host build has it as a target. An embedded build builds it first with the
+host compiler, in the build directory, where the workflows run it.
 
 | Command           | Takes                                                | Gives                                                                    |
 |-------------------|------------------------------------------------------|--------------------------------------------------------------------------|
@@ -357,7 +358,7 @@ The image a pack carries is the application image the descriptor step copies out
 bootloader writes the descriptor itself after an installation (Part E). Its destination is the start of the
 application slot.
 
-Like the keys, the pack is made after the build. Beside each application image the build writes a small CMake
+Like the keys, the pack is made after the build. Beside each application image the build writes a small pack
 script that holds what the pack takes from the build: the image, the product name of Part B, the project
 version, the component, and the application and staging slots of the board's flash layout. The release workflow
 runs it with a key set and the asset's file name, and nothing else; continuous integration runs it with the
@@ -392,9 +393,9 @@ check writes no pack and fails the workflow.
 | ECDSA-P256 verification  | Pack signature                                      | micro-ecc, over a SHA-256 computed in software without mbedTLS                                                                                                                                                          |
 | AES-128-CTR decryption   | Image confidentiality                               | tiny-aes, through the library's AES decryptor                                                                                                                                                                           |
 | SHA-256                  | Signature digest and the check at every reset       | The library's software SHA-256, fed in pieces read from flash                                                                                                                                                           |
-| Device identity register | What the chip is                                    | The processor's device-identity register (Part I)                                                                                                                                                                       |
+| Device identity          | What the chip is                                    | The device identity that the processor reports (Part I)                                                                                                                                                                 |
 | Processor jump           | Start the application (Part F)                      | Embedded-infrastructure library; points the vector table at the slot, then loads the stack pointer and branches                                                                                                         |
-| Image tool               | Write the key slot into the bootloader (Part G)     | The embedded-infrastructure library's `application.bootloader_image inject-keys` (Part J)                                                                                                                               |
+| Image tool               | Write the key slot into the bootloader (Part G)     | The key injection of the embedded-infrastructure library's firmware image tool (Part J)                                                                                                                                 |
 
 ---
 
@@ -452,7 +453,7 @@ sequenceDiagram
 | Constraint           | Value / Description                                                                                                                                                                                                                                                                                                                                                                                                        |
 |----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Bootloader size      | a 32 KB region on every board; 17.1 KB on the reference board. 16 KB of RAM reserved for its stack, where the image's first 2 KB and the signature check live                                                                                                                                                                                                                                                              |
-| Largest pack         | the staging slot, 320 KB on every board; below the 393 216 bytes of the `can-lite` transfer limit                                                                                                                                                                                                                                                                                                                          |
+| Largest pack         | the staging slot, 320 KB on every board; below the 393 216 bytes of the can-lite transfer limit                                                                                                                                                                                                                                                                                                                          |
 | Largest image        | the application slot less its 64-byte descriptor                                                                                                                                                                                                                                                                                                                                                                           |
 | Check at every reset | one SHA-256 over the image at the application's clock (Part F); on the reference board, 0.74 s from reset to the application's banner, against about 5 s at the reset clock the bootloader ran at before                                                                                                                                                                                                                   |
 | Installation         | erase of the slot sectors the image spans and of the descriptor's sector, then decrypt and write; repeated from the start after any interruption. On the reference board, from Activate to the application's heartbeat for a 265 KB pack, the hardware apply scenario's `[METRIC]` line: 9.5 s, against 29.8 s at the reset clock the bootloader ran at before; programming the slot at the flash's own rate is most of it |

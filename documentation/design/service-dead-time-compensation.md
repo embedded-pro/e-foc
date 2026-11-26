@@ -2,9 +2,9 @@
 title: "Service: Dead-Time Compensation"
 type: design
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: service-dead-time-compensation
-date: 2026-10-23
+date: 2026-11-26
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-10-23
 | Title     | Service: Dead-Time Compensation |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.2.1                           |
+| Version   | 0.2.2                           |
 | Component | service-dead-time-compensation  |
-| Date      | 2026-10-23                      |
+| Date      | 2026-11-26                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -30,14 +30,14 @@ date: 2026-10-23
 
 A leg of the bridge does not deliver its duty. Between one switch turning off and the other turning
 on, the phase current alone decides where the switch node goes, and the leg loses voltage against
-the current's sign (`documentation/verification_and_validation/software-in-the-loop.md`, Part L). On the reference board the
+the current's sign ([software-in-the-loop](../verification_and_validation/software-in-the-loop.md), Part L). On the reference board the
 loss is about 0.2 % of the period once the current passes about 0.2 A, and below that it shrinks in
 proportion to the current. At small currents the winding therefore sees about 0.17 Ω more than it
 has, which is why the online resistance estimate reads about 20 % high on the rig.
 
 **Is responsible for:**
 - Correcting every duty the drive commands by the loss its leg's current will cause
-- Removing the sensors' offsets from every phase current on the way in (`service-current-offsets.md`)
+- Removing the sensors' offsets from every phase current on the way in ([service-current-offsets.md](service-current-offsets.md))
 - Passing start, stop, the base frequency and the current limit through unchanged
 
 ---
@@ -49,13 +49,13 @@ has, which is why the online resistance estimate reads about 20 % high on the ri
 The correction lives in the inverter compensation stage, which stands between the platform's
 inverter and everything that commands duties or reads currents: the current loop and the
 identification and alignment procedures. To them it is the inverter. On the way in it removes the
-sensors' offsets from each sample (`service-current-offsets.md`) and remembers the result; on the
+sensors' offsets from each sample ([service-current-offsets.md](service-current-offsets.md)) and remembers the result; on the
 way out it corrects the next duty with those currents. In the closed loop the duty follows the
 sample it was computed from in the same interrupt, so the correction always uses the current of
-that period. It also hands the offsets it removes down to the platform (`CurrentOffsets`): a
+that period. It also hands the offsets it removes down to the platform: a
 low-side shunt board rebuilds a hidden phase from the other two raw samples, and that phase must
 carry the sum of the three offsets for the subtraction here to leave it unbiased
-(`documentation/theory/low-side-current-sensing.md` §4).
+([low-side current sensing](../theory/low-side-current-sensing.md) §4).
 
 Both corrections share the stage so that a sample and a duty each cross one call, not two. They
 used to be two stages, one wrapping the other, and each passed the other's traffic through.
@@ -114,7 +114,7 @@ shorter than the band, so the band should not be narrowed without measuring that
 
 - **A held duty.** The alignment writes its duties once, when the current is still zero, and holds
   them, so its duties go uncompensated. The resistance identification no longer does: it holds its
-  legs near mid-rail and writes them again on every sample (`service-electrical-ident.md`).
+  legs near mid-rail and writes them again on every sample ([service-electrical-ident.md](service-electrical-ident.md)).
 - **A leg at either rail.** A leg that does not switch has no dead time, but the correction still
   moves it by up to the full loss. Space-vector modulation keeps the legs off the rails except at
   full modulation, where the effect is a fraction of a percent.
@@ -170,7 +170,7 @@ the commanded voltage to within 1 mV.
 
 Through the bench's power stage, uncompensated, the online resistance reads 18.1 to 18.3 % above
 the winding, and compensated with the board's figure it reads 3.2 to 3.3 % above
-(REQ-CTL-001, `identification_robustness.feature`).
+(REQ-CTL-001, identification robustness scenarios).
 
 Through the same stage the calibration resistance reads 4.4 % above the winding uncompensated and
 2.4 % above compensated (REQ-CMS-001). Held at 1 % legs and written once, it read 4.2 % and 4.5 %:

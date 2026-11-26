@@ -2,9 +2,9 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: service-cogging-compensation
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Cogging Compensation |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.4.0                         |
+| Version   | 0.4.1                         |
 | Component | service-cogging-compensation  |
-| Date      | 2026-11-08                    |
+| Date      | 2026-11-26                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -31,10 +31,10 @@ date: 2026-11-08
 A permanent-magnet rotor prefers some angles to others even with no current in the winding: its
 magnets pull towards the stator teeth. On the bench motor, a 12-slot, 8-pole machine, that cogging
 torque repeats 24 times a revolution and is about 4 mN·m deep, as large as the shaft's 3.7 mN·m of
-dry friction (`software-in-the-loop.md`, Part K). A position setpoint between two detents sits
+dry friction ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part K). A position setpoint between two detents sits
 where the cogging pushes the rotor away. A loop holds it there only if its stiffness exceeds the
 cogging's, and at the default tunings it does not: the PID, two-DOF and Cascade P laws step
-between the neighbouring detents instead (`documentation/theory/position-loop-pid.md`).
+between the neighbouring detents instead ([position loop PID](../theory/position-loop-pid.md)).
 
 **Is responsible for:**
 - Measuring the cogging torque over one electrical period during the full calibration, in speed
@@ -98,7 +98,7 @@ full calibrations:
 |------------------------------------------|-------------|----------------|
 | Bench, no cogging, four noise seeds      | 0.99 – 1.20 | none           |
 | Bench, 3.7 mN·m dry friction, no cogging | 0.85        | none           |
-| Teknic and anaheim reference motors      | 0.76 – 0.78 | none           |
+| Teknic and Anaheim reference motors      | 0.76 – 0.78 | none           |
 | Bench, 0.5 mN·m cogging                  | 6.6         | 0.60 mN·m peak |
 | Bench, 1 mN·m cogging                    | 9.1         | 1.08 mN·m peak |
 | Bench, the bench's 4 mN·m cogging        | 26          | 3.87 mN·m peak |
@@ -117,7 +117,7 @@ without one.
 The map is stored as 48 signed bytes and one scale: the largest bin is ±127. It adds 52 bytes, so
 the calibration record grows from 56 to 108 bytes inside its 128-byte region, and the layout
 version goes from 3 to 4. A board flashed with this version therefore boots with no calibration and
-has to be calibrated again (`service-nvm.md`).
+has to be calibrated again ([service-nvm.md](service-nvm.md)).
 
 An external electrical identification over CAN keeps the stored map, as it keeps the current
 offsets: it measures neither.
@@ -140,7 +140,7 @@ without the compensation from an earlier one.
 
 Torque mode compensates with the same map once a speed or position calibration has stored one, since the
 calibration record is shared by the modes. Its cascade adds the current to the operator's q-axis setpoint
-after the speed limiter (`foc-torque.md`), so the limiter folds the operator's torque and not the cogging's,
+after the speed limiter ([foc-torque.md](foc-torque.md)), so the limiter folds the operator's torque and not the cogging's,
 and holds the sum within the current limit. The compensation is added, not part of the command: the demand the
 cascade reports to the supervisors, and over CAN, is the operator's. A current command of a calibration step,
 such as the flux-linkage identification's, is not compensated, and a new calibration clears the map before it
@@ -148,7 +148,7 @@ identifies the motor, as in the other modes (REQ-CTL-001).
 
 The online mechanical estimator regresses the current without the compensation's share. The
 compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
-the inertia, the friction, and only what the map missed (`service-mechanical-ident.md`).
+the inertia, the friction, and only what the map missed ([service-mechanical-ident.md](service-mechanical-ident.md)).
 
 ### Part E — Where it does not reach
 
@@ -179,7 +179,7 @@ cascades read as no feed-forward; the calibration traces the value, or that ther
 
 The speed and position cascades, when a calibration with a friction is applied, divide it by the torque
 constant once, and at every outer-loop period add that current, signed by the speed reference and ramped
-linearly through zero over $\pm$2 rad/s, to the speed loop's demand (`documentation/theory/disturbances-and-noise.md`,
+linearly through zero over $\pm$2 rad/s, to the speed loop's demand ([disturbances and noise](../theory/disturbances-and-noise.md),
 *Friction*). The current is held below the drive's current limit at load time; a friction that would need the
 whole limit is refused. The addition sits before the current limit, so the sum is held within it, and outside the
 torque the online mechanical estimator regresses. Torque mode has no speed reference and applies none. Like the

@@ -2,9 +2,9 @@
 title: "Virtual Motor App Design"
 type: design
 status: draft
-version: 0.10.0
+version: 0.10.1
 component: "tool-virtual-motor"
-date: 2026-11-10
+date: 2026-11-26
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | Virtual Motor App Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.10.0                   |
+| Version   | 0.10.1                   |
 | Component | tool-virtual-motor       |
-| Date      | 2026-11-10               |
+| Date      | 2026-11-26               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -27,7 +27,7 @@ date: 2026-11-10
 ## Responsibilities
 
 **Is responsible for:**
-- Starting, pausing, power-cycling and powering off virtual motors (`virtual-motor.md`), each a CAN
+- Starting, pausing, power-cycling and powering off virtual motors ([virtual-motor.md](virtual-motor.md)), each a CAN
   node on a virtual bus, and restoring the set of motors on the next start
 - Hosting the virtual CAN hub, and showing which buses exist and who is on them
 - Showing, per motor, what bench instruments would show: phase currents, leg voltages and the
@@ -43,7 +43,7 @@ date: 2026-11-10
 
 ### Part A — logic, support and presentation layers
 
-As in the CAN Commander (`tool-can-commander.md` Part A), everything but widget layout is testable
+As in the CAN Commander ([tool-can-commander.md](tool-can-commander.md) Part A), everything but widget layout is testable
 without a display:
 
 - **Engine client** — starts and stops virtual motor processes, holds each one's plant port, and turns
@@ -75,26 +75,26 @@ without a display:
 
 - **Add Motor** asks for the node, the plant (Teknic, Anaheim, or a description file, which is where
   non-idealities and wiring faults are set) and how it starts: keep its memory, factory-fresh, or
-  calibrated for its plant, which runs in every control mode once aligned (`virtual-motor.md` Part B). A
+  calibrated for its plant, which runs in every control mode once aligned ([virtual-motor.md](virtual-motor.md) Part B). A
   node already in the list is refused with the reason. It also asks for the current-sense offset of each
   phase, the offset a board's conditioning circuit adds to the measured currents, zero by default: it
   holds for the motor's life, is kept with the motor and shown with its parameters, and the firmware's
   offset calibration is expected to remove it.
-- **State** is the process's (`virtual-motor.md` Part H), never what the user last clicked: *Starting…*
+- **State** is the process's ([virtual-motor.md](virtual-motor.md) Part H), never what the user last clicked: *Starting…*
   until the motor introduces itself on the plant port, then *Running* or *Paused* as its status says;
   *Restarting* while a motor that reset reconnects; *Stopped* once powered off; *Crashed* when its process
   ends unasked. A crashed motor keeps its row with its last log lines one click away; the row explains that
   the CAN Commander will report it offline.
-- A motor that introduces itself with another plant port protocol version (`virtual-motor.md` Part F)
+- A motor that introduces itself with another plant port protocol version ([virtual-motor.md](virtual-motor.md) Part F)
   is powered off, and its log names both versions: the app and the virtual motor program it starts
   ship together.
 - **Real time** shows the real-time factor; below 0.98 it is a warning with the overrun count in the
   tooltip, because the drive is then running late.
 - **Open CAN Commander** starts the CAN Commander installed next to the app; its Interface box lists
-  `virtual:default` while the hub runs (`tool-can-commander.md` Part N).
+  `virtual:default` while the hub runs ([tool-can-commander.md](tool-can-commander.md) Part N).
 - The motor list, with each motor's node, plant and start mode, is restored on the next start; restored
   motors start again, keeping their memory.
-- The bus row offers drop probability, added latency and taking a node off the bus (`virtual-motor.md`
+- The bus row offers drop probability, added latency and taking a node off the bus ([virtual-motor.md](virtual-motor.md)
   Part G), each listed under *Disturbances* while active.
 - Closing the app powers every motor off, after a confirmation that names the motors and says the CAN
   Commander will see them go offline.
@@ -149,7 +149,7 @@ state, and the number of active disturbances with **Clear All** beside it.
 
 ### Part D — scopes
 
-Every trace view is a scope on the continuous stream (`virtual-motor.md` Part F), drawn as the
+Every trace view is a scope on the continuous stream ([virtual-motor.md](virtual-motor.md) Part F), drawn as the
 minimum-maximum envelope of each 2 kHz window, so ripple and noise are seen at a glance without a full
 rate stream.
 
@@ -243,7 +243,7 @@ The index pulse is not in the Data Model, so the monitor does not show it.
 
 ### Part G — torque and noise
 
-The side panel holds the changes of `virtual-motor.md` Part E: **Torque** (load torque, and external
+The side panel holds the changes of [virtual-motor.md](virtual-motor.md) Part E: **Torque** (load torque, and external
 torque as a constant, a step, a ramp or a sine) and **Noise** (current noise, encoder noise).
 Below them, the motor's parameters are shown read-only from its plant description, with a note that
 another motor means another description and a restart. Values are typed or
@@ -251,7 +251,7 @@ dragged but **apply only on Apply** or Enter, never while typing; each group sho
 Every active change appears in the header count and in a list with its own remove button; **Clear All**
 returns the plant to its description.
 
-**Profiles** (`virtual-motor.md` Part E) are written, loaded, saved, started and stopped from the
+**Profiles** ([virtual-motor.md](virtual-motor.md) Part E) are written, loaded, saved, started and stopped from the
 panel's Profile group. The profile is plain text in an editor there, so a profile is written by hand or
 loaded from a file and changed before it starts. **Start** reads it and sends it to the motor; a line it
 cannot read is reported with its number and nothing is sent, and a profile the motor refuses is reported
@@ -264,7 +264,7 @@ A profile file holds one statement per line; blank lines and lines starting with
 | Statement                                         | Meaning                                                                                                                     |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `trigger immediately`                             | Start at once; the default when no trigger is given                                                                         |
-| `trigger rising` / `falling` / `either` *n level* | Start when Data Model signal *n* (1 to 25, in the order of `virtual-motor.md`'s Data Model) crosses *level* in its own unit |
+| `trigger rising` / `falling` / `either` *n level* | Start when Data Model signal *n* (1 to 25, in the order of [virtual-motor.md](virtual-motor.md)'s Data Model) crosses *level* in its own unit |
 | `trigger protection`                              | Start when the board protection asserts                                                                                     |
 | `trigger leds` *names*                            | Start when one of the named LEDs lights: `operational`, `warning`, `failure`, separated by commas                           |
 | `at` *s* `load` *N·m*                             | Set the load torque *s* seconds after the trigger                                                                           |
@@ -283,7 +283,7 @@ to 1,024 changes. **Save** writes the editor's text as it stands, so a saved fil
 
 The CAN Commander needs no knowledge of the plant. A node whose board kind is *virtual* is marked
 **Virtual** in its tab and overview chip, so a bench engineer never confuses it with hardware
-(`tool-can-commander.md` Part N). Its Motor menu offers **Launch Virtual Motor…**, which starts this app.
+([tool-can-commander.md](tool-can-commander.md) Part N). Its Motor menu offers **Launch Virtual Motor…**, which starts this app.
 
 ### Part I — installers
 
@@ -325,14 +325,14 @@ zero draws a vertical line and noise or a misalignment widens or tilts it.
 
 | Interface        | Purpose                                     | Contract                                                    |
 |------------------|---------------------------------------------|-------------------------------------------------------------|
-| Virtual CAN hub  | Buses for virtual motors and CAN Commanders | `virtual-motor.md` Part G, while the app is open            |
+| Virtual CAN hub  | Buses for virtual motors and CAN Commanders | [virtual-motor.md](virtual-motor.md) Part G, while the app is open            |
 | Persisted motors | The rig reopens with its motors             | Node, plant, start mode and memory file per motor, per user |
 
 ### Required
 
 | Interface        | Purpose                                       | Contract                                         |
 |------------------|-----------------------------------------------|--------------------------------------------------|
-| Virtual motor    | The motors themselves                         | `virtual-motor.md`: start options, plant port    |
+| Virtual motor    | The motors themselves                         | [virtual-motor.md](virtual-motor.md): start options, plant port    |
 | Theme and scopes | Look, status colours, scope and hexagon views | The shared tool UI library, as the CAN Commander |
 
 ---

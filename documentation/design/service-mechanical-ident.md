@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.5.1
+version: 0.5.2
 component: service-mechanical-ident
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.5.1                                         |
+| Version   | 0.5.2                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-11-08                                    |
+| Date      | 2026-11-26                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -65,13 +65,13 @@ This is a linear model in the three unknowns [J, B, τ_friction]. The RLS estima
 
 ### Torque Estimation
 
-At each sampling callback, the instantaneous electromagnetic torque is estimated from the q-axis current:
+At each phase-current sample, the instantaneous electromagnetic torque is estimated from the q-axis current:
 
 ```text
 τ_motor = Kt × Iq
 ```
 
-where `Kt` is the torque constant (N·m/A) provided by the caller. The q-axis current `Iq` is the measured value the control loop is already sampling — the same current feedback path used by the FOC current controller.
+where $K_t$ is the torque constant (N·m/A) provided by the caller. The q-axis current $I_q$ is the measured value the control loop is already sampling — the same current feedback path used by the FOC current controller.
 
 The d-axis contribution to torque is zero for surface PMSM under the Id = 0 operating condition assumed during identification. For interior PMSM with reluctance torque, this approximation introduces a small systematic error in the torque estimate; the caller should account for this if Ld ≠ Lq.
 
@@ -240,8 +240,8 @@ direction, or whose measured speed exceeds the speed limit, the run ends and rep
 The power stage is stopped **in the interrupt that observed the sample**, not with the rest of the
 teardown. Deferring it would leave the inverter driving an out-of-envelope current until the event loop
 next ran, which is the one thing the envelope exists to prevent; stopping the inverter
-touches no callback slot, so it is safe from the interrupt, whereas releasing the observer there would
-destroy the closure being executed. Releasing the observer, stopping the drive through the controller and
+touches no handler, so it is safe from the interrupt, whereas releasing the observer there would
+destroy the handler that runs. Releasing the observer, stopping the drive through the controller and
 delivering the completion therefore stay deferred, as they are for every other way a run ends.
 
 The envelope is evaluated on **every** sample for as long as the drive is live — including samples that
@@ -292,25 +292,25 @@ P_k = (P_{k−1} − K_k · φ_k · P_{k−1}) / λ
 
 The scalar λ (0 < λ <= 1) is the **forgetting factor** (default 0.9995). Values less than 1 cause older observations to carry exponentially decreasing weight, which is important for tracking slowly time-varying loads. At λ = 1 the estimator is an ordinary batch least squares — it never forgets.
 
-The RLS state (θ and P) is held in a statically allocated object (`std::optional<MotorRLS>`) that is emplaced in-place at the start of each procedure invocation and destroyed when the procedure ends. This avoids heap allocation while still permitting the state to be absent between procedures.
+The RLS state (θ and P) is held in statically allocated storage that is constructed in place at the start of each procedure invocation and destroyed when the procedure ends. This avoids heap allocation while still permitting the state to be absent between procedures.
 
 ```mermaid
 flowchart TD
-    START["EstimateFrictionAndInertia(Kt, polePairs, config, onDone)"] --> INIT["Initialise RLS\n(θ=0, P=αI)"]
+    START["Estimate friction and inertia\n(Kt, pole pairs, configuration)"] --> INIT["Initialise RLS\n(θ=0, P=αI)"]
     INIT --> OBS["Register phase-current observer\non the running control loop"]
     OBS --> DRIVE["Start drive"]
     DRIVE --> CMD_SPEED["Command target speed"]
-    CMD_SPEED --> CB["Observer call\n(ADC interrupt)"]
+    CMD_SPEED --> CB["Observer call\n(phase-current interrupt)"]
     CB --> TAU["Accumulate τ = Kt × Iq"]
     CB --> VEL["Accumulate ω, dω/dt\nfrom encoder"]
     TAU --> POST["Close the window,\npost it to the ring"]
     VEL --> POST
     POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[1, dω/dt, ω], y=τ)"]
-    RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
+    RLS --> TIMEOUT{"Single-shot timer\nexpired?"}
     TIMEOUT -->|No| CB
     TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
     REL --> REPORT["Read θ = [J, B, τ_fric]"]
-    REPORT --> CB2["onDone(B, J)\n(dispatcher context)"]
+    REPORT --> CB2["Complete with B and J\n(event loop)"]
 ```
 
 ### Where the Fit Runs
@@ -323,10 +323,10 @@ a full ring, the interrupt only records it.
 
 The run's 1 ms tick in the event loop, the one that also slews the speed command, takes the windows from
 the ring in order, runs the update, the inertia-settling check and the convergence decision on each, and
-ends the run once the interrupt has recorded an outcome. On the rig, with the fit in the interrupt, every
-calibration took 472 interrupts past the 4500-cycle budget, at up to 5000 cycles, one for each fitted
+ends the run once the interrupt has recorded an outcome. On the reference board, with the fit in the interrupt, every
+calibration took 472 interrupts past the interrupt's time budget, by up to 11 %, one for each fitted
 window of the two runs. With the fit in the event loop but scheduled from the interrupt, each sample that
-posted a window still took about 4550 cycles: scheduling a call cost about 600 cycles of it.
+posted a window still ran about 1 % past the budget: scheduling a call cost about 13 % of the budget.
 
 The fit produces the same estimate as before, because it sees the same windows in the same order and
 takes the window length and the sample index each was closed on from the window itself, not from the
@@ -339,32 +339,34 @@ On the timeout, and when the run finishes, the windows still in the ring are fit
 A window can be as short as one sample, so at 20 kHz up to twenty arrive between two ticks. The ring holds
 three ticks of them, and the tick is the only thing that fits: the interrupt never schedules a fit. With a
 16-entry ring it had to, once half the ring was waiting, which was every eighth sample of a run with
-single-sample windows and cost the 600 cycles above each time. A run whose windows still fill the ring
+single-sample windows and cost the scheduling time above each time. A run whose windows still fill the ring
 before they are fitted ends without an estimate rather than skipping a window.
 
 ### Structure
 
-`MechanicalParametersIdentificationImpl` owns the run: the drive, the envelopes, the tick and timeout timers, the outcome
+The service owns the run: the drive, the envelopes, the tick and timeout timers, the outcome
 and the result. The work above is split into parts that each run in one context:
 
-| Part                   | Context                | Holds                                                                                                              |
-|------------------------|------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `EncoderResolution`    | control interrupt      | Smallest step and step-change energy; the window length they call for                                              |
-| `SampleWindow`         | control interrupt      | Position and torque accumulation, the kernel-centred speed and torque, the window resize; owns `EncoderResolution` |
-| `ObservationQueue`     | interrupt → event loop | The 16-entry ring; reports when half of it waits and when it is full                                               |
-| `MechanicalFit`        | event loop             | The RLS estimator, persistence of excitation, the convergence decision and the dwell boundary to finish on         |
-| `InertiaSettling`      | event loop             | The inertia reference compared once per estimator memory                                                           |
-| `TwoLevelSpeedProfile` | event loop             | The dwell and target levels, the slewed speed command and the timer that alternates them                           |
+| Part                    | Context                | Holds                                                                                                       |
+|-------------------------|------------------------|-------------------------------------------------------------------------------------------------------------|
+| Encoder resolution      | control interrupt      | Smallest step and step-change energy; the window length they call for                                       |
+| Sample window           | control interrupt      | Position and torque accumulation, the kernel-centred speed and torque, the window resize                    |
+| Observation queue       | interrupt → event loop | The 16-entry ring; reports when half of it waits and when it is full                                        |
+| Mechanical fit          | event loop             | The RLS estimator, persistence of excitation, the convergence decision and the dwell boundary to finish on  |
+| Inertia settling        | event loop             | The inertia reference compared once per estimator memory                                                    |
+| Two-level speed profile | event loop             | The dwell and target levels, the slewed speed command and the timer that alternates them                    |
+
+The sample window owns the encoder resolution part.
 
 The interrupt reads two things the event loop writes: whether a run is active and the dwell boundary to finish on.
 
 ### Timeout and Result Delivery
 
-A `TimerSingleShot` starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:
+A single-shot timer starts when the procedure begins. When it fires, the current RLS parameter vector is read and the results are extracted:
 
 - **τ_friction** (the constant term) is the first element of θ. It is τ_c plus any constant shaft load, because the one-shot run turns one way only and cannot separate dry friction from a load, so it is not reported. The Coulomb friction comes from the cogging-map step, which turns both ways (`service-cogging-compensation.md`).
-- **J** (inertia) is the second element of θ; reported as `NewtonMeterSecondSquared`.
-- **B** (viscous friction) is the third element of θ; reported as `NewtonMeterSecondPerRadian`.
+- **J** (inertia) is the second element of θ; reported in kg·m² (N·m·s²).
+- **B** (viscous friction) is the third element of θ; reported in N·m·s/rad.
 
 ### Acceptance Policy
 
@@ -395,16 +397,16 @@ calibration step.
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Idle : EstimateFrictionAndInertia\nwith an unusable configuration\n(onDone(nullopt) fired)
-    Idle --> Running : EstimateFrictionAndInertia called
-    Running --> Finishing : TimerSingleShot fires
+    Idle --> Idle : estimation requested\nwith an unusable configuration\n(completes with absent values)
+    Idle --> Running : estimation requested
+    Running --> Finishing : single-shot timer fires
     Running --> Finishing : converged observation
     Running --> Finishing : sample outside the\ncurrent or speed envelope\n(power stage stopped at once)
-    Running --> Idle : Abort (completion dropped)
-    Finishing --> Idle : onDone(J, B) when converged and plausible,\notherwise onDone(nullopt)
+    Running --> Idle : abort (completion dropped)
+    Finishing --> Idle : completes with J and B when converged and plausible,\notherwise with absent values
 ```
 
-Only one estimation may be in progress at a time. A call to `EstimateFrictionAndInertia` while already Running is rejected immediately (callback invoked with absent values).
+Only one estimation may be in progress at a time. A request while already Running is rejected immediately (the completion fires with absent values).
 
 ---
 
@@ -412,9 +414,12 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 
 ### Provided
 
-| Interface                                                               | Purpose                                                                                | Contract                                                                                                                                                  |
-|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control along a bounded two-level trajectory | Delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` exactly once; absent unless the estimate is converged and plausible |
+| Interface                     | Purpose                                                                                | Contract                                                                          |
+|-------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| Estimate friction and inertia | Runs the RLS estimator under active speed control along a bounded two-level trajectory | Delivers the viscous friction and the inertia, each optional, exactly once        |
+
+The request takes the torque constant, the pole pairs and the configuration. Both values are absent unless the
+estimate is converged and plausible.
 
 A request is rejected through its own completion, with both values absent, when a run is already in
 flight, when the configuration does not describe a usable bounded trajectory, or when the torque constant
@@ -422,18 +427,21 @@ or pole-pair count is not positive.
 
 ### Required
 
-| Interface                 | Purpose                                                                                                                   | Contract                                                                                                                                                                       |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocSpeed`                | Commands the two speed setpoints that excite the mechanical dynamics                                                      | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
-| `ThreePhaseInverter`      | Gives the control rate and the supported current, and stops the power stage when a sample leaves the envelope             | Stopped from the control interrupt; everything else of the teardown is deferred                                                                                                |
-| `PhaseCurrentsObservable` | Every control interrupt's phase currents, with the q-axis current the loop measured from them and the rotor angle it used | One observer at a time; released when the run ends                                                                                                                             |
-| `Encoder`                 | Supplies the mechanical angle the run starts from                                                                         | Read once, when the run starts; every later angle comes with its sample                                                                                                        |
+| Interface                 | Purpose                                                                                                        | Contract                                                                        |
+|---------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| Speed control loop        | Commands the two speed setpoints that excite the mechanical dynamics                                           | Active and in control of the motor before the procedure begins (see below)      |
+| Three-phase inverter      | Gives the control rate and the supported current, and stops the power stage when a sample leaves the envelope | Stopped from the control interrupt; everything else of the teardown is deferred |
+| Phase-current observation | Every control interrupt's phase currents, with the q-axis current measured from them and the rotor angle used | One observer at a time; released when the run ends                              |
+| Encoder                   | Supplies the mechanical angle the run starts from                                                              | Read once, when the run starts; every later angle comes with its sample         |
+
+The speed control loop must have an electrical model and mechanics applied, so its gains and current envelope
+are not inert.
 
 ---
 
 ## Online Inertia and Friction Estimation
 
-In addition to the one-shot timed procedure above, a continuous online estimator (`RealTimeFrictionAndInertiaEstimator`) runs alongside the closed-loop speed controller to track slow mechanical parameter drift.
+In addition to the one-shot timed procedure above, a continuous online estimator runs alongside the closed-loop speed controller to track slow mechanical parameter drift.
 
 ### Model
 
@@ -535,7 +543,7 @@ which keeps the friction resolved across both speed levels.
 
 ### Torque Constant Dependency
 
-The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine derives it from the calibration NVM record as $\tfrac{3}{2} p \psi_f$ (`core/foc/interfaces/MotorModel.hpp`) and supplies it via `SetTorqueConstant()` during the `EnterEnabled` transition; the one-shot procedure receives the same value.
+The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine derives it from the calibration record as $\tfrac{3}{2} p \psi_f$ and supplies it on the entry to Enabled; the one-shot procedure receives the same value.
 
 A wrong $k_t$ scales every identified $J$ and $B$ by the same factor, which is why it is not a per-target constant. Updates run opportunistically while the FOC controller is active.
 
@@ -563,19 +571,19 @@ Both procedures now take every sample above the minimum speed, and count separat
 needs before it may be published: at least 64 samples accelerating faster than 20 rad/s² (inertia; for the one-shot
 procedure 64 sixteen-sample windows' worth, see Speed and Acceleration Estimation), and
 observations spanning more than a quarter of the fastest speed seen (friction apart from the intercept).
-The shared `MechanicalExcitation` tracks both. The online estimator, which runs indefinitely, admits a
+The shared excitation tracker tracks both. The online estimator, which runs indefinitely, admits a
 non-accelerating sample only while the covariance trace is under a ceiling, so a long constant-speed run
 cannot inflate the inertia direction without bound; the offline run is bounded by its timeout and its
 trajectory re-excites every dwell.
 
 ### Plausibility Band and Update Rate
 
-A finiteness test alone admits values such as $10^{30}$. Before an estimate is published to `CurrentInertia()`
-/ `CurrentFriction()` — and therefore before it can become PID gains — it must pass every gate of the shared
+A finiteness test alone admits values such as $10^{30}$. Before an estimate is published as the current inertia
+and friction — and therefore before it can become PID gains — it must pass every gate of the shared
 acceptance policy above: enough accelerating observations and a span of speeds since the last seed, a
 settled fit, and a value inside the physical band. The offline procedure judges the fit by its innovation
 and covariance; the online estimator, which runs on outer-loop window averages (see
-`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual under a quarter of the
+`theory/friction-inertia-estimation.md` §4.1), by an averaged residual under a quarter of the
 averaged output in RMS terms (a residual power under 1/16 of the output power), because an instantaneous
 innovation of 0.1 mN·m sits under any real drive's torque ripple. The bound was a tenth until the bench motor
 ran: there the residual, torque the model has no term for, settles at 14 % of the torque the 26/52 rad/s steps
@@ -587,7 +595,7 @@ fit is still moving. An estimate that fails any gate is discarded and the last a
 
 ### Seeding and Warm Start
 
-When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded
+When calibration data is loaded (from the non-volatile memory or after a fresh calibration run), the online estimator is seeded
 with the calibration values $(J_{cal}, B_{cal})$. This initialises the RLS coefficient vector to $\theta =
 [0,\ J_{cal},\ B_{cal}]^T$ in both fits, setting the intercepts to zero and warm-starting the inertia and
 viscous-friction estimates at the identified operating point. This avoids a cold-start transient where

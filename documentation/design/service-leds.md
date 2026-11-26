@@ -2,9 +2,9 @@
 title: "Service: Status LEDs"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-leds
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Status LEDs |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.0                |
+| Version   | 0.1.1                |
 | Component | service-leds         |
-| Date      | 2026-11-08           |
+| Date      | 2026-11-26           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -103,8 +103,8 @@ its phase.
 
 ### Part E — Lifetime
 
-The service is a static application-level object that lives as long as the event loop runs, so the
-asynchronous-callback lifetime rules (`async-callback-lifetime.md`) do not apply. It schedules nothing on the
+The application creates the service once, and the service lives as long as the event loop runs. The
+asynchronous-callback lifetime rules ([async-callback-lifetime.md](async-callback-lifetime.md)) therefore do not apply. It schedules nothing on the
 dispatcher but its own repeating timer.
 
 ---
@@ -115,7 +115,7 @@ dispatcher but its own repeating timer.
 
 | Interface    | Purpose               | Contract                                                                                                             |
 |--------------|-----------------------|----------------------------------------------------------------------------------------------------------------------|
-| Construction | Starts the indication | Drives the LEDs from the first tick; the three LEDs are configured as outputs and are off when the service goes away |
+| Start        | Starts the indication | Drives the LEDs from the first tick; the three LEDs are configured as outputs and are off when the service goes away |
 
 ### Required
 
@@ -129,8 +129,8 @@ dispatcher but its own repeating timer.
 
 ## State Machine
 
-Each LED runs the same player, EmIL's `services::LedPatternPlayer`, playing a `services::LedPattern`: a pattern and the
-number of ticks it has been playing. The pattern is recomputed from the status every tick.
+Each LED runs the same pattern player from EmIL. The player holds a pattern and the number of ticks it has been
+playing. The pattern is recomputed from the status every tick.
 
 ```mermaid
 stateDiagram-v2
@@ -175,7 +175,7 @@ sequenceDiagram
     S->>Src: lifecycle state and fault code
     Src-->>S: Fault, overvoltage
     S->>S: patterns (green off, amber off, red 3 flashes)
-    S->>Pins: Set(level of each pattern at its tick)
+    S->>Pins: set each pin to its pattern's level at this tick
 ```
 
 ---
@@ -187,6 +187,6 @@ sequenceDiagram
 | Tick        | 50 ms; every time in a pattern is a whole number of ticks                                        |
 | Latency     | One tick between a transition and its indication                                                 |
 | Context     | Event loop only; never the control interrupts                                                    |
-| Memory      | No allocation; three players and the patterns are plain values                                   |
+| Memory      | No allocation; three players and the patterns need no heap                                   |
 | Power off   | All LEDs are off without power; no pattern can express it                                        |
 | Fault codes | Several faults share the motion code 7; the CAN fault code or the fault history tells them apart |

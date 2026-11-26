@@ -2,9 +2,9 @@
 title: "FOC Torque Control"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: foc-torque
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value              |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | FOC Torque Control |
 | Type      | design             |
 | Status    | draft              |
-| Version   | 0.5.0              |
+| Version   | 0.5.1              |
 | Component | foc-torque         |
-| Date      | 2026-11-08         |
+| Date      | 2026-11-26         |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -42,33 +42,33 @@ date: 2026-11-08
 
 ## Component Details
 
-### Innermost Control Loop — 20 kHz ISR Execution
+### Innermost Control Loop — 20 kHz Interrupt Execution
 
 The torque control loop is the innermost layer of the FOC cascade. It is invoked once per PWM switching period (default 20 kHz) by the hardware interrupt handler that drives the three-phase inverter. The entire loop — from phase current input to duty cycle output — must complete within the interrupt budget.
 
 The sequence executed each cycle is:
 
-1. Receive phase currents (Ia, Ib, Ic) as the `PhaseCurrents` argument.
-2. Read the rotor mechanical angle θm from the `Radians` argument (supplied by the Runner from the encoder).
-3. Compute the electrical angle: `θe = θm × pole_pairs`.
-4. Evaluate `cos(θe)` and `sin(θe)` via the fast trigonometric LUT — one evaluation, results reused.
+1. Receive the phase currents (Ia, Ib, Ic).
+2. Receive the rotor mechanical angle θm, which the control interrupt reads from the encoder.
+3. Compute the electrical angle: θe = θm × pole pairs.
+4. Evaluate cos(θe) and sin(θe) via the fast trigonometric LUT — one evaluation, results reused.
 5. Clarke forward: (Ia, Ib) → (Iα, Iβ); Ic is derived from the balanced-phase constraint.
 6. Park forward: (Iα, Iβ, θe) → (Id, Iq).
 7. Current stream: add Id and Iq to the stream window; on the window's last sample, store the two means and θm
-   for the event loop (`service-can.md` Part J). Skipped while the stream is stopped.
-8. Speed limiter: fold Iq_setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
-   add the cogging current at θe (`service-cogging-compensation.md` Part D) and clamp to the current limit.
+   for the event loop ([service-can.md](service-can.md) Part J). Skipped while the stream is stopped.
+8. Speed limiter: fold the q-axis setpoint by the measured speed against the overspeed limit (Speed Limiter, below),
+   add the cogging current at θe ([service-cogging-compensation.md](service-cogging-compensation.md) Part D) and clamp to the current limit.
 9. d-axis and q-axis PID: error = I_setpoint − I → output = Vd, Vq.
-10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The sampled cos/sin pair is rotated through the delay angle (`foc-transforms.md`, *Delay compensation*), with ωe the filtered electrical speed of step 8's limiter and n the platform's duty delay in periods.
+10. Inverse Park: (Vd, Vq, θe + (n + ½)·ωe·Ts) → (Vα, Vβ). The sampled cos/sin pair is rotated through the delay angle ([foc-transforms.md](foc-transforms.md), *Delay compensation*), with ωe the filtered electrical speed of step 8's limiter and n the platform's duty delay in periods.
 11. Space vector modulation: (Vα, Vβ) → (duty_a, duty_b, duty_c).
-12. Return `PhasePwmDutyCycles` to the Runner for immediate PWM register update.
+12. Return the duty cycles to the control interrupt, which applies them to the power stage at once.
 13. Zero-vector rates: from Id, Iq and ωe, the rate of each phase current while all low sides conduct, turned
     one period ahead, handed to the slope sink the platform provides
-    (`platform-sampling-skew.md` Part B). Zero until the model has an inductance.
+    ([platform-sampling-skew.md](platform-sampling-skew.md) Part B). Zero until the model has an inductance.
 
 ```mermaid
 flowchart LR
-    A["PhaseCurrents\nIa, Ib, Ic"] --> B["Clarke\nForward"]
+    A["Phase currents\nIa, Ib, Ic"] --> B["Clarke\nForward"]
     B --> C["Park\nForward"]
     D["θm → θe\nLUT cos/sin"] --> C
     D --> H
@@ -79,7 +79,7 @@ flowchart LR
     F --> H["Inverse Park\nVd, Vq → Vα, Vβ"]
     G --> H
     H --> I["SVM\nVα, Vβ → Da, Db, Dc"]
-    I --> J["PhasePwmDutyCycles\nto Runner"]
+    I --> J["Duty cycles\nto the power stage"]
 ```
 
 ### d-axis and q-axis PID Controllers
@@ -87,22 +87,22 @@ flowchart LR
 Two independent incremental PID controllers regulate the direct (d) and quadrature (q) current components independently. Both PIDs share the same structural properties:
 
 - **Output clamping**: the output magnitude is limited to the modulation circle, 1 at the configured DC bus voltage and r at a measured one (Bus Voltage Tracking).
-- **Anti-windup**: back-calculation. Each axis is the toolbox `controllers::PiIncremental<float>`: `Propose` returns the unlimited demand, the modulation-circle limit is applied to the d/q vector, and `CommitRealized` writes the realised voltage back, so the next increment starts from what was applied and the integrator cannot wind up.
+- **Anti-windup**: back-calculation. Each axis is the incremental PI controller of the numerical toolbox. It first proposes the unlimited demand. The modulation-circle limit is then applied to the d/q vector, and the controller takes the realised voltage back, so the next increment starts from what was applied and the integrator cannot wind up.
 - **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth, normalised by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
 - **Incrementalism**: the PID uses the incremental (velocity) form, accumulating output from step to step, which naturally limits abrupt changes at Enable transitions.
 
-The d-axis setpoint is normally 0 A for a surface PMSM (Id = 0 gives maximum torque per ampere). Setting Id_setpoint to a non-zero negative value for flux weakening is structurally possible but the operational consequences are outside the scope of this document.
+The d-axis setpoint is normally 0 A for a surface PMSM (Id = 0 gives maximum torque per ampere). Setting the d-axis setpoint to a non-zero negative value for flux weakening is structurally possible but the operational consequences are outside the scope of this document.
 
 ### Bus Voltage Tracking
 
-Every number the current law is built from assumes the bus voltage `Configure()` supplied: the gains are
+Every number the current law is built from assumes the bus voltage that the configuration supplied: the gains are
 normalised by it, the decoupling and back-EMF feed-forwards are scaled by it, and the reported q-axis voltage
 converts per-unit to volts with it. A bus that sags under load or rises under regeneration would otherwise
 scale the voltage the winding gets by V_meas / V_cfg, and with it the loop gain, the feed-forwards and the
 reported voltage.
 
-`TrackBusVoltage()` hands the cascade a measured bus voltage; the bus-voltage service reads it every 10 ms
-and filters it (`service-bus-voltage.md`). The cascade keeps every configured number and
+The bus-voltage input hands the cascade a measured bus voltage; the bus-voltage service reads it every 10 ms
+and filters it ([service-bus-voltage.md](service-bus-voltage.md)). The cascade keeps every configured number and
 scales only the output: the modulator divides each per-unit phase voltage by r = V_meas / V_cfg, so the duty
 gives the winding the voltage the law asked for, and the law limits its output to a magnitude of r, the
 largest voltage the measured bus can make, which keeps its anti-windup honest. r is held within 0.5 to 2 so
@@ -112,9 +112,9 @@ is off by one measurement's change for one period (REQ-PRO-003).
 
 ### Enable and Disable
 
-**Enable**: ends a quick stop, arms both the d-axis and the q-axis PID controllers and resets their internal integrator state to zero. The most recently stored setpoints (Id_setpoint, Iq_setpoint) are re-applied immediately — there is no rollback to zero. This allows seamless re-engagement after a brief disable event without a step change in the setpoint.
+**Enable**: ends a quick stop, arms both the d-axis and the q-axis PID controllers and resets their internal integrator state to zero. The most recently stored d-axis and q-axis setpoints are re-applied immediately — there is no rollback to zero. This allows seamless re-engagement after a brief disable event without a step change in the setpoint.
 
-**Disable**: ends a quick stop and disarms both PIDs. While disarmed, the `Calculate()` method returns zero duty cycles regardless of the current error. PID state is frozen and will be fully reset on the next Enable call.
+**Disable**: ends a quick stop and disarms both PIDs. While disarmed, the control step returns zero duty cycles regardless of the current error. PID state is frozen and will be fully reset on the next Enable call.
 
 The two states are the only run-time states of this component:
 
@@ -137,17 +137,17 @@ sample. Disable ends the command and closes the window.
 
 The speed and position cascades bound the current reference their outer loop produces. Torque mode
 has no outer loop — the reference arrives from the operator, over CAN — so the cascade
-applies the bound itself, at `SetPoint`, before the reference reaches the current loop.
+applies the bound itself, when the setpoint arrives, before the reference reaches the current loop.
 
 The bound is on the **magnitude of the current vector**, not on either axis separately: the plant
 constraint is $\sqrt{I_d^2 + I_q^2} \le I_{max}$, and a per-axis clamp would admit $\sqrt 2$ times
 the limit on the diagonal. A setpoint outside the envelope is scaled onto it, preserving the
 commanded ratio between $I_d$ and $I_q$ rather than clipping one axis and rotating the vector.
 
-The envelope comes from the inverter's `MaxCurrentSupported()`, the same source the speed and
+The envelope comes from the maximum current the inverter supports, the same source the speed and
 position cascades take theirs from, so the three modes cannot disagree about the hardware limit.
 
-Below the envelope the motor's overload protection can set a lower current limit (`fault-supervision.md`
+Below the envelope the motor's overload protection can set a lower current limit ([fault-supervision.md](fault-supervision.md)
 Part I). Each sample the interrupt clamps the q-axis setpoint, after the speed limiter, to that limit; the
 limit reaches it as one single-precision store, written from the event loop in any state and capped at the
 envelope, and the demanded torque current the cascade reports is the clamped one.
@@ -160,7 +160,7 @@ interrupt always reads a pair published together, never a new Id with the previo
 
 Torque mode has no speed loop, so nothing bounds the speed a torque command reaches: with the load gone, a
 held torque accelerates the rotor until the back-EMF uses up the voltage. The limiter bounds it from the
-overspeed limit of the configuration record (`fault-supervision.md` Part G), at the measured speed the loop
+overspeed limit of the configuration record ([fault-supervision.md](fault-supervision.md) Part G), at the measured speed the loop
 already filters for its feed-forward (one-millisecond time constant).
 
 Each sample the q-axis setpoint is scaled by a fold factor of the mechanical speed |ω| against the limit L:
@@ -184,7 +184,7 @@ second, so the interrupt reads either the old or the new limit, never a mix. A r
 nothing. It is set by the control-mode state machine whenever the mode is activated and whenever the
 configuration record is written, in any state; a new limit is in force from the next sample. The demanded
 torque current the cascade reports to the supervisors is the folded one, so the phase-loss monitor
-(`fault-supervision.md` Part E) does not mistake a folded current for one that cannot flow.
+([fault-supervision.md](fault-supervision.md) Part E) does not mistake a folded current for one that cannot flow.
 
 ```mermaid
 flowchart LR
@@ -198,7 +198,7 @@ flowchart LR
 
 ### Quick Stop
 
-Torque mode has no speed loop to decelerate the rotor, so a quick stop (`state-machine.md`, Quick Stop) makes the
+Torque mode has no speed loop to decelerate the rotor, so a quick stop ([state-machine.md](state-machine.md), Quick Stop) makes the
 cascade brake by itself until the next Enable or Disable. Each sample it replaces the q-axis setpoint with a
 current against the filtered mechanical speed ω:
 
@@ -222,7 +222,7 @@ branch per sample outside a quick stop.
 
 ### Pole-Pair Configuration
 
-The pole-pair count is an integer property that translates the mechanical rotor angle supplied by the encoder into the electrical angle required by the Park transform. It must be configured before the first `Calculate()` call. Changing it while enabled produces undefined control behaviour and must be avoided.
+The pole-pair count is an integer property that translates the mechanical rotor angle supplied by the encoder into the electrical angle required by the Park transform. It must be configured before the first control step. Changing it while enabled produces undefined control behaviour and must be avoided.
 
 ---
 
@@ -232,14 +232,14 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 | Interface         | Purpose                                                                                                         | Contract                                                                                                                                |
 |-------------------|-----------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| Configure         | Supplies the motor model: resistance, inductance, flux linkage, bus voltage, sampling frequency and pole pairs. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                       |
+| Configure         | Supplies the motor model: resistance, inductance, flux linkage, bus voltage, sampling frequency and pole pairs. | Must be called before the first control step. Must not be changed while Enabled.                                                        |
 | Enable            | Arms both PID controllers and resets their integrator state.                                                    | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved.                                         |
-| Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. `Calculate()` returns zero while disabled.                                                               |
-| SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call.                          |
-| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
-| Calculate         | Executes the full 12-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                                                |
-| TrackBusVoltage   | Hands a measured bus voltage (Bus Voltage Tracking).                                                            | Called from the event loop; in force from the next `Calculate()`, also while Enabled.                                                   |
-| Current stream    | The stream whose window the loop fills, given at construction (`service-can.md` Part J).                        | Never absent, so `Calculate()` does not test for it. The stream outlives the controller.                                                |
+| Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. The control step returns zero while disabled.                                                            |
+| Current tunings   | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next control step.                                 |
+| Setpoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next control step. Can be called while Enabled.             |
+| Control step      | Executes the full FOC torque loop for one control cycle.                                                        | Must be called at 20 kHz from the control interrupt. Returns the duty cycles. Must not block.                                          |
+| Bus voltage       | Hands a measured bus voltage (Bus Voltage Tracking).                                                            | Called from the event loop; in force from the next control step, also while Enabled.                                                    |
+| Current stream    | The stream whose window the loop fills, given at construction ([service-can.md](service-can.md) Part J).                        | Never absent, so the control step does not test for it. The stream outlives the controller.                                             |
 | Current command   | Runs the cascade on a q-axis current with $I_d = 0$ and reports the mean q-axis voltage it applies.             | Starts from 0 A and ends with Disable. The voltage is the mean over the last millisecond, in volts, and zero outside the command.       |
 | Speed limit       | Sets the overspeed limit, in mechanical rad/s, that the speed limiter folds the q-axis setpoint against.        | Callable in any state, also while Enabled; in force from the next sample. A limit of zero folds nothing.                                |
 | Current limit     | Sets the current limit, in amperes, that the q-axis setpoint is clamped to below the envelope.                  | Callable in any state, also while Enabled; in force from the next sample. Capped at the envelope.                                       |
@@ -249,7 +249,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 | Interface | Purpose                                                                                                                        | Contract |
 |-----------|--------------------------------------------------------------------------------------------------------------------------------|----------|
-| None      | The inverter and encoder are managed externally by the Runner; they are not accessed directly by the torque control component. | —        |
+| None      | The control interrupt manages the inverter and the encoder; the torque control component does not access them directly.        | —        |
 
 ---
 
@@ -257,13 +257,13 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 | Entity            | Field        | Type / Unit           | Range           | Notes                                            |
 |-------------------|--------------|-----------------------|-----------------|--------------------------------------------------|
-| Phase currents    | Ia, Ib, Ic   | Ampere (float)        | ± motor rated A | Ic derived; passed in from ADC callback          |
+| Phase currents    | Ia, Ib, Ic   | Ampere (float)        | ± motor rated A | Ic derived; passed in from the current sampling  |
 | Synchronous frame | Id, Iq       | Ampere (float)        | ± motor rated A | Regulated quantities                             |
 | Current setpoint  | Id_sp, Iq_sp | Ampere (float)        | ± motor rated A | Id_sp = 0 for SPMSM MTPA; Iq_sp from application |
 | Voltage demands   | Vd, Vq       | Dimensionless (float) | [−1, +1]        | PID output; normalised to DC bus                 |
-| Duty cycles       | Da, Db, Dc   | Dimensionless (float) | [0.0, 1.0]      | Returned to Runner for PWM register write        |
-| Mechanical angle  | θm           | Radians (float)       | [0, 2π)         | Supplied by Runner; pole-pairs multiply to θe    |
-| Electrical angle  | θe           | Radians (float)       | [0, 2π)         | θm × pole_pairs; used for Park and inverse Park  |
+| Duty cycles       | Da, Db, Dc   | Dimensionless (float) | [0.0, 1.0]      | Returned to the control interrupt for the power stage |
+| Mechanical angle  | θm           | Radians (float)       | [0, 2π)         | Supplied by the control interrupt; × pole pairs = θe |
+| Electrical angle  | θe           | Radians (float)       | [0, 2π)         | θm × pole pairs; used for Park and inverse Park  |
 | Pole pairs        | P            | Integer (unsigned)    | ≥ 1             | Motor property; configured once at startup       |
 
 ---
@@ -273,13 +273,13 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Constraint                      | Value / Description                                                                                                   |
 |---------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                                         |
-| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period) for the full `Calculate()` execution.                           |
-| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                                          |
-| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.                  |
-| Electrical angle wrapping       | Handled by the table index mask in `math::FastSine` — no explicit modulo operation required in loop.                  |
-| Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through `Configure()` first. |
-| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
-| Current envelope                | Vector magnitude bounded to the inverter's `MaxCurrentSupported()` at `SetPoint`; it is not a regulator.              |
+| Cycle budget                    | At most 75 % of the control period for the full control step.                                                         |
+| No indirect calls in hot path   | The control step must not pay the cost of a runtime dispatch.                                                         |
+| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; the platform converts them for the power stage.                                 |
+| Electrical angle wrapping       | Handled by the table index mask of the fast sine — no explicit modulo operation required in loop.                     |
+| Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through the configuration first. |
+| No flux weakening               | A d-axis setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
+| Current envelope                | Vector magnitude bounded to the inverter's maximum current when the setpoint arrives; it is not a regulator.          |
 | Speed limiter                   | Folds, never brakes: an outside torque beyond the limit is left to the overspeed fault (REQ-PRO-004).                 |
 | PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                                |
 
@@ -289,9 +289,9 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 The dual-PID current controller described above is one of several selectable strategies for the
 current loop. Alternative controllers — Decoupled PID, Deadbeat, and Sliding-mode — are described in
-`documentation/theory/advanced-controllers.md` (`current-loop-decoupled-pid.md`, `current-loop-deadbeat.md`, `current-loop-sliding-mode.md`). Plant model foundations are in
-`documentation/theory/foc-plant-models.md`.
+[advanced-controllers.md](../theory/advanced-controllers.md) ([current-loop-decoupled-pid.md](../theory/current-loop-decoupled-pid.md), [current-loop-deadbeat.md](../theory/current-loop-deadbeat.md), [current-loop-sliding-mode.md](../theory/current-loop-sliding-mode.md)). Plant model foundations are in
+[foc-plant-models.md](../theory/foc-plant-models.md).
 
 The mechanism by which a controller strategy is selected at runtime, stored without heap allocation,
-dispatched in the ISR via type-aware visit, and persisted to NVM is described in
-`documentation/design/controller-selection.md`.
+dispatched in the control interrupt without an indirect call, and persisted to non-volatile memory is described in
+[controller-selection.md](controller-selection.md).

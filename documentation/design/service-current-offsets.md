@@ -2,9 +2,9 @@
 title: "Service: Current Sensor Offsets"
 type: design
 status: draft
-version: 0.2.1
+version: 0.2.2
 component: service-current-offsets
-date: 2026-11-05
+date: 2026-11-26
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Current Sensor Offsets |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.2.1                           |
+| Version   | 0.2.2                           |
 | Component | service-current-offsets         |
-| Date      | 2026-11-05                      |
+| Date      | 2026-11-26                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -31,7 +31,7 @@ date: 2026-11-05
 A phase current sensor does not read zero at zero current. On the reference board the three phases read
 +27, −18 and +54 mA with no current flowing. In the stationary frame that is a 42 mA error, which
 the rotation turns into a ripple at the electrical frequency, and it hides small torques such as the
-bench rotor's viscous friction (`documentation/verification_and_validation/software-in-the-loop.md`, Part M).
+bench rotor's viscous friction ([software-in-the-loop](../verification_and_validation/software-in-the-loop.md), Part M).
 
 **Is responsible for:**
 - Measuring each phase sensor's zero-current reading at the start of the full calibration, and
@@ -51,7 +51,7 @@ The offsets are removed by the inverter compensation stage, which stands between
 inverter and everything that reads phase currents: the current loop, the online estimators, and the
 identification and alignment procedures. To them it is the inverter. It subtracts the offsets in
 force from each sample before handing it on, and the same stage corrects each duty for the dead-time
-loss (`service-dead-time-compensation.md`). A sample therefore crosses one stage on its way in and a
+loss ([service-dead-time-compensation.md](service-dead-time-compensation.md)). A sample therefore crosses one stage on its way in and a
 duty one on its way out; the offsets cost three subtractions inside that stage's call.
 
 This service measures the offsets and hands them to the stage. It does not stand in the path itself.
@@ -65,7 +65,7 @@ With all three legs at 50 % duty the windings see no voltage, so each sensor rea
 That holds only for a rotor at rest: the legs short the windings, so a turning rotor's back-EMF drives
 current through the sensors, and a rotor that slows to a stop during the average leaves part of it in
 the result. The calibration sequence therefore starts the measurement only once the rotor is at rest
-(`state-machine.md`, Calibration Sequence).
+([state-machine.md](state-machine.md), Calibration Sequence).
 The measurement runs at the control frequency, the one the loop runs at. It discards the first 200
 samples while the bridge and the sensing settle, then averages the next 2000 for each phase: 110 ms at
 20 kHz, which brings 35 mA of sample noise below 1 mA. It reads the raw samples, whatever offsets are
@@ -74,7 +74,7 @@ applied at the time.
 The same samples give the sensors' noise: the RMS over the three phases of each sample's distance from
 its phase's offset. The calibration record stores it in whole milliamperes, and the automatic
 current-loop bandwidth is held where its proportional gain keeps that noise out of earshot
-(`controller-selection.md`, *Automatic bandwidth*; REQ-CTL-006).
+([controller-selection.md](controller-selection.md), *Automatic bandwidth*; REQ-CTL-006).
 
 One such average is a window. A measurement takes two windows and keeps their mean, offsets and noise
 alike, when every phase agrees within 10 mA. With 35 mA of sample noise two undisturbed windows differ
@@ -115,7 +115,7 @@ A record written before this step existed carries zero offsets, which applies no
 ### Part D — The refresh at enable
 
 An amplifier's offset drifts with temperature and age after the calibration that measured it
-(`documentation/theory/sensing-chain.md` §3). The drive therefore measures the offsets again, by the
+([sensing chain](../theory/sensing-chain.md) §3). The drive therefore measures the offsets again, by the
 procedure of Part B, at the first Enable after power-up, after a control-mode switch and after every
 Fault. The drive stays Ready throughout: it waits for the rotor to come to rest, as the calibration
 does, so that no winding current is taken for sensor bias, and then measures.
@@ -157,7 +157,7 @@ sequenceDiagram
     CO-->>SM: offsets, or failure (event loop)
     SM->>CO: Apply(offsets)
     CO->>IC: offsets in force
-    SM->>EI: EstimateNumberOfPolePairs
+    SM->>EI: estimate the pole pairs
     EI->>IC: duties and sample requests
     IC->>INV: duties corrected for the dead time
     INV-->>IC: raw samples
@@ -194,17 +194,17 @@ sequenceDiagram
 Against plants whose phases are biased by +27, −18 and +54 mA with 35 mA of noise, the full
 calibration traces offsets within 1.5 mA of the biases on both reference motors and the bench motor,
 and an electrical identification over CAN stores them within the same 5 mA (REQ-CMS-001,
-`parameter_identification.feature`).
+parameter identification scenarios).
 
 With a phase sensor 20 mA from the offset its calibration record stores, the first Start enables the
 drive; with it 100 mA away the Start is refused and the drive stays Ready (REQ-CMS-003,
-`motor_control.feature`).
+motor control scenarios).
 
 The refresh is what keeps the torque current right after a sensor drifts. On the bench current-sense chain, with
 phase A 20 mA from its calibration and the rotor held 90 electrical degrees from its aligned position, where an
 uncorrected phase-A offset lands on the q axis as two thirds of itself, the winding's mean q-axis current over
 1.5 s is within 0.1 mA of a 0, 0.1, 1.0 and 3.0 A command against a limit of 1 % plus 5 mA (REQ-CTL-001,
-`control_performance.feature`).
+control performance scenarios).
 
 In the model in the loop, phase B read 52 mA low for the first 105 ms of the measurement, which covers
 most of the first window. Without the confirmation the stored phase B offset was 49 mA off; with it,

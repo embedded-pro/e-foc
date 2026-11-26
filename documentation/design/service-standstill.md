@@ -2,9 +2,9 @@
 title: "Service: Rotor Standstill"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-standstill
-date: 2026-10-27
+date: 2026-11-26
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-10-27
 | Title     | Service: Rotor Standstill |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.1.0                     |
+| Version   | 0.1.1                     |
 | Component | service-standstill        |
-| Date      | 2026-10-27                |
+| Date      | 2026-11-26                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,10 +29,10 @@ date: 2026-10-27
 ## Responsibilities
 
 The full calibration starts by measuring the current sensors' offsets with all three legs at 50 % duty
-(`service-current-offsets.md`). That shorts the windings, so a rotor still turning from an earlier run
+([service-current-offsets.md](service-current-offsets.md)). That shorts the windings, so a rotor still turning from an earlier run
 drives its back-EMF current through the sensors, and the offset step would store that current as sensor
 bias. In simulation, a calibration started 25 ms after disabling the bench motor at 500 rpm stored
-offsets 5 to 15 mA off in five runs out of five (`state-machine.md`, Calibration Sequence). This
+offsets 5 to 15 mA off in five runs out of five ([state-machine.md](state-machine.md), Calibration Sequence). This
 service holds the calibration back until the rotor is at rest (REQ-CMS-001).
 
 **Is responsible for:**

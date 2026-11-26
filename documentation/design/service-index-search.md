@@ -2,9 +2,9 @@
 title: "Service: Encoder Index Search"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-index-search
-date: 2026-11-06
+date: 2026-11-26
 ---
 
 | Field     | Value                         |
@@ -12,9 +12,9 @@ date: 2026-11-06
 | Title     | Service: Encoder Index Search |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.1.0                         |
+| Version   | 0.1.1                         |
 | Component | service-index-search          |
-| Date      | 2026-11-06                    |
+| Date      | 2026-11-26                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -83,17 +83,17 @@ pulse and its width does not separate the two readings.
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Holding : Search(config)\n(refused without R and Vdc)
+    Idle --> Holding : search requested\n(refused without R and Vdc)
     Holding --> Turning : 200 ms elapsed\n(index armed)
     Turning --> Found : index pulse\n(reading taken, vector holds)
-    Found --> Idle : event loop applies the target,\nstops the inverter, onDone(reading)
+    Found --> Idle : event loop applies the target,\nstops the inverter, completes with the reading
     Turning --> Delivering : 1.25 revolutions without an index
     Holding --> Delivering : over-current
     Turning --> Delivering : over-current
-    Delivering --> Idle : event loop, onDone(nullopt)
-    Holding --> Idle : 4 s timeout or Abort
-    Turning --> Idle : 4 s timeout or Abort
-    Found --> Idle : Abort\n(encoder untouched)
+    Delivering --> Idle : event loop, completes with no reading
+    Holding --> Idle : 4 s timeout or abort
+    Turning --> Idle : 4 s timeout or abort
+    Found --> Idle : abort\n(encoder untouched)
 ```
 
 ### Part C — Bounds
@@ -106,7 +106,7 @@ stateDiagram-v2
 | Time    | 4 s                                                                | The hold and the travel take 2.7 s; the timer only backs the travel limit up               |
 
 A failure stops the inverter and completes with no reading. The completion is always delivered from the
-event loop, never from the interrupt. `Abort()` stops the inverter and drops the completion without invoking
+event loop, never from the interrupt. An abort stops the inverter and drops the completion without invoking
 it; an abort after the pulse has been seen leaves the encoder untouched.
 
 ### Part D — The encoder index port
@@ -115,13 +115,13 @@ The platform reports the index through a port beside the encoder:
 
 | Operation | Meaning                                                                                         |
 |-----------|-------------------------------------------------------------------------------------------------|
-| Has index | Whether the board wires an index channel at all; without one nothing searches                   |
+| Has index | Whether the target wires an index channel at all; without one nothing searches                  |
 | Arm       | Forget any pulse seen so far                                                                    |
 | Seen      | Whether a pulse has been seen since the last arm; polled every control period during the search |
 
 A platform whose encoder interface latches the pulse sees a pulse shorter than a control period. A platform that
-reads the index pin's level relies on the pulse lasting: one count wide it holds for 0.5 ms at the search speed of a 4000-count encoder — ten control periods. The emulated
-target reports the plant's index (`software-in-the-loop.md`, Part A), and the host has none.
+reads the index level relies on the pulse lasting. One count wide, it holds for 0.5 ms at the search speed of a
+4000-count encoder: ten control periods. The emulated target reports the plant's index (`software-in-the-loop.md`, Part A), and the host has none.
 
 ---
 
@@ -129,17 +129,17 @@ target reports the plant's index (`software-in-the-loop.md`, Part A), and the ho
 
 ### Provided
 
-| Interface                | Purpose                                                                                 | Contract                                                                                                           |
-|--------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `Available()`            | Whether a search can find anything                                                      | False without an index channel                                                                                     |
-| `Search(config, onDone)` | Searches the index; with a target in the configuration, re-references the encoder to it | `onDone` fires once, from the event loop, after the inverter has stopped, with the reading at the pulse or nothing |
-| `Abort()`                | Stops a search                                                                          | Inverter stopped, completion dropped, encoder untouched                                                            |
-| `IsRunning()`            | Whether a search owns the inverter or a completion is queued                            | The state machine counts it as pending work                                                                        |
+| Interface    | Purpose                                                                                 | Contract                                                                                         |
+|--------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Availability | Whether a search can find anything                                                      | False without an index channel                                                                   |
+| Search       | Searches the index; with a target in the configuration, re-references the encoder to it | Completes once, from the event loop, after the inverter has stopped, with the reading or nothing |
+| Abort        | Stops a search                                                                          | Inverter stopped, completion dropped, encoder untouched                                          |
+| Running      | Whether a search owns the inverter or a completion is queued                            | The state machine counts it as pending work                                                      |
 
 ### Required
 
 | Interface            | Purpose                                                        | Contract                                            |
 |----------------------|----------------------------------------------------------------|-----------------------------------------------------|
-| `ThreePhaseInverter` | Open-loop vector and the phase-current interrupt that paces it | Not claimed by the control loop while a search runs |
-| `Encoder`            | Reading at the pulse, and the re-reference                     | `Set` makes the current reading the given angle     |
-| `EncoderIndex`       | The index pulse                                                | Polled from the phase-current interrupt             |
+| Three-phase inverter | Open-loop vector and the phase-current interrupt that paces it | Not claimed by the control loop while a search runs |
+| Encoder              | Reading at the pulse, and the re-reference                     | A set makes the current reading the given angle     |
+| Encoder index        | The index pulse                                                | Polled from the phase-current interrupt             |

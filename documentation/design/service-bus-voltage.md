@@ -2,9 +2,9 @@
 title: "Service: Bus Voltage"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: service-bus-voltage
-date: 2026-11-05
+date: 2026-11-26
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-11-05
 | Title     | Service: Bus Voltage |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.3.0                |
+| Version   | 0.3.1                |
 | Component | service-bus-voltage  |
-| Date      | 2026-11-05           |
+| Date      | 2026-11-26           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -31,13 +31,13 @@ date: 2026-11-05
 The motor model is configured once with the bus voltage read at boot, before the bridge switches. A bus
 that sags under load or rises under regeneration then scales the voltage the winding gets. This service
 measures the bus while the drive runs and hands the cascade a filtered value, so that the cascade can
-scale its duties by the measured over the configured voltage (`foc-torque.md`, Bus Voltage Tracking).
+scale its duties by the measured over the configured voltage ([Torque control](foc-torque.md), Bus Voltage Tracking).
 
 **Is responsible for:**
 - Reading the platform's bus voltage every 10 ms from the event loop
 - Filtering the readings with a 50 ms time constant, starting from the first reading
 - Handing every filtered value to the control mode, which passes it to the active cascade, and to the
-  bus-voltage limit monitor (`fault-supervision.md` Part L)
+  bus-voltage limit monitor ([Fault supervision](fault-supervision.md) Part L)
 
 ---
 
@@ -45,8 +45,8 @@ scale its duties by the measured over the configured voltage (`foc-torque.md`, B
 
 ### Part A — Reading the bus
 
-The platform's bus voltage read blocks for its conversion: about 134 µs on the reference board, whose
-divider is sampled for 256 ADC clocks with eight-fold oversampling. The service therefore reads it from
+The platform's bus voltage read blocks for its conversion. On the reference board, the oversampled
+conversion takes about 134 µs. The service therefore reads it from
 the event loop, never from an interrupt, once every 10 ms, which costs about 1.3 % of the event loop. The
 control interrupt preempts the read, so the 20 kHz loop is untouched.
 
@@ -90,5 +90,5 @@ new motor model returns to the configured bus until the next value, at most 10 m
 | Constraint     | Description                                                                                                                                      |
 |----------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
 | Tracking lag   | The 10 ms poll and the 50 ms filter follow a slow sag; a bus that moves within a few milliseconds is followed late                               |
-| Blocking read  | The read blocks the event loop for its conversion; a non-blocking read needs a triggered conversion per board                                    |
+| Blocking read  | The read blocks the event loop for its conversion; a non-blocking read needs a triggered conversion on each target                                    |
 | Identification | Flux-linkage identification reads the cascade's q-axis voltage, which the tracking keeps true; resistance and inductance read the bus themselves |

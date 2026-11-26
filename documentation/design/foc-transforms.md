@@ -2,9 +2,9 @@
 title: "FOC Mathematical Transforms"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: foc-transforms
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | FOC Mathematical Transforms |
 | Type      | design                      |
 | Status    | draft                       |
-| Version   | 0.2.0                       |
+| Version   | 0.2.1                       |
 | Component | foc-transforms              |
-| Date      | 2026-11-08                  |
+| Date      | 2026-11-26                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -56,8 +56,8 @@ Iβ = (Ib - Ic) / √3
 When the system *is* balanced (`Ia + Ib + Ic = 0`) this reduces to the familiar two-sensor form
 `Iα = Ia`, `Iβ = (Ia + 2·Ib)/√3`. The implementation uses the three-phase form unconditionally.
 
-All three phase currents are measured. `AdcPhaseCurrentMeasurement` converts three ADC samples and
-delivers them as a `PhaseCurrents` triple, so no phase is reconstructed from the balance constraint.
+All three phase currents are measured. The phase-current measurement converts three converter samples and
+delivers them as one set of three currents, so no phase is reconstructed from the balance constraint.
 
 **Inverse transform** (voltages αβ → 3-phase):
 
@@ -108,9 +108,9 @@ The caller is responsible for supplying the correct θe.
 - The forward Park in the current-sensing path uses the sampled θe. The inverse Park of the closed-loop current paths uses that angle advanced by the delay between the sample and the instant the voltage is applied, θe + (n + ½)·ωe·Ts, where n is the number of periods the bridge takes to load a new duty and ωe is the electrical speed the cascade already holds. The open-loop drives (alignment, pole-pair sweep, inductance injection, resistance hold) and the cogging feed-forward keep the sampled angle.
 - The transform is stateless — no memory of previous cycles.
 
-### Composite ClarkePark — Chained Transform with Single Trigonometric Evaluation
+### Composite Clarke–Park — Chained Transform with Single Trigonometric Evaluation
 
-The ClarkePark composite combines the forward Clarke and forward Park transforms (or their inverses) into a single operation. The motivation is efficiency: cos(θe) and sin(θe) are computed exactly once and reused for both the Park rotation in the forward direction and the inverse Park rotation.
+The Clarke–Park composite combines the forward Clarke and forward Park transforms (or their inverses) into a single operation. The motivation is efficiency: cos(θe) and sin(θe) are computed exactly once and reused for both the Park rotation in the forward direction and the inverse Park rotation.
 
 The forward composite takes (Ia, Ib, θe) and produces (Id, Iq) directly.  
 The inverse composite takes (Vd, Vq, θe), performs inverse Park to (Vα, Vβ), then inverse Clarke to (Va, Vb, Vc), producing all three phase voltages in one call.
@@ -156,19 +156,19 @@ graph LR
 
 ### Fast Trigonometry — Lookup-Table Sine and Cosine
 
-Direct hardware transcendental functions (`sin`, `cos`) introduce variable latency and are unsuitable for a 20 kHz ISR. A 512-entry pre-computed lookup table (LUT) covering one full period [0, 2π) provides both sine and cosine with bounded, cycle-predictable evaluation time.
+Library sine and cosine functions introduce variable latency and are unsuitable for a 20 kHz control interrupt. A 512-entry pre-computed lookup table (LUT) covering one full period [0, 2π) provides both sine and cosine with bounded, cycle-predictable evaluation time.
 
 **LUT characteristics:**
 - 512 entries, each a 32-bit floating-point value
-- Stored in ROM (read-only, `constexpr`) at a 16-byte memory alignment boundary
+- Stored in ROM (read-only, computed at build time) at a 16-byte memory alignment boundary
 - Total ROM footprint: 512 × 4 bytes = 2 048 bytes (2 KB)
 - Covers exactly one full period
 
 **Range handling**: the angle is *not* normalised to [0, 2π) before indexing. It is scaled by
-512/2π, truncated toward negative infinity, and the resulting index is masked with `size - 1`, so
+512/2π, truncated toward negative infinity, and the resulting index is masked with the table size minus one, so
 the wrap is a bitwise AND on the index rather than a modulo on the angle. This is why there is no
-`fmod` in the hot path. The consequence to know is the domain limit it leaves: the intermediate is
-an `int32_t`, so the result is meaningless for angles beyond roughly 2.6 × 10⁷ radians. Electrical
+floating-point modulo in the hot path. The consequence to know is the domain limit it leaves: the intermediate is
+a 32-bit signed integer, so the result is meaningless for angles beyond roughly 2.6 × 10⁷ radians. Electrical
 angle reaches the transforms already wrapped, so this bound is not approached in the control loop.
 
 **Cosine** reuses the sine table — there is no separate cosine table — but it is *not* an index
@@ -183,8 +183,8 @@ a phase error of about Nε / (2 sin ω) over its N-sample block, which biases th
 These take the table entry just below the angle and rotate it by the remaining offset δ < 2π/512 with
 the series sin δ ≈ δ − δ³/6 and cos δ ≈ 1 − δ²/2 + δ⁴/24, whose truncation error is below 10⁻¹¹.
 The result is as accurate as the table entries themselves (within 1.3 × 10⁻⁶), uses the same ROM, and keeps
-the software `sinf`/`cosf` and their argument reduction — about 4 KB of flash on the target — out of the
-firmware. It costs a handful of multiplies more than `Sine`, so the control loop keeps the interpolated
+the library's single-precision sine and cosine and their argument reduction — about 4 KB of flash on the target — out of the
+firmware. It costs a handful of multiplies more than the interpolated sine, so the control loop keeps the interpolated
 form.
 
 ---
@@ -199,16 +199,16 @@ form.
 | Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
 | Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
 | Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
-| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
-| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
-| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
+| Clarke–Park — Forward            | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| Clarke–Park — Inverse            | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
+| Space vector modulation          | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
 
 ### Required
 
 | Interface                                      | Purpose                                     | Contract                                                                                  |
 |------------------------------------------------|---------------------------------------------|-------------------------------------------------------------------------------------------|
-| `math::FastSine`, `math::FastCosine` (toolbox) | sin(θe) and cos(θe) for the Park transforms | 512-entry ROM table with linear interpolation; any angle, no wrap needed; within 2 × 10⁻⁵ |
-| `math::AccurateSineAndCosine` (toolbox)        | sin(θ) and cos(θ) for configuration code    | Same table plus a short series; within 1.3 × 10⁻⁶. Not for the control loop               |
+| Fast sine and cosine (numerical toolbox)       | sin(θe) and cos(θe) for the Park transforms | 512-entry ROM table with linear interpolation; any angle, no wrap needed; within 2 × 10⁻⁵ |
+| Accurate sine and cosine (numerical toolbox)   | sin(θ) and cos(θ) for configuration time    | Same table plus a short series; within 1.3 × 10⁻⁶. Not for the control loop               |
 
 ---
 
@@ -221,9 +221,9 @@ form.
 | Synchronous frame   | Id, Iq     | Ampere (float)        | ± rated current | Output of Park forward                          |
 | Voltage demand      | Vd, Vq     | Dimensionless (float) | [−1, +1]        | Normalised to DC bus                            |
 | Stationary voltage  | Vα, Vβ     | Dimensionless (float) | [−1, +1]        | Output of inverse Park / input to SVM           |
-| Phase duty cycles   | Da, Db, Dc | `hal::DutyCycle`      | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
-| Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole_pairs; normalised before LUT indexing |
-| LUT                 | Sine table | float[512]            | [−1.0, +1.0]    | constexpr; 2 KB ROM; 16-byte aligned            |
+| Phase duty cycles   | Da, Db, Dc | Fraction (float)      | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
+| Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole pairs; normalised before LUT indexing |
+| LUT                 | Sine table | 512 floats            | [−1.0, +1.0]    | Built at compile time; 2 KB ROM; 16-byte aligned |
 
 ---
 
@@ -234,7 +234,7 @@ graph LR
     Ia["Ia, Ib (Ampere)"] --> Clarke["Clarke\nForward"]
     Clarke --> Ialpha["Iα, Iβ"]
     Ialpha --> Park["Park\nForward"]
-    Theta["θe (Radians)"] --> Trig["math::FastSine/FastCosine\nLUT"]
+    Theta["θe (Radians)"] --> Trig["Fast sine and cosine\nLUT"]
     Trig --> Park
     Trig --> InvPark["Park\nInverse"]
     Park --> dq["Id, Iq"]
@@ -256,6 +256,6 @@ graph LR
 | LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.                                   |
 | SVM input normalisation         | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values.                      |
 | SVM output saturation           | Duty cycles are clamped to [0.0, 1.0]. Over-modulation is silently saturated, not flagged.                                |
-| Electrical angle responsibility | The caller is responsible for computing θe = θm × pole_pairs before invoking any Park operation.                          |
+| Electrical angle responsibility | The caller is responsible for computing θe = θm × pole pairs before invoking any Park operation.                          |
 | Stateless transforms            | No transform retains state between calls. Every call is independent.                                                      |
 | Hot-path constraint             | All transforms must execute within the cycle budget of the 20 kHz FOC interrupt.                                          |

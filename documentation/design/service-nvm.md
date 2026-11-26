@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.17.0
+version: 0.17.1
 component: service-nvm
-date: 2026-11-08
+date: 2026-11-26
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-11-08
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.17.0                       |
+| Version   | 0.17.1                       |
 | Component | service-nvm                  |
-| Date      | 2026-11-08                   |
+| Date      | 2026-11-26                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -34,13 +34,13 @@ date: 2026-11-08
   configuration (CAN and start-up settings, telemetry rate, loop tunings and algorithm selections, fault-supervision
   settings, and the drive-wide limits: overspeed, following error, speed ramps, command timeout, motor current ratings,
   target window, travel limits, temperature, bus voltage and quick-stop deceleration) across power cycles using the
-  target's EEPROM
+  target's non-volatile memory
 - Persisting the fault history and the learned motor model, the inductance, inertia and friction online
   recalibration adopted (`online-recalibration.md`, Part F)
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Rejecting a record written with another layout version as invalid, so it is never misread
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
-- Providing non-blocking, callback-based operations — no operation may block the calling context
+- Providing non-blocking, completion-based operations — no operation may block the calling context
 
 ---
 
@@ -48,17 +48,17 @@ date: 2026-11-08
 
 ### Logical Regions
 
-The service manages four independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
+The service manages four independent non-volatile memory regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
 
-| Region        | Magic        | Data structure    | Data size |
-|---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 100 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 192 bytes |
-| Fault history | `0xFA17C0DE` | fault history     | 112 bytes |
-| Learned model | `0x1EA4ED0D` | learned model     | 26 bytes  |
+| Region        | Magic        | Content              | Data size |
+|---------------|--------------|----------------------|-----------|
+| Calibration   | `0xCAFEF00D` | calibration record   | 100 bytes |
+| Configuration | `0xDEADBEEF` | configuration record | 192 bytes |
+| Fault history | `0xFA17C0DE` | fault history        | 112 bytes |
+| Learned model | `0x1EA4ED0D` | learned model        | 26 bytes  |
 
 The calibration record's layout is at version 6. Version 6 dropped four fields nothing read — the q-axis inductance
-(always equal to the d-axis one), the alignment angle and the encoder direction (the rotor reference lives in RAM
+(always equal to the d-axis one), the alignment angle and the encoder direction (the rotor reference lives in working memory
 and the index angle), and a current-loop bandwidth calibration only ever carried forward as 0 — and widened the
 current noise to two bytes, so a noise above 255 mA is stored instead of saturating. That took the data from 112
 to 100 bytes, so a record written by an earlier firmware reads as invalid and the motor has to be calibrated again.
@@ -89,7 +89,7 @@ the start-up settings, the tuning settings, the default control mode, the algori
 settings and the limits return to their defaults and are stored again by the next change. The calibration
 record is untouched by any of these bumps.
 
-The regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on one region has no effect on the others.
+Each region has its own memory region, given to the service when it is built, and can be read, written, and erased independently. An operation on one region has no effect on the others.
 
 ### Fault History Region
 
@@ -141,14 +141,14 @@ Each region stores a single record consisting of a fixed-size header followed by
 | Magic   | 4 bytes | Region identifier (`0xCAFEF00D` or `0xDEADBEEF`) |
 | Version | 1 byte  | Layout version constant baked into firmware      |
 | CRC-32  | 4 bytes | CRC-32 of the data bytes only (header excluded)  |
-| Data    | N bytes | Serialised `CalibrationData` or `ConfigData`     |
+| Data    | N bytes | Serialised calibration or configuration record   |
 
-This layout ensures that a calibration record stored in EEPROM cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
+This layout ensures that a calibration record stored in the non-volatile memory cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
 
 The header's multi-byte fields are stored least significant byte first, and the data is the structure's own bytes,
-so the CRC covers exactly the stored bytes. `CalibrationData` and `ConfigData` list their four-byte fields before
+so the CRC covers exactly the stored bytes. The calibration and configuration records list their four-byte fields before
 the smaller ones and fill the last word exactly, so neither has implicit padding whose value would be undefined;
-a `static_assert` on each size holds that. A layout version is bumped whenever a field is added, resized or
+a build-time check on each size holds that. A layout version is bumped whenever a field is added, resized or
 reordered, so a record written by an earlier firmware reads as invalid instead of being misinterpreted. The
 software-in-the-loop harness builds its NVM images with the same encoding the firmware uses, so the two cannot
 drift apart.
@@ -165,49 +165,49 @@ When a region is read back, the following checks are applied in order:
 2. **Version check** — the version byte must match the version constant compiled into the current firmware.
 3. **CRC-32 check** — a CRC-32 is computed over the data bytes and compared to the stored CRC field.
 
-Only if all three checks pass is the data considered valid and `NvmStatus::Ok` reported; any failure is
-`NvmStatus::InvalidData`. No caller treats a record of another version differently from a damaged one: either
+Only if all three checks pass is the data considered valid and *ok* reported; any failure is
+*invalid data*. No caller treats a record of another version differently from a damaged one: either
 way the calibration has to be redone, and a configuration falls back to its defaults. A configuration load
-therefore reports `Ok` with the defaults when its record is invalid.
+therefore reports *ok* with the defaults when its record is invalid.
 
 These three checks establish that the record is *intact*, not that its values are *usable*: a record whose CRC
-matches can still hold a non-finite float. `FocStateMachineCommon::HasValidCalibration()` therefore applies a
+matches can still hold a non-finite float. The state machine therefore applies a
 plausibility gate on top, requiring the electrical fields to be finite (and the phase resistance positive)
-before the restored calibration can carry the drive to `Ready`. The same gate runs on externally supplied
-calibration in `CmdCompleteExternalCalibration`, so a value that arrives over CAN cannot be persisted either.
+before the restored calibration can carry the drive to Ready. The same gate runs on externally supplied
+calibration when the external calibration completes, so a value that arrives over CAN cannot be persisted either.
 Positive infinity passes every `> 0` test, which is why finiteness is checked explicitly rather than inferred
 from a range comparison.
 
 ### Write Sequence
 
 Every write stores the whole image without an erase and reads it back; each step is driven by an asynchronous
-callback from the `NvmRegion` abstraction, and no step blocks:
+completion from the memory region, and no step blocks:
 
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant NVM as NonVolatileMemory
-    participant Region as NvmRegion
+    participant NVM as Non-volatile memory service
+    participant Region as Memory region
 
-    Caller->>NVM: SaveCalibration(data, onDone)
+    Caller->>NVM: Save calibration
     NVM->>Region: Write image\n(magic + version + CRC + data)
     Region-->>NVM: written
     NVM->>Region: Read back image
     Region-->>NVM: read
     alt read-back equals what was written
-        NVM-->>Caller: onDone(NvmStatus::Ok)
+        NVM-->>Caller: complete: ok
     else read-back differs
-        NVM-->>Caller: onDone(NvmStatus::HardwareFault)
+        NVM-->>Caller: complete: hardware fault
     end
 ```
 
-The read-back comparison catches EEPROM hardware faults, programming errors and marginal cells. Only
-`InvalidateCalibration` erases: it erases the calibration region, reads it back, and reports `WriteFailed` if
+The read-back comparison catches memory hardware faults, programming errors and marginal cells. Only
+the calibration invalidation erases: it erases the calibration region, reads it back, and reports *write failed* if
 an intact record survived the erase.
 
-### EEPROM Address-Space Map
+### Address-Space Map
 
-The two NVM regions occupy fixed, non-overlapping address ranges within the EEPROM. Addresses are byte offsets from the start of the EEPROM address space.
+The regions occupy fixed, non-overlapping address ranges within the non-volatile memory. Addresses are byte offsets from the start of its address space.
 
 | Region        | Base address | Size      | Content                  |
 |---------------|--------------|-----------|--------------------------|
@@ -217,52 +217,52 @@ The two NVM regions occupy fixed, non-overlapping address ranges within the EEPR
 | Fault history | 384          | 128 B     | The fault history image  |
 | Reserved      | 512+         | remainder | Unused; not accessed     |
 
-The regions fit within the 2048-byte on-chip EEPROM of one target, and fill the 512-byte external EEPROM of the
-reference board, which backs a processor with no EEPROM of its own; the fault history therefore holds eight
+The regions fit within the 2048-byte internal non-volatile memory of one target, and fill the 512-byte external
+non-volatile memory of the reference board, whose target has none of its own; the fault history therefore holds eight
 records, the number its 128 bytes take. The configuration region grew
 from 128 to 256 bytes when the record of layout 7 outgrew it, so it now spans both 256-byte blocks of the
-external EEPROM; the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
-193-byte record of layout 15 fits in the 224 that remain, and no stored record moves. Targets with no EEPROM and the host use an in-memory stub of
+external memory; the driver splits a write at the block boundary. The learned model took the last 32 of its 256 bytes: the
+193-byte record of layout 15 fits in the 224 that remain, and no stored record moves. Targets with no non-volatile memory and the host use an in-memory stand-in of
 identical layout for regression testing.
 
 ### Power-Loss Mitigation
 
-EEPROM cells retain data indefinitely once a write word-program cycle completes. The write sequence (write record → read-back verify) is designed so that power loss at any point leaves the system in a known state:
+The memory cells retain data indefinitely once a write completes. The write sequence (write record → read-back verify) is designed so that power loss at any point leaves the system in a known state:
 
-- **Power loss during an invalidation's erase**: The region holds erased bytes or a part of the old record. On next read, the magic or the CRC-32 check fails and `NvmStatus::InvalidData` is returned — the application must re-run identification or use factory defaults.
-- **Power loss during write**: The partially-written record will fail either the magic check or the CRC-32 check on next read. The same `InvalidData` result is returned; no silent corruption is possible.
-- **Power loss during read-back**: The write has already completed. On next power-on, the record will re-read correctly. The application may retry the write if the previous session reported `WriteFailed`.
+- **Power loss during an invalidation's erase**: The region holds erased bytes or a part of the old record. On next read, the magic or the CRC-32 check fails and *invalid data* is returned — the application must re-run identification or use factory defaults.
+- **Power loss during write**: The partially-written record will fail either the magic check or the CRC-32 check on next read. The same *invalid data* result is returned; no silent corruption is possible.
+- **Power loss during read-back**: The write has already completed. On next power-on, the record will re-read correctly. The application may retry the write if the previous session reported *write failed*.
 
-No journaling or wear-levelling is implemented. Each write operation overwrites the same address range, which is sufficient for infrequent commissioning writes. If frequent writes are required, a wear-levelling strategy must be added at the `NvmRegion` layer.
+No journaling or wear-levelling is implemented. Each write operation overwrites the same address range, which is sufficient for infrequent commissioning writes. If frequent writes are required, a wear-levelling strategy must be added at the memory-region layer.
 
 ### Buffer Management — No Heap
 
-Each region is held in an EmIL `services::NvmImage<Size>` (`services/util/NvmImage.hpp`), which owns two statically allocated byte arrays:
+Each region is held in an EmIL non-volatile image, which owns two statically allocated byte arrays:
 
-- **Write buffer** — sized to hold one complete image; populated before the `NvmRegion::Write` call.
-- **Read-back buffer** — same size; populated by the `NvmRegion::Read` call, compared after a write and decoded after a load. `NvmImage` reports the comparison as `bool verified`; the service maps `false` to `NvmStatus::HardwareFault`.
+- **Write buffer** — sized to hold one complete image; populated before the write to the memory region.
+- **Read-back buffer** — same size; populated by the read from the memory region, compared after a write and decoded after a load. The image reports whether the comparison verified; the service maps a failed comparison to *hardware fault*.
 
-Both buffers are `std::array<uint8_t, recordSize>` members of the service object. They are reused across invocations. No heap is used at any point.
+Both buffers are fixed-size byte arrays inside the service. They are reused across invocations. No heap is used at any point.
 
 ### Concurrency — One Operation At A Time, Device-Wide
 
-Both logical regions are backed by a single EEPROM device, and that device driver serialises access:
+All logical regions are backed by a single non-volatile memory device, and that device driver serialises access:
 it accepts exactly one erase, program, or read at a time and treats a second concurrent request as a
 programming error. Admission control is therefore **device-wide, not per region**: while any
 operation is in flight, every entry point — calibration save, load and invalidate, configuration save and
 load, and the fault-history and learned-model loads and saves — is refused. No refused request ever reaches
 a region.
 
-A refused request never silently disappears. Its callback is invoked immediately with `Busy`. Callers
-that arm a pending-command callback before issuing a request therefore always see it complete, and
+A refused request never silently disappears. Its completion is invoked immediately with *busy*. Callers
+that arm a pending-command completion before issuing a request therefore always see it complete, and
 cannot be wedged by a dropped notification.
 
 Refusal is decided before any internal state is touched, so a caller that issues a further request
-from inside a synchronously delivered `Busy` callback can only be refused in turn — re-entry cannot
-corrupt an in-flight operation. Admission is released just before the completion callback of the
-in-flight operation runs, so a follow-up request issued from that callback is accepted normally.
+from inside a synchronously delivered *busy* completion can only be refused in turn — re-entry cannot
+corrupt an in-flight operation. Admission is released just before the completion of the
+in-flight operation runs, so a follow-up request issued from that completion is accepted normally.
 
-Callers are expected to treat `Busy` as "nothing was written": any in-memory state speculatively
+Callers are expected to treat *busy* as "nothing was written": any in-memory state speculatively
 updated in anticipation of a successful write must be rolled back, and the originating command
 rejected cleanly rather than escalated to a fault.
 
@@ -272,74 +272,74 @@ rejected cleanly rather than escalated to a fault.
 stateDiagram-v2
     [*] --> Idle
     Idle --> Writing : any save
-    Idle --> Erasing : InvalidateCalibration
+    Idle --> Erasing : invalidate calibration
     Idle --> Reading : any load
     Erasing --> ReadingBack : erase complete
     Writing --> ReadingBack : write complete
-    ReadingBack --> Idle : read-back checked (Ok, HardwareFault or WriteFailed)
-    Reading --> Idle : read complete (Ok or InvalidData)
-    Erasing --> Erasing : any further request refused with Busy
-    Writing --> Writing : any further request refused with Busy
-    ReadingBack --> ReadingBack : any further request refused with Busy
-    Reading --> Reading : any further request refused with Busy
+    ReadingBack --> Idle : read-back checked (ok, hardware fault or write failed)
+    Reading --> Idle : read complete (ok or invalid data)
+    Erasing --> Erasing : any further request refused with busy
+    Writing --> Writing : any further request refused with busy
+    ReadingBack --> ReadingBack : any further request refused with busy
+    Reading --> Reading : any further request refused with busy
 ```
 
 ### Error Codes
 
 | Status          | Meaning                                                       |
 |-----------------|---------------------------------------------------------------|
-| `Ok`            | Operation completed successfully                              |
-| `InvalidData`   | Magic, version or CRC-32 mismatch on read                     |
-| `WriteFailed`   | An intact calibration record survived an invalidation's erase |
-| `HardwareFault` | The read-back after a write differs from what was written     |
-| `Busy`          | Another operation is in flight; nothing was read or written   |
+| Ok              | Operation completed successfully                              |
+| Invalid data    | Magic, version or CRC-32 mismatch on read                     |
+| Write failed    | An intact calibration record survived an invalidation's erase |
+| Hardware fault  | The read-back after a write differs from what was written     |
+| Busy            | Another operation is in flight; nothing was read or written   |
 
 ### Calibration and Configuration Data Fields
 
-**CalibrationData** (100 bytes total, layout version 6):
+**Calibration record** (100 bytes total, layout version 6):
 
 | Field              | Physical unit | Description                                                      |
 |--------------------|---------------|------------------------------------------------------------------|
-| rPhase             | Ω             | Measured phase resistance                                        |
-| lD                 | mH            | Measured phase inductance, used for both axes                    |
-| fluxLinkage        | Wb            | Rotor flux linkage, identified from the back-EMF                 |
-| currentOffsetA/B/C | A             | Zero-current reading of each phase current sensor                |
-| inertia            | kg·m²         | Estimated rotor inertia                                          |
-| frictionCoulomb    | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
-| frictionViscous    | N·m·s/rad     | Viscous friction coefficient                                     |
-| speedLoopBandwidth | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
-| coggingTorqueScale | N·m per count | Scale of the cogging map entries                                 |
-| encoderIndexAngle  | rad           | Encoder reading at the index in the aligned frame; NaN when none |
-| polePairs          | —             | Number of motor pole pairs                                       |
-| stage              | —             | Whether the calibration completed                                |
-| currentNoise       | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
-| coggingTorque      | counts        | Cogging torque over one electrical period, 48 bins               |
+| Phase resistance   | Ω             | Measured phase resistance                                        |
+| Inductance         | mH            | Measured phase inductance, used for both axes                    |
+| Flux linkage       | Wb            | Rotor flux linkage, identified from the back-EMF                 |
+| Current offsets    | A             | Zero-current reading of each phase current sensor                |
+| Inertia            | kg·m²         | Estimated rotor inertia                                          |
+| Coulomb friction   | N·m           | Dry friction from the cogging step; 0 = no feed-forward          |
+| Viscous friction   | N·m·s/rad     | Viscous friction coefficient                                     |
+| Speed bandwidth    | rad/s         | Not measured: mechanical identification writes a fixed 100 rad/s |
+| Cogging scale      | N·m per count | Scale of the cogging map entries                                 |
+| Index angle        | rad           | Encoder reading at the index in the aligned frame; NaN when none |
+| Pole pairs         | —             | Number of motor pole pairs                                       |
+| Stage              | —             | Whether the calibration completed                                |
+| Current noise      | mA            | RMS current-sensor noise, two bytes; 0 when not measured         |
+| Cogging map        | counts        | Cogging torque over one electrical period, 48 bins               |
 
 The four-byte fields come first, then the current noise, the pole pairs and the stage, which fill one word,
 then the cogging map.
 
-**ConfigData** (188 bytes total):
+**Configuration record** (192 bytes total):
 
 | Field                  | Physical unit                   | Description                                                                                                    |
 |------------------------|---------------------------------|----------------------------------------------------------------------------------------------------------------|
-| canNodeId              | —                               | Base CAN node ID; board ID added at boot                                                                       |
-| canBaudrate            | bit/s                           | CAN bus baud rate                                                                                              |
-| telemetryRateHz        | Hz                              | Rate of the current stream (`service-can.md` Part J): 0 stops it, 1–1000 Hz; default 100                       |
-| encoderResolution      | —                               | Encoder counts per mechanical revolution                                                                       |
-| currentLoop            | rad/s, A, —                     | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
-| speedLoop              | rad/s, —, s                     | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
-| positionLoop           | rad/s, —, s                     | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
-| supervision            | s, —, rad/s, rad, rad           | Still window, current fraction, demanded speed, position error and still excursion of the fault supervisor     |
-| limits                 | rad/s, rad, s, rad/s², A, °C, V | Drive limits; ranges and defaults below the table                                                              |
-| defaultControlMode     | —                               | Control mode selected on power-up                                                                              |
-| currentAlgorithm       | —                               | Current-loop algorithm selected on power-up                                                                    |
-| speedAlgorithm         | —                               | Speed-loop algorithm selected on power-up                                                                      |
-| positionAlgorithm      | —                               | Position-loop algorithm selected on power-up                                                                   |
-| currentTwoStepDeadbeat | —                               | Two-step variant of the deadbeat current law                                                                   |
-| stallDetection         | —                               | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
-| recalibrationMode      | —                               | Online recalibration: 0 off (the default), 1 on command, 2 automatic (`online-recalibration.md`)               |
-| homingRequired         | —                               | Whether position mode starts only once the drive is homed: 0 no (the default), 1 yes (`foc-position.md`)       |
-| positionCircular       | —                               | Position mode: 0 linear, multi-turn (the default), 1 circular, within one turn (`foc-position.md`)             |
+| CAN node ID            | —                               | Base CAN node ID; the hardware node ID is added at boot                                                       |
+| CAN baud rate          | bit/s                           | CAN bus baud rate                                                                                              |
+| Telemetry rate         | Hz                              | Rate of the current stream (`service-can.md` Part J): 0 stops it, 1–1000 Hz; default 100                       |
+| Encoder resolution     | —                               | Encoder counts per mechanical revolution                                                                       |
+| Current loop           | rad/s, A, —                     | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
+| Speed loop             | rad/s, —, s                     | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
+| Position loop          | rad/s, —, s                     | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
+| Supervision            | s, —, rad/s, rad, rad           | Still window, current fraction, demanded speed, position error and still excursion of the fault supervisor     |
+| Limits                 | rad/s, rad, s, rad/s², A, °C, V | Drive limits; ranges and defaults below the table                                                              |
+| Default control mode   | —                               | Control mode selected on power-up                                                                              |
+| Current algorithm      | —                               | Current-loop algorithm selected on power-up                                                                    |
+| Speed algorithm        | —                               | Speed-loop algorithm selected on power-up                                                                      |
+| Position algorithm     | —                               | Position-loop algorithm selected on power-up                                                                   |
+| Two-step deadbeat      | —                               | Two-step variant of the deadbeat current law                                                                   |
+| Stall detection        | —                               | Whether the fault supervisor raises a stall (1, the default) or not (0)                                        |
+| Recalibration mode     | —                               | Online recalibration: 0 off (the default), 1 on command, 2 automatic (`online-recalibration.md`)               |
+| Homing required        | —                               | Whether position mode starts only once the drive is homed: 0 no (the default), 1 yes (`foc-position.md`)       |
+| Circular position      | —                               | Position mode: 0 linear, multi-turn (the default), 1 circular, within one turn (`foc-position.md`)             |
 
 The limits are the overspeed limit (`fault-supervision.md` Part G), 1–5000 rad/s, default 1000; the
 following-error window, 0–3.2 rad, 0 (off) by default, and time, 0.001–10 s, default 0.1 (Part H); the speed
@@ -347,7 +347,7 @@ acceleration and deceleration, 0–100 000 rad/s², 0 (no limit) by default (`fo
 acceleration and deceleration, 0–100 000 rad/s², and the profile jerk, 0–10 000 000 rad/s³ (0 selects the trapezoidal plan), all 0 by
 default, which turns the profile off (`foc-position.md`, Motion Profile); the command timeout,
 0–60 s, 0 (off) by default (`service-can.md` Part F); and the continuous and peak current, 0–100 A, 0 by default
-(off, and the board limit), with the peak time, 0.1–60 s, default 1 (`fault-supervision.md` Part I); and the
+(off, and the board's current limit), with the peak time, 0.1–60 s, default 1 (`fault-supervision.md` Part I); and the
 position window, 0–3.2 rad, default 6.28 mrad (four counts of the default 4000-count encoder), with its time,
 0–10 s, default 0.02 (`foc-position.md` Target Reached); and the position minimum and maximum, ±2000π rad (1000 turns),
 both 0 (off) by default (`foc-position.md` Software Position Limits); the calibration temperature,
@@ -374,23 +374,26 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                           | Purpose                                                    | Contract                                                                                                     |
-|-------------------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)`     | Writes the calibration record and verifies the read-back   | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
-| `LoadCalibration(data, onDone)`     | Reads and integrity-checks the calibration record          | `onDone(NvmStatus)` fires exactly once; `InvalidData` with an empty record when the stored one is not intact |
-| `InvalidateCalibration(onDone)`     | Erases the calibration region without writing a new record | A later load reports `InvalidData`; `onDone(NvmStatus)` fires exactly once                                   |
-| `SaveConfig(data, onDone)`          | Same write+verify sequence for the configuration region    | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
-| `LoadConfig(data, onDone)`          | Reads and integrity-checks the configuration record        | `onDone(NvmStatus)` fires exactly once; `Ok` with the defaults when the stored record is not intact          |
-| `LoadFaultHistory(onDone)`          | Reads the fault history image and checks each part         | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic or version, with an empty history            |
-| `SaveFaultHistory(history, onDone)` | Writes the fault history image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
-| `LoadLearnedModel(model, onDone)`   | Reads the learned-model image and checks it                | `onDone(NvmStatus)` fires once; `InvalidData` for a wrong magic, version or CRC, with an empty model         |
-| `SaveLearnedModel(model, onDone)`   | Writes the learned-model image and verifies the read-back  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied                                     |
+| Interface              | Purpose                                                    | Contract                                                                |
+|------------------------|------------------------------------------------------------|-------------------------------------------------------------------------|
+| Save calibration       | Writes the calibration record and verifies the read-back   | Completes exactly once; *busy* if the device is occupied                |
+| Load calibration       | Reads and integrity-checks the calibration record          | Completes exactly once; *invalid data* with an empty record when broken |
+| Invalidate calibration | Erases the calibration region without writing a new record | A later load reports *invalid data*; completes exactly once             |
+| Save configuration     | Same write+verify sequence for the configuration region    | Completes exactly once; *busy* if the device is occupied                |
+| Load configuration     | Reads and integrity-checks the configuration record        | Completes exactly once; *ok* with the defaults when broken              |
+| Load fault history     | Reads the fault history image and checks each part         | Completes once; *invalid data* for a wrong magic or version, empty      |
+| Save fault history     | Writes the fault history image and verifies the read-back  | Completes exactly once; *busy* if the device is occupied                |
+| Load learned model     | Reads the learned-model image and checks it                | Completes once; *invalid data* for a wrong magic, version or CRC, empty |
+| Save learned model     | Writes the learned-model image and verifies the read-back  | Completes exactly once; *busy* if the device is occupied                |
+
+Each completion carries one of the statuses of Error Codes. "Broken" means the stored record is not intact; "empty"
+means the load hands back an empty history or model.
 
 ### Required
 
-| Interface                            | Purpose                                                                 | Contract                                                                                   |
-|--------------------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| `NvmRegion` (calibration instance)   | Abstracts raw EEPROM write and read for the calibration address range   | Must be backed by a dedicated EEPROM address range; must not be shared with any other user |
-| `NvmRegion` (configuration instance) | Abstracts raw EEPROM write and read for the configuration address range | Must be backed by a dedicated EEPROM address range separate from the calibration range     |
-| `NvmRegion` (fault history instance) | Abstracts raw EEPROM write and read for the fault history address range | A dedicated address range of at least the image's 112 bytes                                |
-| `NvmRegion` (learned model instance) | Abstracts raw EEPROM write and read for the learned model address range | A dedicated address range of at least the image's 26 bytes                                 |
+| Interface                    | Purpose                                                         | Contract                                                         |
+|------------------------------|-----------------------------------------------------------------|------------------------------------------------------------------|
+| Calibration memory region    | Raw write and read of the calibration address range             | A dedicated address range, not shared with any other user        |
+| Configuration memory region  | Raw write and read of the configuration address range           | A dedicated address range, separate from the calibration range   |
+| Fault history memory region  | Raw write and read of the fault history address range           | A dedicated address range of at least the image's 112 bytes      |
+| Learned model memory region  | Raw write and read of the learned model address range           | A dedicated address range of at least the image's 26 bytes       |

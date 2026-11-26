@@ -2,9 +2,9 @@
 title: "Position Tracker"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: position-tracker
-date: 2026-11-15
+date: 2026-11-26
 ---
 
 | Field     | Value            |
@@ -12,9 +12,9 @@ date: 2026-11-15
 | Title     | Position Tracker |
 | Type      | design           |
 | Status    | draft            |
-| Version   | 0.1.0            |
+| Version   | 0.1.1            |
 | Component | position-tracker |
-| Date      | 2026-11-15       |
+| Date      | 2026-11-26       |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -30,7 +30,7 @@ date: 2026-11-15
 
 **Is responsible for:**
 - Keeping the multi-turn position θ = 2π·n + θm of the rotor from the position zero in every control mode and
-  state, by counting the turns n of the encoder angle θm (`foc-position.md`, Multi-Turn Position)
+  state, by counting the turns n of the encoder angle θm ([foc-position.md](foc-position.md), Multi-Turn Position)
 - Counting the turns on the event loop, from an encoder reading every 1 ms, while the position cascade does not
 - Handing the count to the position cascade when it starts and taking it back when it stops, and reporting the
   count the cascade publishes in between
@@ -95,7 +95,7 @@ stateDiagram-v2
 | Interface    | Purpose                                                             | Contract                                                                                       |
 |--------------|---------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
 | Position     | The multi-turn position from the position zero, in radians          | Event loop. The published count while the cascade holds it, the tracker's own count otherwise. |
-| Encoder port | Read, Set and SetZero of the encoder for alignment and index search | Reads and settings are forwarded; a setting restarts the count at turn 0.                      |
+| Encoder port | Reading, setting and zeroing the encoder for alignment and index search | Reads and settings are forwarded; a setting restarts the count at turn 0.                      |
 | Hold         | The count and its angle, for the cascade that starts                | Event loop, before the cascade's first tick. Nothing to hold before the first sample.          |
 | Publish      | The cascade's count of this tick                                    | Outer-loop interrupt, while held.                                                              |
 | Release      | Ends the hold; the tracker counts on from the last published count  | Event loop, after the cascade's last tick.                                                     |
@@ -113,9 +113,9 @@ stateDiagram-v2
 
 | Entity     | Field | Type / Unit     | Range   | Notes                                                  |
 |------------|-------|-----------------|---------|--------------------------------------------------------|
-| Turn count | n     | int32           | ±2³¹    | Turns since the position zero                          |
+| Turn count | n     | 32-bit integer  | ±2³¹    | Turns since the position zero                          |
 | Angle      | θm    | Radians (float) | [−π, π) | The sample the count was last advanced at              |
-| Position   | θ     | Radians (float) | 2π·n+θm | Reported; a `float32` resolves 0.001 rad to 1300 turns |
+| Position   | θ     | Radians (float) | 2π·n+θm | Reported; a single-precision value resolves 0.001 rad to 1300 turns |
 
 ---
 
@@ -147,4 +147,4 @@ sequenceDiagram
 | Turn counting      | Exact while the rotor turns less than half a turn between two samples of the counter that counts |
 | One counter counts | The cascade while it runs, the tracker otherwise; the handover happens on the event loop         |
 | Power cycle        | The count starts at turn 0; a machine that needs its turns after a power cycle homes again       |
-| No heap            | The tracker and its timer are value members of the application                                   |
+| No heap            | The application allocates the tracker and its timer statically                                   |
